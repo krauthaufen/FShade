@@ -453,7 +453,7 @@ module Expressions =
 
                             return! compileExpression lastExpression isStatement (Expr.Call(subDispatcher, [f; arg]))
 
-                // coersions to object are simply ignored. (some corner-cases perform those coersions)
+                // coercions to object are simply ignored. (some F# constructs make use of those)
                 | Coerce(a,t) when t = typeof<obj> ->
                     return! compileExpression lastExpression isStatement a
 
