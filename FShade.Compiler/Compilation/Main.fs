@@ -1,5 +1,7 @@
 ﻿namespace FShade.Compiler
 
+//TODO: add documentation
+
 [<AutoOpen>]
 module TypeGraph =
     open System
