@@ -8,6 +8,7 @@ open FShade.Compiler
 
 [<AutoOpen>]
 module ShaderState =
+
     [<NoComparison>]
     type ShaderState = { inputs : Map<string, Var>; outputs : Map<string, Option<string> * Var>; currentUniformIndex : int; uniforms : Map<Unique<Uniform>, Var>; builder : Option<Expr> }
 

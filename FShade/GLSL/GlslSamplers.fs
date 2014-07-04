@@ -1,5 +1,13 @@
-﻿namespace FShade 
-
+﻿#if INTERACTIVE
+#r "..\\..\\BinPrebuilt\\Aardvark.Base.TypeProviders.dll"
+#r "..\\..\\BinPrebuilt\\Aardvark.Base.dll"
+#r "..\\..\\BinPrebuilt\\Aardvark.Base.FSharp.dll"
+#r "..\\..\\Bin\\Debug\\FShade.Compiler.dll"
+#r "..\\..\\Bin\\Debug\\FShade.dll"
+open FShade
+#else
+namespace FShade 
+#endif
 open Aardvark.Base
 open FShade.Compiler
 

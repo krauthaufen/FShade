@@ -13,6 +13,70 @@ open FShade.Compiler
 [<AutoOpen>]
 module ParameterCompilation =
 
+    [<AutoOpen>]
+    module Uniforms =
+        open FShade.Parameters.Uniforms
+        open Aardvark.Base.TypeInfo.Patterns
+
+        let (|Uniform|_|) (e : Expr) =
+            match detectUniform e with
+                | Some u -> Uniform(u) |> Some
+                | None -> 
+                    match e with
+
+                        | PropertyGet(None, pi, []) ->
+                            match pi.Type with
+                                | SamplerType(_) ->
+                                    match Expr.tryEval e with
+                                        | Some sam ->
+                                            match sam with
+                                                | :? Sampler2d as sam ->
+                                                    let tex : ShaderTexture2D = sam.Texture
+                                                    let textureUniform = Attribute(tex.Scope, typeof<ShaderTexture2D>, tex.Semantic)
+                                                    Uniform(textureUniform) |> Some
+                                                | _ -> None
+                                        | None -> None
+                                | _ -> None
+
+                        | Call(None, Method("op_Dynamic", [UniformScopeType; String]), [scope; Value(s,_)]) ->
+                            match Expr.tryEval scope with
+                                | Some scope ->
+                                    let scope = scope |> unbox
+                                    Uniform(Attribute(scope, e.Type, s |> unbox<string>)) |> Some
+                                | None ->
+                                    None
+
+                        | PropertyGet(Some scope, p, []) when scope.Type = typeof<UniformScope> ->
+                            try
+                                match Expr.tryEval scope with
+                                    | Some scope ->
+                                        let result = p.GetValue(scope, [||])
+                                        match tryExtractUniformFromValue result with
+                                            | Some uniform ->
+                                                Uniform(uniform) |> Some
+                                            | _ -> None
+                                    | None ->
+                                        None
+                            with :? TargetInvocationException as ex ->
+                                match ex.InnerException with
+                                    | :? SemanticException as s -> Uniform(Attribute(s.Scope, p.PropertyType, s.Semantic)) |> Some
+                                    | _ -> None
+
+                        | Call(None, m, [scope]) when scope.Type = typeof<UniformScope> ->
+                            try
+                                match Expr.tryEval scope with
+                                    | Some scope ->
+                                        m.Invoke(null, [| scope |]) |> ignore
+                                        None
+                                    | None ->
+                                        None
+                            with :? TargetInvocationException as ex ->
+                                match ex.InnerException with
+                                    | :? SemanticException as s -> Uniform(Attribute(s.Scope, m.ReturnType, s.Semantic)) |> Some
+                                    | _ -> None
+
+                        | _ -> None
+
     let rec substituteUniforms (e : Expr) =
         transform {
             match e with

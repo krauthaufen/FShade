@@ -19,6 +19,7 @@ module Shaders =
     type PositionAttribute() = inherit SemanticAttribute("Position")
     type WorldPositionAttribute() = inherit SemanticAttribute("WorldPosition")
     type NormalAttribute() = inherit SemanticAttribute("Normal")
+    type TexCoord() = inherit SemanticAttribute("TexCoord")
 
     /// <summary>
     /// Some typed extensions for common uniforms. Note that the 'anonymous' 
@@ -31,13 +32,16 @@ module Shaders =
         member x.ProjTrafo : M44d = uniform?PerView?ProjTrafo
         member x.ViewProjTrafo : M44d = uniform?PerView?ViewProjTrafo
 
+        member x.DiffuseTexture : ShaderTexture2D = uniform?DiffuseTexture
+
     /// <summary>
     /// defining a vertex requires semantic annotations for all fields.
     /// </summary>
     type Vertex = 
         { [<Position>]          pos     : V4d
           [<WorldPosition>]     world   : V4d
-          [<Normal>]            n       : V3d }
+          [<Normal>]            n       : V3d
+          [<TexCoord>]          tc      : V2d }
 
     /// <summary>
     /// a very simple transformation-shader using the uniforms defined above.
@@ -53,9 +57,9 @@ module Shaders =
             let normalMatrix = uniform.ModelTrafo |> Mat.transpose |> Mat.inverse
             let n = normalMatrix * V4d(v.n, 0.0) |> Vec.xyz
 
-            return { pos = transformedPos
-                     world = worldPos
-                     n = v.n}
+            return { v with pos = transformedPos
+                            world = worldPos
+                            n = n}
         }
 
     /// <summary>
@@ -70,5 +74,20 @@ module Shaders =
         }
 
 
+
+
+    let diffuseLinear = 
+        sampler2d {
+            texture     uniform.DiffuseTexture
+
+            filter      Filter.Anisotropic
+            addressU    WrapMode.Wrap
+            addressV    WrapMode.Wrap
+        }
+
+    let textureShader (v : Vertex) =
+        fragment {
+            return diffuseLinear.Sample(v.tc)
+        }
     
 
