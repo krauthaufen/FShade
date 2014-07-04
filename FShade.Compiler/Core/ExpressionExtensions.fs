@@ -284,3 +284,6 @@ module ExpressionExtensions =
                         | Some(cases) -> Switch(a, cases) |> Some
                         | _ -> None
                 | _ -> None
+
+        let (|ExprOf|) (e : Expr) =
+            ExprOf(e.Type)

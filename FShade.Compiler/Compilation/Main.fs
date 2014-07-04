@@ -3,7 +3,7 @@
 //TODO: add documentation
 
 [<AutoOpen>]
-module TypeGraph =
+module Main =
     open System
     open System.Reflection
     open Microsoft.FSharp.Quotations

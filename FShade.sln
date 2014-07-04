@@ -1,11 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
-VisualStudioVersion = 12.0.30219.0
+VisualStudioVersion = 12.0.30324.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FShade.Compiler", "FShade.Compiler\FShade.Compiler.fsproj", "{843B90D4-D949-4A93-9717-467EBC4530C4}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FShade", "FShade\FShade.fsproj", "{EC6DA69C-E93A-4481-9BB6-440482B1EEB1}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FShade.Demo", "FShade.Demo\FShade.Demo.fsproj", "{2867B916-7CC3-4A30-8059-CB99AA653EE3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +23,10 @@ Global
 		{EC6DA69C-E93A-4481-9BB6-440482B1EEB1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EC6DA69C-E93A-4481-9BB6-440482B1EEB1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EC6DA69C-E93A-4481-9BB6-440482B1EEB1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2867B916-7CC3-4A30-8059-CB99AA653EE3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2867B916-7CC3-4A30-8059-CB99AA653EE3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2867B916-7CC3-4A30-8059-CB99AA653EE3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2867B916-7CC3-4A30-8059-CB99AA653EE3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

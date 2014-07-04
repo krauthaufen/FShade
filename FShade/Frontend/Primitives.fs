@@ -75,3 +75,5 @@ module Primitives =
         static member VertexCount = 4
         static member InputTopology = InputTopology.Patch 4
 
+
+    let emitVertex() = ()
