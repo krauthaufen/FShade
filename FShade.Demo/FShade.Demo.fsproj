@@ -24,7 +24,7 @@
     <WarningLevel>3</WarningLevel>
     <PlatformTarget>AnyCPU</PlatformTarget>
     <DocumentationFile>..\Bin\Debug\FShade.Demo.XML</DocumentationFile>
-    <Prefer32Bit>true</Prefer32Bit>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -51,6 +51,14 @@
     <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
       <Private>True</Private>
     </Reference>
+    <Reference Include="OpenTK">
+      <HintPath>..\packages\OpenTK.1.1.1589.5941\lib\NET40\OpenTK.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="OpenTK.GLControl">
+      <HintPath>..\packages\OpenTK.GLControl.1.1.1589.5941\lib\NET40\OpenTK.GLControl.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
@@ -60,11 +68,27 @@
     <Compile Include="Shaders.fs" />
     <Compile Include="Program.fs" />
     <None Include="App.config" />
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\FShade.Compiler\FShade.Compiler.fsproj">
       <Name>FShade.Compiler</Name>
       <Project>{843b90d4-d949-4a93-9717-467ebc4530c4}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\FShade.Debug\FShade.Debug.fsproj">
+      <Name>FShade.Debug</Name>
+      <Project>{55f1a5a0-f789-4b6a-9968-6da3dc29f6c3}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\FShade.DemoRenderer\FShade.DemoRenderer.fsproj">
+      <Name>FShade.DemoRenderer</Name>
+      <Project>{d68f8db7-bcb3-41cd-b25b-a6205616118e}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\FShade.TypeProviders\FShade.TypeProviders.fsproj">
+      <Name>FShade.TypeProviders</Name>
+      <Project>{13d1d916-10c5-4f12-abba-82b191848870}</Project>
       <Private>True</Private>
     </ProjectReference>
     <ProjectReference Include="..\FShade\FShade.fsproj">

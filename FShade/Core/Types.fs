@@ -29,7 +29,12 @@ module Types =
     type Effect = { vertexShader : Option<Shader>; geometryShader : Option<Shader * OutputTopology>; tessControlShader : Option<Shader>; tessEvalShader : Option<Shader>; fragmentShader : Option<Shader>; originals : list<Shader> }
 
     [<NoComparison>]
-    type UniformGetter = { value : IMod; valueType : Type}
+    type UniformGetter(value : obj, t : Type) =
+        member x.Value = value
+        member x.Type = t
+
+        member x.IsSamplerUniform =
+            value.GetType() = typeof<string * SamplerState>
 
     [<NoComparison>]
     type CompiledShader = { usedTypes : Set<Unique<Type>>; uniforms : Map<string, UniformGetter>; uniformBuffers : Map<UniformScope, list<Type * string>>; code : string }

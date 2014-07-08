@@ -81,9 +81,27 @@ module GLSL =
                                 else return sprintf "imat%dx%d" d.Y d.X |> Some
 
                             | Ref(t) -> return! compileIntrinsicType t
-                            | TextureType(dim,arr) -> 
-                                if arr then return sprintf "sampler%dDArray" dim |> Some
-                                else return sprintf "sampler%dD" dim |> Some
+
+                            | SamplerType(dim, arr, shadow, ms, valueType) -> 
+                                let dimStr =
+                                    match dim with
+                                        | SamplerDimension.Sampler1d -> "1D"
+                                        | SamplerDimension.Sampler2d -> "2D"
+                                        | SamplerDimension.Sampler3d -> "3D"
+                                        | SamplerDimension.SamplerCube -> "Cube"
+                                        | _ -> failwith "unsupported sampler dimension"
+
+                                let shadowSuffix = if shadow then "Shadow" else ""
+                                let msSuffix = if ms then "MS" else ""
+                                let typePrefix = 
+                                    match valueType.Name with
+                                        | "V4d" -> ""
+                                        | "V4i" -> "i"
+                                        | _ -> failwith "unsupported sampler value-type"
+
+                                if arr then return sprintf "%ssampler%s%sArray%s" typePrefix dimStr shadowSuffix msSuffix |> Some
+                                else return sprintf "%ssampler%s%s%s" typePrefix dimStr shadowSuffix msSuffix |> Some
+
                             | _ -> return None
                 }
 
@@ -182,16 +200,23 @@ module GLSL =
                         | MethodQuote <@ LanguagePrimitives.IntrinsicFunctions.SetArray @> [_] -> return Some "{0}[{1}] = {2}"
                         | MethodQuote <@ emitVertex @> [] -> return Some "EmitVertex();\r\n"
 
-                        | MethodQuote <@ ShaderTexture2D().Sample @> [] -> return Some "{0}.Sample({1}, {2})"
-                        | MethodQuote <@ ShaderTexture2D().SampleGrad @> [] -> return Some "{0}.SampleGrad({1}, {2}, {3}, {4})"
-                        | MethodQuote <@ ShaderTexture2D().SampleLevel @> [] -> return Some "{0}.SampleLevel({1}, {2}, {3})"
-                        | MethodQuote <@ ShaderTexture2D().SampleCmp @> [] -> return Some "{0}.SampleCmp({1}, {2}, {3})"
-                        | MethodQuote <@ ShaderTexture2D().SampleCmpLevelZero @> [] -> return Some "{0}.SampleCmpLevelZero({1}, {2}, {3})"
+//                        | MethodQuote <@ ShaderTexture2D().Sample @> [] -> return Some "{0}.Sample({1}, {2})"
+//                        | MethodQuote <@ ShaderTexture2D().SampleGrad @> [] -> return Some "{0}.SampleGrad({1}, {2}, {3}, {4})"
+//                        | MethodQuote <@ ShaderTexture2D().SampleLevel @> [] -> return Some "{0}.SampleLevel({1}, {2}, {3})"
+//                        | MethodQuote <@ ShaderTexture2D().SampleCmp @> [] -> return Some "{0}.SampleCmp({1}, {2}, {3})"
+//                        | MethodQuote <@ ShaderTexture2D().SampleCmpLevelZero @> [] -> return Some "{0}.SampleCmpLevelZero({1}, {2}, {3})"
+
+                        //| MethodQuote <@ Sampler2d().Sample @> [] -> return Some "texture({0}, {1})"
+
+                        | Method("Sample", [SamplerType(_); _]) -> return Some "texture({0}, {1})"
+                        | Method("Sample", [SamplerType(_,true,_,_,_); _; _]) -> return Some "texture({0}, vec3({1}, {2}))"
+                        | Method("SampleLevel", [SamplerType(_); _; _]) -> return Some "textureLod({0}, {1}, {2})"
+                        | Method("SampleLevel", [SamplerType(_,true,_,_,_); _; _; _]) -> return Some "textureLod({0}, vec3({1}, {2}), {3})"
 
 
-                        | MethodQuote <@ ShaderTexture2DArray().Sample @> [] -> return Some "{0}.Sample({1}, {2}, {3})"
-                        | MethodQuote <@ ShaderTexture2DArray().SampleCmp @> [] -> return Some "{0}.SampleCmp({1}, {2}, {3}, {4})"
-                        | MethodQuote <@ ShaderTexture2DArray().SampleCmpLevelZero @> [] -> return Some "{0}.SampleCmpLevelZero({1}, {2}, {3}, {4})"
+//                        | MethodQuote <@ ShaderTexture2DArray().Sample @> [] -> return Some "{0}.Sample({1}, {2}, {3})"
+//                        | MethodQuote <@ ShaderTexture2DArray().SampleCmp @> [] -> return Some "{0}.SampleCmp({1}, {2}, {3}, {4})"
+//                        | MethodQuote <@ ShaderTexture2DArray().SampleCmpLevelZero @> [] -> return Some "{0}.SampleCmpLevelZero({1}, {2}, {3}, {4})"
 
                         | Method("get_Length", [FixedArrayType(s,t)]) -> return Some (sprintf "%d" s)
                         | Method("get_Item", [FixedArrayType(s,t);v]) -> return Some "{0}[{1}]"
@@ -322,11 +347,12 @@ module GLSL =
 
             member x.FilterFunctionArguments (args : list<Var>) =
                 compile {
-                    return args |> List.choose (fun a ->
-                                match a.Type with
-                                    | TextureType(_) -> None
-                                    | _ -> Some a
-                                )
+                    return args
+//                    return args |> List.choose (fun a ->
+//                                match a.Type with
+//                                    | TextureType(_) -> None
+//                                    | _ -> Some a
+//                                )
                 }
 
             member x.ProcessFunctionBody (body : Expr) =
@@ -445,6 +471,7 @@ module GLSL =
                                             match u with
                                                 | UserUniform(t,o) -> (uniform, t, v.Name)
                                                 | Attribute(scope, t, n) -> (scope, t, n)
+                                                | SamplerUniform(t,sem, n,_) -> (uniform, t, n)
                                         ) 
                                       |> Seq.groupBy(fun (s,_,_) -> s)
                                       |> Seq.map (fun (g,v) -> (g, v |> Seq.map (fun (_,t,n) -> (t,n)) |> Seq.toList))
@@ -481,7 +508,8 @@ module GLSL =
 
             let uniformGetters = uniforms' |> Seq.choose(fun (u,v) ->
                                                     match u with
-                                                        | UserUniform(t,o) -> Some (v.Name, { value = o; valueType = t })
+                                                        | UserUniform(t,o) -> Some (v.Name, UniformGetter(o, t))
+                                                        | SamplerUniform(t,sem, n,sam) -> Some (n, UniformGetter((sem, sam), t))
                                                         | _ -> None
                                                 )
                                            |> Map.ofSeq
@@ -745,7 +773,7 @@ module GLSL =
                 compile {
                     let elements = System.Collections.Generic.HashSet(elements)
 
-                    let groups = elements |> Seq.groupBy (fun (t,_) -> match t with TextureType(_) -> true | _ -> false)
+                    let groups = elements |> Seq.groupBy (fun (t,_) -> match t with | SamplerType(_) -> true | _ -> false)
                     let (textures, elements) = (groups |> Seq.tryPick (fun (f,g) -> if f then Some g else None), groups |> Seq.tryPick (fun (f,g) -> if f then None else Some g))
 
                     let! buffer = compile {
@@ -799,6 +827,9 @@ module GLSL =
 
 
     let private glsl = Compiler()
+
+    let run e =
+        e |> runCompile glsl
 
     let compileEffect (e : Compiled<Effect, ShaderState>) : Error<Map<string, UniformGetter> * string> =
         e |> compileEffectInternal |> runCompile glsl

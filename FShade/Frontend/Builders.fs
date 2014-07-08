@@ -7,6 +7,11 @@ open Aardvark.Base
 [<AutoOpen>]
 module Builders =
 
+    type TessLevels = 
+        { [<Semantic("TessLevelInner")>] innerLevel : float[]; 
+          [<Semantic("TessLevelOuter")>] outerLevel : float[] }
+
+
     type IShaderBuilder =
         abstract member ShaderType : ShaderType
 
@@ -51,8 +56,7 @@ module Builders =
             member x.ShaderType = ShaderType.Geometry top
 
 
-    type TessLevels = { [<Semantic("TessLevelInner")>] innerLevel : float[]; [<Semantic("TessLevelOuter")>] outerLevel : float[] }
-
+    
     type TessControlBuilder() =
         inherit BaseBuilder()
 

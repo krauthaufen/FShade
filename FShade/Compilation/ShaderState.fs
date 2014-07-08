@@ -57,7 +57,7 @@ module ShaderState =
                 | Some (_,v) -> return v
         }
 
-    let getUniform uniform =
+    let rec getUniform uniform =
         transform {
             let! s = compilerState
             
@@ -72,5 +72,10 @@ module ShaderState =
                                                   let v = Var(name, t)
                                                   do! addAnonymousUniform u v
                                                   return v
+                            | SamplerUniform(t,sem, n,sam) ->
+                                let v = Var(n, t)
+                                do! addUniform u v
+                                return v
+
                 | Some v -> return v
         }

@@ -17,7 +17,8 @@ module Parameters =
 
         [<NoComparison>]
         type Uniform = Attribute of UniformScope * Type * string
-                     | UserUniform of Type * IMod
+                     | SamplerUniform of Type * string * string * SamplerState
+                     | UserUniform of Type * obj
 
         and UniformScope(parent : Option<UniformScope>, name : string) = 
             let id = System.Threading.Interlocked.Increment(&id)
@@ -48,7 +49,8 @@ module Parameters =
                            s
 
                 
-
+        type ISemanticValue with
+            member x.Scope = x.ScopeUntyped |> unbox<UniformScope>
 
 
         type SemanticException(scope : UniformScope, sem : string) =
@@ -60,12 +62,6 @@ module Parameters =
 
         let private raiseSem (scope : UniformScope) (sem : string) =
             raise <| SemanticException(scope, sem)
-
-
-        type ISemanticValue =
-            //static member CreateUniform(semantic : string, scope : UniformScope)
-            abstract member Semantic : string
-            abstract member Scope : UniformScope
 
         let createSemanticValueWhenPossible (t : Type) (sem : string) (scope : UniformScope) =
             let creator = t.GetMethod("CreateUniform", [|typeof<string>; typeof<UniformScope>|])
@@ -89,7 +85,7 @@ module Parameters =
                     | Some value -> value |> unbox<'a>
                     | None -> raiseSem u name
 
-        let private (|UniformScopeType|_|) (t : Type) =
+        let (|UniformScopeType|_|) (t : Type) =
             if t = typeof<UniformScope> then UniformScopeType |> Some
             else None
 
