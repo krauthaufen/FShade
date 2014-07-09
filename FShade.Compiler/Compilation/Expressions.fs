@@ -77,6 +77,10 @@ module Expressions =
         compile {
             match e with
 
+//                | Let(v, Coerce(e,_), b) ->
+//                    return! compileExpression lastExpression isStatement (b.Substitute(fun vi -> if vi = v then Some e else None))
+//                | Coerce(e,_) ->
+//                    return! compileExpression lastExpression isStatement e
                 // foreach-loops have to be matched as first pattern since they consist of a number of expressions
                 // and may be 'destroyed' otherwise.
                 | ForEach(var,seq,body) ->
@@ -508,6 +512,9 @@ module Expressions =
                         | None -> return! Expr.Call(pi.GetMethod, indices) |> compileExpression lastExpression isStatement
                         | Some t -> return! Expr.Call(t, pi.GetMethod, indices) |> compileExpression lastExpression isStatement
 
+
+                | Coerce(e, _) ->
+                    return! compileExpression lastExpression isStatement e
 
                 | _ -> return! error "unknown expression: %A" e
         }

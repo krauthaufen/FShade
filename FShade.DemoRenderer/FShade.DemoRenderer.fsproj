@@ -97,11 +97,6 @@
       <Project>{55f1a5a0-f789-4b6a-9968-6da3dc29f6c3}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\FShade.TypeProviders\FShade.TypeProviders.fsproj">
-      <Name>FShade.TypeProviders</Name>
-      <Project>{13d1d916-10c5-4f12-abba-82b191848870}</Project>
-      <Private>True</Private>
-    </ProjectReference>
     <ProjectReference Include="..\FShade\FShade.fsproj">
       <Name>FShade</Name>
       <Project>{ec6da69c-e93a-4481-9bb6-440482b1eeb1}</Project>

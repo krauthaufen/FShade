@@ -38,7 +38,7 @@ let main argv =
 
     FShade.Debug.EffectEditor.runTray()
 
-    let sg = Sg.fileTexture "DiffuseTexture" @"E:\Development\WorkDirectory\bricksDiffuse3.png" sg
+    let sg = Sg.fileTexture "DiffuseTexture" @"C:\Aardwork\DataSVN\pattern.jpg" sg
 
     w.Scene <- sg
 

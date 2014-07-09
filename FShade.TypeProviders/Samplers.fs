@@ -166,10 +166,19 @@ module ReflectionHelpers =
 open System.Runtime.CompilerServices
 open TypeLevelEnums
 
+type Sampler =
+
+    static member sample (sampler : SamplerBase<_, 'a, 'c, False, False, False>,coord : 'c) : 'a =
+        failwith ""
+
+    static member sampleArray (sampler : SamplerBase<_, 'a, 'c, True, False, False>,coord : 'c,slice : int) : 'a =
+        failwith ""
+
+
 [<Extension>]
 type SamplerExtensions =
     [<Extension>]
-    static member Sample(this : SamplerBase<_, 'a, 'c, False, False, False>, coord : 'c) : 'a =
+    static member inline Sample<'s, 'a, 'c, 't when 's :> SamplerBase<'t, 'a, 'c, False, False, False>>(this : 's, coord : 'c) : 'a =
         failwith ""
     
     [<Extension>]

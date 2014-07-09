@@ -11,7 +11,7 @@ open FShade.Utils
 open FShade.Compiler
 
 
-module GLSL =
+module GLES =
 
     // The GLSL-Compiler does not need any additional state so we simply use
     // ShaderState here.
@@ -208,7 +208,6 @@ module GLSL =
 
                         //| MethodQuote <@ Sampler2d().Sample @> [] -> return Some "texture({0}, {1})"
 
-                        //| MethodQuote <@ Sampler.sample @> _ -> return Some "texture({0}, {1})"
                         | Method("Sample", [SamplerType(_); _]) -> return Some "texture({0}, {1})"
                         | Method("Sample", [SamplerType(_,true,_,_,_); _; _]) -> return Some "texture({0}, vec3({1}, {2}))"
                         | Method("SampleLevel", [SamplerType(_); _; _]) -> return Some "textureLod({0}, {1}, {2})"
@@ -330,7 +329,7 @@ module GLSL =
                             return sprintf "vec%d(%s)" d (String.concat ", " fieldValues) |> Some
                         | Float32|Float64 ->
                             let d = Convert.ToDouble(o)
-                            return d.ToString(System.Globalization.CultureInfo.InvariantCulture) |> Some
+                            return d.ToString("0.00000E00", System.Globalization.CultureInfo.InvariantCulture) |> Some
                         | Num ->
                             return o.ToString() |> Some
                         | Bool ->
@@ -405,7 +404,11 @@ module GLSL =
                     | "Positions" -> Some "gl_Position"
                     | _ -> None
             | Fragment ->
-                None
+                match s with
+                    | "Colors" -> Some "gl_FragColor"
+                    | "Depth" -> Some "gl_FragDepth"
+                    | _ -> None
+
             | TessControl ->
                 match s with
                     | "Positions" -> Some "gl_Position"
@@ -453,10 +456,31 @@ module GLSL =
                     return! compileVariableDeclaration t name None
         }
 
+    let private changeIONames (s : Shader) (last : Option<ShaderType>) (next : Option<ShaderType>) =
+        let newInputs = 
+            match last with
+                | Some stage ->
+                    s.inputs |> Map.map(fun k v -> Var(sprintf "%s%A" k stage, v.Type, v.IsMutable))
+                | None -> s.inputs
+
+        let newOutputs = 
+            s.outputs |> Map.map(fun k (o,v) -> o,Var(sprintf "%s%A" k s.shaderType, v.Type, v.IsMutable))
+
+        let mutable body = s.body
+        for (s,i) in s.inputs |> Map.toSeq do
+            body <- body.Substitute(fun vi -> if vi = i then (match Map.tryFind s newInputs with | Some ni -> Expr.Var ni |> Some | _ -> None) else None)
+
+        for (s,(_,i)) in s.outputs |> Map.toSeq do
+            body <- body.Substitute(fun vi -> if vi = i then (match Map.tryFind s newOutputs with | Some (_,ni) -> Expr.Var ni |> Some | _ -> None) else None)
+
+        { s with body = body; inputs = newInputs; outputs = newOutputs}
+
     let private compileShader (entryName : string) (s : Shader) (last : Option<ShaderType>) (next : Option<ShaderType>) =
         compile {
             let s = liftIntrinsics s last next
             do! resetCompilerState
+
+            let s = changeIONames s last next
 
             let! (header, c) = compileMainWithoutTypes [] s.body entryName
             let! state = compilerState : Compiled<ShaderState, ShaderState>
@@ -481,13 +505,14 @@ module GLSL =
 
             let! inputs = inputs |> Seq.mapCi (fun i (KeyValue(_,n)) -> 
                 compile {
+                    let inName = if s.shaderType = ShaderType.Vertex then "attribute" else "varying"
                     if n.Type.IsArray then
                         let t = n.Type.GetElementType()
                         let! r = compileVariableDeclaration t n.Name
-                        return sprintf "layout(location = %d) in %s[];" i r
+                        return sprintf "%s %s[];" inName r
                     else
                         let! r = compileVariableDeclaration n.Type n.Name
-                        return sprintf "layout(location = %d) in %s;" i r
+                        return sprintf "%s %s;" inName r
                 })
 
             let! outputs = outputs |> Seq.mapCi (fun i (KeyValue(_,(_,n))) -> 
@@ -495,10 +520,10 @@ module GLSL =
                      if s.shaderType = ShaderType.TessControl then
                         let t = n.Type
                         let! r = compileVariableDeclaration t n.Name
-                        return sprintf "layout(location = %d) out %s[];" i r
+                        return sprintf "varying %s[];" r
                     else
                         let! r = compileVariableDeclaration n.Type n.Name
-                        return sprintf "layout(location = %d) out %s;" i r
+                        return sprintf "varying %s;" r
                     })
 
 
@@ -774,32 +799,8 @@ module GLSL =
                 compile {
                     let elements = System.Collections.Generic.HashSet(elements)
 
-                    let groups = elements |> Seq.groupBy (fun (t,_) -> match t with | SamplerType(_) -> true | _ -> false)
-                    let (textures, elements) = (groups |> Seq.tryPick (fun (f,g) -> if f then Some g else None), groups |> Seq.tryPick (fun (f,g) -> if f then None else Some g))
-
-                    let! buffer = compile {
-                                    match elements with
-                                        | Some elements ->
-                                            let! elements = elements |> Seq.mapC (fun (t,n) ->
-                                                compile {
-                                                    let! r = compileVariableDeclaration t n
-                                                    return r + ";"
-                                                })
-
-                                            let name = match buffer.Parent with
-                                                        | None -> "Global"
-                                                        | Some _ -> buffer.Name
-
-                                            let elements = String.concat "\r\n" elements
-
-                                            return sprintf "uniform %s\r\n{\r\n%s\r\n};\r\n" name (String.indent 1 elements) |> Some
-                                        | None -> return None
-                                  }
-
-                    let! textures = compile {
-                                      match textures with
-                                        | Some textures ->
-                                            let! textures = textures |> Seq.mapC (fun (t,n) ->
+                    let! uniformCode = compile {
+                                            let! textures = elements |> Seq.mapC (fun (t,n) ->
                                                 compile {
                                                     let! r = compileVariableDeclaration t n
                                                     return "uniform " + r + ";"
@@ -807,21 +808,16 @@ module GLSL =
 
 
                                             let textures = String.concat "\r\n" textures
-                                            return textures |> Some
-                                        | None -> return None
-                                    }
+                                            return textures
+                                       }
 
-                    match buffer, textures with 
-                        | Some b, Some t -> return sprintf "%s\r\n%s" b t
-                        | None, Some t -> return t
-                        | Some b, None -> return b
-                        | None, None -> return ""
+                    return uniformCode
                 })
             let bufferDecls = String.concat "\r\n" bufferDecls
 
             let! typeCode = compileTypes types
 
-            let completeCode = sprintf "#version 410\r\n%s\r\n%s\r\n%s%s%s%s" typeCode bufferDecls vsCode teCode gsCode fsCode
+            let completeCode = sprintf "#version 100\r\n%s\r\n%s\r\n%s%s%s%s" typeCode bufferDecls vsCode teCode gsCode fsCode
 
             return uniforms, completeCode
         }

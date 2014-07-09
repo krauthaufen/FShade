@@ -68,6 +68,7 @@
     <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="FSCC.fs" />
     <Compile Include="Program.fs" />
     <None Include="App.config" />
     <None Include="packages.config" />
@@ -76,11 +77,6 @@
     <ProjectReference Include="..\..\FShade.Compiler\FShade.Compiler.fsproj">
       <Name>FShade.Compiler</Name>
       <Project>{843b90d4-d949-4a93-9717-467ebc4530c4}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\..\FShade.TypeProviders\FShade.TypeProviders.fsproj">
-      <Name>FShade.TypeProviders</Name>
-      <Project>{13d1d916-10c5-4f12-abba-82b191848870}</Project>
       <Private>True</Private>
     </ProjectReference>
     <ProjectReference Include="..\..\FShade\FShade.fsproj">
