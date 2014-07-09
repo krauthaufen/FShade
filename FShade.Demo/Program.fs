@@ -5,6 +5,7 @@ open Aardvark.Base
 open FShade
 open FShade.Demo
 
+
 [<EntryPoint>]
 let main argv = 
 
@@ -26,7 +27,6 @@ let main argv =
     //FShade.Resources.Icon |> printfn "%A"
 
     let w = new Window()
-    w.Icon <- FShade.Resources.MainIcon
 
     let ps = [|V3f.OOO; V3f.IOO; V3f.IIO; V3f.OIO|] :> Array
     let tc = [|V2f(-0.5,-0.5); V2f(1.5, -0.5); V2f(1.5,1.5); V2f(-0.5, 1.5)|] :> Array

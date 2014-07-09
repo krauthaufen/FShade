@@ -146,6 +146,7 @@ type Window() =
        base.Mouse.WheelChanged.Add mouseScroll
        base.Keyboard.KeyDown.Add keyDown
        base.Keyboard.KeyUp.Add keyUp
+       base.Icon <- FShade.Resources.MainIcon
 
     member x.Scene
         with get() = sg.Value

@@ -47,7 +47,7 @@ module ShaderDebug =
                 let mutable brLevel = 0
                 let mutable started = false
 
-                while not started || brLevel > 0 do
+                while (not started || brLevel > 0) && current < str.Length do
                     let c = str.[current]
                                     
                     if c = '{' then
@@ -58,9 +58,11 @@ module ShaderDebug =
 
                     current <- current + 1 
 
-
-                let code = str.Substring(index, current - index)
-                removeIndent code |> Some
+                if brLevel = 0  && current < str.Length then
+                    let code = str.Substring(index, current - index)
+                    removeIndent code |> Some
+                else
+                    None
             | None -> None
 
     [<AutoOpen>]
