@@ -69,8 +69,8 @@ module Service =
                 printfn "%d workers running" (Interlocked.Increment(&workersRunning))
                 while true do 
                     use reader = new StreamReader(ctx.Request.InputStream, ctx.Request.ContentEncoding)
+                    let str = ctx.Request.QueryString
                     let msg = reader.ReadToEnd()
-                    printfn "got message: %A" msg
 
                     if msg.Length <> 0 then
                         let data = parseFormData msg
@@ -86,16 +86,15 @@ module Service =
                                 ctx.Response.OutputStream.Write(b, 0, b.Length)
                                 ctx.Response.OutputStream.Close()
                             | _ ->
-                                ctx.Response.StatusCode <- 400
-                                ctx.Response.ContentLength64 <- 0L
-                                ctx.Response.OutputStream.Close()
+                                raise <| System.OperationCanceledException()
                     else
-                        ctx.Response.StatusCode <- 400
-                        ctx.Response.ContentLength64 <- 0L
-                        ctx.Response.OutputStream.Close()
-            with e ->
-                printfn "ERROR: %A" e
-                Interlocked.Decrement(&workersRunning) |> ignore
+                        raise <| System.OperationCanceledException()
+            with 
+                | :? System.OperationCanceledException as e -> 
+                    Interlocked.Decrement(&workersRunning) |> ignore
+                | e ->
+                    printfn "ERROR: %A" e
+                    Interlocked.Decrement(&workersRunning) |> ignore
 
         ) |> ignore
 

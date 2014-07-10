@@ -283,7 +283,6 @@ module FSC =
 
         if not initialized then
             initialized <- true
-            printfn "initializing FSC"
 
             let refAsmDir, fscDir =
                 match Environment.OSVersion with
@@ -309,16 +308,12 @@ module FSC =
                 let p = Path.Combine(fscDir, f)
                 if File.Exists p then
                     copyFile p f
-                else
-                    printfn "could not find file: %A" f
             )
 
             refFiles |> List.iter (fun f ->
                 let p = Path.Combine(refAsmDir, f)
                 if File.Exists p then
                     copyFile p f
-                else
-                    printfn "could not find file: %A" f
             )
 
     let private fsc = Microsoft.FSharp.Compiler.SimpleSourceCodeServices.SimpleSourceCodeServices()
@@ -336,7 +331,6 @@ module FSC =
         let args = [[|"-o"; tempFile; "-a"; file;|]; r] |> Array.concat
         //let cmd = sprintf "fsc.exe %s" ([[|"-o"; tempFile; "-a"; file;|]; assemblyLocations |> Array.collect (fun r -> [|"-r"; sprintf "\"%s\"" r |])] |> Array.concat |> String.concat " ")
         //printfn "%A" cmd
-        printfn "starting fsc"
         match fsc.CompileToDynamicAssembly(args, None) with
             | (_,_,Some ass) -> Some ass
             | (err,c,_) -> 
