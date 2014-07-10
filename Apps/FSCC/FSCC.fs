@@ -263,15 +263,34 @@ module CLI =
         sprintf "%s %s" toolName args 
  
 module FSC =
+    open System
     open System.IO
     let private folder = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
 
+    type OSType = Windows
+                | MacOSX
+                | Linux
+
+    let (|Windows|MacOSX|Linux|) (v : OperatingSystem) =
+        match v.Platform with
+            | PlatformID.Win32NT | PlatformID.Win32S | PlatformID.Win32Windows | PlatformID.WinCE | PlatformID.Xbox -> Windows
+            | PlatformID.MacOSX -> MacOSX
+            | PlatformID.Unix -> Linux
+            | _ -> failwith "impossible"
+
     let mutable private initialized = false
     let private initSession() =
+
         if not initialized then
             initialized <- true
-            let refAsmDir = @"C:\Program Files (x86)\Reference Assemblies\Microsoft\FSharp\3.0\Runtime\v4.0"
-            let fsiDir = @"C:\Program Files (x86)\Microsoft SDKs\F#\3.0\Framework\v4.0"
+            printfn "initializing FSC"
+
+            let refAsmDir, fscDir =
+                match Environment.OSVersion with
+                    | Windows -> @"C:\Program Files (x86)\Reference Assemblies\Microsoft\FSharp\3.0\Runtime\v4.0",
+                                 @"C:\Program Files (x86)\Microsoft SDKs\F#\3.0\Framework\v4.0"
+                    | Linux -> "/usr/lib/mono/4.0"," /usr/lib/mono/4.0 " 
+                    | MacOSX -> failwith "notimp"
 
             let compilerFiles = [ "FSharp.Build.dll"; "FSharp.Compiler.dll"; "FsiAnyCPU.exe"; "FsiAnyCPU.exe.config"; "Fsc.exe"; "FSharp.Compiler.Interactive.Settings.dll" ]
             let refFiles = ["FSharp.Core.optdata"; "FSharp.Core.sigdata"; "policy.2.3.FSharp.Core.dll"; "pub.config"; "Type Providers\\FSharp.Data.TypeProviders.dll"]
@@ -287,30 +306,37 @@ module FSC =
                     File.Copy(source, target, true)
 
             compilerFiles |> List.iter (fun f ->
-                let p = Path.Combine(fsiDir, f)
+                let p = Path.Combine(fscDir, f)
                 if File.Exists p then
                     copyFile p f
+                else
+                    printfn "could not find file: %A" f
             )
 
             refFiles |> List.iter (fun f ->
                 let p = Path.Combine(refAsmDir, f)
                 if File.Exists p then
                     copyFile p f
+                else
+                    printfn "could not find file: %A" f
             )
 
     let private fsc = Microsoft.FSharp.Compiler.SimpleSourceCodeServices.SimpleSourceCodeServices()
 
-    let private references = [| "Aardvark.Base.TypeProviders";"System.Drawing"; "Aardvark.Preliminary"; "Aardvark.Base"; "Aardvark.Base.FSharp"; "FShade.Compiler"; "FShade"; "System"; "System.Core"; "FShade.TypeProviders" |]
+    let private references = [| "Aardvark.Base.TypeProviders";"System.Drawing"; "Aardvark.Preliminary"; "Aardvark.Base"; "Aardvark.Base.FSharp"; "FShade.Compiler"; "FShade"; "System"; "System.Core" |]
     let private assemblyLocations = references |> Array.choose(fun n -> try System.Reflection.Assembly.Load(n).Location |> Some with e -> None)
     
     
     let private r = assemblyLocations |> Array.collect (fun r -> [|"-r"; r |])
     let compile (file : string) =
+        
         initSession()
+        
         let tempFile = System.IO.Path.GetTempFileName() + ".dll"
         let args = [[|"-o"; tempFile; "-a"; file;|]; r] |> Array.concat
-        let cmd = sprintf "fsc.exe %s" ([[|"-o"; tempFile; "-a"; file;|]; assemblyLocations |> Array.collect (fun r -> [|"-r"; sprintf "\"%s\"" r |])] |> Array.concat |> String.concat " ")
-        printfn "%A" cmd
+        //let cmd = sprintf "fsc.exe %s" ([[|"-o"; tempFile; "-a"; file;|]; assemblyLocations |> Array.collect (fun r -> [|"-r"; sprintf "\"%s\"" r |])] |> Array.concat |> String.concat " ")
+        //printfn "%A" cmd
+        printfn "starting fsc"
         match fsc.CompileToDynamicAssembly(args, None) with
             | (_,_,Some ass) -> Some ass
             | (err,c,_) -> 
@@ -455,7 +481,18 @@ module FSCC =
             let shader = compose allShaders
             match GLES.compileEffect shader with
                 | Aardvark.Base.Prelude.Success(uniforms, code) ->
-                    c.output.Write(code)
+
+                    let samplerStates = uniforms |> Map.toList |> List.filter (fun (s,v) -> v.IsSamplerUniform) |> List.map (fun (s,v) ->
+                                            let sem, sam = v.Value |> unbox<string * SamplerState>
+
+                                            let code = GlslSamplers.compileSamplerState s sam
+
+                                            let code = FShade.Utils.String.linePrefix "//" code
+
+                                            sprintf "//string %s = \"%s\"\r\n%s" s sem code
+                                        ) |> String.concat "\r\n"
+
+                    c.output.Write(sprintf "%s\r\n//SAMPLERSTATES\r\n%s" code samplerStates)
                 | Aardvark.Base.Prelude.Error e ->
                     eprintfn "ERROR: %A" e
 

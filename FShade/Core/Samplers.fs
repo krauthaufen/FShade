@@ -94,7 +94,7 @@ module ReflectionHelpers =
     /// The properties are given by SamplerType(dim, isArray, isShadow, isMS, valueType)
     /// </summary>
     let (|SamplerType|_|) (t : Type) =
-        if t.IsGenericType && typeof<ISampler>.IsAssignableFrom(t) then
+        if typeof<ISampler>.IsAssignableFrom(t) then
             let dim : SamplerDimension = getProp "Dimension" t
             let valueType : Type = getProp "ValueType" t
             let coordType : Type = getProp "CoordType" t
