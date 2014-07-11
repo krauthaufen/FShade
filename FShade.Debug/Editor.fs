@@ -127,7 +127,6 @@ module EffectEditor =
 
                                     let e = { e with originals = newShaders }
                                     m.write (compile { return e })
-                                    propagate()
 
                                     Report.End() |> ignore //updating
                                 

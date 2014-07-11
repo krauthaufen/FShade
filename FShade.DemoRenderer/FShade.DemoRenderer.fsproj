@@ -56,18 +56,21 @@
     <Compile Include="Window.fs" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="Aardvark.Base">
-      <HintPath>..\BinPrebuilt\Aardvark.Base.dll</HintPath>
-    </Reference>
-    <Reference Include="Aardvark.Base.FSharp">
-      <HintPath>..\BinPrebuilt\Aardvark.Base.FSharp.dll</HintPath>
-    </Reference>
-    <Reference Include="Aardvark.Base.TypeProviders">
-      <HintPath>..\BinPrebuilt\Aardvark.Base.TypeProviders.dll</HintPath>
-    </Reference>
-    <Reference Include="Aardvark.Preliminary">
-      <HintPath>..\BinPrebuilt\Aardvark.Preliminary.dll</HintPath>
-    </Reference>
+    <ProjectReference Include="..\Libs\Aardvark.Base.FSharp\Aardvark.Base.FSharp.fsproj">
+      <Name>Aardvark.Base.FSharp</Name>
+      <Project>{36c16e14-31e9-4981-9aed-dfa9726a080d}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Libs\Aardvark.Base.TypeProviders\Aardvark.Base.TypeProviders.fsproj">
+      <Name>Aardvark.Base.TypeProviders</Name>
+      <Project>{df5cb9d7-21ff-4cb7-9384-d8f9a5da934a}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Libs\Aardvark.Base\Aardvark.Base.csproj">
+      <Name>Aardvark.Base</Name>
+      <Project>{377da721-c821-45f6-b803-9c8724c7b37f}</Project>
+      <Private>True</Private>
+    </ProjectReference>
     <Reference Include="AssimpNet">
       <HintPath>..\BinPrebuilt\AssimpNet.dll</HintPath>
     </Reference>
