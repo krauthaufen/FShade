@@ -161,16 +161,17 @@ module SceneGraph =
             member x.Render s = x.Render s
 
     type Group(elements : seq<ISg>) =
+        let l = obj()
         let elements = System.Collections.Generic.HashSet<ISg>(elements)
 
         member x.Add (s : ISg) =
-            elements.Add s |> ignore
+            lock l (fun () -> elements.Add s |> ignore)
 
         member x.Remove (s : ISg) =
-            elements.Remove s |> ignore
+            lock l (fun () -> elements.Remove s |> ignore)
 
         member x.Render (state : TraversalState) =
-            elements |> Seq.iter (fun e -> e.Render(state))
+            lock l (fun () -> elements |> Seq.iter (fun e -> e.Render(state)))
 
         interface ISg with
             member x.Render s = x.Render s

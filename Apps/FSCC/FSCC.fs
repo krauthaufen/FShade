@@ -324,7 +324,7 @@ module FSC =
     
     let private r = assemblyLocations |> Array.collect (fun r -> [|"-r"; r |])
     let compile (file : string) =
-        
+
         initSession()
         
         let tempFile = System.IO.Path.GetTempFileName() + ".dll"
@@ -341,6 +341,7 @@ module FSCC =
     open CLI
     open FShade.Compiler
     open FShade
+    open Aardvark.Base
 
     let mutable repl = false
 
@@ -429,66 +430,80 @@ module FSCC =
     let run(args : string[]) =
         let c = parseConfig args
 
-        let assemblies = c.inputFiles |> List.choose (fun p ->
+        let types = c.inputFiles |> List.collect (fun p ->
                             let ext = System.IO.Path.GetExtension(p)
                             if ext = ".dll" || ext = ".exe" then
-                                System.Reflection.Assembly.LoadFile p |> Some
+                                let ass = System.Reflection.Assembly.LoadFile p
+                                try
+                                    ass.GetTypes() |> Array.map (fun t -> Success t) |> Array.toList
+                                with e ->
+                                    []
                             elif ext = ".fs" then
-                                FSC.compile p
+                                let code = System.IO.File.ReadAllText p
+                                match Aardvark.Base.Fsi.compileModule code with
+                                    | Fsi.FsiSuccess m -> [Success m]
+                                    | Fsi.FsiError e -> [Error e.AsString]
                             else 
-                                None
-                         ) |> List.toArray
+                                []
+                    ) |> List.toArray
   
         let rec flattenNesting (t : Type) =
             let n = t.GetNestedTypes() |> Array.collect flattenNesting
             [[|t|]; n] |> Array.concat
 
-        let allTypes = assemblies |> Array.collect (fun a -> try a.GetTypes() with e -> [||])
-        let allTypes = allTypes |> Array.collect flattenNesting
+
+        let allSuccess = types |> Array.forall (fun t -> match t with | Success _ -> true | _ -> false)
+
+        if allSuccess then
+            
+            let allTypes = types |> Array.map (fun t -> match t with | Success t -> t | _ -> failwith "impossible")
+            let allTypes = allTypes |> Array.collect flattenNesting
        
 
-        let toEffectMethod = FShade.Compiler.ReflectionExtensions.getMethodInfo <@ toEffect @>
-        let buildFunctionMethod = FShade.Compiler.ReflectionExtensions.getMethodInfo <@ Aardvark.Base.FunctionReflection.FunctionBuilder.BuildFunction<int, int>(null, null) @>
+            let toEffectMethod = FShade.Compiler.ReflectionExtensions.getMethodInfo <@ toEffect @>
+            let buildFunctionMethod = FShade.Compiler.ReflectionExtensions.getMethodInfo <@ Aardvark.Base.FunctionReflection.FunctionBuilder.BuildFunction<int, int>(null, null) @>
 
-        let allShaders = c.shaderNames |> List.map (fun name ->
-            allTypes |> Array.tryPick (fun t ->
-                let mi = t.GetMethod name
+            let allShaders = c.shaderNames |> List.map (fun name ->
+                allTypes |> Array.tryPick (fun t ->
+                    let mi = t.GetMethod name
 
-                if mi <> null then
-                    let p = mi.GetParameters().[0]
-                    let toEffect = toEffectMethod.MakeGenericMethod [|p.ParameterType; mi.ReturnType.GetGenericArguments().[0]|]
-                    let build = buildFunctionMethod.MakeGenericMethod [|p.ParameterType; mi.ReturnType|]
+                    if mi <> null then
+                        let p = mi.GetParameters().[0]
+                        let toEffect = toEffectMethod.MakeGenericMethod [|p.ParameterType; mi.ReturnType.GetGenericArguments().[0]|]
+                        let build = buildFunctionMethod.MakeGenericMethod [|p.ParameterType; mi.ReturnType|]
 
-                    let f = build.Invoke(null, [|null; mi|])
+                        let f = build.Invoke(null, [|null; mi|])
 
-                    let effect = toEffect.Invoke(null, [|f|]) |> unbox<Compiled<Effect, ShaderState>>
+                        let effect = toEffect.Invoke(null, [|f|]) |> unbox<Compiled<Effect, ShaderState>>
 
-                    Some effect
-                else 
-                    None
+                        Some effect
+                    else 
+                        None
+                )
             )
-        )
 
-        if allShaders |> List.forall (fun o -> o.IsSome) then
-            let allShaders = allShaders |> List.map (fun o -> o.Value)
+            if allShaders |> List.forall (fun o -> o.IsSome) then
+                let allShaders = allShaders |> List.map (fun o -> o.Value)
 
-            let shader = compose allShaders
-            match GLES.compileEffect shader with
-                | Aardvark.Base.Prelude.Success(uniforms, code) ->
+                let shader = compose allShaders
+                match GLES.compileEffect shader with
+                    | Aardvark.Base.Prelude.Success(uniforms, code) ->
 
-                    let samplerStates = uniforms |> Map.toList |> List.filter (fun (s,v) -> v.IsSamplerUniform) |> List.map (fun (s,v) ->
-                                            let sem, sam = v.Value |> unbox<string * SamplerState>
+                        let samplerStates = uniforms |> Map.toList |> List.filter (fun (s,v) -> v.IsSamplerUniform) |> List.map (fun (s,v) ->
+                                                let sem, sam = v.Value |> unbox<string * SamplerState>
 
-                                            let code = GlslSamplers.compileSamplerState s sam
+                                                let code = GlslSamplers.compileSamplerState s sam
 
-                                            let code = FShade.Utils.String.linePrefix "//" code
+                                                let code = FShade.Utils.String.linePrefix "//" code
 
-                                            sprintf "//string %s = \"%s\"\r\n%s" s sem code
-                                        ) |> String.concat "\r\n"
+                                                sprintf "//string %s = \"%s\"\r\n%s" s sem code
+                                            ) |> String.concat "\r\n"
 
-                    c.output.Write(sprintf "%s\r\n//SAMPLERSTATES\r\n%s" code samplerStates)
-                | Aardvark.Base.Prelude.Error e ->
-                    eprintfn "ERROR: %A" e
-
+                        c.output.Write(sprintf "%s\r\n//SAMPLERSTATES\r\n%s" code samplerStates)
+                    | Aardvark.Base.Prelude.Error e ->
+                        c.output.Write("ERROR: " + e)
+            else
+                ()
         else
-            ()
+            let err = types |> Array.choose (fun e -> match e with | Error e -> Some e | _ -> None) |> String.concat "\r\n"
+            c.output.Write("ERROR: " + err)

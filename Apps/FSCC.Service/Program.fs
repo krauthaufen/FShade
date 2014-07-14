@@ -69,7 +69,6 @@ module Service =
                 printfn "%d workers running" (Interlocked.Increment(&workersRunning))
                 while true do 
                     use reader = new StreamReader(ctx.Request.InputStream, ctx.Request.ContentEncoding)
-                    let str = ctx.Request.QueryString
                     let msg = reader.ReadToEnd()
 
                     if msg.Length <> 0 then

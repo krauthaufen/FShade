@@ -121,8 +121,6 @@ module EffectEditor =
                             | Success e ->
                                 Report.End() |> ignore //composing
                                 if commit then
-                                    Report.BeginTimed "validating shader"
-        
                                     Report.BeginTimed "updating shader"
 
                                     let e = { e with originals = newShaders }

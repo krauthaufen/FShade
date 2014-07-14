@@ -208,8 +208,8 @@ module GLES =
 
                         //| MethodQuote <@ Sampler2d().Sample @> [] -> return Some "texture({0}, {1})"
 
-                        | Method("Sample", [SamplerType(_); _]) -> return Some "texture({0}, {1})"
-                        | Method("Sample", [SamplerType(_,true,_,_,_); _; _]) -> return Some "texture({0}, vec3({1}, {2}))"
+                        | Method("Sample", [SamplerType(_); _]) -> return Some "texture2D({0}, {1})"
+                        | Method("Sample", [SamplerType(_,true,_,_,_); _; _]) -> return Some "texture2D({0}, vec3({1}, {2}))"
                         | Method("SampleLevel", [SamplerType(_); _; _]) -> return Some "textureLod({0}, {1}, {2})"
                         | Method("SampleLevel", [SamplerType(_,true,_,_,_); _; _; _]) -> return Some "textureLod({0}, vec3({1}, {2}), {3})"
 
@@ -460,18 +460,21 @@ module GLES =
         let newInputs = 
             match last with
                 | Some stage ->
-                    s.inputs |> Map.map(fun k v -> Var(sprintf "%s%A" k stage, v.Type, v.IsMutable))
-                | None -> s.inputs
+                    s.inputs |> Map.toList |> List.map(fun (k,v) -> k,v.Name,Var(sprintf "%s%A" k stage, v.Type, v.IsMutable))
+                | None -> s.inputs |> Map.toList |> List.map (fun (k,v) -> k,v.Name,v)
+
+        let inputRepl = newInputs |> List.map (fun (_,k,v) -> (k,Expr.Var v)) |> Map.ofList
+        let newInputs = newInputs |> List.map (fun (k,_,v) -> (k,v)) |> Map.ofList
 
         let newOutputs = 
-            s.outputs |> Map.map(fun k (o,v) -> o,Var(sprintf "%s%A" k s.shaderType, v.Type, v.IsMutable))
+            s.outputs |> Map.toList |> List.map (fun (k,(o,v)) -> (k,o,v,Var(sprintf "%s%A" k s.shaderType, v.Type, v.IsMutable)))
 
-        let mutable body = s.body
-        for (s,i) in s.inputs |> Map.toSeq do
-            body <- body.Substitute(fun vi -> if vi = i then (match Map.tryFind s newInputs with | Some ni -> Expr.Var ni |> Some | _ -> None) else None)
+        let outputRepl = newOutputs |> List.map (fun (_,_,o,n) -> o.Name, Expr.Var n) |> Map.ofList
+        let newOutputs = newOutputs |> List.map (fun (k,o,_,v) -> k,(o,v)) |> Map.ofList
 
-        for (s,(_,i)) in s.outputs |> Map.toSeq do
-            body <- body.Substitute(fun vi -> if vi = i then (match Map.tryFind s newOutputs with | Some (_,ni) -> Expr.Var ni |> Some | _ -> None) else None)
+        let body = s.body.Substitute (fun v -> Map.tryFind v.Name inputRepl)
+        let body = body.Substitute (fun v -> Map.tryFind v.Name outputRepl)
+
 
         { s with body = body; inputs = newInputs; outputs = newOutputs}
 
