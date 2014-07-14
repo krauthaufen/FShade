@@ -1,0 +1,71 @@
+<html>
+<head>
+	<title>FShade Compiler Service</title>
+	<script type="text/javascript">
+		function compile(code, composition, action)
+		{
+			var request = new XMLHttpRequest();
+			request.onload = function() {
+				//alert(request.responseText);
+				if(request.status == 200)
+				{
+					action(request.responseText);
+				}
+			};
+			
+			request.open("POST", "http://lattice/", true);
+			//request.setRequestHeader("Content-type", "multipart/form-data");
+			
+			var formData = new FormData();
+			formData.append("code", code);
+			formData.append("comp", composition);
+			
+			request.send(formData);//{ code: code, comp : composition });
+		}
+
+
+		function updateGLSLCode()
+		{
+			var code = document.getElementById("code").value;
+			var comp = document.getElementById("comp").value;
+			var target = document.getElementById("glsl");
+			
+			compile(code, comp, function(code) {
+				
+				target.value = code;
+			});
+			
+		}
+	</script>
+</head>
+<body>
+	<table> <tr>
+	<td>
+	<textarea cols="80" rows="50" id="code">
+namespace Test
+
+module Simple =
+    open Aardvark.Base
+    open FShade
+    
+    type V = { [<Semantic("Positions")>] p : V4d }
+
+    let trafo(v : V) =
+        vertex {
+            return { p = 2.0 * v.p }
+        }
+
+    let shade(v : V) =
+        fragment {
+            return V4d.IIII
+        }
+	</textarea><br>
+	<input type="text" size="93" id="comp" value="trafo shade"/>
+	<input type="submit" value="Compile" onclick="updateGLSLCode()"/><br>
+	</td>
+	<td>
+	<textarea cols="80" rows="52" id="glsl"></textarea>
+	</td>
+	</tr> </table>
+</body>
+</html>
