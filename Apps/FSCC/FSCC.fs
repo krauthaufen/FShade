@@ -1,6 +1,7 @@
 ﻿namespace FSCC
 
 open System
+open Newtonsoft.Json
 
 module CLI =
     type Range = ZeroToInf
@@ -385,10 +386,11 @@ module FSCC =
             System.Environment.Exit(1)
             failwith "impossible"
 
-    type Output = File of string | StdOut with
+    type Output = File of string | StreamOut of System.IO.TextWriter | StdOut with
         member x.Write(text : string) =
             match x with
                 | File f -> System.IO.File.WriteAllText(f, text)
+                | StreamOut s -> s.WriteLine(text)
                 | StdOut -> System.Console.WriteLine(text)
 
     type Language = GLSL
@@ -451,7 +453,6 @@ module FSCC =
             let n = t.GetNestedTypes() |> Array.collect flattenNesting
             [[|t|]; n] |> Array.concat
 
-
         let allSuccess = types |> Array.forall (fun t -> match t with | Success _ -> true | _ -> false)
 
         if allSuccess then
@@ -507,3 +508,67 @@ module FSCC =
         else
             let err = types |> Array.choose (fun e -> match e with | Error e -> Some e | _ -> None) |> String.concat "\r\n"
             c.output.Write("ERROR: " + err)
+
+    type CompilerResult = { code : string; errors : list<Fsi.CompilerError> }
+
+    let compile (config : Config) (code : string) (comp : string) =
+        let rec flattenNesting (t : Type) =
+            let n = t.GetNestedTypes() |> Array.collect flattenNesting
+            [[|t|]; n] |> Array.concat
+
+        match Aardvark.Base.Fsi.compileModule code with
+            | Fsi.FsiSuccess m ->
+                let allTypes = [|m|] |> Array.collect flattenNesting
+       
+
+                let toEffectMethod = FShade.Compiler.ReflectionExtensions.getMethodInfo <@ toEffect @>
+                let buildFunctionMethod = FShade.Compiler.ReflectionExtensions.getMethodInfo <@ Aardvark.Base.FunctionReflection.FunctionBuilder.BuildFunction<int, int>(null, null) @>
+
+                let allShaders = config.shaderNames |> List.map (fun name ->
+                    allTypes |> Array.tryPick (fun t ->
+                        let mi = t.GetMethod name
+
+                        if mi <> null then
+                            let p = mi.GetParameters().[0]
+                            let toEffect = toEffectMethod.MakeGenericMethod [|p.ParameterType; mi.ReturnType.GetGenericArguments().[0]|]
+                            let build = buildFunctionMethod.MakeGenericMethod [|p.ParameterType; mi.ReturnType|]
+
+                            let f = build.Invoke(null, [|null; mi|])
+
+                            let effect = toEffect.Invoke(null, [|f|]) |> unbox<Compiled<Effect, ShaderState>>
+
+                            Some effect
+                        else 
+                            None
+                    )
+                )
+
+                if allShaders |> List.forall (fun o -> o.IsSome) then
+                    let allShaders = allShaders |> List.map (fun o -> o.Value)
+
+                    let shader = compose allShaders
+                    match GLES.compileEffect shader with
+                        | Aardvark.Base.Prelude.Success(uniforms, code) ->
+
+                            let samplerStates = uniforms |> Map.toList |> List.filter (fun (s,v) -> v.IsSamplerUniform) |> List.map (fun (s,v) ->
+                                                    let sem, sam = v.Value |> unbox<string * SamplerState>
+
+                                                    let code = GlslSamplers.compileSamplerState s sam
+
+                                                    let code = FShade.Utils.String.linePrefix "//" code
+
+                                                    sprintf "//string %s = \"%s\"\r\n%s" s sem code
+                                                ) |> String.concat "\r\n"
+
+                            let res = { code = sprintf "%s\r\n//SAMPLERSTATES\r\n%s" code samplerStates; errors = [] }
+
+                            config.output.Write(JsonConvert.SerializeObject(res))
+                        | Aardvark.Base.Prelude.Error e ->
+                            let e = { Fsi.CompilerError.file = ""; Fsi.CompilerError.line = 0; Fsi.CompilerError.col = 0; Fsi.CompilerError.code = ""; Fsi.CompilerError.errorType = Fsi.CompilerErrorType.Error; Fsi.CompilerError.message = e }
+                            config.output.Write(JsonConvert.SerializeObject({ code = null; errors = [e] }))
+                else
+                    ()
+                ()
+            | Fsi.FsiError e -> 
+                let res = { code = null; errors = e.errors }
+                config.output.Write(JsonConvert.SerializeObject(res))

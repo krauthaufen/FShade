@@ -55,10 +55,12 @@ module Service =
         printfn "starting FSCC"
         let ms = new System.IO.MemoryStream()
         let o = new System.IO.StreamWriter(ms)
-        let savedOut = System.Console.Out
-        System.Console.SetOut(o)
-        [[|temp; "-c"; |]; shaderNames] |> Array.concat |> FSCC.run
-        System.Console.SetOut(savedOut)
+        //let savedOut = System.Console.Out
+        //System.Console.SetOut(o)
+
+        let c = { FSCC.Config.inputFiles = []; FSCC.Config.language = FSCC.Language.GLSL; FSCC.Config.output = FSCC.StreamOut o; FSCC.Config.shaderNames = shaderNames |> Array.toList }
+
+        FSCC.compile c code composition
 
         o.Flush()
         ms.ToArray()
