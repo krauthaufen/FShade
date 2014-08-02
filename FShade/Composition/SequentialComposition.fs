@@ -29,7 +29,7 @@ module SequentialComposition =
                 | Some _ -> true
                 | None -> false
 
-        let allVariablesFound = free |> Seq.toList |> List.all (fun v -> mapValue v s.inputs || mapValueOutput v s.outputs || Set.contains v uniformSet)
+        let allVariablesFound = free |> Seq.toList |> List.forall (fun v -> mapValue v s.inputs || mapValueOutput v s.outputs || Set.contains v uniformSet)
 
         if not allVariablesFound then
             failwithf "shader contains free variables which are no in-/outputs %A" free
@@ -87,7 +87,8 @@ module SequentialComposition =
         //NOTE: hidden contains variables originating from left
         for KeyValue(n,o) in r.outputs do
             match Map.tryFind n l.outputs with
-                | Some (_,leftOutput) -> hidden <- Set.add leftOutput hidden
+                | Some (_,leftOutput) -> 
+                    hidden <- Set.add leftOutput hidden
                 | _ -> ()
 
         //All inputs of right that are outputs of left are converted to local variables
@@ -116,8 +117,31 @@ module SequentialComposition =
         let outputs = [r.outputs |> Map.toSeq; l.outputs |> Map.toSeq |> Seq.filter(fun (_,(_,v)) -> not <| Set.contains v hidden) |> Seq.map (fun (k,(_,v)) -> k,(None, v))] |> Seq.concat |> Map.ofSeq
 
         //the uniform set is simply merged
-        let uniforms = [l.uniforms; r.uniforms] |> List.concat
+        let uniforms = [l.uniforms; r.uniforms] |> List.concat //|> Seq.map (fun (u,v) -> Unique v, u) |> Map.ofSeq |> Map.toList |> List.map (fun (a,b) -> b,a.Value)
+        let uniformMap = uniforms |> List.map (fun (a,b) -> b.Name, b) |> Map.ofList
 
+
+
+        let b0 = b0.Substitute(fun vi -> 
+                    match Map.tryFind vi.Name l.inputs with
+                        | Some i -> 
+                            match Map.tryFind vi.Name inputs with
+                                | Some v -> v |> Expr.Var |> Some
+                                | _ -> None
+                        | None -> None
+                )
+//
+//        let b0 = b0.Substitute(fun vi -> 
+//                    match Map.tryFind vi.Name outputs with
+//                        | Some (_,v) -> v |> Expr.Var |> Some
+//                        | _ -> None
+//                )
+//
+//        let b0 = b0.Substitute(fun vi -> 
+//                    match Map.tryFind vi.Name uniformMap with
+//                        | Some v -> v |> Expr.Var |> Some
+//                        | _ -> None
+//                )
 
         transform {
             return checkShaderConsistency { shaderType = l.shaderType; inputs = inputs; outputs = outputs; uniforms = uniforms; body = b0; inputTopology = l.inputTopology; debugInfo = None }

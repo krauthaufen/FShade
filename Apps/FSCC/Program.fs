@@ -7,11 +7,11 @@ open FSCC
 [<EntryPoint>]
 let main argv = 
 
-    Aardvark.Base.Fsi.execute "let a = 10" |> ignore
-    let code = "a.E"
-    let set = Aardvark.Base.Fsi.getCompletions code 1 2 "E"
-    set.Items |> Array.iter(fun a -> printfn "%A" a.DescriptionText)
-    System.Environment.Exit(0)
+//    Aardvark.Base.Fsi.execute "let a = 10" |> ignore
+//    let code = "a.E"
+//    let set = Aardvark.Base.Fsi.getCompletions code 1 2 "E"
+//    set.Items |> Array.iter(fun a -> printfn "%A" a.DescriptionText)
+//    System.Environment.Exit(0)
 
 
     if argv.Length = 0 then
