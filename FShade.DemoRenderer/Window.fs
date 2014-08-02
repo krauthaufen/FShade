@@ -165,10 +165,12 @@ type Window() =
                         "ProjTrafo", projTrafo :> obj
                         "ViewProjTrafo", (viewTrafo * projTrafo ) :> obj
                         "ViewportSize", V2i(base.Width, base.Height) :> obj
+                        "CameraLocation", location :> obj
+                        "LightLocation", (location + V3d.OOI) :> obj
                        ] |> Map.ofSeq
 
         let state = TraversalState.Empty
-        let state = { state with uniforms = uniforms}
+        let state = { state with uniforms = uniforms }
 
         match sg with
             | Some sg -> sg.Render(state)

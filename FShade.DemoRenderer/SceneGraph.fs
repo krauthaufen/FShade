@@ -228,3 +228,6 @@ module Sg =
 
     let group (elements : #seq<ISg>) =
         Group(elements) :> ISg
+
+    let uniform (name : string) (value : 'a) (sg : ISg) =
+        UniformNode([name, value :> obj], sg) :> ISg

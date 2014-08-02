@@ -29,10 +29,10 @@ module SequentialComposition =
                 | Some _ -> true
                 | None -> false
 
-        let allVariablesFound = free |> Seq.toList |> List.forall (fun v -> mapValue v s.inputs || mapValueOutput v s.outputs || Set.contains v uniformSet)
+        let notFound = free |> Seq.toList |> List.choose (fun v -> if not (mapValue v s.inputs || mapValueOutput v s.outputs || Set.contains v uniformSet) then Some v else None)
 
-        if not allVariablesFound then
-            failwithf "shader contains free variables which are no in-/outputs %A" free
+        if notFound.Length > 0 then
+            failwithf "shader contains free variables which are no in-/outputs %A" notFound
 
         s
 
@@ -144,7 +144,7 @@ module SequentialComposition =
 //                )
 
         transform {
-            return checkShaderConsistency { shaderType = l.shaderType; inputs = inputs; outputs = outputs; uniforms = uniforms; body = b0; inputTopology = l.inputTopology; debugInfo = None }
+            return { shaderType = l.shaderType; inputs = inputs; outputs = outputs; uniforms = uniforms; body = b0; inputTopology = l.inputTopology; debugInfo = None }
         }
 
 

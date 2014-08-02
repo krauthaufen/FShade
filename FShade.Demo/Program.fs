@@ -10,7 +10,15 @@ module Simple =
     open Aardvark.Base
     open FShade
     
+    type UniformScope with
+        member x.CameraLocation : V3d = x?PerView?CameraLocation
+        member x.LightLocation : V3d = x?PerLight?LightLocation
+
+        member x.ModelTrafo : M44d = x?PerModel?ModelTrafo
+        member x.ViewProjTrafo : M44d = x?PerView?ViewProjTrafo
+
     type V = { [<Semantic("Positions")>] p : V4d 
+               [<Semantic("World")>] wp : V4d
                [<Semantic("Normals")>] n : V3d
                [<Semantic("Tangents")>] t : V3d
                [<Semantic("BiNormals")>] b : V3d
@@ -29,10 +37,8 @@ module Simple =
 
     let trafo(v : V) =
         vertex {
-            let model : M44d = uniform?ModelTrafo
-            let vp : M44d = uniform?ViewProjTrafo
-            let world = model * v.p
-            return { v with p = vp * world }
+            let world = uniform.ModelTrafo * v.p
+            return { v with p = uniform.ViewProjTrafo * world; wp = world }
         }
 
     let normals(v : V) =
@@ -61,7 +67,15 @@ module Simple =
     let light (v : V) =
         fragment {
             let n = v.n.Normalized
-            return  v.color.XYZ * (0.6 + 0.6 * Vec.dot n V3d.OIO)
+
+            let c = uniform.CameraLocation - v.wp.XYZ |> Vec.normalize
+            let l = uniform.LightLocation - v.wp.XYZ |> Vec.normalize
+            let r = -Vec.reflect c n |> Vec.normalize
+
+            let d = Vec.dot l n |> clamp 0.0 1.0
+            let s = Vec.dot r l |> clamp 0.0 1.0
+
+            return  v.color.XYZ * (0.2 + 0.8 * d) + V3d.III * pow s 64.0
         }    
             
             
@@ -76,6 +90,7 @@ let main argv =
 
 
     let effect = [Simple.trafo |> toEffect
+                  Simple.bump |> toEffect
                   Simple.texture |> toEffect
                   Simple.light |> toEffect] |> compose
 
@@ -96,17 +111,23 @@ let main argv =
     let w = new Window()
 
     let ps = [|V3f.OOO; V3f.IOO; V3f.IIO; V3f.OIO|] :> Array
-    let tc = [|V2f(-0.5,-0.5); V2f(1.5, -0.5); V2f(1.5,1.5); V2f(-0.5, 1.5)|] :> Array
+    let tc = [|V2f.OO; V2f.IO; V2f.II; V2f.OI|] :> Array
     let n = [|V3f.OOI; V3f.OOI; V3f.OOI; V3f.OOI|] :> Array
+    let b = [|V3f.IOO; V3f.IOO; V3f.IOO; V3f.IOO|] :> Array
+    let t = [|V3f.OIO; V3f.OIO; V3f.OIO; V3f.OIO|] :> Array
     let indices = [|0;1;2; 0;2;3|] :> Array
 
-    let sg = Sg.geometry (Some indices) (["Positions", ps; "TexCoords", tc; "Normals", n] |> Map.ofList)
+    let sg = Sg.geometry (Some indices) (["Positions", ps; "TexCoords", tc; "Normals", n; "BiNormals", b; "Tangents", t] |> Map.ofList)
     let sg = Sg.shader "Main" effect sg
 
 
     FShade.Debug.EffectEditor.runTray()
 
     let sg = Sg.fileTexture "DiffuseTexture" @"E:\Development\WorkDirectory\DataSVN\pattern.jpg" sg
+    let sg = Sg.fileTexture "NormalMap" @"E:\Development\WorkDirectory\DataSVN\bump.jpg" sg
+
+    //let sg = Sg.uniform "CameraLocation" V3d.III sg
+
 
     w.Scene <- sg
 
