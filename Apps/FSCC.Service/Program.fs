@@ -65,6 +65,35 @@ module Service =
         o.Flush()
         ms.ToArray()
 
+    open System
+    let appDomains = Array.init 4 (fun i -> DateTime.Now,AppDomain.CreateDomain(sprintf "FSCC%d" i))
+    let rand = System.Random()
+
+    let runInRandomDomain (f : unit -> string) =
+        let index = rand.Next(appDomains.Length)
+        let (t,d) = appDomains.[index]
+        let name = d.FriendlyName
+
+        let age = DateTime.Now - t
+        let d =
+            if age.TotalMinutes > 30.0 then
+                printfn "killed AppDomain: %s" name
+                AppDomain.Unload(d)
+                let d = AppDomain.CreateDomain(name)
+                appDomains.[index] <- (DateTime.Now, d)
+                d
+            else
+                d
+
+
+        let mine = System.AppDomain.CurrentDomain
+        d.DoCallBack(System.CrossAppDomainDelegate(fun () ->
+            let str = f()
+            mine.SetData(System.AppDomain.CurrentDomain.FriendlyName, str)
+        ))
+        let result = mine.GetData(name) |> unbox<string>
+        result
+
     let worker(ctx : HttpListenerContext) =
         Task.Factory.StartNew(fun () ->
             try
@@ -79,7 +108,7 @@ module Service =
                         match Map.tryFind "code" data, Map.tryFind "comp" data with
                             | Some code, Some comp ->
                                 printfn "starting compiler"
-                                let b = compile code comp
+                                let b = runInRandomDomain (fun () -> compile code comp |> System.Text.ASCIIEncoding.Default.GetString) |> System.Text.ASCIIEncoding.Default.GetBytes
 
                                 printfn "reply"
                                 ctx.Response.StatusCode <- 200
@@ -94,7 +123,7 @@ module Service =
                 | :? System.OperationCanceledException as e -> 
                     Interlocked.Decrement(&workersRunning) |> ignore
                 | e ->
-                    printfn "ERROR: %A" e
+                    //printfn "ERROR: %A" e
                     Interlocked.Decrement(&workersRunning) |> ignore
 
         ) |> ignore
@@ -105,6 +134,7 @@ module Service =
         listener.Start()
         while true do
             let ctx = listener.GetContext()
+           
             ctx.Response.AddHeader("Access-Control-Allow-Origin", "*")
             worker(ctx)
 
