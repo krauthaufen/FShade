@@ -70,16 +70,14 @@
       <Project>{36c16e14-31e9-4981-9aed-dfa9726a080d}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\Aardvark.Base.TypeProviders\Aardvark.Base.TypeProviders.fsproj">
-      <Name>Aardvark.Base.TypeProviders</Name>
-      <Project>{df5cb9d7-21ff-4cb7-9384-d8f9a5da934a}</Project>
-      <Private>True</Private>
-    </ProjectReference>
     <ProjectReference Include="..\Aardvark.Base\Aardvark.Base.csproj">
       <Name>Aardvark.Base</Name>
       <Project>{377da721-c821-45f6-b803-9c8724c7b37f}</Project>
       <Private>True</Private>
     </ProjectReference>
+    <Reference Include="Aardvark.Base.TypeProviders">
+      <HintPath>..\..\BinPrebuilt\Release\Aardvark.Base.TypeProviders.dll</HintPath>
+    </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
       <Private>True</Private>
