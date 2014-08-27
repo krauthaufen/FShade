@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2012
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FShade.Compiler", "FShade.Compiler\FShade.Compiler.fsproj", "{843B90D4-D949-4A93-9717-467EBC4530C4}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FShade.Compiler", "Libs\FShade.Compiler\FShade.Compiler.fsproj", "{843B90D4-D949-4A93-9717-467EBC4530C4}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FShade", "FShade\FShade.fsproj", "{EC6DA69C-E93A-4481-9BB6-440482B1EEB1}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FShade", "Libs\FShade\FShade.fsproj", "{EC6DA69C-E93A-4481-9BB6-440482B1EEB1}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FShade.Demo", "FShade.Demo\FShade.Demo.fsproj", "{2867B916-7CC3-4A30-8059-CB99AA653EE3}"
 EndProject
@@ -13,7 +13,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Core", "Core", "{01E9F782-F
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FShade.DemoRenderer", "FShade.DemoRenderer\FShade.DemoRenderer.fsproj", "{D68F8DB7-BCB3-41CD-B25B-A6205616118E}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FShade.Debug", "FShade.Debug\FShade.Debug.fsproj", "{55F1A5A0-F789-4B6A-9968-6DA3DC29F6C3}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FShade.Debug", "Libs\FShade.Debug\FShade.Debug.fsproj", "{55F1A5A0-F789-4B6A-9968-6DA3DC29F6C3}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Apps", "Apps", "{C2865272-132A-4916-908D-83C8FBFCBFD8}"
 EndProject

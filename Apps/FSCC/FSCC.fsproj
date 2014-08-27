@@ -66,12 +66,12 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\FShade.Compiler\FShade.Compiler.fsproj">
+    <ProjectReference Include="..\..\Libs\FShade.Compiler\FShade.Compiler.fsproj">
       <Name>FShade.Compiler</Name>
       <Project>{843b90d4-d949-4a93-9717-467ebc4530c4}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\..\FShade\FShade.fsproj">
+    <ProjectReference Include="..\..\Libs\FShade\FShade.fsproj">
       <Name>FShade</Name>
       <Project>{ec6da69c-e93a-4481-9bb6-440482b1eeb1}</Project>
       <Private>True</Private>
