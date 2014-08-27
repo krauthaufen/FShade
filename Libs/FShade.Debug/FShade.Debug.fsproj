@@ -84,7 +84,7 @@
       <SpecificVersion>False</SpecificVersion>
     </Reference>
     <Reference Include="ScintillaNET">
-      <HintPath>..\BinPrebuilt\ScintillaNET.dll</HintPath>
+      <HintPath>..\..\BinPrebuilt\Release\ScintillaNET.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
