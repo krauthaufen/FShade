@@ -330,7 +330,7 @@ module GLSL =
                             return sprintf "vec%d(%s)" d (String.concat ", " fieldValues) |> Some
                         | Float32|Float64 ->
                             let d = Convert.ToDouble(o)
-                            return d.ToString(System.Globalization.CultureInfo.InvariantCulture) |> Some
+                            return d.ToString("0.000E00", System.Globalization.CultureInfo.InvariantCulture) |> Some
                         | Num ->
                             return o.ToString() |> Some
                         | Bool ->
