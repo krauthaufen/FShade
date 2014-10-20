@@ -72,32 +72,39 @@
     <Compile Include="GLSL\GlslCompiler.fs" />
     <Compile Include="GLSL\GlESCompiler.fs" />
     <Content Include="packages.config" />
-    <Content Include="app.config" />
+    <Content Include="App.config" />
     <EmbeddedResource Include="Resources.resx" />
     <Compile Include="Resources.fs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Aardvark.Base.FSharp\Aardvark.Base.FSharp.fsproj">
-      <Name>Aardvark.Base.FSharp</Name>
-      <Project>{36c16e14-31e9-4981-9aed-dfa9726a080d}</Project>
+    <Reference Include="Aardvark.Base">
+      <HintPath>..\..\packages\Aardvark.Base.1.0.4\lib\net45\Aardvark.Base.dll</HintPath>
       <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\Aardvark.Base\Aardvark.Base.csproj">
-      <Name>Aardvark.Base</Name>
-      <Project>{377da721-c821-45f6-b803-9c8724c7b37f}</Project>
+    </Reference>
+    <Reference Include="Aardvark.Base.FSharp">
+      <HintPath>..\..\packages\Aardvark.Base.FSharp.1.0.0\lib\net40\Aardvark.Base.FSharp.dll</HintPath>
       <Private>True</Private>
-    </ProjectReference>
+    </Reference>
     <Reference Include="Aardvark.Base.TypeProviders">
-      <HintPath>..\..\BinPrebuilt\Release\Aardvark.Base.TypeProviders.dll</HintPath>
+      <HintPath>..\..\packages\Aardvark.Base.FSharp.1.0.0\lib\net40\Aardvark.Base.TypeProviders.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="FSharp.Compiler.Service">
-      <HintPath>..\packages\FSharp.Compiler.Service.0.0.58\lib\net45\FSharp.Compiler.Service.dll</HintPath>
+      <HintPath>..\..\packages\FSharp.Compiler.Service.0.0.71\lib\net45\FSharp.Compiler.Service.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
       <Private>True</Private>
       <SpecificVersion>False</SpecificVersion>
+    </Reference>
+    <Reference Include="nunit.framework">
+      <HintPath>..\..\packages\NUnit.2.6.3\lib\nunit.framework.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="RegexProvider">
+      <HintPath>..\..\packages\RegexProvider.0.0.3\lib\net40\RegexProvider.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
