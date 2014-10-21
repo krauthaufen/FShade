@@ -61,18 +61,18 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="Aardvark.Base.FSharp">
-      <HintPath>..\packages\Aardvark.Base.FSharp.1.0.0\lib\net40\Aardvark.Base.FSharp.dll</HintPath>
+      <HintPath>..\packages\Aardvark.Base.FSharp.1.0.2\lib\net45\Aardvark.Base.FSharp.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Aardvark.Base.TypeProviders">
-      <HintPath>..\packages\Aardvark.Base.FSharp.1.0.0\lib\net40\Aardvark.Base.TypeProviders.dll</HintPath>
+      <HintPath>..\packages\Aardvark.Base.FSharp.1.0.2\lib\net45\Aardvark.Base.TypeProviders.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="AssimpNet">
       <HintPath>..\BinPrebuilt\AssimpNet.dll</HintPath>
     </Reference>
     <Reference Include="FSharp.Compiler.Service">
-      <HintPath>..\packages\FSharp.Compiler.Service.0.0.71\lib\net45\FSharp.Compiler.Service.dll</HintPath>
+      <HintPath>..\packages\FSharp.Compiler.Service.0.0.72\lib\net45\FSharp.Compiler.Service.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="mscorlib" />
