@@ -326,7 +326,8 @@ module LambdaFunctions =
             let allFree = HashSet(free) |> Seq.toList
 
             let! free = getAllFieldNames Set.empty "" c map
-            let! freeDecls = free |> List.mapC (fun (n,t) -> compile { let! t = compileType t in return sprintf "%s %s;" t n })
+
+            let! freeDecls = free |> List.mapC (fun (n,t) -> compile { let! t = compileType t in return! compileFieldDeclaration { name = n; fieldType = t; arraySize = None; info = None }})
             let allFields = free |> List.choose (fun (n,_) -> if n = "Function" then None else Some n)
 
             let funType = FSharpType.MakeFunctionType(c.inputType, c.returnType)
