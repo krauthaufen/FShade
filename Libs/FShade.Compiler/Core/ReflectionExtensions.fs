@@ -126,6 +126,7 @@ module ReflectionExtensions =
 /// </summary>
 [<AutoOpen>]
 module ReflectionPatterns =
+    let typePrefixPattern = System.Text.RegularExpressions.Regex @"^.*\.(?<methodName>.*)$"
     let (|Method|_|)  (mi : MethodInfo) =
         let args = mi.GetParameters() |> Seq.map(fun p -> p.ParameterType)
         let parameters = if mi.IsStatic then
@@ -133,7 +134,12 @@ module ReflectionPatterns =
                             else
                             seq { yield mi.DeclaringType; yield! args }
 
-        Method (mi.Name, parameters |> Seq.toList) |> Some
+        let m = typePrefixPattern.Match mi.Name
+        let name =
+            if m.Success then m.Groups.["methodName"].Value
+            else mi.Name
+
+        Method (name, parameters |> Seq.toList) |> Some
 
     let private compareMethods (template : MethodInfo) (m : MethodInfo) =
         if template.IsGenericMethod && m.IsGenericMethod then
