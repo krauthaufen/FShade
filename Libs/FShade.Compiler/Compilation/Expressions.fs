@@ -121,8 +121,8 @@ module Expressions =
                                 let! b = compileExpression lastExpression true body
                                 do! removeBound var
 
-                                let! t = compileType var.Type
-                                let! d = compileVariableDeclaration t var.Name None
+                                let! t = compileType baseType
+                                let! d = compileVariableDeclaration t var.Name (Some (dim.ToString()))
 
                                 // Note that the variable-definition does not contain an assignment.
                                 return sprintf "%s;\r\n%s" d b
