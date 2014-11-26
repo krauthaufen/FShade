@@ -115,11 +115,45 @@ module ExpressionExtensions =
         open Microsoft.FSharp.Quotations
         open Microsoft.FSharp.Quotations.Patterns
 
-        let (|IfThen|_|) (e : Expr) =
+        let (<|>) (a : bool) (b : bool) =
+            a || b
+
+        let (<&>) (a : bool) (b : bool) =
+            a && b
+
+        let rec extractOrAndAlso (e : Expr) =
             match e with
-                | IfThenElse(c,i,Value(_,t)) when t = typeof<unit> -> IfThen(c,i) |> Some
+                | IfThenElse(a, Value(v, Bool), b) when v |> unbox<bool> = true ->
+                    // a || b => IfThenElse (a, Value (true), b)))
+                    let ca = extractOrAndAlso a
+                    let cb = extractOrAndAlso b
+                    <@@ %%ca <|> %%cb @@>
+                | IfThenElse(a, b, Value(v, Bool)) when v |> unbox<bool> = false ->
+                    // a && b => IfThenElse (a, b, Value (false))))
+                    let ca = extractOrAndAlso a
+                    let cb = extractOrAndAlso b
+                    <@@ %%ca <&> %%cb @@>
+                | _ -> e
+
+        let (|WhileLoopFlat|_|) (e : Expr) =
+            match e with
+                | WhileLoop(c,b) ->
+                    let c = extractOrAndAlso c
+                    WhileLoopFlat(c, b) |> Some
+                | _ ->
+                    None
+
+        let (|IfThenFlat|_|) (e : Expr) =
+            match e with
+                | IfThenElse(c,i,Value(_,t)) when t = typeof<unit> -> 
+                    IfThenFlat(extractOrAndAlso c,i) |> Some
                 | _ -> None
 
+        let (|IfThenElseFlat|_|) (e : Expr) =
+            match e with
+                | IfThenElse(c,i,e) -> 
+                    IfThenElseFlat(extractOrAndAlso c,i, e) |> Some
+                | _ -> None
         let (|MemberFieldGet|_|) (e : Expr) =
             match e with
                 | PropertyGet(Some t,p,[]) ->
@@ -283,6 +317,25 @@ module ExpressionExtensions =
                     match findSwitchCases a None e with
                         | Some(cases) -> Switch(a, cases) |> Some
                         | _ -> None
+                | _ -> None
+
+
+        let rec private findAlternatives (e : Expr) =
+            match e with
+                | IfThenElseFlat(c,i,e) ->
+                    (Some c,i)::findAlternatives e
+                | _ -> [None,e]
+
+        let (|Alternatives|_|) (e : Expr) =
+            match e with
+                | IfThenElse(_, _, IfThenElse(_,_,_)) -> 
+                    let alts = findAlternatives e
+
+                    let e = alts |> List.filter(fun (c,_) -> c.IsNone) |> List.head |> snd
+                    let c = alts |> List.choose(fun (c,b) -> match c with | Some c -> Some(c,b) | _ -> None)
+
+                    Alternatives(c, e) |> Some
+
                 | _ -> None
 
         let (|ExprOf|) (e : Expr) =
