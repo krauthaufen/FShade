@@ -231,6 +231,22 @@ module Expressions =
 
                     return sprintf "switch(%s)\r\n{\r\n%s\r\n}\r\n" v (String.indent 1 (String.concat "\r\n" cases))
 
+                | Alternatives(cases, elseCase) when isStatement ->
+                    let! alts = cases |> List.mapC (fun (c,b) ->
+                                    compile {
+                                        let! c = compileExpression false false c
+                                        let! i = compileExpression lastExpression true b
+                                        return sprintf "if(%s)\r\n{\r\n%s}\r\n" c (String.indent 1 i)
+                                    }
+                                )
+
+                    let! e = compileExpression lastExpression true elseCase
+                    let ec = sprintf "else\r\n{\r\n%s}\r\n" (String.indent 1 e)
+
+                    let cascade = (alts |> String.concat "else ") + ec
+
+                    return cascade
+
                 // a simple if then expression (without the else branch)
                 | IfThenFlat(c,i) ->
                     if isStatement then

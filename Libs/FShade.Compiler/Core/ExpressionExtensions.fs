@@ -319,5 +319,24 @@ module ExpressionExtensions =
                         | _ -> None
                 | _ -> None
 
+
+        let rec private findAlternatives (e : Expr) =
+            match e with
+                | IfThenElseFlat(c,i,e) ->
+                    (Some c,i)::findAlternatives e
+                | _ -> [None,e]
+
+        let (|Alternatives|_|) (e : Expr) =
+            match e with
+                | IfThenElse(_, _, IfThenElse(_,_,_)) -> 
+                    let alts = findAlternatives e
+
+                    let e = alts |> List.filter(fun (c,_) -> c.IsNone) |> List.head |> snd
+                    let c = alts |> List.choose(fun (c,b) -> match c with | Some c -> Some(c,b) | _ -> None)
+
+                    Alternatives(c, e) |> Some
+
+                | _ -> None
+
         let (|ExprOf|) (e : Expr) =
             ExprOf(e.Type)
