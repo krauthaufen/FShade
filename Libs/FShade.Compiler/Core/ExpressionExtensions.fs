@@ -135,6 +135,14 @@ module ExpressionExtensions =
                     <@@ %%ca <&> %%cb @@>
                 | _ -> e
 
+        let (|WhileLoopFlat|_|) (e : Expr) =
+            match e with
+                | WhileLoop(c,b) ->
+                    let c = extractOrAndAlso c
+                    WhileLoopFlat(c, b) |> Some
+                | _ ->
+                    None
+
         let (|IfThenFlat|_|) (e : Expr) =
             match e with
                 | IfThenElse(c,i,Value(_,t)) when t = typeof<unit> -> 

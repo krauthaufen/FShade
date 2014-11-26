@@ -187,7 +187,7 @@ module Expressions =
                 
                 // While loops simply work like in C but F# doesn't come with support for breaks.
                 // TODO: think about integrating break just for the shader-language.
-                | WhileLoop(c,b) ->
+                | WhileLoopFlat(c,b) ->
                     let! c = compileExpression false false c
                     let! b = compileExpression false true b
 
