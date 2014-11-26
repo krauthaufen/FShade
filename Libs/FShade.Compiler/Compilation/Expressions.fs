@@ -77,6 +77,15 @@ module Expressions =
         compile {
             match e with
 
+                | Call(None, Method("op_LessAmpGreater", _), [a;b]) ->
+                    let! a = compileExpression false false a
+                    let! b = compileExpression false false b
+                    return sprintf "(%s && %s)" a b |> ret
+
+                | Call(None, Method("op_LessBarGreater", _), [a;b]) ->
+                    let! a = compileExpression false false a
+                    let! b = compileExpression false false b
+                    return sprintf "(%s || %s)" a b |> ret
 //                | Let(v, Coerce(e,_), b) ->
 //                    return! compileExpression lastExpression isStatement (b.Substitute(fun vi -> if vi = v then Some e else None))
 //                | Coerce(e,_) ->
@@ -223,7 +232,7 @@ module Expressions =
                     return sprintf "switch(%s)\r\n{\r\n%s\r\n}\r\n" v (String.indent 1 (String.concat "\r\n" cases))
 
                 // a simple if then expression (without the else branch)
-                | IfThen(c,i) ->
+                | IfThenFlat(c,i) ->
                     if isStatement then
                         let t = i.Type
                         let! c = compileExpression false false c
@@ -239,7 +248,7 @@ module Expressions =
                 // a conditional-expression having an if and an else-branch
                 // Note that conditional expressions in C come with several restrictions
                 // which might not be fully implemented here
-                | IfThenElse(c,ifTrue,ifFalse) ->
+                | IfThenElseFlat(c,ifTrue,ifFalse) ->
                     let! c = compileExpression false false c
                     if not isStatement then
                         // if the conditional's type is unit it can't be expressed

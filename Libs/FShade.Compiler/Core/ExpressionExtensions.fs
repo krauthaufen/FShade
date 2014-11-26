@@ -115,11 +115,37 @@ module ExpressionExtensions =
         open Microsoft.FSharp.Quotations
         open Microsoft.FSharp.Quotations.Patterns
 
-        let (|IfThen|_|) (e : Expr) =
+        let (<|>) (a : bool) (b : bool) =
+            a || b
+
+        let (<&>) (a : bool) (b : bool) =
+            a && b
+
+        let rec extractOrAndAlso (e : Expr) =
             match e with
-                | IfThenElse(c,i,Value(_,t)) when t = typeof<unit> -> IfThen(c,i) |> Some
+                | IfThenElse(a, Value(v, Bool), b) when v |> unbox<bool> = true ->
+                    // a || b => IfThenElse (a, Value (true), b)))
+                    let ca = extractOrAndAlso a
+                    let cb = extractOrAndAlso b
+                    <@@ %%ca <|> %%cb @@>
+                | IfThenElse(a, b, Value(v, Bool)) when v |> unbox<bool> = false ->
+                    // a && b => IfThenElse (a, b, Value (false))))
+                    let ca = extractOrAndAlso a
+                    let cb = extractOrAndAlso b
+                    <@@ %%ca <&> %%cb @@>
+                | _ -> e
+
+        let (|IfThenFlat|_|) (e : Expr) =
+            match e with
+                | IfThenElse(c,i,Value(_,t)) when t = typeof<unit> -> 
+                    IfThenFlat(extractOrAndAlso c,i) |> Some
                 | _ -> None
 
+        let (|IfThenElseFlat|_|) (e : Expr) =
+            match e with
+                | IfThenElse(c,i,e) -> 
+                    IfThenElseFlat(extractOrAndAlso c,i, e) |> Some
+                | _ -> None
         let (|MemberFieldGet|_|) (e : Expr) =
             match e with
                 | PropertyGet(Some t,p,[]) ->
