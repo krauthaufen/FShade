@@ -40,6 +40,13 @@ module Expressions =
                     return ()
         }
 
+    let isRecordField (p : PropertyInfo) =
+        if FSharpType.IsRecord p.DeclaringType then
+            let fields = FSharpType.GetRecordFields p.DeclaringType
+            fields |> Array.exists (fun f -> f = p)
+        else
+            false
+
     /// <summary>
     /// compileValue translates a value having a given type.
     /// </summary>
@@ -315,41 +322,53 @@ module Expressions =
                     // all other fields are simply resolved using the intrinsic property-definition provided
                     // by the compiler and get a default-name if they're not intrinsic.
                     else
-                        let! i = compileIntrinsicProperty m
-                        let! t = compileExpression false false t
-                        match i with
-                            | Some(str) -> return sprintf "%s.%s" t str |> ret
+                        let! fmt = compileIntrinsicPropertyGet m
+                        let! t' = compileExpression false false t
+                        match fmt with
+                            | Some(str) -> return String.Format(str, t') |> ret
                             | None -> 
                                 match m with
-                                    | :? CustomProperty as m -> return sprintf "%s.%s" t m.Name
+                                    | :? CustomProperty as m -> return sprintf "%s.%s" t' m.Name
                                     | _ ->
                                         match m with
                                             | :? PropertyInfo as p -> 
                                                 let! i = compileIntrinsicFunction p.GetMethod
                                                 match i with
                                                     | Some fmt -> return System.String.Format(fmt, t) |> ret
-                                                    | None ->  return sprintf "%s.%s" t m.Name |> ret
+                                                    | None ->  
+                                                        if isRecordField p then
+                                                            return sprintf "%s.%s" t' m.Name |> ret
+                                                        else
+                                                            let ex = Expr.Call(t, p.GetMethod, [])
+                                                            return! compileExpression lastExpression isStatement ex
                                             | _ ->
-                                                 return sprintf "%s.%s" t m.Name |> ret
+                                                 return sprintf "%s.%s" t' m.Name |> ret
 
                 // matches FieldSet and PropertySet since we make no distinction between them here.
                 // since the current implementation does not allow union-type fields to be mutable we
                 // don't have to check for these here.
                 | MemberFieldSet(t, m, v) ->
-                    let! i = compileIntrinsicProperty m
-                    let! t = compileExpression false false t
-                    let! v = compileExpression false false v
-                    match i with
-                        | Some(str) -> return sprintf "%s.%s = %s;\r\n" t str v
+                    let! fmt = compileIntrinsicPropertySet m
+                    let! t' = compileExpression false false t
+                    let! v' = compileExpression false false v
+                    match fmt with
+                        | Some(str) -> return String.Format(str + ";\r\n", t', v')
                         | None ->  
                             match m with
                                     | :? PropertyInfo as p -> 
                                         let! i = compileIntrinsicFunction p.SetMethod
                                         match i with
-                                            | Some fmt -> return System.String.Format(fmt, t, v) |> ret
-                                            | None ->  return sprintf "%s.%s = %s;\r\n" t m.Name v
+                                            | Some fmt -> return System.String.Format(fmt, t', v') |> ret
+                                            | None ->  
+                                                if isRecordField p then
+                                                    return sprintf "%s.%s = %s;\r\n" t' m.Name v'
+                                                else
+                                                    let ex = Expr.Call(t, p.SetMethod, [v])
+                                                    let! r = compileExpression lastExpression isStatement ex
+                                                    return sprintf "%s;\r\n" r
+
                                     | _ ->
-                                         return sprintf "%s.%s = %s;\r\n" t m.Name v
+                                         return sprintf "%s.%s = %s;\r\n" t' m.Name v'
 
                 // static properties and fields are simply inlined atm. 
                 // TODO: this might not be sufficient since changes will not be reflected in the shader-code.

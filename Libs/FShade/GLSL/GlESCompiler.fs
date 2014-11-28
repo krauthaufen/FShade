@@ -248,13 +248,22 @@ module GLES =
 
                 compile {return e}
 
-            member x.CompileIntrinsicProperty(p : MemberInfo) = 
+            member x.CompileIntrinsicPropertyGet(p : MemberInfo) = 
                 compile {
                     match p with
-                        | VectorSwizzle(name) -> return name.ToLower() |> Some
-                        | MatrixElement(x,y) -> return sprintf "_%d%d" (x+1) (y+1) |> Some
+                        | VectorSwizzle(name) -> return "{0}." + name.ToLower() |> Some
+                        | MatrixElement(x,y) -> return sprintf "{0}._%d%d" (x+1) (y+1) |> Some
                         | _ -> return None   
                 }
+
+            member x.CompileIntrinsicPropertySet(p : MemberInfo) = 
+                compile {
+                    match p with
+                        | VectorSwizzle(name) -> return "{0}." + name.ToLower() + " = {1}" |> Some
+                        | MatrixElement(x,y) -> return sprintf "{0}._%d%d = {1}" (x+1) (y+1) |> Some
+                        | _ -> return None   
+                }
+
 
             member x.CompileIntrinsicConstructor(c : ConstructorInfo) = 
                 compile {
