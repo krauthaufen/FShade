@@ -61,7 +61,12 @@ module TypeGraph =
 
                              else
                                 let fields = t.GetFields allFlags |> Seq.toList
-                                let fields = fields |> List.sortBy (fun fi -> System.Runtime.InteropServices.Marshal.OffsetOf(t, fi.Name))
+                                let fields = 
+                                    if t.IsValueType then
+                                        fields |> List.sortBy (fun fi -> System.Runtime.InteropServices.Marshal.OffsetOf(t, fi.Name))
+                                    else
+                                        fields
+
                                 fields |> List.mapC (fun fi -> 
                                     compile {
                                         let! t = compileType fi.FieldType

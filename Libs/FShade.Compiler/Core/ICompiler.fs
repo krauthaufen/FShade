@@ -19,7 +19,8 @@ type ICompiler<'s> =
     abstract member CompileIntrinsicType : Type -> Compiled<Option<string>, 's>
     abstract member CompileIntrinsicFunction : MethodInfo -> Compiled<Option<string>, 's>
     abstract member CompileIntrinsicFunctionDefinition : MethodInfo -> Compiled<Option<Expr>, 's>
-    abstract member CompileIntrinsicProperty : MemberInfo -> Compiled<Option<string>, 's>
+    abstract member CompileIntrinsicPropertyGet : MemberInfo -> Compiled<Option<string>, 's>
+    abstract member CompileIntrinsicPropertySet : MemberInfo -> Compiled<Option<string>, 's>
     abstract member CompileIntrinsicConstructor : ConstructorInfo -> Compiled<Option<string>, 's>
     abstract member CompileFunctionDeclaration : string -> string -> list<string*string*Option<string> * ParameterPassingStyle> -> string -> Compiled<string, 's>
     abstract member CompileTypeDeclaration : string -> list<string> -> Compiled<string, 's>
@@ -85,8 +86,11 @@ module CompilerFunctions =
     let compileIntrinsicFunctionDefinition (m : MethodInfo)  =
         { runCompile = fun s -> (s.compiler.CompileIntrinsicFunctionDefinition m).runCompile s }
 
-    let compileIntrinsicProperty (p : MemberInfo)  =
-        { runCompile = fun s -> (s.compiler.CompileIntrinsicProperty p).runCompile s }
+    let compileIntrinsicPropertyGet (p : MemberInfo)  =
+        { runCompile = fun s -> (s.compiler.CompileIntrinsicPropertyGet p).runCompile s }
+
+    let compileIntrinsicPropertySet (p : MemberInfo)  =
+        { runCompile = fun s -> (s.compiler.CompileIntrinsicPropertySet p).runCompile s }
 
     let compileIntrinsicConstructor (c : ConstructorInfo)  =
         { runCompile = fun s -> (s.compiler.CompileIntrinsicConstructor c).runCompile s }
