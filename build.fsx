@@ -29,9 +29,16 @@ Target "Apps" (fun () ->
 )
 
 
+
 Target "Compile" (fun () -> ())
 Target "Default" (fun () -> ())
 Target "Rebuild" (fun () -> ())
+Target "Build" (fun () -> ())
+
+
+"Restore" ==> "Core"
+"Core" ==> "Demo"
+"Core" ==> "Apps"
 
 "Core" ==>
     "Demo" ==>
@@ -43,11 +50,9 @@ Target "Rebuild" (fun () -> ())
     "Default"
 
 
-"Clean" ==>
-    "Restore"
-    "Compile" ==>
-    "Rebuild"
-
+"Clean" ==> "Rebuild"
+"Compile" ==> "Rebuild"
+"Compile" ==> "Build"
 
 // start build
 RunTargetOrDefault "Default"
