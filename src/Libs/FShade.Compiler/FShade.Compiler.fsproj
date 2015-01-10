@@ -5,37 +5,32 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>089d8df3-4ed7-4600-907a-04cd7419e9ef</ProjectGuid>
-    <OutputType>Exe</OutputType>
-    <RootNamespace>FSCC.Service</RootNamespace>
-    <AssemblyName>FSCC.Service</AssemblyName>
+    <ProjectGuid>843b90d4-d949-4a93-9717-467ebc4530c4</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <RootNamespace>FShade.Compiler</RootNamespace>
+    <AssemblyName>FShade.Compiler</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <TargetFSharpCoreVersion>4.3.1.0</TargetFSharpCoreVersion>
-    <Name>FSCC.Service</Name>
+    <Name>FShade.Compiler</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <Tailcalls>false</Tailcalls>
-    <OutputPath>..\..\Bin\Debug\</OutputPath>
+    <OutputPath>..\..\..\Bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <DocumentationFile>..\..\Bin\Debug\FSCC.Service.XML</DocumentationFile>
-    <Prefer32Bit>true</Prefer32Bit>
+    <DocumentationFile>..\..\..\Bin\Debug\FShade.Compiler.XML</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <Tailcalls>true</Tailcalls>
-    <OutputPath>..\..\Bin\Release\</OutputPath>
+    <OutputPath>..\..\..\Bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <DocumentationFile>..\..\Bin\Release\FSCC.Service.XML</DocumentationFile>
-    <Prefer32Bit>false</Prefer32Bit>
+    <DocumentationFile>..\..\..\Bin\Release\FShade.Compiler.XML</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
@@ -54,25 +49,39 @@
   </Choose>
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
-    <Compile Include="Program.fs" />
+    <Compile Include="Utilities\Utilities.fs" />
+    <Compile Include="Core\Base.fs" />
+    <Compile Include="Core\ICompiler.fs" />
+    <Compile Include="Core\CompilerMonad.fs" />
+    <Compile Include="Core\ReflectionExtensions.fs" />
+    <Compile Include="Core\ExpressionExtensions.fs" />
+    <Compile Include="Compilation\Renaming.fs" />
+    <Compile Include="Compilation\Names.fs" />
+    <Compile Include="Compilation\Types.fs" />
+    <Compile Include="Compilation\Methods.fs" />
+    <Compile Include="Compilation\Expressions.fs" />
+    <Compile Include="Compilation\LambdaFunctions.fs" />
+    <Compile Include="Compilation\CallGraph.fs" />
+    <Compile Include="Compilation\TypeGraph.fs" />
+    <Compile Include="Compilation\Main.fs" />
+    <None Include="packages.config" />
     <None Include="App.config" />
-    <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Aardvark.Base">
-      <HintPath>..\..\packages\Aardvark.Base.1.0.4\lib\net45\Aardvark.Base.dll</HintPath>
+      <HintPath>..\..\..\Packages\Aardvark.Base.1.0.4\lib\net45\Aardvark.Base.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Aardvark.Base.FSharp">
-      <HintPath>..\..\packages\Aardvark.Base.FSharp.1.0.2\lib\net45\Aardvark.Base.FSharp.dll</HintPath>
+      <HintPath>..\..\..\Packages\Aardvark.Base.FSharp.1.0.2\lib\net45\Aardvark.Base.FSharp.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Aardvark.Base.TypeProviders">
-      <HintPath>..\..\packages\Aardvark.Base.FSharp.1.0.2\lib\net45\Aardvark.Base.TypeProviders.dll</HintPath>
+      <HintPath>..\..\..\Packages\Aardvark.Base.FSharp.1.0.2\lib\net45\Aardvark.Base.TypeProviders.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="FSharp.Compiler.Service">
-      <HintPath>..\..\packages\FSharp.Compiler.Service.0.0.72\lib\net45\FSharp.Compiler.Service.dll</HintPath>
+      <HintPath>..\..\..\Packages\FSharp.Compiler.Service.0.0.72\lib\net45\FSharp.Compiler.Service.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="mscorlib" />
@@ -80,32 +89,17 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="nunit.framework">
-      <HintPath>..\..\packages\NUnit.2.6.3\lib\nunit.framework.dll</HintPath>
+      <HintPath>..\..\..\Packages\NUnit.2.6.3\lib\nunit.framework.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="RegexProvider">
-      <HintPath>..\..\packages\RegexProvider.0.0.3\lib\net40\RegexProvider.dll</HintPath>
+      <HintPath>..\..\..\Packages\RegexProvider.0.0.3\lib\net40\RegexProvider.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Numerics" />
-    <ProjectReference Include="..\FSCC\FSCC.fsproj">
-      <Name>FSCC</Name>
-      <Project>{a5fa9f6a-57a6-4d26-bfa2-d6c307808ae6}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\..\Libs\FShade.Compiler\FShade.Compiler.fsproj">
-      <Name>FShade.Compiler</Name>
-      <Project>{843b90d4-d949-4a93-9717-467ebc4530c4}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\..\Libs\FShade\FShade.fsproj">
-      <Name>FShade</Name>
-      <Project>{ec6da69c-e93a-4481-9bb6-440482b1eeb1}</Project>
-      <Private>True</Private>
-    </ProjectReference>
   </ItemGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

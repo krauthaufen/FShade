@@ -19,11 +19,11 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <Tailcalls>false</Tailcalls>
-    <OutputPath>..\..\Bin\Debug\</OutputPath>
+    <OutputPath>..\..\..\Bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
     <PlatformTarget>AnyCPU</PlatformTarget>
-    <DocumentationFile>..\..\Bin\Debug\FSCC.XML</DocumentationFile>
+    <DocumentationFile>..\..\..\Bin\Debug\FSCC.XML</DocumentationFile>
     <Prefer32Bit>true</Prefer32Bit>
     <StartArguments>
     </StartArguments>
@@ -32,30 +32,31 @@
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <Tailcalls>true</Tailcalls>
-    <OutputPath>..\..\Bin\Release\</OutputPath>
+    <OutputPath>..\..\..\Bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
     <PlatformTarget>AnyCPU</PlatformTarget>
-    <DocumentationFile>..\..\Bin\Release\FSCC.XML</DocumentationFile>
+    <DocumentationFile>
+    </DocumentationFile>
     <Prefer32Bit>false</Prefer32Bit>
     <StartArguments>
     </StartArguments>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Aardvark.Base">
-      <HintPath>..\..\packages\Aardvark.Base.1.0.4\lib\net45\Aardvark.Base.dll</HintPath>
+      <HintPath>..\..\..\Packages\Aardvark.Base.1.0.4\lib\net45\Aardvark.Base.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Aardvark.Base.FSharp">
-      <HintPath>..\..\packages\Aardvark.Base.FSharp.1.0.2\lib\net45\Aardvark.Base.FSharp.dll</HintPath>
+      <HintPath>..\..\..\Packages\Aardvark.Base.FSharp.1.0.2\lib\net45\Aardvark.Base.FSharp.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Aardvark.Base.TypeProviders">
-      <HintPath>..\..\packages\Aardvark.Base.FSharp.1.0.2\lib\net45\Aardvark.Base.TypeProviders.dll</HintPath>
+      <HintPath>..\..\..\Packages\Aardvark.Base.FSharp.1.0.2\lib\net45\Aardvark.Base.TypeProviders.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="FSharp.Compiler.Service">
-      <HintPath>..\..\packages\FSharp.Compiler.Service.0.0.72\lib\net45\FSharp.Compiler.Service.dll</HintPath>
+      <HintPath>..\..\..\Packages\FSharp.Compiler.Service.0.0.72\lib\net45\FSharp.Compiler.Service.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="mscorlib" />
@@ -63,15 +64,15 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="Newtonsoft.Json">
-      <HintPath>..\..\packages\Newtonsoft.Json.6.0.5\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <HintPath>..\..\..\Packages\Newtonsoft.Json.6.0.5\lib\net45\Newtonsoft.Json.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="nunit.framework">
-      <HintPath>..\..\packages\NUnit.2.6.3\lib\nunit.framework.dll</HintPath>
+      <HintPath>..\..\..\Packages\NUnit.2.6.3\lib\nunit.framework.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="RegexProvider">
-      <HintPath>..\..\packages\RegexProvider.0.0.3\lib\net40\RegexProvider.dll</HintPath>
+      <HintPath>..\..\..\Packages\RegexProvider.0.0.3\lib\net40\RegexProvider.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />

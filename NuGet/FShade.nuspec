@@ -1,0 +1,31 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+    <metadata>
+        <id>FShade</id>
+        <version>1.0.0</version>
+        <authors>Georg Haaser</authors>
+        <owners>Georg Haaser</owners>
+        <licenseUrl>http://opensource.org/licenses/Apache-2.0</licenseUrl>
+        <projectUrl>http://www.fshade.org</projectUrl>
+        <requireLicenseAcceptance>false</requireLicenseAcceptance>
+        <title>FShade</title>
+        <description>FShade extends F# with an embedded language for writing and composing shaders.</description>
+        <summary>FShade extends F# with an embedded language for writing and composing shaders.</summary>
+        <releaseNotes>initial version of nuget package</releaseNotes>
+		<copyright>Copyright © 2015 Georg Haaser, A-1200 Wien, Austria.</copyright>
+        <language>en-US</language>
+        <tags>graphics fsharp visualization geometry math algorithms shader</tags>
+        <dependencies>
+            <dependency id="Aardvark.Base" version="1.0.4" />
+            <dependency id="Aardvark.Base.FSharp" />
+            <dependency id="FSharp.Compiler.Service" version="0.0.72" />
+            <dependency id="NUnit" version="2.6.3" />
+            <dependency id="RegexProvider" version="0.0.3" />
+        </dependencies>
+    </metadata>
+    <files>
+        <file src="..\Bin\Release\FShade.Compiler.dll" target="lib\net45\FShade.Compiler.dll" />
+        <file src="..\Bin\Release\FShade.dll" target="lib\net45\FShade.dll" />
+        <file src="..\Bin\Release\FShade.Debug.dll" target="lib\net45\FShade.Debug.dll" />
+    </files>
+</package>
