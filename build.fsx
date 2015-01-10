@@ -4,9 +4,9 @@
 open Fake
 
 
-let core = ["Libs/FShade.Compiler/FShade.Compiler.fsproj"; "Libs/FShade/FShade.fsproj"; "Libs/FShade.Debug/FShade.Debug.fsproj"];
-let demo = ["Apps/FShade.DemoRenderer/FShade.DemoRenderer.fsproj"; "Apps/FShade.Demo/FShade.Demo.fsproj"];
-let apps = ["Apps/FSCC/FSCC.fsproj"; "Apps/FSCC.Service/FSCC.Service.fsproj"]
+let core = ["src/Libs/FShade.Compiler/FShade.Compiler.fsproj"; "src/Libs/FShade/FShade.fsproj"; "src/Libs/FShade.Debug/FShade.Debug.fsproj"];
+let demo = ["src/Apps/FShade.DemoRenderer/FShade.DemoRenderer.fsproj"; "src/Apps/FShade.Demo/FShade.Demo.fsproj"];
+let apps = ["src/Apps/FSCC/FSCC.fsproj"; "src/Apps/FSCC.Service/FSCC.Service.fsproj"]
 
 Target "Restore" (fun () ->
     RestorePackages()

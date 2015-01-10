@@ -5,74 +5,74 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>2867b916-7cc3-4a30-8059-cb99aa653ee3</ProjectGuid>
+    <ProjectGuid>a5fa9f6a-57a6-4d26-bfa2-d6c307808ae6</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <RootNamespace>FShade.Demo</RootNamespace>
-    <AssemblyName>FShade.Demo</AssemblyName>
+    <RootNamespace>FSCC</RootNamespace>
+    <AssemblyName>FSCC</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <TargetFSharpCoreVersion>4.3.1.0</TargetFSharpCoreVersion>
-    <Name>FShade.Demo</Name>
+    <Name>FSCC</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <Tailcalls>false</Tailcalls>
-    <OutputPath>..\..\Bin\Debug\</OutputPath>
+    <OutputPath>..\..\..\Bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
     <PlatformTarget>AnyCPU</PlatformTarget>
-    <DocumentationFile>..\Bin\Debug\FShade.Demo.XML</DocumentationFile>
-    <Prefer32Bit>false</Prefer32Bit>
+    <DocumentationFile>..\..\..\Bin\Debug\FSCC.XML</DocumentationFile>
+    <Prefer32Bit>true</Prefer32Bit>
+    <StartArguments>
+    </StartArguments>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <Tailcalls>true</Tailcalls>
-    <OutputPath>..\..\Bin\Release\</OutputPath>
+    <OutputPath>..\..\..\Bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
     <PlatformTarget>AnyCPU</PlatformTarget>
     <DocumentationFile>
     </DocumentationFile>
-    <Prefer32Bit>true</Prefer32Bit>
+    <Prefer32Bit>false</Prefer32Bit>
+    <StartArguments>
+    </StartArguments>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Aardvark.Base">
-      <HintPath>..\..\packages\Aardvark.Base.1.0.4\lib\net45\Aardvark.Base.dll</HintPath>
+      <HintPath>..\..\..\Packages\Aardvark.Base.1.0.4\lib\net45\Aardvark.Base.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Aardvark.Base.FSharp">
-      <HintPath>..\..\packages\Aardvark.Base.FSharp.1.0.2\lib\net45\Aardvark.Base.FSharp.dll</HintPath>
+      <HintPath>..\..\..\Packages\Aardvark.Base.FSharp.1.0.2\lib\net45\Aardvark.Base.FSharp.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Aardvark.Base.TypeProviders">
-      <HintPath>..\..\packages\Aardvark.Base.FSharp.1.0.2\lib\net45\Aardvark.Base.TypeProviders.dll</HintPath>
+      <HintPath>..\..\..\Packages\Aardvark.Base.FSharp.1.0.2\lib\net45\Aardvark.Base.TypeProviders.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="FSharp.Compiler.Service">
-      <HintPath>..\..\packages\FSharp.Compiler.Service.0.0.72\lib\net45\FSharp.Compiler.Service.dll</HintPath>
+      <HintPath>..\..\..\Packages\FSharp.Compiler.Service.0.0.72\lib\net45\FSharp.Compiler.Service.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
       <Private>True</Private>
     </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\..\..\Packages\Newtonsoft.Json.6.0.5\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="nunit.framework">
-      <HintPath>..\..\packages\NUnit.2.6.3\lib\nunit.framework.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="OpenTK">
-      <HintPath>..\..\packages\OpenTK.1.1.1589.5942\lib\NET40\OpenTK.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="OpenTK.GLControl">
-      <HintPath>..\..\packages\OpenTK.GLControl.1.1.1589.5942\lib\NET40\OpenTK.GLControl.dll</HintPath>
+      <HintPath>..\..\..\Packages\NUnit.2.6.3\lib\nunit.framework.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="RegexProvider">
-      <HintPath>..\..\packages\RegexProvider.0.0.3\lib\net40\RegexProvider.dll</HintPath>
+      <HintPath>..\..\..\Packages\RegexProvider.0.0.3\lib\net40\RegexProvider.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
@@ -81,7 +81,7 @@
     <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Shaders.fs" />
+    <Compile Include="FSCC.fs" />
     <Compile Include="Program.fs" />
     <None Include="App.config" />
     <None Include="packages.config" />
@@ -90,16 +90,6 @@
     <ProjectReference Include="..\..\Libs\FShade.Compiler\FShade.Compiler.fsproj">
       <Name>FShade.Compiler</Name>
       <Project>{843b90d4-d949-4a93-9717-467ebc4530c4}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\..\Libs\FShade.Debug\FShade.Debug.fsproj">
-      <Name>FShade.Debug</Name>
-      <Project>{55f1a5a0-f789-4b6a-9968-6da3dc29f6c3}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\FShade.DemoRenderer\FShade.DemoRenderer.fsproj">
-      <Name>FShade.DemoRenderer</Name>
-      <Project>{d68f8db7-bcb3-41cd-b25b-a6205616118e}</Project>
       <Private>True</Private>
     </ProjectReference>
     <ProjectReference Include="..\..\Libs\FShade\FShade.fsproj">
