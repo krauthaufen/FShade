@@ -57,10 +57,11 @@ Target "Build" (fun () -> ())
 
 Target "CreatePackage" (fun () ->
     let branch = Fake.Git.Information.getBranchName "."
+    let releaseNotes = Fake.Git.Information.getCurrentHash()
 
     if branch = "master" then
         let tag = Fake.Git.Information.getLastTag()
-        NuGetPack (fun p -> { p with OutputPath = "Bin"; Version = tag }) "NuGet/FShade.nuspec"
+        NuGetPack (fun p -> { p with Title = "FShade"; Project = "FShade"; OutputPath = "Bin"; Version = tag; ReleaseNotes = releaseNotes }) "NuGet/FShade.nuspec"
     else 
         traceError (sprintf "cannot create package for branch: %A" branch)
 )
@@ -73,13 +74,13 @@ Target "Deploy" (fun () ->
         else None
 
     let branch = Fake.Git.Information.getBranchName "."
-
+    let releaseNotes = Fake.Git.Information.getCurrentHash()
     if branch = "master" then
         let tag = Fake.Git.Information.getLastTag()
         match accessKey with
             | Some accessKey ->
                 try
-                    NuGet (fun p -> let r = { p with Title = "FShade"; Project = "FShade"; OutputPath = "Bin"; AccessKey = accessKey; Publish = true; Version = tag } in printfn "%A" r; r) "NuGet/FShade.nuspec"
+                    NuGet (fun p -> let r = { p with Title = "FShade"; Project = "FShade"; OutputPath = "Bin"; AccessKey = accessKey; Publish = true; Version = tag; ReleaseNotes = releaseNotes } in printfn "%A" r; r) "NuGet/FShade.nuspec"
                 with e ->
                     ()
             | None ->
