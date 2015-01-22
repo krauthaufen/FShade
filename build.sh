@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ ! -d "packages/FAKE" ]; then
+if [ ! -d "Packages/FAKE" ]; then
 	echo "downloading FAKE"
 	mono --runtime=v4.0 Packages/nuget.exe install FAKE -OutputDirectory Packages -ExcludeVersion
 	mono --runtime=v4.0 Packages/nuget.exe install FSharp.Formatting.CommandTool -OutputDirectory Packages -ExcludeVersion -Prerelease 
