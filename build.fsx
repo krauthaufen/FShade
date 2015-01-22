@@ -10,7 +10,14 @@ let demo = ["src/Apps/FShade.DemoRenderer/FShade.DemoRenderer.fsproj"; "src/Apps
 let apps = ["src/Apps/FSCC/FSCC.fsproj"; "src/Apps/FSCC.Service/FSCC.Service.fsproj"]
 
 Target "Restore" (fun () ->
-    RestorePackages()
+
+    let packageConfigs = !!"src/**/packages.config" |> Seq.toList
+
+    let defaultNuGetSources = RestorePackageHelper.RestorePackageDefaults.Sources
+    for pc in packageConfigs do
+        RestorePackage (fun p -> { p with OutputPath = "Packages" }) pc
+
+
 )
 
 Target "Clean" (fun () ->
