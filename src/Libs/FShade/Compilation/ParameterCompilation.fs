@@ -124,18 +124,22 @@ module ParameterCompilation =
 
     let rec substituteOutputs (outputType : Type) (e : Expr) =
         transform {
-            let getVar name t m =
-                match Map.tryFind name m with
-                    | Some(v) -> (m, v)
-                    | None -> let v = Var(name + "Out", t)
-                              (Map.add name v m, v)
+
             match e with
                 | Output outputType (args) -> 
 
-                    let! outputs = args |> List.mapC (fun ((t,n),e) -> 
+                    let! outputs = args |> List.collectC (fun ((sem,t),e) -> 
                         transform { 
-                            let! v = getOutput e.Type t n
-                            return (v,e)
+                            let! v = getOutput e.Type sem t
+
+                            if sem = "Positions" then
+                                let! vi = getOutput e.Type "_Positions_" t
+                                return [
+                                    vi, Expr.Var(v)
+                                    v, e
+                                ]
+                            else
+                                return [v,e]
                         })
 
 

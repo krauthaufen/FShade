@@ -392,9 +392,10 @@ module GLSL =
                     | _ -> None
 
             | Fragment ->
-                match s with
-                    | "Positions" -> Some "gl_FragCoord"
-                    | _ -> None
+                None
+//                match s with
+//                    | "Positions" -> Some "gl_FragCoord"
+//                    | _ -> None
             | TessControl ->
                 match s with
                     | "Positions" -> Some "gl_Position"
@@ -413,7 +414,9 @@ module GLSL =
                     | "Positions" -> Some "gl_Position"
                     | _ -> None
             | Fragment ->
-                None
+                match s with
+                    | "Depth" -> Some "gl_FragDepth"
+                    | _ -> None
             | TessControl ->
                 match s with
                     | "Positions" -> Some "gl_Position"
@@ -422,28 +425,49 @@ module GLSL =
                     | _ -> None
 
     //compilation functions
-    let private liftIntrinsics (s : Shader) (last : Option<ShaderType>) (next : Option<ShaderType>)=
+    let private liftIntrinsics (s : Shader)  (last : Option<ShaderType>) (next : Option<ShaderType>)=
         let mutable body = s.body
         let mutable inputs = Map.empty
         let mutable outputs = Map.empty
 
         for KeyValue(sem, v) in s.inputs do
             match getIntrinsicInputName s.shaderType last sem with
-                | Some name -> body <- body.Substitute(fun vi -> 
-                                        if vi = v then 
-                                            Some (Expr.Var(Var(name, vi.Type)))
-                                        else
-                                            None)
-                | _ -> inputs <- Map.add sem v inputs
+                | Some name -> 
+                    let replacement = Var(name, v.Type)
+                    body <- body.Substitute(fun vi -> 
+                                if vi = v then 
+                                    Some (Expr.Var(replacement))
+                                else
+                                    None
+                            )
+
+                | _ -> 
+                    if sem = "Positions" && s.shaderType = ShaderType.Fragment then
+                        let sem = "_Positions_"
+                        let replacement = Var(sem, v.Type)
+                        body <- body.Substitute(fun vi -> 
+                                    if vi = v then 
+                                        Some (Expr.Var(replacement))
+                                    else
+                                        None
+                                )
+                        inputs <- Map.add sem replacement inputs
+                    else
+                        inputs <- Map.add sem v inputs
 
         for KeyValue(sem, (t,v)) in s.outputs do
             match getIntrinsicOutputName s.shaderType next sem with
-                | Some name -> body <- body.Substitute(fun vi -> 
-                                        if vi = v then 
-                                            Some (Expr.Var(Var(name, vi.Type)))
-                                        else
-                                            None)
-                | _ -> outputs <- Map.add sem (t,v) outputs
+                | Some name -> 
+                    let replacement = Var(name, v.Type)
+                    body <- body.Substitute(fun vi -> 
+                                if vi = v then 
+                                    Some (Expr.Var(replacement))
+                                else
+                                    None
+                            )
+
+                | _ -> 
+                    outputs <- Map.add sem (t,v) outputs
         
 
         { shaderType = s.shaderType; inputs = inputs; outputs = outputs; body = body; uniforms = s.uniforms; inputTopology = s.inputTopology; debugInfo = s.debugInfo }
@@ -461,9 +485,8 @@ module GLSL =
                     return! compileVariableDeclaration t name None
         }
 
-    let private compileShader (entryName : string) (s : Shader) (last : Option<ShaderType>) (next : Option<ShaderType>) =
+    let private compileShader (entryName : string) (s : Shader) =
         compile {
-            let s = liftIntrinsics s last next
             do! resetCompilerState
 
             let! (header, c) = compileMainWithoutTypes [] s.body entryName
@@ -590,8 +613,10 @@ module GLSL =
                                                                         | None -> not <| Map.containsKey k topUsed
                                                                  ) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
                                                     let fs = removeOutputs unused fs
+                                                    printfn "INPUTS: %A" fs.inputs
 
-                                                    let! fsc = compileShader "PS" fs ((if hasgs then Geometry TriangleStrip else Vertex) |> Some) None
+                                                    let fs = liftIntrinsics fs ((if hasgs then Geometry TriangleStrip else Vertex) |> Some) None
+                                                    let! fsc = compileShader "PS" fs
 
                                                     let used = seq { yield ("Positions",typeof<V4d>); yield! fs.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k,v.Type)) } |> Map.ofSeq
                                                     return used, Some fsc
@@ -599,7 +624,6 @@ module GLSL =
                                     | None -> compile { return Map.ofList [("Positions",typeof<V4d>)], None }
 
             do! resetCompilerState
-
             let! gsUsed,gsCode = match e.geometryShader with
                                     | Some(gs, t) -> compile {
                                                     let additional = fsUsed |> Map.filter (fun k _ -> not <| Map.containsKey k gs.outputs)
@@ -608,7 +632,8 @@ module GLSL =
                                                     let unused = gs.outputs |> Map.filter (fun k v -> not <| Map.containsKey k fsUsed) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
                                                     let gs = removeOutputs unused gs
 
-                                                    let! gsc = compileShader "GS" gs (Some Vertex) (Some Fragment)
+                                                    let gs = liftIntrinsics gs (Some Vertex) (Some Fragment)
+                                                    let! gsc = compileShader "GS" gs
 
                                                     let used = gs.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k, if v.Type.IsArray then v.Type.GetElementType() else v.Type)) |> Map.ofSeq
                                                 
@@ -694,8 +719,12 @@ module GLSL =
                                                 let newTcs = substitute tcs.body
                                                 let tcs = { tcs with body = newTcs }
 
-                                                let! tevc = compileShader "TEV" tev (Some Vertex) (Some Fragment)
-                                                let! tcsc = compileShader "TCS" tcs (Some Vertex) (Some Fragment)
+                                                let tev = liftIntrinsics tev (Some Vertex) (Some Fragment)
+                                                let tcs = liftIntrinsics tcs (Some Vertex) (Some Fragment)
+
+
+                                                let! tevc = compileShader "TEV" tev
+                                                let! tcsc = compileShader "TCS" tcs
 
                                                 
                                                 let glPos = System.Text.RegularExpressions.Regex("gl_Position\[(?<index>[^\]]+)\]")
@@ -742,7 +771,9 @@ module GLSL =
                             let unused = vs.outputs |> Map.filter (fun k v -> not <| Map.containsKey k tessUsed) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
                             let vs = removeOutputs unused vs
 
-                            let! vsc = compileShader "VS" vs None ((if hasgs then Geometry TriangleStrip else Fragment) |> Some)
+                            let vs = liftIntrinsics vs None ((if hasgs then Geometry TriangleStrip else Fragment) |> Some) 
+                            
+                            let! vsc = compileShader "VS" vs
                             return Some vsc
                           }
 
