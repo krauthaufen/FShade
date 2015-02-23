@@ -219,6 +219,10 @@ module Optimization =
                 Expr.ArrayAccess(Expr.Var v, Expr.Var (Var("gl_InvocationID", typeof<int>)))
             else
                 TessellationMethods.defaultEvalInterpolation v arity
+                
+    let getInputName (outputName : string) (stage : ShaderType) =
+        if outputName = "_Positions_" then "Positions"
+        else outputName
 
     let rec addOutputs (wanted : Map<string, Type>) (s : Shader) : Shader =
         if wanted.Count > 0 then
@@ -230,6 +234,8 @@ module Optimization =
                                 
                             let b = s.body
                             let inputs = wanted |> Seq.map(fun (KeyValue(k,v)) -> 
+                                                    let k = getInputName k s.shaderType
+
                                                     match Map.tryFind k s.inputs with
                                                         | Some var -> k,var
                                                         | None -> k,Var(k, v.MakeArrayType())
@@ -246,6 +252,8 @@ module Optimization =
                 | _ -> let b = s.body
 
                        let inputs = wanted |> Seq.map(fun (KeyValue(k,v)) -> 
+                                                let k = getInputName k s.shaderType
+
                                                 match Map.tryFind k s.inputs with
                                                     | Some var -> k,var
                                                     | None -> k,Var(k, v)

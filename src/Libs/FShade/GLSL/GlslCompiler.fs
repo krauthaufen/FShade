@@ -613,7 +613,6 @@ module GLSL =
                                                                         | None -> not <| Map.containsKey k topUsed
                                                                  ) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
                                                     let fs = removeOutputs unused fs
-                                                    printfn "INPUTS: %A" fs.inputs
 
                                                     let fs = liftIntrinsics fs ((if hasgs then Geometry TriangleStrip else Vertex) |> Some) None
                                                     let! fsc = compileShader "PS" fs
