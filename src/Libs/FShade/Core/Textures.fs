@@ -5,6 +5,8 @@ open Aardvark.Base
 
 [<AutoOpen>]
 module Textures = 
+    open SamplerStateModule
+
     type ShaderTextureHandle(semantic : string, scope : UniformScope) =
         static member CreateUniform(semantic : string, scope : UniformScope) = ShaderTextureHandle(semantic, scope)
         interface ISemanticValue with

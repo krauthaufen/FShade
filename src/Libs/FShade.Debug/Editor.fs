@@ -11,6 +11,9 @@ module EffectEditor =
     open FShade.Compiler
     open FShade
     open FShade.ShaderDebug
+    
+
+    type Delta<'a> = Add of 'a | Remove of 'a
 
     let private lineBreak = System.Text.RegularExpressions.Regex "\r\n"
     let private ws = System.Text.RegularExpressions.Regex "^[ ]*"
