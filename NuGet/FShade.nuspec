@@ -16,11 +16,11 @@
         <language>en-US</language>
         <tags>graphics fsharp visualization geometry math algorithms shader</tags>
         <dependencies>
-            <dependency id="Aardvark.Base" version="1.0.4" />
-            <dependency id="Aardvark.Base.FSharp" />
-            <dependency id="FSharp.Compiler.Service" version="0.0.72" />
-            <dependency id="NUnit" version="2.6.3" />
-            <dependency id="RegexProvider" version="0.0.3" />
+            <dependency id="Aardvark.Base" version="1.0.9" />
+            <dependency id="Aardvark.Base.FSharp" version="1.0.9" />
+            <dependency id="FSharp.Compiler.Service" version="0.0.85" />
+            <dependency id="NUnit" version="2.6.4" />
+            <dependency id="RegexProvider" version="0.0.4" />
         </dependencies>
     </metadata>
     <files>
