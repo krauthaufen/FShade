@@ -12,6 +12,8 @@ open Aardvark.Base
 open FShade.Compiler
 
 module GlslSamplers =
+    open FShade.SamplerStateModule
+
     let compileWrapMode (name : string) (m : Option<WrapMode>) =
         match m with
             | Some m ->

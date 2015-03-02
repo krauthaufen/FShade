@@ -8,7 +8,8 @@ open FShade
 open Aardvark.Base
 
 module OpenGlResourceManager =
-    
+    open FShade.SamplerStateModule
+
     type private GLShaderType = OpenTK.Graphics.OpenGL4.ShaderType
 
     let private translateShaderType (t : ShaderType) =
