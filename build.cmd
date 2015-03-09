@@ -14,7 +14,6 @@ REM mklink .\.git\hooks\pre-commit .\pre-commit
 )
 
 SET TARGET="Default"
-
 IF NOT [%1]==[] (set TARGET="%1")
 
 "Packages\FAKE\tools\Fake.exe" "build.fsx" "target=%TARGET%"
