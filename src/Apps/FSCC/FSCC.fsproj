@@ -44,15 +44,15 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Aardvark.Base">
-      <HintPath>..\..\..\Packages\Aardvark.Base.1.1.6\lib\net45\Aardvark.Base.dll</HintPath>
+      <HintPath>..\..\..\Packages\Aardvark.Base.1.1.7\lib\net45\Aardvark.Base.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Aardvark.Base.FSharp">
-      <HintPath>..\..\..\Packages\Aardvark.Base.FSharp.1.1.6\lib\net45\Aardvark.Base.FSharp.dll</HintPath>
+      <HintPath>..\..\..\Packages\Aardvark.Base.FSharp.1.1.7\lib\net45\Aardvark.Base.FSharp.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Aardvark.Base.TypeProviders">
-      <HintPath>..\..\..\Packages\Aardvark.Base.FSharp.1.1.6\lib\net45\Aardvark.Base.TypeProviders.dll</HintPath>
+      <HintPath>..\..\..\Packages\Aardvark.Base.FSharp.1.1.7\lib\net45\Aardvark.Base.TypeProviders.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="DevILSharp">
