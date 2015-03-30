@@ -313,7 +313,7 @@ module Expressions =
                                 let fieldIndex = c.GetFields() |> Array.tryFindIndex (fun fi -> fi :> MemberInfo = m)
                                 match fieldIndex with
                                     | Some i -> let fieldName = getUnionField c.Name i
-                                                return sprintf "%s.%s" t fieldName |> ret
+                                                return sprintf "(%s).%s" t fieldName |> ret
                                     | None -> return! error "not a union-case field %A" m
 
                             | None ->

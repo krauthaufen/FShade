@@ -173,11 +173,11 @@ module GLES =
                         | MethodQuote <@ Vec.reflect : V3d -> V3d -> V3d @> _ -> return Some "reflect({0}, {1})"
                         | MethodQuote <@ Vec.refract : V3d -> V3d -> float -> V3d @> _ -> return Some "refract({0}, {1}, {2})"
 
-                        | MethodQuote <@ Vec.xy : V3d -> V2d @> _ -> return Some "{0}.xy"
-                        | MethodQuote <@ Vec.yz : V3d -> V2d @> _ -> return Some "{0}.yz"
-                        | MethodQuote <@ Vec.zw : V4d -> V2d @> _ -> return Some "{0}.zw"
-                        | MethodQuote <@ Vec.xyz : V4d -> V3d @> _ -> return Some "{0}.xyz"
-                        | MethodQuote <@ Vec.yzw : V4d -> V3d @> _ -> return Some "{0}.yzw"
+                        | MethodQuote <@ Vec.xy : V3d -> V2d @> _ -> return Some "({0}).xy"
+                        | MethodQuote <@ Vec.yz : V3d -> V2d @> _ -> return Some "({0}).yz"
+                        | MethodQuote <@ Vec.zw : V4d -> V2d @> _ -> return Some "({0}).zw"
+                        | MethodQuote <@ Vec.xyz : V4d -> V3d @> _ -> return Some "({0}).xyz"
+                        | MethodQuote <@ Vec.yzw : V4d -> V3d @> _ -> return Some "({0}).yzw"
 
                         | MethodQuote <@ Vec.anySmaller : V3d -> V3d -> bool @> _ -> return Some "any(lessThan({0},{1}))"
                         | MethodQuote <@ Vec.anyGreater : V3d -> V3d -> bool @> _ -> return Some "any(greaterThan({0},{1}))"
@@ -200,23 +200,11 @@ module GLES =
                         | MethodQuote <@ LanguagePrimitives.IntrinsicFunctions.SetArray @> [_] -> return Some "{0}[{1}] = {2}"
                         | MethodQuote <@ emitVertex @> [] -> return Some "EmitVertex();\r\n"
 
-//                        | MethodQuote <@ ShaderTexture2D().Sample @> [] -> return Some "{0}.Sample({1}, {2})"
-//                        | MethodQuote <@ ShaderTexture2D().SampleGrad @> [] -> return Some "{0}.SampleGrad({1}, {2}, {3}, {4})"
-//                        | MethodQuote <@ ShaderTexture2D().SampleLevel @> [] -> return Some "{0}.SampleLevel({1}, {2}, {3})"
-//                        | MethodQuote <@ ShaderTexture2D().SampleCmp @> [] -> return Some "{0}.SampleCmp({1}, {2}, {3})"
-//                        | MethodQuote <@ ShaderTexture2D().SampleCmpLevelZero @> [] -> return Some "{0}.SampleCmpLevelZero({1}, {2}, {3})"
-
-                        //| MethodQuote <@ Sampler2d().Sample @> [] -> return Some "texture({0}, {1})"
 
                         | Method("Sample", [SamplerType(_); _]) -> return Some "texture2D({0}, {1})"
                         | Method("Sample", [SamplerType(_,true,_,_,_); _; _]) -> return Some "texture2D({0}, vec3({1}, {2}))"
                         | Method("SampleLevel", [SamplerType(_); _; _]) -> return Some "textureLod({0}, {1}, {2})"
                         | Method("SampleLevel", [SamplerType(_,true,_,_,_); _; _; _]) -> return Some "textureLod({0}, vec3({1}, {2}), {3})"
-
-
-//                        | MethodQuote <@ ShaderTexture2DArray().Sample @> [] -> return Some "{0}.Sample({1}, {2}, {3})"
-//                        | MethodQuote <@ ShaderTexture2DArray().SampleCmp @> [] -> return Some "{0}.SampleCmp({1}, {2}, {3}, {4})"
-//                        | MethodQuote <@ ShaderTexture2DArray().SampleCmpLevelZero @> [] -> return Some "{0}.SampleCmpLevelZero({1}, {2}, {3}, {4})"
 
                         | Method("get_Length", [FixedArrayType(s,t)]) -> return Some (sprintf "%d" s)
                         | Method("get_Item", [FixedArrayType(s,t);v]) -> return Some "{0}[{1}]"
@@ -251,16 +239,16 @@ module GLES =
             member x.CompileIntrinsicPropertyGet(p : MemberInfo) = 
                 compile {
                     match p with
-                        | VectorSwizzle(name) -> return "{0}." + name.ToLower() |> Some
-                        | MatrixElement(x,y) -> return sprintf "{0}._%d%d" (x+1) (y+1) |> Some
+                        | VectorSwizzle(name) -> return "({0})." + name.ToLower() |> Some
+                        | MatrixElement(x,y) -> return sprintf "({0})._%d%d" (x+1) (y+1) |> Some
                         | _ -> return None   
                 }
 
             member x.CompileIntrinsicPropertySet(p : MemberInfo) = 
                 compile {
                     match p with
-                        | VectorSwizzle(name) -> return "{0}." + name.ToLower() + " = {1}" |> Some
-                        | MatrixElement(x,y) -> return sprintf "{0}._%d%d = {1}" (x+1) (y+1) |> Some
+                        | VectorSwizzle(name) -> return "({0})." + name.ToLower() + " = {1}" |> Some
+                        | MatrixElement(x,y) -> return sprintf "({0})._%d%d = {1}" (x+1) (y+1) |> Some
                         | _ -> return None   
                 }
 

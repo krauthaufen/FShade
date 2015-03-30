@@ -209,15 +209,6 @@ module GLSL =
                         | MethodQuote <@ ddx<int> @> _ -> return Some "dFdx({0})"
                         | MethodQuote <@ ddy<int> @> _ -> return Some "dFdy({0})"
 
-//                        | MethodQuote <@ ShaderTexture2D().Sample @> [] -> return Some "{0}.Sample({1}, {2})"
-//                        | MethodQuote <@ ShaderTexture2D().SampleGrad @> [] -> return Some "{0}.SampleGrad({1}, {2}, {3}, {4})"
-//                        | MethodQuote <@ ShaderTexture2D().SampleLevel @> [] -> return Some "{0}.SampleLevel({1}, {2}, {3})"
-//                        | MethodQuote <@ ShaderTexture2D().SampleCmp @> [] -> return Some "{0}.SampleCmp({1}, {2}, {3})"
-//                        | MethodQuote <@ ShaderTexture2D().SampleCmpLevelZero @> [] -> return Some "{0}.SampleCmpLevelZero({1}, {2}, {3})"
-
-                        //| MethodQuote <@ Sampler2d().Sample @> [] -> return Some "texture({0}, {1})"
-
-                        //| MethodQuote <@ Sampler.sample @> _ -> return Some "texture({0}, {1})"
 
                         //SamplerType(dim, isArray, isShadow, isMS, valueType) 
                         | Method("Sample", [SamplerType(dim, isArray, isShadow, isMS, valueType); _]) -> 
@@ -238,10 +229,6 @@ module GLSL =
                         | Method("SampleLevel", [SamplerType(_); _; _]) -> return Some "textureLod({0}, {1}, {2})"
                         | Method("SampleLevel", [SamplerType(_,true,_,_,_); _; _; _]) -> return Some "textureLod({0}, vec3({1}, {2}), {3})"
 
-
-//                        | MethodQuote <@ ShaderTexture2DArray().Sample @> [] -> return Some "{0}.Sample({1}, {2}, {3})"
-//                        | MethodQuote <@ ShaderTexture2DArray().SampleCmp @> [] -> return Some "{0}.SampleCmp({1}, {2}, {3}, {4})"
-//                        | MethodQuote <@ ShaderTexture2DArray().SampleCmpLevelZero @> [] -> return Some "{0}.SampleCmpLevelZero({1}, {2}, {3}, {4})"
 
                         | Method("get_Length", [FixedArrayType(s,t)]) -> return Some (sprintf "%d" s)
                         | Method("get_Item", [FixedArrayType(s,t);v]) -> return Some "{0}[{1}]"
