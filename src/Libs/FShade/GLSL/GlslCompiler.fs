@@ -205,6 +205,7 @@ module GLSL =
                         | MethodQuote <@ LanguagePrimitives.IntrinsicFunctions.GetArray @> [_] -> return Some "{0}[{1}]"
                         | MethodQuote <@ LanguagePrimitives.IntrinsicFunctions.SetArray @> [_] -> return Some "{0}[{1}] = {2}"
                         | MethodQuote <@ emitVertex @> [] -> return Some "EmitVertex();\r\n"
+                        | MethodQuote <@ discard @> [] -> return Some "discard;\r\n"
 
 //                        | MethodQuote <@ ShaderTexture2D().Sample @> [] -> return Some "{0}.Sample({1}, {2})"
 //                        | MethodQuote <@ ShaderTexture2D().SampleGrad @> [] -> return Some "{0}.SampleGrad({1}, {2}, {3}, {4})"

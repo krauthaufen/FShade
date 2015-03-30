@@ -77,3 +77,4 @@ module Primitives =
 
 
     let emitVertex() = ()
+    let discard () : unit = failwith "_"
