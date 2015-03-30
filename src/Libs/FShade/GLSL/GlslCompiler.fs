@@ -179,11 +179,11 @@ module GLSL =
                         | MethodQuote <@ Vec.reflect : V3d -> V3d -> V3d @> _ -> return Some "reflect({0}, {1})"
                         | MethodQuote <@ Vec.refract : V3d -> V3d -> float -> V3d @> _ -> return Some "refract({0}, {1}, {2})"
 
-                        | MethodQuote <@ Vec.xy : V3d -> V2d @> _ -> return Some "{0}.xy"
-                        | MethodQuote <@ Vec.yz : V3d -> V2d @> _ -> return Some "{0}.yz"
-                        | MethodQuote <@ Vec.zw : V4d -> V2d @> _ -> return Some "{0}.zw"
-                        | MethodQuote <@ Vec.xyz : V4d -> V3d @> _ -> return Some "{0}.xyz"
-                        | MethodQuote <@ Vec.yzw : V4d -> V3d @> _ -> return Some "{0}.yzw"
+                        | MethodQuote <@ Vec.xy : V3d -> V2d @> _ -> return Some "({0}).xy"
+                        | MethodQuote <@ Vec.yz : V3d -> V2d @> _ -> return Some "({0}).yz"
+                        | MethodQuote <@ Vec.zw : V4d -> V2d @> _ -> return Some "({0}).zw"
+                        | MethodQuote <@ Vec.xyz : V4d -> V3d @> _ -> return Some "({0}).xyz"
+                        | MethodQuote <@ Vec.yzw : V4d -> V3d @> _ -> return Some "({0}).yzw"
 
                         | MethodQuote <@ Vec.anySmaller : V3d -> V3d -> bool @> _ -> return Some "any(lessThan({0},{1}))"
                         | MethodQuote <@ Vec.anyGreater : V3d -> V3d -> bool @> _ -> return Some "any(greaterThan({0},{1}))"
@@ -206,6 +206,8 @@ module GLSL =
                         | MethodQuote <@ LanguagePrimitives.IntrinsicFunctions.SetArray @> [_] -> return Some "{0}[{1}] = {2}"
                         | MethodQuote <@ emitVertex @> [] -> return Some "EmitVertex();\r\n"
                         | MethodQuote <@ discard @> [] -> return Some "discard;\r\n"
+                        | MethodQuote <@ ddx<int> @> _ -> return Some "dFdx({0})"
+                        | MethodQuote <@ ddy<int> @> _ -> return Some "dFdy({0})"
 
 //                        | MethodQuote <@ ShaderTexture2D().Sample @> [] -> return Some "{0}.Sample({1}, {2})"
 //                        | MethodQuote <@ ShaderTexture2D().SampleGrad @> [] -> return Some "{0}.SampleGrad({1}, {2}, {3}, {4})"
@@ -274,16 +276,16 @@ module GLSL =
             member x.CompileIntrinsicPropertyGet(p : MemberInfo) = 
                 compile {
                     match p with
-                        | VectorSwizzle(name) -> return "{0}." + name.ToLower() |> Some
-                        | MatrixElement(x,y) -> return sprintf "{0}._%d%d" (x+1) (y+1) |> Some
+                        | VectorSwizzle(name) -> return "({0})." + name.ToLower() |> Some
+                        | MatrixElement(x,y) -> return sprintf "({0})._%d%d" (x+1) (y+1) |> Some
                         | _ -> return None   
                 }
 
             member x.CompileIntrinsicPropertySet(p : MemberInfo) = 
                 compile {
                     match p with
-                        | VectorSwizzle(name) -> return "{0}." + name.ToLower() + " = {1}" |> Some
-                        | MatrixElement(x,y) -> return sprintf "{0}._%d%d = {1}" (x+1) (y+1) |> Some
+                        | VectorSwizzle(name) -> return "({0})." + name.ToLower() + " = {1}" |> Some
+                        | MatrixElement(x,y) -> return sprintf "({0})._%d%d = {1}" (x+1) (y+1) |> Some
                         | _ -> return None   
                 }
 

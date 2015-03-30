@@ -282,7 +282,7 @@ module Expressions =
                             let! i = compileExpression lastExpression false ifTrue
                             let! e = compileExpression lastExpression false ifFalse
 
-                            return sprintf "%s ? %s : %s" c i e
+                            return sprintf "(%s) ? (%s) : (%s)" c i e
                     else
                         let! i = compileExpression lastExpression true ifTrue
                         let! e = compileExpression lastExpression true ifFalse
@@ -328,7 +328,7 @@ module Expressions =
                             | Some(str) -> return String.Format(str, t') |> ret
                             | None -> 
                                 match m with
-                                    | :? CustomProperty as m -> return sprintf "%s.%s" t' m.Name
+                                    | :? CustomProperty as m -> return sprintf "(%s).%s" t' m.Name
                                     | _ ->
                                         match m with
                                             | :? PropertyInfo as p -> 
@@ -337,12 +337,12 @@ module Expressions =
                                                     | Some fmt -> return System.String.Format(fmt, t) |> ret
                                                     | None ->  
                                                         if isRecordField p then
-                                                            return sprintf "%s.%s" t' m.Name |> ret
+                                                            return sprintf "(%s).%s" t' m.Name |> ret
                                                         else
                                                             let ex = Expr.Call(t, p.GetMethod, [])
                                                             return! compileExpression lastExpression isStatement ex
                                             | _ ->
-                                                 return sprintf "%s.%s" t' m.Name |> ret
+                                                 return sprintf "(%s).%s" t' m.Name |> ret
 
                 // matches FieldSet and PropertySet since we make no distinction between them here.
                 // since the current implementation does not allow union-type fields to be mutable we
@@ -361,14 +361,14 @@ module Expressions =
                                             | Some fmt -> return System.String.Format(fmt, t', v') |> ret
                                             | None ->  
                                                 if isRecordField p then
-                                                    return sprintf "%s.%s = %s;\r\n" t' m.Name v'
+                                                    return sprintf "(%s).%s = %s;\r\n" t' m.Name v'
                                                 else
                                                     let ex = Expr.Call(t, p.SetMethod, [v])
                                                     let! r = compileExpression lastExpression isStatement ex
                                                     return sprintf "%s;\r\n" r
 
                                     | _ ->
-                                         return sprintf "%s.%s = %s;\r\n" t' m.Name v'
+                                         return sprintf "(%s).%s = %s;\r\n" t' m.Name v'
 
                 // static properties and fields are simply inlined atm. 
                 // TODO: this might not be sufficient since changes will not be reflected in the shader-code.
@@ -406,7 +406,7 @@ module Expressions =
                 //       throughout the compiler.
                 | UnionCaseTest(e, c) ->
                     let! e = compileExpression false false e
-                    return sprintf "%s.tag == %d" e c.Tag |> ret
+                    return sprintf "(%s).tag == %d" e c.Tag |> ret
 
                 // when an object is created the compiler currenlty assumes that the constructor
                 // takes all arguments in the exact order of its fields and does simply assign the
@@ -434,7 +434,7 @@ module Expressions =
                 | TupleGet(t,i) ->
                     let fieldName = getTupleField i
                     let! t = compileExpression false false t
-                    return sprintf "%s.%s" t fieldName |> ret
+                    return sprintf "(%s).%s" t fieldName |> ret
 
                 // Since pipes are very common in F#-code w want to support them whenever possible
                 // Most pipes can however simply be 'inlined'. This active pattern determines
