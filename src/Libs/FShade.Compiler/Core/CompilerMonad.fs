@@ -98,6 +98,29 @@ module CompilerMonad =
         let rec mapC (f : 'a -> Compiled<'b,'s>) (elements : seq<'a>) : Compiled<seq<'b>,'s> =
             mapCi (fun _ e -> f e) elements
 
+        let rec mapCs (seed : 'sr) (f : 'sr -> 'a -> Compiled<'sr * 'b,'s>) (elements : seq<'a>) : Compiled<seq<'b>,'s> =
+            { runCompile = fun s -> 
+                    let mutable c = s
+                    let mutable error = None
+
+                    let l = System.Collections.Generic.List<'b>()
+                    let mutable state = seed
+                    
+                    for e in elements do
+                        match error with
+                            | None -> match (f state e).runCompile c with
+                                        | Success(s,(newState, v)) -> 
+                                            l.Add(v)
+                                            c <- s
+                                            state <- newState
+                                        | Error e -> error <- Some e
+                            | _ -> ()
+
+                    match error with
+                        | None -> Success(c,l :> seq<'b>)
+                        | Some e -> Error e }
+
+
         let rec collectC (f : 'a -> Compiled<#seq<'b>, 's>) (elements : seq<'a>) : Compiled<seq<'b>,'s> =
             compile {
                 let! ll = mapC f elements

@@ -559,30 +559,41 @@ module GLSL =
                                       |> Map.ofSeq
 
 
-            let! inputs = inputs |> Seq.mapCi (fun i (KeyValue(_,n)) -> 
-                compile {
+            let! inputs = 
+                inputs 
+                    |> Seq.mapCs 0  (fun i (KeyValue(_,n)) -> 
+                        compile {
                     
-                    let modifier =
-                        if glslVersion > version120 then
-                            sprintf "layout(location = %d) in" i
-                        else
-                            if s.shaderType = ShaderType.Vertex then 
-                                "attribute" 
-                            else 
-                                "varying"
+                            let modifier =
+                                if glslVersion > version120 then
+                                    sprintf "layout(location = %d) in" i
+                                else
+                                    if s.shaderType = ShaderType.Vertex then 
+                                        "attribute" 
+                                    else 
+                                        "varying"
 
-                    if n.Type.IsArray then
-                        let t = n.Type.GetElementType()
-                        let! r = compileVariableDeclaration t n.Name
-                        return sprintf "%s %s[];" modifier r
+                            let size =
+                                match n.Type with
+                                    | MatrixOf(size, t) ->
+                                        if size.X = 4 then size.Y
+                                        elif size.X = 3 then size.Y
+                                        else 1
+                                    | _ -> 1
 
-                    else
-                        let! r = compileVariableDeclaration n.Type n.Name
-                        return sprintf "%s %s;" modifier r
+                            if n.Type.IsArray then
+                                let t = n.Type.GetElementType()
+                                let! r = compileVariableDeclaration t n.Name
+                                return (i+size),sprintf "%s %s[];" modifier r
 
-                })
+                            else
+                                let! r = compileVariableDeclaration n.Type n.Name
+                                return (i+size),sprintf "%s %s;" modifier r
 
-            let! outputs = outputs |> Seq.mapCi (fun i (KeyValue(_,(_,n))) -> 
+                        }
+                    )
+
+            let! outputs = outputs |> Seq.mapCs 0 (fun i (KeyValue(_,(_,n))) -> 
                 compile {
                     let modifier =
                         if glslVersion > version120 then
@@ -590,13 +601,22 @@ module GLSL =
                         else
                             "varying"
 
+
+                    let size =
+                            match n.Type with
+                                | MatrixOf(size, t) ->
+                                    if size.X = 4 then size.Y
+                                    elif size.X = 3 then size.Y
+                                    else 1
+                                | _ -> 1
+
                     if s.shaderType = ShaderType.TessControl then
                         let t = n.Type
                         let! r = compileVariableDeclaration t n.Name
-                        return sprintf "%s %s[];" modifier r
+                        return (i+size),sprintf "%s %s[];" modifier r
                     else
                         let! r = compileVariableDeclaration n.Type n.Name
-                        return sprintf "%s %s;" modifier r
+                        return (i+size),sprintf "%s %s;" modifier r
                     })
 
 
