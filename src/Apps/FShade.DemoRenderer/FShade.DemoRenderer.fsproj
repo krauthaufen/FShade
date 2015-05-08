@@ -58,16 +58,13 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Aardvark.Base">
-      <HintPath>..\..\..\Packages\Aardvark.Base.1.1.13\lib\net45\Aardvark.Base.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\..\packages\Aardvark.Base.1.2.1\lib\net45\Aardvark.Base.dll</HintPath>
     </Reference>
     <Reference Include="Aardvark.Base.FSharp">
-      <HintPath>..\..\..\Packages\Aardvark.Base.FSharp.1.1.13\lib\net45\Aardvark.Base.FSharp.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\..\packages\Aardvark.Base.FSharp.1.2.1\lib\net45\Aardvark.Base.FSharp.dll</HintPath>
     </Reference>
     <Reference Include="Aardvark.Base.TypeProviders">
-      <HintPath>..\..\..\Packages\Aardvark.Base.FSharp.1.1.13\lib\net45\Aardvark.Base.TypeProviders.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\..\..\packages\Aardvark.Base.FSharp.1.2.1\lib\net45\Aardvark.Base.TypeProviders.dll</HintPath>
     </Reference>
     <Reference Include="AssimpNet">
       <HintPath>..\..\..\BinPrebuilt\AssimpNet.dll</HintPath>
