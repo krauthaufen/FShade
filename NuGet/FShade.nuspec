@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
     <metadata>
         <id>FShade</id>
-        <version>1.0.0</version>
+        <version>@build.number@</version>
         <authors>Georg Haaser</authors>
         <owners>Georg Haaser</owners>
         <licenseUrl>http://opensource.org/licenses/Apache-2.0</licenseUrl>
@@ -16,8 +16,8 @@
         <language>en-US</language>
         <tags>graphics fsharp visualization geometry math algorithms shader</tags>
         <dependencies>
-            <dependency id="Aardvark.Base" version="1.1.13" />
-            <dependency id="Aardvark.Base.FSharp" version="1.1.13" />
+            <dependency id="Aardvark.Base" version="@build.number@" />
+            <dependency id="Aardvark.Base.FSharp" version="@build.number@" />
             <dependency id="FSharp.Compiler.Service" version="0.0.85" />
             <dependency id="NUnit" version="2.6.4" />
             <dependency id="RegexProvider" version="0.0.4" />

@@ -24,11 +24,13 @@ let updatePackages (sources : list<string>) (projectFiles : #seq<string>) =
     if Set.count packages <> 0 then
         for project in projectFiles do
             project |> Fake.NuGet.Update.NugetUpdate (fun p ->  
+                let l = packages |> Set.intersect (Set.ofList p.Ids) |> Set.toList
+                printfn "updating: %A" l
                 { p with 
-                    Ids = packages |> Set.intersect (Set.ofList p.Ids) |> Set.toList
+                    Ids = l
                     //ToolPath = @"E:\Development\aardvark-2015\tools\NuGet\nuget.exe"
                     RepositoryPath = "packages"
-                    Sources = sources @ Fake.NuGet.Install.NugetInstallDefaults.Sources
+                    Sources = sources @ Fake.NuGet.Install.NugetInstallDefaults.Sources @ ["https://www.nuget.org/api/v2/" ]
                     //Prerelease = true
                 } 
             )
