@@ -51,19 +51,21 @@ module BuilderCompilation =
 
                     let e = Expr.ForIntegerRangeLoop(i, Expr.Value(0), Expr.Value(count - 1),  body)
                     
-                    do! setBuilder b
                     return e
 
-                | BuilderCall(_, Method("Combine",_), [l;r]) ->
+                | BuilderCall(b, Method("Combine",_), [l;r]) ->
+
                     let! l = removeBuilderCallsInternal l
                     let! r = removeBuilderCallsInternal r
                     return Expr.Sequential(l,r)
 
-                | BuilderCall(_, Method("Delay",_), [Lambda(_,b)]) ->
+                | BuilderCall(builder, Method("Delay",_), [Lambda(_,b)]) ->
+                    do! setBuilder builder
                     let! b = removeBuilderCallsInternal b
                     return b
 
-                | BuilderCall(_, Method("Zero",_), []) ->
+                | BuilderCall(b, Method("Zero",_), []) ->
+                    do! setBuilder b
                     return Expr.Value(())
 
                 //PropertyGet (Some (Value (<null>)), TessCoord, [])
@@ -88,8 +90,12 @@ module BuilderCompilation =
                     let i = Expr.Var(i)
                     return Expr.ArrayAccess(i, index)
 
-                | BuilderCall(b, mi, [NewRecord(t, fields)]) when mi.Name = "Yield" ->
+                | BuilderCall(b, mi, [Let(v, e, inner)]) when mi.Name = "Yield" ->
+                    let inner = inner.Substitute (fun vi -> if vi = v then Some e else None)
+                    return! removeBuilderCallsInternal (Expr.Call(b, mi, [inner]))
 
+                | BuilderCall(b, mi, [NewRecord(t, fields)]) when mi.Name = "Yield" ->
+                    do! setBuilder b
                     let semantics = FSharpType.GetRecordFields t |> Seq.map (fun m -> m.Semantic, m.AssignedTarget) |> Seq.toList
                     let setters = List.zip semantics fields
 
@@ -102,6 +108,10 @@ module BuilderCompilation =
                     let emit = Expr.Call(getMethodInfo <@ emitVertex @>, [])
                     let result = outputs |> List.fold (fun a (v,e) -> Expr.Sequential(Expr.VarSet(v,e), a)) emit
                     return result
+
+                | BuilderCall(b, mi, [Let(v, e, inner)]) when mi.Name = "Return" ->
+                    let inner = inner.Substitute (fun vi -> if vi = v then Some e else None)
+                    return! removeBuilderCallsInternal (Expr.Call(b, mi, [inner]))
 
                 | BuilderCall(b, mi, [value]) when mi.Name = "Return" ->
                     do! setBuilder b

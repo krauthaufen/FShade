@@ -55,6 +55,9 @@ and [<NoComparison>] [<NoEquality>] CompilerState<'s> =
       lambdaId : int
       lambdas : Map<string, Expr * int>
 
+      uniformId : int
+      uniforms : Map<Unique<obj>, Var>
+
       defines : Map<string, string>
           
       bound : Set<Var>

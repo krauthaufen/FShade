@@ -78,7 +78,8 @@ module Primitives =
 
     let emitVertex() = ()
 
-
+    let endPrimitive() = ()
+    let restartStrip() = ()
 
     let inline ddx< ^a when ^a : (static member (-) : ^a -> ^a -> ^a) > (v : ^a) : ^a = failwith "_"
     let inline ddy< ^a when ^a : (static member (-) : ^a -> ^a -> ^a) > (v : ^a) : ^a = failwith "_"

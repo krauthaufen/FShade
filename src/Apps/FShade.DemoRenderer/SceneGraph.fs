@@ -105,9 +105,9 @@ module SceneGraph =
            
             
             if isIndexed then
-                GL.DrawElements(BeginMode.Triangles, faceVertexCount, DrawElementsType.UnsignedInt, 0)
+                GL.DrawElements(BeginMode.Points, faceVertexCount, DrawElementsType.UnsignedInt, 0)
             else
-                GL.DrawArrays(PrimitiveType.Triangles, 0, faceVertexCount)
+                GL.DrawArrays(PrimitiveType.Points, 0, faceVertexCount)
 
             for (i,_,_) in samplers do
                 GL.ActiveTexture((int TextureUnit.Texture0 + i) |> unbox)

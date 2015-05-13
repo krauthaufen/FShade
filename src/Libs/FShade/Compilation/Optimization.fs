@@ -121,7 +121,7 @@ module Optimization =
         while !r do
             r := false
             let comp = eliminateDeadCodeInternal result
-            let state = { compiler = Unchecked.defaultof<ICompiler<EliminationState>>; types = Set.empty; functions = Set.empty; functionId = 0; constantId = 0; constants = Map.empty; lambdaId = 0; lambdas = Map.empty; defines = Map.empty; bound = Set.empty; userState = { used = free; found = false }}
+            let state = { compiler = Unchecked.defaultof<ICompiler<EliminationState>>; types = Set.empty; functions = Set.empty; functionId = 0; constantId = 0; constants = Map.empty; lambdaId = 0; lambdas = Map.empty; uniformId = 0; uniforms = Map.empty; defines = Map.empty; bound = Set.empty; userState = { used = free; found = false }}
             match comp.runCompile state with
                 | Success(s,v) -> r := s.userState.found
                                   result <- v

@@ -10,28 +10,26 @@ open FShade.Compiler
 module ShaderState =
 
     [<NoComparison>]
-    type ShaderState = { inputs : Map<string, Var>; outputs : Map<string, Option<string> * Var>; currentUniformIndex : int; uniforms : Map<Unique<Uniform>, Var>; builder : Option<Expr> }
+    type ShaderState = { inputs : Map<string, Var>; outputs : Map<string, Option<string> * Var>; uniforms : Map<Unique<Uniform>, Var>; builder : Option<Expr> }
 
     let addInput n i =
-        modifyCompilerState(fun s -> { inputs = Map.add n i s.inputs; outputs = s.outputs; currentUniformIndex = s.currentUniformIndex; uniforms = s.uniforms; builder = s.builder })
+        modifyCompilerState(fun s -> { inputs = Map.add n i s.inputs; outputs = s.outputs;  uniforms = s.uniforms; builder = s.builder })
 
     let addOutput n i =
-        modifyCompilerState(fun s -> { inputs = s.inputs; outputs = Map.add n i s.outputs; currentUniformIndex = s.currentUniformIndex; uniforms = s.uniforms; builder = s.builder })
+        modifyCompilerState(fun s -> { inputs = s.inputs; outputs = Map.add n i s.outputs;uniforms = s.uniforms; builder = s.builder })
 
     let addUniform n i =
-        modifyCompilerState(fun s -> { inputs = s.inputs; outputs = s.outputs; currentUniformIndex = s.currentUniformIndex; uniforms = Map.add n i s.uniforms; builder = s.builder })
+        modifyCompilerState(fun s -> { inputs = s.inputs; outputs = s.outputs; uniforms = Map.add n i s.uniforms; builder = s.builder })
 
-    let addAnonymousUniform n i =
-        modifyCompilerState(fun s -> { inputs = s.inputs; outputs = s.outputs; currentUniformIndex = s.currentUniformIndex + 1; uniforms = Map.add n i s.uniforms; builder = s.builder })
-
+    
     let setBuilder b =
         modifyCompilerState(fun s -> 
             match s.builder with
-                | None -> { inputs = s.inputs; outputs = s.outputs; currentUniformIndex = s.currentUniformIndex; uniforms = s.uniforms; builder = Some b }
+                | None -> { inputs = s.inputs; outputs = s.outputs; uniforms = s.uniforms; builder = Some b }
                 | Some _ -> s
         )
 
-    let emptyShaderState = { inputs = Map.empty; outputs = Map.empty; currentUniformIndex = 0; uniforms = Map.empty; builder = None }
+    let emptyShaderState = { inputs = Map.empty; outputs = Map.empty; uniforms = Map.empty; builder = None }
 
 
 
@@ -68,10 +66,11 @@ module ShaderState =
                             | Attribute(_,t,n) -> let v = Var(n, t)
                                                   do! addUniform u v
                                                   return v
-                            | UserUniform(t,e) -> let name = sprintf "userUniform%d" s.currentUniformIndex
-                                                  let v = Var(name, t)
-                                                  do! addAnonymousUniform u v
-                                                  return v
+                            | UserUniform(t,e) -> 
+                                let! res = getUserUniform t e
+                                do! addUniform u res
+                                return res
+
                             | SamplerUniform(t,sem, n,sam) ->
                                 let v = Var(n, t)
                                 do! addUniform u v

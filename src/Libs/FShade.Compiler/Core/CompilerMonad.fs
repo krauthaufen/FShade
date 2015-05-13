@@ -30,6 +30,10 @@ module StateHelpers =
 
                                  defines = Map.empty
                                  functionId = 0
+
+                                 uniformId = 0
+                                 uniforms = Map.empty
+
                                  bound = Set.empty
                                  userState = c.InitialState() }
 
@@ -199,6 +203,25 @@ module StateModification =
     let addUsedType t = { runCompile = fun o -> Success({ o with  types = Set.add (Unique(t)) o.types },()) }
     let addMethod mi = { runCompile = fun o -> Success({ o with functions = Set.add (Unique(MethodFunction mi)) o.functions },()) }
     let addFunction args body = { runCompile = fun o -> Success({ o with functions = Set.add (Unique(SpecialFunction(o.functionId, args, body))) o.functions; functionId = o.functionId + 1},o.functionId) }
+
+    let getUserUniform t obj = 
+        { runCompile = 
+            fun o -> 
+                match Map.tryFind (Unique obj) o.uniforms with
+                    | Some v -> Success(o, v)
+                    | None ->
+                        let v = Var(sprintf "userUniform%d" o.uniformId, t)
+                        let newState =
+                            { o with 
+                                uniforms = Map.add (Unique obj) v o.uniforms
+                                uniformId = o.uniformId + 1
+                            }
+
+                        Success(newState, v)
+        }
+
+
+
     let addBound v = { runCompile = fun o -> Success({o with bound = Set.add v o.bound}, ()) }
     let removeBound v = { runCompile = fun o -> Success({o with bound = Set.remove v o.bound}, ()) }
     let isBound v = { runCompile = fun o -> Success(o, Set.contains v o.bound) }

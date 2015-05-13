@@ -208,7 +208,8 @@ module GLSL =
                         | MethodQuote <@ discard @> [] -> return Some "discard;\r\n"
                         | MethodQuote <@ ddx<int> @> _ -> return Some "dFdx({0})"
                         | MethodQuote <@ ddy<int> @> _ -> return Some "dFdy({0})"
-
+                        | MethodQuote <@ endPrimitive @> _ -> return Some "EndPrimitive()​"
+                        | MethodQuote <@ restartStrip @> _ -> return Some "EndPrimitive()​"
 
                         //SamplerType(dim, isArray, isShadow, isMS, valueType) 
                         | Method("Sample", [SamplerType(dim, isArray, isShadow, isMS, valueType); _]) -> 
@@ -394,53 +395,96 @@ module GLSL =
         }
 
 
-//    let (|VertexOpt|GeometryOpt|FragmentOpt|NoneOpt|) (t : Option<ShaderType>) =
-//        match t with
-//            | Some Vertex -> VertexOpt
-//            | Some (Geometry _) -> GeometryOpt
-//            | Some Fragment -> FragmentOpt
-//            | _ -> NoneOpt
+
+    // intrisics are taken from: https://www.opengl.org/wiki/Built-in_Variable_(GLSL)
 
     let private getIntrinsicInputName (v : Version) (t : ShaderType) (last : Option<ShaderType>) (s : string) =
-        match t with
-            | Vertex ->
-                None
-            | Geometry(_) ->
-                match s with
-                    | "Positions" -> Some "gl_Position"
-                    | _ -> None
+        match s, last with
+            | "PointSize", Some _ -> 
+                Some "gl_PointSize"
 
-            | Fragment ->
-                None
+            | "ClipDistance", Some _  -> 
+                Some "gl_ClipDistance"
 
-            | TessControl ->
-                match s with
-                    | "Positions" -> Some "gl_Position"
-                    | "InvocationId" -> Some "gl_InvocationID"
-                    | _ -> None
-            | TessEval ->
-                match s with
-                    | "Positions" -> Some "gl_Position"
-                    | "TessCoord" -> Some "gl_TessCoord"
-                    | _ -> None
+            | _ ->
+                match t with
+                    | Vertex ->
+                        match s with
+                            | "VertexId" -> Some "gl_VertexID"
+                            | "InstanceId" -> Some "gl_InstanceID"
+                            | _ -> None
+
+                    | TessControl ->
+                        match s with
+                            | "PatchVertices" -> Some "gl_PatchVerticesIn"
+                            | "PrimitiveId" -> Some "gl_PrimitiveID"
+                            | "InvocationId" -> Some "gl_InvocationID"
+                            | _ -> None
+                    | TessEval ->
+                        match s with
+                            | "TessCoord" -> Some "gl_TessCoord"
+                            | "PatchVertices" -> Some "gl_PatchVerticesIn"
+                            | "PrimitiveId" -> Some "gl_PrimitiveID"
+                            | "TessLevelInner" -> Some "gl_TessLevelInner"
+                            | "TessLevelOuter" -> Some "gl_TessLevelOuter"
+                            | _ -> None
+
+                    | Geometry(_) ->
+                        match s with
+                            | "PrimitiveId" -> Some "gl_PrimitiveIDIn"
+                            | "InvocationId" -> Some "gl_InvocationID"
+                            | _ -> None
+
+                    | Fragment ->
+                        match s with
+                            | "FragCoord" -> Some "gl_FragCoord"
+                            | "FrontFacing" -> Some "gl_FrontFacing"
+                            | "PointCoord" -> Some "gl_PointCoord"
+                            | "SampleId" -> Some "gl_SampleID"
+                            | "SamplePosition" -> Some "gl_SamplePosition"
+                            | "SampleMask" -> Some "gl_SampleMaskIn"
+                            | "PrimitiveId" -> Some "gl_PrimitiveID"
+                            | "Layer" -> Some "gl_Layer"
+                            | "ViewportIndex" -> Some "gl_ViewportIndex"
+                            | _ -> None
 
     let private getIntrinsicOutputName (v : Version) (t : ShaderType) (next : Option<ShaderType>) (s : string) =
-        match t with
-            | Vertex|Geometry(_)|TessEval ->
-                match s with
-                    | "Positions" -> Some "gl_Position"
-                    | _ -> None
-            | Fragment ->
-                match s with
-                    | "Depth" -> Some "gl_FragDepth"
-                    | "Colors" when v <= version120 -> Some "gl_FragColor"
-                    | _ -> None
-            | TessControl ->
-                match s with
-                    | "Positions" -> Some "gl_Position"
-                    | "TessLevelInner" -> Some "gl_TessLevelInner"
-                    | "TessLevelOuter" -> Some "gl_TessLevelOuter"
-                    | _ -> None
+        match s, next with
+            | "Positions", Some Fragment -> 
+                Some "gl_Position"
+
+            | "PointSize", Some _ -> 
+                Some "gl_PointSize"
+
+            | "ClipDistance", Some _  -> 
+                Some "gl_ClipDistance"
+
+            | _ ->
+                match t with
+                    | Vertex ->
+                        None
+
+                    | TessControl ->
+                        match s with
+                            | "TessLevelInner" -> Some "gl_TessLevelInner"
+                            | "TessLevelOuter" -> Some "gl_TessLevelOuter"
+                            | _ -> None
+
+                    | TessEval ->
+                        None
+
+                    | Geometry(_) ->
+                        match s with
+                            | "Layer" -> Some "gl_Layer"
+                            | "ViewportIndex" -> Some "gl_ViewportIndex"
+                            | "PrimitiveId" -> Some "gl_PrimitiveID"
+                            | _ -> None
+
+                    | Fragment ->
+                        match s with
+                            | "Depth" -> Some "gl_FragDepth"
+                            | "Colors" when v <= version120 -> Some "gl_FragColor"
+                            | _ -> None
 
     //compilation functions
     let private changeIONames (s : Shader) (last : Option<ShaderType>) (next : Option<ShaderType>) =
@@ -512,6 +556,7 @@ module GLSL =
                                 else
                                     None
                             )
+
 
                 | _ -> 
                     outputs <- Map.add sem (t,v) outputs
