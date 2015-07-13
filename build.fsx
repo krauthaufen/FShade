@@ -1,88 +1,176 @@
 #I @"packages/FAKE/tools/"
+#I @"packages/Aardvark.Build/lib/net45"
+#I @"packages/Mono.Cecil/lib/net45"
+#I @"packages/Paket.Core/lib/net45"
+#r @"System.Xml.Linq"
 #r @"FakeLib.dll"
+#r @"Aardvark.Build.dll"
+#r @"Mono.Cecil.dll"
+#r @"Paket.Core.dll"
+
+#load @"bin\addSources.fsx"
 
 open Fake
 open System
 open System.IO
+open Aardvark.Build
+open System.Text.RegularExpressions
+open AdditionalSources
+do Environment.CurrentDirectory <- __SOURCE_DIRECTORY__
+let packageNameRx = Regex @"(?<name>[a-zA-Z_0-9\.]+?)\.(?<version>([0-9]+\.)*[0-9]+)\.nupkg"
 
-let core = ["src/Libs/FShade.Compiler/FShade.Compiler.fsproj"; "src/Libs/FShade/FShade.fsproj"; "src/Libs/FShade.Debug/FShade.Debug.fsproj"];
-let demo = ["src/Apps/FShade.DemoRenderer/FShade.DemoRenderer.fsproj"; "src/Apps/FShade.Demo/FShade.Demo.fsproj"];
-let apps = ["src/Apps/FSCC/FSCC.fsproj"; "src/Apps/FSCC.Service/FSCC.Service.fsproj"]
-
-let packageRx = System.Text.RegularExpressions.Regex @"(?<name>.*?)\.(?<version>([0-9]+\.)*[0-9]+)\.nupkg$"
-
+Target "Install" (fun () ->
+    AdditionalSources.paketDependencies.Install(false, false, false, true)
+    AdditionalSources.installSources ()
+)
 
 Target "Restore" (fun () ->
-
-    let packageConfigs = !!"src/**/packages.config" |> Seq.toList
-
-    
-
-    let addtionalSources = (environVarOrDefault "AdditionalNugetSources" "").Split([|";"|],StringSplitOptions.RemoveEmptyEntries) |> Array.toList
-    let defaultNuGetSources = RestorePackageHelper.RestorePackageDefaults.Sources @ ["https://www.nuget.org/api/v2/" ]
-
-    for pc in packageConfigs do
-        RestorePackage (fun p -> { p with OutputPath = "packages"
-                                          Sources = addtionalSources @ defaultNuGetSources  
-                                 }) pc
-
-
+    AdditionalSources.paketDependencies.Restore()
+    AdditionalSources.installSources ()
 )
+
+Target "Update" (fun () ->
+    AdditionalSources.paketDependencies.Update(false, false)
+    AdditionalSources.installSources ()
+)
+
+Target "AddSource" (fun () ->
+    let args = Environment.GetCommandLineArgs()
+    let folders =
+        if args.Length > 3 then
+            Array.skip 3 args
+        else
+            failwith "no source folder given"
+
+    AdditionalSources.addSources (Array.toList folders)
+)
+
+Target "RemoveSource" (fun () ->
+    let args = Environment.GetCommandLineArgs()
+    let folders =
+        if args.Length > 3 then
+            Array.skip 3 args
+        else
+            failwith "no source folder given"
+
+    AdditionalSources.removeSources (Array.toList folders)
+)
+
 
 Target "Clean" (fun () ->
-    CleanDir "Bin"
-)
-
-Target "Core" (fun () ->
-    MSBuildRelease "Bin/Release" "Build" core |> ignore
-)
-
-Target "Demo" (fun () ->
-    MSBuildRelease "Bin/Release" "Build" demo |> ignore
-)
-
-Target "Apps" (fun () ->
-    MSBuildRelease "Bin/Release" "Build" apps |> ignore
+    DeleteDir (Path.Combine("bin", "Release"))
+    DeleteDir (Path.Combine("bin", "Debug"))
 )
 
 
-Target "Compile" (fun () -> ())
+
+Target "Compile" (fun () ->
+    MSBuildRelease "bin/Release" "Build" ["src/FShade.sln"] |> ignore
+)
+
+
+
 Target "Default" (fun () -> ())
-Target "Rebuild" (fun () -> ())
-Target "Build" (fun () -> ())
 
-
-"Restore" ==> "Core"
-"Core" ==> "Demo"
-"Core" ==> "Apps"
-
-"Core" ==>
-    "Demo" ==>
-    "Apps" ==>
-    "Compile"
 
 "Restore" ==> 
     "Compile" ==>
     "Default"
 
 
-"Clean" ==> "Rebuild"
-"Compile" ==> "Rebuild"
-"Compile" ==> "Build"
-
-
 Target "CreatePackage" (fun () ->
-    let branch = Fake.Git.Information.getBranchName "."
-    let releaseNotes = Fake.Git.Information.getCurrentHash()
-
-    if branch = "master" then
-        let tag = Fake.Git.Information.getLastTag()
-        NuGetPack (fun p -> { p with Title = "FShade"; Project = "FShade"; OutputPath = "Bin"; Version = tag; ReleaseNotes = releaseNotes }) "NuGet/FShade.nuspec"
+    let releaseNotes = try Fake.Git.Information.getCurrentHash() |> Some with _ -> None
+    if releaseNotes.IsNone then 
+        //traceError "could not grab git status. Possible source: no git, not a git working copy"
+        failwith "could not grab git status. Possible source: no git, not a git working copy"
     else 
-        traceError (sprintf "cannot create package for branch: %A" branch)
+        trace "git appears to work fine."
+    
+    let releaseNotes = releaseNotes.Value
+    let branch = try Fake.Git.Information.getBranchName "." with e -> "master"
+
+    let tag = Fake.Git.Information.getLastTag()
+    AdditionalSources.paketDependencies.Pack("bin", version = tag, releaseNotes = releaseNotes)
+)
+
+Target "InjectNativeDependencies" (fun () ->
+
+    if Directory.Exists "bin/Debug" then
+        File.Copy(@"packages/Aardvark.Build/lib/net45/Aardvark.Build.dll", @"bin/Debug/Aardvark.Build.dll", true)
+    if Directory.Exists "bin/Release" then
+        File.Copy(@"packages/Aardvark.Build/lib/net45/Aardvark.Build.dll", @"bin/Release/Aardvark.Build.dll", true)
+
+    let dirs = Directory.GetDirectories "libs/Native"
+    for d in dirs do
+        let n = Path.GetFileName d
+        let d = d |> Path.GetFullPath
+        let paths = [
+            Path.Combine("bin/Release", n + ".dll") |> Path.GetFullPath
+            Path.Combine("bin/Release", n + ".exe") |> Path.GetFullPath
+            Path.Combine("bin/Debug", n + ".dll") |> Path.GetFullPath
+            Path.Combine("bin/Debug", n + ".exe") |> Path.GetFullPath
+        ]
+
+        let wd = Environment.CurrentDirectory
+        try
+        
+            for p in paths do
+                if File.Exists p then
+                    Environment.CurrentDirectory <- Path.GetDirectoryName p
+                    let ass = Mono.Cecil.AssemblyDefinition.ReadAssembly(p)
+                    AssemblyInjector.addResources d ass
+                    ass.Write p
+                    tracefn "injeted native stuff in %A" p
+        finally
+            Environment.CurrentDirectory <- wd
+
+        ()
+
+    ()
+)
+
+
+
+Target "Push" (fun () ->
+    let packages = !!"bin/*.nupkg"
+    let packageNameRx = Regex @"(?<name>[a-zA-Z_0-9\.]+?)\.(?<version>([0-9]+\.)*[0-9]+)\.nupkg"
+    let tag = Fake.Git.Information.getLastTag()
+
+    let myPackages = 
+        packages 
+            |> Seq.choose (fun p ->
+                let m = packageNameRx.Match (Path.GetFileName p)
+                if m.Success then 
+                    Some(m.Groups.["name"].Value)
+                else
+                    None
+            )
+            |> Set.ofSeq
+
+    try
+        for id in myPackages do
+            let source = sprintf "bin/%s.%s.nupkg" id tag
+            let target = sprintf @"\\hobel.ra1.vrvis.lan\NuGet\%s.%s.nupkg" id tag
+            File.Copy(source, target, true)
+    with e ->
+        traceError (string e)
 )
 
 Target "Deploy" (fun () ->
+
+    let packages = !!"bin/*.nupkg"
+    
+
+    let myPackages = 
+        packages 
+            |> Seq.choose (fun p ->
+                let m = packageNameRx.Match (Path.GetFileName p)
+                if m.Success then 
+                    Some(m.Groups.["name"].Value)
+                else
+                    None
+            )
+            |> Set.ofSeq
 
     let accessKeyPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".ssh", "nuget.key")
     let accessKey =
@@ -96,18 +184,21 @@ Target "Deploy" (fun () ->
         match accessKey with
             | Some accessKey ->
                 try
-                    NuGet (fun p -> let r = { p with Title = "FShade"; Project = "FShade"; OutputPath = "Bin"; AccessKey = accessKey; Publish = true; Version = tag; ReleaseNotes = releaseNotes } in printfn "%A" r; r) "NuGet/FShade.nuspec"
+                    for id in myPackages do
+                        Paket.Dependencies.Push(sprintf "bin/%s.%s.nupkg" id tag, apiKey = accessKey)
                 with e ->
-                    ()
+                    traceError (string e)
             | None ->
-                ()
+                traceError (sprintf "Could not find nuget access key")
      else 
         traceError (sprintf "cannot deploy branch: %A" branch)
 )
 
-"Core" ==> "CreatePackage"
-"CreatePackage" ==> "Deploy"
 
+"Compile" ==> "CreatePackage"
+"Compile" ==> "InjectNativeDependencies" ==> "CreatePackage"
+"CreatePackage" ==> "Deploy"
+"CreatePackage" ==> "Push"
 // start build
 RunTargetOrDefault "Default"
 

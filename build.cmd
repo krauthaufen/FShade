@@ -1,22 +1,28 @@
 @echo off
-echo %~dp0
 
 PUSHD %~dp0
-cls
+REM cls
 
 IF exist packages\FAKE ( echo skipping FAKE download ) ELSE ( 
 echo downloading FAKE
-REM mklink .\.git\hooks\pre-commit .\pre-commit
-"Packages\nuget.exe" "install" "FAKE" "-OutputDirectory" "Packages" "-ExcludeVersion" "-Prerelease"
-"Packages\nuget.exe" "install" "FSharp.Formatting.CommandTool" "-OutputDirectory" "Packages" "-ExcludeVersion" "-Prerelease"
-"Packages\nuget.exe" "install" "SourceLink.Fake" "-OutputDirectory" "Packages" "-ExcludeVersion"
-"Packages\nuget.exe" "install" "NUnit.Runners" "-OutputDirectory" "Packages" "-ExcludeVersion"
+REM dir
+"bin\nuget.exe" "install" "FAKE" "-OutputDirectory" "Packages" "-ExcludeVersion" "-Prerelease"
+"bin\nuget.exe" "install" "FSharp.Formatting.CommandTool" "-OutputDirectory" "Packages" "-ExcludeVersion" "-Prerelease"
+"bin\nuget.exe" "install" "SourceLink.Fake" "-OutputDirectory" "Packages" "-ExcludeVersion"
+"bin\nuget.exe" "install" "NUnit.Runners" "-OutputDirectory" "Packages" "-ExcludeVersion"
+"bin\nuget.exe" "install" "Aardvark.Build" "-OutputDirectory" "Packages" "-ExcludeVersion"
+"bin\nuget.exe" "install" "Paket.Core" "-OutputDirectory" "packages" "-ExcludeVersion"
 )
 
-SET TARGET="Default"
-IF NOT [%1]==[] (set TARGET="%1")
+SET TARGET=Default
+IF NOT [%1]==[] (set TARGET=%1)
 
-"Packages\FAKE\tools\Fake.exe" "build.fsx" "target=%TARGET%"
+>tmp ECHO(%*
+SET /P t=<tmp
+SETLOCAL EnableDelayedExpansion
+IF DEFINED t SET "t=!t:%1 =!"
+SET args=!t!
 
-REM IF NOT [%1]==[] (set TARGET="%1")
-REM "tools\FAKE\tools\Fake.exe" "build.fsx" "target=%TARGET%" %*
+"packages\FAKE\tools\Fake.exe" "build.fsx" "target=%TARGET%" %args%
+del tmp
+
