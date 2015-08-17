@@ -68,9 +68,35 @@ module BuilderCompilation =
                     do! setBuilder b
                     return Expr.Value(())
 
+                | Let(v, PropertyGet(Some p, pi, []), body)  when p.Type.GetInterface("Primitive`1") <> null ->
+                    
+                    let index = 
+                        match pi.Name with
+                            | "P0" | "Value" -> 0
+                            | "P1"           -> 1
+                            | "P2"           -> 2
+                            | "P3"           -> 3
+                            | _              -> -1                   
+
+                    if index < 0 then
+                        return! error "invalid input property" 
+                    else
+                        let i = Expr.Value(index)
+                        let vi = Var(v.Name, typeof<int>)
+                        
+                        let! body = substituteInputAccess v vi body
+                        let! body = removeBuilderCallsInternal body
+
+                        return Expr.Let(vi, Expr.Value(index), body)
+
+
+
+
                 //PropertyGet (Some (Value (<null>)), TessCoord, [])
                 | MemberFieldGet(PropertyGet(Some p, pi, []), m) when p.Type.GetInterface("Primitive`1") <> null ->
                     
+
+                    //p.Value.abc
                     let t = m.Type.MakeArrayType()
                     let n = m.Semantic
                     let! i = getInput t n
@@ -101,6 +127,7 @@ module BuilderCompilation =
 
                     let! outputs = setters |> List.mapC (fun ((s,t),v) ->
                                     transform {
+                                        let! v = removeBuilderCallsInternal v
                                         let! o = getOutput v.Type s t
                                         return (o,v)
                                     })

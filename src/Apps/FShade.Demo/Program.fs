@@ -67,19 +67,22 @@ module Simple =
         let sx = size.X
         let sy = size.Y
         triangle {
-            let pos = p.Value.p 
-            let pxyz = pos.XYZ / pos.W
-            //let v = p.Value
+            let v = p.Value
 
-            let p00 = V3d(pxyz + V3d( -sx, -sy, 0.0 ))
-            let p01 = V3d(pxyz + V3d( -sx,  sy, 0.0 ))
-            let p10 = V3d(pxyz + V3d(  sx, -sy, 0.0 ))
-            let p11 = V3d(pxyz + V3d(  sx,  sy, 0.0 ))
+            match p.Value with
+                | { p = pos; n = n } ->
 
-            yield { p.Value with p = V4d(p00 * pos.W, pos.W); tc = V2d.OO }
-            yield { p.Value with p = V4d(p10 * pos.W, pos.W); tc = V2d.IO }
-            yield { p.Value with p = V4d(p01 * pos.W, pos.W); tc = V2d.OI }
-            yield { p.Value with p = V4d(p11 * pos.W, pos.W); tc = V2d.II }
+                    let pxyz = pos.XYZ / pos.W
+            
+                    let p00 = V3d(pxyz + V3d( -sx, -sy, 0.0 ))
+                    let p01 = V3d(pxyz + V3d( -sx,  sy, 0.0 ))
+                    let p10 = V3d(pxyz + V3d(  sx, -sy, 0.0 ))
+                    let p11 = V3d(pxyz + V3d(  sx,  sy, 0.0 ))
+
+                    yield { p.Value with p = V4d(p00 * pos.W, pos.W); tc = V2d.OO }
+                    yield { p.Value with p = V4d(p10 * pos.W, pos.W); tc = V2d.IO }
+                    yield { p.Value with p = V4d(p01 * pos.W, pos.W); tc = V2d.OI }
+                    yield { p.Value with p = V4d(p11 * pos.W, pos.W); tc = V2d.II }
 
         }
             
@@ -110,8 +113,8 @@ let main argv =
 
     let effect = [Simple.trafo |> toEffect
                   Simple.pointSurface (V2d(0.06, 0.08)) |> toEffect
-                  Simple.white |> toEffect
-                  Simple.texture |> toEffect ] |> compose
+                  //Simple.white |> toEffect
+                  Simple.normals |> toEffect ] |> compose
 
 //    match GLSL.compileEffect effect with
 //        | Success (uniforms, code) ->
@@ -141,9 +144,9 @@ let main argv =
 
 
     FShade.Debug.EffectEditor.runTray()
-
-    let sg = Sg.fileTexture "DiffuseTexture" @"C:\Users\haaser\Development\WorkDirectory\Server\pattern.jpg" sg
-    let sg = Sg.fileTexture "NormalMap"      @"C:\Users\haaser\Development\WorkDirectory\Server\bump.jpg" sg
+//
+//    let sg = Sg.fileTexture "DiffuseTexture" @"C:\Users\haaser\Development\WorkDirectory\Server\pattern.jpg" sg
+//    let sg = Sg.fileTexture "NormalMap"      @"C:\Users\haaser\Development\WorkDirectory\Server\bump.jpg" sg
 
     //let sg = Sg.uniform "CameraLocation" V3d.III sg
 

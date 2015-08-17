@@ -96,12 +96,6 @@ module ParameterCompilation =
 
     let rec substituteInputs (inputType : Type) (index : Option<Expr>) (e : Expr) =
         transform {
-            let inputName (f : MemberInfo) =
-                let att = f.GetCustomAttributes<SemanticAttribute>(true) |> Seq.toList
-                match att with
-                    | x::_ -> x.Semantic
-                    | _ -> f.Name
-
             match e with
                 | Input inputType (t,sem) -> match index with
                                                 | None -> let! v = getInput t sem
@@ -120,6 +114,28 @@ module ParameterCompilation =
                     return Expr.Lambda(v, b)
 
                 | _ -> return e
+            }
+
+    let rec substituteInputAccess (v : Var) (index : Var) (e : Expr) =
+        transform {
+            match e with
+                | MemberFieldGet(Var vi, fi) when vi = v ->
+                    let! v = getInput (fi.Type.MakeArrayType()) fi.Semantic
+                    return Expr.ArrayAccess(Expr.Var(v), Expr.Var(index))
+
+                | ShapeCombination(o, args) ->
+                    
+                    let! args = args |> List.mapC (substituteInputAccess v index)
+                    return RebuildShapeCombination(o, args)
+
+
+                | ShapeLambda(vl,b) -> 
+                    let! b = substituteInputAccess v index b
+                    return Expr.Lambda(vl, b)
+
+                | ShapeVar(v) ->
+                    return e
+
             }
 
     let rec substituteOutputs (outputType : Type) (e : Expr) =
