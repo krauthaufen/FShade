@@ -345,8 +345,13 @@ module GLSL =
                 compile {
                     match t with
                         | VectorOf(d, b) -> 
-                            let fields = t.GetFields(BindingFlags.Instance ||| BindingFlags.Public ||| BindingFlags.NonPublic)
-                            let! fieldValues = fields |> Seq.mapC (fun fi -> compileValue fi.FieldType (fi.GetValue(o)))
+
+                            let! fieldValues = 
+                                Meta.VecFields 
+                                    |> Seq.take d 
+                                    |> Seq.map (fun name -> t.GetField(name, BindingFlags.Instance ||| BindingFlags.Public ||| BindingFlags.NonPublic))
+                                    |> Seq.mapC (fun fi -> compileValue fi.FieldType (fi.GetValue(o)))
+
                             return sprintf "vec%d(%s)" d (String.concat ", " fieldValues) |> Some
                         | Float32|Float64 ->
                             let d = Convert.ToDouble(o)
