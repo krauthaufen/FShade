@@ -113,9 +113,9 @@ let main argv =
 
 
     let effect = [Simple.trafo |> toEffect
-                  Simple.pointSurface (V2d(0.06, 0.08)) |> toEffect
-                  //Simple.white |> toEffect
-                  Simple.texture |> toEffect] |> compose
+                  //Simple.pointSurface (V2d(0.06, 0.08)) |> toEffect
+                  Simple.white |> toEffect
+                  ] |> compose
 
 //    match GLSL.compileEffect effect with
 //        | Success (uniforms, code) ->

@@ -428,7 +428,7 @@ module GLSL =
                             return sprintf "vec%d(%s)" d (String.concat ", " fieldValues) |> Some
                         | Float32|Float64 ->
                             let d = Convert.ToDouble(o)
-                            return d.ToString("0.000E00", System.Globalization.CultureInfo.InvariantCulture) |> Some
+                            return d.ToString(System.Globalization.CultureInfo.InvariantCulture) |> Some
                         | Num ->
                             return o.ToString() |> Some
                         | Bool ->
@@ -666,6 +666,93 @@ module GLSL =
 
         { shaderType = s.shaderType; inputs = inputs; outputs = outputs; body = body; uniforms = s.uniforms; inputTopology = s.inputTopology; debugInfo = s.debugInfo }
 
+    let private adjustPositionWrites (config : CompilerConfiguration) (s : Shader)  (last : Option<ShaderType>) (next : Option<ShaderType>) =
+        match next with
+            | Some Fragment ->
+                if config.flipHandedness || config.depthRange.Min <> -1.0 || config.depthRange.Max <> 1.0 then
+                    let rec replacePositionWrites (e : Expr) =
+                        match e with
+                            | VarSet(v, e) when v.Name = "gl_Position" ->
+                                
+                                let flip = config.flipHandedness
+                                let range = config.depthRange
+
+                                let intermediate = Var("_pos", v.Type, true)
+                                let ie = Expr.Var intermediate
+
+                                let newZ =
+                                    if range.Min <> -1.0 || range.Max <> 1.0 then
+                                       
+                                        // newZ = a * z + b * w
+
+                                        // due to projective division:
+                                        // max = (a * w + b * w) / w
+                                        // min = (a * -w + b * w) / w
+
+                                        // therefore:
+                                        // (1) max = a + b
+                                        // (2) min = b - a
+
+                             
+                                        // (1) + (2) => max + min = 2 * b
+                                        // (1) - (2) => max - min = 2 * a
+
+                                        // so finally we get:
+                                        // a = (max - min) / 2
+                                        // b = (max + min) / 2
+
+
+                                        let a = range.Size / 2.0
+                                        let b = (range.Min + range.Max) / 2.0
+
+                                        if a = b then
+                                            <@@ a * ((%%ie : V4d).Z + (%%ie : V4d).W) @@>
+                                        else
+                                            <@@ a * (%%ie : V4d).Z + b * (%%ie : V4d).W @@>
+                                    else
+                                        <@@ (%%ie : V4d).Z @@>
+
+                                let ie =
+                                    if config.flipHandedness then
+                                        <@@ V4d((%%ie : V4d).X, -(%%ie : V4d).Y, %%newZ, (%%ie : V4d).W)  @@>
+                                    else
+                                        ie
+
+
+                                Expr.Let(intermediate, e, Expr.VarSet(v, ie))
+//
+//                                let final = 
+//                                    if config.flipHandedness then
+//                                        let y = v.Type.GetField "Y"
+//                                        Expr.Sequential(
+//                                            Expr.FieldSet(Expr.Var intermediate, y, <@@ -(%%ie : V4d).Y @@>),
+//                                            final
+//                                        )
+//                                    else final
+//
+//                                Expr.Let(intermediate, e, final)
+
+//                                <@@
+//                                    let mutable v : V4d = V4d.Zero
+//                                    let mutable gl_PositionStandard = (%%e : V4d)
+//                                    gl_PositionStandard.Y <- -gl_PositionStandard.Y
+//                                    gl_PositionStandard.Z <- (gl_PositionStandard.Z + gl_PositionStandard.W) * 0.5
+//                                    v <- gl_PositionStandard
+//                                @@>
+                            | ShapeCombination(o, args) -> RebuildShapeCombination(o, args |> List.map replacePositionWrites)
+                            | ShapeLambda(v,b) -> Expr.Lambda(v, replacePositionWrites b)
+                            | ShapeVar _ -> e
+
+                    { s with body = replacePositionWrites s.body }
+                else
+                    s
+            | _ ->
+                s
+
+    let private adjustToConfig (config : CompilerConfiguration) (s : Shader)  (last : Option<ShaderType>) (next : Option<ShaderType>) =
+        let s = liftIntrinsics config s last next
+        let s = adjustPositionWrites config s last next
+        s
 
     let private compileVariableDeclaration (t : Type) (name : string) =
         compile {
@@ -967,7 +1054,7 @@ module GLSL =
                                                                  ) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
                                                     let fs = removeOutputs unused fs
 
-                                                    let fs = liftIntrinsics config fs ((if hasgs then Geometry TriangleStrip else Vertex) |> Some) None
+                                                    let fs = adjustToConfig config fs ((if hasgs then Geometry TriangleStrip else Vertex) |> Some) None
 
                                                     let! fsc = compileShader "PS" fs
 
@@ -985,7 +1072,7 @@ module GLSL =
                                                     let unused = gs.outputs |> Map.filter (fun k v -> not <| Map.containsKey k fsUsed) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
                                                     let gs = removeOutputs unused gs
 
-                                                    let gs = liftIntrinsics config gs (Some Vertex) (Some Fragment)
+                                                    let gs = adjustToConfig config gs (Some Vertex) (Some Fragment)
                                                     let! gsc = compileShader "GS" gs
 
                                                     let used = gs.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k, if v.Type.IsArray then v.Type.GetElementType() else v.Type)) |> Map.ofSeq
@@ -1072,8 +1159,8 @@ module GLSL =
                                                 let newTcs = substitute tcs.body
                                                 let tcs = { tcs with body = newTcs }
 
-                                                let tev = liftIntrinsics config tev (Some Vertex) (Some Fragment)
-                                                let tcs = liftIntrinsics config tcs (Some Vertex) (Some Fragment)
+                                                let tev = adjustToConfig config tev (Some Vertex) (Some Fragment)
+                                                let tcs = adjustToConfig config tcs (Some Vertex) (Some Fragment)
 
 
                                                 let! tevc = compileShader "TEV" tev
@@ -1124,7 +1211,7 @@ module GLSL =
                             let unused = vs.outputs |> Map.filter (fun k v -> not <| Map.containsKey k tessUsed) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
                             let vs = removeOutputs unused vs
 
-                            let vs = liftIntrinsics config vs None ((if hasgs then Geometry TriangleStrip else Fragment) |> Some) 
+                            let vs = adjustToConfig config vs None ((if hasgs then Geometry TriangleStrip else Fragment) |> Some) 
                             
                             let! vsc = compileShader "VS" vs
                             return Some vsc
