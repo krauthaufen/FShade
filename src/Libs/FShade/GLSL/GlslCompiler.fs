@@ -85,11 +85,19 @@ module GLSL =
             return ds
         }
 
-    let stepDescriptorSetIndex = 
+    let stepDescriptorSetIndexIfNotEmpty = 
         compile {
-            let! ds = nextCounter descriptorSetCounterName
-            do! resetCounter bindingCounterName
-            return ()
+            let! s = compilerState
+            let bindingCounter = 
+                match Map.tryFind bindingCounterName s.counters with
+                    | Some c -> c
+                    | None -> 0
+
+            if bindingCounter > 0 then
+                let! _ = nextDescriptorSetIndex
+                return ()
+            else
+                return () 
         }
 
     let nextBindingIndex = nextCounter bindingCounterName
@@ -849,7 +857,7 @@ module GLSL =
 
                 })
 
-            do! stepDescriptorSetIndex
+            do! stepDescriptorSetIndexIfNotEmpty
 
             let! textureDecls = textures |> Seq.mapCi (fun i (t,n) ->
                 compile {
