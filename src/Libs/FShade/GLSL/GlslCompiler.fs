@@ -70,34 +70,12 @@ module GLSL =
     let private descriptorSetCounterName = "DescriptorSetCounter"
     let private bindingCounterName = "BindingCounter"
 
-    let currentDescriptorIndex =
-        compile {
-            let! s = compilerState
-            match Map.tryFind descriptorSetCounterName s.counters with
-                | Some c -> return c
-                | None -> return 0
-        }
 
     let nextDescriptorSetIndex = 
         compile {
-            let! ds = nextCounter descriptorSetCounterName
+            let! c = nextCounter descriptorSetCounterName
             do! resetCounter bindingCounterName
-            return ds
-        }
-
-    let stepDescriptorSetIndexIfNotEmpty = 
-        compile {
-            let! s = compilerState
-            let bindingCounter = 
-                match Map.tryFind bindingCounterName s.counters with
-                    | Some c -> c
-                    | None -> 0
-
-            if bindingCounter > 0 then
-                let! _ = nextDescriptorSetIndex
-                return ()
-            else
-                return () 
+            return c
         }
 
     let nextBindingIndex = nextCounter bindingCounterName
@@ -799,13 +777,16 @@ module GLSL =
 //                uniformBuffers.Count
 //
 
+            let! ds = 
+                if Map.isEmpty uniformBuffers then compile { return -1 }
+                else nextDescriptorSetIndex
+
             let! bufferDecls = uniformBuffers |> Map.toSeq |> Seq.mapC (fun (buffer,elements) ->
                 compile {
                     let! uniformLayoutPrefix = 
                         compile {
                             match config.createDescriptorSets, config.createBindings with
                                 | true, true -> 
-                                    let! ds = currentDescriptorIndex
                                     let! b = nextBindingIndex
                                     return sprintf "layout(set = %d, binding = %d)\r\n" ds b
 
@@ -814,7 +795,6 @@ module GLSL =
                                     return sprintf "layout(binding = %d)\r\n" b
                                     
                                 | true, false ->
-                                    let! ds = currentDescriptorIndex
                                     return sprintf "layout(set = %d)\r\n" ds
 
                                 | false, false ->
@@ -856,8 +836,6 @@ module GLSL =
                             else return elements |> declareGlobal
 
                 })
-
-            do! stepDescriptorSetIndexIfNotEmpty
 
             let! textureDecls = textures |> Seq.mapCi (fun i (t,n) ->
                 compile {
