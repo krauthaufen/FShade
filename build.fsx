@@ -177,10 +177,16 @@ Target "MyGetDeploy" (fun () ->
 )
 
 
+Target "InternalDeploy" DoNothing
+
 "Compile" ==> "CreatePackage"
 "CreatePackage" ==> "Deploy"
 "CreatePackage" ==> "MyGetDeploy"
 "CreatePackage" ==> "Push"
+
+"Push" ==> "InternalDeploy"
+"MyGetDeploy" ==> "InternalDeploy"
+
 // start build
 RunTargetOrDefault "Default"
 
