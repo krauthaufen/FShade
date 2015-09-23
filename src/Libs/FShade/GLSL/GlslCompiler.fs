@@ -37,7 +37,7 @@ module GLSL =
 
     let private version410 =
         {
-            languageVersion = Version(4,1)
+            languageVersion = Version(4,1,0)
             enabledExtensions = Set.empty
             
             createUniformBuffers = true
@@ -53,7 +53,7 @@ module GLSL =
 
     let private version120 =
         {
-            languageVersion = Version(1,2)
+            languageVersion = Version(1,2,0)
             enabledExtensions = Set.empty
             
             createUniformBuffers = false
@@ -1259,7 +1259,7 @@ module GLSL =
 
             let versionString = 
                 let v = config.languageVersion
-                sprintf "%d%d%d" v.Major v.Minor v.Build
+                sprintf "%d%d0" v.Major v.Minor
 
             let completeCode = sprintf "#version %s\r\n%s\r\n%s\r\n%s\r\n%s%s%s%s" versionString extensions typeCode uniformDecls vsCode teCode gsCode fsCode
 
