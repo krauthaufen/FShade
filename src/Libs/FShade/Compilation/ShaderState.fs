@@ -10,30 +10,50 @@ open FShade.Compiler
 module ShaderState =
 
     [<NoComparison>]
-    type ShaderState = { inputs : Map<string, Var>; outputs : Map<string, Option<string> * Var>; uniforms : Map<Unique<Uniform>, Var>; builder : Option<Expr> }
+    type ShaderState = { inputs : Map<string, Var>; outputs : Map<string, Option<string> * Var>; uniforms : Map<Unique<Uniform>, Var>; builder : Option<Expr>; counters : Map<string, int> }
 
     let addInput n i =
-        modifyCompilerState(fun s -> { inputs = Map.add n i s.inputs; outputs = s.outputs;  uniforms = s.uniforms; builder = s.builder })
+        modifyCompilerState(fun (s : ShaderState) -> { s with inputs = Map.add n i s.inputs })
 
     let addOutput n i =
-        modifyCompilerState(fun s -> { inputs = s.inputs; outputs = Map.add n i s.outputs;uniforms = s.uniforms; builder = s.builder })
+        modifyCompilerState(fun (s : ShaderState) -> { s with outputs = Map.add n i s.outputs })
 
     let addUniform n i =
-        modifyCompilerState(fun s -> { inputs = s.inputs; outputs = s.outputs; uniforms = Map.add n i s.uniforms; builder = s.builder })
+        modifyCompilerState(fun (s : ShaderState) -> { s with  uniforms = Map.add n i s.uniforms })
 
     
     let setBuilder b =
         modifyCompilerState(fun s -> 
             match s.builder with
-                | None -> { inputs = s.inputs; outputs = s.outputs; uniforms = s.uniforms; builder = Some b }
+                | None -> { s with builder = Some b }
                 | Some _ -> s
         )
 
-    let emptyShaderState = { inputs = Map.empty; outputs = Map.empty; uniforms = Map.empty; builder = None }
+    let emptyShaderState = { inputs = Map.empty; outputs = Map.empty; uniforms = Map.empty; builder = None; counters = Map.empty }
+
+
 
 
 
     let transform = CompilerBuilder()
+
+    let nextCounter (counterName : string) =
+        transform {
+            let! s = compilerState
+            let current = 
+                match Map.tryFind counterName s.counters with
+                    | Some c -> c
+                    | None -> 0
+
+            do! putCompilerState { s with counters = Map.add counterName (current + 1) s.counters }
+            return current
+        }
+
+    let resetCounter (counterName : string) =
+        transform {
+            let! s = compilerState
+            do! putCompilerState { s with counters = Map.remove counterName s.counters }
+        }
 
     let getInput t sem =
         transform {

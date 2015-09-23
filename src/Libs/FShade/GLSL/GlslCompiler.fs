@@ -17,11 +17,84 @@ module GLSL =
     // ShaderState here.
     type CompilerState = ShaderState
 
-    let private version410 = Version(4,1)
-    let private version120 = Version(1,2)
+    type CompilerConfiguration =
+        {
+            languageVersion : Version
+            enabledExtensions : Set<string>
+            
+            createUniformBuffers : bool
+            createGlobalUniforms : bool
+            createBindings : bool
+            createDescriptorSets : bool
+            createInputLocations : bool
+            createRowMajorMatrices : bool
 
-    type Compiler(?glslVersion : Version) =
-        let glslVersion = defaultArg glslVersion (Version(4,1))
+            createPerStageUniforms : bool
+
+            flipHandedness : bool
+            depthRange : Range1d
+        }
+
+    let private version410 =
+        {
+            languageVersion = Version(4,1)
+            enabledExtensions = Set.empty
+            
+            createUniformBuffers = true
+            createGlobalUniforms = true
+            createBindings = false
+            createDescriptorSets = false
+            createInputLocations = true
+            createRowMajorMatrices = true
+            createPerStageUniforms = false
+            flipHandedness = false
+            depthRange = Range1d(-1.0,1.0)
+        }
+
+    let private version120 =
+        {
+            languageVersion = Version(1,2)
+            enabledExtensions = Set.empty
+            
+            createUniformBuffers = false
+            createGlobalUniforms = true
+            createBindings = false
+            createDescriptorSets = false
+            createInputLocations = false
+            createRowMajorMatrices = true
+            createPerStageUniforms = false
+            flipHandedness = false
+            depthRange = Range1d(-1.0,1.0)
+        }
+
+    let private descriptorSetCounterName = "DescriptorSetCounter"
+    let private bindingCounterName = "BindingCounter"
+
+    let currentDescriptorIndex =
+        compile {
+            let! s = compilerState
+            match Map.tryFind descriptorSetCounterName s.counters with
+                | Some c -> return c
+                | None -> return 0
+        }
+
+    let nextDescriptorSetIndex = 
+        compile {
+            let! ds = nextCounter descriptorSetCounterName
+            do! resetCounter bindingCounterName
+            return ds
+        }
+
+    let stepDescriptorSetIndex = 
+        compile {
+            let! ds = nextCounter descriptorSetCounterName
+            do! resetCounter bindingCounterName
+            return ()
+        }
+
+    let nextBindingIndex = nextCounter bindingCounterName
+
+    type Compiler(config : CompilerConfiguration) =
         let funDefCache = MemoCache(false)
 
         let rec compileZero (t : Type) =
@@ -53,7 +126,7 @@ module GLSL =
                         return! error "cannot create zero for type: %A" t
             }
 
-        member x.Version = glslVersion
+        member x.Config = config
 
         interface ICompiler<CompilerState> with
 
@@ -213,7 +286,7 @@ module GLSL =
 
                         //SamplerType(dim, isArray, isShadow, isMS, valueType) 
                         | Method("Sample", [SamplerType(dim, isArray, isShadow, isMS, valueType); _]) -> 
-                            if glslVersion > version120 then
+                            if config.languageVersion > Version(1,2) then
                                 return Some "texture({0}, {1})"
                             else
                                 let samplerFun =
@@ -366,6 +439,8 @@ module GLSL =
 
             member x.InitialState() = emptyShaderState
 
+            member x.ResetState(state : CompilerState) = { emptyShaderState with counters = state.counters }
+
             member x.ProcessCode c =
                 compile {
                     return c
@@ -394,7 +469,16 @@ module GLSL =
         { runCompile = fun s ->
             match s.compiler with
                 | :? Compiler as c ->
-                    Success(s,c.Version)
+                    Success(s,c.Config.languageVersion)
+                | _ ->
+                    Error "cannot determine version for non GLSL compiler"
+        }
+
+    let private config : Compiled<_, ShaderState> =
+        { runCompile = fun s ->
+            match s.compiler with
+                | :? Compiler as c ->
+                    Success(s,c.Config)
                 | _ ->
                     Error "cannot determine version for non GLSL compiler"
         }
@@ -403,7 +487,7 @@ module GLSL =
 
     // intrisics are taken from: https://www.opengl.org/wiki/Built-in_Variable_(GLSL)
 
-    let private getIntrinsicInputName (v : Version) (t : ShaderType) (last : Option<ShaderType>) (s : string) =
+    let private getIntrinsicInputName (v : CompilerConfiguration) (t : ShaderType) (last : Option<ShaderType>) (s : string) =
         match s, last with
             | "PointSize", Some _ -> 
                 Some "gl_PointSize"
@@ -453,7 +537,7 @@ module GLSL =
                             | "ViewportIndex" -> Some "gl_ViewportIndex"
                             | _ -> None
 
-    let private getIntrinsicOutputName (v : Version) (t : ShaderType) (next : Option<ShaderType>) (s : string) =
+    let private getIntrinsicOutputName (v : CompilerConfiguration) (t : ShaderType) (next : Option<ShaderType>) (s : string) =
         match s, next with
             | "Positions", Some Fragment -> 
                 Some "gl_Position"
@@ -488,22 +572,35 @@ module GLSL =
                     | Fragment ->
                         match s with
                             | "Depth" -> Some "gl_FragDepth"
-                            | "Colors" when v <= version120 -> Some "gl_FragColor"
+                            | "Colors" when v.languageVersion <= Version(1,2) -> Some "gl_FragColor"
                             | _ -> None
+
+    
+    let private stageName (s : ShaderType) =
+        match s with
+            | Vertex -> "Vertex"
+            | Geometry(_) -> "Geometry"
+            | TessControl -> "TessControl"
+            | TessEval -> "TessEval"
+            | Fragment -> "Fragment"
+            
 
     //compilation functions
     let private changeIONames (s : Shader) (last : Option<ShaderType>) (next : Option<ShaderType>) =
         let newInputs = 
             match last with
                 | Some stage ->
-                    s.inputs |> Map.toList |> List.map(fun (k,v) -> k,v.Name,Var(sprintf "%s%A" k stage, v.Type, v.IsMutable))
+                    s.inputs |> Map.toList |> List.map(fun (k,v) -> k,v.Name,Var(sprintf "%s%s" k (stageName stage), v.Type, v.IsMutable))
                 | None -> s.inputs |> Map.toList |> List.map (fun (k,v) -> k,v.Name,v)
 
         let inputRepl = newInputs |> List.map (fun (_,k,v) -> (k,Expr.Var v)) |> Map.ofList
         let newInputs = newInputs |> List.map (fun (k,_,v) -> (k,v)) |> Map.ofList
 
         let newOutputs = 
-            s.outputs |> Map.toList |> List.map (fun (k,(o,v)) -> (k,o,v,Var(sprintf "%s%A" k s.shaderType, v.Type, v.IsMutable)))
+            match next with
+                | Some _ ->
+                    s.outputs |> Map.toList |> List.map (fun (k,(o,v)) -> (k,o,v,Var(sprintf "%s%s" k (stageName s.shaderType), v.Type, v.IsMutable)))
+                | None -> s.outputs |> Map.toList |> List.map (fun (k,(o,v)) -> k,o,v,v)
 
         let outputRepl = newOutputs |> List.map (fun (_,_,o,n) -> o.Name, Expr.Var n) |> Map.ofList
         let newOutputs = newOutputs |> List.map (fun (k,o,_,v) -> k,(o,v)) |> Map.ofList
@@ -516,18 +613,18 @@ module GLSL =
 
 
 
-    let private liftIntrinsics (glslVersion : Version) (s : Shader)  (last : Option<ShaderType>) (next : Option<ShaderType>)=
+    let private liftIntrinsics (config : CompilerConfiguration) (s : Shader)  (last : Option<ShaderType>) (next : Option<ShaderType>)=
         
         let s =
-            if glslVersion <= version120 then changeIONames s last next
-            else s
+            if config.createInputLocations then s
+            else changeIONames s last next
         
         let mutable body = s.body
         let mutable inputs = Map.empty
         let mutable outputs = Map.empty
 
         for KeyValue(sem, v) in s.inputs do
-            match getIntrinsicInputName glslVersion s.shaderType last sem with
+            match getIntrinsicInputName config s.shaderType last sem with
                 | Some name -> 
                     let replacement = Var(name, v.Type)
                     body <- body.Substitute(fun vi -> 
@@ -552,7 +649,7 @@ module GLSL =
                         inputs <- Map.add sem v inputs
 
         for KeyValue(sem, (t,v)) in s.outputs do
-            match getIntrinsicOutputName glslVersion s.shaderType next sem with
+            match getIntrinsicOutputName config s.shaderType next sem with
                 | Some name -> 
                     let replacement = Var(name, v.Type)
                     body <- body.Substitute(fun vi -> 
@@ -582,6 +679,121 @@ module GLSL =
                     return! compileVariableDeclaration t name None
         }
 
+    let private compileUniforms (uniforms : Map<UniformScope, list<Type * string>>) =
+        compile {
+            let! config = config
+
+            let textures = 
+                uniforms 
+                    |> Map.toSeq 
+                    |> Seq.collect (fun (_,elements) -> elements |> Seq.filter(function ((SamplerType _),_) -> true | _ -> false))
+                    |> Seq.toList
+
+            let uniformBuffers =
+                uniforms
+                    |> Map.map (fun scope elements -> elements |> List.filter (function (SamplerType(_),_) -> false | _ -> true))
+                    |> Map.filter (fun _ e -> not <| List.isEmpty e)
+
+
+//
+//            let textureDescriptorOffset = 
+//                if Map.isEmpty uniformBuffers then 0
+//                else 1
+//
+//            let textureBindingOffset =
+//                uniformBuffers.Count
+//
+
+            let! bufferDecls = uniformBuffers |> Map.toSeq |> Seq.mapC (fun (buffer,elements) ->
+                compile {
+                    let! uniformLayoutPrefix = 
+                        compile {
+                            match config.createDescriptorSets, config.createBindings with
+                                | true, true -> 
+                                    let! ds = currentDescriptorIndex
+                                    let! b = nextBindingIndex
+                                    return sprintf "layout(set = %d, binding = %d)\r\n" ds b
+
+                                | false, true ->
+                                    let! b = nextBindingIndex
+                                    return sprintf "layout(binding = %d)\r\n" b
+                                    
+                                | true, false ->
+                                    let! ds = currentDescriptorIndex
+                                    return sprintf "layout(set = %d)\r\n" ds
+
+                                | false, false ->
+                                    return ""
+                        }
+
+                    let! elements = elements |> Seq.mapC (fun (t,n) ->
+                        compile {
+                            let prefix =
+                                if config.createRowMajorMatrices then
+                                    match t with
+                                        | MatrixOf(s, bt) -> "layout(row_major) "
+                                        | _ -> ""
+                                else
+                                    ""
+                            let! r = compileVariableDeclaration t n
+                            return prefix + r + ";"
+                        })
+
+                    let declareBuffer (name : string) (elements : seq<string>) =
+                        elements 
+                            |> String.concat "\r\n" 
+                            |> String.indent 1
+                            |> sprintf "%suniform %s\r\n{\r\n%s\r\n};\r\n" uniformLayoutPrefix name
+
+                    let declareGlobal (elements : seq<string>) =
+                        elements 
+                            |> Seq.map (fun l -> "uniform " + l) 
+                            |> String.concat "\r\n" 
+                            |> sprintf "%s%s" uniformLayoutPrefix
+
+                    match buffer.Parent with
+                        | None ->
+                            if config.createGlobalUniforms then return elements |> declareGlobal
+                            else return elements |> declareBuffer "Global"
+                        | Some _ -> 
+                            let name = buffer.Name
+                            if config.createUniformBuffers then return elements |> declareBuffer name
+                            else return elements |> declareGlobal
+
+                })
+
+            do! stepDescriptorSetIndex
+
+            let! textureDecls = textures |> Seq.mapCi (fun i (t,n) ->
+                compile {
+                    let! textureLayoutPrefix =
+                        compile {
+                            match config.createDescriptorSets, config.createBindings with
+                                | true, true -> 
+                                    let! ds = nextDescriptorSetIndex
+                                    let! b = nextBindingIndex
+                                    return sprintf "layout(set = %d, binding = %d) " ds b
+
+                                | false, true ->
+                                    let! b = nextBindingIndex
+                                    return sprintf "layout(binding = %d) " b
+
+                                | true, false ->
+                                    let! ds = nextDescriptorSetIndex
+                                    return sprintf "layout(set = %d) " ds
+
+                                | false, false ->
+                                    return ""
+                        }
+
+                    let! r = compileVariableDeclaration t n
+                    return sprintf "%suniform %s;" textureLayoutPrefix r
+                })
+
+
+            return (String.concat "\r\n" bufferDecls) + (String.concat "\r\n" textureDecls)
+        }
+
     let private compileShader (entryName : string) (s : Shader) =
         compile {
             do! resetCompilerState
@@ -590,7 +802,7 @@ module GLSL =
 
             let! (header, c) = compileMainWithoutTypes [] s.body entryName
             let! state = compilerState : Compiled<ShaderState, ShaderState>
-            let! glslVersion = version
+            let! config = config
 
 
 
@@ -615,13 +827,13 @@ module GLSL =
                         compile {
                     
                             let modifier =
-                                if glslVersion > version120 then
+                                if config.createInputLocations then
                                     sprintf "layout(location = %d) in" i
                                 else
-                                    if s.shaderType = ShaderType.Vertex then 
-                                        "attribute" 
-                                    else 
-                                        "varying"
+                                    if config.languageVersion > Version(1,2) then "in"
+                                    else
+                                        if s.shaderType = ShaderType.Vertex then "attribute" 
+                                        else "varying"
 
                             let size =
                                 match n.Type with
@@ -646,10 +858,10 @@ module GLSL =
             let! outputs = outputs |> Seq.mapCs 0 (fun i (KeyValue(_,(_,n))) -> 
                 compile {
                     let modifier =
-                        if glslVersion > version120 then
-                            sprintf "layout(location = %d) out" i
+                        if config.createInputLocations then sprintf "layout(location = %d) out" i
                         else
-                            "varying"
+                            if config.languageVersion > Version(1,2) then "out"
+                            else "varying"
 
 
                     let size =
@@ -730,8 +942,11 @@ module GLSL =
             let! (def,disp) = compileLambdas()
 //            let disp = sprintf "%s\r\n%s" def disp
 
+            let! uniformDecls = 
+                if config.createPerStageUniforms then compileUniforms uniforms
+                else compile { return "" }
 
-            let completeCode = sprintf "%s\r\n%s\r\n%s\r\n%s\r\n%s\r\n%s%s" def header disp inputs outputs layout c
+            let completeCode = sprintf "%s\r\n\r\n%s\r\n%s\r\n%s\r\n%s\r\n%s\r\n%s%s" uniformDecls def header disp inputs outputs layout c
 
             return { usedTypes = types; uniforms = uniformGetters; uniformBuffers = uniforms; code = completeCode }
         }
@@ -739,7 +954,7 @@ module GLSL =
     let private compileEffectInternal (e : Compiled<Effect, ShaderState>) =
         compile {
             let! e = e
-            let! glslVersion = version
+            let! config = config
 
             let hasgs = match e.geometryShader with | Some _ -> true | _ -> false
             let topUsed = ["Colors", typeof<V4d>; "Depth", typeof<float>] |> Map.ofList
@@ -752,7 +967,7 @@ module GLSL =
                                                                  ) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
                                                     let fs = removeOutputs unused fs
 
-                                                    let fs = liftIntrinsics glslVersion fs ((if hasgs then Geometry TriangleStrip else Vertex) |> Some) None
+                                                    let fs = liftIntrinsics config fs ((if hasgs then Geometry TriangleStrip else Vertex) |> Some) None
 
                                                     let! fsc = compileShader "PS" fs
 
@@ -770,7 +985,7 @@ module GLSL =
                                                     let unused = gs.outputs |> Map.filter (fun k v -> not <| Map.containsKey k fsUsed) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
                                                     let gs = removeOutputs unused gs
 
-                                                    let gs = liftIntrinsics glslVersion gs (Some Vertex) (Some Fragment)
+                                                    let gs = liftIntrinsics config gs (Some Vertex) (Some Fragment)
                                                     let! gsc = compileShader "GS" gs
 
                                                     let used = gs.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k, if v.Type.IsArray then v.Type.GetElementType() else v.Type)) |> Map.ofSeq
@@ -857,8 +1072,8 @@ module GLSL =
                                                 let newTcs = substitute tcs.body
                                                 let tcs = { tcs with body = newTcs }
 
-                                                let tev = liftIntrinsics glslVersion tev (Some Vertex) (Some Fragment)
-                                                let tcs = liftIntrinsics glslVersion tcs (Some Vertex) (Some Fragment)
+                                                let tev = liftIntrinsics config tev (Some Vertex) (Some Fragment)
+                                                let tcs = liftIntrinsics config tcs (Some Vertex) (Some Fragment)
 
 
                                                 let! tevc = compileShader "TEV" tev
@@ -909,7 +1124,7 @@ module GLSL =
                             let unused = vs.outputs |> Map.filter (fun k v -> not <| Map.containsKey k tessUsed) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
                             let vs = removeOutputs unused vs
 
-                            let vs = liftIntrinsics glslVersion vs None ((if hasgs then Geometry TriangleStrip else Fragment) |> Some) 
+                            let vs = liftIntrinsics config vs None ((if hasgs then Geometry TriangleStrip else Fragment) |> Some) 
                             
                             let! vsc = compileShader "VS" vs
                             return Some vsc
@@ -946,81 +1161,42 @@ module GLSL =
                     | None -> types, uniforms, uniformBuffers, ""
 
 
-
-            let! bufferDecls = uniformBuffers |> Map.toSeq |> Seq.mapC (fun (buffer,elements) ->
-                compile {
-                    
-                    let elements = System.Collections.Generic.HashSet(elements)
-
-                    let groups = elements |> Seq.groupBy (fun (t,_) -> match t with | SamplerType(_) -> true | _ -> false)
-                    let (textures, elements) = (groups |> Seq.tryPick (fun (f,g) -> if f then Some g else None), groups |> Seq.tryPick (fun (f,g) -> if f then None else Some g))
-
-                    let! buffer = compile {
-                                    match elements with
-                                        | Some elements ->
-                                            let! elements = elements |> Seq.mapC (fun (t,n) ->
-                                                compile {
-                                                    let! r = compileVariableDeclaration t n
-                                                    return r + ";"
-                                                })
-
-                                            
-                                            if glslVersion > version120 then
-                                                let elements = String.concat "\r\n" elements
-
-                                                let name = match buffer.Parent with
-                                                            | None -> "Global"
-                                                            | Some _ -> buffer.Name
-
-                                                return sprintf "uniform %s\r\n{\r\n%s\r\n};\r\n" name (String.indent 1 elements) |> Some
-                                            else
-                                                let elements = elements |> Seq.map (fun l -> "uniform " + l) |> String.concat "\r\n" 
-                                                return Some elements
-
-                                        | None -> return None
-                                  }
-
-                    let! textures = compile {
-                                      match textures with
-                                        | Some textures ->
-                                            let! textures = textures |> Seq.mapC (fun (t,n) ->
-                                                compile {
-                                                    let! r = compileVariableDeclaration t n
-                                                    return "uniform " + r + ";"
-                                                })
-
-
-                                            let textures = String.concat "\r\n" textures
-                                            return textures |> Some
-                                        | None -> return None
-                                    }
-
-                    match buffer, textures with 
-                        | Some b, Some t -> return sprintf "%s\r\n%s" b t
-                        | None, Some t -> return t
-                        | Some b, None -> return b
-                        | None, None -> return ""
-                })
-            let bufferDecls = String.concat "\r\n" bufferDecls
+            let! uniformDecls = 
+                if config.createPerStageUniforms then compile { return "" }
+                else compileUniforms uniformBuffers
 
             let! typeCode = compileTypes types
             
             
-            let versionString = sprintf "%d%d0" glslVersion.Major glslVersion.Minor
+            let extensions = config.enabledExtensions |> Seq.map (sprintf "#extension %s : enable") |> String.concat "\r\n"
 
-            let completeCode = sprintf "#version %s\r\n%s\r\n%s\r\n%s%s%s%s" versionString typeCode bufferDecls vsCode teCode gsCode fsCode
+            let versionString = 
+                let v = config.languageVersion
+                sprintf "%d%d%d" v.Major v.Minor v.Build
+
+            let completeCode = sprintf "#version %s\r\n%s\r\n%s\r\n%s\r\n%s%s%s%s" versionString extensions typeCode uniformDecls vsCode teCode gsCode fsCode
 
             return uniforms, completeCode
         }
 
 
-    let glsl410 = Compiler(Version(4,1))
-    let glsl120 = Compiler(Version(1,2))
+    let glsl410 = Compiler(version410)
+    let glsl120 = Compiler(version120)
 
-    let run e =
+    let private compilers = Dict.ofList [version120, glsl120; version410, glsl410]
+
+    let run (v : CompilerConfiguration) e =
+        let c = compilers.GetOrCreate(v, Func<_,_>(fun v -> Compiler(v)))
+        e |> runCompile c
+
+    let compileEffect (v : CompilerConfiguration) (e : Compiled<Effect, ShaderState>) : Error<Map<string, UniformGetter> * string> =
+        let c = compilers.GetOrCreate(v, Func<_,_>(fun v -> Compiler(v)))
+        e |> compileEffectInternal |> runCompile c
+
+    let run410 e =
         e |> runCompile glsl410
 
-    let compileEffect (e : Compiled<Effect, ShaderState>) : Error<Map<string, UniformGetter> * string> =
+    let compileEffect410 (e : Compiled<Effect, ShaderState>) : Error<Map<string, UniformGetter> * string> =
         e |> compileEffectInternal |> runCompile glsl410
 
     let run120 e =

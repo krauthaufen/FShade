@@ -46,7 +46,7 @@ module EffectEditor =
                 | Fsi.CompilerErrorType.Error -> outOfDate
 
     let private compileEffect (env : EditorEnvironment) (m : EffectNode) (code : list<string>) (commit : bool) =
-        let effect = m.read() |> GLSL.run
+        let effect = m.read() |> GLSL.run410
         match effect with
             | Success (effect) ->
                 let debugInfos =
@@ -75,7 +75,7 @@ module EffectEditor =
 
                         Report.BeginTimed "compiling shader"
 
-                        let shaders = newDebugInfos |> List.map debugInfoToEffect |> List.map (GLSL.run)
+                        let shaders = newDebugInfos |> List.map debugInfoToEffect |> List.map (GLSL.run410)
                         let shaders = List.zip shaders newDebugInfos
 
                         let countLines (str : string) = (lineBreak.Split str |> Array.length)
@@ -120,7 +120,7 @@ module EffectEditor =
                             }
 
                         
-                        match GLSL.run compiled with
+                        match GLSL.run410 compiled with
                             | Success e ->
                                 Report.End() |> ignore //composing
                                 if commit then
@@ -225,7 +225,7 @@ module EffectEditor =
             if env.list.SelectedItems.Count > 0 then
                 let node = env.list.SelectedItems.[0].Tag |> unbox<EffectNode>
                 let s = node.read()
-                match GLSL.compileEffect s with
+                match GLSL.compileEffect410 s with
                     | Success(_, code) ->
                         let f = new Form()
                         f.Text <- "GLSL"
@@ -259,7 +259,7 @@ module EffectEditor =
             if env.list.SelectedItems.Count > 0 then
                 let item = env.list.SelectedItems.[0]
                 let s = item.Tag |> unbox<EffectNode>
-                let effect = s.read() |> GLSL.run
+                let effect = s.read() |> GLSL.run410
 
                 match effect with
                     | Success e ->
@@ -436,7 +436,7 @@ module EffectEditor =
                         t.UndoRedo.EmptyUndoBuffer()
                     | _ ->
                         let tag = e.Item.Tag |> unbox<EffectNode>
-                        let effect = tag.read() |> GLSL.run
+                        let effect = tag.read() |> GLSL.run410
                         match effect with
                             | Success effect ->
                                 let codes =

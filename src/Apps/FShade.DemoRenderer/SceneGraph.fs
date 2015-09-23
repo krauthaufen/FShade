@@ -183,7 +183,7 @@ module Sg =
     let shader (name : string) (e : Compiled<Effect, ShaderState>) (sg : ISg) =
         
         
-        match GLSL.compileEffect e with
+        match GLSL.compileEffect410 e with
             | Success (uniforms, code) ->
                 printfn "%s" code
 
@@ -196,7 +196,7 @@ module Sg =
                 FShade.Debug.EffectEditor.register { name = name; read = (fun () -> !currentEffect); write = 
                     (fun e -> 
                         
-                        match GLSL.compileEffect e with
+                        match GLSL.compileEffect410 e with
                             | Success (uniforms, code) ->
                                 currentEffect := e
                                 g.Remove !currentNode

@@ -198,7 +198,7 @@ module StateModification =
     let compilerState = { runCompile = fun s -> Success(s,s.userState) }
     let putCompilerState s = { runCompile = fun o -> Success({ o with userState = s },()) }
     let modifyCompilerState f = { runCompile = fun o -> Success({ o with userState = f o.userState },()) }
-    let resetCompilerState = { runCompile = fun o -> Success({ o with userState = o.compiler.InitialState() },()) }
+    let resetCompilerState = { runCompile = fun o -> Success({ o with userState = o.compiler.ResetState(o.userState) },()) }
 
     let addUsedType t = { runCompile = fun o -> Success({ o with  types = Set.add (Unique(t)) o.types },()) }
     let addMethod mi = { runCompile = fun o -> Success({ o with functions = Set.add (Unique(MethodFunction mi)) o.functions },()) }

@@ -35,6 +35,7 @@ type ICompiler<'s> =
     abstract member ProcessCode : string -> Compiled<string, 's>
     abstract member ProcessFunctionBody : Expr -> Compiled<Expr, 's>
     abstract member InitialState : unit -> 's
+    abstract member ResetState : 's -> 's
 
 /// <summary>
 /// The CompilerState represents the internal state of the compilation process and can

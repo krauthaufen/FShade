@@ -55,7 +55,8 @@ module Simple =
         
     let white (v : V) =
         fragment {
-            return V4d.IIII
+            let c : V4d = uniform?PerView?Color
+            return c
         }
             
     let texture (v : V) =
@@ -114,7 +115,7 @@ let main argv =
     let effect = [Simple.trafo |> toEffect
                   Simple.pointSurface (V2d(0.06, 0.08)) |> toEffect
                   //Simple.white |> toEffect
-                  Simple.normals |> toEffect ] |> compose
+                  Simple.texture |> toEffect] |> compose
 
 //    match GLSL.compileEffect effect with
 //        | Success (uniforms, code) ->
@@ -129,6 +130,34 @@ let main argv =
 //
 
     //FShade.Resources.Icon |> printfn "%A"
+
+
+    let config =
+        {
+            GLSL.languageVersion = Version(1,4,0)
+            GLSL.enabledExtensions = Set.ofList ["GL_ARB_separate_shader_objects"; "GL_ARB_shading_language_420pack" ]
+
+            GLSL.createUniformBuffers = true
+            GLSL.createGlobalUniforms = false
+            GLSL.createBindings = true
+            GLSL.createDescriptorSets = true
+            GLSL.createInputLocations = true
+            GLSL.createRowMajorMatrices = true
+            GLSL.createPerStageUniforms = true
+
+            GLSL.flipHandedness = true
+            GLSL.depthRange = Range1d(0.0,1.0)
+        }
+
+    let res = effect |> GLSL.compileEffect config
+    match res with
+        | Success (_,code) ->
+            printfn "%s" code
+        | Error e ->
+            failwith e
+
+    Environment.Exit 0
+
 
     let w = new Window()
 

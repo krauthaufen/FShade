@@ -337,6 +337,9 @@ module GLES =
 
             member x.InitialState() = emptyShaderState
 
+            member x.ResetState(state : CompilerState) = { emptyShaderState with counters = state.counters }
+
+
             member x.ProcessCode c =
                 compile {
                     return c
