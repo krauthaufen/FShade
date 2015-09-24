@@ -42,12 +42,13 @@ module Parameters =
             member x.Parent = parent
             member x.Name = name
             member x.GetChildScope(n : string) =
-                match childScopes.TryGetValue n with
-                    | (true,s) -> s
-                    | _ -> let s = UniformScope(Some x, n)
-                           childScopes.[n] <- s
-                           s
-
+                lock childScopes (fun () ->
+                    match childScopes.TryGetValue n with
+                        | (true,s) -> s
+                        | _ -> let s = UniformScope(Some x, n)
+                               childScopes.[n] <- s
+                               s
+                )
                 
         type ISemanticValue with
             member x.Scope = x.ScopeUntyped |> unbox<UniformScope>

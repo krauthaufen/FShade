@@ -45,19 +45,19 @@ type ICompiler<'s> =
 /// </summary>
 and [<NoComparison>] [<NoEquality>] CompilerState<'s> = 
     { compiler : ICompiler<'s>
-      types : Set<Unique<Type>>
+      types : PersistentHashSet<Type>
         
       functionId : int
-      functions : Set<Unique<Function>>
+      functions : PersistentHashSet<Function>
           
       constantId : int
-      constants : Map<Unique<obj>, Var>
+      constants : HashMap<obj, Var>
           
       lambdaId : int
       lambdas : Map<string, Expr * int>
 
       uniformId : int
-      uniforms : Map<Unique<obj>, Var>
+      uniforms : HashMap<obj, Var>
 
       defines : Map<string, string>
           

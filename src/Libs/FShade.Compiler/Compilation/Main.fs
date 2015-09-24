@@ -49,7 +49,7 @@ module Main =
             let funCode = String.concat "\r\n" (visitCallGraph cg)
             
 
-            let! constants = constants |> Seq.mapC (fun (KeyValue(u,v)) -> compileConstantDeclaration v.Type v.Name u.Value)
+            let! constants = constants |> HashMap.toSeq |> Seq.mapC (fun (u,v) -> compileConstantDeclaration v.Type v.Name u)
             let defines = defines |> Seq.map (fun (KeyValue(n,v)) -> sprintf "#define %s %s" n v) |> String.concat "\r\n"
             
             let! (def,disp) = compileLambdas()
@@ -58,7 +58,7 @@ module Main =
             return! processCode c
         } 
 
-    let compileTypes (types : Set<Unique<Type>>) =
+    let compileTypes (types : PersistentHashSet<Type>) =
         compile {
             let! tgs = buildTypeGraph types
             let typeCode = String.concat "\r\n" (visitTypeGraphs tgs)
@@ -79,7 +79,7 @@ module Main =
             let funCode = String.concat "\r\n" (visitCallGraph cg.called)
             let self = cg.code
 
-            let! constants = constants |> Seq.mapC (fun (KeyValue(u,v)) -> compileConstantDeclaration v.Type v.Name u.Value)
+            let! constants = constants |> HashMap.toSeq |> Seq.mapC (fun (u,v) -> compileConstantDeclaration v.Type v.Name u)
             let defines = defines |> Seq.map (fun (KeyValue(n,v)) -> sprintf "#define %s %s" n v) |> String.concat "\r\n"
             
             let c = defines + "\r\n" + (String.concat "\r\n" constants) + "\r\n//__AFTERCONSTANTS__\r\n\r\n" + preamble + "\r\n\r\n" + funCode
@@ -106,7 +106,7 @@ module Main =
             let funCode = String.concat "\r\n" (visitCallGraph cg)
             
 
-            let! constants = constants |> Seq.mapC (fun (KeyValue(u,v)) -> compileConstantDeclaration v.Type v.Name u.Value)
+            let! constants = constants |> HashMap.toSeq |> Seq.mapC (fun (u,v) -> compileConstantDeclaration v.Type v.Name u)
             let defines = defines |> Seq.map (fun (KeyValue(n,v)) -> sprintf "#define %s %s" n v) |> String.concat "\r\n"
             
             let c = defines + "\r\n" + typeCode + "\r\n//__AFTERTYPES__\r\n" + (String.concat "\r\n" constants) + "\r\n//__AFTERCONSTANTS__\r\n\r\n" + preamble + "\r\n\r\n" + funCode

@@ -120,25 +120,25 @@ module TypeGraph =
             
             match scope.TryGetValue t with
                 | (true, tg) -> return tg
-                | _ -> do! putUsedTypes Set.empty
+                | _ -> do! putUsedTypes PersistentHashSet.empty
                        let! c = compileTypeDefinition t
                        let! fieldTypes = usedTypes
-                       let fieldTypes = Set.remove (Unique(t)) fieldTypes
+                       let fieldTypes = PersistentHashSet.remove t fieldTypes
 
                        let tg = { self = t; code = c; used = [] }
                        scope.Add(t, tg)
 
-                       let! used = fieldTypes |> Seq.filter (fun t -> not <| t.Value.Name.StartsWith "FSharpFunc") |> Seq.mapC (fun t -> buildTypeGraphInternal scope t.Value)
+                       let! used = fieldTypes |> PersistentHashSet.toSeq |> Seq.filter (fun t -> not <| t.Name.StartsWith "FSharpFunc") |> Seq.mapC (fun t -> buildTypeGraphInternal scope t)
                        tg.used <- used |> Seq.toList
 
                        return tg
 
         }
 
-    let buildTypeGraph (s : Set<Unique<Type>>) =
+    let buildTypeGraph (s : PersistentHashSet<Type>) =
         compile {
             let scope = System.Collections.Generic.Dictionary()
-            let! result = s |> Seq.filter (fun t -> not <| t.Value.Name.StartsWith "FSharpFunc") |> Seq.mapC (fun u -> buildTypeGraphInternal scope u.Value)
+            let! result = s |> PersistentHashSet.toSeq |> Seq.filter (fun t -> not <| t.Name.StartsWith "FSharpFunc") |> Seq.mapC (fun u -> buildTypeGraphInternal scope u)
             return result |> Seq.toList
         }
 

@@ -491,7 +491,7 @@ module GLES =
 
 
 
-            let uniforms' = seq { yield! s.uniforms ; yield! state.uniforms |> Seq.map(fun (KeyValue(u,v)) -> (u.Value, v)) } |> Seq.toList
+            let uniforms' = seq { yield! s.uniforms ; yield! state.uniforms |> HashMap.toSeq } |> Seq.toList
 
             let inputs = s.inputs |> Seq.sortBy(fun (KeyValue(_,n)) -> n.Name)
             let outputs = s.outputs |> Seq.sortBy(fun (KeyValue(_,(_,n))) -> n.Name)
@@ -737,7 +737,7 @@ module GLES =
                                                 ))
 
                                                 let agg = { code = sprintf "\r\n#ifdef TessControl\r\n%s\r\n#endif\r\n#ifdef TessEval\r\n%s\r\n#endif\r\n" tcsCode tevCode
-                                                            usedTypes = Set.union tevc.usedTypes tcsc.usedTypes
+                                                            usedTypes = PersistentHashSet.union tevc.usedTypes tcsc.usedTypes
                                                             uniformBuffers = uniformBufferUnion tevc.uniformBuffers tcsc.uniformBuffers
                                                             uniforms = Map.union tevc.uniforms tcsc.uniforms }
                
@@ -779,21 +779,21 @@ module GLES =
             let types, uniforms, uniformBuffers, vsCode = 
                 match vsCode with
                     | Some(compiled) -> (compiled.usedTypes,compiled.uniforms, compiled.uniformBuffers, sprintf "#ifdef Vertex\r\n%s#endif\r\n\r\n" compiled.code)
-                    | None -> Set.empty,Map.empty, Map.empty, ""
+                    | None -> PersistentHashSet.empty,Map.empty, Map.empty, ""
 
             let types, uniforms, uniformBuffers, teCode = 
                 match tessCode with
-                    | Some(compiled) -> (Set.union types compiled.usedTypes, mapUnion uniforms compiled.uniforms, uniformBufferUnion uniformBuffers compiled.uniformBuffers, compiled.code)
+                    | Some(compiled) -> (PersistentHashSet.union types compiled.usedTypes, mapUnion uniforms compiled.uniforms, uniformBufferUnion uniformBuffers compiled.uniformBuffers, compiled.code)
                     | None -> types, uniforms, uniformBuffers, ""
 
             let types, uniforms, uniformBuffers, gsCode = 
                 match gsCode with
-                    | Some(compiled,t) -> (Set.union types compiled.usedTypes, mapUnion uniforms compiled.uniforms, uniformBufferUnion uniformBuffers compiled.uniformBuffers, sprintf "#ifdef Geometry\r\n%s#endif\r\n\r\n" compiled.code)
+                    | Some(compiled,t) -> (PersistentHashSet.union types compiled.usedTypes, mapUnion uniforms compiled.uniforms, uniformBufferUnion uniformBuffers compiled.uniformBuffers, sprintf "#ifdef Geometry\r\n%s#endif\r\n\r\n" compiled.code)
                     | None -> types, uniforms, uniformBuffers, ""
 
             let types, uniforms, uniformBuffers, fsCode =
                 match fsCode with
-                    | Some(compiled) -> (Set.union types compiled.usedTypes, mapUnion uniforms compiled.uniforms, uniformBufferUnion uniformBuffers compiled.uniformBuffers, sprintf "#ifdef Pixel\r\n%s#endif\r\n\r\n" compiled.code)
+                    | Some(compiled) -> (PersistentHashSet.union types compiled.usedTypes, mapUnion uniforms compiled.uniforms, uniformBufferUnion uniformBuffers compiled.uniformBuffers, sprintf "#ifdef Pixel\r\n%s#endif\r\n\r\n" compiled.code)
                     | None -> types, uniforms, uniformBuffers, ""
 
 

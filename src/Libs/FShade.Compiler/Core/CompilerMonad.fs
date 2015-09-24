@@ -20,10 +20,10 @@ module StateHelpers =
     /// is used internally to create a initial userState.
     /// </summary>
     let emptyCompilerState c = { compiler = c
-                                 types = Set.empty
-                                 functions = Set.empty
+                                 types = PersistentHashSet.empty
+                                 functions = PersistentHashSet.empty
                                  constantId = 0
-                                 constants = Map.empty
+                                 constants = HashMap.empty
 
                                  lambdaId = 0
                                  lambdas = Map.empty
@@ -32,7 +32,7 @@ module StateHelpers =
                                  functionId = 0
 
                                  uniformId = 0
-                                 uniforms = Map.empty
+                                 uniforms = HashMap.empty
 
                                  bound = Set.empty
                                  userState = c.InitialState() }
@@ -200,20 +200,20 @@ module StateModification =
     let modifyCompilerState f = { runCompile = fun o -> Success({ o with userState = f o.userState },()) }
     let resetCompilerState = { runCompile = fun o -> Success({ o with userState = o.compiler.ResetState(o.userState) },()) }
 
-    let addUsedType t = { runCompile = fun o -> Success({ o with  types = Set.add (Unique(t)) o.types },()) }
-    let addMethod mi = { runCompile = fun o -> Success({ o with functions = Set.add (Unique(MethodFunction mi)) o.functions },()) }
-    let addFunction args body = { runCompile = fun o -> Success({ o with functions = Set.add (Unique(SpecialFunction(o.functionId, args, body))) o.functions; functionId = o.functionId + 1},o.functionId) }
+    let addUsedType t = { runCompile = fun o -> Success({ o with  types = PersistentHashSet.add t o.types },()) }
+    let addMethod mi = { runCompile = fun o -> Success({ o with functions = PersistentHashSet.add (MethodFunction mi) o.functions },()) }
+    let addFunction args body = { runCompile = fun o -> Success({ o with functions = PersistentHashSet.add (SpecialFunction(o.functionId, args, body)) o.functions; functionId = o.functionId + 1},o.functionId) }
 
     let getUserUniform t obj = 
         { runCompile = 
             fun o -> 
-                match Map.tryFind (Unique obj) o.uniforms with
+                match HashMap.tryFind obj o.uniforms with
                     | Some v -> Success(o, v)
                     | None ->
                         let v = Var(sprintf "userUniform%d" o.uniformId, t)
                         let newState =
                             { o with 
-                                uniforms = Map.add (Unique obj) v o.uniforms
+                                uniforms = HashMap.add obj v o.uniforms
                                 uniformId = o.uniformId + 1
                             }
 
@@ -227,7 +227,7 @@ module StateModification =
     let isBound v = { runCompile = fun o -> Success(o, Set.contains v o.bound) }
 
     
-    let lambdas = { runCompile = fun o -> Success(o, o.lambdas |> Map.toSeq |> Seq.map (fun (_,(e,id)) -> (Unique e, id)) |> Map.ofSeq) }
+    let lambdas = { runCompile = fun o -> Success(o, o.lambdas |> Map.toSeq |> Seq.map (fun (_,(e,id)) -> (e, id)) |> HashMap.ofSeq) }
     let resetLambdas() = { runCompile = fun o -> Success({ o with  lambdas = Map.empty; lambdaId = 0 }, ()) }
 
     let addLambda (lambda : Expr) = { runCompile = fun o -> 
@@ -239,12 +239,11 @@ module StateModification =
 
     let asConstant e =
         { runCompile = fun o ->
-            let u = Unique(e)
-            match Map.tryFind u o.constants with
+            match HashMap.tryFind e o.constants with
                 | Some e -> Success(o, Expr.Var(e))
                 | None ->
                     let v = Var(sprintf "constant%d" o.constantId, e.GetType())
-                    let newState = { o with  constantId = o.constantId + 1; constants = Map.add u v o.constants }
+                    let newState = { o with  constantId = o.constantId + 1; constants = HashMap.add e v o.constants }
                     Success(newState,Expr.Var(v)) }
      
     let asDefine (name : string) (value : string) =

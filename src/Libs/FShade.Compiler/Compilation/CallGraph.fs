@@ -39,19 +39,19 @@ module CallGraph =
         compile {
             let! l = lambdas
 
-            if Map.isEmpty l then
+            if HashMap.isEmpty l then
                 return "",""
             else
-                let grouped = l |> Map.toSeq |> Seq.groupBy (fun (b, id) -> b.Value.Type)
+                let grouped = l |> HashMap.toSeq |> Seq.groupBy (fun (b, id) -> b.Type)
                                 |> Seq.map (fun (t,b) ->
                                     let arg,ret = FSharpType.GetFunctionElements(t)
-                                    let bodies = b |> Seq.map (fun (u,id) -> (id,u.Value)) |> Map.ofSeq
-                                    (Unique(t), { inputType = arg; returnType = ret; bodies = bodies })
-                                ) |> Map.ofSeq
+                                    let bodies = b |> Seq.map (fun (u,id) -> (id,u)) |> Map.ofSeq
+                                    (t, { inputType = arg; returnType = ret; bodies = bodies })
+                                ) |> HashMap.ofSeq
 
                 let map = { closures = grouped }
 
-                let! closures = grouped |> Seq.mapC (fun (KeyValue(_,c)) -> compileClosureDefinition c map)
+                let! closures = grouped |> HashMap.toSeq |> Seq.mapC (fun (_,c) -> compileClosureDefinition c map)
                 let closures = closures |> Seq.toList
 
                 let definitions = closures |> List.map (fun (d,_,_) -> d) |> String.concat "\r\n"
@@ -71,7 +71,7 @@ module CallGraph =
 
                 //TODO: find a better way for this fixpoint search
                 //      also used types and functions will not be correct
-                if l'.Count <> l.Count then
+                if (HashMap.toArray l').Length <> (HashMap.toArray l).Length then
                     return! compileLambdas()
                 else
                     do! resetLambdas()
@@ -114,10 +114,9 @@ module CallGraph =
         compile {
             return! f |> List.mapC(fun (name,f) ->
                 compile {
-                    let u = Unique(f)
                     match scope.TryGetValue f with
                         | (true, cg) -> return cg
-                        | _ ->  do! putUsedFunctions Set.empty
+                        | _ ->  do! putUsedFunctions PersistentHashSet.empty
                                 let! cg = compile {
                                              match f with
                                                 | MethodFunction mi -> 
@@ -132,7 +131,7 @@ module CallGraph =
                                           }
                                 let! called = usedFunctions
                                 scope.Add(f, cg)
-                                let! calledGraphs = called |> Seq.mapC(fun c -> buildCallGraphInternal scope [None,c.Value])
+                                let! calledGraphs = called |> PersistentHashSet.toSeq |> Seq.mapC(fun c -> buildCallGraphInternal scope [None,c])
                                 cg.called <- List.concat [calledGraphs |> Seq.concat |> Seq.toList; cg.called]
 
                                 return cg

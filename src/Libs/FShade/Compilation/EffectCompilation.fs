@@ -36,7 +36,8 @@ module EffectCompilation =
 
                     let! state = compilerState
 
-                    let uniforms  = state.uniforms |> Seq.map (fun (KeyValue(k,v)) -> (k.Value,v)) |> Seq.toList
+                    let uniforms  = state.uniforms |> HashMap.toList
+
                     let builder = match state.builder with
                                         | Some b -> 
                                             match Expr.tryEval b with

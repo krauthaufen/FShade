@@ -117,7 +117,7 @@ module SequentialComposition =
         let outputs = [r.outputs |> Map.toSeq; l.outputs |> Map.toSeq |> Seq.filter(fun (_,(_,v)) -> not <| Set.contains v hidden) |> Seq.map (fun (k,(_,v)) -> k,(None, v))] |> Seq.concat |> Map.ofSeq
 
         //the uniform set is simply merged
-        let uniforms = [l.uniforms; r.uniforms] |> List.concat //|> Seq.map (fun (u,v) -> Unique v, u) |> Map.ofSeq |> Map.toList |> List.map (fun (a,b) -> b,a.Value)
+        let uniforms = [l.uniforms; r.uniforms] |> List.concat
         let uniformMap = uniforms |> List.map (fun (a,b) -> b.Name, b) |> Map.ofList
 
 

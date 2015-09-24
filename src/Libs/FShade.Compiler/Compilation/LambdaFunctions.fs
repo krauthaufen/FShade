@@ -18,7 +18,7 @@ module LambdaFunctions =
     type Closure = { inputType : Type; returnType : Type; bodies : Map<int, Expr> }
 
     [<NoComparison>]
-    type ClosureMap = { closures : Map<Unique<Type>, Closure> }
+    type ClosureMap = { closures : HashMap<Type, Closure> }
 
 
     let subClosure (rem : int) (c : Closure) =
@@ -104,7 +104,7 @@ module LambdaFunctions =
                                                                     return Expr.Call(subDispatcher, [l; arg])
                                                                 else
                                                                         
-                                                                    match Map.tryFind (Unique l.Type) map.closures with
+                                                                    match HashMap.tryFind l.Type map.closures with
                                                                         | Some inner ->
                                                                             neededDispatchers.Add(inner)
                                                                             let! subName = getDispatcherNameForClosure inner
@@ -200,7 +200,7 @@ module LambdaFunctions =
         
     let compileDispatcherForest (map : ClosureMap) =
         compile {
-            let closures = map.closures |> Map.toList |> List.map snd
+            let closures = map.closures |> HashMap.toList |> List.map snd
             let set = HashSet()
 
             let! closureCodes = closures |> List.mapC (fun c -> compileDispatcherTree set "" c map)
@@ -226,7 +226,7 @@ module LambdaFunctions =
                                     let fieldName = if prefix = "" then sprintf "lambda%d_%s" id f.Name else sprintf "%s_lambda%d_%s" prefix id f.Name
 
                                     if fieldType.Name.StartsWith "FSharpFunc" then
-                                        match Map.tryFind (Unique fieldType) map.closures with
+                                        match HashMap.tryFind fieldType map.closures with
                                             | Some innerClosure ->
                                                 return! getAllFieldNames visited fieldName innerClosure map
                                             | _ -> 
@@ -285,7 +285,7 @@ module LambdaFunctions =
                                     compile {
                                             
                                         if v.Type.Name.StartsWith "FSharpFunc" then
-                                            match Map.tryFind (Unique v.Type) map.closures with
+                                            match HashMap.tryFind v.Type map.closures with
                                                 | Some targetClosure ->
                                                     let! copyFields = compileAllFieldNames "" targetClosure map
                                                     let copyFields = copyFields |> Seq.filter (fun f -> allFields.Contains(sprintf "%s_%s_%s" lambdaName v.Name f)) |> Seq.toList

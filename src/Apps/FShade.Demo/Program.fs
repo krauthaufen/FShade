@@ -80,10 +80,10 @@ module Simple =
                     let p10 = V3d(pxyz + V3d(  sx, -sy, 0.0 ))
                     let p11 = V3d(pxyz + V3d(  sx,  sy, 0.0 ))
 
-                    yield { p.Value with p = V4d(p00 * pos.W, pos.W); tc = V2d.OO }
-                    yield { p.Value with p = V4d(p10 * pos.W, pos.W); tc = V2d.IO }
-                    yield { p.Value with p = V4d(p01 * pos.W, pos.W); tc = V2d.OI }
-                    yield { p.Value with p = V4d(p11 * pos.W, pos.W); tc = V2d.II }
+                    yield { p.Value with p = uniform.ViewProjTrafo * V4d(p00 * pos.W, pos.W); tc = V2d.OO }
+                    yield { p.Value with p = uniform.ViewProjTrafo * V4d(p10 * pos.W, pos.W); tc = V2d.IO }
+                    yield { p.Value with p = uniform.ViewProjTrafo * V4d(p01 * pos.W, pos.W); tc = V2d.OI }
+                    yield { p.Value with p = uniform.ViewProjTrafo * V4d(p11 * pos.W, pos.W); tc = V2d.II }
 
         }
             
@@ -100,7 +100,93 @@ module Simple =
 
             return  v.color.XYZ * (0.2 + 0.8 * d) + V3d.III * pow s 64.0
         }    
-            
+ 
+ 
+module Dead =
+    type BillboardVertex =
+        {
+            [<Position>] position : V4d
+            [<Color>] color : V4d
+            [<SemanticAttribute("DiffuseColorCoordinate")>] texCoord : V2d
+            [<SemanticAttribute("ViewPosition")>] viewPos : V4d
+        }
+
+    type UniformScope with
+        member x.ModelViewTrafo : M44d = uniform?PerModel?ModelViewTrafo
+        member x.ProjTrafo : M44d = uniform?PerView?ProjTrafo
+        member x.UserSelected : bool = uniform?UserSelected
+
+    let BillboardTrafo (v : BillboardVertex) =
+        vertex {
+            let vp = uniform.ModelViewTrafo * v.position
+            let pp = uniform.ProjTrafo * vp
+            return {
+                position = pp
+                texCoord = V2d(0,0)
+                color = v.color
+                viewPos = vp
+            }
+        }
+
+    let BillboardGeometry (sizes: V2d) (distanceScalingFactor : float -> float) (v : Point<BillboardVertex>) =
+        let targetRange = 5.0
+
+        triangle {
+            let s = sizes
+            let offsetX = s.X
+            let offsetY = s.Y
+
+            let bv = v.Value
+            let pos = bv.position
+            let vp = bv.viewPos
+            let c = bv.color
+
+            let factor =
+                let d = abs(vp.Z)
+                let e = 
+                    if d < targetRange then
+                        1.0 - ( d / targetRange )
+                    else
+                        0.0
+                1.0 + e
+        
+            let offsetX = offsetX * factor
+            let offsetY = offsetY * factor
+
+            let TopLeft =       V4d(vp.XYZ + V3d(   -offsetX,   -offsetY, 0.0),vp.W)
+            let TopRight =      V4d(vp.XYZ + V3d(    offsetX,   -offsetY, 0.0),vp.W)
+            let BottomLeft =    V4d(vp.XYZ + V3d(   -offsetX,    offsetY, 0.0),vp.W)
+            let BottomRight =   V4d(vp.XYZ + V3d(    offsetX,    offsetY, 0.0),vp.W)
+
+            let TLO =   uniform.ProjTrafo * TopLeft
+            let TRO =   uniform.ProjTrafo * TopRight
+            let BLO =   uniform.ProjTrafo * BottomLeft
+            let BRO =   uniform.ProjTrafo * BottomRight
+        
+            yield { position = TLO; color = c; texCoord = V2d(0, 1); viewPos = vp }
+            yield { position = TRO; color = c; texCoord = V2d(1, 1); viewPos = vp }
+            yield { position = BLO; color = c; texCoord = V2d(0, 0); viewPos = vp }
+            yield { position = BRO; color = c; texCoord = V2d(1, 0); viewPos = vp }
+            }
+
+    let BillboardFragment (color: V4d) (v : BillboardVertex) =
+        fragment {
+            let c = color
+            let s = uniform.UserSelected
+            let t = v.texCoord
+            let comp = V2d(0.5, 0.5)
+            let dist = t - comp
+            let len = dist.Length
+            if len < 0.5 then
+                if s then
+                    return c
+                else
+                    return v.color
+            else
+                discard()
+                return V4d(0,0,0,0)
+        } 
+           
             
             
 
@@ -113,9 +199,11 @@ let main argv =
 
 
     let effect = [Simple.trafo |> toEffect
-                  //Simple.pointSurface (V2d(0.06, 0.08)) |> toEffect
+                  Simple.pointSurface (V2d(0.06, 0.08)) |> toEffect
                   Simple.white |> toEffect
                   ] |> compose
+
+    let effect = [Dead.BillboardTrafo |> toEffect; Dead.BillboardGeometry V2d.II id |> toEffect; Dead.BillboardFragment V4d.IIII |> toEffect] |> compose
 
 //    match GLSL.compileEffect effect with
 //        | Success (uniforms, code) ->
@@ -149,7 +237,7 @@ let main argv =
             GLSL.depthRange = Range1d(0.0,1.0)
         }
 
-    let res = effect |> GLSL.compileEffect config
+    let res = effect |> GLSL.compileEffect410
     match res with
         | Success (_,code) ->
             printfn "%s" code

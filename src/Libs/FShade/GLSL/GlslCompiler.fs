@@ -41,11 +41,11 @@ module GLSL =
             enabledExtensions = Set.empty
             
             createUniformBuffers = true
-            createGlobalUniforms = true
+            createGlobalUniforms = false
             createBindings = false
             createDescriptorSets = false
             createInputLocations = true
-            createRowMajorMatrices = true
+            createRowMajorMatrices = false
             createPerStageUniforms = false
             flipHandedness = false
             depthRange = Range1d(-1.0,1.0)
@@ -767,16 +767,6 @@ module GLSL =
                     |> Map.map (fun scope elements -> elements |> List.filter (function (SamplerType(_),_) -> false | _ -> true))
                     |> Map.filter (fun _ e -> not <| List.isEmpty e)
 
-
-//
-//            let textureDescriptorOffset = 
-//                if Map.isEmpty uniformBuffers then 0
-//                else 1
-//
-//            let textureBindingOffset =
-//                uniformBuffers.Count
-//
-
             let! ds = 
                 if Map.isEmpty uniformBuffers then compile { return -1 }
                 else nextDescriptorSetIndex
@@ -879,19 +869,25 @@ module GLSL =
 
 
 
-            let uniforms' = seq { yield! s.uniforms ; yield! state.uniforms |> Seq.map(fun (KeyValue(u,v)) -> (u.Value, v)) } |> Seq.toList
+            let uniforms' = 
+                [
+                    yield! s.uniforms
+                    yield! state.uniforms |> HashMap.toSeq
+                ]
 
             let inputs = s.inputs |> Seq.sortBy(fun (KeyValue(_,n)) -> n.Name)
             let outputs = s.outputs |> Seq.sortBy(fun (KeyValue(_,(_,n))) -> n.Name)
-            let uniforms = uniforms'  |> Seq.map(fun (u,v) ->
-                                            match u with
-                                                | UserUniform(t,o) -> (uniform, t, v.Name)
-                                                | Attribute(scope, t, n) -> (scope, t, n)
-                                                | SamplerUniform(t,sem, n,_) -> (uniform, t, n)
-                                        ) 
-                                      |> Seq.groupBy(fun (s,_,_) -> s)
-                                      |> Seq.map (fun (g,v) -> (g, v |> Seq.map (fun (_,t,n) -> (t,n)) |> Seq.toList))
-                                      |> Map.ofSeq
+            let uniforms = 
+                uniforms'  
+                    |> Seq.map(fun (u,v) ->
+                        match u with
+                            | UserUniform(t,o) -> (uniform, t, v.Name)
+                            | Attribute(scope, t, n) -> (scope, t, n)
+                            | SamplerUniform(t,sem, n,_) -> (uniform, t, n)
+                       ) 
+                    |> Seq.groupBy(fun (s,_,_) -> s)
+                    |> Seq.map (fun (g,v) -> (g, v |> Seq.map (fun (_,t,n) -> (t,n)) |> Seq.toList))
+                    |> Map.ofSeq
 
 
             let! inputs = 
@@ -1172,7 +1168,7 @@ module GLSL =
                                                 ))
 
                                                 let agg = { code = sprintf "\r\n#ifdef TessControl\r\n%s\r\n#endif\r\n#ifdef TessEval\r\n%s\r\n#endif\r\n" tcsCode tevCode
-                                                            usedTypes = Set.union tevc.usedTypes tcsc.usedTypes
+                                                            usedTypes = PersistentHashSet.union tevc.usedTypes tcsc.usedTypes
                                                             uniformBuffers = uniformBufferUnion tevc.uniformBuffers tcsc.uniformBuffers
                                                             uniforms = Map.union tevc.uniforms tcsc.uniforms }
                
@@ -1216,21 +1212,21 @@ module GLSL =
             let types, uniforms, uniformBuffers, vsCode = 
                 match vsCode with
                     | Some(compiled) -> (compiled.usedTypes,compiled.uniforms, compiled.uniformBuffers, sprintf "#ifdef Vertex\r\n%s#endif\r\n\r\n" compiled.code)
-                    | None -> Set.empty,Map.empty, Map.empty, ""
+                    | None -> PersistentHashSet.empty,Map.empty, Map.empty, ""
 
             let types, uniforms, uniformBuffers, teCode = 
                 match tessCode with
-                    | Some(compiled) -> (Set.union types compiled.usedTypes, mapUnion uniforms compiled.uniforms, uniformBufferUnion uniformBuffers compiled.uniformBuffers, compiled.code)
+                    | Some(compiled) -> (PersistentHashSet.union types compiled.usedTypes, mapUnion uniforms compiled.uniforms, uniformBufferUnion uniformBuffers compiled.uniformBuffers, compiled.code)
                     | None -> types, uniforms, uniformBuffers, ""
 
             let types, uniforms, uniformBuffers, gsCode = 
                 match gsCode with
-                    | Some(compiled,t) -> (Set.union types compiled.usedTypes, mapUnion uniforms compiled.uniforms, uniformBufferUnion uniformBuffers compiled.uniformBuffers, sprintf "#ifdef Geometry\r\n%s#endif\r\n\r\n" compiled.code)
+                    | Some(compiled,t) -> (PersistentHashSet.union types compiled.usedTypes, mapUnion uniforms compiled.uniforms, uniformBufferUnion uniformBuffers compiled.uniformBuffers, sprintf "#ifdef Geometry\r\n%s#endif\r\n\r\n" compiled.code)
                     | None -> types, uniforms, uniformBuffers, ""
 
             let types, uniforms, uniformBuffers, fsCode =
                 match fsCode with
-                    | Some(compiled) -> (Set.union types compiled.usedTypes, mapUnion uniforms compiled.uniforms, uniformBufferUnion uniformBuffers compiled.uniformBuffers, sprintf "#ifdef Pixel\r\n%s#endif\r\n\r\n" compiled.code)
+                    | Some(compiled) -> (PersistentHashSet.union types compiled.usedTypes, mapUnion uniforms compiled.uniforms, uniformBufferUnion uniformBuffers compiled.uniformBuffers, sprintf "#ifdef Pixel\r\n%s#endif\r\n\r\n" compiled.code)
                     | None -> types, uniforms, uniformBuffers, ""
 
 

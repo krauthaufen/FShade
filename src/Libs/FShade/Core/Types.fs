@@ -37,7 +37,7 @@ module Types =
             value.GetType() = typeof<string * SamplerState>
 
     [<NoComparison>]
-    type CompiledShader = { usedTypes : Set<Unique<Type>>; uniforms : Map<string, UniformGetter>; uniformBuffers : Map<UniformScope, list<Type * string>>; code : string }
+    type CompiledShader = { usedTypes : PersistentHashSet<Type>; uniforms : Map<string, UniformGetter>; uniformBuffers : Map<UniformScope, list<Type * string>>; code : string }
 
     [<NoComparison>]
     type ColorOnlyFragment = { [<Semantic("Colors")>] colorOnly : V4d }

@@ -10,7 +10,7 @@ open FShade.Compiler
 module ShaderState =
 
     [<NoComparison>]
-    type ShaderState = { inputs : Map<string, Var>; outputs : Map<string, Option<string> * Var>; uniforms : Map<Unique<Uniform>, Var>; builder : Option<Expr>; counters : Map<string, int> }
+    type ShaderState = { inputs : Map<string, Var>; outputs : Map<string, Option<string> * Var>; uniforms : HashMap<Uniform, Var>; builder : Option<Expr>; counters : Map<string, int> }
 
     let addInput n i =
         modifyCompilerState(fun (s : ShaderState) -> { s with inputs = Map.add n i s.inputs })
@@ -19,7 +19,7 @@ module ShaderState =
         modifyCompilerState(fun (s : ShaderState) -> { s with outputs = Map.add n i s.outputs })
 
     let addUniform n i =
-        modifyCompilerState(fun (s : ShaderState) -> { s with  uniforms = Map.add n i s.uniforms })
+        modifyCompilerState(fun (s : ShaderState) -> { s with  uniforms = HashMap.add n i s.uniforms })
 
     
     let setBuilder b =
@@ -29,7 +29,7 @@ module ShaderState =
                 | Some _ -> s
         )
 
-    let emptyShaderState = { inputs = Map.empty; outputs = Map.empty; uniforms = Map.empty; builder = None; counters = Map.empty }
+    let emptyShaderState = { inputs = Map.empty; outputs = Map.empty; uniforms = HashMap.empty; builder = None; counters = Map.empty }
 
 
 
@@ -75,25 +75,24 @@ module ShaderState =
                 | Some (_,v) -> return v
         }
 
-    let rec getUniform uniform =
+    let rec getUniform (uniform : Uniform) =
         transform {
             let! s = compilerState
             
 
-            let u = Unique(uniform)
-            match Map.tryFind u s.uniforms with
+            match HashMap.tryFind uniform s.uniforms with
                 | None -> match uniform with
                             | Attribute(_,t,n) -> let v = Var(n, t)
-                                                  do! addUniform u v
+                                                  do! addUniform uniform v
                                                   return v
                             | UserUniform(t,e) -> 
                                 let! res = getUserUniform t e
-                                do! addUniform u res
+                                do! addUniform uniform res
                                 return res
 
                             | SamplerUniform(t,sem, n,sam) ->
                                 let v = Var(n, t)
-                                do! addUniform u v
+                                do! addUniform uniform v
                                 return v
 
                 | Some v -> return v
