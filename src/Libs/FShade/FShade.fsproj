@@ -71,7 +71,7 @@
     <Compile Include="GLSL\GlslSamplers.fs" />
     <Compile Include="GLSL\GlslCompiler.fs" />
     <Compile Include="GLSL\GlESCompiler.fs" />
-    <Content Include="App.config" />
+    <Content Include="app.config" />
     <EmbeddedResource Include="Resources.resx" />
     <Compile Include="Resources.fs" />
   </ItemGroup>
