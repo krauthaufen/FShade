@@ -1,5 +1,5 @@
 language: csharp
-solution: src/Aardvark.Rendering.sln
+solution: src/FShade.sln
 before_install:
 before_install:
   # Make sure mono is installed,
