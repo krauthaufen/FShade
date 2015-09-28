@@ -1,6 +1,6 @@
 # FShade
 FShade is a Library allowing users to write Shaders in F# using code-quotations
-
+ 
 For further details see:
 http://www.fshade.org/
 
