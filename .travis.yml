@@ -1,6 +1,5 @@
 language: csharp
-solution: src/FShade.sln 
-before_install:
+solution: src/FShade.sln
 before_install: 
   # Make sure mono is installed,
   # pipe stdout to dev/null because qq is still too chatty
