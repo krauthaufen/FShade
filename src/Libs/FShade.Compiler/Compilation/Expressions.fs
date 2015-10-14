@@ -334,7 +334,7 @@ module Expressions =
                                             | :? PropertyInfo as p -> 
                                                 let! i = compileIntrinsicFunction p.GetMethod
                                                 match i with
-                                                    | Some fmt -> return System.String.Format(fmt, t) |> ret
+                                                    | Some fmt -> return System.String.Format(fmt, t') |> ret
                                                     | None ->  
                                                         if isRecordField p then
                                                             return sprintf "(%s).%s" t' m.Name |> ret
