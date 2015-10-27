@@ -768,7 +768,7 @@ module GLSL =
                     |> Map.filter (fun _ e -> not <| List.isEmpty e)
 
             let! ds = 
-                if Map.isEmpty uniformBuffers then compile { return -1 }
+                if Map.isEmpty uniformBuffers || not config.createDescriptorSets then compile { return -1 }
                 else nextDescriptorSetIndex
 
             let! bufferDecls = uniformBuffers |> Map.toSeq |> Seq.mapC (fun (buffer,elements) ->
