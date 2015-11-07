@@ -4,6 +4,7 @@
 module Names =
     open System
     open Microsoft.FSharp.Reflection
+    open FShade.Utils
 
     /// <summary>
     /// defines tuple-field names.
@@ -64,5 +65,5 @@ module Names =
     /// Gets all 'fields' contained in all the cases of a union-type
     /// </summary>
     let getAllUnionFields (t : Type) =
-        let cases = FSharpType.GetUnionCases(t, true) |> Seq.toList
+        let cases = FSharpTypeExt.GetUnionCases(t) |> Seq.toList
         cases |> List.collect getCaseFields

@@ -41,8 +41,8 @@ module Expressions =
         }
 
     let isRecordField (p : PropertyInfo) =
-        if FSharpType.IsRecord p.DeclaringType then
-            let fields = FSharpType.GetRecordFields p.DeclaringType
+        if FSharpTypeExt.IsRecord(p.DeclaringType) then
+            let fields = FSharpTypeExt.GetRecordFields(p.DeclaringType)
             fields |> Array.exists (fun f -> f = p)
         else
             false
@@ -304,8 +304,8 @@ module Expressions =
                 // between those cases here.
                 | MemberFieldGet(t, m) ->
                     // since union-type fields have non-standard names we use some special logic here
-                    if FSharpType.IsUnion t.Type then
-                        let case = FSharpType.GetUnionCases t.Type |> Seq.tryFind (fun c -> (c.GetFields() |> Seq.tryFind(fun fi -> fi :> MemberInfo = m)).IsSome)
+                    if FSharpTypeExt.IsUnion(t.Type) then
+                        let case = FSharpTypeExt.GetUnionCases(t.Type) |> Seq.tryFind (fun c -> (c.GetFields() |> Seq.tryFind(fun fi -> fi :> MemberInfo = m)).IsSome)
                         
                         match case with
                             | Some(c) -> 
@@ -388,7 +388,7 @@ module Expressions =
                     return sprintf "%s(%s)" ctor (String.concat ", " args) |> ret
 
                 | NewTuple(args) ->
-                    let t = FSharpType.MakeTupleType(args |> Seq.map (fun e -> e.Type) |> Seq.toArray)
+                    let t = FSharpTypeExt.MakeTupleType(args |> Seq.map (fun e -> e.Type) |> Seq.toArray)
                     let! ctor = compileCtorName t
                     let! args = args |> List.mapC (compileExpression false false)
 

@@ -10,6 +10,7 @@ module TypeGraph =
     open Microsoft.FSharp.Quotations.Patterns
     open Microsoft.FSharp.Reflection
     open Aardvark.Base
+    open FShade.Utils
 
     [<NoComparison>]
     type TypeGraph = { self : Type; code : string; mutable used : list<TypeGraph> }
@@ -19,8 +20,8 @@ module TypeGraph =
 
     let compileTypeDefinition (t : Type) : Compiled<string, 's> =
         compile {
-            let! fieldInfo = if FSharpType.IsTuple t then
-                                let fieldTypes = FSharpType.GetTupleElements t |> Seq.filter(fun pi -> pi <> typeof<unit>) |> Seq.toList
+            let! fieldInfo = if FSharpTypeExt.IsTuple t then
+                                let fieldTypes = FSharpTypeExt.GetTupleElements t |> Seq.filter(fun pi -> pi <> typeof<unit>) |> Seq.toList
 
                                 fieldTypes |> List.mapCi (fun i t -> 
                                     compile {
@@ -31,8 +32,8 @@ module TypeGraph =
                                         //return (t, name, None, ValueArgument)
                                     })
 
-                             elif FSharpType.IsRecord t then
-                                let fields = FSharpType.GetRecordFields t |> Seq.filter(fun pi -> pi.PropertyType <> typeof<unit>) |> Seq.toList
+                             elif FSharpTypeExt.IsRecord(t) then
+                                let fields = FSharpTypeExt.GetRecordFields(t) |> Seq.filter(fun pi -> pi.PropertyType <> typeof<unit>) |> Seq.toList
 
                                 fields |> List.mapC (fun pi -> 
                                     compile {
@@ -42,7 +43,7 @@ module TypeGraph =
                                         //return (t, name, None, ValueArgument)
                                     })
 
-                             elif FSharpType.IsUnion t then
+                             elif FSharpTypeExt.IsUnion(t) then
                                 let fields = getAllUnionFields t |> Seq.filter(fun (t,_) -> t <> typeof<unit>) |> Seq.toList
                                 compile {
                                     let! intType = compileType typeof<int>
@@ -81,9 +82,9 @@ module TypeGraph =
             let! n = compileType t
             let! def = compileTypeDeclaration n (fieldDecls |> Seq.toList)
 
-            if FSharpType.IsUnion t then
+            if FSharpTypeExt.IsUnion(t) then
                 
-                let ctors = FSharpType.GetUnionCases t |> Seq.map (fun c -> (getUnionCtorName n c.Name, c.Tag, getCaseFields c)) |> Seq.toList
+                let ctors = FSharpTypeExt.GetUnionCases(t) |> Seq.map (fun c -> (getUnionCtorName n c.Name, c.Tag, getCaseFields c)) |> Seq.toList
 
                 let typeName = n
 

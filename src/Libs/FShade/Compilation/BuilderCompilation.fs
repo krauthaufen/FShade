@@ -122,7 +122,7 @@ module BuilderCompilation =
 
                 | BuilderCall(b, mi, [NewRecord(t, fields)]) when mi.Name = "Yield" ->
                     do! setBuilder b
-                    let semantics = FSharpType.GetRecordFields(t, true) |> Seq.map (fun m -> m.Semantic, m.AssignedTarget) |> Seq.toList
+                    let semantics = FSharpTypeExt.GetRecordFields(t) |> Seq.map (fun m -> m.Semantic, m.AssignedTarget) |> Seq.toList
                     let setters = List.zip semantics fields
 
                     let! outputs = setters |> List.mapC (fun ((s,t),v) ->
@@ -145,7 +145,7 @@ module BuilderCompilation =
                     
                     let! value = removeBuilderCallsInternal value
 
-                    if FSharpType.IsRecord(mi.ReturnType, true) && mi.ReturnType = value.Type then
+                    if FSharpTypeExt.IsRecord(mi.ReturnType) && mi.ReturnType = value.Type then
                         //standard record return
                         return inlineTopLevelVariables value
 
@@ -172,7 +172,7 @@ module BuilderCompilation =
                         else
                             return! error "unknown shader type: %A" b.Type
 
-                    elif FSharpType.IsRecord(mi.ReturnType, true) && (FSharpType.GetRecordFields(mi.ReturnType, true)).Length = 1 then
+                    elif FSharpTypeExt.IsRecord(mi.ReturnType) && (FSharpTypeExt.GetRecordFields(mi.ReturnType)).Length = 1 then
                         //old and deprecated ColorOnly-return-style
                         return Expr.NewRecord(mi.ReturnType, [value])
 

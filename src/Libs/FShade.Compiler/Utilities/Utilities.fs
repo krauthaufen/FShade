@@ -29,3 +29,44 @@ module String =
     let lineCount (str : string) =
         let lines = lineBreak.Split str
         (lines |> Array.filter(fun l -> l.Length > 0)).Length
+
+[<AutoOpen>]
+module MyFSharpType =
+    open System.Reflection
+    open Microsoft.FSharp.Reflection
+
+    let private anyFlags = BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance
+
+    module FSharpTypeExt = 
+
+        let IsTuple(t : Type) =
+            FSharpType.IsTuple(t)
+
+        let GetTupleElements(t : Type) =
+            FSharpType.GetTupleElements(t)
+
+        let MakeTupleType(types) =
+            FSharpType.MakeTupleType types
+
+
+        let IsFunction(t : Type) =
+            FSharpType.IsTuple(t)
+
+        let GetFunctionElements(t : Type) =
+            FSharpType.GetFunctionElements(t)
+
+        let MakeFunctionType(ta, tr) =
+            FSharpType.MakeFunctionType(ta, tr)
+
+
+        let IsRecord(t : Type) =
+            FSharpType.IsRecord(t, anyFlags)
+
+        let GetRecordFields(t : Type) =
+            FSharpType.GetRecordFields(t, anyFlags)
+
+        let IsUnion(t : Type) =
+            FSharpType.IsUnion(t, anyFlags)
+
+        let GetUnionCases(t : Type) =
+            FSharpType.GetUnionCases(t, anyFlags)

@@ -46,7 +46,7 @@ module LambdaFunctions =
             let bodies = c.bodies |> Map.toList
             let arg = Var("arg", c.inputType)
             let replacements = Dictionary<int * Var, Expr>()
-            let funType = FSharpType.MakeFunctionType(c.inputType, c.returnType)
+            let funType = FSharpTypeExt.MakeFunctionType(c.inputType, c.returnType)
             let closure = Expr.Var(Var("closure", funType))
 
             let rec getExtractor (id : int) (v : Var) =
@@ -86,7 +86,7 @@ module LambdaFunctions =
                                             | Lambda(v,b) ->
                                                 let! free = getFreeVars b
                                                     
-                                                let (argType,retType) = FSharpType.GetFunctionElements(f.Type)
+                                                let (argType,retType) = FSharpTypeExt.GetFunctionElements(f.Type)
                                                 let subClosure = subClosure id c
                                                 let! subName = getDispatcherNameForClosure subClosure
                                                 let suffix = subClosure.bodies |> Map.toSeq |> Seq.map fst |> Seq.map (sprintf "%d") |> String.concat ""
@@ -262,7 +262,7 @@ module LambdaFunctions =
 
     let compileCreators (c : Closure)  (map : ClosureMap) =
         compile {
-            let funType = FSharpType.MakeFunctionType(c.inputType, c.returnType)
+            let funType = FSharpTypeExt.MakeFunctionType(c.inputType, c.returnType)
             let! structName = compileType funType
 
 
@@ -330,7 +330,7 @@ module LambdaFunctions =
             let! freeDecls = free |> List.mapC (fun (n,t) -> compile { let! t = compileType t in return! compileFieldDeclaration { name = n; fieldType = t; arraySize = None; info = None }})
             let allFields = free |> List.choose (fun (n,_) -> if n = "Function" then None else Some n)
 
-            let funType = FSharpType.MakeFunctionType(c.inputType, c.returnType)
+            let funType = FSharpTypeExt.MakeFunctionType(c.inputType, c.returnType)
             let! typeName = compileType funType
 
 

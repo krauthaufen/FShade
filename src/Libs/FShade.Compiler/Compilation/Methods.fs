@@ -8,6 +8,7 @@ module Methods =
     open Microsoft.FSharp.Quotations.Patterns
     open Microsoft.FSharp.Reflection
     open Aardvark.Base
+    open FShade.Utils
 
     /// <summary>
     /// gets the dispatcher-name for a given function-type.
@@ -15,7 +16,7 @@ module Methods =
     let getDispatcherNameForType (t : Type) = 
         compile {
             if t.Name.StartsWith "FSharpFunc" then
-                let (a,r) = FSharpType.GetFunctionElements t
+                let (a,r) = FSharpTypeExt.GetFunctionElements t
                 let! argType = compileType a
                 let! retType = compileType r
 

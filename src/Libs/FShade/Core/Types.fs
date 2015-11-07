@@ -8,6 +8,7 @@ open Microsoft.FSharp.Quotations.Patterns
 open Aardvark.Base
 open FShade.Compiler
 open Aardvark.Base.ReflectionHelpers
+open FShade.Utils
 
 [<AutoOpen>]
 module Types = 
@@ -60,7 +61,7 @@ module Types =
     let (|Output|_|) (t : Type) (e : Expr) =
         match e with
             | NewRecord(rt, args) when t = rt ->
-                let semantics = FSharpType.GetRecordFields t |> Seq.map (fun m -> m.Semantic, m.AssignedTarget) |> Seq.toList
+                let semantics = FSharpTypeExt.GetRecordFields(t) |> Seq.map (fun m -> m.Semantic, m.AssignedTarget) |> Seq.toList
 
                 Output(List.zip semantics args) |> Some
 

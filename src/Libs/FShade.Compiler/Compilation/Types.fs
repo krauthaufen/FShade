@@ -5,6 +5,7 @@ module Types =
     open System
     open Microsoft.FSharp.Reflection
     open Aardvark.Base
+    open FShade.Utils
 
     /// <summary>
     /// translates a type-name to the target language. Works by determining whether the
@@ -33,14 +34,14 @@ module Types =
                                 //mark the type used (so the compiler will emit a definition for it)
                                 do! addUsedType t
 
-                                if FSharpType.IsTuple t then
-                                    let! argTypes = FSharpType.GetTupleElements t |> Seq.mapC compileType
+                                if FSharpTypeExt.IsTuple t then
+                                    let! argTypes = FSharpTypeExt.GetTupleElements t |> Seq.mapC compileType
                                     let argTypes = argTypes |> Seq.map saneTypeName
                                     return sprintf "tup_%s" (String.concat "_" argTypes)
                                 else
-                                    //could use FSharpType.IsFunction here but that seems to be extremely slow.
+                                    //could use FSharpTypeExt.IsFunction here but that seems to be extremely slow.
                                     if t.Name.StartsWith "FSharpFunc" then
-                                        let (arg, ret) = FSharpType.GetFunctionElements t
+                                        let (arg, ret) = FSharpTypeExt.GetFunctionElements t
                                         let! arg = compileType arg
                                         let! ret = compileType ret
                                         let arg = arg |> saneTypeName

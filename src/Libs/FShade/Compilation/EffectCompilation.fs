@@ -54,7 +54,7 @@ module EffectCompilation =
     let createPassingShader (prim : Type) (id : Var)=
         compile {
             let vertexType = prim.GetGenericArguments().[0]
-            let fields = FSharpType.GetRecordFields(vertexType, true)
+            let fields = FSharpTypeExt.GetRecordFields(vertexType)
 
             let input = Var("input", prim)
 //            let item = prim.Type.GetProperty("Item")
@@ -190,7 +190,7 @@ module EffectCompilation =
                 | Fsi.FsiSuccess quot ->
                     let mutable result = quot
                     for (t,n,v) in info.closure do
-                        let (arg,ret) = Reflection.FSharpType.GetFunctionElements(result.GetType())
+                        let (arg,ret) = FSharpTypeExt.GetFunctionElements(result.GetType())
                         let funType = typedefof<_ -> _>.MakeGenericType [|arg;ret|]
 
                         let i = funType.GetMethod("Invoke" , [|t|])
@@ -198,7 +198,7 @@ module EffectCompilation =
 
 
                     let mi = getMethodInfo <@ toEffect @>
-                    let (a,b) = Reflection.FSharpType.GetFunctionElements(result.GetType())
+                    let (a,b) = FSharpTypeExt.GetFunctionElements(result.GetType())
                     let mi = mi.MakeGenericMethod [|a; b.GetGenericArguments().[0]|]
 
                     let rr = mi.Invoke(null, [|result|])

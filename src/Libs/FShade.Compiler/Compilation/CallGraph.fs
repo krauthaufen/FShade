@@ -10,6 +10,7 @@ module CallGraph =
     open Microsoft.FSharp.Quotations.Patterns
     open Microsoft.FSharp.Reflection
     open Aardvark.Base
+    open FShade.Utils
 
     [<NoComparison>]
     type CallGraph = { self : Function; code : string; mutable called : list<CallGraph> }
@@ -44,7 +45,7 @@ module CallGraph =
             else
                 let grouped = l |> HashMap.toSeq |> Seq.groupBy (fun (b, id) -> b.Type)
                                 |> Seq.map (fun (t,b) ->
-                                    let arg,ret = FSharpType.GetFunctionElements(t)
+                                    let arg,ret = FSharpTypeExt.GetFunctionElements(t)
                                     let bodies = b |> Seq.map (fun (u,id) -> (id,u)) |> Map.ofSeq
                                     (t, { inputType = arg; returnType = ret; bodies = bodies })
                                 ) |> HashMap.ofSeq
