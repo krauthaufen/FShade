@@ -64,5 +64,5 @@ module Names =
     /// Gets all 'fields' contained in all the cases of a union-type
     /// </summary>
     let getAllUnionFields (t : Type) =
-        let cases = FSharpType.GetUnionCases t |> Seq.toList
+        let cases = FSharpType.GetUnionCases(t, true) |> Seq.toList
         cases |> List.collect getCaseFields

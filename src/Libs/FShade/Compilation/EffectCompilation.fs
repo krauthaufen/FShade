@@ -54,7 +54,7 @@ module EffectCompilation =
     let createPassingShader (prim : Type) (id : Var)=
         compile {
             let vertexType = prim.GetGenericArguments().[0]
-            let fields = FSharpType.GetRecordFields vertexType
+            let fields = FSharpType.GetRecordFields(vertexType, true)
 
             let input = Var("input", prim)
 //            let item = prim.Type.GetProperty("Item")
