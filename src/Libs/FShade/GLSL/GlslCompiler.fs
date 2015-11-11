@@ -1033,20 +1033,30 @@ module GLSL =
             return { usedTypes = types; uniforms = uniformGetters; uniformBuffers = uniforms; code = completeCode }
         }
 
-    let private compileEffectInternal (e : Compiled<Effect, ShaderState>) =
+    let private compileEffectInternal (neededOutputs : Map<string, Type>) (e : Compiled<Effect, ShaderState>) =
         compile {
             let! e = e
             let! config = config
 
             let hasgs = match e.geometryShader with | Some _ -> true | _ -> false
-            let topUsed = ["Colors", typeof<V4d>; "Depth", typeof<float>] |> Map.ofList
             let! fsUsed,fsCode = match e.fragmentShader with
                                     | Some(fs) -> compile {
+                                                    let additional =
+                                                        neededOutputs 
+                                                            |> Map.remove "Depth"
+                                                            |> Map.filter (fun k t ->
+                                                                match Map.tryFind k fs.outputs with
+                                                                    | Some _ -> false
+                                                                    | None -> true
+                                                            )
+                                                    let fs = addOutputs additional fs
+
                                                     let unused = fs.outputs |> Map.filter (fun k (t,v) -> 
                                                                     match t with
                                                                         | Some t -> false
-                                                                        | None -> not <| Map.containsKey k topUsed
+                                                                        | None -> not <| Map.containsKey k neededOutputs
                                                                  ) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
+
                                                     let fs = removeOutputs unused fs
 
                                                     let fs = adjustToConfig config fs ((if hasgs then Geometry(None, TriangleStrip) else Vertex) |> Some) None
@@ -1271,18 +1281,18 @@ module GLSL =
         let c = compilers.GetOrCreate(v, Func<_,_>(fun v -> Compiler(v)))
         e |> runCompile c
 
-    let compileEffect (v : CompilerConfiguration) (e : Compiled<Effect, ShaderState>) : Error<Map<string, UniformGetter> * string> =
+    let compileEffect (v : CompilerConfiguration) (neededOutputs : Map<string, Type>) (e : Compiled<Effect, ShaderState>) : Error<Map<string, UniformGetter> * string> =
         let c = compilers.GetOrCreate(v, Func<_,_>(fun v -> Compiler(v)))
-        e |> compileEffectInternal |> runCompile c
+        e |> compileEffectInternal neededOutputs |> runCompile c
 
     let run410 e =
         e |> runCompile glsl410
 
-    let compileEffect410 (e : Compiled<Effect, ShaderState>) : Error<Map<string, UniformGetter> * string> =
-        e |> compileEffectInternal |> runCompile glsl410
+    let compileEffect410 (neededOutputs : Map<string, Type>) (e : Compiled<Effect, ShaderState>) : Error<Map<string, UniformGetter> * string> =
+        e |> compileEffectInternal neededOutputs |> runCompile glsl410
 
     let run120 e =
         e |> runCompile glsl120
 
-    let compileEffect120 (e : Compiled<Effect, ShaderState>) : Error<Map<string, UniformGetter> * string> =
-        e |> compileEffectInternal |> runCompile glsl120
+    let compileEffect120 (neededOutputs : Map<string, Type>) (e : Compiled<Effect, ShaderState>) : Error<Map<string, UniformGetter> * string> =
+        e |> compileEffectInternal neededOutputs |> runCompile glsl120

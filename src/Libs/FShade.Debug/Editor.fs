@@ -225,7 +225,7 @@ module EffectEditor =
             if env.list.SelectedItems.Count > 0 then
                 let node = env.list.SelectedItems.[0].Tag |> unbox<EffectNode>
                 let s = node.read()
-                match GLSL.compileEffect410 s with
+                match GLSL.compileEffect410 (Map.ofList ["Colors", typeof<V4d>; "Depth", typeof<float>]) s with
                     | Success(_, code) ->
                         let f = new Form()
                         f.Text <- "GLSL"

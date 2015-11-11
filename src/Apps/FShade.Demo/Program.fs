@@ -237,7 +237,7 @@ let main argv =
             GLSL.depthRange = Range1d(0.0,1.0)
         }
 
-    let res = effect |> GLSL.compileEffect410
+    let res = effect |> GLSL.compileEffect410 (Map.ofList ["Colors", typeof<V4d>; "Depth", typeof<float>])
     match res with
         | Success (_,code) ->
             printfn "%s" code
