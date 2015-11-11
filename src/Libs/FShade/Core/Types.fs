@@ -15,7 +15,7 @@ module Types =
 
     type OutputTopology = Points | LineStrip | TriangleStrip
     type InputTopology = Point | Line | LineAdjacency | Triangle | TriangleAdjacency | Patch of int
-    type ShaderType = Vertex | Geometry of OutputTopology | Fragment | TessControl | TessEval
+    type ShaderType = Vertex | Geometry of Option<int> * OutputTopology | Fragment | TessControl | TessEval
 
     [<NoComparison>]
     type SourceFileInfo = { sourceFilePath : string; startLine : int; startCol : int; endLine : int; endCol : int }

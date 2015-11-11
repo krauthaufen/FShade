@@ -148,7 +148,7 @@ module EffectCompilation =
             match s.shaderType with
                 | Vertex -> { vertexShader = Some s; geometryShader = None; tessControlShader = None; tessEvalShader = None; fragmentShader = None; originals = [s] }
                 | Fragment -> { vertexShader = None; geometryShader = None; tessControlShader = None; tessEvalShader = None; fragmentShader = Some s; originals = [s] }
-                | Geometry t -> { vertexShader = None; geometryShader = Some(s,t); tessControlShader = None; tessEvalShader = None; fragmentShader = None; originals = [s] } 
+                | Geometry(maxVertices, t) -> { vertexShader = None; geometryShader = Some(s,t); tessControlShader = None; tessEvalShader = None; fragmentShader = None; originals = [s] } 
                 | TessControl -> { vertexShader = None; geometryShader = None; tessControlShader = Some s; tessEvalShader = None; fragmentShader = None; originals = [s] }
                 | TessEval -> { vertexShader = None; geometryShader = None; tessControlShader = None; tessEvalShader = Some s; fragmentShader = None; originals = [s] }
         ) s
@@ -163,7 +163,7 @@ module EffectCompilation =
                     match s.shaderType with
                         | Vertex -> result <- { result with vertexShader = Some s }
                         | Fragment ->  result <- { result with fragmentShader = Some s }
-                        | Geometry t ->  result <- { result with geometryShader = Some(s,t) } 
+                        | Geometry(maxVertices, t) ->  result <- { result with geometryShader = Some(s, t) } 
                         | TessControl ->  result <- { result with tessControlShader = Some s }
                         | TessEval ->  result <- { result with tessEvalShader = Some s }
                 return result

@@ -425,7 +425,8 @@ module GLSL =
 
             member x.InitialState() = emptyShaderState
 
-            member x.ResetState(state : CompilerState) = { emptyShaderState with counters = state.counters }
+            member x.ResetState(state : CompilerState) = 
+                { emptyShaderState with counters = state.counters }
 
             member x.ProcessCode c =
                 compile {
@@ -965,7 +966,7 @@ module GLSL =
                                            |> Map.ofSeq
 
             let layout = match s.shaderType with
-                            | Geometry top -> 
+                            | Geometry(maxVertices, top) -> 
                                 let top = match top with
                                             | TriangleStrip -> "triangle_strip"
                                             | LineStrip -> "line_strip"
@@ -979,8 +980,20 @@ module GLSL =
                                             | Some(InputTopology.TriangleAdjacency) -> "triangles_adjacency"
                                             | _ -> failwith "geometryshader does not have proper inputTopology"
 
+
                                 //TODO: find max_vertices
-                                sprintf "layout(%s, max_vertices = 12) out;\r\nlayout(%s) in;\r\n" top itop
+                                match maxVertices with
+                                    | Some v -> sprintf "layout(%s, max_vertices = %d) out;\r\nlayout(%s) in;\r\n" top v itop
+                                    | None -> 
+                                        let range = 
+                                            s.body |> ExprUtilities.estimateNumberOfCallsTo (getMethodInfo <@ emitVertex @>)
+
+                                        if range.Max >= 0 then
+                                            sprintf "layout(%s, max_vertices = %d) out;\r\nlayout(%s) in;\r\n" top range.Max itop
+                                        else
+                                            Log.warn "could not determine upper bound for emitVertex-calls (%A): using 32, please annotate" range
+                                            sprintf "layout(%s, max_vertices = 32) out;\r\nlayout(%s) in;\r\n" top itop
+
                             | TessControl ->
                                 let top = 
                                     match s.inputTopology with
@@ -1036,7 +1049,7 @@ module GLSL =
                                                                  ) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
                                                     let fs = removeOutputs unused fs
 
-                                                    let fs = adjustToConfig config fs ((if hasgs then Geometry TriangleStrip else Vertex) |> Some) None
+                                                    let fs = adjustToConfig config fs ((if hasgs then Geometry(None, TriangleStrip) else Vertex) |> Some) None
 
                                                     let! fsc = compileShader "PS" fs
 
@@ -1193,7 +1206,7 @@ module GLSL =
                             let unused = vs.outputs |> Map.filter (fun k v -> not <| Map.containsKey k tessUsed) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
                             let vs = removeOutputs unused vs
 
-                            let vs = adjustToConfig config vs None ((if hasgs then Geometry TriangleStrip else Fragment) |> Some) 
+                            let vs = adjustToConfig config vs None ((if hasgs then Geometry(None, TriangleStrip) else Fragment) |> Some) 
                             
                             let! vsc = compileShader "VS" vs
                             return Some vsc

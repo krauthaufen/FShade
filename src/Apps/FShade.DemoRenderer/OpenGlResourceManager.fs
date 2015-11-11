@@ -341,7 +341,7 @@ module OpenGlResourceManager =
             [ if code.Contains "VS(" then yield createShader ShaderType.Vertex code
               if code.Contains "TCS(" then yield createShader ShaderType.TessControl code
               if code.Contains "TEV(" then yield createShader ShaderType.TessEval code
-              if code.Contains "GS(" then yield createShader (ShaderType.Geometry OutputTopology.TriangleStrip) code
+              if code.Contains "GS(" then yield createShader (ShaderType.Geometry(None, OutputTopology.TriangleStrip)) code
               if code.Contains "PS(" then yield createShader ShaderType.Fragment code ]
         let handle = GL.CreateProgram()
 

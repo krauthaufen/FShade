@@ -64,6 +64,7 @@
     <Compile Include="Compilation\CallGraph.fs" />
     <Compile Include="Compilation\TypeGraph.fs" />
     <Compile Include="Compilation\Main.fs" />
+    <Compile Include="Compilation\ExprUtilities.fs" />
     <None Include="app.config" />
   </ItemGroup>
   <ItemGroup>

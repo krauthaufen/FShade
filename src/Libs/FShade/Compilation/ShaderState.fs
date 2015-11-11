@@ -29,6 +29,21 @@ module ShaderState =
                 | Some _ -> s
         )
 
+    let userGivenMaxVertices =
+        compile {
+            let! s = compilerState
+            match s.builder with
+                | Some(Patterns.Value(v, t)) -> 
+                    match v with
+                        | :? GeometryBuilder as g ->
+                            return g.Size
+
+                        | _ -> 
+                            return None
+                | _ -> 
+                    return None
+        }
+
     let emptyShaderState = { inputs = Map.empty; outputs = Map.empty; uniforms = HashMap.empty; builder = None; counters = Map.empty }
 
 

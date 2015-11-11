@@ -124,8 +124,11 @@ module Builders =
         interface IShaderBuilder with
             member x.ShaderType = ShaderType.Fragment
 
-    type GeometryBuilder(top : OutputTopology) =
+    type GeometryBuilder(size : Option<int>, top : OutputTopology) =
         inherit BaseBuilder()
+
+        member x.Size = size
+
         member x.Yield(v : 'a) : seq<Primitive<'a>> = failwith ""
         member x.For(p : Primitive<'a>, f : 'a -> seq<Primitive<'b>>) : seq<Primitive<'b>> =
             failwith ""
@@ -138,7 +141,7 @@ module Builders =
         member x.Zero() : seq<Primitive<'a>> = Seq.empty
 
         interface IShaderBuilder with
-            member x.ShaderType = ShaderType.Geometry top
+            member x.ShaderType = ShaderType.Geometry (size, top)
 
 
     
@@ -164,9 +167,16 @@ module Builders =
 
     let vertex = VertexBuilder()
     let fragment = FragmentBuilder()
-    let triangle = GeometryBuilder(OutputTopology.TriangleStrip)
-    let line = GeometryBuilder(OutputTopology.LineStrip)
-    let point = GeometryBuilder(OutputTopology.Points)
+
+    let triangle = GeometryBuilder(None, OutputTopology.TriangleStrip)
+    let line = GeometryBuilder(None, OutputTopology.LineStrip)
+    let point = GeometryBuilder(None, OutputTopology.Points)
+
+    let _triangle<'d> = GeometryBuilder(Some typeSize<'d>, OutputTopology.TriangleStrip)
+    let _line<'d> = GeometryBuilder(Some typeSize<'d>, OutputTopology.LineStrip)
+    let _point<'d> = GeometryBuilder(Some typeSize<'d>, OutputTopology.Points)
+
+
     let tessControl = TessControlBuilder()
     let tessEval = TessEvalBuilder()
 

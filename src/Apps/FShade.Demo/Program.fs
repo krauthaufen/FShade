@@ -131,7 +131,7 @@ module Dead =
     let BillboardGeometry (sizes: V2d) (distanceScalingFactor : float -> float) (v : Point<BillboardVertex>) =
         let targetRange = 5.0
 
-        triangle {
+        _triangle<4 N> {
             let s = sizes
             let offsetX = s.X
             let offsetY = s.Y

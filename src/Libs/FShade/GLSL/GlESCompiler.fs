@@ -337,7 +337,8 @@ module GLES =
 
             member x.InitialState() = emptyShaderState
 
-            member x.ResetState(state : CompilerState) = { emptyShaderState with counters = state.counters }
+            member x.ResetState(state : CompilerState) = 
+                { emptyShaderState with counters = state.counters }
 
 
             member x.ProcessCode c =
@@ -534,7 +535,6 @@ module GLES =
             let inputs = String.concat "\r\n" inputs
             let outputs = String.concat "\r\n" outputs
 
-
             let uniformGetters = uniforms' |> Seq.choose(fun (u,v) ->
                                                     match u with
                                                         | UserUniform(t,o) -> Some (v.Name, UniformGetter(o, t))
@@ -544,7 +544,7 @@ module GLES =
                                            |> Map.ofSeq
 
             let layout = match s.shaderType with
-                            | Geometry top -> 
+                            | Geometry(maxVertices, top) -> 
                                 let top = match top with
                                             | TriangleStrip -> "triangle_strip"
                                             | LineStrip -> "line_strip"
@@ -559,7 +559,9 @@ module GLES =
                                             | _ -> failwith "geometryshader does not have proper inputTopology"
 
                                 //TODO: find max_vertices
-                                sprintf "layout(%s, max_vertices = 12) out;\r\nlayout(%s) in;\r\n" top itop
+                                match maxVertices with
+                                    | Some maxVertices -> sprintf "layout(%s, max_vertices = %d) out;\r\nlayout(%s) in;\r\n" top  maxVertices itop
+                                    | _ -> sprintf "layout(%s, max_vertices = 12) out;\r\nlayout(%s) in;\r\n" top itop
                             | TessControl ->
                                 let top = 
                                     match s.inputTopology with
@@ -611,7 +613,7 @@ module GLES =
                                                                  ) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
                                                     let fs = removeOutputs unused fs
 
-                                                    let! fsc = compileShader "PS" fs ((if hasgs then Geometry TriangleStrip else Vertex) |> Some) None
+                                                    let! fsc = compileShader "PS" fs ((if hasgs then Geometry(None, TriangleStrip) else Vertex) |> Some) None
 
                                                     let used = seq { yield ("Positions",typeof<V4d>); yield! fs.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k,v.Type)) } |> Map.ofSeq
                                                     return used, Some fsc
@@ -762,7 +764,7 @@ module GLES =
                             let unused = vs.outputs |> Map.filter (fun k v -> not <| Map.containsKey k tessUsed) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
                             let vs = removeOutputs unused vs
 
-                            let! vsc = compileShader "VS" vs None ((if hasgs then Geometry TriangleStrip else Fragment) |> Some)
+                            let! vsc = compileShader "VS" vs None ((if hasgs then Geometry(None, TriangleStrip) else Fragment) |> Some)
                             return Some vsc
                           }
 
