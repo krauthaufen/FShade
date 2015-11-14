@@ -81,7 +81,7 @@ module GLSL =
     let nextBindingIndex = nextCounter bindingCounterName
 
     type Compiler(config : CompilerConfiguration) =
-        let funDefCache = MemoCache(false)
+        let funDefCache = GenericMemoCache()
 
         let rec compileZero (t : Type) =
             compile {
@@ -301,7 +301,7 @@ module GLSL =
                 }
 
             member x.CompileIntrinsicFunctionDefinition(mi : MethodInfo) =
-                let e = funDefCache.Memoized1 (fun mi ->
+                let e = funDefCache.Invoke( (fun mi ->
                             match mi with
                                 | (MethodQuote <@ M44d().TransformPosProj @> _) | (MethodQuote <@ Mat.transformPosProj : M44d -> V3d -> V3d @> _) ->
                                     Some <@@ fun (m : M44d) (v : V3d) -> 
@@ -316,7 +316,7 @@ module GLSL =
 
 
                                 | _ -> None
-                        ) mi
+                        ), mi)
 
                 compile {return e}
 

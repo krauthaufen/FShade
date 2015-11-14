@@ -18,7 +18,7 @@ module GLES =
     type CompilerState = ShaderState
 
     type Compiler() =
-        let funDefCache = MemoCache(false)
+        let funDefCache = GenericMemoCache()
 
         let rec compileZero (t : Type) =
             compile {
@@ -217,7 +217,7 @@ module GLES =
                 }
 
             member x.CompileIntrinsicFunctionDefinition(mi : MethodInfo) =
-                let e = funDefCache.Memoized1 (fun mi ->
+                let e = funDefCache.Invoke( (fun mi ->
                             match mi with
                                 | (MethodQuote <@ M44d().TransformPosProj @> _) | (MethodQuote <@ Mat.transformPosProj : M44d -> V3d -> V3d @> _) ->
                                     Some <@@ fun (m : M44d) (v : V3d) -> 
@@ -232,7 +232,7 @@ module GLES =
 
 
                                 | _ -> None
-                        ) mi
+                        ), mi)
 
                 compile {return e}
 

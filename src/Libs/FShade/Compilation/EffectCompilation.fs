@@ -142,33 +142,36 @@ module EffectCompilation =
                 return [{ s with debugInfo = debugInfo }]
         }
 
-    let toEffectInternalCache = MemoCache(false)
-    let toEffectInternal (s : Shader) =
-        toEffectInternalCache.Memoized1 (fun s ->
+    let private toEffectInternalCache = 
+        MemoCache (fun (s : Shader) ->
             match s.shaderType with
                 | Vertex -> { vertexShader = Some s; geometryShader = None; tessControlShader = None; tessEvalShader = None; fragmentShader = None; originals = [s] }
                 | Fragment -> { vertexShader = None; geometryShader = None; tessControlShader = None; tessEvalShader = None; fragmentShader = Some s; originals = [s] }
                 | Geometry(maxVertices, t) -> { vertexShader = None; geometryShader = Some(s,t); tessControlShader = None; tessEvalShader = None; fragmentShader = None; originals = [s] } 
                 | TessControl -> { vertexShader = None; geometryShader = None; tessControlShader = Some s; tessEvalShader = None; fragmentShader = None; originals = [s] }
                 | TessEval -> { vertexShader = None; geometryShader = None; tessControlShader = None; tessEvalShader = Some s; fragmentShader = None; originals = [s] }
-        ) s
+        )
 
-    let toEffectCache = MemoCache(false)
+    let toEffectInternal (s : Shader) =
+        toEffectInternalCache.Invoke s
+
+    let private toEffectCache = GenericMemoCache()
+    let private createEffect (f : 'a -> Expr<'b>) =
+        transform {
+            let! shaders = toShader' f
+            let mutable result = { vertexShader = None; geometryShader = None; tessControlShader = None; tessEvalShader = None; fragmentShader = None; originals = shaders }
+            do for s in shaders do
+                match s.shaderType with
+                    | Vertex -> result <- { result with vertexShader = Some s }
+                    | Fragment ->  result <- { result with fragmentShader = Some s }
+                    | Geometry(maxVertices, t) ->  result <- { result with geometryShader = Some(s, t) } 
+                    | TessControl ->  result <- { result with tessControlShader = Some s }
+                    | TessEval ->  result <- { result with tessEvalShader = Some s }
+            return result
+        }
+
     let toEffect (f : 'a -> Expr<'b>) =
-        toEffectCache.Memoized1 (fun f ->
-            transform {
-                let! shaders = toShader' f
-                let mutable result = { vertexShader = None; geometryShader = None; tessControlShader = None; tessEvalShader = None; fragmentShader = None; originals = shaders }
-                do for s in shaders do
-                    match s.shaderType with
-                        | Vertex -> result <- { result with vertexShader = Some s }
-                        | Fragment ->  result <- { result with fragmentShader = Some s }
-                        | Geometry(maxVertices, t) ->  result <- { result with geometryShader = Some(s, t) } 
-                        | TessControl ->  result <- { result with tessControlShader = Some s }
-                        | TessEval ->  result <- { result with tessEvalShader = Some s }
-                return result
-            }
-        ) f
+        toEffectCache.Invoke(createEffect, f)
         
     let private shaderWithDebugInfo (s : Option<Shader>) (info : ShaderDebugInfo) =
         match s with

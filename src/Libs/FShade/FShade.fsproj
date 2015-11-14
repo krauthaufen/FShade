@@ -60,6 +60,7 @@
     <Compile Include="Core\SamplerCodeGen.fs" />
     <Compile Include="Core\SamplerGenerated.fs" />
     <Compile Include="Core\Textures.fs" />
+    <Compile Include="Core\MemoCache.fs" />
     <Compile Include="Frontend\Primitives.fs" />
     <Compile Include="Frontend\Builders.fs" />
     <Compile Include="Compilation\ShaderState.fs" />
