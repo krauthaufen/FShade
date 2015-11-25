@@ -50,6 +50,14 @@
     </Otherwise>
   </Choose>
   <Import Project="$(FSharpTargetsPath)" Condition="exists('$(FSharpTargetsPath)')" />
+  <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
   <ItemGroup>
     <Compile Include="Core\ReflectionPatterns.fs" />
     <Compile Include="Core\Exceptions.fs" />
@@ -72,6 +80,10 @@
     <Compile Include="GLSL\GlslSamplers.fs" />
     <Compile Include="GLSL\GlslCompiler.fs" />
     <Compile Include="GLSL\GlESCompiler.fs" />
+    <None Include="SPIRV\CodeGen.fsx" />
+    <Compile Include="SPIRV\SpirVTypes.fs" />
+    <Compile Include="SPIRV\SpirV.fs" />
+    <None Include="SPIRV\Test.fsx" />
     <Content Include="app.config" />
     <EmbeddedResource Include="Resources.resx" />
     <Compile Include="Resources.fs" />
@@ -91,14 +103,6 @@
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>
-  <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
   <Choose>
     <When Condition="($(TargetFrameworkIdentifier) == '.NETFramework' And ($(TargetFrameworkVersion) == 'v4.5' Or $(TargetFrameworkVersion) == 'v4.5.1' Or $(TargetFrameworkVersion) == 'v4.5.2' Or $(TargetFrameworkVersion) == 'v4.5.3' Or $(TargetFrameworkVersion) == 'v4.6')) Or ($(TargetFrameworkIdentifier) == 'MonoAndroid') Or ($(TargetFrameworkIdentifier) == 'MonoTouch')">
       <ItemGroup>

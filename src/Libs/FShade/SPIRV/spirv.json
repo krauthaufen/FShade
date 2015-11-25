@@ -1,0 +1,7173 @@
+{
+	"OpCodes": [
+    { 
+        "Name": "OpNop",
+        "OpCode": 0,
+        "Category": 24,
+        "MinWordCount": 1,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpUndef",
+        "OpCode": 1,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpSourceContinued",
+        "OpCode": 2,
+        "Category": 24,
+        "MinWordCount": 2,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 1,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Continued Source'",
+                "Type": 9,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpSource",
+        "OpCode": 3,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 1,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "",
+                "Type": 10,
+                "Optional": false
+            },
+            {
+                "Name": "'Version'",
+                "Type": 8,
+                "Optional": false
+            },
+            {
+                "Name": "'Source'",
+                "Type": 9,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpSourceExtension",
+        "OpCode": 4,
+        "Category": 24,
+        "MinWordCount": 2,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 1,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Extension'",
+                "Type": 9,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpName",
+        "OpCode": 5,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 1,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Target'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Name'",
+                "Type": 9,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpMemberName",
+        "OpCode": 6,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 1,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Type'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Member'",
+                "Type": 8,
+                "Optional": false
+            },
+            {
+                "Name": "'Name'",
+                "Type": 9,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpString",
+        "OpCode": 7,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 1,
+        "HasResultType": false,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'String'",
+                "Type": 9,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpLine",
+        "OpCode": 8,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'File'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Line'",
+                "Type": 8,
+                "Optional": false
+            },
+            {
+                "Name": "'Column'",
+                "Type": 8,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 9,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpExtension",
+        "OpCode": 10,
+        "Category": 24,
+        "MinWordCount": 2,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 1,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Name'",
+                "Type": 9,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpExtInstImport",
+        "OpCode": 11,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 1,
+        "HasResultType": false,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Name'",
+                "Type": 9,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpExtInst",
+        "OpCode": 12,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Set'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Instruction'",
+                "Type": 8,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 1', +
+'Operand 2', +
+...",
+                "Type": 2,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 13,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpMemoryModel",
+        "OpCode": 14,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "",
+                "Type": 12,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 13,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpEntryPoint",
+        "OpCode": 15,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "",
+                "Type": 11,
+                "Optional": false
+            },
+            {
+                "Name": "'Entry Point'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Name'",
+                "Type": 9,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpExecutionMode",
+        "OpCode": 16,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Entry Point'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Mode'",
+                "Type": 14,
+                "Optional": false
+            },
+            {
+                "Name": "See <<Execution_Mode,Execution Mode>>",
+                "Type": 3,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpCapability",
+        "OpCode": 17,
+        "Category": 24,
+        "MinWordCount": 2,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Capability'",
+                "Type": 39,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 18,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpTypeVoid",
+        "OpCode": 19,
+        "Category": 24,
+        "MinWordCount": 2,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpTypeBool",
+        "OpCode": 20,
+        "Category": 24,
+        "MinWordCount": 2,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpTypeInt",
+        "OpCode": 21,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Width'",
+                "Type": 8,
+                "Optional": false
+            },
+            {
+                "Name": "'Signedness'",
+                "Type": 8,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpTypeFloat",
+        "OpCode": 22,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Width'",
+                "Type": 8,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpTypeVector",
+        "OpCode": 23,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Component Type'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Component Count'",
+                "Type": 8,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpTypeMatrix",
+        "OpCode": 24,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Column Type'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Column Count'",
+                "Type": 8,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpTypeImage",
+        "OpCode": 25,
+        "Category": 24,
+        "MinWordCount": 10,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Sampled Type'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 16,
+                "Optional": false
+            },
+            {
+                "Name": "'Depth'",
+                "Type": 8,
+                "Optional": false
+            },
+            {
+                "Name": "'Arrayed'",
+                "Type": 8,
+                "Optional": false
+            },
+            {
+                "Name": "'MS'",
+                "Type": 8,
+                "Optional": false
+            },
+            {
+                "Name": "'Sampled'",
+                "Type": 8,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 19,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 26,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpTypeSampler",
+        "OpCode": 26,
+        "Category": 24,
+        "MinWordCount": 2,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpTypeSampledImage",
+        "OpCode": 27,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Image Type'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpTypeArray",
+        "OpCode": 28,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Element Type'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Length'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpTypeRuntimeArray",
+        "OpCode": 29,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Element Type'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpTypeStruct",
+        "OpCode": 30,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Member 0 type', +
+'member 1 type', +
+...",
+                "Type": 2,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpTypeOpaque",
+        "OpCode": 31,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 1,
+        "HasResultType": false,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "The name of the opaque type.",
+                "Type": 9,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpTypePointer",
+        "OpCode": 32,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "",
+                "Type": 15,
+                "Optional": false
+            },
+            {
+                "Name": "'Type'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpTypeFunction",
+        "OpCode": 33,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Return Type'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Parameter 0 Type', +
+'Parameter 1 Type', +
+...",
+                "Type": 2,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpTypeEvent",
+        "OpCode": 34,
+        "Category": 24,
+        "MinWordCount": 2,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpTypeDeviceEvent",
+        "OpCode": 35,
+        "Category": 24,
+        "MinWordCount": 2,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpTypeReserveId",
+        "OpCode": 36,
+        "Category": 24,
+        "MinWordCount": 2,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpTypeQueue",
+        "OpCode": 37,
+        "Category": 24,
+        "MinWordCount": 2,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpTypePipe",
+        "OpCode": 38,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Qualifier'",
+                "Type": 26,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpTypeForwardPointer",
+        "OpCode": 39,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Pointer Type'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 15,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 40,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpConstantTrue",
+        "OpCode": 41,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpConstantFalse",
+        "OpCode": 42,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpConstant",
+        "OpCode": 43,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Value'",
+                "Type": 5,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpConstantComposite",
+        "OpCode": 44,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Constituents'",
+                "Type": 2,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpConstantSampler",
+        "OpCode": 45,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "",
+                "Type": 17,
+                "Optional": false
+            },
+            {
+                "Name": "'Param'",
+                "Type": 8,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 18,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpConstantNull",
+        "OpCode": 46,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 47,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpSpecConstantTrue",
+        "OpCode": 48,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpSpecConstantFalse",
+        "OpCode": 49,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpSpecConstant",
+        "OpCode": 50,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Value'",
+                "Type": 5,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpSpecConstantComposite",
+        "OpCode": 51,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Constituents'",
+                "Type": 2,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpSpecConstantOp",
+        "OpCode": 52,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Opcode'",
+                "Type": 8,
+                "Optional": false
+            },
+            {
+                "Name": "'Operands'",
+                "Type": 2,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 53,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpFunction",
+        "OpCode": 54,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "",
+                "Type": 32,
+                "Optional": false
+            },
+            {
+                "Name": "'Function Type'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpFunctionParameter",
+        "OpCode": 55,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpFunctionEnd",
+        "OpCode": 56,
+        "Category": 24,
+        "MinWordCount": 1,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpFunctionCall",
+        "OpCode": 57,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Function'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Argument 0', +
+'Argument 1', +
+...",
+                "Type": 2,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 58,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpVariable",
+        "OpCode": 59,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "",
+                "Type": 15,
+                "Optional": false
+            },
+            {
+                "Name": "'Initializer'",
+                "Type": 1,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageTexelPointer",
+        "OpCode": 60,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Sample'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpLoad",
+        "OpCode": 61,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 34,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpStore",
+        "OpCode": 62,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Object'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 34,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpCopyMemory",
+        "OpCode": 63,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Target'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Source'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 34,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpCopyMemorySized",
+        "OpCode": 64,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Target'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Source'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Size'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 34,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpAccessChain",
+        "OpCode": 65,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Base'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Indexes'",
+                "Type": 2,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpInBoundsAccessChain",
+        "OpCode": 66,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Base'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Indexes'",
+                "Type": 2,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpPtrAccessChain",
+        "OpCode": 67,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Base'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Element'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Indexes'",
+                "Type": 2,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpArrayLength",
+        "OpCode": 68,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Structure'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Array member'",
+                "Type": 8,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGenericPtrMemSemantics",
+        "OpCode": 69,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpInBoundsPtrAccessChain",
+        "OpCode": 70,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Base'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Element'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Indexes'",
+                "Type": 2,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpDecorate",
+        "OpCode": 71,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Target'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 28,
+                "Optional": false
+            },
+            {
+                "Name": "See <<Decoration,'Decoration'>>.",
+                "Type": 5,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpMemberDecorate",
+        "OpCode": 72,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Structure Type'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Member'",
+                "Type": 8,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 28,
+                "Optional": false
+            },
+            {
+                "Name": "See <<Decoration,'Decoration'>>.",
+                "Type": 5,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpDecorationGroup",
+        "OpCode": 73,
+        "Category": 24,
+        "MinWordCount": 2,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpGroupDecorate",
+        "OpCode": 74,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Decoration Group'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Targets'",
+                "Type": 2,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGroupMemberDecorate",
+        "OpCode": 75,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Decoration Group'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Targets'",
+                "Type": 6,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 76,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpVectorExtractDynamic",
+        "OpCode": 77,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Vector'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Index'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpVectorInsertDynamic",
+        "OpCode": 78,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Vector'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Component'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Index'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpVectorShuffle",
+        "OpCode": 79,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Vector 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Vector 2'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Components'",
+                "Type": 5,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpCompositeConstruct",
+        "OpCode": 80,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Constituents'",
+                "Type": 2,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpCompositeExtract",
+        "OpCode": 81,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Composite'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Indexes'",
+                "Type": 5,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpCompositeInsert",
+        "OpCode": 82,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Object'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Composite'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Indexes'",
+                "Type": 5,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpCopyObject",
+        "OpCode": 83,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpTranspose",
+        "OpCode": 84,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Matrix'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 85,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpSampledImage",
+        "OpCode": 86,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Sampler'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageSampleImplicitLod",
+        "OpCode": 87,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Sampled Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 22,
+                "Optional": true
+            },
+            {
+                "Name": "",
+                "Type": 2,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageSampleExplicitLod",
+        "OpCode": 88,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Sampled Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 22,
+                "Optional": true
+            },
+            {
+                "Name": "",
+                "Type": 2,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageSampleDrefImplicitLod",
+        "OpCode": 89,
+        "Category": 24,
+        "MinWordCount": 8,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Sampled Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'D~ref~'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 22,
+                "Optional": true
+            },
+            {
+                "Name": "",
+                "Type": 2,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageSampleDrefExplicitLod",
+        "OpCode": 90,
+        "Category": 24,
+        "MinWordCount": 8,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Sampled Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'D~ref~'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 22,
+                "Optional": true
+            },
+            {
+                "Name": "",
+                "Type": 2,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageSampleProjImplicitLod",
+        "OpCode": 91,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Sampled Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 22,
+                "Optional": true
+            },
+            {
+                "Name": "",
+                "Type": 2,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageSampleProjExplicitLod",
+        "OpCode": 92,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Sampled Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 22,
+                "Optional": true
+            },
+            {
+                "Name": "",
+                "Type": 2,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageSampleProjDrefImplicitLod",
+        "OpCode": 93,
+        "Category": 24,
+        "MinWordCount": 8,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Sampled Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'D~ref~'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 22,
+                "Optional": true
+            },
+            {
+                "Name": "",
+                "Type": 2,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageSampleProjDrefExplicitLod",
+        "OpCode": 94,
+        "Category": 24,
+        "MinWordCount": 8,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Sampled Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'D~ref~'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 22,
+                "Optional": true
+            },
+            {
+                "Name": "",
+                "Type": 2,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageFetch",
+        "OpCode": 95,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 22,
+                "Optional": true
+            },
+            {
+                "Name": "",
+                "Type": 2,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageGather",
+        "OpCode": 96,
+        "Category": 24,
+        "MinWordCount": 8,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Sampled Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Component'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 22,
+                "Optional": true
+            },
+            {
+                "Name": "",
+                "Type": 2,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageDrefGather",
+        "OpCode": 97,
+        "Category": 24,
+        "MinWordCount": 8,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Sampled Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'D~ref~'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 22,
+                "Optional": true
+            },
+            {
+                "Name": "",
+                "Type": 2,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageRead",
+        "OpCode": 98,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 22,
+                "Optional": true
+            },
+            {
+                "Name": "",
+                "Type": 2,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageWrite",
+        "OpCode": 99,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Texel'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 22,
+                "Optional": true
+            },
+            {
+                "Name": "",
+                "Type": 2,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImage",
+        "OpCode": 100,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Sampled Image'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageQueryFormat",
+        "OpCode": 101,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Image'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageQueryOrder",
+        "OpCode": 102,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Image'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageQuerySizeLod",
+        "OpCode": 103,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Level of Detail'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageQuerySize",
+        "OpCode": 104,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Image'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageQueryLod",
+        "OpCode": 105,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageQueryLevels",
+        "OpCode": 106,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Image'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageQuerySamples",
+        "OpCode": 107,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Image'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 108,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpConvertFToU",
+        "OpCode": 109,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Float Value'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpConvertFToS",
+        "OpCode": 110,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Float Value'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpConvertSToF",
+        "OpCode": 111,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Signed Value'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpConvertUToF",
+        "OpCode": 112,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Unsigned Value'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpUConvert",
+        "OpCode": 113,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Unsigned Value'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpSConvert",
+        "OpCode": 114,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Signed Value'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpFConvert",
+        "OpCode": 115,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Float Value'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpQuantizeToF16",
+        "OpCode": 116,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Value'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpConvertPtrToU",
+        "OpCode": 117,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpSatConvertSToU",
+        "OpCode": 118,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Signed Value'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpSatConvertUToS",
+        "OpCode": 119,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Unsigned Value'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpConvertUToPtr",
+        "OpCode": 120,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Integer Value'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpPtrCastToGeneric",
+        "OpCode": 121,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGenericCastToPtr",
+        "OpCode": 122,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGenericCastToPtrExplicit",
+        "OpCode": 123,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Storage'",
+                "Type": 15,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpBitcast",
+        "OpCode": 124,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 125,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpSNegate",
+        "OpCode": 126,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpFNegate",
+        "OpCode": 127,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpIAdd",
+        "OpCode": 128,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpFAdd",
+        "OpCode": 129,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpISub",
+        "OpCode": 130,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpFSub",
+        "OpCode": 131,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpIMul",
+        "OpCode": 132,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpFMul",
+        "OpCode": 133,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpUDiv",
+        "OpCode": 134,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpSDiv",
+        "OpCode": 135,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpFDiv",
+        "OpCode": 136,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpUMod",
+        "OpCode": 137,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpSRem",
+        "OpCode": 138,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpSMod",
+        "OpCode": 139,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpFRem",
+        "OpCode": 140,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpFMod",
+        "OpCode": 141,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpVectorTimesScalar",
+        "OpCode": 142,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Vector'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Scalar'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpMatrixTimesScalar",
+        "OpCode": 143,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Matrix'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Scalar'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpVectorTimesMatrix",
+        "OpCode": 144,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Vector'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Matrix'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpMatrixTimesVector",
+        "OpCode": 145,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Matrix'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Vector'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpMatrixTimesMatrix",
+        "OpCode": 146,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'LeftMatrix'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'RightMatrix'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpOuterProduct",
+        "OpCode": 147,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Vector 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Vector 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpDot",
+        "OpCode": 148,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Vector 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Vector 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpIAddCarry",
+        "OpCode": 149,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpISubBorrow",
+        "OpCode": 150,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpUMulExtended",
+        "OpCode": 151,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpSMulExtended",
+        "OpCode": 152,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 153,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpAny",
+        "OpCode": 154,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Vector'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpAll",
+        "OpCode": 155,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Vector'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpIsNan",
+        "OpCode": 156,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'x'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpIsInf",
+        "OpCode": 157,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'x'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpIsFinite",
+        "OpCode": 158,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'x'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpIsNormal",
+        "OpCode": 159,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'x'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpSignBitSet",
+        "OpCode": 160,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'x'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpLessOrGreater",
+        "OpCode": 161,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'x'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'y'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpOrdered",
+        "OpCode": 162,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'x'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'y'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpUnordered",
+        "OpCode": 163,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'x'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'y'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpLogicalEqual",
+        "OpCode": 164,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpLogicalNotEqual",
+        "OpCode": 165,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpLogicalOr",
+        "OpCode": 166,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpLogicalAnd",
+        "OpCode": 167,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpLogicalNot",
+        "OpCode": 168,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpSelect",
+        "OpCode": 169,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Condition'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Object 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Object 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpIEqual",
+        "OpCode": 170,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpINotEqual",
+        "OpCode": 171,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpUGreaterThan",
+        "OpCode": 172,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpSGreaterThan",
+        "OpCode": 173,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpUGreaterThanEqual",
+        "OpCode": 174,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpSGreaterThanEqual",
+        "OpCode": 175,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpULessThan",
+        "OpCode": 176,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpSLessThan",
+        "OpCode": 177,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpULessThanEqual",
+        "OpCode": 178,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpSLessThanEqual",
+        "OpCode": 179,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpFOrdEqual",
+        "OpCode": 180,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpFUnordEqual",
+        "OpCode": 181,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpFOrdNotEqual",
+        "OpCode": 182,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpFUnordNotEqual",
+        "OpCode": 183,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpFOrdLessThan",
+        "OpCode": 184,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpFUnordLessThan",
+        "OpCode": 185,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpFOrdGreaterThan",
+        "OpCode": 186,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpFUnordGreaterThan",
+        "OpCode": 187,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpFOrdLessThanEqual",
+        "OpCode": 188,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpFUnordLessThanEqual",
+        "OpCode": 189,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpFOrdGreaterThanEqual",
+        "OpCode": 190,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpFUnordGreaterThanEqual",
+        "OpCode": 191,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 192,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 193,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpShiftRightLogical",
+        "OpCode": 194,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Base'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Shift'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpShiftRightArithmetic",
+        "OpCode": 195,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Base'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Shift'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpShiftLeftLogical",
+        "OpCode": 196,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Base'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Shift'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpBitwiseOr",
+        "OpCode": 197,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpBitwiseXor",
+        "OpCode": 198,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpBitwiseAnd",
+        "OpCode": 199,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand 1'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Operand 2'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpNot",
+        "OpCode": 200,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Operand'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpBitFieldInsert",
+        "OpCode": 201,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Base'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Insert'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Offset'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Count'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpBitFieldSExtract",
+        "OpCode": 202,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Base'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Offset'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Count'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpBitFieldUExtract",
+        "OpCode": 203,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Base'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Offset'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Count'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpBitReverse",
+        "OpCode": 204,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Base'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpBitCount",
+        "OpCode": 205,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Base'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 206,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpDPdx",
+        "OpCode": 207,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'P'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpDPdy",
+        "OpCode": 208,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'P'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpFwidth",
+        "OpCode": 209,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'P'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpDPdxFine",
+        "OpCode": 210,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'P'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpDPdyFine",
+        "OpCode": 211,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'P'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpFwidthFine",
+        "OpCode": 212,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'P'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpDPdxCoarse",
+        "OpCode": 213,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'P'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpDPdyCoarse",
+        "OpCode": 214,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'P'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpFwidthCoarse",
+        "OpCode": 215,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'P'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 216,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 217,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpEmitVertex",
+        "OpCode": 218,
+        "Category": 24,
+        "MinWordCount": 1,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpEndPrimitive",
+        "OpCode": 219,
+        "Category": 24,
+        "MinWordCount": 1,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpEmitStreamVertex",
+        "OpCode": 220,
+        "Category": 24,
+        "MinWordCount": 2,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Stream'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpEndStreamPrimitive",
+        "OpCode": 221,
+        "Category": 24,
+        "MinWordCount": 2,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Stream'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 222,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 223,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpControlBarrier",
+        "OpCode": 224,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Execution'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Memory'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Semantics'",
+                "Type": 33,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpMemoryBarrier",
+        "OpCode": 225,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Memory'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Semantics'",
+                "Type": 33,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 226,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpAtomicLoad",
+        "OpCode": 227,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Scope'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Semantics'",
+                "Type": 33,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpAtomicStore",
+        "OpCode": 228,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Scope'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Semantics'",
+                "Type": 33,
+                "Optional": false
+            },
+            {
+                "Name": "'Value'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpAtomicExchange",
+        "OpCode": 229,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Scope'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Semantics'",
+                "Type": 33,
+                "Optional": false
+            },
+            {
+                "Name": "'Value'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpAtomicCompareExchange",
+        "OpCode": 230,
+        "Category": 24,
+        "MinWordCount": 9,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Scope'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Equal'",
+                "Type": 33,
+                "Optional": false
+            },
+            {
+                "Name": "'Unequal'",
+                "Type": 33,
+                "Optional": false
+            },
+            {
+                "Name": "'Value'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Comparator'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpAtomicCompareExchangeWeak",
+        "OpCode": 231,
+        "Category": 24,
+        "MinWordCount": 9,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Scope'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Equal'",
+                "Type": 33,
+                "Optional": false
+            },
+            {
+                "Name": "'Unequal'",
+                "Type": 33,
+                "Optional": false
+            },
+            {
+                "Name": "'Value'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Comparator'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpAtomicIIncrement",
+        "OpCode": 232,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Scope'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Semantics'",
+                "Type": 33,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpAtomicIDecrement",
+        "OpCode": 233,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Scope'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Semantics'",
+                "Type": 33,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpAtomicIAdd",
+        "OpCode": 234,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Scope'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Semantics'",
+                "Type": 33,
+                "Optional": false
+            },
+            {
+                "Name": "'Value'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpAtomicISub",
+        "OpCode": 235,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Scope'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Semantics'",
+                "Type": 33,
+                "Optional": false
+            },
+            {
+                "Name": "'Value'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpAtomicSMin",
+        "OpCode": 236,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Scope'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Semantics'",
+                "Type": 33,
+                "Optional": false
+            },
+            {
+                "Name": "'Value'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpAtomicUMin",
+        "OpCode": 237,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Scope'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Semantics'",
+                "Type": 33,
+                "Optional": false
+            },
+            {
+                "Name": "'Value'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpAtomicSMax",
+        "OpCode": 238,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Scope'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Semantics'",
+                "Type": 33,
+                "Optional": false
+            },
+            {
+                "Name": "'Value'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpAtomicUMax",
+        "OpCode": 239,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Scope'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Semantics'",
+                "Type": 33,
+                "Optional": false
+            },
+            {
+                "Name": "'Value'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpAtomicAnd",
+        "OpCode": 240,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Scope'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Semantics'",
+                "Type": 33,
+                "Optional": false
+            },
+            {
+                "Name": "'Value'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpAtomicOr",
+        "OpCode": 241,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Scope'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Semantics'",
+                "Type": 33,
+                "Optional": false
+            },
+            {
+                "Name": "'Value'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpAtomicXor",
+        "OpCode": 242,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Scope'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Semantics'",
+                "Type": 33,
+                "Optional": false
+            },
+            {
+                "Name": "'Value'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 243,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 244,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpPhi",
+        "OpCode": 245,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Variable, Parent, ...'",
+                "Type": 2,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpLoopMerge",
+        "OpCode": 246,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Merge Block'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Continue Target'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 31,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpSelectionMerge",
+        "OpCode": 247,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Merge Block'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 30,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpLabel",
+        "OpCode": 248,
+        "Category": 24,
+        "MinWordCount": 2,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpBranch",
+        "OpCode": 249,
+        "Category": 24,
+        "MinWordCount": 2,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Target Label'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpBranchConditional",
+        "OpCode": 250,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Condition'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'True Label'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'False Label'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Branch weights'",
+                "Type": 5,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpSwitch",
+        "OpCode": 251,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Selector'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Default'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Target'",
+                "Type": 7,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpKill",
+        "OpCode": 252,
+        "Category": 24,
+        "MinWordCount": 1,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpReturn",
+        "OpCode": 253,
+        "Category": 24,
+        "MinWordCount": 1,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpReturnValue",
+        "OpCode": 254,
+        "Category": 24,
+        "MinWordCount": 2,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Value'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpUnreachable",
+        "OpCode": 255,
+        "Category": 24,
+        "MinWordCount": 1,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpLifetimeStart",
+        "OpCode": 256,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Size'",
+                "Type": 8,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpLifetimeStop",
+        "OpCode": 257,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Size'",
+                "Type": 8,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 258,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpGroupAsyncCopy",
+        "OpCode": 259,
+        "Category": 24,
+        "MinWordCount": 9,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Execution'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Destination'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Source'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Num Elements'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Stride'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Event'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGroupWaitEvents",
+        "OpCode": 260,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Execution'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Num Events'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Events List'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGroupAll",
+        "OpCode": 261,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Execution'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Predicate'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGroupAny",
+        "OpCode": 262,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Execution'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Predicate'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGroupBroadcast",
+        "OpCode": 263,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Execution'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Value'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'LocalId'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGroupIAdd",
+        "OpCode": 264,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Execution'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Operation'",
+                "Type": 36,
+                "Optional": false
+            },
+            {
+                "Name": "'X'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGroupFAdd",
+        "OpCode": 265,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Execution'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Operation'",
+                "Type": 36,
+                "Optional": false
+            },
+            {
+                "Name": "'X'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGroupFMin",
+        "OpCode": 266,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Execution'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Operation'",
+                "Type": 36,
+                "Optional": false
+            },
+            {
+                "Name": "X",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGroupUMin",
+        "OpCode": 267,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Execution'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Operation'",
+                "Type": 36,
+                "Optional": false
+            },
+            {
+                "Name": "'X'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGroupSMin",
+        "OpCode": 268,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Execution'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Operation'",
+                "Type": 36,
+                "Optional": false
+            },
+            {
+                "Name": "X",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGroupFMax",
+        "OpCode": 269,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Execution'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Operation'",
+                "Type": 36,
+                "Optional": false
+            },
+            {
+                "Name": "X",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGroupUMax",
+        "OpCode": 270,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Execution'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Operation'",
+                "Type": 36,
+                "Optional": false
+            },
+            {
+                "Name": "X",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGroupSMax",
+        "OpCode": 271,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Execution'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Operation'",
+                "Type": 36,
+                "Optional": false
+            },
+            {
+                "Name": "X",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 272,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 273,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpReadPipe",
+        "OpCode": 274,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pipe'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Size'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Alignment'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpWritePipe",
+        "OpCode": 275,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pipe'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Size'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Alignment'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpReservedReadPipe",
+        "OpCode": 276,
+        "Category": 24,
+        "MinWordCount": 9,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pipe'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Reserve Id'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Index'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Size'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Alignment'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpReservedWritePipe",
+        "OpCode": 277,
+        "Category": 24,
+        "MinWordCount": 9,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pipe'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Reserve Id'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Index'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Size'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Alignment'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpReserveReadPipePackets",
+        "OpCode": 278,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pipe'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Num Packets'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Size'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Alignment'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpReserveWritePipePackets",
+        "OpCode": 279,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pipe'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Num Packets'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Size'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Alignment'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpCommitReadPipe",
+        "OpCode": 280,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Pipe'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Reserve Id'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Size'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Alignment'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpCommitWritePipe",
+        "OpCode": 281,
+        "Category": 24,
+        "MinWordCount": 5,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Pipe'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Reserve Id'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Size'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Alignment'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpIsValidReserveId",
+        "OpCode": 282,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Reserve Id'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGetNumPipePackets",
+        "OpCode": 283,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pipe'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Size'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Alignment'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGetMaxPipePackets",
+        "OpCode": 284,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pipe'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Size'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Alignment'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGroupReserveReadPipePackets",
+        "OpCode": 285,
+        "Category": 24,
+        "MinWordCount": 8,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Execution'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Pipe'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Num Packets'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Size'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Alignment'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGroupReserveWritePipePackets",
+        "OpCode": 286,
+        "Category": 24,
+        "MinWordCount": 8,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Execution'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Pipe'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Num Packets'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Size'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Alignment'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGroupCommitReadPipe",
+        "OpCode": 287,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Execution'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Pipe'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Reserve Id'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Size'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Alignment'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGroupCommitWritePipe",
+        "OpCode": 288,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Execution'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Pipe'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Reserve Id'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Size'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Packet Alignment'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 289,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "Bad",
+        "OpCode": 290,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpEnqueueMarker",
+        "OpCode": 291,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Queue'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Num Events'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Wait Events'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Ret Event'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpEnqueueKernel",
+        "OpCode": 292,
+        "Category": 24,
+        "MinWordCount": 14,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Queue'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Flags'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'ND Range'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Num Events'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Wait Events'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Ret Event'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Invoke'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Param'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Param Size'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Param Align'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Local Size'",
+                "Type": 2,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGetKernelNDrangeSubGroupCount",
+        "OpCode": 293,
+        "Category": 24,
+        "MinWordCount": 8,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'ND Range'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Invoke'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Param'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Param Size'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Param Align'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGetKernelNDrangeMaxSubGroupSize",
+        "OpCode": 294,
+        "Category": 24,
+        "MinWordCount": 8,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'ND Range'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Invoke'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Param'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Param Size'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Param Align'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGetKernelWorkGroupSize",
+        "OpCode": 295,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Invoke'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Param'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Param Size'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Param Align'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGetKernelPreferredWorkGroupSizeMultiple",
+        "OpCode": 296,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Invoke'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Param'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Param Size'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Param Align'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpRetainEvent",
+        "OpCode": 297,
+        "Category": 24,
+        "MinWordCount": 2,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Event'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpReleaseEvent",
+        "OpCode": 298,
+        "Category": 24,
+        "MinWordCount": 2,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Event'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpCreateUserEvent",
+        "OpCode": 299,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpIsValidEvent",
+        "OpCode": 300,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Event'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpSetUserEventStatus",
+        "OpCode": 301,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Event'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Status'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpCaptureEventProfilingInfo",
+        "OpCode": 302,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Event'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Profiling Info'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Value'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpGetDefaultQueue",
+        "OpCode": 303,
+        "Category": 24,
+        "MinWordCount": 3,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpBuildNDRange",
+        "OpCode": 304,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'GlobalWorkSize'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'LocalWorkSize'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'GlobalWorkOffset'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageSparseSampleImplicitLod",
+        "OpCode": 305,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Sampled Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 22,
+                "Optional": true
+            },
+            {
+                "Name": "",
+                "Type": 2,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageSparseSampleExplicitLod",
+        "OpCode": 306,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Sampled Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 22,
+                "Optional": true
+            },
+            {
+                "Name": "",
+                "Type": 2,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageSparseSampleDrefImplicitLod",
+        "OpCode": 307,
+        "Category": 24,
+        "MinWordCount": 8,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Sampled Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'D~ref~'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 22,
+                "Optional": true
+            },
+            {
+                "Name": "",
+                "Type": 2,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageSparseSampleDrefExplicitLod",
+        "OpCode": 308,
+        "Category": 24,
+        "MinWordCount": 8,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Sampled Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'D~ref~'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 22,
+                "Optional": true
+            },
+            {
+                "Name": "",
+                "Type": 2,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageSparseSampleProjImplicitLod",
+        "OpCode": 309,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Sampled Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 22,
+                "Optional": true
+            },
+            {
+                "Name": "",
+                "Type": 2,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageSparseSampleProjExplicitLod",
+        "OpCode": 310,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Sampled Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 22,
+                "Optional": true
+            },
+            {
+                "Name": "",
+                "Type": 2,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageSparseSampleProjDrefImplicitLod",
+        "OpCode": 311,
+        "Category": 24,
+        "MinWordCount": 8,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Sampled Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'D~ref~'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 22,
+                "Optional": true
+            },
+            {
+                "Name": "",
+                "Type": 2,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageSparseSampleProjDrefExplicitLod",
+        "OpCode": 312,
+        "Category": 24,
+        "MinWordCount": 8,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Sampled Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'D~ref~'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 22,
+                "Optional": true
+            },
+            {
+                "Name": "",
+                "Type": 2,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageSparseFetch",
+        "OpCode": 313,
+        "Category": 24,
+        "MinWordCount": 7,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 22,
+                "Optional": true
+            },
+            {
+                "Name": "",
+                "Type": 2,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageSparseGather",
+        "OpCode": 314,
+        "Category": 24,
+        "MinWordCount": 8,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Sampled Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Component'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 22,
+                "Optional": true
+            },
+            {
+                "Name": "",
+                "Type": 2,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageSparseDrefGather",
+        "OpCode": 315,
+        "Category": 24,
+        "MinWordCount": 8,
+        "HasVariableWordCount": true,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Sampled Image'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Coordinate'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'D~ref~'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "",
+                "Type": 22,
+                "Optional": true
+            },
+            {
+                "Name": "",
+                "Type": 2,
+                "Optional": true
+            }
+        ]
+    },
+    { 
+        "Name": "OpImageSparseTexelsResident",
+        "OpCode": 316,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Resident Code'",
+                "Type": 1,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpNoLine",
+        "OpCode": 317,
+        "Category": 24,
+        "MinWordCount": 1,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+        ]
+    },
+    { 
+        "Name": "OpAtomicFlagTestAndSet",
+        "OpCode": 318,
+        "Category": 24,
+        "MinWordCount": 6,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": true,
+        "HasResult": true,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Scope'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Semantics'",
+                "Type": 33,
+                "Optional": false
+            }
+        ]
+    },
+    { 
+        "Name": "OpAtomicFlagClear",
+        "OpCode": 319,
+        "Category": 24,
+        "MinWordCount": 4,
+        "HasVariableWordCount": false,
+        "MinVariableUsedCount": 0,
+        "HasResultType": false,
+        "HasResult": false,
+        "Operands": [
+            {
+                "Name": "'Pointer'",
+                "Type": 1,
+                "Optional": false
+            },
+            {
+                "Name": "'Scope'",
+                "Type": 35,
+                "Optional": false
+            },
+            {
+                "Name": "'Semantics'",
+                "Type": 33,
+                "Optional": false
+            }
+        ]
+    }
+]
+
+}
