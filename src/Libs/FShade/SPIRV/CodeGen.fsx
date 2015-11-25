@@ -522,6 +522,13 @@ module Reader =
 
                                 let operands =
                                     [
+                                        if hasResultType then
+                                            yield { Name = "ResultType"; Type = OperandClass.OperandId; Optional = false}
+
+                                        if hasResult then
+                                            yield { Name = "Result"; Type = OperandClass.OperandId; Optional = false}
+
+
                                         for e in current.["Operands"] do
                                             let n : string = e.["Name"].ToObject()
                                             let t : int = e.["Type"].ToObject()
@@ -785,13 +792,13 @@ module Writer =
                             let lastArg = o.Operands |> Seq.last
                             let lastArgName = lastArg.Name |> fsharpName
 
-
+                            let fixedOperands = o.Operands.Length
                             if lastArg.Type.IsString then
-                                printfn "                    let wordCount = %d + (%s.Length + 4 &&& ~~~3) / 4" o.MinWordCount lastArgName
+                                printfn "                    let wordCount = %d + (%s.Length + 4 &&& ~~~3) / 4" fixedOperands lastArgName
                             elif (lastArg.Optional && not (lastArg.Type.IsArray || lastArg.Type.IsString))  || lastArg.Type = OperandClass.OperandOptionalLiteral then
-                                printfn "                    let wordCount = %d + (if %s.IsSome then 1 else 0)" o.MinWordCount lastArgName
+                                printfn "                    let wordCount = %d + (if %s.IsSome then 1 else 0)" fixedOperands lastArgName
                             else
-                                printfn "                    let wordCount = %d + %s.Length" o.MinWordCount lastArgName
+                                printfn "                    let wordCount = %d + %s.Length" fixedOperands lastArgName
                         
                             printfn "                    writeOpHeader %d wordCount target" o.OpCode
 
@@ -923,7 +930,7 @@ module Writer =
             printfn "        let bound = source.ReadUInt32()"
             printfn "        let reserved = source.ReadUInt32()"
             printfn "        let instructions = readInstructions source"
-            printfn "        { magic = magic; version = version; generatorMagic = generatorMagic; bound = bound; reserved = reserved; instructions = instructions }"
+            printfn "        { magic = magic; version = version; generatorMagic = generatorMagic; bound = bound; reserved = reserved; instructions = Seq.toList instructions }"
 
 
 
@@ -957,7 +964,7 @@ module Writer =
         printfn "        generatorMagic : uint32"
         printfn "        bound : uint32"
         printfn "        reserved : uint32"
-        printfn "        instructions : seq<Instruction>"
+        printfn "        instructions : list<Instruction>"
         printfn "    }"
 
         printfn ""
