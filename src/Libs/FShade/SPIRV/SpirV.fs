@@ -4,7 +4,7 @@ type Instruction =
     | OpNop
     | OpUndef of resultType : uint32 * result : uint32
     | OpSourceContinued of sourceCont : string
-    | OpSource of _source : SourceLanguage * version : uint32 * file : uint32 * code : string
+    | OpSource of _source : SourceLanguage * version : uint32 * code : string
     | OpSourceExtension of extension : string
     | OpName of _target : uint32 * name : string
     | OpMemberName of _type : uint32 * _member : uint32 * name : string
@@ -341,12 +341,11 @@ module Serializer =
                     let wordCount = 1 + (sourceCont.Length + 4 &&& ~~~3) / 4
                     writeOpHeader 2 wordCount target
                     writeString sourceCont target
-                | OpSource(_source, version, file, code) -> 
-                    let wordCount = 4 + (code.Length + 4 &&& ~~~3) / 4
+                | OpSource(_source, version, code) -> 
+                    let wordCount = 3 + (code.Length + 4 &&& ~~~3) / 4
                     writeOpHeader 3 wordCount target
                     target.Write(uint32 (int _source))
                     target.Write(version)
-                    target.Write(file)
                     writeString code target
                 | OpSourceExtension(extension) -> 
                     let wordCount = 1 + (extension.Length + 4 &&& ~~~3) / 4
@@ -2182,12 +2181,11 @@ module Serializer =
                         let sourceCont = readString source sourceContSize
                         yield OpSourceContinued(sourceCont)
                     | 3 ->
-                        let codeSize = max 0 (size - 4)
+                        let codeSize = max 0 (size - 3)
                         let _source = unbox<SourceLanguage> (int (source.ReadUInt32()))
                         let version = source.ReadUInt32()
-                        let file = source.ReadUInt32()
                         let code = readString source codeSize
-                        yield OpSource(_source, version, file, code)
+                        yield OpSource(_source, version, code)
                     | 4 ->
                         let extensionSize = max 0 (size - 1)
                         let extension = readString source extensionSize

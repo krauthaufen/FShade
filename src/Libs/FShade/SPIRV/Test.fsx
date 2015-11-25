@@ -7,7 +7,7 @@ open SpirV
 
 let test() =
 
-    let inputData = File.ReadAllBytes @"C:\VulkanSDK\0.9.2\Bin\cube-frag.spv"
+    let inputData = File.ReadAllBytes @"C:\VulkanSDK\0.9.2\Bin\cube-vert.spv"
 
     use stream = new MemoryStream(inputData)
     let reader = new BinaryReader(stream)

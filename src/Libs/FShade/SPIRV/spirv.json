@@ -65,12 +65,6 @@
                     "Optional": false
                 },
                 {
-                    "Name": "file",
-                    "Description": "'File'",
-                    "Type": 8,
-                    "Optional": false
-                },
-                {
                     "Name": "code",
                     "Description": "'Source'",
                     "Type": 9,
