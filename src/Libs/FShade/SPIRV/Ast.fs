@@ -3,6 +3,8 @@
 open Aardvark.Base
 open SpirV
 
+#nowarn "9"
+#nowarn "51"
 
 type Type =
     | Void
@@ -152,10 +154,14 @@ type BinaryOperation =
     | Equal
     | NotEqual
 
+    | And | Or
+    | BitAnd | BitOr | BitXor | LeftShift | RightShiftArithmetic | RightShiftLogic
+
 
 type UnaryOperation =
     | Negate
-
+    | All
+    | Any
 
 type ExpressionType =
     | Custom = 0
@@ -176,6 +182,9 @@ type Expr =
     abstract member Type : Type
     abstract member Kind : ExpressionType
     abstract member Substitute : (Var -> Option<Var>) -> Expr
+
+
+type Function = FunctionDefinition of arguments : list<Var> * body : Expr
 
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -316,11 +325,50 @@ module Expr =
                     | Add | Sub -> additionType l r
                     | Mul  -> multiplicationType l r
                     | Div | Mod -> divisionType l r
-                    | _ -> Some Type.Bool
+                    | Greater | Smaller | GreaterOrEqual | SmallerOrEqual ->
+                        if l = r then
+                            match l with
+                                | Int(_,_) | Float(_) -> Some Type.Bool
+                                | Vector(_,d) -> Vector(Type.Bool, d) |> Some
+                                | _ -> None
+                        else
+                            None
+
+                    | And | Or ->
+                        if l = r then
+                            match l with
+                                | Bool -> Some Type.Bool
+                                | Vector(Bool,d) -> Vector(Type.Bool, d) |> Some
+                                | _ -> None
+                        else
+                            None
+
+                    | BitAnd | BitOr | BitXor | LeftShift | RightShiftArithmetic | RightShiftLogic ->
+                        match r with
+                            | Int(_,_) ->
+                                match l with
+                                    | Int(_,_) -> Some l
+                                    | _ -> None
+                            | _ -> None
+
+                    | Equal | NotEqual ->
+                        if l = r then
+                            match l with
+                                | Int(_,_) | Float(_) | Bool -> Some Type.Bool
+                                | Vector(_,d) -> Vector(Type.Bool, d) |> Some
+                                | _ -> None
+                        else
+                            None
 
             match res with
                 | Some res -> res
                 | None -> failwithf "could not determine type for %A(%A, %A)" op l r
+
+        let private unaryOpResultType (op : UnaryOperation) (i : Type) =
+            match op with
+                | Negate -> i
+                | All -> Bool
+                | Any -> Bool
 
         [<AbstractClass>]
         type AbstractExpression(kind : ExpressionType, t : Type) =
@@ -365,7 +413,7 @@ module Expr =
             member x.Var = v
 
         type UnaryExpression(op : UnaryOperation, e : Expr) =
-            inherit DerivedExpression(ExpressionType.Unary, e.Type, [e])
+            inherit DerivedExpression(ExpressionType.Unary, unaryOpResultType op e.Type, [e])
             member x.Operation = op
             member x.Operand = e
         
@@ -422,9 +470,7 @@ module Expr =
             override x.Substitute _ = x :> Expr
 
         type BlockExpression(statements : list<Expr>) =
-            inherit DerivedExpression(ExpressionType.Block, Type.Unit, statements)
-            do assert (match statements with | [] -> true | (:? LabelExpression)::_ -> true | _ -> false )
-               assert (statements |> List.forall (fun s -> s.Type = Type.Unit))
+            inherit DerivedExpression(ExpressionType.Block, statements |> Seq.last |> (fun e -> e.Type), statements)
 
             member x.Statements = statements
 
@@ -471,6 +517,8 @@ module Expr =
 
         type IfThenElseExpression(cond : Expr, ifTrue : Expr, ifFalse : Expr) =
             inherit DerivedExpression(ExpressionType.IfThenElse, ifTrue.Type, [cond; ifTrue; ifFalse])
+            do assert(cond.Type = Bool)
+               assert(ifTrue.Type = ifFalse.Type)
 
             member x.Condition = cond
             member x.IfTrue = ifTrue
@@ -501,6 +549,18 @@ module Expr =
     let SmallerOrEqual(l : Expr, r : Expr) = BinaryExpression(SmallerOrEqual, l, r) :> Expr
     let Equal(l : Expr, r : Expr) = BinaryExpression(Equal, l, r) :> Expr
     let NotEqual(l : Expr, r : Expr) = BinaryExpression(NotEqual, l, r) :> Expr
+
+    let And(l : Expr, r : Expr) = BinaryExpression(And, l, r) :> Expr
+    let Or(l : Expr, r : Expr) = BinaryExpression(Or, l, r) :> Expr
+    
+    let BitAnd(l : Expr, r : Expr) = BinaryExpression(BitAnd, l, r) :> Expr
+    let BitOr(l : Expr, r : Expr) = BinaryExpression(BitOr, l, r) :> Expr
+    let BitXor(l : Expr, r : Expr) = BinaryExpression(BitXor, l, r) :> Expr
+
+    let LeftShift(l : Expr, r : Expr) = BinaryExpression(LeftShift, l, r) :> Expr
+    let RightShiftLogic(l : Expr, r : Expr) = BinaryExpression(RightShiftLogic, l, r) :> Expr
+    let RightShiftArithmetic(l : Expr, r : Expr) = BinaryExpression(RightShiftArithmetic, l, r) :> Expr
+
 
 
     let NewObject(t : Type, args : list<Expr>) = NewObjectExpression(t, args) :> Expr
@@ -584,6 +644,18 @@ module Expr =
 [<AutoOpen>]
 module SpirVBuilders =
     
+    let (|ExitInstruction|_|) (i : Instruction) =
+        match i with
+            | OpReturn -> Some()
+            | OpReturnValue _ -> Some()
+            | OpBranch _ -> Some()
+            | OpBranchConditional _ -> Some()
+            | OpKill -> Some ()
+            | OpUnreachable -> Some ()
+            | OpSwitch(_,_,_) -> Some ()
+            | _ -> None
+
+
     type RevList<'a> =
         | Snoc of RevList<'a> * 'a
         | Nil
@@ -607,19 +679,26 @@ module SpirVBuilders =
     type SpirVState = 
         {
             currentId : uint32
+            typeInstructions : RevList<Instruction>
             instructions : RevList<Instruction>
             typeCache : Map<Type, uint32>
             labelIds : Map<Label, uint32>
             variableIds : Map<Var, uint32>
+            variableDeclarationLabels : Map<Var, uint32>
+            expressionValueCache : HashMap<Expr, uint32>
+      
         } with
             
             static member Empty = 
                 {
                     currentId = 0u
+                    typeInstructions = Nil
                     instructions = Nil
                     typeCache = Map.empty
                     labelIds = Map.empty
                     variableIds = Map.empty
+                    variableDeclarationLabels = Map.empty
+                    expressionValueCache = HashMap.empty
                 }
 
 
@@ -627,6 +706,11 @@ module SpirVBuilders =
 
 
     let newId = { build = fun s -> { s with currentId = s.currentId + 1u}, s.currentId}
+
+    let lastInstruction =
+        { build = fun s ->
+            s, (match s.instructions with | Snoc(_,i) -> Some i | Nil -> None)
+        }
 
     let tryFindTypeId (t : Type) =
         { build = fun s ->
@@ -638,10 +722,23 @@ module SpirVBuilders =
             { s with typeCache = Map.add t id s.typeCache }, ()
         }
 
-
-    let tryFindLabelId (l : Label) =
+    let tryFindExprCache (e : Expr) =
         { build = fun s ->
-            s, Map.tryFind l s.labelIds
+            s, HashMap.tryFind e s.expressionValueCache
+        }
+
+    let setExprValue (e : Expr) (value : uint32) =
+         { build = fun s -> {s with expressionValueCache = HashMap.add e value s.expressionValueCache },() }
+
+
+    let getLabelId (l : Label) =
+        { build = fun s ->
+            match Map.tryFind l s.labelIds with
+                | Some id -> 
+                    s,id
+                | None ->
+                    let (s, id) = newId.build s
+                    { s with labelIds = Map.add l id s.labelIds }, id
         }
 
     let setLabelId (l : Label) (id : uint32) =
@@ -652,10 +749,33 @@ module SpirVBuilders =
     let getVarId (v : Var) =
         { build = fun s ->
             match Map.tryFind v s.variableIds with
-                | Some id -> s,id
+                | Some id -> 
+                    s,id
                 | None ->
                     let (s, id) = newId.build s
-                    { s with variableIds = Map.add v id s.variableIds }, id
+                    let (s, lid) = getLabelId(Label()).build s
+
+                    { s with 
+                        variableIds = Map.add v id s.variableIds
+                        instructions = Snoc(s.instructions, OpLabel(lid)) 
+                        variableDeclarationLabels = Map.add v lid s.variableDeclarationLabels
+                    }, id
+        }
+
+    let getVarLabelId (v : Var) =
+        { build = fun s ->
+            match Map.tryFind v s.variableDeclarationLabels with
+                | Some id -> 
+                    s,id
+                | None ->
+                    let (s, id) = newId.build s
+                    let (s, lid) = getLabelId(Label()).build s
+
+                    { s with 
+                        variableIds = Map.add v id s.variableIds
+                        instructions = Snoc(s.instructions, OpLabel(lid)) 
+                        variableDeclarationLabels = Map.add v lid s.variableDeclarationLabels
+                    }, lid
         }
 
     let fail str : SpirV<'a> =
@@ -716,6 +836,62 @@ module SpirVBuilders =
     let spirv = SpirVBuilder()
 
 
+    type SpirVTypeBuilder() =
+
+        member x.Yield(i : Instruction) =
+            { build = fun s ->
+                { s with typeInstructions = Snoc(s.typeInstructions, i) }, ()
+            }
+
+        member x.YieldFrom(i : seq<Instruction>) =
+            { build = fun s ->
+                let mutable c = s.typeInstructions
+                for e in i do c <- Snoc(c, e)
+                { s with typeInstructions = c }, ()
+            }
+
+
+        member x.Bind(m : SpirV<'a>, f : 'a -> SpirV<'b>) =
+            { build = fun s ->
+                let (s,v) = m.build s
+                (f v).build s
+            }
+
+        member x.Zero() =
+            { build = fun s -> s, () }
+
+
+        member x.Combine(l : SpirV<unit>, r : SpirV<'a>) =
+            { build = fun s -> 
+                let (s, ()) = l.build s
+                r.build s
+            }
+
+        member x.Delay(f : unit -> SpirV<'a>) =
+            { build = fun s ->
+                (f ()).build s
+            }
+
+        member x.For(seq : seq<'a>, f : 'a -> SpirV<unit>) =
+            { build = fun s ->
+                let mutable c = s
+                for e in seq do
+                    let (s,()) = (f e).build c
+                    c <- s
+                c, ()
+            } 
+
+
+        member x.Return(v : 'a) =
+            { build = fun s -> s, v }
+
+        member x.ReturnFrom(v : SpirV<'a>) =
+            v
+
+    let spirvType = SpirVTypeBuilder()
+
+
+
     module List =
         let mapSpv (f : 'a -> SpirV<'b>) (l : list<'a>) =
             { build = fun s ->
@@ -734,6 +910,7 @@ module SpirVBuilders =
                     ) (0, s, [])
                 (s, res)
             }
+
     module Seq =
         let mapSpv (f : 'a -> SpirV<'b>) (l : seq<'a>) =
             { build = fun s ->
@@ -746,9 +923,10 @@ module SpirVBuilders =
 
 module SpirV =
     open Expr.Patterns
+    open System.Runtime.InteropServices
 
     let rec getTypeId (t : Type) =
-        spirv {
+        spirvType {
             let! existing = tryFindTypeId t
             match existing with
                 | Some id -> return id
@@ -806,220 +984,668 @@ module SpirV =
                     return id
         }
 
-    let getLabelId (l : Label) =
-        spirv {
-            let! id = tryFindLabelId l
-            match id with
-                | Some id ->
-                    return id
-                | None ->
-                    let! id = newId
-                    do! setLabelId l id
-                    return id
-        }
+    let getLabelId (l : Label) = getLabelId l
     
 
-    let rec compile (self : Expr) =
-        spirv {
-            match self with
-                | Return(UnitVal) -> 
-                    yield OpReturn
-                    return None
 
-                | Return e ->
-                    let! e = compile e
-                    match e with
-                        | Some e ->
-                            yield OpReturnValue(e)
-                            return None
-                        | None ->
+    let byteArray (v : obj) =
+        let s = Marshal.SizeOf(v)
+        let arr : byte[] = Array.zeroCreate s
+
+        let gc = GCHandle.Alloc(arr, GCHandleType.Pinned)
+        Marshal.StructureToPtr(v, gc.AddrOfPinnedObject(), false)
+        gc.Free()
+
+
+        arr
+            
+
+    let rec private compileConstant (t : Type) (data : byte[]) =
+        spirv {
+            let! tid = getTypeId t
+            let! id = newId
+
+            let skip (n : int) (arr : byte[]) =
+                if n = 0 then arr
+                else Array.sub arr n (arr.Length - n)
+
+            let take (n : int) (arr : byte[]) =
+                if arr.Length = n then arr
+                elif arr.Length > n then Array.sub arr 0 n
+                else Array.append (Array.zeroCreate (n - arr.Length)) arr
+
+            let toWordArray (arr : byte[]) : uint32[] =
+                let wordCount = ((arr.Length + 3) &&& ~~~3) / 4
+                let real = Array.zeroCreate wordCount
+                real.UnsafeCoercedApply<byte>(fun real -> arr.CopyTo(real, 0))
+                real
+
+            match t with
+                | Int(w,_) | Float(w) ->
+                    let byteSize = w / 8
+                    yield OpConstant(tid, id, data |> take byteSize |> toWordArray)
+                    return id, byteSize
+
+
+                | Bool ->
+                    yield OpConstant(tid, id, data |> take 4 |> toWordArray)
+                    return id, 4
+
+                | Vector(bt, d) | Matrix(bt, d) | Array(bt, d) ->
+                    
+                    let ids = Array.zeroCreate d
+                    let mutable offset = 0
+
+                    for i in 0..d-1 do
+                        let! (iid, size) = compileConstant bt (skip offset data)
+                        offset <- offset + size
+                        ids.[i] <- iid
+
+                    yield OpConstantComposite(tid, id, ids)
+                    return (id, offset)
+
+                | Struct(_, fields) ->
+                    
+                    let fields = List.toArray fields
+                    let ids = Array.zeroCreate fields.Length
+                    let mutable offset = 0
+
+                    for i in 0..fields.Length-1 do
+                        let (t,_) = fields.[i]
+                        let! (iid, size) = compileConstant t (skip offset data)
+                        offset <- offset + size
+                        ids.[i] <- iid
+
+                    yield OpConstantComposite(tid, id, ids)
+                    return (id, offset)
+
+                | _ ->
+                    return failwithf "unsupported constant-type: %A" t
+                    
+        }
+
+    let rec compileBinaryOperator (resultType : Type) (op : BinaryOperation) (l : Expr) (r : Expr) =
+        spirv {
+            let! lid = compileExpr l
+            let! rid = compileExpr r
+            match lid, rid with
+                | Some lid, Some rid ->
+                    let! tid = getTypeId resultType
+                    let! id = newId
+
+                    match op with
+                        | Add ->
+                            assert(resultType = l.Type)
+                            match l.Type,r.Type with
+                                | Int(_,_), Int(_,_) when l.Type = r.Type ->
+                                    yield OpIAdd(tid, id, lid, rid)
+
+                                | Float(_), Float(_) when l.Type = r.Type ->
+                                    yield OpFAdd(tid, id, lid, rid)
+                            
+                                | Vector(bt, _), Vector(_, _) when l.Type = r.Type ->
+                                    match bt with
+                                        | Int(_,_) -> yield OpISub(tid, id, lid, rid)
+                                        | Float(_) -> yield OpFSub(tid, id, lid, rid)
+                                        | _ ->
+                                            failwithf "cannot sub vectors with non-scalar components: %A" bt
+                                            
+
+
+                                | _ -> 
+                                    failwithf "cannot add %A and %A" l.Type r.Type
+
+                        | Sub ->
+                            assert(resultType = l.Type)
+                            match l.Type,r.Type with
+                                | Int(_,_), Int(_,_) when l.Type = r.Type ->
+                                    yield OpISub(tid, id, lid, rid)
+
+                                | Float(_), Float(_) when l.Type = r.Type ->
+                                    yield OpFSub(tid, id, lid, rid)
+                            
+                                | Vector(bt, _), Vector(_, _) when l.Type = r.Type ->
+                                    match bt with
+                                        | Int(_,_) -> yield OpISub(tid, id, lid, rid)
+                                        | Float(_) -> yield OpFSub(tid, id, lid, rid)
+                                        | _ ->
+                                            failwithf "cannot sub vectors with non-scalar components: %A" bt
+                                            
+
+                                | _ -> 
+                                    failwithf "cannot sub %A and %A" l.Type r.Type
+
+                        | Mul ->
+                            match l.Type,r.Type with
+                                | Int(_,_), Int(_,_) when l.Type = r.Type ->
+                                    assert(resultType = l.Type)
+                                    yield OpIMul(tid, id, lid, rid)
+
+                                | Float(_), Float(_) when l.Type = r.Type ->
+                                    assert(resultType = l.Type)
+                                    yield OpFMul(tid, id, lid, rid)
+                            
+                                | Vector(bt, _), Vector(_, _) when l.Type = r.Type ->
+                                    assert(resultType = l.Type)
+                                    match bt with
+                                        | Int(_,_) -> yield OpIMul(tid, id, lid, rid)
+                                        | Float(_) -> yield OpFMul(tid, id, lid, rid)
+                                        | _ ->
+                                            failwithf "cannot multiply vectors with non-scalar components: %A" bt
+                                    
+                                | Vector(Float(_), d), Float(_) ->
+                                    assert(resultType = l.Type)
+                                    yield OpVectorTimesScalar(tid, id, lid, rid)
+
+                                | Float(_), Vector(Float(_), d) ->
+                                    assert(resultType = r.Type)
+                                    yield OpVectorTimesScalar(tid, id, rid, lid)
+
+
+                                | Vector(vt, d), Int(_,_) when vt = r.Type->
+                                    assert(resultType = l.Type)
+                                    let! vecId = newId
+                                    yield OpCompositeConstruct(tid, vecId, Array.create d rid)
+                                    yield OpIMul(tid, id, lid, vecId)
+
+                                | Int(_,_), Vector(vt, d) when vt = l.Type->
+                                    assert(resultType = r.Type)
+                                    let! vecId = newId
+                                    yield OpCompositeConstruct(tid, vecId, Array.create d lid)
+                                    yield OpIMul(tid, id, vecId, rid)
+
+
+
+                                | Matrix(Vector(Float(_), _),_), Float(_) ->
+                                    assert(resultType = l.Type)
+                                    yield OpMatrixTimesScalar(tid, id, lid, rid)
+
+                                | Float(_), Matrix(Vector(Float(_), _),_) ->
+                                    assert(resultType = r.Type)
+                                    yield OpMatrixTimesScalar(tid, id, rid, lid)
+
+                                | Matrix(Vector(mb, rows), cols), Vector(vb, d) when mb = vb && d = cols ->
+                                    assert(resultType = Vector(mb, rows))
+                                    yield OpMatrixTimesVector(tid, id, lid, rid)
+
+                                | Vector(vb, d), Matrix(Vector(mb, rows), cols) when mb = vb && d = cols ->
+                                    assert(resultType = Vector(mb, rows))
+                                    yield OpVectorTimesMatrix(tid, id, lid, rid)
+
+                                | _ -> 
+                                    failwithf "cannot multiply %A and %A" l.Type r.Type
+
+                        | Div ->
+                            match l.Type,r.Type with
+                                | Int(_,true), Int(_,true) when l.Type = r.Type ->
+                                    assert(resultType = l.Type)
+                                    yield OpSDiv(tid, id, lid, rid)
+
+                                | Int(_,false), Int(_,false) when l.Type = r.Type ->
+                                    assert(resultType = l.Type)
+                                    yield OpUDiv(tid, id, lid, rid)
+
+
+                                | Float(_), Float(_) when l.Type = r.Type ->
+                                    assert(resultType = l.Type)
+                                    yield OpFDiv(tid, id, lid, rid)
+                            
+                                | Vector(bt, _), Vector(_, _) when l.Type = r.Type ->
+                                    assert(resultType = l.Type)
+                                    match bt with
+                                        | Int(_,true) -> yield OpSDiv(tid, id, lid, rid)
+                                        | Int(_,false) -> yield OpUDiv(tid, id, lid, rid)
+                                        | Float(_) -> yield OpFDiv(tid, id, lid, rid)
+                                        | _ ->
+                                            failwithf "cannot multiply vectors with non-scalar components: %A" bt
+                                    
+                                | Vector(Float(w), d), Float(_) ->
+                                    assert(resultType = l.Type)
+                                    let! vecId = newId
+                                    yield OpCompositeConstruct(tid, vecId, Array.create d rid)
+                                    yield OpFDiv(tid, id, lid, rid)
+
+                                | Float(_), Vector(Float(_), d) ->
+                                    assert(resultType = r.Type)
+                                    let! vecId = newId
+                                    yield OpCompositeConstruct(tid, vecId, Array.create d lid)
+                                    yield OpFDiv(tid, id, vecId, rid)
+
+                                | Vector(vt, d), Int(_,signed) when vt = r.Type ->
+                                    assert(resultType = l.Type)
+                                    let! vecId = newId
+                                    yield OpCompositeConstruct(tid, vecId, Array.create d rid)
+                                    if signed then 
+                                        yield OpSDiv(tid, id, lid, vecId)
+                                    else
+                                        yield OpUDiv(tid, id, lid, vecId)
+
+
+                                | Int(_,signed), Vector(vt, d) when vt = l.Type ->
+                                    assert(resultType = r.Type)
+                                    let! vecId = newId
+                                    yield OpCompositeConstruct(tid, vecId, Array.create d lid)
+                                    if signed then 
+                                        yield OpSDiv(tid, id, vecId, rid)
+                                    else
+                                        yield OpUDiv(tid, id, vecId, rid)
+
+                                | _ -> 
+                                    failwithf "cannot divide %A and %A" l.Type r.Type
+                                
+                        | Mod ->
+                            failwith "Mod not implemented"
+
+
+
+                        | Smaller ->
+                            if l.Type = r.Type then
+                                match l.Type with
+                                    | Int(_,true) | Vector(Int(_, true),_) -> 
+                                        yield OpSLessThan(tid, id, lid, rid)
+
+                                    | Int(_,false) | Vector(Int(_, false),_) -> 
+                                        yield OpULessThan(tid, id, lid, rid)
+
+                                    | Float(_) | Vector(Float(_),_) -> 
+                                        yield OpFOrdLessThan(tid, id, lid, rid)
+
+                                    | _ -> failwith "comparison for %A not supported" l.Type
+                            else
+                                failwithf "cannot compare %A to %A" l.Type r.Type
+
+                        | SmallerOrEqual ->
+                            if l.Type = r.Type then
+                                match l.Type with
+                                    | Int(_,true) | Vector(Int(_, true),_) -> 
+                                        yield OpSLessThanEqual(tid, id, lid, rid)
+
+                                    | Int(_,false) | Vector(Int(_, false),_) -> 
+                                        yield OpULessThanEqual(tid, id, lid, rid)
+
+                                    | Float(_) | Vector(Float(_),_) -> 
+                                        yield OpFOrdLessThanEqual(tid, id, lid, rid)
+
+                                    | _ -> failwith "comparison for %A not supported" l.Type
+                            else
+                                failwithf "cannot compare %A to %A" l.Type r.Type
+                                
+                        | Greater ->
+                            if l.Type = r.Type then
+                                match l.Type with
+                                    | Int(_,true) | Vector(Int(_, true),_) -> 
+                                        yield OpSGreaterThan(tid, id, lid, rid)
+
+                                    | Int(_,false) | Vector(Int(_, false),_) -> 
+                                        yield OpUGreaterThan(tid, id, lid, rid)
+
+                                    | Float(_) | Vector(Float(_),_) -> 
+                                        yield OpFOrdGreaterThan(tid, id, lid, rid)
+
+                                    | _ -> failwith "comparison for %A not supported" l.Type
+                            else
+                                failwithf "cannot compare %A to %A" l.Type r.Type
+                                
+                        | GreaterOrEqual ->
+                            if l.Type = r.Type then
+                                match l.Type with
+                                    | Int(_,true) | Vector(Int(_, true),_) -> 
+                                        yield OpSGreaterThanEqual(tid, id, lid, rid)
+
+                                    | Int(_,false) | Vector(Int(_, false),_) -> 
+                                        yield OpUGreaterThanEqual(tid, id, lid, rid)
+
+                                    | Float(_) | Vector(Float(_),_) -> 
+                                        yield OpFOrdGreaterThanEqual(tid, id, lid, rid)
+
+                                    | _ -> failwith "comparison for %A not supported" l.Type
+                            else
+                                failwithf "cannot compare %A to %A" l.Type r.Type
+                            
+                        | Equal ->
+                            if l.Type = r.Type then
+                                match l.Type with
+                                    | Int(_,_) | Vector(Int(_, _),_) -> 
+                                        yield OpIEqual(tid, id, lid, rid)
+
+                                    | Float(_) | Vector(Float(_),_) -> 
+                                        yield OpFOrdEqual(tid, id, lid, rid)
+
+                                    | Bool | Vector(Bool, _) ->
+                                        yield OpLogicalEqual(tid, id, lid, rid)
+
+                                    | _ -> failwith "equality for %A not supported" l.Type
+                            else
+                                failwithf "cannot equal %A to %A" l.Type r.Type
+
+                        | NotEqual ->
+                            if l.Type = r.Type then
+                                match l.Type with
+                                    | Int(_,_) | Vector(Int(_, _),_) -> 
+                                        yield OpINotEqual(tid, id, lid, rid)
+
+                                    | Float(_) | Vector(Float(_),_) -> 
+                                        yield OpFOrdNotEqual(tid, id, lid, rid)
+
+                                    | Bool | Vector(Bool, _) ->
+                                        yield OpLogicalNotEqual(tid, id, lid, rid)
+
+                                    | _ -> failwith "equality for %A not supported" l.Type
+                            else
+                                failwithf "cannot equal %A to %A" l.Type r.Type
+
+ 
+
+                        | And ->
+                            if l.Type = r.Type then
+                                match l.Type with
+                                    | Bool -> yield OpLogicalAnd(tid, id, lid, rid)
+                                    | Vector(Bool,_) -> yield OpLogicalAnd(tid, id, lid, rid)
+                                    | _ -> failwith "logics for %A not supported" l.Type
+                            else
+                                failwithf "cannot and %A and %A" l.Type r.Type
+
+                        | Or ->
+                            if l.Type = r.Type then
+                                match l.Type with
+                                    | Bool -> yield OpLogicalOr(tid, id, lid, rid)
+                                    | Vector(Bool,_) -> yield OpLogicalOr(tid, id, lid, rid)
+                                    | _ -> failwith "logics for %A not supported" l.Type
+                            else
+                                failwithf "cannot and %A and %A" l.Type r.Type
+
+
+                        | BitAnd ->
+                            yield OpBitwiseAnd(tid, id, lid, rid)
+
+                        | BitOr ->
+                            yield OpBitwiseOr(tid, id, lid, rid)
+
+                        | BitXor ->
+                            yield OpBitwiseXor(tid, id, lid, rid)
+
+                        | LeftShift ->
+                            yield OpShiftLeftLogical(tid, id, lid, rid)
+
+                        | RightShiftArithmetic ->
+                            yield OpShiftRightArithmetic(tid, id, lid, rid)
+
+                        | RightShiftLogic ->
+                            yield OpShiftRightLogical(tid, id, lid, rid)
+
+                    return id
+                | _ ->
+                    return failwith "non-value operation"
+        }
+
+
+    and compileExpr (self : Expr) : SpirV<Option<uint32>> =
+        spirv {
+            let! c = tryFindExprCache self
+            match c with
+                | Some v -> return Some v
+                | None -> 
+                    match self with
+                        | Return(UnitVal) -> 
                             yield OpReturn
                             return None
 
-                | Binary(op, l, r) ->
-                    let! tid = getTypeId self.Type
-                    let! lid = compile l
-                    let! rid = compile r
-                    let! id = newId
+                        | Return e ->
+                            let! e = compileExpr e
+                            match e with
+                                | Some e ->
+                                    yield OpReturnValue(e)
+                                    return Some e
+                                | None ->
+                                    yield OpReturn
+                                    return None
 
-                    match lid, rid with
-                        | Some lid, Some rid ->
-                            match l.Type with
-                                | Type.Integral ->
-                                    match op with
-                                        | Add -> yield OpIAdd(tid, id, lid, rid)
-                                        | Sub -> yield OpISub(tid, id, lid, rid)
-                                        | Mul -> yield OpIMul(tid, id, lid, rid)
-                                        | Div -> 
-                                            match self.Type with
-                                                | Type.Signed -> yield OpSDiv(tid, id, lid, rid)
-                                                | _ -> yield OpUDiv(tid, id, lid, rid)
-                                        | Mod ->
-                                            match self.Type with
-                                                | Type.Signed -> yield OpSMod(tid, id, lid, rid)
-                                                | _ -> yield OpUMod(tid, id, lid, rid)
-
-                                        | Greater ->
-                                            match self.Type with
-                                                | Type.Signed -> yield OpSGreaterThan(tid, id, lid, rid)
-                                                | _ -> yield OpUGreaterThan(tid, id, lid, rid)
-
-                                        | GreaterOrEqual ->
-                                            match self.Type with
-                                                | Type.Signed -> yield OpSGreaterThanEqual(tid, id, lid, rid)
-                                                | _ -> yield OpUGreaterThanEqual(tid, id, lid, rid)
-
-                                        | Smaller ->
-                                            match self.Type with
-                                                | Type.Signed -> yield OpSLessThan(tid, id, lid, rid)
-                                                | _ -> yield OpULessThan(tid, id, lid, rid)
-
-                                        | SmallerOrEqual ->
-                                            match self.Type with
-                                                | Type.Signed -> yield OpSLessThanEqual(tid, id, lid, rid)
-                                                | _ -> yield OpULessThanEqual(tid, id, lid, rid)
-                                        | Equal ->
-                                            yield OpIEqual(tid, id, lid, rid)
-
-                                        | NotEqual ->
-                                            yield OpINotEqual(tid, id, lid, rid)
-                                        
-                                | Type.Fractional ->
-                                    match op with
-                                        | Add -> yield OpFAdd(tid, id, lid, rid)
-                                        | Sub -> yield OpFSub(tid, id, lid, rid)
-                                        | Mul -> yield OpFMul(tid, id, lid, rid)
-                                        | Div -> yield OpFDiv(tid, id, lid, rid)
-                                        | Mod -> yield OpFMod(tid, id, lid, rid)
-
-                                        | Greater -> yield OpFOrdGreaterThan(tid, id, lid, rid)
-                                        | GreaterOrEqual -> yield OpFOrdGreaterThanEqual(tid, id, lid, rid)
-                                        | Smaller -> yield OpFOrdLessThan(tid, id, lid, rid)
-                                        | SmallerOrEqual -> yield OpFOrdLessThanEqual(tid, id, lid, rid)
-                                        | Equal -> yield OpFOrdEqual(tid, id, lid, rid)
-                                        | NotEqual -> yield OpFOrdNotEqual(tid, id, lid, rid)
-
-                                | _ ->
-                                    failwithf "cannot add type: %A" self.Type
-
+                        | Binary(op, l, r) ->
+                            let! id = compileBinaryOperator self.Type op l r
+                            do! setExprValue self id
                             return Some id
-                        | _ ->
-                            return failwithf "cannot add non-value expressions: %A %A" l r
 
-                | Unary(op, e) ->
-                    let! e = compile e
+                        | Unary(op, e) ->
+                            let! e = compileExpr e
 
-                    match e with
-                        | Some e ->
-                            let! id = newId
-                            let! tid = getTypeId self.Type
-                            match self.Type with
-                                | Type.Signed -> yield OpSNegate(tid, id, e)
-                                | _ -> yield OpFNegate(tid, id, e)
+                            match e with
+                                | Some e ->
+                                    let! id = newId
+                                    let! tid = getTypeId self.Type
+                                    match op with
+                                        | Negate ->
+                                            match self.Type with
+                                                | Type.Signed -> yield OpSNegate(tid, id, e)
+                                                | _ -> yield OpFNegate(tid, id, e)
 
-                            return Some id
-                        | None ->
-                            return failwithf "non-value expression found %A" e
+                                        | All -> yield OpAll(tid, id, e)
+                                        | Any -> yield OpAny(tid, id, e)
 
-                | Block(statements) ->
-                    for s in statements do
-                        let! r = compile s
-                        match r with
-                            | None -> ()
-                            | Some v -> Log.warn "unused value: %A" v
+                                    do! setExprValue self id
+                                    return Some id
+                                | None ->
+                                    return failwithf "non-value expression found %A" e
 
-                    return None
+                        | Block(statements) ->
+                            let mutable lastId = -1
 
-                | NewObject(t, values) ->
+                            let arr = List.toArray statements
+
+                            for i in 0..arr.Length-2 do
+                                let! r = compileExpr arr.[i]
+                                match r with
+                                    | None -> ()
+                                    | Some v -> Log.warn "unused value: %A" v
+
+                            let! r = compileExpr arr.[arr.Length-1]
+                            return r
+
+                        | NewObject(t, values) ->
                     
-                    let! values = values |> List.mapSpv compile
+                            let! values = values |> List.mapSpv compileExpr
 
-                    let values =
-                        if values |> List.forall Option.isSome then
-                            values |> List.map (fun v -> v.Value) |> List.toArray
-                        else
-                            failwith "cannot create composite type from non-value expressions"
+                            let values =
+                                if values |> List.forall Option.isSome then
+                                    values |> List.map (fun v -> v.Value) |> List.toArray
+                                else
+                                    failwith "cannot create composite type from non-value expressions"
 
-                    let! id = newId
-                    let! tid = getTypeId t
-                    yield OpCompositeConstruct(tid, id, values)
+                            let! id = newId
+                            let! tid = getTypeId t
+                            yield OpCompositeConstruct(tid, id, values)
 
-                    return Some id
+                            do! setExprValue self id
+                            return Some id
 
-                | Var(v) ->
-                    let! id = getVarId v
-                    return Some id
+                        | Var(v) ->
+                            let! id = getVarId v
 
-                | Value(t, v) ->
-                    let! t = getTypeId t
-                    let! id = newId
+                            do! setExprValue self id
+                            return Some id
 
-                    let bytes =
-                        match v with
-                            | :? int32 as v -> System.BitConverter.GetBytes(v)
-                            | :? uint32 as v -> System.BitConverter.GetBytes(v)
-                            | :? int64 as v -> System.BitConverter.GetBytes(v)
-                            | :? uint64 as v -> System.BitConverter.GetBytes(v)
-                            | :? float32 as v -> System.BitConverter.GetBytes(v)
-                            | :? float as v -> System.BitConverter.GetBytes(v)
-                            | _ -> failwithf "unsupported constant-value: %A" v
 
-                    let words =
-                        Array.init ((bytes.Length + 3 &&& ~~~3) / 4) (fun i ->
-                            System.BitConverter.ToUInt32(bytes, 4 * i)
-                        )
+                        | Value(t, v) ->
+                            let byteArray = byteArray v
+                            let! (id, size) = compileConstant t byteArray
+                            assert(size = byteArray.Length)
 
-                    yield OpConstant(t, id, words)
-                    return Some id
+                            do! setExprValue self id
+                            return Some id
 
-                | Label(l) ->
-                    let! id = getLabelId l
-                    yield OpLabel(id)
-                    return None
-
-                | Let(v,e,b) ->
-                    let! e = compile e
-                    match e with
-                        | Some e ->
-                            let! tid = getTypeId v.Type
-                            let! vid = getVarId v
-                            
-                            yield OpVariable(tid, vid, StorageClass.Private, Some e)
-                            yield OpName(vid, v.Name)
-
-                            let! b = compile b
-                            return b
-
-                        | None ->
-                            return failwith "cannot let non-value expression"
-
-                | IfThenElse(c,i,e) ->
-                    let! c = compile c
-
-                    match c with
-                        | Some c ->
-                            
-                            let! trueLabel = getLabelId <| Label()
-                            let! falseLabel = getLabelId <| Label()
-                            let! endLabel = getLabelId <| Label()
-
-                            yield OpBranchConditional(c, trueLabel, falseLabel, [||])
-
-                            yield OpLabel(trueLabel)
-                            let! _ = compile i
-                            yield OpBranch(endLabel)
-
-                            yield OpLabel(falseLabel)
-                            let! _ = compile e
-                            yield OpLabel(endLabel)
-
+                        | Label(l) ->
+                            let! id = getLabelId l
+                            yield OpLabel(id)
                             return None
-                        | None ->
-                            return failwith "non-value condition in ifthenelse"
+
+                        | Let(v,e,b) ->
+                            let! e = compileExpr e
+                            match e with
+                                | Some e ->
+                                    let! tid = getTypeId v.Type
+                                    let! vid = getVarId v
+                            
+                                    yield OpVariable(tid, vid, StorageClass.Private, Some e)
+                                    yield OpName(vid, v.Name)
+
+                                    let! b = compileExpr b
+                                    return b
+
+                                | None ->
+                                    return failwith "cannot let non-value expression"
 
 
-                | _ ->  
-                    return None
+                        | IfThenElse(c, UnitVal, UnitVal) ->
+                            return None
+
+                        | IfThenElse(c, Var(i), e) when self.Type <> Type.Unit ->
+                            let! c = compileExpr c
+
+                            match c with
+                                | Some c ->
+                                    let! iv = getVarId i
+                                    let! declId = getVarLabelId i
+
+                                    let! falseLabel = getLabelId <| Label()
+                                    let! endLabel = getLabelId <| Label()
+
+                                    yield OpBranchConditional(c, endLabel, falseLabel, [||])
+                                    yield OpLabel(falseLabel)
+                                    let! ev = compileExpr e
+                                    yield OpLabel(endLabel)
+
+                                    match ev with
+                                        | Some ev ->
+                                            let! resType = getTypeId self.Type
+                                            let! id = newId
+                                            
+                                            yield OpPhi(resType, id, [|iv; declId; ev; falseLabel|])
+                                            return Some id
+                                        | _ ->
+                                            return failwith "inconsistent types in if/else"
+                                | None ->
+                                    return failwith "non-value condition in ifthenelse"
+
+                        | IfThenElse(c, i, Var(e)) when self.Type <> Type.Unit ->
+                            let! c = compileExpr c
+
+                            match c with
+                                | Some c ->
+                                    let! ev = getVarId e
+                                    let! declId = getVarLabelId e
+
+                                    let! trueLabel = getLabelId <| Label()
+                                    let! endLabel = getLabelId <| Label()
+
+                                    yield OpBranchConditional(c, trueLabel, endLabel, [||])
+                                    yield OpLabel(trueLabel)
+                                    let! iv = compileExpr i
+                                    yield OpLabel(endLabel)
+
+
+                                    match iv with
+                                        | Some iv ->
+                                            let! resType = getTypeId self.Type
+                                            let! id = newId
+                                            
+                                            yield OpPhi(resType, id, [|iv; trueLabel; ev; declId|])
+                                            return Some id
+                                        | _ ->
+                                            return failwith "inconsistent types in if/else"
+                                | None ->
+                                    return failwith "non-value condition in ifthenelse"
+
+                        | IfThenElse(c, i, UnitVal) ->
+                            let! c = compileExpr c
+
+                            match c with
+                                | Some c ->
+                                    let! trueLabel = getLabelId <| Label()
+                                    let! falseLabel = getLabelId <| Label()
+                            
+                                    yield OpBranchConditional(c, trueLabel, falseLabel, [||])
+
+                                    yield OpLabel(trueLabel)
+                                    let! _ = compileExpr i
+                                    yield OpLabel(falseLabel)
+
+
+                                    return None
+
+                                | None ->
+                                    return failwith "non-value condition in ifthenelse"
+
+
+                        | IfThenElse(c, UnitVal, e) ->
+                            let! c = compileExpr c
+
+                            match c with
+                                | Some c ->
+                                    let! trueLabel = getLabelId <| Label()
+                                    let! falseLabel = getLabelId <| Label()
+                            
+                                    yield OpBranchConditional(c, trueLabel, falseLabel, [||])
+
+                                    yield OpLabel(falseLabel)
+                                    let! _ = compileExpr e
+                                    yield OpLabel(trueLabel)
+
+
+                                    return None
+
+                                | None ->
+                                    return failwith "non-value condition in ifthenelse"
+
+
+
+                        | IfThenElse(c,i,e) ->
+                            let! c = compileExpr c
+
+                            match c with
+                                | Some c ->
+                            
+                                    let! trueLabel = getLabelId <| Label()
+                                    let! falseLabel = getLabelId <| Label()
+                                    let endLabel = Label()
+
+                                    yield OpBranchConditional(c, trueLabel, falseLabel, [||])
+
+                                    yield OpLabel(trueLabel)
+                                    let! iv = compileExpr i
+
+                                    let mutable needsEndLabel = false
+                                    let! last = lastInstruction
+                                    match last with
+                                        | Some ExitInstruction -> 
+                                            ()
+                                        | _ -> 
+                                            needsEndLabel <- true
+                                            let! endLabel = getLabelId endLabel
+                                            yield OpBranch(endLabel)
+
+                                    yield OpLabel(falseLabel)
+                                    let! ev = compileExpr e
+
+                                    let! last = lastInstruction
+                                    match last with
+                                        | Some ExitInstruction when not needsEndLabel -> ()
+                                        | _ -> 
+                                            let! endLabel = getLabelId endLabel
+                                            yield OpLabel(endLabel)
+
+                                    match iv, ev with
+                                        | Some iv, Some ev when self.Type <> Type.Unit ->
+                                            let! resType = getTypeId self.Type
+                                            let! id = newId
+                                            yield OpPhi(resType, id, [|iv; trueLabel; ev; falseLabel|])
+                                            return Some id
+                                        | _ ->
+                                            return None
+                                | None ->
+                                    return failwith "non-value condition in ifthenelse"
+
+
+                        | _ ->  
+                            return None
         }
 
 
@@ -1034,33 +1660,30 @@ module SpirV =
     let test() =
         test2()
 
-        let l = new Label()
-        let l1 = new Label()
-        let l2 = new Label()
-        let v = new Var("a", Type.Float64)
-        let v2 = new Var("b", Type.Float64)
+        let v = new Var("a", Type.UInt8)
+        let v2 = new Var("b", Type.UInt8)
+
+        let zeroVec = Expr.Value(Type.V2d, V2d.II)
+
         let ex = 
-            Expr.Block [
-                Expr.Label l
-                Expr.Let(v, Expr.Value(Type.Float64, 1.0), 
-                    Expr.IfThenElse(
-                        Expr.Smaller(Expr.Var v, Expr.Value(Type.Float64, 2.0)),
-                        Expr.Block [
-                            Expr.Label l2
-                            Expr.Let(v2, Expr.Div(Expr.NewObject(Type.V2d, [Expr.Var v; Expr.Var v]), Expr.Var v), 
-                                Expr.Return (Expr.Var v2)
-                            )
-                        ],
-                        Expr.Return(Expr.NewObject(Type.V2d, [Expr.Value(Type.Float64, 0.0); Expr.Value(Type.Float64, 0.0)]))
-                    )
+            Expr.Let(v, Expr.Value(Type.UInt8, 1uy), 
+                Expr.IfThenElse(
+                    Expr.Smaller(Expr.Var v, Expr.Value(Type.UInt8, 2uy)),
+                    Expr.Var v,
+                    Expr.Value(Type.UInt8, 0uy)
                 )
-            ]
+            )
 
-        let s = compile ex
-        let (s, e) = s.build SpirVState.Empty
+        let s = compileExpr ex
+        let (s, _) = s.build SpirVState.Empty
 
+        let typeInstructions = s.typeInstructions |> RevList.toList
         let instructions = s.instructions |> RevList.toList
 
         printfn "bound: %A" s.currentId
+
+        for i in typeInstructions do
+            printfn "%A" i
+
         for i in instructions do
             printfn "%A" i
