@@ -194,6 +194,11 @@ module Dead =
 [<EntryPoint>]
 let main argv = 
 
+    FShade.SpirV.SpirV.test()
+
+    Environment.Exit 0
+
+
     let effect = [Shaders.simpleTrafoShader |> toEffect
                   Shaders.textureShader |> toEffect] |> compose
 
