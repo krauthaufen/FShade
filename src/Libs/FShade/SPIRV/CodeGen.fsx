@@ -744,6 +744,86 @@ module Writer =
 
             ()
 
+        printfn "[<AutoOpen>]"
+        printfn "module InstructionExtensions ="
+        printfn "    type Instruction with"
+        printfn "        member x.ResultType ="
+        printfn "            match x with"
+
+        for o in spec.OpCodes do
+            if o.Name <> "Bad" then
+                let argCount = o.Operands |> List.length
+                if o.HasResultType then
+                    let args = "tid," + (List.init (argCount-1) (fun _ -> "_") |> String.concat ",")
+                    printfn "                | %s(%s) -> Some tid" o.Name args
+
+        printfn "                | _ -> None"
+        printfn ""
+        printfn ""
+
+
+
+        printfn "        member x.ResultId ="
+        printfn "            match x with"
+
+        for o in spec.OpCodes do
+            if o.Name <> "Bad" then
+                let argCount = o.Operands |> List.length
+                if o.HasResult then
+                    let prefix,skip = 
+                        if o.HasResultType then "_,id",2
+                        else "id",1
+
+                    let args = prefix :: List.init (argCount-skip) (fun _ -> "_") |> String.concat ","
+                    printfn "                | %s(%s) -> Some id" o.Name args
+
+        printfn "                | _ -> None"
+        printfn ""
+        printfn ""
+
+
+        printfn "        member x.Operands ="
+        printfn "            match x with"
+
+        for o in spec.OpCodes do
+            if o.Name <> "Bad" then
+                let argCount = o.Operands |> List.length
+                let skip = 
+                    if o.HasResultType && o.HasResult then 2
+                    elif o.HasResultType then 1
+                    elif o.HasResult then 1
+                    else 0
+
+                let opNames = o.Operands |> List.skip skip |> List.map (fun o -> fsharpName o.Name)
+                let args = (List.init skip (fun _ -> "_") @ opNames) |> String.concat ","
+                let listStr = opNames |> List.map (sprintf "%s :> obj") |> String.concat "; "
+
+                if argCount <> 0 then
+                    printfn "                | %s(%s) -> [%s]" o.Name args listStr
+
+        printfn "                | _ -> []"
+        printfn ""
+        printfn ""
+
+
+        printfn "        member x.Name ="
+        printfn "            match x with"
+
+        for o in spec.OpCodes do
+            if o.Name <> "Bad" then
+                if not (List.isEmpty o.Operands) then
+                    printfn "                | %s(_) -> \"%s\"" o.Name o.Name
+                else
+                    printfn "                | %s -> \"%s\"" o.Name o.Name
+                    
+
+        printfn ""
+        printfn ""
+
+
+
+
+
     let writeSerializer (spec : SpirVSpec) =
         let enumTypes = spec.Enums |> List.map (fun e -> e.Name) |> Set.ofList
 

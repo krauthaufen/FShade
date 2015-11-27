@@ -6,9 +6,11 @@ open SpirV
 #nowarn "9"
 #nowarn "51"
 
+[<StructuralComparison; StructuralEquality>]
 type Type =
     | Void
     | Bool
+    | Sampler
     | Function of args : list<Type> * retType : Type
     | Int of width : int * signed : bool
     | Float of width : int
@@ -18,6 +20,7 @@ type Type =
     | Struct of name : string * fields : list<Type * string>
     | Image of sampledType : Type * dim : Dim * depth : int * arrayed : bool * ms : int * sampled : bool * format : int
     | SampledImage of Type
+    | Ptr of StorageClass * Type
 
     //sampledType : uint32 * dim : Dim * depth : uint32 * arrayed : uint32 * ms : uint32 * sampled : uint32 * format : int * access : Option<AccessQualifier>
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -95,6 +98,193 @@ module Type =
         ]
 
 
+module InstructionPrinter =
+    
+
+    let rec private buildNameMaps (current : Map<uint32, string>) (currentMembers : Map<uint32 * uint32, string>) (s : list<Instruction>) =
+        match s with
+            | [] -> current, currentMembers
+            | OpName(id, name) :: rest -> buildNameMaps (Map.add id name current) currentMembers rest
+            | OpMemberName(id, idx, name) :: rest -> buildNameMaps current (Map.add (id,idx) name currentMembers) rest
+            | _ :: rest -> buildNameMaps current currentMembers rest
+
+    let rec private buildTypeMap (names : Map<uint32, string>) (memberNames : Map<uint32 * uint32, string>) (current : Map<uint32, Type>) (s : list<Instruction>) =
+        let buildTypeMap c s = buildTypeMap names memberNames c s
+
+        match s with
+            | [] -> current
+            | OpTypeVoid id :: s -> buildTypeMap (Map.add id Void current) s
+            | OpTypeBool id :: s -> buildTypeMap (Map.add id Bool current) s
+            | OpTypeInt(id,w,s) :: rest -> buildTypeMap (Map.add id (Int(int w, if s = 1u then true else false)) current) rest
+            | OpTypeFloat(id,w) :: rest -> buildTypeMap (Map.add id (Float(int w)) current) rest
+            | OpTypeVector(id,inner, dim) :: rest -> 
+                let inner = current.[inner]
+                buildTypeMap (Map.add id (Vector(inner, int dim)) current) rest
+            | OpTypeMatrix(id,inner, dim) :: rest -> 
+                let inner = current.[inner]
+                buildTypeMap (Map.add id (Matrix(inner, int dim)) current) rest
+
+            | OpTypeArray(id,inner, dim) :: rest -> 
+                let inner = current.[inner]
+                buildTypeMap (Map.add id (Array(inner, int dim)) current) rest
+
+            | OpTypePointer(id,c, inner) :: rest -> 
+                let inner = current.[inner]
+                buildTypeMap (Map.add id (Ptr(c, inner)) current) rest
+
+            | OpTypeStruct(id, fields) :: rest ->
+                let getMemberName (i : int) =
+                    match Map.tryFind (id, uint32 i) memberNames with
+                        | Some n -> n
+                        | None -> sprintf "f%d" i
+
+                let name =
+                    match Map.tryFind id names with
+                        | Some n -> n
+                        | _ -> sprintf "struct%d" (int id)
+
+                let fieldTypes = fields |> Array.mapi (fun i id -> current.[id], getMemberName i) |> Array.toList
+                let t = Struct(name, fieldTypes)
+                buildTypeMap (Map.add id t current) rest
+
+            | OpTypeFunction(id, ret, args) :: rest ->
+                let args = args |> Array.map (fun a -> current.[a]) |> Array.toList
+                let ret = current.[ret]
+
+                buildTypeMap (Map.add id (Function(args, ret)) current) rest
+
+            | OpTypeSampler(id) :: rest ->
+                buildTypeMap (Map.add id Sampler current) rest
+                
+
+            | OpTypeImage(id,a,b,c,d,e,f,g,h) :: rest ->
+                let t = Image(current.[a], b, int c, (if d = 1u then true else false), int e, (if f = 1u then true else false), int g)
+                buildTypeMap (Map.add id t current) rest
+                
+            | OpTypeSampledImage(id, t) :: rest ->
+                buildTypeMap (Map.add id (SampledImage(current.[t])) current) rest
+
+            | i::rest -> buildTypeMap current rest
+
+
+    let rec private shortTypeName (t : Type) =
+        match t with
+            
+            | Bool -> "bool"
+            | Void -> "void"
+            | Sampler -> "sam"
+            | Image(_) -> "img"
+
+            | Int(8, false) -> "byte"
+            | Int(8, true) -> "sbyte"
+            | Int(32, true) -> "int"
+            | Float(16) -> "half"
+            | Float(32) -> "float"
+            | Float(64) -> "double"
+
+            | Int(w,true) -> sprintf "int%d" w
+            | Int(w,false) -> sprintf "uint%d" w
+
+
+            | Vector(Float(32), d) -> sprintf "fvec%d" d
+            | Vector(Float(64), d) -> sprintf "dvec%d" d
+            | Vector(Int(32,true), d) -> sprintf "ivec%d" d
+            | Vector(Int(32,false), d) -> sprintf "uvec%d" d
+            | Vector(Bool, d) -> sprintf "bvec%d" d
+
+            | Struct(name,_) -> sprintf "str %s" name
+
+
+            | Matrix(Vector(Float(32), r), c) -> 
+                if r = c then sprintf "fmat%d" r
+                else sprintf "fmat%d%d" r c
+
+            | Matrix(Vector(Float(64), r), c) -> 
+                if r = c then sprintf "dmat%d" r
+                else sprintf "dmat%d%d" r c
+
+            | Array(t, l) ->
+                sprintf "%s[%d]" (shortTypeName t) l
+
+            | Ptr(_,t) -> sprintf "%s*" (shortTypeName t)
+            | _ -> sprintf "%A" t
+
+
+    let toString (s : seq<Instruction>) =
+        let s = Seq.toList s
+
+
+        let names, memberNames = buildNameMaps Map.empty Map.empty s
+
+        let typeMap = buildTypeMap names memberNames Map.empty s
+
+        let mutable names = names
+        for (id,t) in Map.toList typeMap do
+            names <- Map.remove id names
+
+
+
+        let printOperand (o : obj) =
+            match o with
+                | null -> "None"
+                | :? uint32 as o ->
+                    match Map.tryFind o names with
+                        | Some n -> sprintf "%s(%s)" (string o) n
+                        | None -> string o
+
+                | _ ->
+                    sprintf "%A" o
+
+        let data = 
+            s |> List.map (fun i ->
+                let id = i.ResultId |> Option.map string
+                let tid = i.ResultType |> Option.map (fun i -> sprintf "%d(%s)" i (shortTypeName typeMap.[i]))
+                let name = i.Name
+                let args = i.Operands |> List.map printOperand |> String.concat " "
+
+                (i, id,tid,name,args)
+            )
+
+        let longestId = data |> List.choose (fun (_,i,_,_,_) -> i) |> List.map String.length |> List.max
+        let longestType = data |> List.choose (fun (_,_,i,_,_) -> i) |> List.map String.length |> List.max
+
+
+        let padLeft (l : int) (s : string) =
+            if s.Length < l then System.String(' ', l - s.Length) + s
+            else s
+
+        let padRight (l : int) (s : string) =
+            if s.Length < l then s + System.String(' ', l - s.Length)
+            else s
+
+        let mutable indent = ""
+
+        let lines =
+            data |> List.map (fun (o,i,t,n,a) ->
+                let i = padLeft (longestId + 1) (match i with | Some i -> i + ":" | None -> " ")
+                let t = padLeft longestType (match t with | Some i -> i | None -> "")
+
+                match o with
+                    | OpFunctionEnd -> indent <- indent.Substring(2)
+                    | _ -> ()
+
+                let res = sprintf "%s   %s %s%s %s" i t indent n a
+
+                match o with
+                    | OpFunction(_) -> indent <- indent + "  "
+                    | _ -> ()
+
+                res
+            )
+
+        String.concat "\r\n" lines
+
+
+
+
+
+
+
 type Label(name : string) =
     let id = System.Guid.NewGuid()
     let name = if System.String.IsNullOrEmpty name then id.ToString() else name
@@ -119,6 +309,7 @@ type Label(name : string) =
 
 type Var(name : string, t : Type, isMutable : bool) =
     let id = System.Guid.NewGuid()
+    //let t = Ptr(StorageClass.Function, t)
 
     member x.Id = id
     member x.Name = name
@@ -163,24 +354,10 @@ type UnaryOperation =
     | All
     | Any
 
-type ExpressionType =
-    | Custom = 0
-    | Binary = 1
-    | Unary = 2
-    | NewObject = 3
-    | Var = 4
-    | Value = 5
-    | Return = 6
-    | Unit = 7
-    | Block = 8
-    | Label = 9
-    | VectorSwizzle = 10
-    | Let = 11
-    | IfThenElse = 12
+
 
 type Expr =
     abstract member Type : Type
-    abstract member Kind : ExpressionType
     abstract member Substitute : (Var -> Option<Var>) -> Expr
 
 
@@ -371,20 +548,17 @@ module Expr =
                 | Any -> Bool
 
         [<AbstractClass>]
-        type AbstractExpression(kind : ExpressionType, t : Type) =
+        type AbstractExpression(t : Type) =
             member x.Type = t
-            member x.Kind = kind
-
             abstract member Substitute : (Var -> Option<Var>) -> Expr
 
             interface Expr with
                 member x.Type = t
-                member x.Kind = kind
                 member x.Substitute f = x.Substitute f
        
         [<AbstractClass>] 
-        type DerivedExpression(kind : ExpressionType, t : Type, args : list<Expr>) =
-            inherit AbstractExpression(kind, t)
+        type DerivedExpression(t : Type, args : list<Expr>) =
+            inherit AbstractExpression(t)
 
             abstract member Rebuild : list<Expr> -> Expr
 
@@ -397,13 +571,13 @@ module Expr =
 
 
         type ValueExpression (t : Type, v : obj) =
-            inherit AbstractExpression(ExpressionType.Value, t)
+            inherit AbstractExpression(t)
             override x.Substitute f = x :> Expr
 
             member x.Value = v
 
         type VariableExpression (v : Var) =
-            inherit AbstractExpression(ExpressionType.Var, v.Type)
+            inherit AbstractExpression(v.Type)
 
             override x.Substitute f =
                 match f v with
@@ -412,8 +586,22 @@ module Expr =
 
             member x.Var = v
 
+        type VarSetExpression(v : Var, e : Expr) =
+            inherit AbstractExpression(Type.Unit)
+
+            member x.Var = v
+            member x.Value = e
+
+            override x.Substitute f =
+                let v =
+                    match f v with
+                        | Some v -> v
+                        | None -> v
+
+                VarSetExpression(v, e.Substitute f) :> Expr
+
         type UnaryExpression(op : UnaryOperation, e : Expr) =
-            inherit DerivedExpression(ExpressionType.Unary, unaryOpResultType op e.Type, [e])
+            inherit DerivedExpression(unaryOpResultType op e.Type, [e])
             member x.Operation = op
             member x.Operand = e
         
@@ -421,7 +609,7 @@ module Expr =
                 UnaryExpression(op, List.head args) :> Expr
 
         type BinaryExpression(op : BinaryOperation, l : Expr, r : Expr) =
-            inherit DerivedExpression(ExpressionType.Binary, binaryOpResultType op l.Type r.Type, [l;r])
+            inherit DerivedExpression(binaryOpResultType op l.Type r.Type, [l;r])
 
             member x.Operation = op
             member x.Left = l
@@ -433,7 +621,7 @@ module Expr =
                     | _ -> failwith "impossible"
 
         type NewObjectExpression(t : Type, args : list<Expr>) =
-            inherit DerivedExpression(ExpressionType.NewObject, t, args)
+            inherit DerivedExpression(t, args)
 
             member x.Args = args
 
@@ -441,7 +629,7 @@ module Expr =
                 NewObjectExpression(t, args) :> Expr
 
         type ReturnExpression(e : Expr) =
-            inherit DerivedExpression(ExpressionType.Return, Type.Unit, [e])
+            inherit DerivedExpression(Type.Unit, [e])
 
             member x.Value = e
 
@@ -449,7 +637,7 @@ module Expr =
                 ReturnExpression(List.head args) :> Expr
 
         type UnitExpression private () =
-            inherit AbstractExpression(ExpressionType.Unit, Type.Unit)
+            inherit AbstractExpression(Type.Unit)
             static let single = UnitExpression()
 
             static member Instance = single
@@ -463,14 +651,14 @@ module Expr =
                     | _ -> false
 
         type LabelExpression(l : Label) =
-            inherit AbstractExpression(ExpressionType.Label, Type.Unit)
+            inherit AbstractExpression(Type.Unit)
 
             member x.Label = l
 
             override x.Substitute _ = x :> Expr
 
         type BlockExpression(statements : list<Expr>) =
-            inherit DerivedExpression(ExpressionType.Block, statements |> Seq.last |> (fun e -> e.Type), statements)
+            inherit DerivedExpression(statements |> Seq.last |> (fun e -> e.Type), statements)
 
             member x.Statements = statements
 
@@ -478,7 +666,7 @@ module Expr =
                 BlockExpression(args) :> Expr
 
         type VectorComponentExpression(comp : int, v : Expr) =
-            inherit DerivedExpression(ExpressionType.VectorSwizzle, (match v.Type with | Vector(bt,dim) -> (if comp < dim then bt else failwith "vector-component out of bounds") | _ -> failwith "not a vector type"), [v])
+            inherit DerivedExpression((match v.Type with | Vector(bt,dim) -> (if comp < dim then bt else failwith "vector-component out of bounds") | _ -> failwith "not a vector type"), [v])
 
             member x.Component = comp
             member x.Vector = v
@@ -488,7 +676,6 @@ module Expr =
 
         type MatrixElementExpression(row : int, col : int, m : Expr) =
             inherit DerivedExpression(
-                ExpressionType.VectorSwizzle, 
                 (match m.Type with | Matrix(Vector(bt,rows), cols) -> (if row < rows && col < cols then bt else failwith "matrix-component out of bounds") | _ -> failwith "not a matrix type"), 
                 [m]
             )
@@ -501,7 +688,7 @@ module Expr =
                 MatrixElementExpression(row, col, List.head args) :> Expr
 
         type LetExpression(v : Var, e : Expr, body : Expr) =
-            inherit AbstractExpression(ExpressionType.Let, body.Type)
+            inherit AbstractExpression(body.Type)
 
             override x.Substitute f =
                 let b = body.Substitute f
@@ -516,7 +703,7 @@ module Expr =
             member x.Body = body
 
         type IfThenElseExpression(cond : Expr, ifTrue : Expr, ifFalse : Expr) =
-            inherit DerivedExpression(ExpressionType.IfThenElse, ifTrue.Type, [cond; ifTrue; ifFalse])
+            inherit DerivedExpression(ifTrue.Type, [cond; ifTrue; ifFalse])
             do assert(cond.Type = Bool)
                assert(ifTrue.Type = ifFalse.Type)
 
@@ -529,10 +716,57 @@ module Expr =
                     | [cond; i; e] -> IfThenElseExpression(cond, i, e) :> Expr
                     | _ -> failwith "impossible"
 
+        type ForIntergerRangeLoopExpression(v : Var, lower : Expr, upper : Expr, body : Expr) =
+            inherit AbstractExpression(Type.Unit)
+
+            member x.Var = v
+            member x.Lower = lower
+            member x.Upper = upper
+            member x.Body = body
+
+            override x.Substitute f =
+                let v = match f v with | Some v -> v | None -> v
+                ForIntergerRangeLoopExpression(v, lower.Substitute f, upper.Substitute f, body.Substitute f) :> Expr
+
+        type WhileExpression(guard : Expr, body : Expr) =
+            inherit DerivedExpression(Type.Unit, [guard; body])
+
+
+            member x.Guard = guard
+            member x.Body = body
+
+            override x.Rebuild(args) =
+                match args with
+                    | [guard; body] -> WhileExpression(guard, body) :> Expr
+                    | _ -> failwith "impossible"
+
+        type KillExpression private() =
+            inherit AbstractExpression(Type.Unit)
+
+            static let instance = KillExpression()
+            static member Instance = instance
+            override x.Substitute _ = x :> Expr
+
+        type BreakExpression private() =
+            inherit AbstractExpression(Type.Unit)
+
+            static let instance = BreakExpression()
+            static member Instance = instance
+            override x.Substitute _ = x :> Expr
+
+        type ContinueExpression private() =
+            inherit AbstractExpression(Type.Unit)
+
+            static let instance = ContinueExpression()
+            static member Instance = instance
+            override x.Substitute _ = x :> Expr
+ 
+
 
     let Value(t : Type, v : obj) = ValueExpression(t, v) :> Expr
     let Var(v : Var) = VariableExpression(v) :> Expr
-    
+    let VarSet(v : Var, e : Expr) = VarSetExpression(v,e) :> Expr
+
     let Unary(op : UnaryOperation, e : Expr) = UnaryExpression(op, e) :> Expr
     let Negate(e : Expr) = UnaryExpression(Negate, e) :> Expr
 
@@ -574,7 +808,11 @@ module Expr =
     let MatrixElement(mat : Expr, row : int, col : int) = MatrixElementExpression(row, col, mat) :> Expr
     let Let(v : Var, e : Expr, body : Expr) = LetExpression(v, e, body) :> Expr
     let IfThenElse(c : Expr, ifTrue : Expr, ifFalse : Expr) = IfThenElseExpression(c, ifTrue, ifFalse) :> Expr
-
+    let ForIntegerRangeLoop(v : Var, lower : Expr, upper : Expr, body : Expr) = ForIntergerRangeLoopExpression(v, lower, upper, body) :> Expr
+    let While(guard : Expr, body : Expr) = WhileExpression(guard, body) :> Expr
+    let Kill = KillExpression.Instance :> Expr
+    let Break = BreakExpression.Instance :> Expr
+    let Continue = ContinueExpression.Instance :> Expr
 
     module Patterns =
         let (|Value|_|) (e : Expr) =
@@ -585,6 +823,11 @@ module Expr =
         let (|Var|_|) (e : Expr) =
             match e with
                 | :? VariableExpression as v -> Some v.Var
+                | _ -> None
+
+        let (|VarSet|_|) (e : Expr) =
+            match e with
+                | :? VarSetExpression as v -> Some (v.Var, v.Value)
                 | _ -> None
 
         let (|Unary|_|) (e : Expr) =
@@ -641,6 +884,31 @@ module Expr =
                 | :? IfThenElseExpression as e -> Some(e.Condition, e.IfTrue, e.IfFalse)
                 | _ -> None
 
+        let (|ForIntegerRangeLoop|_|) (e : Expr) =
+            match e with
+                | :? ForIntergerRangeLoopExpression as e -> Some(e.Var, e.Lower, e.Upper, e.Body)
+                | _ -> None
+
+        let (|While|_|) (e : Expr) =
+            match e with
+                | :? WhileExpression as e -> Some(e.Guard, e.Body)
+                | _ -> None
+
+        let (|Kill|_|) (e : Expr) =
+            match e with
+                | :? KillExpression -> Some()
+                | _ -> None
+
+        let (|Break|_|) (e : Expr) =
+            match e with
+                | :? BreakExpression -> Some()
+                | _ -> None
+
+        let (|Continue|_|) (e : Expr) =
+            match e with
+                | :? ContinueExpression -> Some()
+                | _ -> None
+
 [<AutoOpen>]
 module SpirVBuilders =
     
@@ -676,6 +944,8 @@ module SpirVBuilders =
             Snoc(l,v)
 
 
+    type Scope = { startLabel : uint32; endLabel : uint32 }
+
     type SpirVState = 
         {
             currentId : uint32
@@ -686,6 +956,7 @@ module SpirVBuilders =
             variableIds : Map<Var, uint32>
             variableDeclarationLabels : Map<Var, uint32>
             expressionValueCache : HashMap<Expr, uint32>
+            currentScope : list<Scope>
       
         } with
             
@@ -699,6 +970,7 @@ module SpirVBuilders =
                     variableIds = Map.empty
                     variableDeclarationLabels = Map.empty
                     expressionValueCache = HashMap.empty
+                    currentScope = []
                 }
 
 
@@ -714,12 +986,33 @@ module SpirVBuilders =
 
     let tryFindTypeId (t : Type) =
         { build = fun s ->
-            s, Map.tryFind t s.typeCache
+            match Map.tryFind t s.typeCache with
+                | Some id -> s, Some id
+                | _ -> s, None
         }
 
     let setTypeId (t : Type) (id : uint32) =
         { build = fun s ->
             { s with typeCache = Map.add t id s.typeCache }, ()
+        }
+
+    let pushScope newScope =
+        { build = fun s ->
+            { s with currentScope = newScope::s.currentScope }, ()
+        }
+
+    let popScope =
+        { build = fun s ->
+            match s.currentScope with
+                | _::scope -> { s with currentScope = scope }, ()
+                | _ -> s,()
+        }
+
+    let currentScope =
+        { build = fun s ->
+            match s.currentScope with
+                | scope::_ -> s, Some scope
+                | _ -> s, None
         }
 
     let tryFindExprCache (e : Expr) =
@@ -760,6 +1053,12 @@ module SpirVBuilders =
                         instructions = Snoc(s.instructions, OpLabel(lid)) 
                         variableDeclarationLabels = Map.add v lid s.variableDeclarationLabels
                     }, id
+        }
+
+    let freshVarId (v : Var) =
+        { build = fun s ->
+            let (s, id) = newId.build s
+            { s with  variableIds = Map.add v id s.variableIds}, id
         }
 
     let getVarLabelId (v : Var) =
@@ -895,29 +1194,38 @@ module SpirVBuilders =
     module List =
         let mapSpv (f : 'a -> SpirV<'b>) (l : list<'a>) =
             { build = fun s ->
-                l |> List.fold (fun (s,l) v -> 
-                    let (s,e) = (f v).build s
-                    (s, e::l)
-                ) (s, [])
+                let mutable c = s
+                let mutable res = Nil
+                for e in l do
+                    let (s,e) = (f e).build c
+                    c <- s
+                    res <- Snoc(res, e)
+                c, RevList.toList res
             }
 
         let mapSpvi (f : int -> 'a -> SpirV<'b>) (l : list<'a>) =
             { build = fun s ->
-                let (_,s,res) =
-                    l |> List.fold (fun (i, s,l) v -> 
-                        let (s,e) = (f i v).build s
-                        (i + 1, s, e::l)
-                    ) (0, s, [])
-                (s, res)
+                let mutable c = s
+                let mutable i = 0
+                let mutable res = Nil
+                for e in l do
+                    let (s,e) = (f i e).build c
+                    c <- s
+                    i <- i + 1
+                    res <- Snoc(res, e)
+                c, RevList.toList res
             }
 
     module Seq =
         let mapSpv (f : 'a -> SpirV<'b>) (l : seq<'a>) =
             { build = fun s ->
-                l |> Seq.fold (fun (s,l) v -> 
-                    let (s,e) = (f v).build s
-                    (s, e::l)
-                ) (s, [])
+                let mutable c = s
+                let mutable res = Nil
+                for e in l do
+                    let (s,e) = (f e).build c
+                    c <- s
+                    res <- Snoc(res, e)
+                c, RevList.toList res
             }
 
 
@@ -929,59 +1237,126 @@ module SpirV =
         spirvType {
             let! existing = tryFindTypeId t
             match existing with
-                | Some id -> return id
+                | Some id -> 
+                    return id
                 | None ->
-                    let! id = newId
+                    
                     match t with
+                        
                         | Bool ->
+                            let! id = newId
                             yield OpTypeBool id
 
+                            do! setTypeId t id
+                            return id
+
                         | Void -> 
+                            let! id = newId
                             yield OpTypeVoid id
+
+                            do! setTypeId t id
+                            return id
+
+                        | Sampler ->
+                            let! id = newId
+                            yield OpTypeSampler id
+
+                            do! setTypeId t id
+                            return id
+
                         | Int(w,s) ->
+                            let! id = newId
                             yield OpTypeInt(id, uint32 w, if s then 1u else 0u)
+
+                            do! setTypeId t id
+                            return id
+
                         | Float(w) ->
+                            let! id = newId
                             yield OpTypeFloat(id, uint32 w)
+
+                            do! setTypeId t id
+                            return id
 
                         | Function(args, ret) ->
                             let! args = List.mapSpv getTypeId args
                             let! ret = getTypeId ret
 
+                            let! id = newId
                             yield OpTypeFunction(id, ret, args |> List.map uint32 |> List.toArray)
+
+                            do! setTypeId t id
+                            return id
 
                         | Vector(bt, dim) ->
                             let! bt = getTypeId bt
+
+                            let! id = newId
                             yield OpTypeVector(id, bt, uint32 dim)
+
+                            do! setTypeId t id
+                            return id
 
                         | Matrix(bt, dim) ->
                             let! bt = getTypeId bt
+
+                            let! id = newId
                             yield OpTypeMatrix(id, bt, uint32 dim)
+
+                            do! setTypeId t id
+                            return id
 
                         | Array(et, len) ->
                             let! et = getTypeId et
+
+                            let! id = newId
                             yield OpTypeArray(id, et, uint32 len)
+
+                            do! setTypeId t id
+                            return id
 
                         | Struct(name, fields) ->
                             
                             let! fields = 
                                 fields |> List.mapSpvi (fun i (t,n) -> spirv { let! tid = getTypeId t in return (tid, i, n)})
 
+                            let! id = newId
+                            yield OpTypeStruct(id, fields |> List.map (fun (t,_,_) -> t) |> List.toArray)
+
                             for (_,i,n) in fields do
                                 yield OpMemberName(id, uint32 i, n)
 
                             yield OpName(id, name)
-                            yield OpTypeStruct(id, fields |> List.map (fun (t,_,_) -> t) |> List.toArray)
+
+                            do! setTypeId t id
+                            return id
 
                         | Image(sampledType, dim, depth, arrayed, ms, sampled, format) ->
                             let! sampledType = getTypeId sampledType
+
+                            let! id = newId
                             yield OpTypeImage(id, sampledType, dim, uint32 depth, (if arrayed then 1u else 0u), uint32 ms, (if sampled then 1u else 0u), format, None)
+
+                            do! setTypeId t id
+                            return id
 
                         | SampledImage(imageType) ->
                             let! imageType = getTypeId imageType
+
+                            let! id = newId
                             yield OpTypeSampledImage(id, imageType)
 
-                    do! setTypeId t id
-                    return id
+                            do! setTypeId t id
+                            return id
+
+                        | Ptr(c, ct) ->
+                            let! tid = getTypeId ct
+
+                            let! id = newId
+                            yield OpTypePointer(id, c, tid)
+
+                            do! setTypeId t id
+                            return id
         }
 
     let getLabelId (l : Label) = getLabelId l
@@ -1460,9 +1835,23 @@ module SpirV =
                         | Var(v) ->
                             let! id = getVarId v
 
-                            do! setExprValue self id
-                            return Some id
+                            let! tid = getTypeId v.Type
+                            let! rid = newId
 
+                            yield OpLoad(tid, rid, id, None)
+
+                            return Some rid
+
+                        | VarSet(v,e) ->
+                            let! e = compileExpr e
+                            match e with
+                                | Some e ->
+                                    let! id = getVarId v
+
+                                    yield OpStore(id, e, None)
+                                    return None
+                                | None ->
+                                    return failwith "cannot set variable to non-value expression"
 
                         | Value(t, v) ->
                             let byteArray = byteArray v
@@ -1481,10 +1870,10 @@ module SpirV =
                             let! e = compileExpr e
                             match e with
                                 | Some e ->
-                                    let! tid = getTypeId v.Type
+                                    let! tid = getTypeId (Ptr(StorageClass.Function, v.Type))
                                     let! vid = getVarId v
                             
-                                    yield OpVariable(tid, vid, StorageClass.Private, Some e)
+                                    yield OpVariable(tid, vid, StorageClass.Function, Some e)
                                     yield OpName(vid, v.Name)
 
                                     let! b = compileExpr b
@@ -1496,63 +1885,6 @@ module SpirV =
 
                         | IfThenElse(c, UnitVal, UnitVal) ->
                             return None
-
-                        | IfThenElse(c, Var(i), e) when self.Type <> Type.Unit ->
-                            let! c = compileExpr c
-
-                            match c with
-                                | Some c ->
-                                    let! iv = getVarId i
-                                    let! declId = getVarLabelId i
-
-                                    let! falseLabel = getLabelId <| Label()
-                                    let! endLabel = getLabelId <| Label()
-
-                                    yield OpBranchConditional(c, endLabel, falseLabel, [||])
-                                    yield OpLabel(falseLabel)
-                                    let! ev = compileExpr e
-                                    yield OpLabel(endLabel)
-
-                                    match ev with
-                                        | Some ev ->
-                                            let! resType = getTypeId self.Type
-                                            let! id = newId
-                                            
-                                            yield OpPhi(resType, id, [|iv; declId; ev; falseLabel|])
-                                            return Some id
-                                        | _ ->
-                                            return failwith "inconsistent types in if/else"
-                                | None ->
-                                    return failwith "non-value condition in ifthenelse"
-
-                        | IfThenElse(c, i, Var(e)) when self.Type <> Type.Unit ->
-                            let! c = compileExpr c
-
-                            match c with
-                                | Some c ->
-                                    let! ev = getVarId e
-                                    let! declId = getVarLabelId e
-
-                                    let! trueLabel = getLabelId <| Label()
-                                    let! endLabel = getLabelId <| Label()
-
-                                    yield OpBranchConditional(c, trueLabel, endLabel, [||])
-                                    yield OpLabel(trueLabel)
-                                    let! iv = compileExpr i
-                                    yield OpLabel(endLabel)
-
-
-                                    match iv with
-                                        | Some iv ->
-                                            let! resType = getTypeId self.Type
-                                            let! id = newId
-                                            
-                                            yield OpPhi(resType, id, [|iv; trueLabel; ev; declId|])
-                                            return Some id
-                                        | _ ->
-                                            return failwith "inconsistent types in if/else"
-                                | None ->
-                                    return failwith "non-value condition in ifthenelse"
 
                         | IfThenElse(c, i, UnitVal) ->
                             let! c = compileExpr c
@@ -1574,7 +1906,6 @@ module SpirV =
                                 | None ->
                                     return failwith "non-value condition in ifthenelse"
 
-
                         | IfThenElse(c, UnitVal, e) ->
                             let! c = compileExpr c
 
@@ -1594,7 +1925,6 @@ module SpirV =
 
                                 | None ->
                                     return failwith "non-value condition in ifthenelse"
-
 
 
                         | IfThenElse(c,i,e) ->
@@ -1644,10 +1974,145 @@ module SpirV =
                                     return failwith "non-value condition in ifthenelse"
 
 
+
+                        | ForIntegerRangeLoop(v, l, u, body) ->
+                            
+                            let! tid = getTypeId v.Type
+                            let! ptid = getTypeId <| Ptr(StorageClass.Function, v.Type)
+                            let! vid = getVarId v
+                            let! bid = getTypeId Type.Bool
+
+                            let! one = compileExpr (Expr.Value(l.Type, 1))
+                            let! l = compileExpr l
+                            let! u = compileExpr u
+                            match l, u, one with
+                                | Some l, Some u, Some one ->
+
+                                    yield OpVariable(ptid, vid, StorageClass.Function, Some l)
+
+                                    let! startLabel = getLabelId <| Label()
+                                    let! contLabel = getLabelId <| Label()
+                                    let! bodyLabel = getLabelId <| Label()
+                                    let! endLabel = getLabelId <| Label()
+
+                                    let! iv = newId
+                                    let! cid = newId
+                                    let! incId = newId
+
+                                    // start:
+                                    yield OpLabel(startLabel)
+                                    
+                                    // if i < upper then jmp body else jmp body
+                                    yield OpLoad(tid, iv, vid, None)
+                                    yield OpSLessThanEqual(bid, cid, iv, u)
+                                    yield OpLoopMerge(endLabel, startLabel, LoopControl.NoControl)
+
+
+                                    
+                                    yield OpBranchConditional(cid, bodyLabel, endLabel, [||])
+
+                                    yield OpLabel(bodyLabel)
+                                    do! pushScope { startLabel = startLabel; endLabel = contLabel }
+                                    let! _ = compileExpr body
+                                    do! popScope
+
+
+                                    yield OpLabel(contLabel)
+
+                                    // i <- i + 1
+                                    yield OpIAdd(tid, incId, iv, one)
+                                    yield OpStore(vid, incId, None)
+
+                                    // jmp start
+                                    yield OpBranch(startLabel)
+
+                                    //end:
+                                    yield OpLabel(endLabel)
+
+                                    return None
+                                | _ ->
+                                    return failwith "non-value loop bounds"
+
+                        
+                        | While(guard, body) ->
+                            
+                            let! startLabel = getLabelId <| Label()
+                            let! bodyLabel = getLabelId <| Label()
+                            let! endLabel = getLabelId <| Label()
+
+                            yield OpLabel startLabel
+                            let! gid = compileExpr guard
+                            match gid with
+                                | Some gid ->
+                                    
+                                    yield OpLoopMerge(endLabel, startLabel, LoopControl.NoControl)
+                                    yield OpBranchConditional(gid, bodyLabel, endLabel, [||])
+
+                                    do! pushScope { startLabel = startLabel; endLabel = endLabel }
+                                    let! _ = compileExpr body
+                                    do! popScope
+
+                                    yield OpBranch(startLabel)
+                                    yield OpLabel(endLabel)
+
+
+                                    return None
+
+                                | None ->
+                                    return failwith "non-value guard in while expression"
+
+                        | Kill ->
+                            yield OpKill
+                            return None
+                        
+                        | Break ->
+                            let! s = currentScope
+                            match s with
+                                | Some s ->
+                                    yield OpBranch(s.endLabel)
+                                | None ->
+                                    return failwith "break outside of scope"
+
+                            return None
+
+                        | Continue ->
+                            let! s = currentScope
+                            match s with
+                                | Some s ->
+                                    yield OpBranch(s.startLabel)
+                                | None ->
+                                    return failwith "continue outside of scope"
+
+                            return None
+
                         | _ ->  
                             return None
         }
 
+    and compileFunction (name : string) (retType : Type) (args : list<Var>) (body : Expr) =
+        spirv {
+            let! ret = getTypeId retType
+            let! argIds = args |> List.mapSpv freshVarId
+            let! fType = getTypeId <| Function(args |> List.map (fun v -> Ptr(StorageClass.Function, v.Type)), retType)
+            let! fid = newId
+
+            let! label = getLabelId <| Label()
+
+            yield OpFunction(ret, fid, FunctionControlMask.Pure, fType)
+            yield OpName(fid, name)
+
+            for (id, a) in List.zip argIds args do
+                let! t = getTypeId (Ptr(StorageClass.Function, a.Type))
+                yield OpFunctionParameter(t, id)
+                yield OpName(id, a.Name)
+                
+            yield OpLabel label
+
+            let! _ = compileExpr body
+
+            yield OpFunctionEnd
+            return fid
+        }
 
     let test2() =
         let v = new Var("v", Type.M34f)
@@ -1660,30 +2125,64 @@ module SpirV =
     let test() =
         test2()
 
+
+        let myType = Struct("sepp", [Type.V2f, "v0"; Type.Int32, "v1"])
+
         let v = new Var("a", Type.UInt8)
         let v2 = new Var("b", Type.UInt8)
 
         let zeroVec = Expr.Value(Type.V2d, V2d.II)
 
+        let m = new Var("m", myType)
+
         let ex = 
             Expr.Let(v, Expr.Value(Type.UInt8, 1uy), 
-                Expr.IfThenElse(
-                    Expr.Smaller(Expr.Var v, Expr.Value(Type.UInt8, 2uy)),
-                    Expr.Var v,
-                    Expr.Value(Type.UInt8, 0uy)
+                Expr.Let(m, Expr.NewObject(myType, [Expr.Value(Type.V2f, V2f.Zero); Expr.Value(Type.Int32, 0)]),
+                    Expr.IfThenElse(
+                        Expr.Smaller(Expr.Var v, Expr.Value(Type.UInt8, 2uy)),
+                        Expr.Var v,
+                        Expr.Value(Type.UInt8, 0uy)
+                    )
                 )
             )
 
         let s = compileExpr ex
         let (s, _) = s.build SpirVState.Empty
 
+
+
+        let a = Var("a", Type.Int32)
+        let b = Var("b", Type.Int32)
+        let i = Var("i", Type.Int32)
+        let v = Var("v", Type.Int32)
+        let body =
+            Expr.Let(v, Expr.Value(Type.Int32, 0),
+                Expr.Block [
+                    Expr.ForIntegerRangeLoop(
+                        i, Expr.Value(Type.Int32, 0), Expr.Var a,
+                        Expr.Block [
+                            Expr.IfThenElse(
+                                Expr.Smaller(Expr.Var i, Expr.Value(Type.Int32, 2)),
+                                Expr.Continue,
+                                Expr.Break
+                            )
+                            Expr.VarSet(v, Expr.Add(Expr.Var v, Expr.Mul(Expr.Var i, Expr.Var b)))
+                        ]
+                    )
+                    Expr.Return(Expr.Var v)
+                ]
+            )
+
+        let c = compileFunction "test" Type.Int32 [a; b] body
+        let (s,_) = c.build SpirVState.Empty
+
+
         let typeInstructions = s.typeInstructions |> RevList.toList
         let instructions = s.instructions |> RevList.toList
 
         printfn "bound: %A" s.currentId
 
-        for i in typeInstructions do
-            printfn "%A" i
+        typeInstructions @ instructions 
+            |> InstructionPrinter.toString 
+            |> printfn "%s"
 
-        for i in instructions do
-            printfn "%A" i

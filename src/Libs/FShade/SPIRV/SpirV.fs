@@ -294,6 +294,1066 @@ type Instruction =
     | OpNoLine
     | OpAtomicFlagTestAndSet of resultType : uint32 * result : uint32 * ptr : uint32 * scope : ExecutionScope * sem : MemorySemantics
     | OpAtomicFlagClear of ptr : uint32 * scope : ExecutionScope * sem : MemorySemantics
+[<AutoOpen>]
+module InstructionExtensions =
+    type Instruction with
+        member x.ResultType =
+            match x with
+                | OpUndef(tid,_) -> Some tid
+                | OpExtInst(tid,_,_,_,_) -> Some tid
+                | OpConstantTrue(tid,_) -> Some tid
+                | OpConstantFalse(tid,_) -> Some tid
+                | OpConstant(tid,_,_) -> Some tid
+                | OpConstantComposite(tid,_,_) -> Some tid
+                | OpConstantSampler(tid,_,_,_,_) -> Some tid
+                | OpConstantNull(tid,_) -> Some tid
+                | OpSpecConstantTrue(tid,_) -> Some tid
+                | OpSpecConstantFalse(tid,_) -> Some tid
+                | OpSpecConstant(tid,_,_) -> Some tid
+                | OpSpecConstantComposite(tid,_,_) -> Some tid
+                | OpSpecConstantOp(tid,_,_,_) -> Some tid
+                | OpFunction(tid,_,_,_) -> Some tid
+                | OpFunctionParameter(tid,_) -> Some tid
+                | OpFunctionCall(tid,_,_,_) -> Some tid
+                | OpVariable(tid,_,_,_) -> Some tid
+                | OpImageTexelPointer(tid,_,_,_,_) -> Some tid
+                | OpLoad(tid,_,_,_) -> Some tid
+                | OpAccessChain(tid,_,_,_) -> Some tid
+                | OpInBoundsAccessChain(tid,_,_,_) -> Some tid
+                | OpPtrAccessChain(tid,_,_,_,_) -> Some tid
+                | OpArrayLength(tid,_,_,_) -> Some tid
+                | OpGenericPtrMemSemantics(tid,_,_) -> Some tid
+                | OpInBoundsPtrAccessChain(tid,_,_,_,_) -> Some tid
+                | OpVectorExtractDynamic(tid,_,_,_) -> Some tid
+                | OpVectorInsertDynamic(tid,_,_,_,_) -> Some tid
+                | OpVectorShuffle(tid,_,_,_,_) -> Some tid
+                | OpCompositeConstruct(tid,_,_) -> Some tid
+                | OpCompositeExtract(tid,_,_,_) -> Some tid
+                | OpCompositeInsert(tid,_,_,_,_) -> Some tid
+                | OpCopyObject(tid,_,_) -> Some tid
+                | OpTranspose(tid,_,_) -> Some tid
+                | OpSampledImage(tid,_,_,_) -> Some tid
+                | OpImageSampleImplicitLod(tid,_,_,_,_,_) -> Some tid
+                | OpImageSampleExplicitLod(tid,_,_,_,_,_) -> Some tid
+                | OpImageSampleDrefImplicitLod(tid,_,_,_,_,_,_) -> Some tid
+                | OpImageSampleDrefExplicitLod(tid,_,_,_,_,_,_) -> Some tid
+                | OpImageSampleProjImplicitLod(tid,_,_,_,_,_) -> Some tid
+                | OpImageSampleProjExplicitLod(tid,_,_,_,_,_) -> Some tid
+                | OpImageSampleProjDrefImplicitLod(tid,_,_,_,_,_,_) -> Some tid
+                | OpImageSampleProjDrefExplicitLod(tid,_,_,_,_,_,_) -> Some tid
+                | OpImageFetch(tid,_,_,_,_,_) -> Some tid
+                | OpImageGather(tid,_,_,_,_,_,_) -> Some tid
+                | OpImageDrefGather(tid,_,_,_,_,_,_) -> Some tid
+                | OpImageRead(tid,_,_,_,_,_) -> Some tid
+                | OpImage(tid,_,_) -> Some tid
+                | OpImageQueryFormat(tid,_,_) -> Some tid
+                | OpImageQueryOrder(tid,_,_) -> Some tid
+                | OpImageQuerySizeLod(tid,_,_,_) -> Some tid
+                | OpImageQuerySize(tid,_,_) -> Some tid
+                | OpImageQueryLod(tid,_,_,_) -> Some tid
+                | OpImageQueryLevels(tid,_,_) -> Some tid
+                | OpImageQuerySamples(tid,_,_) -> Some tid
+                | OpConvertFToU(tid,_,_) -> Some tid
+                | OpConvertFToS(tid,_,_) -> Some tid
+                | OpConvertSToF(tid,_,_) -> Some tid
+                | OpConvertUToF(tid,_,_) -> Some tid
+                | OpUConvert(tid,_,_) -> Some tid
+                | OpSConvert(tid,_,_) -> Some tid
+                | OpFConvert(tid,_,_) -> Some tid
+                | OpQuantizeToF16(tid,_,_) -> Some tid
+                | OpConvertPtrToU(tid,_,_) -> Some tid
+                | OpSatConvertSToU(tid,_,_) -> Some tid
+                | OpSatConvertUToS(tid,_,_) -> Some tid
+                | OpConvertUToPtr(tid,_,_) -> Some tid
+                | OpPtrCastToGeneric(tid,_,_) -> Some tid
+                | OpGenericCastToPtr(tid,_,_) -> Some tid
+                | OpGenericCastToPtrExplicit(tid,_,_,_) -> Some tid
+                | OpBitcast(tid,_,_) -> Some tid
+                | OpSNegate(tid,_,_) -> Some tid
+                | OpFNegate(tid,_,_) -> Some tid
+                | OpIAdd(tid,_,_,_) -> Some tid
+                | OpFAdd(tid,_,_,_) -> Some tid
+                | OpISub(tid,_,_,_) -> Some tid
+                | OpFSub(tid,_,_,_) -> Some tid
+                | OpIMul(tid,_,_,_) -> Some tid
+                | OpFMul(tid,_,_,_) -> Some tid
+                | OpUDiv(tid,_,_,_) -> Some tid
+                | OpSDiv(tid,_,_,_) -> Some tid
+                | OpFDiv(tid,_,_,_) -> Some tid
+                | OpUMod(tid,_,_,_) -> Some tid
+                | OpSRem(tid,_,_,_) -> Some tid
+                | OpSMod(tid,_,_,_) -> Some tid
+                | OpFRem(tid,_,_,_) -> Some tid
+                | OpFMod(tid,_,_,_) -> Some tid
+                | OpVectorTimesScalar(tid,_,_,_) -> Some tid
+                | OpMatrixTimesScalar(tid,_,_,_) -> Some tid
+                | OpVectorTimesMatrix(tid,_,_,_) -> Some tid
+                | OpMatrixTimesVector(tid,_,_,_) -> Some tid
+                | OpMatrixTimesMatrix(tid,_,_,_) -> Some tid
+                | OpOuterProduct(tid,_,_,_) -> Some tid
+                | OpDot(tid,_,_,_) -> Some tid
+                | OpIAddCarry(tid,_,_,_) -> Some tid
+                | OpISubBorrow(tid,_,_,_) -> Some tid
+                | OpUMulExtended(tid,_,_,_) -> Some tid
+                | OpSMulExtended(tid,_,_,_) -> Some tid
+                | OpAny(tid,_,_) -> Some tid
+                | OpAll(tid,_,_) -> Some tid
+                | OpIsNan(tid,_,_) -> Some tid
+                | OpIsInf(tid,_,_) -> Some tid
+                | OpIsFinite(tid,_,_) -> Some tid
+                | OpIsNormal(tid,_,_) -> Some tid
+                | OpSignBitSet(tid,_,_) -> Some tid
+                | OpLessOrGreater(tid,_,_,_) -> Some tid
+                | OpOrdered(tid,_,_,_) -> Some tid
+                | OpUnordered(tid,_,_,_) -> Some tid
+                | OpLogicalEqual(tid,_,_,_) -> Some tid
+                | OpLogicalNotEqual(tid,_,_,_) -> Some tid
+                | OpLogicalOr(tid,_,_,_) -> Some tid
+                | OpLogicalAnd(tid,_,_,_) -> Some tid
+                | OpLogicalNot(tid,_,_) -> Some tid
+                | OpSelect(tid,_,_,_,_) -> Some tid
+                | OpIEqual(tid,_,_,_) -> Some tid
+                | OpINotEqual(tid,_,_,_) -> Some tid
+                | OpUGreaterThan(tid,_,_,_) -> Some tid
+                | OpSGreaterThan(tid,_,_,_) -> Some tid
+                | OpUGreaterThanEqual(tid,_,_,_) -> Some tid
+                | OpSGreaterThanEqual(tid,_,_,_) -> Some tid
+                | OpULessThan(tid,_,_,_) -> Some tid
+                | OpSLessThan(tid,_,_,_) -> Some tid
+                | OpULessThanEqual(tid,_,_,_) -> Some tid
+                | OpSLessThanEqual(tid,_,_,_) -> Some tid
+                | OpFOrdEqual(tid,_,_,_) -> Some tid
+                | OpFUnordEqual(tid,_,_,_) -> Some tid
+                | OpFOrdNotEqual(tid,_,_,_) -> Some tid
+                | OpFUnordNotEqual(tid,_,_,_) -> Some tid
+                | OpFOrdLessThan(tid,_,_,_) -> Some tid
+                | OpFUnordLessThan(tid,_,_,_) -> Some tid
+                | OpFOrdGreaterThan(tid,_,_,_) -> Some tid
+                | OpFUnordGreaterThan(tid,_,_,_) -> Some tid
+                | OpFOrdLessThanEqual(tid,_,_,_) -> Some tid
+                | OpFUnordLessThanEqual(tid,_,_,_) -> Some tid
+                | OpFOrdGreaterThanEqual(tid,_,_,_) -> Some tid
+                | OpFUnordGreaterThanEqual(tid,_,_,_) -> Some tid
+                | OpShiftRightLogical(tid,_,_,_) -> Some tid
+                | OpShiftRightArithmetic(tid,_,_,_) -> Some tid
+                | OpShiftLeftLogical(tid,_,_,_) -> Some tid
+                | OpBitwiseOr(tid,_,_,_) -> Some tid
+                | OpBitwiseXor(tid,_,_,_) -> Some tid
+                | OpBitwiseAnd(tid,_,_,_) -> Some tid
+                | OpNot(tid,_,_) -> Some tid
+                | OpBitFieldInsert(tid,_,_,_,_,_) -> Some tid
+                | OpBitFieldSExtract(tid,_,_,_,_) -> Some tid
+                | OpBitFieldUExtract(tid,_,_,_,_) -> Some tid
+                | OpBitReverse(tid,_,_) -> Some tid
+                | OpBitCount(tid,_,_) -> Some tid
+                | OpDPdx(tid,_,_) -> Some tid
+                | OpDPdy(tid,_,_) -> Some tid
+                | OpFwidth(tid,_,_) -> Some tid
+                | OpDPdxFine(tid,_,_) -> Some tid
+                | OpDPdyFine(tid,_,_) -> Some tid
+                | OpFwidthFine(tid,_,_) -> Some tid
+                | OpDPdxCoarse(tid,_,_) -> Some tid
+                | OpDPdyCoarse(tid,_,_) -> Some tid
+                | OpFwidthCoarse(tid,_,_) -> Some tid
+                | OpAtomicLoad(tid,_,_,_,_) -> Some tid
+                | OpAtomicExchange(tid,_,_,_,_,_) -> Some tid
+                | OpAtomicCompareExchange(tid,_,_,_,_,_,_,_) -> Some tid
+                | OpAtomicCompareExchangeWeak(tid,_,_,_,_,_,_,_) -> Some tid
+                | OpAtomicIIncrement(tid,_,_,_,_) -> Some tid
+                | OpAtomicIDecrement(tid,_,_,_,_) -> Some tid
+                | OpAtomicIAdd(tid,_,_,_,_,_) -> Some tid
+                | OpAtomicISub(tid,_,_,_,_,_) -> Some tid
+                | OpAtomicSMin(tid,_,_,_,_,_) -> Some tid
+                | OpAtomicUMin(tid,_,_,_,_,_) -> Some tid
+                | OpAtomicSMax(tid,_,_,_,_,_) -> Some tid
+                | OpAtomicUMax(tid,_,_,_,_,_) -> Some tid
+                | OpAtomicAnd(tid,_,_,_,_,_) -> Some tid
+                | OpAtomicOr(tid,_,_,_,_,_) -> Some tid
+                | OpAtomicXor(tid,_,_,_,_,_) -> Some tid
+                | OpPhi(tid,_,_) -> Some tid
+                | OpGroupAsyncCopy(tid,_,_,_,_,_,_,_) -> Some tid
+                | OpGroupAll(tid,_,_,_) -> Some tid
+                | OpGroupAny(tid,_,_,_) -> Some tid
+                | OpGroupBroadcast(tid,_,_,_,_) -> Some tid
+                | OpGroupIAdd(tid,_,_,_,_) -> Some tid
+                | OpGroupFAdd(tid,_,_,_,_) -> Some tid
+                | OpGroupFMin(tid,_,_,_,_) -> Some tid
+                | OpGroupUMin(tid,_,_,_,_) -> Some tid
+                | OpGroupSMin(tid,_,_,_,_) -> Some tid
+                | OpGroupFMax(tid,_,_,_,_) -> Some tid
+                | OpGroupUMax(tid,_,_,_,_) -> Some tid
+                | OpGroupSMax(tid,_,_,_,_) -> Some tid
+                | OpReadPipe(tid,_,_,_,_,_) -> Some tid
+                | OpWritePipe(tid,_,_,_,_,_) -> Some tid
+                | OpReservedReadPipe(tid,_,_,_,_,_,_,_) -> Some tid
+                | OpReservedWritePipe(tid,_,_,_,_,_,_,_) -> Some tid
+                | OpReserveReadPipePackets(tid,_,_,_,_,_) -> Some tid
+                | OpReserveWritePipePackets(tid,_,_,_,_,_) -> Some tid
+                | OpIsValidReserveId(tid,_,_) -> Some tid
+                | OpGetNumPipePackets(tid,_,_,_,_) -> Some tid
+                | OpGetMaxPipePackets(tid,_,_,_,_) -> Some tid
+                | OpGroupReserveReadPipePackets(tid,_,_,_,_,_,_) -> Some tid
+                | OpGroupReserveWritePipePackets(tid,_,_,_,_,_,_) -> Some tid
+                | OpEnqueueMarker(tid,_,_,_,_,_) -> Some tid
+                | OpEnqueueKernel(tid,_,_,_,_,_,_,_,_,_,_,_,_) -> Some tid
+                | OpGetKernelNDrangeSubGroupCount(tid,_,_,_,_,_,_) -> Some tid
+                | OpGetKernelNDrangeMaxSubGroupSize(tid,_,_,_,_,_,_) -> Some tid
+                | OpGetKernelWorkGroupSize(tid,_,_,_,_,_) -> Some tid
+                | OpGetKernelPreferredWorkGroupSizeMultiple(tid,_,_,_,_,_) -> Some tid
+                | OpCreateUserEvent(tid,_) -> Some tid
+                | OpIsValidEvent(tid,_,_) -> Some tid
+                | OpGetDefaultQueue(tid,_) -> Some tid
+                | OpBuildNDRange(tid,_,_,_,_) -> Some tid
+                | OpImageSparseSampleImplicitLod(tid,_,_,_,_,_) -> Some tid
+                | OpImageSparseSampleExplicitLod(tid,_,_,_,_,_) -> Some tid
+                | OpImageSparseSampleDrefImplicitLod(tid,_,_,_,_,_,_) -> Some tid
+                | OpImageSparseSampleDrefExplicitLod(tid,_,_,_,_,_,_) -> Some tid
+                | OpImageSparseSampleProjImplicitLod(tid,_,_,_,_,_) -> Some tid
+                | OpImageSparseSampleProjExplicitLod(tid,_,_,_,_,_) -> Some tid
+                | OpImageSparseSampleProjDrefImplicitLod(tid,_,_,_,_,_,_) -> Some tid
+                | OpImageSparseSampleProjDrefExplicitLod(tid,_,_,_,_,_,_) -> Some tid
+                | OpImageSparseFetch(tid,_,_,_,_,_) -> Some tid
+                | OpImageSparseGather(tid,_,_,_,_,_,_) -> Some tid
+                | OpImageSparseDrefGather(tid,_,_,_,_,_,_) -> Some tid
+                | OpImageSparseTexelsResident(tid,_,_) -> Some tid
+                | OpAtomicFlagTestAndSet(tid,_,_,_,_) -> Some tid
+                | _ -> None
+
+
+        member x.ResultId =
+            match x with
+                | OpUndef(_,id) -> Some id
+                | OpString(id,_) -> Some id
+                | OpExtInstImport(id,_) -> Some id
+                | OpExtInst(_,id,_,_,_) -> Some id
+                | OpTypeVoid(id) -> Some id
+                | OpTypeBool(id) -> Some id
+                | OpTypeInt(id,_,_) -> Some id
+                | OpTypeFloat(id,_) -> Some id
+                | OpTypeVector(id,_,_) -> Some id
+                | OpTypeMatrix(id,_,_) -> Some id
+                | OpTypeImage(id,_,_,_,_,_,_,_,_) -> Some id
+                | OpTypeSampler(id) -> Some id
+                | OpTypeSampledImage(id,_) -> Some id
+                | OpTypeArray(id,_,_) -> Some id
+                | OpTypeRuntimeArray(id,_) -> Some id
+                | OpTypeStruct(id,_) -> Some id
+                | OpTypeOpaque(id,_) -> Some id
+                | OpTypePointer(id,_,_) -> Some id
+                | OpTypeFunction(id,_,_) -> Some id
+                | OpTypeEvent(id) -> Some id
+                | OpTypeDeviceEvent(id) -> Some id
+                | OpTypeReserveId(id) -> Some id
+                | OpTypeQueue(id) -> Some id
+                | OpTypePipe(id,_) -> Some id
+                | OpConstantTrue(_,id) -> Some id
+                | OpConstantFalse(_,id) -> Some id
+                | OpConstant(_,id,_) -> Some id
+                | OpConstantComposite(_,id,_) -> Some id
+                | OpConstantSampler(_,id,_,_,_) -> Some id
+                | OpConstantNull(_,id) -> Some id
+                | OpSpecConstantTrue(_,id) -> Some id
+                | OpSpecConstantFalse(_,id) -> Some id
+                | OpSpecConstant(_,id,_) -> Some id
+                | OpSpecConstantComposite(_,id,_) -> Some id
+                | OpSpecConstantOp(_,id,_,_) -> Some id
+                | OpFunction(_,id,_,_) -> Some id
+                | OpFunctionParameter(_,id) -> Some id
+                | OpFunctionCall(_,id,_,_) -> Some id
+                | OpVariable(_,id,_,_) -> Some id
+                | OpImageTexelPointer(_,id,_,_,_) -> Some id
+                | OpLoad(_,id,_,_) -> Some id
+                | OpAccessChain(_,id,_,_) -> Some id
+                | OpInBoundsAccessChain(_,id,_,_) -> Some id
+                | OpPtrAccessChain(_,id,_,_,_) -> Some id
+                | OpArrayLength(_,id,_,_) -> Some id
+                | OpGenericPtrMemSemantics(_,id,_) -> Some id
+                | OpInBoundsPtrAccessChain(_,id,_,_,_) -> Some id
+                | OpDecorationGroup(id) -> Some id
+                | OpVectorExtractDynamic(_,id,_,_) -> Some id
+                | OpVectorInsertDynamic(_,id,_,_,_) -> Some id
+                | OpVectorShuffle(_,id,_,_,_) -> Some id
+                | OpCompositeConstruct(_,id,_) -> Some id
+                | OpCompositeExtract(_,id,_,_) -> Some id
+                | OpCompositeInsert(_,id,_,_,_) -> Some id
+                | OpCopyObject(_,id,_) -> Some id
+                | OpTranspose(_,id,_) -> Some id
+                | OpSampledImage(_,id,_,_) -> Some id
+                | OpImageSampleImplicitLod(_,id,_,_,_,_) -> Some id
+                | OpImageSampleExplicitLod(_,id,_,_,_,_) -> Some id
+                | OpImageSampleDrefImplicitLod(_,id,_,_,_,_,_) -> Some id
+                | OpImageSampleDrefExplicitLod(_,id,_,_,_,_,_) -> Some id
+                | OpImageSampleProjImplicitLod(_,id,_,_,_,_) -> Some id
+                | OpImageSampleProjExplicitLod(_,id,_,_,_,_) -> Some id
+                | OpImageSampleProjDrefImplicitLod(_,id,_,_,_,_,_) -> Some id
+                | OpImageSampleProjDrefExplicitLod(_,id,_,_,_,_,_) -> Some id
+                | OpImageFetch(_,id,_,_,_,_) -> Some id
+                | OpImageGather(_,id,_,_,_,_,_) -> Some id
+                | OpImageDrefGather(_,id,_,_,_,_,_) -> Some id
+                | OpImageRead(_,id,_,_,_,_) -> Some id
+                | OpImage(_,id,_) -> Some id
+                | OpImageQueryFormat(_,id,_) -> Some id
+                | OpImageQueryOrder(_,id,_) -> Some id
+                | OpImageQuerySizeLod(_,id,_,_) -> Some id
+                | OpImageQuerySize(_,id,_) -> Some id
+                | OpImageQueryLod(_,id,_,_) -> Some id
+                | OpImageQueryLevels(_,id,_) -> Some id
+                | OpImageQuerySamples(_,id,_) -> Some id
+                | OpConvertFToU(_,id,_) -> Some id
+                | OpConvertFToS(_,id,_) -> Some id
+                | OpConvertSToF(_,id,_) -> Some id
+                | OpConvertUToF(_,id,_) -> Some id
+                | OpUConvert(_,id,_) -> Some id
+                | OpSConvert(_,id,_) -> Some id
+                | OpFConvert(_,id,_) -> Some id
+                | OpQuantizeToF16(_,id,_) -> Some id
+                | OpConvertPtrToU(_,id,_) -> Some id
+                | OpSatConvertSToU(_,id,_) -> Some id
+                | OpSatConvertUToS(_,id,_) -> Some id
+                | OpConvertUToPtr(_,id,_) -> Some id
+                | OpPtrCastToGeneric(_,id,_) -> Some id
+                | OpGenericCastToPtr(_,id,_) -> Some id
+                | OpGenericCastToPtrExplicit(_,id,_,_) -> Some id
+                | OpBitcast(_,id,_) -> Some id
+                | OpSNegate(_,id,_) -> Some id
+                | OpFNegate(_,id,_) -> Some id
+                | OpIAdd(_,id,_,_) -> Some id
+                | OpFAdd(_,id,_,_) -> Some id
+                | OpISub(_,id,_,_) -> Some id
+                | OpFSub(_,id,_,_) -> Some id
+                | OpIMul(_,id,_,_) -> Some id
+                | OpFMul(_,id,_,_) -> Some id
+                | OpUDiv(_,id,_,_) -> Some id
+                | OpSDiv(_,id,_,_) -> Some id
+                | OpFDiv(_,id,_,_) -> Some id
+                | OpUMod(_,id,_,_) -> Some id
+                | OpSRem(_,id,_,_) -> Some id
+                | OpSMod(_,id,_,_) -> Some id
+                | OpFRem(_,id,_,_) -> Some id
+                | OpFMod(_,id,_,_) -> Some id
+                | OpVectorTimesScalar(_,id,_,_) -> Some id
+                | OpMatrixTimesScalar(_,id,_,_) -> Some id
+                | OpVectorTimesMatrix(_,id,_,_) -> Some id
+                | OpMatrixTimesVector(_,id,_,_) -> Some id
+                | OpMatrixTimesMatrix(_,id,_,_) -> Some id
+                | OpOuterProduct(_,id,_,_) -> Some id
+                | OpDot(_,id,_,_) -> Some id
+                | OpIAddCarry(_,id,_,_) -> Some id
+                | OpISubBorrow(_,id,_,_) -> Some id
+                | OpUMulExtended(_,id,_,_) -> Some id
+                | OpSMulExtended(_,id,_,_) -> Some id
+                | OpAny(_,id,_) -> Some id
+                | OpAll(_,id,_) -> Some id
+                | OpIsNan(_,id,_) -> Some id
+                | OpIsInf(_,id,_) -> Some id
+                | OpIsFinite(_,id,_) -> Some id
+                | OpIsNormal(_,id,_) -> Some id
+                | OpSignBitSet(_,id,_) -> Some id
+                | OpLessOrGreater(_,id,_,_) -> Some id
+                | OpOrdered(_,id,_,_) -> Some id
+                | OpUnordered(_,id,_,_) -> Some id
+                | OpLogicalEqual(_,id,_,_) -> Some id
+                | OpLogicalNotEqual(_,id,_,_) -> Some id
+                | OpLogicalOr(_,id,_,_) -> Some id
+                | OpLogicalAnd(_,id,_,_) -> Some id
+                | OpLogicalNot(_,id,_) -> Some id
+                | OpSelect(_,id,_,_,_) -> Some id
+                | OpIEqual(_,id,_,_) -> Some id
+                | OpINotEqual(_,id,_,_) -> Some id
+                | OpUGreaterThan(_,id,_,_) -> Some id
+                | OpSGreaterThan(_,id,_,_) -> Some id
+                | OpUGreaterThanEqual(_,id,_,_) -> Some id
+                | OpSGreaterThanEqual(_,id,_,_) -> Some id
+                | OpULessThan(_,id,_,_) -> Some id
+                | OpSLessThan(_,id,_,_) -> Some id
+                | OpULessThanEqual(_,id,_,_) -> Some id
+                | OpSLessThanEqual(_,id,_,_) -> Some id
+                | OpFOrdEqual(_,id,_,_) -> Some id
+                | OpFUnordEqual(_,id,_,_) -> Some id
+                | OpFOrdNotEqual(_,id,_,_) -> Some id
+                | OpFUnordNotEqual(_,id,_,_) -> Some id
+                | OpFOrdLessThan(_,id,_,_) -> Some id
+                | OpFUnordLessThan(_,id,_,_) -> Some id
+                | OpFOrdGreaterThan(_,id,_,_) -> Some id
+                | OpFUnordGreaterThan(_,id,_,_) -> Some id
+                | OpFOrdLessThanEqual(_,id,_,_) -> Some id
+                | OpFUnordLessThanEqual(_,id,_,_) -> Some id
+                | OpFOrdGreaterThanEqual(_,id,_,_) -> Some id
+                | OpFUnordGreaterThanEqual(_,id,_,_) -> Some id
+                | OpShiftRightLogical(_,id,_,_) -> Some id
+                | OpShiftRightArithmetic(_,id,_,_) -> Some id
+                | OpShiftLeftLogical(_,id,_,_) -> Some id
+                | OpBitwiseOr(_,id,_,_) -> Some id
+                | OpBitwiseXor(_,id,_,_) -> Some id
+                | OpBitwiseAnd(_,id,_,_) -> Some id
+                | OpNot(_,id,_) -> Some id
+                | OpBitFieldInsert(_,id,_,_,_,_) -> Some id
+                | OpBitFieldSExtract(_,id,_,_,_) -> Some id
+                | OpBitFieldUExtract(_,id,_,_,_) -> Some id
+                | OpBitReverse(_,id,_) -> Some id
+                | OpBitCount(_,id,_) -> Some id
+                | OpDPdx(_,id,_) -> Some id
+                | OpDPdy(_,id,_) -> Some id
+                | OpFwidth(_,id,_) -> Some id
+                | OpDPdxFine(_,id,_) -> Some id
+                | OpDPdyFine(_,id,_) -> Some id
+                | OpFwidthFine(_,id,_) -> Some id
+                | OpDPdxCoarse(_,id,_) -> Some id
+                | OpDPdyCoarse(_,id,_) -> Some id
+                | OpFwidthCoarse(_,id,_) -> Some id
+                | OpAtomicLoad(_,id,_,_,_) -> Some id
+                | OpAtomicExchange(_,id,_,_,_,_) -> Some id
+                | OpAtomicCompareExchange(_,id,_,_,_,_,_,_) -> Some id
+                | OpAtomicCompareExchangeWeak(_,id,_,_,_,_,_,_) -> Some id
+                | OpAtomicIIncrement(_,id,_,_,_) -> Some id
+                | OpAtomicIDecrement(_,id,_,_,_) -> Some id
+                | OpAtomicIAdd(_,id,_,_,_,_) -> Some id
+                | OpAtomicISub(_,id,_,_,_,_) -> Some id
+                | OpAtomicSMin(_,id,_,_,_,_) -> Some id
+                | OpAtomicUMin(_,id,_,_,_,_) -> Some id
+                | OpAtomicSMax(_,id,_,_,_,_) -> Some id
+                | OpAtomicUMax(_,id,_,_,_,_) -> Some id
+                | OpAtomicAnd(_,id,_,_,_,_) -> Some id
+                | OpAtomicOr(_,id,_,_,_,_) -> Some id
+                | OpAtomicXor(_,id,_,_,_,_) -> Some id
+                | OpPhi(_,id,_) -> Some id
+                | OpLabel(id) -> Some id
+                | OpGroupAsyncCopy(_,id,_,_,_,_,_,_) -> Some id
+                | OpGroupAll(_,id,_,_) -> Some id
+                | OpGroupAny(_,id,_,_) -> Some id
+                | OpGroupBroadcast(_,id,_,_,_) -> Some id
+                | OpGroupIAdd(_,id,_,_,_) -> Some id
+                | OpGroupFAdd(_,id,_,_,_) -> Some id
+                | OpGroupFMin(_,id,_,_,_) -> Some id
+                | OpGroupUMin(_,id,_,_,_) -> Some id
+                | OpGroupSMin(_,id,_,_,_) -> Some id
+                | OpGroupFMax(_,id,_,_,_) -> Some id
+                | OpGroupUMax(_,id,_,_,_) -> Some id
+                | OpGroupSMax(_,id,_,_,_) -> Some id
+                | OpReadPipe(_,id,_,_,_,_) -> Some id
+                | OpWritePipe(_,id,_,_,_,_) -> Some id
+                | OpReservedReadPipe(_,id,_,_,_,_,_,_) -> Some id
+                | OpReservedWritePipe(_,id,_,_,_,_,_,_) -> Some id
+                | OpReserveReadPipePackets(_,id,_,_,_,_) -> Some id
+                | OpReserveWritePipePackets(_,id,_,_,_,_) -> Some id
+                | OpIsValidReserveId(_,id,_) -> Some id
+                | OpGetNumPipePackets(_,id,_,_,_) -> Some id
+                | OpGetMaxPipePackets(_,id,_,_,_) -> Some id
+                | OpGroupReserveReadPipePackets(_,id,_,_,_,_,_) -> Some id
+                | OpGroupReserveWritePipePackets(_,id,_,_,_,_,_) -> Some id
+                | OpEnqueueMarker(_,id,_,_,_,_) -> Some id
+                | OpEnqueueKernel(_,id,_,_,_,_,_,_,_,_,_,_,_) -> Some id
+                | OpGetKernelNDrangeSubGroupCount(_,id,_,_,_,_,_) -> Some id
+                | OpGetKernelNDrangeMaxSubGroupSize(_,id,_,_,_,_,_) -> Some id
+                | OpGetKernelWorkGroupSize(_,id,_,_,_,_) -> Some id
+                | OpGetKernelPreferredWorkGroupSizeMultiple(_,id,_,_,_,_) -> Some id
+                | OpCreateUserEvent(_,id) -> Some id
+                | OpIsValidEvent(_,id,_) -> Some id
+                | OpGetDefaultQueue(_,id) -> Some id
+                | OpBuildNDRange(_,id,_,_,_) -> Some id
+                | OpImageSparseSampleImplicitLod(_,id,_,_,_,_) -> Some id
+                | OpImageSparseSampleExplicitLod(_,id,_,_,_,_) -> Some id
+                | OpImageSparseSampleDrefImplicitLod(_,id,_,_,_,_,_) -> Some id
+                | OpImageSparseSampleDrefExplicitLod(_,id,_,_,_,_,_) -> Some id
+                | OpImageSparseSampleProjImplicitLod(_,id,_,_,_,_) -> Some id
+                | OpImageSparseSampleProjExplicitLod(_,id,_,_,_,_) -> Some id
+                | OpImageSparseSampleProjDrefImplicitLod(_,id,_,_,_,_,_) -> Some id
+                | OpImageSparseSampleProjDrefExplicitLod(_,id,_,_,_,_,_) -> Some id
+                | OpImageSparseFetch(_,id,_,_,_,_) -> Some id
+                | OpImageSparseGather(_,id,_,_,_,_,_) -> Some id
+                | OpImageSparseDrefGather(_,id,_,_,_,_,_) -> Some id
+                | OpImageSparseTexelsResident(_,id,_) -> Some id
+                | OpAtomicFlagTestAndSet(_,id,_,_,_) -> Some id
+                | _ -> None
+
+
+        member x.Operands =
+            match x with
+                | OpUndef(_,_) -> []
+                | OpSourceContinued(sourceCont) -> [sourceCont :> obj]
+                | OpSource(_source,version,code) -> [_source :> obj; version :> obj; code :> obj]
+                | OpSourceExtension(extension) -> [extension :> obj]
+                | OpName(_target,name) -> [_target :> obj; name :> obj]
+                | OpMemberName(_type,_member,name) -> [_type :> obj; _member :> obj; name :> obj]
+                | OpString(_,value) -> [value :> obj]
+                | OpLine(file,line,column) -> [file :> obj; line :> obj; column :> obj]
+                | OpExtension(name) -> [name :> obj]
+                | OpExtInstImport(_,name) -> [name :> obj]
+                | OpExtInst(_,_,set,instruction,operands) -> [set :> obj; instruction :> obj; operands :> obj]
+                | OpMemoryModel(addressing,memory) -> [addressing :> obj; memory :> obj]
+                | OpEntryPoint(executionModel,entryPoint,name) -> [executionModel :> obj; entryPoint :> obj; name :> obj]
+                | OpExecutionMode(entryPoint,mode,modes) -> [entryPoint :> obj; mode :> obj; modes :> obj]
+                | OpCapability(capability) -> [capability :> obj]
+                | OpTypeVoid(_) -> []
+                | OpTypeBool(_) -> []
+                | OpTypeInt(_,width,signedness) -> [width :> obj; signedness :> obj]
+                | OpTypeFloat(_,width) -> [width :> obj]
+                | OpTypeVector(_,compType,compCount) -> [compType :> obj; compCount :> obj]
+                | OpTypeMatrix(_,colType,colCount) -> [colType :> obj; colCount :> obj]
+                | OpTypeImage(_,sampledType,dim,depth,arrayed,ms,sampled,format,access) -> [sampledType :> obj; dim :> obj; depth :> obj; arrayed :> obj; ms :> obj; sampled :> obj; format :> obj; access :> obj]
+                | OpTypeSampler(_) -> []
+                | OpTypeSampledImage(_,imageType) -> [imageType :> obj]
+                | OpTypeArray(_,elementType,length) -> [elementType :> obj; length :> obj]
+                | OpTypeRuntimeArray(_,elementType) -> [elementType :> obj]
+                | OpTypeStruct(_,memberTypes) -> [memberTypes :> obj]
+                | OpTypeOpaque(_,opaqueTypeName) -> [opaqueTypeName :> obj]
+                | OpTypePointer(_,storage,_type) -> [storage :> obj; _type :> obj]
+                | OpTypeFunction(_,retType,paramTypes) -> [retType :> obj; paramTypes :> obj]
+                | OpTypeEvent(_) -> []
+                | OpTypeDeviceEvent(_) -> []
+                | OpTypeReserveId(_) -> []
+                | OpTypeQueue(_) -> []
+                | OpTypePipe(_,qualifier) -> [qualifier :> obj]
+                | OpTypeForwardPointer(ptrType,storage) -> [ptrType :> obj; storage :> obj]
+                | OpConstantTrue(_,_) -> []
+                | OpConstantFalse(_,_) -> []
+                | OpConstant(_,_,value) -> [value :> obj]
+                | OpConstantComposite(_,_,constituents) -> [constituents :> obj]
+                | OpConstantSampler(_,_,addressingMode,param,filterMode) -> [addressingMode :> obj; param :> obj; filterMode :> obj]
+                | OpConstantNull(_,_) -> []
+                | OpSpecConstantTrue(_,_) -> []
+                | OpSpecConstantFalse(_,_) -> []
+                | OpSpecConstant(_,_,value) -> [value :> obj]
+                | OpSpecConstantComposite(_,_,constituents) -> [constituents :> obj]
+                | OpSpecConstantOp(_,_,opCode,operands) -> [opCode :> obj; operands :> obj]
+                | OpFunction(_,_,_function,funType) -> [_function :> obj; funType :> obj]
+                | OpFunctionParameter(_,_) -> []
+                | OpFunctionCall(_,_,_function,args) -> [_function :> obj; args :> obj]
+                | OpVariable(_,_,storage,initializer) -> [storage :> obj; initializer :> obj]
+                | OpImageTexelPointer(_,_,image,coord,sample) -> [image :> obj; coord :> obj; sample :> obj]
+                | OpLoad(_,_,ptr,access) -> [ptr :> obj; access :> obj]
+                | OpStore(ptr,_object,access) -> [ptr :> obj; _object :> obj; access :> obj]
+                | OpCopyMemory(_target,_source,access) -> [_target :> obj; _source :> obj; access :> obj]
+                | OpCopyMemorySized(_target,_source,size,access) -> [_target :> obj; _source :> obj; size :> obj; access :> obj]
+                | OpAccessChain(_,_,_base,indices) -> [_base :> obj; indices :> obj]
+                | OpInBoundsAccessChain(_,_,_base,indices) -> [_base :> obj; indices :> obj]
+                | OpPtrAccessChain(_,_,_base,element,indices) -> [_base :> obj; element :> obj; indices :> obj]
+                | OpArrayLength(_,_,structure,arrMember) -> [structure :> obj; arrMember :> obj]
+                | OpGenericPtrMemSemantics(_,_,ptr) -> [ptr :> obj]
+                | OpInBoundsPtrAccessChain(_,_,_base,element,indices) -> [_base :> obj; element :> obj; indices :> obj]
+                | OpDecorate(_target,decoration,args) -> [_target :> obj; decoration :> obj; args :> obj]
+                | OpMemberDecorate(structType,_member,decoration,args) -> [structType :> obj; _member :> obj; decoration :> obj; args :> obj]
+                | OpDecorationGroup(_) -> []
+                | OpGroupDecorate(group,targets) -> [group :> obj; targets :> obj]
+                | OpGroupMemberDecorate(group,targets) -> [group :> obj; targets :> obj]
+                | OpVectorExtractDynamic(_,_,vector,index) -> [vector :> obj; index :> obj]
+                | OpVectorInsertDynamic(_,_,vector,_component,index) -> [vector :> obj; _component :> obj; index :> obj]
+                | OpVectorShuffle(_,_,v0,v1,components) -> [v0 :> obj; v1 :> obj; components :> obj]
+                | OpCompositeConstruct(_,_,constituents) -> [constituents :> obj]
+                | OpCompositeExtract(_,_,composite,indices) -> [composite :> obj; indices :> obj]
+                | OpCompositeInsert(_,_,_object,composite,indices) -> [_object :> obj; composite :> obj; indices :> obj]
+                | OpCopyObject(_,_,operand) -> [operand :> obj]
+                | OpTranspose(_,_,mat) -> [mat :> obj]
+                | OpSampledImage(_,_,image,sampler) -> [image :> obj; sampler :> obj]
+                | OpImageSampleImplicitLod(_,_,sampledImage,coord,images,variables) -> [sampledImage :> obj; coord :> obj; images :> obj; variables :> obj]
+                | OpImageSampleExplicitLod(_,_,sampledImage,coord,images,variables) -> [sampledImage :> obj; coord :> obj; images :> obj; variables :> obj]
+                | OpImageSampleDrefImplicitLod(_,_,sampledImage,coord,depthRef,images,variables) -> [sampledImage :> obj; coord :> obj; depthRef :> obj; images :> obj; variables :> obj]
+                | OpImageSampleDrefExplicitLod(_,_,sampledImage,coord,depthRef,images,variables) -> [sampledImage :> obj; coord :> obj; depthRef :> obj; images :> obj; variables :> obj]
+                | OpImageSampleProjImplicitLod(_,_,sampledImage,coord,images,variables) -> [sampledImage :> obj; coord :> obj; images :> obj; variables :> obj]
+                | OpImageSampleProjExplicitLod(_,_,sampledImage,coord,images,variables) -> [sampledImage :> obj; coord :> obj; images :> obj; variables :> obj]
+                | OpImageSampleProjDrefImplicitLod(_,_,sampledImage,coord,depthRef,images,variables) -> [sampledImage :> obj; coord :> obj; depthRef :> obj; images :> obj; variables :> obj]
+                | OpImageSampleProjDrefExplicitLod(_,_,sampledImage,coord,depthRef,images,variables) -> [sampledImage :> obj; coord :> obj; depthRef :> obj; images :> obj; variables :> obj]
+                | OpImageFetch(_,_,image,coord,images,variables) -> [image :> obj; coord :> obj; images :> obj; variables :> obj]
+                | OpImageGather(_,_,sampledImage,coord,_component,images,variables) -> [sampledImage :> obj; coord :> obj; _component :> obj; images :> obj; variables :> obj]
+                | OpImageDrefGather(_,_,sampledImage,coord,depthRef,images,variables) -> [sampledImage :> obj; coord :> obj; depthRef :> obj; images :> obj; variables :> obj]
+                | OpImageRead(_,_,image,coords,images,variables) -> [image :> obj; coords :> obj; images :> obj; variables :> obj]
+                | OpImageWrite(image,coord,texel,images,variables) -> [image :> obj; coord :> obj; texel :> obj; images :> obj; variables :> obj]
+                | OpImage(_,_,sampledImage) -> [sampledImage :> obj]
+                | OpImageQueryFormat(_,_,image) -> [image :> obj]
+                | OpImageQueryOrder(_,_,image) -> [image :> obj]
+                | OpImageQuerySizeLod(_,_,image,lod) -> [image :> obj; lod :> obj]
+                | OpImageQuerySize(_,_,image) -> [image :> obj]
+                | OpImageQueryLod(_,_,image,coord) -> [image :> obj; coord :> obj]
+                | OpImageQueryLevels(_,_,image) -> [image :> obj]
+                | OpImageQuerySamples(_,_,image) -> [image :> obj]
+                | OpConvertFToU(_,_,fvec) -> [fvec :> obj]
+                | OpConvertFToS(_,_,floatVal) -> [floatVal :> obj]
+                | OpConvertSToF(_,_,sVal) -> [sVal :> obj]
+                | OpConvertUToF(_,_,uVal) -> [uVal :> obj]
+                | OpUConvert(_,_,uVal) -> [uVal :> obj]
+                | OpSConvert(_,_,sVal) -> [sVal :> obj]
+                | OpFConvert(_,_,floatVal) -> [floatVal :> obj]
+                | OpQuantizeToF16(_,_,value) -> [value :> obj]
+                | OpConvertPtrToU(_,_,ptr) -> [ptr :> obj]
+                | OpSatConvertSToU(_,_,sVal) -> [sVal :> obj]
+                | OpSatConvertUToS(_,_,uVal) -> [uVal :> obj]
+                | OpConvertUToPtr(_,_,intVal) -> [intVal :> obj]
+                | OpPtrCastToGeneric(_,_,ptr) -> [ptr :> obj]
+                | OpGenericCastToPtr(_,_,ptr) -> [ptr :> obj]
+                | OpGenericCastToPtrExplicit(_,_,ptr,storage) -> [ptr :> obj; storage :> obj]
+                | OpBitcast(_,_,operand) -> [operand :> obj]
+                | OpSNegate(_,_,operand) -> [operand :> obj]
+                | OpFNegate(_,_,operand) -> [operand :> obj]
+                | OpIAdd(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpFAdd(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpISub(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpFSub(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpIMul(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpFMul(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpUDiv(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpSDiv(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpFDiv(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpUMod(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpSRem(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpSMod(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpFRem(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpFMod(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpVectorTimesScalar(_,_,vec,scalar) -> [vec :> obj; scalar :> obj]
+                | OpMatrixTimesScalar(_,_,mat,scalar) -> [mat :> obj; scalar :> obj]
+                | OpVectorTimesMatrix(_,_,vec,mat) -> [vec :> obj; mat :> obj]
+                | OpMatrixTimesVector(_,_,mat,vec) -> [mat :> obj; vec :> obj]
+                | OpMatrixTimesMatrix(_,_,left,right) -> [left :> obj; right :> obj]
+                | OpOuterProduct(_,_,left,right) -> [left :> obj; right :> obj]
+                | OpDot(_,_,left,right) -> [left :> obj; right :> obj]
+                | OpIAddCarry(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpISubBorrow(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpUMulExtended(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpSMulExtended(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpAny(_,_,vec) -> [vec :> obj]
+                | OpAll(_,_,vec) -> [vec :> obj]
+                | OpIsNan(_,_,x) -> [x :> obj]
+                | OpIsInf(_,_,y) -> [y :> obj]
+                | OpIsFinite(_,_,x) -> [x :> obj]
+                | OpIsNormal(_,_,x) -> [x :> obj]
+                | OpSignBitSet(_,_,x) -> [x :> obj]
+                | OpLessOrGreater(_,_,x,y) -> [x :> obj; y :> obj]
+                | OpOrdered(_,_,x,y) -> [x :> obj; y :> obj]
+                | OpUnordered(_,_,x,y) -> [x :> obj; y :> obj]
+                | OpLogicalEqual(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpLogicalNotEqual(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpLogicalOr(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpLogicalAnd(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpLogicalNot(_,_,op) -> [op :> obj]
+                | OpSelect(_,_,cond,o1,o2) -> [cond :> obj; o1 :> obj; o2 :> obj]
+                | OpIEqual(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpINotEqual(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpUGreaterThan(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpSGreaterThan(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpUGreaterThanEqual(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpSGreaterThanEqual(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpULessThan(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpSLessThan(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpULessThanEqual(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpSLessThanEqual(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpFOrdEqual(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpFUnordEqual(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpFOrdNotEqual(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpFUnordNotEqual(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpFOrdLessThan(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpFUnordLessThan(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpFOrdGreaterThan(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpFUnordGreaterThan(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpFOrdLessThanEqual(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpFUnordLessThanEqual(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpFOrdGreaterThanEqual(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpFUnordGreaterThanEqual(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpShiftRightLogical(_,_,_base,shift) -> [_base :> obj; shift :> obj]
+                | OpShiftRightArithmetic(_,_,_base,shift) -> [_base :> obj; shift :> obj]
+                | OpShiftLeftLogical(_,_,_base,shift) -> [_base :> obj; shift :> obj]
+                | OpBitwiseOr(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpBitwiseXor(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpBitwiseAnd(_,_,op1,op2) -> [op1 :> obj; op2 :> obj]
+                | OpNot(_,_,operand) -> [operand :> obj]
+                | OpBitFieldInsert(_,_,_base,insert,offset,count) -> [_base :> obj; insert :> obj; offset :> obj; count :> obj]
+                | OpBitFieldSExtract(_,_,_base,offset,count) -> [_base :> obj; offset :> obj; count :> obj]
+                | OpBitFieldUExtract(_,_,_base,offset,count) -> [_base :> obj; offset :> obj; count :> obj]
+                | OpBitReverse(_,_,_base) -> [_base :> obj]
+                | OpBitCount(_,_,_base) -> [_base :> obj]
+                | OpDPdx(_,_,p) -> [p :> obj]
+                | OpDPdy(_,_,p) -> [p :> obj]
+                | OpFwidth(_,_,p) -> [p :> obj]
+                | OpDPdxFine(_,_,p) -> [p :> obj]
+                | OpDPdyFine(_,_,p) -> [p :> obj]
+                | OpFwidthFine(_,_,p) -> [p :> obj]
+                | OpDPdxCoarse(_,_,p) -> [p :> obj]
+                | OpDPdyCoarse(_,_,p) -> [p :> obj]
+                | OpFwidthCoarse(_,_,p) -> [p :> obj]
+                | OpEmitStreamVertex(stream) -> [stream :> obj]
+                | OpEndStreamPrimitive(stream) -> [stream :> obj]
+                | OpControlBarrier(exec,mem,sem) -> [exec :> obj; mem :> obj; sem :> obj]
+                | OpMemoryBarrier(mem,sen) -> [mem :> obj; sen :> obj]
+                | OpAtomicLoad(_,_,ptr,scope,sem) -> [ptr :> obj; scope :> obj; sem :> obj]
+                | OpAtomicStore(ptr,scope,sem,value) -> [ptr :> obj; scope :> obj; sem :> obj; value :> obj]
+                | OpAtomicExchange(_,_,ptr,scope,sem,value) -> [ptr :> obj; scope :> obj; sem :> obj; value :> obj]
+                | OpAtomicCompareExchange(_,_,ptr,scope,eq,neq,value,comparator) -> [ptr :> obj; scope :> obj; eq :> obj; neq :> obj; value :> obj; comparator :> obj]
+                | OpAtomicCompareExchangeWeak(_,_,ptr,scope,eq,neq,value,comparator) -> [ptr :> obj; scope :> obj; eq :> obj; neq :> obj; value :> obj; comparator :> obj]
+                | OpAtomicIIncrement(_,_,ptr,scope,sem) -> [ptr :> obj; scope :> obj; sem :> obj]
+                | OpAtomicIDecrement(_,_,ptr,scope,sem) -> [ptr :> obj; scope :> obj; sem :> obj]
+                | OpAtomicIAdd(_,_,ptr,scope,sem,value) -> [ptr :> obj; scope :> obj; sem :> obj; value :> obj]
+                | OpAtomicISub(_,_,ptr,scope,sem,value) -> [ptr :> obj; scope :> obj; sem :> obj; value :> obj]
+                | OpAtomicSMin(_,_,ptr,scope,sem,value) -> [ptr :> obj; scope :> obj; sem :> obj; value :> obj]
+                | OpAtomicUMin(_,_,ptr,scope,sem,value) -> [ptr :> obj; scope :> obj; sem :> obj; value :> obj]
+                | OpAtomicSMax(_,_,ptr,scope,sem,value) -> [ptr :> obj; scope :> obj; sem :> obj; value :> obj]
+                | OpAtomicUMax(_,_,ptr,scope,sem,value) -> [ptr :> obj; scope :> obj; sem :> obj; value :> obj]
+                | OpAtomicAnd(_,_,ptr,scope,sem,value) -> [ptr :> obj; scope :> obj; sem :> obj; value :> obj]
+                | OpAtomicOr(_,_,ptr,scope,sem,value) -> [ptr :> obj; scope :> obj; sem :> obj; value :> obj]
+                | OpAtomicXor(_,_,ptr,scope,sem,value) -> [ptr :> obj; scope :> obj; sem :> obj; value :> obj]
+                | OpPhi(_,_,varsAndParents) -> [varsAndParents :> obj]
+                | OpLoopMerge(mergeBlock,contTarget,loop) -> [mergeBlock :> obj; contTarget :> obj; loop :> obj]
+                | OpSelectionMerge(mergeBlock,select) -> [mergeBlock :> obj; select :> obj]
+                | OpLabel(_) -> []
+                | OpBranch(_target) -> [_target :> obj]
+                | OpBranchConditional(condition,lTrue,lFalse,weights) -> [condition :> obj; lTrue :> obj; lFalse :> obj; weights :> obj]
+                | OpSwitch(sel,def,_target) -> [sel :> obj; def :> obj; _target :> obj]
+                | OpReturnValue(value) -> [value :> obj]
+                | OpLifetimeStart(ptr,size) -> [ptr :> obj; size :> obj]
+                | OpLifetimeStop(ptr,size) -> [ptr :> obj; size :> obj]
+                | OpGroupAsyncCopy(_,_,execution,dest,_source,num,stride,evt) -> [execution :> obj; dest :> obj; _source :> obj; num :> obj; stride :> obj; evt :> obj]
+                | OpGroupWaitEvents(exec,num,evtList) -> [exec :> obj; num :> obj; evtList :> obj]
+                | OpGroupAll(_,_,exec,pred) -> [exec :> obj; pred :> obj]
+                | OpGroupAny(_,_,exec,pred) -> [exec :> obj; pred :> obj]
+                | OpGroupBroadcast(_,_,exec,value,localid) -> [exec :> obj; value :> obj; localid :> obj]
+                | OpGroupIAdd(_,_,exec,operation,x) -> [exec :> obj; operation :> obj; x :> obj]
+                | OpGroupFAdd(_,_,exec,operation,x) -> [exec :> obj; operation :> obj; x :> obj]
+                | OpGroupFMin(_,_,exec,operation,x) -> [exec :> obj; operation :> obj; x :> obj]
+                | OpGroupUMin(_,_,exec,operation,x) -> [exec :> obj; operation :> obj; x :> obj]
+                | OpGroupSMin(_,_,exec,operation,x) -> [exec :> obj; operation :> obj; x :> obj]
+                | OpGroupFMax(_,_,exec,operation,x) -> [exec :> obj; operation :> obj; x :> obj]
+                | OpGroupUMax(_,_,exec,operation,x) -> [exec :> obj; operation :> obj; x :> obj]
+                | OpGroupSMax(_,_,exec,operation,x) -> [exec :> obj; operation :> obj; x :> obj]
+                | OpReadPipe(_,_,pipe,ptr,packetSize,packetAlign) -> [pipe :> obj; ptr :> obj; packetSize :> obj; packetAlign :> obj]
+                | OpWritePipe(_,_,pipe,ptr,packetSize,packetAlign) -> [pipe :> obj; ptr :> obj; packetSize :> obj; packetAlign :> obj]
+                | OpReservedReadPipe(_,_,pipe,reserveId,index,ptr,packetSize,packetAlign) -> [pipe :> obj; reserveId :> obj; index :> obj; ptr :> obj; packetSize :> obj; packetAlign :> obj]
+                | OpReservedWritePipe(_,_,pipe,reserveId,index,ptr,packetSize,packetAlign) -> [pipe :> obj; reserveId :> obj; index :> obj; ptr :> obj; packetSize :> obj; packetAlign :> obj]
+                | OpReserveReadPipePackets(_,_,pipe,numPackets,packetSize,packetAlign) -> [pipe :> obj; numPackets :> obj; packetSize :> obj; packetAlign :> obj]
+                | OpReserveWritePipePackets(_,_,pipe,numPackets,packetSize,packetAlign) -> [pipe :> obj; numPackets :> obj; packetSize :> obj; packetAlign :> obj]
+                | OpCommitReadPipe(pipe,reserveId,packetSize,packetAlign) -> [pipe :> obj; reserveId :> obj; packetSize :> obj; packetAlign :> obj]
+                | OpCommitWritePipe(pipe,reserveId,packetSize,packetAlign) -> [pipe :> obj; reserveId :> obj; packetSize :> obj; packetAlign :> obj]
+                | OpIsValidReserveId(_,_,reserveId) -> [reserveId :> obj]
+                | OpGetNumPipePackets(_,_,pipe,packetSize,packetAlign) -> [pipe :> obj; packetSize :> obj; packetAlign :> obj]
+                | OpGetMaxPipePackets(_,_,pipe,packetSize,packetAlign) -> [pipe :> obj; packetSize :> obj; packetAlign :> obj]
+                | OpGroupReserveReadPipePackets(_,_,exec,pipe,numPackets,packetSize,packetAlign) -> [exec :> obj; pipe :> obj; numPackets :> obj; packetSize :> obj; packetAlign :> obj]
+                | OpGroupReserveWritePipePackets(_,_,exec,pipe,numPackets,packetSize,packetAlign) -> [exec :> obj; pipe :> obj; numPackets :> obj; packetSize :> obj; packetAlign :> obj]
+                | OpGroupCommitReadPipe(exec,pipe,reserveId,packetSize,packetAlign) -> [exec :> obj; pipe :> obj; reserveId :> obj; packetSize :> obj; packetAlign :> obj]
+                | OpGroupCommitWritePipe(exec,pipe,reserveId,packetSize,packetAlign) -> [exec :> obj; pipe :> obj; reserveId :> obj; packetSize :> obj; packetAlign :> obj]
+                | OpEnqueueMarker(_,_,queue,nEvts,waitEvts,retEvt) -> [queue :> obj; nEvts :> obj; waitEvts :> obj; retEvt :> obj]
+                | OpEnqueueKernel(_,_,queue,flags,ndRange,nEvents,waitEvts,retEvt,invoke,param,paramSize,paramAlign,localSize) -> [queue :> obj; flags :> obj; ndRange :> obj; nEvents :> obj; waitEvts :> obj; retEvt :> obj; invoke :> obj; param :> obj; paramSize :> obj; paramAlign :> obj; localSize :> obj]
+                | OpGetKernelNDrangeSubGroupCount(_,_,ndRange,invoke,param,paramSize,paramAlign) -> [ndRange :> obj; invoke :> obj; param :> obj; paramSize :> obj; paramAlign :> obj]
+                | OpGetKernelNDrangeMaxSubGroupSize(_,_,ndRange,invoke,param,paramSize,paramAlign) -> [ndRange :> obj; invoke :> obj; param :> obj; paramSize :> obj; paramAlign :> obj]
+                | OpGetKernelWorkGroupSize(_,_,invoke,param,paramSize,paramAlign) -> [invoke :> obj; param :> obj; paramSize :> obj; paramAlign :> obj]
+                | OpGetKernelPreferredWorkGroupSizeMultiple(_,_,invoke,param,paramSize,paramAlign) -> [invoke :> obj; param :> obj; paramSize :> obj; paramAlign :> obj]
+                | OpRetainEvent(evt) -> [evt :> obj]
+                | OpReleaseEvent(evt) -> [evt :> obj]
+                | OpCreateUserEvent(_,_) -> []
+                | OpIsValidEvent(_,_,evt) -> [evt :> obj]
+                | OpSetUserEventStatus(evt,status) -> [evt :> obj; status :> obj]
+                | OpCaptureEventProfilingInfo(evt,profileInfo,value) -> [evt :> obj; profileInfo :> obj; value :> obj]
+                | OpGetDefaultQueue(_,_) -> []
+                | OpBuildNDRange(_,_,globalSize,localSize,globalOffset) -> [globalSize :> obj; localSize :> obj; globalOffset :> obj]
+                | OpImageSparseSampleImplicitLod(_,_,sampledImage,coord,images,variables) -> [sampledImage :> obj; coord :> obj; images :> obj; variables :> obj]
+                | OpImageSparseSampleExplicitLod(_,_,sampledImage,coord,images,variables) -> [sampledImage :> obj; coord :> obj; images :> obj; variables :> obj]
+                | OpImageSparseSampleDrefImplicitLod(_,_,sampledImage,coord,depthRef,images,variables) -> [sampledImage :> obj; coord :> obj; depthRef :> obj; images :> obj; variables :> obj]
+                | OpImageSparseSampleDrefExplicitLod(_,_,sampledImage,coord,depthRef,images,variables) -> [sampledImage :> obj; coord :> obj; depthRef :> obj; images :> obj; variables :> obj]
+                | OpImageSparseSampleProjImplicitLod(_,_,sampledImage,coord,images,variables) -> [sampledImage :> obj; coord :> obj; images :> obj; variables :> obj]
+                | OpImageSparseSampleProjExplicitLod(_,_,sampledImage,coord,images,variables) -> [sampledImage :> obj; coord :> obj; images :> obj; variables :> obj]
+                | OpImageSparseSampleProjDrefImplicitLod(_,_,sampledImage,coord,depthRef,images,variables) -> [sampledImage :> obj; coord :> obj; depthRef :> obj; images :> obj; variables :> obj]
+                | OpImageSparseSampleProjDrefExplicitLod(_,_,sampledImage,coord,depthRef,images,variables) -> [sampledImage :> obj; coord :> obj; depthRef :> obj; images :> obj; variables :> obj]
+                | OpImageSparseFetch(_,_,image,coord,images,variables) -> [image :> obj; coord :> obj; images :> obj; variables :> obj]
+                | OpImageSparseGather(_,_,sampledImage,coord,_component,images,variables) -> [sampledImage :> obj; coord :> obj; _component :> obj; images :> obj; variables :> obj]
+                | OpImageSparseDrefGather(_,_,sampledImage,coord,depthRef,images,variables) -> [sampledImage :> obj; coord :> obj; depthRef :> obj; images :> obj; variables :> obj]
+                | OpImageSparseTexelsResident(_,_,residentCode) -> [residentCode :> obj]
+                | OpAtomicFlagTestAndSet(_,_,ptr,scope,sem) -> [ptr :> obj; scope :> obj; sem :> obj]
+                | OpAtomicFlagClear(ptr,scope,sem) -> [ptr :> obj; scope :> obj; sem :> obj]
+                | _ -> []
+
+
+        member x.Name =
+            match x with
+                | OpNop -> "OpNop"
+                | OpUndef(_) -> "OpUndef"
+                | OpSourceContinued(_) -> "OpSourceContinued"
+                | OpSource(_) -> "OpSource"
+                | OpSourceExtension(_) -> "OpSourceExtension"
+                | OpName(_) -> "OpName"
+                | OpMemberName(_) -> "OpMemberName"
+                | OpString(_) -> "OpString"
+                | OpLine(_) -> "OpLine"
+                | OpExtension(_) -> "OpExtension"
+                | OpExtInstImport(_) -> "OpExtInstImport"
+                | OpExtInst(_) -> "OpExtInst"
+                | OpMemoryModel(_) -> "OpMemoryModel"
+                | OpEntryPoint(_) -> "OpEntryPoint"
+                | OpExecutionMode(_) -> "OpExecutionMode"
+                | OpCapability(_) -> "OpCapability"
+                | OpTypeVoid(_) -> "OpTypeVoid"
+                | OpTypeBool(_) -> "OpTypeBool"
+                | OpTypeInt(_) -> "OpTypeInt"
+                | OpTypeFloat(_) -> "OpTypeFloat"
+                | OpTypeVector(_) -> "OpTypeVector"
+                | OpTypeMatrix(_) -> "OpTypeMatrix"
+                | OpTypeImage(_) -> "OpTypeImage"
+                | OpTypeSampler(_) -> "OpTypeSampler"
+                | OpTypeSampledImage(_) -> "OpTypeSampledImage"
+                | OpTypeArray(_) -> "OpTypeArray"
+                | OpTypeRuntimeArray(_) -> "OpTypeRuntimeArray"
+                | OpTypeStruct(_) -> "OpTypeStruct"
+                | OpTypeOpaque(_) -> "OpTypeOpaque"
+                | OpTypePointer(_) -> "OpTypePointer"
+                | OpTypeFunction(_) -> "OpTypeFunction"
+                | OpTypeEvent(_) -> "OpTypeEvent"
+                | OpTypeDeviceEvent(_) -> "OpTypeDeviceEvent"
+                | OpTypeReserveId(_) -> "OpTypeReserveId"
+                | OpTypeQueue(_) -> "OpTypeQueue"
+                | OpTypePipe(_) -> "OpTypePipe"
+                | OpTypeForwardPointer(_) -> "OpTypeForwardPointer"
+                | OpConstantTrue(_) -> "OpConstantTrue"
+                | OpConstantFalse(_) -> "OpConstantFalse"
+                | OpConstant(_) -> "OpConstant"
+                | OpConstantComposite(_) -> "OpConstantComposite"
+                | OpConstantSampler(_) -> "OpConstantSampler"
+                | OpConstantNull(_) -> "OpConstantNull"
+                | OpSpecConstantTrue(_) -> "OpSpecConstantTrue"
+                | OpSpecConstantFalse(_) -> "OpSpecConstantFalse"
+                | OpSpecConstant(_) -> "OpSpecConstant"
+                | OpSpecConstantComposite(_) -> "OpSpecConstantComposite"
+                | OpSpecConstantOp(_) -> "OpSpecConstantOp"
+                | OpFunction(_) -> "OpFunction"
+                | OpFunctionParameter(_) -> "OpFunctionParameter"
+                | OpFunctionEnd -> "OpFunctionEnd"
+                | OpFunctionCall(_) -> "OpFunctionCall"
+                | OpVariable(_) -> "OpVariable"
+                | OpImageTexelPointer(_) -> "OpImageTexelPointer"
+                | OpLoad(_) -> "OpLoad"
+                | OpStore(_) -> "OpStore"
+                | OpCopyMemory(_) -> "OpCopyMemory"
+                | OpCopyMemorySized(_) -> "OpCopyMemorySized"
+                | OpAccessChain(_) -> "OpAccessChain"
+                | OpInBoundsAccessChain(_) -> "OpInBoundsAccessChain"
+                | OpPtrAccessChain(_) -> "OpPtrAccessChain"
+                | OpArrayLength(_) -> "OpArrayLength"
+                | OpGenericPtrMemSemantics(_) -> "OpGenericPtrMemSemantics"
+                | OpInBoundsPtrAccessChain(_) -> "OpInBoundsPtrAccessChain"
+                | OpDecorate(_) -> "OpDecorate"
+                | OpMemberDecorate(_) -> "OpMemberDecorate"
+                | OpDecorationGroup(_) -> "OpDecorationGroup"
+                | OpGroupDecorate(_) -> "OpGroupDecorate"
+                | OpGroupMemberDecorate(_) -> "OpGroupMemberDecorate"
+                | OpVectorExtractDynamic(_) -> "OpVectorExtractDynamic"
+                | OpVectorInsertDynamic(_) -> "OpVectorInsertDynamic"
+                | OpVectorShuffle(_) -> "OpVectorShuffle"
+                | OpCompositeConstruct(_) -> "OpCompositeConstruct"
+                | OpCompositeExtract(_) -> "OpCompositeExtract"
+                | OpCompositeInsert(_) -> "OpCompositeInsert"
+                | OpCopyObject(_) -> "OpCopyObject"
+                | OpTranspose(_) -> "OpTranspose"
+                | OpSampledImage(_) -> "OpSampledImage"
+                | OpImageSampleImplicitLod(_) -> "OpImageSampleImplicitLod"
+                | OpImageSampleExplicitLod(_) -> "OpImageSampleExplicitLod"
+                | OpImageSampleDrefImplicitLod(_) -> "OpImageSampleDrefImplicitLod"
+                | OpImageSampleDrefExplicitLod(_) -> "OpImageSampleDrefExplicitLod"
+                | OpImageSampleProjImplicitLod(_) -> "OpImageSampleProjImplicitLod"
+                | OpImageSampleProjExplicitLod(_) -> "OpImageSampleProjExplicitLod"
+                | OpImageSampleProjDrefImplicitLod(_) -> "OpImageSampleProjDrefImplicitLod"
+                | OpImageSampleProjDrefExplicitLod(_) -> "OpImageSampleProjDrefExplicitLod"
+                | OpImageFetch(_) -> "OpImageFetch"
+                | OpImageGather(_) -> "OpImageGather"
+                | OpImageDrefGather(_) -> "OpImageDrefGather"
+                | OpImageRead(_) -> "OpImageRead"
+                | OpImageWrite(_) -> "OpImageWrite"
+                | OpImage(_) -> "OpImage"
+                | OpImageQueryFormat(_) -> "OpImageQueryFormat"
+                | OpImageQueryOrder(_) -> "OpImageQueryOrder"
+                | OpImageQuerySizeLod(_) -> "OpImageQuerySizeLod"
+                | OpImageQuerySize(_) -> "OpImageQuerySize"
+                | OpImageQueryLod(_) -> "OpImageQueryLod"
+                | OpImageQueryLevels(_) -> "OpImageQueryLevels"
+                | OpImageQuerySamples(_) -> "OpImageQuerySamples"
+                | OpConvertFToU(_) -> "OpConvertFToU"
+                | OpConvertFToS(_) -> "OpConvertFToS"
+                | OpConvertSToF(_) -> "OpConvertSToF"
+                | OpConvertUToF(_) -> "OpConvertUToF"
+                | OpUConvert(_) -> "OpUConvert"
+                | OpSConvert(_) -> "OpSConvert"
+                | OpFConvert(_) -> "OpFConvert"
+                | OpQuantizeToF16(_) -> "OpQuantizeToF16"
+                | OpConvertPtrToU(_) -> "OpConvertPtrToU"
+                | OpSatConvertSToU(_) -> "OpSatConvertSToU"
+                | OpSatConvertUToS(_) -> "OpSatConvertUToS"
+                | OpConvertUToPtr(_) -> "OpConvertUToPtr"
+                | OpPtrCastToGeneric(_) -> "OpPtrCastToGeneric"
+                | OpGenericCastToPtr(_) -> "OpGenericCastToPtr"
+                | OpGenericCastToPtrExplicit(_) -> "OpGenericCastToPtrExplicit"
+                | OpBitcast(_) -> "OpBitcast"
+                | OpSNegate(_) -> "OpSNegate"
+                | OpFNegate(_) -> "OpFNegate"
+                | OpIAdd(_) -> "OpIAdd"
+                | OpFAdd(_) -> "OpFAdd"
+                | OpISub(_) -> "OpISub"
+                | OpFSub(_) -> "OpFSub"
+                | OpIMul(_) -> "OpIMul"
+                | OpFMul(_) -> "OpFMul"
+                | OpUDiv(_) -> "OpUDiv"
+                | OpSDiv(_) -> "OpSDiv"
+                | OpFDiv(_) -> "OpFDiv"
+                | OpUMod(_) -> "OpUMod"
+                | OpSRem(_) -> "OpSRem"
+                | OpSMod(_) -> "OpSMod"
+                | OpFRem(_) -> "OpFRem"
+                | OpFMod(_) -> "OpFMod"
+                | OpVectorTimesScalar(_) -> "OpVectorTimesScalar"
+                | OpMatrixTimesScalar(_) -> "OpMatrixTimesScalar"
+                | OpVectorTimesMatrix(_) -> "OpVectorTimesMatrix"
+                | OpMatrixTimesVector(_) -> "OpMatrixTimesVector"
+                | OpMatrixTimesMatrix(_) -> "OpMatrixTimesMatrix"
+                | OpOuterProduct(_) -> "OpOuterProduct"
+                | OpDot(_) -> "OpDot"
+                | OpIAddCarry(_) -> "OpIAddCarry"
+                | OpISubBorrow(_) -> "OpISubBorrow"
+                | OpUMulExtended(_) -> "OpUMulExtended"
+                | OpSMulExtended(_) -> "OpSMulExtended"
+                | OpAny(_) -> "OpAny"
+                | OpAll(_) -> "OpAll"
+                | OpIsNan(_) -> "OpIsNan"
+                | OpIsInf(_) -> "OpIsInf"
+                | OpIsFinite(_) -> "OpIsFinite"
+                | OpIsNormal(_) -> "OpIsNormal"
+                | OpSignBitSet(_) -> "OpSignBitSet"
+                | OpLessOrGreater(_) -> "OpLessOrGreater"
+                | OpOrdered(_) -> "OpOrdered"
+                | OpUnordered(_) -> "OpUnordered"
+                | OpLogicalEqual(_) -> "OpLogicalEqual"
+                | OpLogicalNotEqual(_) -> "OpLogicalNotEqual"
+                | OpLogicalOr(_) -> "OpLogicalOr"
+                | OpLogicalAnd(_) -> "OpLogicalAnd"
+                | OpLogicalNot(_) -> "OpLogicalNot"
+                | OpSelect(_) -> "OpSelect"
+                | OpIEqual(_) -> "OpIEqual"
+                | OpINotEqual(_) -> "OpINotEqual"
+                | OpUGreaterThan(_) -> "OpUGreaterThan"
+                | OpSGreaterThan(_) -> "OpSGreaterThan"
+                | OpUGreaterThanEqual(_) -> "OpUGreaterThanEqual"
+                | OpSGreaterThanEqual(_) -> "OpSGreaterThanEqual"
+                | OpULessThan(_) -> "OpULessThan"
+                | OpSLessThan(_) -> "OpSLessThan"
+                | OpULessThanEqual(_) -> "OpULessThanEqual"
+                | OpSLessThanEqual(_) -> "OpSLessThanEqual"
+                | OpFOrdEqual(_) -> "OpFOrdEqual"
+                | OpFUnordEqual(_) -> "OpFUnordEqual"
+                | OpFOrdNotEqual(_) -> "OpFOrdNotEqual"
+                | OpFUnordNotEqual(_) -> "OpFUnordNotEqual"
+                | OpFOrdLessThan(_) -> "OpFOrdLessThan"
+                | OpFUnordLessThan(_) -> "OpFUnordLessThan"
+                | OpFOrdGreaterThan(_) -> "OpFOrdGreaterThan"
+                | OpFUnordGreaterThan(_) -> "OpFUnordGreaterThan"
+                | OpFOrdLessThanEqual(_) -> "OpFOrdLessThanEqual"
+                | OpFUnordLessThanEqual(_) -> "OpFUnordLessThanEqual"
+                | OpFOrdGreaterThanEqual(_) -> "OpFOrdGreaterThanEqual"
+                | OpFUnordGreaterThanEqual(_) -> "OpFUnordGreaterThanEqual"
+                | OpShiftRightLogical(_) -> "OpShiftRightLogical"
+                | OpShiftRightArithmetic(_) -> "OpShiftRightArithmetic"
+                | OpShiftLeftLogical(_) -> "OpShiftLeftLogical"
+                | OpBitwiseOr(_) -> "OpBitwiseOr"
+                | OpBitwiseXor(_) -> "OpBitwiseXor"
+                | OpBitwiseAnd(_) -> "OpBitwiseAnd"
+                | OpNot(_) -> "OpNot"
+                | OpBitFieldInsert(_) -> "OpBitFieldInsert"
+                | OpBitFieldSExtract(_) -> "OpBitFieldSExtract"
+                | OpBitFieldUExtract(_) -> "OpBitFieldUExtract"
+                | OpBitReverse(_) -> "OpBitReverse"
+                | OpBitCount(_) -> "OpBitCount"
+                | OpDPdx(_) -> "OpDPdx"
+                | OpDPdy(_) -> "OpDPdy"
+                | OpFwidth(_) -> "OpFwidth"
+                | OpDPdxFine(_) -> "OpDPdxFine"
+                | OpDPdyFine(_) -> "OpDPdyFine"
+                | OpFwidthFine(_) -> "OpFwidthFine"
+                | OpDPdxCoarse(_) -> "OpDPdxCoarse"
+                | OpDPdyCoarse(_) -> "OpDPdyCoarse"
+                | OpFwidthCoarse(_) -> "OpFwidthCoarse"
+                | OpEmitVertex -> "OpEmitVertex"
+                | OpEndPrimitive -> "OpEndPrimitive"
+                | OpEmitStreamVertex(_) -> "OpEmitStreamVertex"
+                | OpEndStreamPrimitive(_) -> "OpEndStreamPrimitive"
+                | OpControlBarrier(_) -> "OpControlBarrier"
+                | OpMemoryBarrier(_) -> "OpMemoryBarrier"
+                | OpAtomicLoad(_) -> "OpAtomicLoad"
+                | OpAtomicStore(_) -> "OpAtomicStore"
+                | OpAtomicExchange(_) -> "OpAtomicExchange"
+                | OpAtomicCompareExchange(_) -> "OpAtomicCompareExchange"
+                | OpAtomicCompareExchangeWeak(_) -> "OpAtomicCompareExchangeWeak"
+                | OpAtomicIIncrement(_) -> "OpAtomicIIncrement"
+                | OpAtomicIDecrement(_) -> "OpAtomicIDecrement"
+                | OpAtomicIAdd(_) -> "OpAtomicIAdd"
+                | OpAtomicISub(_) -> "OpAtomicISub"
+                | OpAtomicSMin(_) -> "OpAtomicSMin"
+                | OpAtomicUMin(_) -> "OpAtomicUMin"
+                | OpAtomicSMax(_) -> "OpAtomicSMax"
+                | OpAtomicUMax(_) -> "OpAtomicUMax"
+                | OpAtomicAnd(_) -> "OpAtomicAnd"
+                | OpAtomicOr(_) -> "OpAtomicOr"
+                | OpAtomicXor(_) -> "OpAtomicXor"
+                | OpPhi(_) -> "OpPhi"
+                | OpLoopMerge(_) -> "OpLoopMerge"
+                | OpSelectionMerge(_) -> "OpSelectionMerge"
+                | OpLabel(_) -> "OpLabel"
+                | OpBranch(_) -> "OpBranch"
+                | OpBranchConditional(_) -> "OpBranchConditional"
+                | OpSwitch(_) -> "OpSwitch"
+                | OpKill -> "OpKill"
+                | OpReturn -> "OpReturn"
+                | OpReturnValue(_) -> "OpReturnValue"
+                | OpUnreachable -> "OpUnreachable"
+                | OpLifetimeStart(_) -> "OpLifetimeStart"
+                | OpLifetimeStop(_) -> "OpLifetimeStop"
+                | OpGroupAsyncCopy(_) -> "OpGroupAsyncCopy"
+                | OpGroupWaitEvents(_) -> "OpGroupWaitEvents"
+                | OpGroupAll(_) -> "OpGroupAll"
+                | OpGroupAny(_) -> "OpGroupAny"
+                | OpGroupBroadcast(_) -> "OpGroupBroadcast"
+                | OpGroupIAdd(_) -> "OpGroupIAdd"
+                | OpGroupFAdd(_) -> "OpGroupFAdd"
+                | OpGroupFMin(_) -> "OpGroupFMin"
+                | OpGroupUMin(_) -> "OpGroupUMin"
+                | OpGroupSMin(_) -> "OpGroupSMin"
+                | OpGroupFMax(_) -> "OpGroupFMax"
+                | OpGroupUMax(_) -> "OpGroupUMax"
+                | OpGroupSMax(_) -> "OpGroupSMax"
+                | OpReadPipe(_) -> "OpReadPipe"
+                | OpWritePipe(_) -> "OpWritePipe"
+                | OpReservedReadPipe(_) -> "OpReservedReadPipe"
+                | OpReservedWritePipe(_) -> "OpReservedWritePipe"
+                | OpReserveReadPipePackets(_) -> "OpReserveReadPipePackets"
+                | OpReserveWritePipePackets(_) -> "OpReserveWritePipePackets"
+                | OpCommitReadPipe(_) -> "OpCommitReadPipe"
+                | OpCommitWritePipe(_) -> "OpCommitWritePipe"
+                | OpIsValidReserveId(_) -> "OpIsValidReserveId"
+                | OpGetNumPipePackets(_) -> "OpGetNumPipePackets"
+                | OpGetMaxPipePackets(_) -> "OpGetMaxPipePackets"
+                | OpGroupReserveReadPipePackets(_) -> "OpGroupReserveReadPipePackets"
+                | OpGroupReserveWritePipePackets(_) -> "OpGroupReserveWritePipePackets"
+                | OpGroupCommitReadPipe(_) -> "OpGroupCommitReadPipe"
+                | OpGroupCommitWritePipe(_) -> "OpGroupCommitWritePipe"
+                | OpEnqueueMarker(_) -> "OpEnqueueMarker"
+                | OpEnqueueKernel(_) -> "OpEnqueueKernel"
+                | OpGetKernelNDrangeSubGroupCount(_) -> "OpGetKernelNDrangeSubGroupCount"
+                | OpGetKernelNDrangeMaxSubGroupSize(_) -> "OpGetKernelNDrangeMaxSubGroupSize"
+                | OpGetKernelWorkGroupSize(_) -> "OpGetKernelWorkGroupSize"
+                | OpGetKernelPreferredWorkGroupSizeMultiple(_) -> "OpGetKernelPreferredWorkGroupSizeMultiple"
+                | OpRetainEvent(_) -> "OpRetainEvent"
+                | OpReleaseEvent(_) -> "OpReleaseEvent"
+                | OpCreateUserEvent(_) -> "OpCreateUserEvent"
+                | OpIsValidEvent(_) -> "OpIsValidEvent"
+                | OpSetUserEventStatus(_) -> "OpSetUserEventStatus"
+                | OpCaptureEventProfilingInfo(_) -> "OpCaptureEventProfilingInfo"
+                | OpGetDefaultQueue(_) -> "OpGetDefaultQueue"
+                | OpBuildNDRange(_) -> "OpBuildNDRange"
+                | OpImageSparseSampleImplicitLod(_) -> "OpImageSparseSampleImplicitLod"
+                | OpImageSparseSampleExplicitLod(_) -> "OpImageSparseSampleExplicitLod"
+                | OpImageSparseSampleDrefImplicitLod(_) -> "OpImageSparseSampleDrefImplicitLod"
+                | OpImageSparseSampleDrefExplicitLod(_) -> "OpImageSparseSampleDrefExplicitLod"
+                | OpImageSparseSampleProjImplicitLod(_) -> "OpImageSparseSampleProjImplicitLod"
+                | OpImageSparseSampleProjExplicitLod(_) -> "OpImageSparseSampleProjExplicitLod"
+                | OpImageSparseSampleProjDrefImplicitLod(_) -> "OpImageSparseSampleProjDrefImplicitLod"
+                | OpImageSparseSampleProjDrefExplicitLod(_) -> "OpImageSparseSampleProjDrefExplicitLod"
+                | OpImageSparseFetch(_) -> "OpImageSparseFetch"
+                | OpImageSparseGather(_) -> "OpImageSparseGather"
+                | OpImageSparseDrefGather(_) -> "OpImageSparseDrefGather"
+                | OpImageSparseTexelsResident(_) -> "OpImageSparseTexelsResident"
+                | OpNoLine -> "OpNoLine"
+                | OpAtomicFlagTestAndSet(_) -> "OpAtomicFlagTestAndSet"
+                | OpAtomicFlagClear(_) -> "OpAtomicFlagClear"
+
+
 
 
 type Module =
