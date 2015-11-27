@@ -22,7 +22,7 @@ type Type =
     | SampledImage of Type
     | Ptr of StorageClass * Type
 
-    //sampledType : uint32 * dim : Dim * depth : uint32 * arrayed : uint32 * ms : uint32 * sampled : uint32 * format : int * access : Option<AccessQualifier>
+
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Type =
 
@@ -96,7 +96,6 @@ module Type =
         Dictionary.ofList [
             (Int8, Int8), Int8
         ]
-
 
 module InstructionPrinter =
     
@@ -282,9 +281,6 @@ module InstructionPrinter =
 
 
 
-
-
-
 type Label(name : string) =
     let id = System.Guid.NewGuid()
     let name = if System.String.IsNullOrEmpty name then id.ToString() else name
@@ -309,7 +305,6 @@ type Label(name : string) =
 
 type Var(name : string, t : Type, isMutable : bool) =
     let id = System.Guid.NewGuid()
-    //let t = Ptr(StorageClass.Function, t)
 
     member x.Id = id
     member x.Name = name
@@ -331,6 +326,12 @@ type Var(name : string, t : Type, isMutable : bool) =
     new(name : string, t : Type) = Var(name, t, false)         
     new(t : Type) = Var(System.Guid.NewGuid().ToString(), t, false)          
 
+
+type UnaryOperation =
+    | Negate
+    | All
+    | Any
+
 type BinaryOperation =
     | Add
     | Sub
@@ -349,20 +350,9 @@ type BinaryOperation =
     | BitAnd | BitOr | BitXor | LeftShift | RightShiftArithmetic | RightShiftLogic
 
 
-type UnaryOperation =
-    | Negate
-    | All
-    | Any
-
-
-
 type Expr =
     abstract member Type : Type
     abstract member Substitute : (Var -> Option<Var>) -> Expr
-
-
-type Function = FunctionDefinition of arguments : list<Var> * body : Expr
-
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Expr =
@@ -962,7 +952,7 @@ module SpirVBuilders =
             
             static member Empty = 
                 {
-                    currentId = 0u
+                    currentId = 1u
                     typeInstructions = Nil
                     instructions = Nil
                     typeCache = Map.empty
@@ -1046,12 +1036,9 @@ module SpirVBuilders =
                     s,id
                 | None ->
                     let (s, id) = newId.build s
-                    let (s, lid) = getLabelId(Label()).build s
 
                     { s with 
                         variableIds = Map.add v id s.variableIds
-                        instructions = Snoc(s.instructions, OpLabel(lid)) 
-                        variableDeclarationLabels = Map.add v lid s.variableDeclarationLabels
                     }, id
         }
 
@@ -2114,6 +2101,68 @@ module SpirV =
             return fid
         }
 
+    and compileShader (inputs : Map<int, Var * Option<BuiltIn>>) (outputs : Map<int, Var * Option<BuiltIn>>) (uniforms : Map<int * int, Var>) (model : ExecutionModel) (body : Expr) =
+        spirv {
+            
+            yield OpSource(SourceLanguage.unknown, 0u, "")
+            yield OpCapability(1) // Shader
+            let! eid = newId
+            yield OpExtInstImport(eid, "GLSL.std.450")
+
+            yield OpMemoryModel(AddressingModel.Logical, MemoryModel.GLSL450)
+
+            for (i,(v,b)) in Map.toSeq inputs do
+                let! vid = getVarId v
+                let! ptid = getTypeId (Ptr(StorageClass.Input, v.Type))
+
+                yield OpVariable(ptid, vid, StorageClass.Input, None)
+
+                match b with
+                    | Some b ->
+                        yield OpDecorate(vid, unbox<Decoration> 11, [|uint32 (int b)|])
+                    | None -> 
+                        yield OpDecorate(vid, Decoration.Location, [|uint32 i|])
+
+                yield OpName(vid, v.Name)
+
+            for (i,(v,b)) in Map.toSeq outputs do
+                let! vid = getVarId v
+                let! ptid = getTypeId (Ptr(StorageClass.Output, v.Type))
+
+                yield OpVariable(ptid, vid, StorageClass.Output, None)
+                
+                match b with
+                    | Some b ->
+                        yield OpDecorate(vid, unbox<Decoration> 11, [|uint32 (int b)|])
+                    | None -> 
+                        yield OpDecorate(vid, Decoration.Location, [|uint32 i|])
+
+                yield OpName(vid, v.Name)
+
+            for ((set, binding), v) in Map.toSeq uniforms do
+                let! vid = getVarId v
+                let! ptid = getTypeId (Ptr(StorageClass.Uniform, v.Type))
+            
+                yield OpVariable(ptid, vid, StorageClass.Uniform, None)
+                yield OpDecorate(vid, Decoration.DescriptorSet, [|uint32 set|])
+                yield OpDecorate(vid, Decoration.Binding, [|uint32 binding|])
+                match v.Type with
+                    | Struct(_) ->
+                        yield OpDecorate(vid, Decoration.Block, [||])
+                        yield OpDecorate(vid, Decoration.GLSLStd140, [||])
+                    | _ ->
+                        ()
+
+                yield OpName(vid, v.Name)
+
+            let! id = compileFunction "main" Type.Unit [] body
+            yield OpEntryPoint(model, id, "main")
+
+
+
+            return ()
+        }
+
     let test2() =
         let v = new Var("v", Type.M34f)
         let a = new Var("a", Type.V4f)
@@ -2146,37 +2195,51 @@ module SpirV =
                 )
             )
 
-        let s = compileExpr ex
-        let (s, _) = s.build SpirVState.Empty
+
+        let pos = Var("gl_Position", Type.V4f)
+        let i = Var("Positions", Type.V4f)
+
+
+        let body = Expr.VarSet(pos, Expr.Var i)
+
+        let res = compileShader (Map.ofList [0, (i, None)]) (Map.ofList [-1, (pos, Some BuiltIn.Position)]) Map.empty ExecutionModel.Vertex body
+
+        let(s,_) = res.build SpirVState.Empty
 
 
 
-        let a = Var("a", Type.Int32)
-        let b = Var("b", Type.Int32)
-        let i = Var("i", Type.Int32)
-        let v = Var("v", Type.Int32)
-        let body =
-            Expr.Let(v, Expr.Value(Type.Int32, 0),
-                Expr.Block [
-                    Expr.ForIntegerRangeLoop(
-                        i, Expr.Value(Type.Int32, 0), Expr.Var a,
-                        Expr.Block [
-                            Expr.IfThenElse(
-                                Expr.Smaller(Expr.Var i, Expr.Value(Type.Int32, 2)),
-                                Expr.Continue,
-                                Expr.Break
-                            )
-                            Expr.VarSet(v, Expr.Add(Expr.Var v, Expr.Mul(Expr.Var i, Expr.Var b)))
-                        ]
-                    )
-                    Expr.Return(Expr.Var v)
-                ]
-            )
-
-        let c = compileFunction "test" Type.Int32 [a; b] body
-        let (s,_) = c.build SpirVState.Empty
-
-
+//
+//        let s = compileExpr ex
+//        let (s, _) = s.build SpirVState.Empty
+//
+//
+//
+//        let a = Var("a", Type.Int32)
+//        let b = Var("b", Type.Int32)
+//        let i = Var("i", Type.Int32)
+//        let v = Var("v", Type.Int32)
+//        let body =
+//            Expr.Let(v, Expr.Value(Type.Int32, 0),
+//                Expr.Block [
+//                    Expr.ForIntegerRangeLoop(
+//                        i, Expr.Value(Type.Int32, 0), Expr.Var a,
+//                        Expr.Block [
+//                            Expr.IfThenElse(
+//                                Expr.Smaller(Expr.Var i, Expr.Value(Type.Int32, 2)),
+//                                Expr.Continue,
+//                                Expr.Break
+//                            )
+//                            Expr.VarSet(v, Expr.Add(Expr.Var v, Expr.Mul(Expr.Var i, Expr.Var b)))
+//                        ]
+//                    )
+//                    Expr.Return(Expr.Var v)
+//                ]
+//            )
+//
+//        let c = compileFunction "test" Type.Int32 [a; b] body
+//        let (s,_) = c.build SpirVState.Empty
+//
+//
         let typeInstructions = s.typeInstructions |> RevList.toList
         let instructions = s.instructions |> RevList.toList
 

@@ -25,3 +25,27 @@ let test() =
         printfn "%A" i
 
 
+    let headerLength = 4*4
+
+    let inputInstructions = Array.sub inputData headerLength (inputData.Length-headerLength)
+    let inputStream = new MemoryStream(Array.append inputInstructions (Array.zeroCreate 10000))
+    for i in m.instructions do
+        use testStream = new MemoryStream()
+        let writer = new BinaryWriter(testStream)
+        Serializer.writeInstructions [i] writer
+        let icode = testStream.ToArray()
+        let real = Array.zeroCreate icode.Length
+        inputStream.Read(real, 0, real.Length) |> ignore
+
+
+        if real <> icode then
+            printfn "bad instruction: %A" i
+
+
+
+
+
+
+    inputData, outputData
+
+

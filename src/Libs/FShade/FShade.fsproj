@@ -81,6 +81,7 @@
     <Compile Include="GLSL\GlslCompiler.fs" />
     <Compile Include="GLSL\GlESCompiler.fs" />
     <None Include="SPIRV\spirv.json" />
+    <None Include="SPIRV\spirv-enums.json" />
     <None Include="SPIRV\CodeGen.fsx" />
     <Compile Include="SPIRV\SpirVTypes.fs" />
     <Compile Include="SPIRV\SpirV.fs" />
