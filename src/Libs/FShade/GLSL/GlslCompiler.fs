@@ -385,6 +385,14 @@ module GLSL =
                             let v = v |> unbox<SamplerComparisonState>
                             return GlslSamplers.compileSamplerComparisonState name v
 
+                        | v when t.IsArray ->
+                            let contentType = t.GetElementType()
+                            let arr = v |> unbox<Array>
+                            let elements = Array.init arr.Length (fun i -> arr.GetValue(i))
+                            let! content = elements |> Seq.mapC (fun e -> compileValue contentType e)
+                            let! t = compileType contentType
+
+                            return sprintf "const %s %s[%d] = %s[](%s);" t name elements.Length t (String.concat ", " content)
 
                         | _ -> return! error "unsupported constant type: %A" t 
                 }
