@@ -349,6 +349,7 @@ type BinaryOperation =
     | And | Or
     | BitAnd | BitOr | BitXor | LeftShift | RightShiftArithmetic | RightShiftLogic
 
+    | Dot 
 
 type Expr =
     abstract member Type : Type
@@ -527,6 +528,15 @@ module Expr =
                         else
                             None
 
+                    | Dot ->
+                        if l = r then
+                            match l with
+                                | Vector(et, d) -> Some et
+                                | _ -> None
+                        else
+                            None
+
+
             match res with
                 | Some res -> res
                 | None -> failwithf "could not determine type for %A(%A, %A)" op l r
@@ -609,6 +619,17 @@ module Expr =
                 match args with
                     | [l;r] -> BinaryExpression(op, l, r) :> Expr
                     | _ -> failwith "impossible"
+
+        type GlslCallInstruction(instruction : GLSLExtInstruction, resType : Type, args : list<Expr>) =
+            inherit DerivedExpression(resType, args)
+
+            member x.Instruction = instruction
+            member x.Arguments = args
+
+            override x.Rebuild args =
+                GlslCallInstruction(instruction, resType, args) :> Expr
+
+
 
         type NewObjectExpression(t : Type, args : list<Expr>) =
             inherit DerivedExpression(t, args)
@@ -785,6 +806,56 @@ module Expr =
     let RightShiftLogic(l : Expr, r : Expr) = BinaryExpression(RightShiftLogic, l, r) :> Expr
     let RightShiftArithmetic(l : Expr, r : Expr) = BinaryExpression(RightShiftArithmetic, l, r) :> Expr
 
+    let Dot(l : Expr, r : Expr) = BinaryExpression(Dot, l, r) :> Expr
+    let GlslCall(f : GLSLExtInstruction, resType : Type, args : list<Expr>) = GlslCallInstruction(f, resType, args) :> Expr
+
+    module Glsl =
+        let Cross(l : Expr, r : Expr) =
+            match l.Type with
+                | Vector(et,3) ->
+                    GlslCall(GLSLExtInstruction.GLSLstd450Cross, Type.Vector(et,3), [l;r])
+                | _ ->
+                    failwith "cross only works on 3 component vectors"
+
+        let inline Round(v : Expr) =  GlslCall(GLSLExtInstruction.GLSLstd450Round, v.Type, [v])
+        let inline RoundEven(v : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450RoundEven, v.Type, [v])
+        let inline Trunc(v : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Trunc, v.Type, [v])
+        let inline FAbs(v : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450FAbs, v.Type, [v])
+        let inline SAbs(r : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450SAbs, r.Type, [r])
+        let inline FSign(r : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450FSign, r.Type, [r])
+        let inline SSign(r : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450SSign, r.Type, [r])
+        let inline Floor(r : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Floor, r.Type, [r])
+        let inline Ceil(r : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Ceil, r.Type, [r])
+        let inline Fract(r : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Fract, r.Type, [r])
+
+        
+        let inline Radians(r : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Radians, r.Type, [r])
+        let inline Degrees(r : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Degrees, r.Type, [r])
+        let inline Sin(r : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Sin, r.Type, [r])
+        let inline Cos(r : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Cos, r.Type, [r])
+        let inline Tan(r : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Tan, r.Type, [r])
+        let inline Asin(r : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Asin, r.Type, [r])
+        let inline Acos(r : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Acos, r.Type, [r])
+        let inline Atan(r : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Atan, r.Type, [r])
+        let inline Sinh(r : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Sinh, r.Type, [r])
+        let inline Cosh(r : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Cosh, r.Type, [r])
+        let inline Tanh(r : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Tanh, r.Type, [r])
+        let inline Asinh(r : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Asinh, r.Type, [r])
+        let inline Acosh(r : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Acosh, r.Type, [r])
+        let inline Atanh(r : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Atanh, r.Type, [r])
+        let inline Atan2(y : Expr, x : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Atan2, y.Type, [y;x])
+
+
+        let inline Pow(x : Expr, e : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Pow, x.Type, [x;e])
+        let inline Exp(x : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Exp, x.Type, [x])
+        let inline Log(x : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Log, x.Type, [x])
+        let inline Exp2(x : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Exp2, x.Type, [x])
+        let inline Log2(x : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Log2, x.Type, [x])
+        let inline Sqrt(x : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Sqrt, x.Type, [x])
+        let inline InvSqrt(x : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450InverseSqrt, x.Type, [x])
+
+        let inline Det(x : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450Determinant, x.Type, [x])
+        let inline MatrixInverse(x : Expr) = GlslCall(GLSLExtInstruction.GLSLstd450MatrixInverse, x.Type, [x])
 
 
     let NewObject(t : Type, args : list<Expr>) = NewObjectExpression(t, args) :> Expr
@@ -803,6 +874,8 @@ module Expr =
     let Kill = KillExpression.Instance :> Expr
     let Break = BreakExpression.Instance :> Expr
     let Continue = ContinueExpression.Instance :> Expr
+
+
 
     module Patterns =
         let (|Value|_|) (e : Expr) =
@@ -829,6 +902,13 @@ module Expr =
             match e with
                 | :? BinaryExpression as e -> Some(e.Operation, e.Left, e.Right)
                 | _ -> None
+
+        let (|GlslCall|_|) (e : Expr) =
+            match e with
+                | :? GlslCallInstruction as glsl ->
+                    Some(glsl.Instruction, glsl.Arguments)
+                | _ -> 
+                    None
 
         let (|NewObject|_|) (e : Expr) =
             match e with
@@ -899,6 +979,8 @@ module Expr =
                 | :? ContinueExpression -> Some()
                 | _ -> None
 
+
+
 [<AutoOpen>]
 module SpirVBuilders =
     
@@ -939,6 +1021,7 @@ module SpirVBuilders =
     type SpirVState = 
         {
             currentId : uint32
+            glslExtId : uint32
             typeInstructions : RevList<Instruction>
             instructions : RevList<Instruction>
             typeCache : Map<Type, uint32>
@@ -953,6 +1036,7 @@ module SpirVBuilders =
             static member Empty = 
                 {
                     currentId = 1u
+                    glslExtId = 0u
                     typeInstructions = Nil
                     instructions = Nil
                     typeCache = Map.empty
@@ -968,6 +1052,16 @@ module SpirVBuilders =
 
 
     let newId = { build = fun s -> { s with currentId = s.currentId + 1u}, s.currentId}
+
+    let setGlslId (id : uint32) =
+        { build = fun s ->
+            { s with glslExtId = id }, ()
+        }
+
+    let glslId =
+        { build = fun s ->
+            s, s.glslExtId
+        }
 
     let lastInstruction =
         { build = fun s ->
@@ -1433,6 +1527,8 @@ module SpirV =
                     
         }
 
+
+
     let rec compileBinaryOperator (resultType : Type) (op : BinaryOperation) (l : Expr) (r : Expr) =
         spirv {
             let! lid = compileExpr l
@@ -1742,6 +1838,11 @@ module SpirV =
                         | RightShiftLogic ->
                             yield OpShiftRightLogical(tid, id, lid, rid)
 
+                        | Dot ->
+                            yield OpDot(tid, id, lid, rid)
+
+         
+
                     return id
                 | _ ->
                     return failwith "non-value operation"
@@ -1794,6 +1895,20 @@ module SpirV =
                                     return Some id
                                 | None ->
                                     return failwithf "non-value expression found %A" e
+
+                        | GlslCall(f, args) ->
+                            let! glsl = glslId
+                            let! args = args |> List.mapSpv compileExpr
+                            let! tid = getTypeId self.Type
+                            let! id = newId
+                            let args =
+                                if args |> List.forall Option.isSome then
+                                    args |> List.map (fun v -> v.Value) |> List.toArray
+                                else
+                                    failwith "cannot create composite type from non-value expressions"
+
+                            yield OpExtInst(tid, id, glsl, uint32 (int f), args)
+                            return Some id
 
                         | Block(statements) ->
                             let mutable lastId = -1
@@ -2124,10 +2239,11 @@ module SpirV =
     and compileShader (inputs : Map<int, Var * Option<BuiltIn>>) (outputs : Map<int, Var * Option<BuiltIn>>) (uniforms : Map<int * int, Var>) (model : ExecutionModel) (body : Expr) =
         spirv {
             
-            yield OpSource(SourceLanguage.Unknown, 0u, "")
+            yield OpSource(SourceLanguage.Unknown, 0u, "FShade")
             yield OpCapability(Capability.Shader) // Shader
             let! eid = newId
             yield OpExtInstImport(eid, "GLSL.std.450")
+            do! setGlslId eid
 
             yield OpMemoryModel(AddressingModel.Logical, MemoryModel.GLSL450)
 
@@ -2197,12 +2313,12 @@ module SpirV =
 
         let myType = Struct("sepp", [Type.V2f, "v0"; Type.Int32, "v1"])
 
-        let v = new Var("a", Type.UInt8)
-        let v2 = new Var("b", Type.UInt8)
+        let v = new Var("a", Type.UInt8, true)
+        let v2 = new Var("b", Type.UInt8, true)
 
         let zeroVec = Expr.Value(Type.V2d, V2d.II)
 
-        let m = new Var("m", myType)
+        let m = new Var("m", myType, true)
 
         let ex = 
             Expr.Let(v, Expr.Value(Type.UInt8, 1uy), 
@@ -2216,8 +2332,8 @@ module SpirV =
             )
 
 
-        let pos = Var("gl_Position", Type.V4f)
-        let i = Var("Positions", Type.V4f)
+        let pos = Var("gl_Position", Type.V4f, true)
+        let i = Var("Positions", Type.V4f, true)
 
 
         let body = Expr.VarSet(pos, Expr.Var i)
