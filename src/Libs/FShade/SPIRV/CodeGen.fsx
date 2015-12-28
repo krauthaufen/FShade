@@ -12,6 +12,7 @@ open Newtonsoft.Json.Linq
 open Newtonsoft.Json.Serialization
 
 let file = Path.Combine(__SOURCE_DIRECTORY__, "spirv.json")
+let enumFile = Path.Combine(__SOURCE_DIRECTORY__, "spirv-enums.json")
 let outputFile = Path.Combine(__SOURCE_DIRECTORY__, "SpirV.fs")
 
 [<AutoOpen>]
@@ -639,6 +640,46 @@ module Writer =
     let splitLines (str : string) =
         str.Split([|'\r'; '\n'|], StringSplitOptions.RemoveEmptyEntries)
 
+
+    let printEnums() =
+        let obj = JsonConvert.DeserializeObject(File.ReadAllText enumFile) |> unbox<JObject>
+    
+        match obj.TryGetValue "spv" with
+            | (true, (:? JObject as spv)) ->
+                
+                match spv.TryGetValue "enum" with
+                    | (true, enums) ->
+                        
+                        for e in enums.Children() do
+                            let name = e.["Name"].Value<string>()
+                            let t = e.["Type"].Value<string>()
+                            let values = e.["Values"].Value<JObject>()
+
+                            let flags = t.ToLower() = "bit"
+
+                            if flags then
+                                printfn "[<Flags>]"
+                                printfn "type %s =" name
+                                printfn "    | None = 0x%08X" 0
+
+                                for v in values.Properties() do
+                                    let bit = v.Value.Value<int>()
+                                    printfn "    | %s = 0x%08X" v.Name (1<<<bit)
+
+                            else
+                                printfn "type %s =" name
+                                for v in values.Properties() do
+                                    printfn "    | %s = %d" v.Name (v.Value.Value<int>())
+
+                            printfn ""
+
+                    | _ ->
+                        failwith "cannot find enums"
+
+            | _ -> failwith "cannot find spv tag"
+
+
+
     let types =
         Map.ofList [
             OperandClass.OperandNone, "unit"
@@ -673,10 +714,10 @@ module Writer =
             OperandClass.OperandBuiltIn, "BuiltIn"
             OperandClass.OperandSelect, "SelectionControl"
             OperandClass.OperandLoop, "LoopControl"
-            OperandClass.OperandFunction, "FunctionControlMask"
+            OperandClass.OperandFunction, "FunctionControl"
             OperandClass.OperandMemorySemantics, "MemorySemantics"
             OperandClass.OperandMemoryAccess, "MemoryAccess"
-            OperandClass.OperandScope, "ExecutionScope"
+            OperandClass.OperandScope, "Scope"
             OperandClass.OperandGroupOperation, "GroupOperation"
             OperandClass.OperandKernelEnqueueFlags, "KernelEnqueueFlags"
             OperandClass.OperandKernelProfilingInfo, "KernelProfilingInfo"
@@ -1032,6 +1073,12 @@ module Writer =
         builder <- System.Text.StringBuilder()
 
         printfn "namespace SpirV"
+        printfn "open System"
+        printfn ""
+
+        printEnums()
+        
+        printfn ""
         printfn ""
         writeOpDefinition spec
 

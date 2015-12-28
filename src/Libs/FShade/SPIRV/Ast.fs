@@ -309,7 +309,7 @@ type Var(name : string, t : Type, isMutable : bool) =
     member x.Id = id
     member x.Name = name
     member x.Type = t
-    member x.Mutable = isMutable
+    member x.IsMutable = isMutable
 
     interface System.IComparable with
         member x.CompareTo(o) =
@@ -1040,6 +1040,13 @@ module SpirVBuilders =
                     { s with 
                         variableIds = Map.add v id s.variableIds
                     }, id
+        }
+
+    let setVarId (v : Var) (id : uint32) =
+        { build = fun s ->
+            { s with 
+                variableIds = Map.add v id s.variableIds
+            }, ()
         }
 
     let freshVarId (v : Var) =
@@ -1820,25 +1827,32 @@ module SpirV =
                             return Some id
 
                         | Var(v) ->
-                            let! id = getVarId v
+                            if v.IsMutable then
+                                let! id = getVarId v
 
-                            let! tid = getTypeId v.Type
-                            let! rid = newId
+                                let! tid = getTypeId v.Type
+                                let! rid = newId
 
-                            yield OpLoad(tid, rid, id, None)
+                                yield OpLoad(tid, rid, id, None)
 
-                            return Some rid
+                                return Some rid
+                            else
+                                let! id = getVarId v
+                                return Some id
 
                         | VarSet(v,e) ->
-                            let! e = compileExpr e
-                            match e with
-                                | Some e ->
-                                    let! id = getVarId v
+                            if v.IsMutable then
+                                let! e = compileExpr e
+                                match e with
+                                    | Some e ->
+                                        let! id = getVarId v
 
-                                    yield OpStore(id, e, None)
-                                    return None
-                                | None ->
-                                    return failwith "cannot set variable to non-value expression"
+                                        yield OpStore(id, e, None)
+                                        return None
+                                    | None ->
+                                        return failwith "cannot set variable to non-value expression"
+                            else
+                                return failwith "cannot set immutable let binding"
 
                         | Value(t, v) ->
                             let byteArray = byteArray v
@@ -1857,17 +1871,23 @@ module SpirV =
                             let! e = compileExpr e
                             match e with
                                 | Some e ->
-                                    let! tid = getTypeId (Ptr(StorageClass.Function, v.Type))
-                                    let! vid = getVarId v
+                                    if v.IsMutable then
+                                        let! tid = getTypeId (Ptr(StorageClass.Function, v.Type))
+                                        let! vid = getVarId v
                             
-                                    yield OpVariable(tid, vid, StorageClass.Function, Some e)
-                                    yield OpName(vid, v.Name)
+                                        yield OpVariable(tid, vid, StorageClass.Function, Some e)
+                                        yield OpName(vid, v.Name)
 
-                                    let! b = compileExpr b
-                                    return b
+                                        let! b = compileExpr b
+                                        return b
 
+                                    else
+                                        do! setVarId v e
+                                        let! b = compileExpr b
+                                        return b
                                 | None ->
                                     return failwith "cannot let non-value expression"
+                                        
 
 
                         | IfThenElse(c, UnitVal, UnitVal) ->
@@ -1992,7 +2012,7 @@ module SpirV =
                                     // if i < upper then jmp body else jmp body
                                     yield OpLoad(tid, iv, vid, None)
                                     yield OpSLessThanEqual(bid, cid, iv, u)
-                                    yield OpLoopMerge(endLabel, startLabel, LoopControl.NoControl)
+                                    yield OpLoopMerge(endLabel, startLabel, LoopControl.None)
 
 
                                     
@@ -2032,7 +2052,7 @@ module SpirV =
                             match gid with
                                 | Some gid ->
                                     
-                                    yield OpLoopMerge(endLabel, startLabel, LoopControl.NoControl)
+                                    yield OpLoopMerge(endLabel, startLabel, LoopControl.None)
                                     yield OpBranchConditional(gid, bodyLabel, endLabel, [||])
 
                                     do! pushScope { startLabel = startLabel; endLabel = endLabel }
@@ -2085,7 +2105,7 @@ module SpirV =
 
             let! label = getLabelId <| Label()
 
-            yield OpFunction(ret, fid, FunctionControlMask.Pure, fType)
+            yield OpFunction(ret, fid, FunctionControl.None, fType)
             yield OpName(fid, name)
 
             for (id, a) in List.zip argIds args do
@@ -2104,7 +2124,7 @@ module SpirV =
     and compileShader (inputs : Map<int, Var * Option<BuiltIn>>) (outputs : Map<int, Var * Option<BuiltIn>>) (uniforms : Map<int * int, Var>) (model : ExecutionModel) (body : Expr) =
         spirv {
             
-            yield OpSource(SourceLanguage.unknown, 0u, "")
+            yield OpSource(SourceLanguage.Unknown, 0u, "")
             yield OpCapability(1) // Shader
             let! eid = newId
             yield OpExtInstImport(eid, "GLSL.std.450")
@@ -2149,7 +2169,7 @@ module SpirV =
                 match v.Type with
                     | Struct(_) ->
                         yield OpDecorate(vid, Decoration.Block, [||])
-                        yield OpDecorate(vid, Decoration.GLSLStd140, [||])
+                        yield OpDecorate(vid, Decoration.GLSLShared, [||])
                     | _ ->
                         ()
 

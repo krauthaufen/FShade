@@ -1,4 +1,731 @@
 namespace SpirV
+open System
+
+type SourceLanguage =
+    | Unknown = 0
+    | ESSL = 1
+    | GLSL = 2
+    | OpenCL_C = 3
+    | OpenCL_CPP = 4
+
+type ExecutionModel =
+    | Vertex = 0
+    | TessellationControl = 1
+    | TessellationEvaluation = 2
+    | Geometry = 3
+    | Fragment = 4
+    | GLCompute = 5
+    | Kernel = 6
+
+type AddressingModel =
+    | Logical = 0
+    | Physical32 = 1
+    | Physical64 = 2
+
+type MemoryModel =
+    | Simple = 0
+    | GLSL450 = 1
+    | OpenCL = 2
+
+type ExecutionMode =
+    | Invocations = 0
+    | SpacingEqual = 1
+    | SpacingFractionalEven = 2
+    | SpacingFractionalOdd = 3
+    | VertexOrderCw = 4
+    | VertexOrderCcw = 5
+    | PixelCenterInteger = 6
+    | OriginUpperLeft = 7
+    | OriginLowerLeft = 8
+    | EarlyFragmentTests = 9
+    | PointMode = 10
+    | Xfb = 11
+    | DepthReplacing = 12
+    | DepthGreater = 14
+    | DepthLess = 15
+    | DepthUnchanged = 16
+    | LocalSize = 17
+    | LocalSizeHint = 18
+    | InputPoints = 19
+    | InputLines = 20
+    | InputLinesAdjacency = 21
+    | Triangles = 22
+    | InputTrianglesAdjacency = 23
+    | Quads = 24
+    | Isolines = 25
+    | OutputVertices = 26
+    | OutputPoints = 27
+    | OutputLineStrip = 28
+    | OutputTriangleStrip = 29
+    | VecTypeHint = 30
+    | ContractionOff = 31
+
+type StorageClass =
+    | UniformConstant = 0
+    | Input = 1
+    | Uniform = 2
+    | Output = 3
+    | Workgroup = 4
+    | CrossWorkgroup = 5
+    | Private = 6
+    | Function = 7
+    | Generic = 8
+    | PushConstant = 9
+    | AtomicCounter = 10
+    | Image = 11
+
+type Dim =
+    | Dim1D = 0
+    | Dim2D = 1
+    | Dim3D = 2
+    | Cube = 3
+    | Rect = 4
+    | Buffer = 5
+    | SubpassData = 6
+
+type SamplerAddressingMode =
+    | None = 0
+    | ClampToEdge = 1
+    | Clamp = 2
+    | Repeat = 3
+    | RepeatMirrored = 4
+
+type SamplerFilterMode =
+    | Nearest = 0
+    | Linear = 1
+
+type ImageFormat =
+    | Unknown = 0
+    | Rgba32f = 1
+    | Rgba16f = 2
+    | R32f = 3
+    | Rgba8 = 4
+    | Rgba8Snorm = 5
+    | Rg32f = 6
+    | Rg16f = 7
+    | R11fG11fB10f = 8
+    | R16f = 9
+    | Rgba16 = 10
+    | Rgb10A2 = 11
+    | Rg16 = 12
+    | Rg8 = 13
+    | R16 = 14
+    | R8 = 15
+    | Rgba16Snorm = 16
+    | Rg16Snorm = 17
+    | Rg8Snorm = 18
+    | R16Snorm = 19
+    | R8Snorm = 20
+    | Rgba32i = 21
+    | Rgba16i = 22
+    | Rgba8i = 23
+    | R32i = 24
+    | Rg32i = 25
+    | Rg16i = 26
+    | Rg8i = 27
+    | R16i = 28
+    | R8i = 29
+    | Rgba32ui = 30
+    | Rgba16ui = 31
+    | Rgba8ui = 32
+    | R32ui = 33
+    | Rgb10a2ui = 34
+    | Rg32ui = 35
+    | Rg16ui = 36
+    | Rg8ui = 37
+    | R16ui = 38
+    | R8ui = 39
+
+type ImageChannelOrder =
+    | R = 0
+    | A = 1
+    | RG = 2
+    | RA = 3
+    | RGB = 4
+    | RGBA = 5
+    | BGRA = 6
+    | ARGB = 7
+    | Intensity = 8
+    | Luminance = 9
+    | Rx = 10
+    | RGx = 11
+    | RGBx = 12
+    | Depth = 13
+    | DepthStencil = 14
+    | sRGB = 15
+    | sRGBx = 16
+    | sRGBA = 17
+    | sBGRA = 18
+
+type ImageChannelDataType =
+    | SnormInt8 = 0
+    | SnormInt16 = 1
+    | UnormInt8 = 2
+    | UnormInt16 = 3
+    | UnormShort565 = 4
+    | UnormShort555 = 5
+    | UnormInt101010 = 6
+    | SignedInt8 = 7
+    | SignedInt16 = 8
+    | SignedInt32 = 9
+    | UnsignedInt8 = 10
+    | UnsignedInt16 = 11
+    | UnsignedInt32 = 12
+    | HalfFloat = 13
+    | Float = 14
+    | UnormInt24 = 15
+    | UnormInt101010_2 = 16
+
+[<Flags>]
+type ImageOperands =
+    | None = 0x00000000
+    | Bias = 0x00000001
+    | Lod = 0x00000002
+    | Grad = 0x00000004
+    | ConstOffset = 0x00000008
+    | Offset = 0x00000010
+    | ConstOffsets = 0x00000020
+    | Sample = 0x00000040
+    | MinLod = 0x00000080
+
+[<Flags>]
+type FPFastMathMode =
+    | None = 0x00000000
+    | NotNaN = 0x00000001
+    | NotInf = 0x00000002
+    | NSZ = 0x00000004
+    | AllowRecip = 0x00000008
+    | Fast = 0x00000010
+
+type FPRoundingMode =
+    | RTE = 0
+    | RTZ = 1
+    | RTP = 2
+    | RTN = 3
+
+type LinkageType =
+    | Export = 0
+    | Import = 1
+
+type AccessQualifier =
+    | ReadOnly = 0
+    | WriteOnly = 1
+    | ReadWrite = 2
+
+type FunctionParameterAttribute =
+    | Zext = 0
+    | Sext = 1
+    | ByVal = 2
+    | Sret = 3
+    | NoAlias = 4
+    | NoCapture = 5
+    | NoWrite = 6
+    | NoReadWrite = 7
+
+type Decoration =
+    | RelaxedPrecision = 0
+    | SpecId = 1
+    | Block = 2
+    | BufferBlock = 3
+    | RowMajor = 4
+    | ColMajor = 5
+    | ArrayStride = 6
+    | MatrixStride = 7
+    | GLSLShared = 8
+    | GLSLPacked = 9
+    | CPacked = 10
+    | BuiltIn = 11
+    | NoPerspective = 13
+    | Flat = 14
+    | Patch = 15
+    | Centroid = 16
+    | Sample = 17
+    | Invariant = 18
+    | Restrict = 19
+    | Aliased = 20
+    | Volatile = 21
+    | Constant = 22
+    | Coherent = 23
+    | NonWritable = 24
+    | NonReadable = 25
+    | Uniform = 26
+    | SaturatedConversion = 28
+    | Stream = 29
+    | Location = 30
+    | Component = 31
+    | Index = 32
+    | Binding = 33
+    | DescriptorSet = 34
+    | Offset = 35
+    | XfbBuffer = 36
+    | XfbStride = 37
+    | FuncParamAttr = 38
+    | FPRoundingMode = 39
+    | FPFastMathMode = 40
+    | LinkageAttributes = 41
+    | NoContraction = 42
+    | InputAttachmentIndex = 43
+    | Alignment = 44
+
+type BuiltIn =
+    | Position = 0
+    | PointSize = 1
+    | ClipDistance = 3
+    | CullDistance = 4
+    | VertexId = 5
+    | InstanceId = 6
+    | PrimitiveId = 7
+    | InvocationId = 8
+    | Layer = 9
+    | ViewportIndex = 10
+    | TessLevelOuter = 11
+    | TessLevelInner = 12
+    | TessCoord = 13
+    | PatchVertices = 14
+    | FragCoord = 15
+    | PointCoord = 16
+    | FrontFacing = 17
+    | SampleId = 18
+    | SamplePosition = 19
+    | SampleMask = 20
+    | FragDepth = 22
+    | HelperInvocation = 23
+    | NumWorkgroups = 24
+    | WorkgroupSize = 25
+    | WorkgroupId = 26
+    | LocalInvocationId = 27
+    | GlobalInvocationId = 28
+    | LocalInvocationIndex = 29
+    | WorkDim = 30
+    | GlobalSize = 31
+    | EnqueuedWorkgroupSize = 32
+    | GlobalOffset = 33
+    | GlobalLinearId = 34
+    | SubgroupSize = 36
+    | SubgroupMaxSize = 37
+    | NumSubgroups = 38
+    | NumEnqueuedSubgroups = 39
+    | SubgroupId = 40
+    | SubgroupLocalInvocationId = 41
+    | VertexIndex = 42
+    | InstanceIndex = 43
+
+[<Flags>]
+type SelectionControl =
+    | None = 0x00000000
+    | Flatten = 0x00000001
+    | DontFlatten = 0x00000002
+
+[<Flags>]
+type LoopControl =
+    | None = 0x00000000
+    | Unroll = 0x00000001
+    | DontUnroll = 0x00000002
+
+[<Flags>]
+type FunctionControl =
+    | None = 0x00000000
+    | Inline = 0x00000001
+    | DontInline = 0x00000002
+    | Pure = 0x00000004
+    | Const = 0x00000008
+
+[<Flags>]
+type MemorySemantics =
+    | None = 0x00000000
+    | Acquire = 0x00000002
+    | Release = 0x00000004
+    | AcquireRelease = 0x00000008
+    | SequentiallyConsistent = 0x00000010
+    | UniformMemory = 0x00000040
+    | SubgroupMemory = 0x00000080
+    | WorkgroupMemory = 0x00000100
+    | CrossWorkgroupMemory = 0x00000200
+    | AtomicCounterMemory = 0x00000400
+    | ImageMemory = 0x00000800
+
+[<Flags>]
+type MemoryAccess =
+    | None = 0x00000000
+    | Volatile = 0x00000001
+    | Aligned = 0x00000002
+    | Nontemporal = 0x00000004
+
+type Scope =
+    | CrossDevice = 0
+    | Device = 1
+    | Workgroup = 2
+    | Subgroup = 3
+    | Invocation = 4
+
+type GroupOperation =
+    | Reduce = 0
+    | InclusiveScan = 1
+    | ExclusiveScan = 2
+
+type KernelEnqueueFlags =
+    | NoWait = 0
+    | WaitKernel = 1
+    | WaitWorkGroup = 2
+
+[<Flags>]
+type KernelProfilingInfo =
+    | None = 0x00000000
+    | CmdExecTime = 0x00000001
+
+type Capability =
+    | Matrix = 0
+    | Shader = 1
+    | Geometry = 2
+    | Tessellation = 3
+    | Addresses = 4
+    | Linkage = 5
+    | Kernel = 6
+    | Vector16 = 7
+    | Float16Buffer = 8
+    | Float16 = 9
+    | Float64 = 10
+    | Int64 = 11
+    | Int64Atomics = 12
+    | ImageBasic = 13
+    | ImageReadWrite = 14
+    | ImageMipmap = 15
+    | Pipes = 17
+    | Groups = 18
+    | DeviceEnqueue = 19
+    | LiteralSampler = 20
+    | AtomicStorage = 21
+    | Int16 = 22
+    | TessellationPointSize = 23
+    | GeometryPointSize = 24
+    | ImageGatherExtended = 25
+    | StorageImageMultisample = 27
+    | UniformBufferArrayDynamicIndexing = 28
+    | SampledImageArrayDynamicIndexing = 29
+    | StorageBufferArrayDynamicIndexing = 30
+    | StorageImageArrayDynamicIndexing = 31
+    | ClipDistance = 32
+    | CullDistance = 33
+    | ImageCubeArray = 34
+    | SampleRateShading = 35
+    | ImageRect = 36
+    | SampledRect = 37
+    | GenericPointer = 38
+    | Int8 = 39
+    | InputAttachment = 40
+    | SparseResidency = 41
+    | MinLod = 42
+    | Sampled1D = 43
+    | Image1D = 44
+    | SampledCubeArray = 45
+    | SampledBuffer = 46
+    | ImageBuffer = 47
+    | ImageMSArray = 48
+    | StorageImageExtendedFormats = 49
+    | ImageQuery = 50
+    | DerivativeControl = 51
+    | InterpolationFunction = 52
+    | TransformFeedback = 53
+    | GeometryStreams = 54
+    | StorageImageReadWithoutFormat = 55
+    | StorageImageWriteWithoutFormat = 56
+
+type Op =
+    | OpNop = 0
+    | OpUndef = 1
+    | OpSourceContinued = 2
+    | OpSource = 3
+    | OpSourceExtension = 4
+    | OpName = 5
+    | OpMemberName = 6
+    | OpString = 7
+    | OpLine = 8
+    | OpExtension = 10
+    | OpExtInstImport = 11
+    | OpExtInst = 12
+    | OpMemoryModel = 14
+    | OpEntryPoint = 15
+    | OpExecutionMode = 16
+    | OpCapability = 17
+    | OpTypeVoid = 19
+    | OpTypeBool = 20
+    | OpTypeInt = 21
+    | OpTypeFloat = 22
+    | OpTypeVector = 23
+    | OpTypeMatrix = 24
+    | OpTypeImage = 25
+    | OpTypeSampler = 26
+    | OpTypeSampledImage = 27
+    | OpTypeArray = 28
+    | OpTypeRuntimeArray = 29
+    | OpTypeStruct = 30
+    | OpTypeOpaque = 31
+    | OpTypePointer = 32
+    | OpTypeFunction = 33
+    | OpTypeEvent = 34
+    | OpTypeDeviceEvent = 35
+    | OpTypeReserveId = 36
+    | OpTypeQueue = 37
+    | OpTypePipe = 38
+    | OpTypeForwardPointer = 39
+    | OpConstantTrue = 41
+    | OpConstantFalse = 42
+    | OpConstant = 43
+    | OpConstantComposite = 44
+    | OpConstantSampler = 45
+    | OpConstantNull = 46
+    | OpSpecConstantTrue = 48
+    | OpSpecConstantFalse = 49
+    | OpSpecConstant = 50
+    | OpSpecConstantComposite = 51
+    | OpSpecConstantOp = 52
+    | OpFunction = 54
+    | OpFunctionParameter = 55
+    | OpFunctionEnd = 56
+    | OpFunctionCall = 57
+    | OpVariable = 59
+    | OpImageTexelPointer = 60
+    | OpLoad = 61
+    | OpStore = 62
+    | OpCopyMemory = 63
+    | OpCopyMemorySized = 64
+    | OpAccessChain = 65
+    | OpInBoundsAccessChain = 66
+    | OpPtrAccessChain = 67
+    | OpArrayLength = 68
+    | OpGenericPtrMemSemantics = 69
+    | OpInBoundsPtrAccessChain = 70
+    | OpDecorate = 71
+    | OpMemberDecorate = 72
+    | OpDecorationGroup = 73
+    | OpGroupDecorate = 74
+    | OpGroupMemberDecorate = 75
+    | OpVectorExtractDynamic = 77
+    | OpVectorInsertDynamic = 78
+    | OpVectorShuffle = 79
+    | OpCompositeConstruct = 80
+    | OpCompositeExtract = 81
+    | OpCompositeInsert = 82
+    | OpCopyObject = 83
+    | OpTranspose = 84
+    | OpSampledImage = 86
+    | OpImageSampleImplicitLod = 87
+    | OpImageSampleExplicitLod = 88
+    | OpImageSampleDrefImplicitLod = 89
+    | OpImageSampleDrefExplicitLod = 90
+    | OpImageSampleProjImplicitLod = 91
+    | OpImageSampleProjExplicitLod = 92
+    | OpImageSampleProjDrefImplicitLod = 93
+    | OpImageSampleProjDrefExplicitLod = 94
+    | OpImageFetch = 95
+    | OpImageGather = 96
+    | OpImageDrefGather = 97
+    | OpImageRead = 98
+    | OpImageWrite = 99
+    | OpImage = 100
+    | OpImageQueryFormat = 101
+    | OpImageQueryOrder = 102
+    | OpImageQuerySizeLod = 103
+    | OpImageQuerySize = 104
+    | OpImageQueryLod = 105
+    | OpImageQueryLevels = 106
+    | OpImageQuerySamples = 107
+    | OpConvertFToU = 109
+    | OpConvertFToS = 110
+    | OpConvertSToF = 111
+    | OpConvertUToF = 112
+    | OpUConvert = 113
+    | OpSConvert = 114
+    | OpFConvert = 115
+    | OpQuantizeToF16 = 116
+    | OpConvertPtrToU = 117
+    | OpSatConvertSToU = 118
+    | OpSatConvertUToS = 119
+    | OpConvertUToPtr = 120
+    | OpPtrCastToGeneric = 121
+    | OpGenericCastToPtr = 122
+    | OpGenericCastToPtrExplicit = 123
+    | OpBitcast = 124
+    | OpSNegate = 126
+    | OpFNegate = 127
+    | OpIAdd = 128
+    | OpFAdd = 129
+    | OpISub = 130
+    | OpFSub = 131
+    | OpIMul = 132
+    | OpFMul = 133
+    | OpUDiv = 134
+    | OpSDiv = 135
+    | OpFDiv = 136
+    | OpUMod = 137
+    | OpSRem = 138
+    | OpSMod = 139
+    | OpFRem = 140
+    | OpFMod = 141
+    | OpVectorTimesScalar = 142
+    | OpMatrixTimesScalar = 143
+    | OpVectorTimesMatrix = 144
+    | OpMatrixTimesVector = 145
+    | OpMatrixTimesMatrix = 146
+    | OpOuterProduct = 147
+    | OpDot = 148
+    | OpIAddCarry = 149
+    | OpISubBorrow = 150
+    | OpUMulExtended = 151
+    | OpSMulExtended = 152
+    | OpAny = 154
+    | OpAll = 155
+    | OpIsNan = 156
+    | OpIsInf = 157
+    | OpIsFinite = 158
+    | OpIsNormal = 159
+    | OpSignBitSet = 160
+    | OpLessOrGreater = 161
+    | OpOrdered = 162
+    | OpUnordered = 163
+    | OpLogicalEqual = 164
+    | OpLogicalNotEqual = 165
+    | OpLogicalOr = 166
+    | OpLogicalAnd = 167
+    | OpLogicalNot = 168
+    | OpSelect = 169
+    | OpIEqual = 170
+    | OpINotEqual = 171
+    | OpUGreaterThan = 172
+    | OpSGreaterThan = 173
+    | OpUGreaterThanEqual = 174
+    | OpSGreaterThanEqual = 175
+    | OpULessThan = 176
+    | OpSLessThan = 177
+    | OpULessThanEqual = 178
+    | OpSLessThanEqual = 179
+    | OpFOrdEqual = 180
+    | OpFUnordEqual = 181
+    | OpFOrdNotEqual = 182
+    | OpFUnordNotEqual = 183
+    | OpFOrdLessThan = 184
+    | OpFUnordLessThan = 185
+    | OpFOrdGreaterThan = 186
+    | OpFUnordGreaterThan = 187
+    | OpFOrdLessThanEqual = 188
+    | OpFUnordLessThanEqual = 189
+    | OpFOrdGreaterThanEqual = 190
+    | OpFUnordGreaterThanEqual = 191
+    | OpShiftRightLogical = 194
+    | OpShiftRightArithmetic = 195
+    | OpShiftLeftLogical = 196
+    | OpBitwiseOr = 197
+    | OpBitwiseXor = 198
+    | OpBitwiseAnd = 199
+    | OpNot = 200
+    | OpBitFieldInsert = 201
+    | OpBitFieldSExtract = 202
+    | OpBitFieldUExtract = 203
+    | OpBitReverse = 204
+    | OpBitCount = 205
+    | OpDPdx = 207
+    | OpDPdy = 208
+    | OpFwidth = 209
+    | OpDPdxFine = 210
+    | OpDPdyFine = 211
+    | OpFwidthFine = 212
+    | OpDPdxCoarse = 213
+    | OpDPdyCoarse = 214
+    | OpFwidthCoarse = 215
+    | OpEmitVertex = 218
+    | OpEndPrimitive = 219
+    | OpEmitStreamVertex = 220
+    | OpEndStreamPrimitive = 221
+    | OpControlBarrier = 224
+    | OpMemoryBarrier = 225
+    | OpAtomicLoad = 227
+    | OpAtomicStore = 228
+    | OpAtomicExchange = 229
+    | OpAtomicCompareExchange = 230
+    | OpAtomicCompareExchangeWeak = 231
+    | OpAtomicIIncrement = 232
+    | OpAtomicIDecrement = 233
+    | OpAtomicIAdd = 234
+    | OpAtomicISub = 235
+    | OpAtomicSMin = 236
+    | OpAtomicUMin = 237
+    | OpAtomicSMax = 238
+    | OpAtomicUMax = 239
+    | OpAtomicAnd = 240
+    | OpAtomicOr = 241
+    | OpAtomicXor = 242
+    | OpPhi = 245
+    | OpLoopMerge = 246
+    | OpSelectionMerge = 247
+    | OpLabel = 248
+    | OpBranch = 249
+    | OpBranchConditional = 250
+    | OpSwitch = 251
+    | OpKill = 252
+    | OpReturn = 253
+    | OpReturnValue = 254
+    | OpUnreachable = 255
+    | OpLifetimeStart = 256
+    | OpLifetimeStop = 257
+    | OpGroupAsyncCopy = 259
+    | OpGroupWaitEvents = 260
+    | OpGroupAll = 261
+    | OpGroupAny = 262
+    | OpGroupBroadcast = 263
+    | OpGroupIAdd = 264
+    | OpGroupFAdd = 265
+    | OpGroupFMin = 266
+    | OpGroupUMin = 267
+    | OpGroupSMin = 268
+    | OpGroupFMax = 269
+    | OpGroupUMax = 270
+    | OpGroupSMax = 271
+    | OpReadPipe = 274
+    | OpWritePipe = 275
+    | OpReservedReadPipe = 276
+    | OpReservedWritePipe = 277
+    | OpReserveReadPipePackets = 278
+    | OpReserveWritePipePackets = 279
+    | OpCommitReadPipe = 280
+    | OpCommitWritePipe = 281
+    | OpIsValidReserveId = 282
+    | OpGetNumPipePackets = 283
+    | OpGetMaxPipePackets = 284
+    | OpGroupReserveReadPipePackets = 285
+    | OpGroupReserveWritePipePackets = 286
+    | OpGroupCommitReadPipe = 287
+    | OpGroupCommitWritePipe = 288
+    | OpEnqueueMarker = 291
+    | OpEnqueueKernel = 292
+    | OpGetKernelNDrangeSubGroupCount = 293
+    | OpGetKernelNDrangeMaxSubGroupSize = 294
+    | OpGetKernelWorkGroupSize = 295
+    | OpGetKernelPreferredWorkGroupSizeMultiple = 296
+    | OpRetainEvent = 297
+    | OpReleaseEvent = 298
+    | OpCreateUserEvent = 299
+    | OpIsValidEvent = 300
+    | OpSetUserEventStatus = 301
+    | OpCaptureEventProfilingInfo = 302
+    | OpGetDefaultQueue = 303
+    | OpBuildNDRange = 304
+    | OpImageSparseSampleImplicitLod = 305
+    | OpImageSparseSampleExplicitLod = 306
+    | OpImageSparseSampleDrefImplicitLod = 307
+    | OpImageSparseSampleDrefExplicitLod = 308
+    | OpImageSparseSampleProjImplicitLod = 309
+    | OpImageSparseSampleProjExplicitLod = 310
+    | OpImageSparseSampleProjDrefImplicitLod = 311
+    | OpImageSparseSampleProjDrefExplicitLod = 312
+    | OpImageSparseFetch = 313
+    | OpImageSparseGather = 314
+    | OpImageSparseDrefGather = 315
+    | OpImageSparseTexelsResident = 316
+    | OpNoLine = 317
+    | OpAtomicFlagTestAndSet = 318
+    | OpAtomicFlagClear = 319
+
+
 
 type Instruction = 
     | OpNop
@@ -49,7 +776,7 @@ type Instruction =
     | OpSpecConstant of resultType : uint32 * result : uint32 * value : uint32[]
     | OpSpecConstantComposite of resultType : uint32 * result : uint32 * constituents : uint32[]
     | OpSpecConstantOp of resultType : uint32 * result : uint32 * opCode : uint32 * operands : uint32[]
-    | OpFunction of resultType : uint32 * result : uint32 * _function : FunctionControlMask * funType : uint32
+    | OpFunction of resultType : uint32 * result : uint32 * _function : FunctionControl * funType : uint32
     | OpFunctionParameter of resultType : uint32 * result : uint32
     | OpFunctionEnd
     | OpFunctionCall of resultType : uint32 * result : uint32 * _function : uint32 * args : uint32[]
@@ -206,24 +933,24 @@ type Instruction =
     | OpEndPrimitive
     | OpEmitStreamVertex of stream : uint32
     | OpEndStreamPrimitive of stream : uint32
-    | OpControlBarrier of exec : ExecutionScope * mem : ExecutionScope * sem : MemorySemantics
-    | OpMemoryBarrier of mem : ExecutionScope * sen : MemorySemantics
-    | OpAtomicLoad of resultType : uint32 * result : uint32 * ptr : uint32 * scope : ExecutionScope * sem : MemorySemantics
-    | OpAtomicStore of ptr : uint32 * scope : ExecutionScope * sem : MemorySemantics * value : uint32
-    | OpAtomicExchange of resultType : uint32 * result : uint32 * ptr : uint32 * scope : ExecutionScope * sem : MemorySemantics * value : uint32
-    | OpAtomicCompareExchange of resultType : uint32 * result : uint32 * ptr : uint32 * scope : ExecutionScope * eq : MemorySemantics * neq : MemorySemantics * value : uint32 * comparator : uint32
-    | OpAtomicCompareExchangeWeak of resultType : uint32 * result : uint32 * ptr : uint32 * scope : ExecutionScope * eq : MemorySemantics * neq : MemorySemantics * value : uint32 * comparator : uint32
-    | OpAtomicIIncrement of resultType : uint32 * result : uint32 * ptr : uint32 * scope : ExecutionScope * sem : MemorySemantics
-    | OpAtomicIDecrement of resultType : uint32 * result : uint32 * ptr : uint32 * scope : ExecutionScope * sem : MemorySemantics
-    | OpAtomicIAdd of resultType : uint32 * result : uint32 * ptr : uint32 * scope : ExecutionScope * sem : MemorySemantics * value : uint32
-    | OpAtomicISub of resultType : uint32 * result : uint32 * ptr : uint32 * scope : ExecutionScope * sem : MemorySemantics * value : uint32
-    | OpAtomicSMin of resultType : uint32 * result : uint32 * ptr : uint32 * scope : ExecutionScope * sem : MemorySemantics * value : uint32
-    | OpAtomicUMin of resultType : uint32 * result : uint32 * ptr : uint32 * scope : ExecutionScope * sem : MemorySemantics * value : uint32
-    | OpAtomicSMax of resultType : uint32 * result : uint32 * ptr : uint32 * scope : ExecutionScope * sem : MemorySemantics * value : uint32
-    | OpAtomicUMax of resultType : uint32 * result : uint32 * ptr : uint32 * scope : ExecutionScope * sem : MemorySemantics * value : uint32
-    | OpAtomicAnd of resultType : uint32 * result : uint32 * ptr : uint32 * scope : ExecutionScope * sem : MemorySemantics * value : uint32
-    | OpAtomicOr of resultType : uint32 * result : uint32 * ptr : uint32 * scope : ExecutionScope * sem : MemorySemantics * value : uint32
-    | OpAtomicXor of resultType : uint32 * result : uint32 * ptr : uint32 * scope : ExecutionScope * sem : MemorySemantics * value : uint32
+    | OpControlBarrier of exec : Scope * mem : Scope * sem : MemorySemantics
+    | OpMemoryBarrier of mem : Scope * sen : MemorySemantics
+    | OpAtomicLoad of resultType : uint32 * result : uint32 * ptr : uint32 * scope : Scope * sem : MemorySemantics
+    | OpAtomicStore of ptr : uint32 * scope : Scope * sem : MemorySemantics * value : uint32
+    | OpAtomicExchange of resultType : uint32 * result : uint32 * ptr : uint32 * scope : Scope * sem : MemorySemantics * value : uint32
+    | OpAtomicCompareExchange of resultType : uint32 * result : uint32 * ptr : uint32 * scope : Scope * eq : MemorySemantics * neq : MemorySemantics * value : uint32 * comparator : uint32
+    | OpAtomicCompareExchangeWeak of resultType : uint32 * result : uint32 * ptr : uint32 * scope : Scope * eq : MemorySemantics * neq : MemorySemantics * value : uint32 * comparator : uint32
+    | OpAtomicIIncrement of resultType : uint32 * result : uint32 * ptr : uint32 * scope : Scope * sem : MemorySemantics
+    | OpAtomicIDecrement of resultType : uint32 * result : uint32 * ptr : uint32 * scope : Scope * sem : MemorySemantics
+    | OpAtomicIAdd of resultType : uint32 * result : uint32 * ptr : uint32 * scope : Scope * sem : MemorySemantics * value : uint32
+    | OpAtomicISub of resultType : uint32 * result : uint32 * ptr : uint32 * scope : Scope * sem : MemorySemantics * value : uint32
+    | OpAtomicSMin of resultType : uint32 * result : uint32 * ptr : uint32 * scope : Scope * sem : MemorySemantics * value : uint32
+    | OpAtomicUMin of resultType : uint32 * result : uint32 * ptr : uint32 * scope : Scope * sem : MemorySemantics * value : uint32
+    | OpAtomicSMax of resultType : uint32 * result : uint32 * ptr : uint32 * scope : Scope * sem : MemorySemantics * value : uint32
+    | OpAtomicUMax of resultType : uint32 * result : uint32 * ptr : uint32 * scope : Scope * sem : MemorySemantics * value : uint32
+    | OpAtomicAnd of resultType : uint32 * result : uint32 * ptr : uint32 * scope : Scope * sem : MemorySemantics * value : uint32
+    | OpAtomicOr of resultType : uint32 * result : uint32 * ptr : uint32 * scope : Scope * sem : MemorySemantics * value : uint32
+    | OpAtomicXor of resultType : uint32 * result : uint32 * ptr : uint32 * scope : Scope * sem : MemorySemantics * value : uint32
     | OpPhi of resultType : uint32 * result : uint32 * varsAndParents : uint32[]
     | OpLoopMerge of mergeBlock : uint32 * contTarget : uint32 * loop : LoopControl
     | OpSelectionMerge of mergeBlock : uint32 * select : SelectionControl
@@ -237,19 +964,19 @@ type Instruction =
     | OpUnreachable
     | OpLifetimeStart of ptr : uint32 * size : uint32
     | OpLifetimeStop of ptr : uint32 * size : uint32
-    | OpGroupAsyncCopy of resultType : uint32 * result : uint32 * execution : ExecutionScope * dest : uint32 * _source : uint32 * num : uint32 * stride : uint32 * evt : uint32
-    | OpGroupWaitEvents of exec : ExecutionScope * num : uint32 * evtList : uint32
-    | OpGroupAll of resultType : uint32 * result : uint32 * exec : ExecutionScope * pred : uint32
-    | OpGroupAny of resultType : uint32 * result : uint32 * exec : ExecutionScope * pred : uint32
-    | OpGroupBroadcast of resultType : uint32 * result : uint32 * exec : ExecutionScope * value : uint32 * localid : uint32
-    | OpGroupIAdd of resultType : uint32 * result : uint32 * exec : ExecutionScope * operation : GroupOperation * x : uint32
-    | OpGroupFAdd of resultType : uint32 * result : uint32 * exec : ExecutionScope * operation : GroupOperation * x : uint32
-    | OpGroupFMin of resultType : uint32 * result : uint32 * exec : ExecutionScope * operation : GroupOperation * x : uint32
-    | OpGroupUMin of resultType : uint32 * result : uint32 * exec : ExecutionScope * operation : GroupOperation * x : uint32
-    | OpGroupSMin of resultType : uint32 * result : uint32 * exec : ExecutionScope * operation : GroupOperation * x : uint32
-    | OpGroupFMax of resultType : uint32 * result : uint32 * exec : ExecutionScope * operation : GroupOperation * x : uint32
-    | OpGroupUMax of resultType : uint32 * result : uint32 * exec : ExecutionScope * operation : GroupOperation * x : uint32
-    | OpGroupSMax of resultType : uint32 * result : uint32 * exec : ExecutionScope * operation : GroupOperation * x : uint32
+    | OpGroupAsyncCopy of resultType : uint32 * result : uint32 * execution : Scope * dest : uint32 * _source : uint32 * num : uint32 * stride : uint32 * evt : uint32
+    | OpGroupWaitEvents of exec : Scope * num : uint32 * evtList : uint32
+    | OpGroupAll of resultType : uint32 * result : uint32 * exec : Scope * pred : uint32
+    | OpGroupAny of resultType : uint32 * result : uint32 * exec : Scope * pred : uint32
+    | OpGroupBroadcast of resultType : uint32 * result : uint32 * exec : Scope * value : uint32 * localid : uint32
+    | OpGroupIAdd of resultType : uint32 * result : uint32 * exec : Scope * operation : GroupOperation * x : uint32
+    | OpGroupFAdd of resultType : uint32 * result : uint32 * exec : Scope * operation : GroupOperation * x : uint32
+    | OpGroupFMin of resultType : uint32 * result : uint32 * exec : Scope * operation : GroupOperation * x : uint32
+    | OpGroupUMin of resultType : uint32 * result : uint32 * exec : Scope * operation : GroupOperation * x : uint32
+    | OpGroupSMin of resultType : uint32 * result : uint32 * exec : Scope * operation : GroupOperation * x : uint32
+    | OpGroupFMax of resultType : uint32 * result : uint32 * exec : Scope * operation : GroupOperation * x : uint32
+    | OpGroupUMax of resultType : uint32 * result : uint32 * exec : Scope * operation : GroupOperation * x : uint32
+    | OpGroupSMax of resultType : uint32 * result : uint32 * exec : Scope * operation : GroupOperation * x : uint32
     | OpReadPipe of resultType : uint32 * result : uint32 * pipe : uint32 * ptr : uint32 * packetSize : uint32 * packetAlign : uint32
     | OpWritePipe of resultType : uint32 * result : uint32 * pipe : uint32 * ptr : uint32 * packetSize : uint32 * packetAlign : uint32
     | OpReservedReadPipe of resultType : uint32 * result : uint32 * pipe : uint32 * reserveId : uint32 * index : uint32 * ptr : uint32 * packetSize : uint32 * packetAlign : uint32
@@ -261,10 +988,10 @@ type Instruction =
     | OpIsValidReserveId of resultType : uint32 * result : uint32 * reserveId : uint32
     | OpGetNumPipePackets of resultType : uint32 * result : uint32 * pipe : uint32 * packetSize : uint32 * packetAlign : uint32
     | OpGetMaxPipePackets of resultType : uint32 * result : uint32 * pipe : uint32 * packetSize : uint32 * packetAlign : uint32
-    | OpGroupReserveReadPipePackets of resultType : uint32 * result : uint32 * exec : ExecutionScope * pipe : uint32 * numPackets : uint32 * packetSize : uint32 * packetAlign : uint32
-    | OpGroupReserveWritePipePackets of resultType : uint32 * result : uint32 * exec : ExecutionScope * pipe : uint32 * numPackets : uint32 * packetSize : uint32 * packetAlign : uint32
-    | OpGroupCommitReadPipe of exec : ExecutionScope * pipe : uint32 * reserveId : uint32 * packetSize : uint32 * packetAlign : uint32
-    | OpGroupCommitWritePipe of exec : ExecutionScope * pipe : uint32 * reserveId : uint32 * packetSize : uint32 * packetAlign : uint32
+    | OpGroupReserveReadPipePackets of resultType : uint32 * result : uint32 * exec : Scope * pipe : uint32 * numPackets : uint32 * packetSize : uint32 * packetAlign : uint32
+    | OpGroupReserveWritePipePackets of resultType : uint32 * result : uint32 * exec : Scope * pipe : uint32 * numPackets : uint32 * packetSize : uint32 * packetAlign : uint32
+    | OpGroupCommitReadPipe of exec : Scope * pipe : uint32 * reserveId : uint32 * packetSize : uint32 * packetAlign : uint32
+    | OpGroupCommitWritePipe of exec : Scope * pipe : uint32 * reserveId : uint32 * packetSize : uint32 * packetAlign : uint32
     | OpEnqueueMarker of resultType : uint32 * result : uint32 * queue : uint32 * nEvts : uint32 * waitEvts : uint32 * retEvt : uint32
     | OpEnqueueKernel of resultType : uint32 * result : uint32 * queue : uint32 * flags : uint32 * ndRange : uint32 * nEvents : uint32 * waitEvts : uint32 * retEvt : uint32 * invoke : uint32 * param : uint32 * paramSize : uint32 * paramAlign : uint32 * localSize : uint32[]
     | OpGetKernelNDrangeSubGroupCount of resultType : uint32 * result : uint32 * ndRange : uint32 * invoke : uint32 * param : uint32 * paramSize : uint32 * paramAlign : uint32
@@ -292,8 +1019,8 @@ type Instruction =
     | OpImageSparseDrefGather of resultType : uint32 * result : uint32 * sampledImage : uint32 * coord : uint32 * depthRef : uint32 * images : int * variables : uint32[]
     | OpImageSparseTexelsResident of resultType : uint32 * result : uint32 * residentCode : uint32
     | OpNoLine
-    | OpAtomicFlagTestAndSet of resultType : uint32 * result : uint32 * ptr : uint32 * scope : ExecutionScope * sem : MemorySemantics
-    | OpAtomicFlagClear of ptr : uint32 * scope : ExecutionScope * sem : MemorySemantics
+    | OpAtomicFlagTestAndSet of resultType : uint32 * result : uint32 * ptr : uint32 * scope : Scope * sem : MemorySemantics
+    | OpAtomicFlagClear of ptr : uint32 * scope : Scope * sem : MemorySemantics
 [<AutoOpen>]
 module InstructionExtensions =
     type Instruction with
@@ -3462,7 +4189,7 @@ module Serializer =
                     | 54 ->
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
-                        let _function = unbox<FunctionControlMask> (int (source.ReadUInt32()))
+                        let _function = unbox<FunctionControl> (int (source.ReadUInt32()))
                         let funType = source.ReadUInt32()
                         yield OpFunction(resultType, result, _function, funType)
                     | 55 ->
@@ -4398,24 +5125,24 @@ module Serializer =
                         let stream = source.ReadUInt32()
                         yield OpEndStreamPrimitive(stream)
                     | 224 ->
-                        let exec = unbox<ExecutionScope> (int (source.ReadUInt32()))
-                        let mem = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let exec = unbox<Scope> (int (source.ReadUInt32()))
+                        let mem = unbox<Scope> (int (source.ReadUInt32()))
                         let sem = unbox<MemorySemantics> (int (source.ReadUInt32()))
                         yield OpControlBarrier(exec, mem, sem)
                     | 225 ->
-                        let mem = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let mem = unbox<Scope> (int (source.ReadUInt32()))
                         let sen = unbox<MemorySemantics> (int (source.ReadUInt32()))
                         yield OpMemoryBarrier(mem, sen)
                     | 227 ->
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
                         let ptr = source.ReadUInt32()
-                        let scope = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let scope = unbox<Scope> (int (source.ReadUInt32()))
                         let sem = unbox<MemorySemantics> (int (source.ReadUInt32()))
                         yield OpAtomicLoad(resultType, result, ptr, scope, sem)
                     | 228 ->
                         let ptr = source.ReadUInt32()
-                        let scope = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let scope = unbox<Scope> (int (source.ReadUInt32()))
                         let sem = unbox<MemorySemantics> (int (source.ReadUInt32()))
                         let value = source.ReadUInt32()
                         yield OpAtomicStore(ptr, scope, sem, value)
@@ -4423,7 +5150,7 @@ module Serializer =
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
                         let ptr = source.ReadUInt32()
-                        let scope = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let scope = unbox<Scope> (int (source.ReadUInt32()))
                         let sem = unbox<MemorySemantics> (int (source.ReadUInt32()))
                         let value = source.ReadUInt32()
                         yield OpAtomicExchange(resultType, result, ptr, scope, sem, value)
@@ -4431,7 +5158,7 @@ module Serializer =
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
                         let ptr = source.ReadUInt32()
-                        let scope = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let scope = unbox<Scope> (int (source.ReadUInt32()))
                         let eq = unbox<MemorySemantics> (int (source.ReadUInt32()))
                         let neq = unbox<MemorySemantics> (int (source.ReadUInt32()))
                         let value = source.ReadUInt32()
@@ -4441,7 +5168,7 @@ module Serializer =
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
                         let ptr = source.ReadUInt32()
-                        let scope = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let scope = unbox<Scope> (int (source.ReadUInt32()))
                         let eq = unbox<MemorySemantics> (int (source.ReadUInt32()))
                         let neq = unbox<MemorySemantics> (int (source.ReadUInt32()))
                         let value = source.ReadUInt32()
@@ -4451,21 +5178,21 @@ module Serializer =
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
                         let ptr = source.ReadUInt32()
-                        let scope = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let scope = unbox<Scope> (int (source.ReadUInt32()))
                         let sem = unbox<MemorySemantics> (int (source.ReadUInt32()))
                         yield OpAtomicIIncrement(resultType, result, ptr, scope, sem)
                     | 233 ->
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
                         let ptr = source.ReadUInt32()
-                        let scope = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let scope = unbox<Scope> (int (source.ReadUInt32()))
                         let sem = unbox<MemorySemantics> (int (source.ReadUInt32()))
                         yield OpAtomicIDecrement(resultType, result, ptr, scope, sem)
                     | 234 ->
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
                         let ptr = source.ReadUInt32()
-                        let scope = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let scope = unbox<Scope> (int (source.ReadUInt32()))
                         let sem = unbox<MemorySemantics> (int (source.ReadUInt32()))
                         let value = source.ReadUInt32()
                         yield OpAtomicIAdd(resultType, result, ptr, scope, sem, value)
@@ -4473,7 +5200,7 @@ module Serializer =
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
                         let ptr = source.ReadUInt32()
-                        let scope = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let scope = unbox<Scope> (int (source.ReadUInt32()))
                         let sem = unbox<MemorySemantics> (int (source.ReadUInt32()))
                         let value = source.ReadUInt32()
                         yield OpAtomicISub(resultType, result, ptr, scope, sem, value)
@@ -4481,7 +5208,7 @@ module Serializer =
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
                         let ptr = source.ReadUInt32()
-                        let scope = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let scope = unbox<Scope> (int (source.ReadUInt32()))
                         let sem = unbox<MemorySemantics> (int (source.ReadUInt32()))
                         let value = source.ReadUInt32()
                         yield OpAtomicSMin(resultType, result, ptr, scope, sem, value)
@@ -4489,7 +5216,7 @@ module Serializer =
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
                         let ptr = source.ReadUInt32()
-                        let scope = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let scope = unbox<Scope> (int (source.ReadUInt32()))
                         let sem = unbox<MemorySemantics> (int (source.ReadUInt32()))
                         let value = source.ReadUInt32()
                         yield OpAtomicUMin(resultType, result, ptr, scope, sem, value)
@@ -4497,7 +5224,7 @@ module Serializer =
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
                         let ptr = source.ReadUInt32()
-                        let scope = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let scope = unbox<Scope> (int (source.ReadUInt32()))
                         let sem = unbox<MemorySemantics> (int (source.ReadUInt32()))
                         let value = source.ReadUInt32()
                         yield OpAtomicSMax(resultType, result, ptr, scope, sem, value)
@@ -4505,7 +5232,7 @@ module Serializer =
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
                         let ptr = source.ReadUInt32()
-                        let scope = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let scope = unbox<Scope> (int (source.ReadUInt32()))
                         let sem = unbox<MemorySemantics> (int (source.ReadUInt32()))
                         let value = source.ReadUInt32()
                         yield OpAtomicUMax(resultType, result, ptr, scope, sem, value)
@@ -4513,7 +5240,7 @@ module Serializer =
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
                         let ptr = source.ReadUInt32()
-                        let scope = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let scope = unbox<Scope> (int (source.ReadUInt32()))
                         let sem = unbox<MemorySemantics> (int (source.ReadUInt32()))
                         let value = source.ReadUInt32()
                         yield OpAtomicAnd(resultType, result, ptr, scope, sem, value)
@@ -4521,7 +5248,7 @@ module Serializer =
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
                         let ptr = source.ReadUInt32()
-                        let scope = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let scope = unbox<Scope> (int (source.ReadUInt32()))
                         let sem = unbox<MemorySemantics> (int (source.ReadUInt32()))
                         let value = source.ReadUInt32()
                         yield OpAtomicOr(resultType, result, ptr, scope, sem, value)
@@ -4529,7 +5256,7 @@ module Serializer =
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
                         let ptr = source.ReadUInt32()
-                        let scope = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let scope = unbox<Scope> (int (source.ReadUInt32()))
                         let sem = unbox<MemorySemantics> (int (source.ReadUInt32()))
                         let value = source.ReadUInt32()
                         yield OpAtomicXor(resultType, result, ptr, scope, sem, value)
@@ -4587,7 +5314,7 @@ module Serializer =
                     | 259 ->
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
-                        let execution = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let execution = unbox<Scope> (int (source.ReadUInt32()))
                         let dest = source.ReadUInt32()
                         let _source = source.ReadUInt32()
                         let num = source.ReadUInt32()
@@ -4595,82 +5322,82 @@ module Serializer =
                         let evt = source.ReadUInt32()
                         yield OpGroupAsyncCopy(resultType, result, execution, dest, _source, num, stride, evt)
                     | 260 ->
-                        let exec = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let exec = unbox<Scope> (int (source.ReadUInt32()))
                         let num = source.ReadUInt32()
                         let evtList = source.ReadUInt32()
                         yield OpGroupWaitEvents(exec, num, evtList)
                     | 261 ->
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
-                        let exec = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let exec = unbox<Scope> (int (source.ReadUInt32()))
                         let pred = source.ReadUInt32()
                         yield OpGroupAll(resultType, result, exec, pred)
                     | 262 ->
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
-                        let exec = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let exec = unbox<Scope> (int (source.ReadUInt32()))
                         let pred = source.ReadUInt32()
                         yield OpGroupAny(resultType, result, exec, pred)
                     | 263 ->
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
-                        let exec = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let exec = unbox<Scope> (int (source.ReadUInt32()))
                         let value = source.ReadUInt32()
                         let localid = source.ReadUInt32()
                         yield OpGroupBroadcast(resultType, result, exec, value, localid)
                     | 264 ->
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
-                        let exec = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let exec = unbox<Scope> (int (source.ReadUInt32()))
                         let operation = unbox<GroupOperation> (int (source.ReadUInt32()))
                         let x = source.ReadUInt32()
                         yield OpGroupIAdd(resultType, result, exec, operation, x)
                     | 265 ->
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
-                        let exec = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let exec = unbox<Scope> (int (source.ReadUInt32()))
                         let operation = unbox<GroupOperation> (int (source.ReadUInt32()))
                         let x = source.ReadUInt32()
                         yield OpGroupFAdd(resultType, result, exec, operation, x)
                     | 266 ->
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
-                        let exec = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let exec = unbox<Scope> (int (source.ReadUInt32()))
                         let operation = unbox<GroupOperation> (int (source.ReadUInt32()))
                         let x = source.ReadUInt32()
                         yield OpGroupFMin(resultType, result, exec, operation, x)
                     | 267 ->
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
-                        let exec = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let exec = unbox<Scope> (int (source.ReadUInt32()))
                         let operation = unbox<GroupOperation> (int (source.ReadUInt32()))
                         let x = source.ReadUInt32()
                         yield OpGroupUMin(resultType, result, exec, operation, x)
                     | 268 ->
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
-                        let exec = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let exec = unbox<Scope> (int (source.ReadUInt32()))
                         let operation = unbox<GroupOperation> (int (source.ReadUInt32()))
                         let x = source.ReadUInt32()
                         yield OpGroupSMin(resultType, result, exec, operation, x)
                     | 269 ->
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
-                        let exec = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let exec = unbox<Scope> (int (source.ReadUInt32()))
                         let operation = unbox<GroupOperation> (int (source.ReadUInt32()))
                         let x = source.ReadUInt32()
                         yield OpGroupFMax(resultType, result, exec, operation, x)
                     | 270 ->
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
-                        let exec = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let exec = unbox<Scope> (int (source.ReadUInt32()))
                         let operation = unbox<GroupOperation> (int (source.ReadUInt32()))
                         let x = source.ReadUInt32()
                         yield OpGroupUMax(resultType, result, exec, operation, x)
                     | 271 ->
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
-                        let exec = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let exec = unbox<Scope> (int (source.ReadUInt32()))
                         let operation = unbox<GroupOperation> (int (source.ReadUInt32()))
                         let x = source.ReadUInt32()
                         yield OpGroupSMax(resultType, result, exec, operation, x)
@@ -4760,7 +5487,7 @@ module Serializer =
                     | 285 ->
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
-                        let exec = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let exec = unbox<Scope> (int (source.ReadUInt32()))
                         let pipe = source.ReadUInt32()
                         let numPackets = source.ReadUInt32()
                         let packetSize = source.ReadUInt32()
@@ -4769,21 +5496,21 @@ module Serializer =
                     | 286 ->
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
-                        let exec = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let exec = unbox<Scope> (int (source.ReadUInt32()))
                         let pipe = source.ReadUInt32()
                         let numPackets = source.ReadUInt32()
                         let packetSize = source.ReadUInt32()
                         let packetAlign = source.ReadUInt32()
                         yield OpGroupReserveWritePipePackets(resultType, result, exec, pipe, numPackets, packetSize, packetAlign)
                     | 287 ->
-                        let exec = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let exec = unbox<Scope> (int (source.ReadUInt32()))
                         let pipe = source.ReadUInt32()
                         let reserveId = source.ReadUInt32()
                         let packetSize = source.ReadUInt32()
                         let packetAlign = source.ReadUInt32()
                         yield OpGroupCommitReadPipe(exec, pipe, reserveId, packetSize, packetAlign)
                     | 288 ->
-                        let exec = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let exec = unbox<Scope> (int (source.ReadUInt32()))
                         let pipe = source.ReadUInt32()
                         let reserveId = source.ReadUInt32()
                         let packetSize = source.ReadUInt32()
@@ -4998,12 +5725,12 @@ module Serializer =
                         let resultType = source.ReadUInt32()
                         let result = source.ReadUInt32()
                         let ptr = source.ReadUInt32()
-                        let scope = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let scope = unbox<Scope> (int (source.ReadUInt32()))
                         let sem = unbox<MemorySemantics> (int (source.ReadUInt32()))
                         yield OpAtomicFlagTestAndSet(resultType, result, ptr, scope, sem)
                     | 319 ->
                         let ptr = source.ReadUInt32()
-                        let scope = unbox<ExecutionScope> (int (source.ReadUInt32()))
+                        let scope = unbox<Scope> (int (source.ReadUInt32()))
                         let sem = unbox<MemorySemantics> (int (source.ReadUInt32()))
                         yield OpAtomicFlagClear(ptr, scope, sem)
                     | c -> failwithf "invalid OpCode: %d" c
