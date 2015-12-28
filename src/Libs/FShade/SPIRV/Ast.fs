@@ -2125,7 +2125,7 @@ module SpirV =
         spirv {
             
             yield OpSource(SourceLanguage.Unknown, 0u, "")
-            yield OpCapability(1) // Shader
+            yield OpCapability(Capability.Shader) // Shader
             let! eid = newId
             yield OpExtInstImport(eid, "GLSL.std.450")
 
@@ -2139,7 +2139,7 @@ module SpirV =
 
                 match b with
                     | Some b ->
-                        yield OpDecorate(vid, unbox<Decoration> 11, [|uint32 (int b)|])
+                        yield OpDecorate(vid, Decoration.BuiltIn, [|uint32 (int b)|])
                     | None -> 
                         yield OpDecorate(vid, Decoration.Location, [|uint32 i|])
 

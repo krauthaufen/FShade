@@ -743,7 +743,7 @@ type Instruction =
     | OpMemoryModel of addressing : AddressingModel * memory : MemoryModel
     | OpEntryPoint of executionModel : ExecutionModel * entryPoint : uint32 * name : string
     | OpExecutionMode of entryPoint : uint32 * mode : ExecutionMode * modes : Option<uint32>
-    | OpCapability of capability : int
+    | OpCapability of capability : Capability
     | OpTypeVoid of result : uint32
     | OpTypeBool of result : uint32
     | OpTypeInt of result : uint32 * width : uint32 * signedness : uint32
@@ -4032,7 +4032,7 @@ module Serializer =
                         let modes = if modesSize = 0 then None else Some (source.ReadUInt32())
                         yield OpExecutionMode(entryPoint, mode, modes)
                     | 17 ->
-                        let capability = unbox<int> (int (source.ReadUInt32()))
+                        let capability = unbox<Capability> (int (source.ReadUInt32()))
                         yield OpCapability(capability)
                     | 19 ->
                         let result = source.ReadUInt32()

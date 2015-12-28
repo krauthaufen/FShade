@@ -721,8 +721,8 @@ module Writer =
             OperandClass.OperandGroupOperation, "GroupOperation"
             OperandClass.OperandKernelEnqueueFlags, "KernelEnqueueFlags"
             OperandClass.OperandKernelProfilingInfo, "KernelProfilingInfo"
-            OperandClass.OperandCapability, "int"
-            OperandClass.OperandOpcode, "int"
+            OperandClass.OperandCapability, "Capability"
+            OperandClass.OperandOpcode, "OpCode"
         ]
 
 
