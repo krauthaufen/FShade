@@ -14,7 +14,8 @@ open Aardvark.Base
 open Aardvark.Base.TypeInfo.Patterns
 open SpirV
 open FShade.Compiler.ExpressionExtensions.Patterns
-
+open FShade
+open FShade.Compiler
 
 
 type Label(name : string) =
@@ -143,7 +144,7 @@ module InstructionPrinter =
                         | Some n -> n
                         | _ -> sprintf "struct%d" (int id)
 
-                let fieldTypes = fields |> Array.mapi (fun i id -> current.[id], getMemberName i) |> Array.toList
+                let fieldTypes = fields |> Array.mapi (fun i id -> (match Map.tryFind id current with | Some a -> a | None -> SpirVType.Unit), getMemberName i) |> Array.toList
                 let t = Struct(name, fieldTypes)
                 buildTypeMap (Map.add id t current) rest
 
@@ -316,6 +317,10 @@ module SpirVBuilders =
 
     type Scope = { startLabel : uint32; endLabel : uint32 }
 
+    type VariableId =
+        | LocationId of uint32
+        | ValueId of uint32
+
     type SpirVState = 
         {
             currentId : uint32
@@ -324,7 +329,7 @@ module SpirVBuilders =
             instructions : RevList<Instruction>
             typeCache : HashMap<Type, uint32>
             labelIds : Map<Label, uint32>
-            variableIds : Map<Var, uint32>
+            variableIds : Map<Var, VariableId>
             variableDeclarationLabels : Map<Var, uint32>
             currentScope : list<Scope>
       
@@ -410,46 +415,30 @@ module SpirVBuilders =
             { s with labelIds = Map.add l id s.labelIds }, ()
         }
 
+    let newMutableVarId (v : Var) =
+        { build = fun s ->
+            let (s, id) = newId.build s
+
+            { s with 
+                variableIds = Map.add v (LocationId id) s.variableIds
+            }, id
+        }
+
     let getVarId (v : Var) =
         { build = fun s ->
             match Map.tryFind v s.variableIds with
                 | Some id -> 
                     s,id
-                | None ->
-                    let (s, id) = newId.build s
-
-                    { s with 
-                        variableIds = Map.add v id s.variableIds
-                    }, id
+                | _ ->
+                    failwith "cannot get location for immutable variable"
         }
+
 
     let setVarId (v : Var) (id : uint32) =
         { build = fun s ->
             { s with 
-                variableIds = Map.add v id s.variableIds
+                variableIds = Map.add v (ValueId id) s.variableIds
             }, ()
-        }
-
-    let freshVarId (v : Var) =
-        { build = fun s ->
-            let (s, id) = newId.build s
-            { s with  variableIds = Map.add v id s.variableIds}, id
-        }
-
-    let getVarLabelId (v : Var) =
-        { build = fun s ->
-            match Map.tryFind v s.variableDeclarationLabels with
-                | Some id -> 
-                    s,id
-                | None ->
-                    let (s, id) = newId.build s
-                    let (s, lid) = getLabelId(Label()).build s
-
-                    { s with 
-                        variableIds = Map.add v id s.variableIds
-                        instructions = Snoc(s.instructions, OpLabel(lid)) 
-                        variableDeclarationLabels = Map.add v lid s.variableDeclarationLabels
-                    }, lid
         }
 
     let fail str : SpirV<'a> =
@@ -605,16 +594,43 @@ module SpirVBuilders =
 
 module SpirVCompiler =
 
+    let doubleAsFloat = true
+
     [<AutoOpen>]
     module private Utils =
         type ptr<'a> = Ptr
+        type parameter<'a> = Input
+        type input<'a> = Input
+        type output<'a> = Output
+        type uniform<'a> = Unif
 
         let makePtrType (t : Type) =
             typedefof<ptr<_>>.MakeGenericType [|t|]
 
+        let makeParameterType (t : Type) =
+            typedefof<parameter<_>>.MakeGenericType [|t|]
+
+        let makeInputType (t : Type) =
+            typedefof<input<_>>.MakeGenericType [|t|]
+
+        let makeOutputType (t : Type) =
+            typedefof<input<_>>.MakeGenericType [|t|]
+
+        let makeUniformType (t : Type) =
+            typedefof<uniform<_>>.MakeGenericType [|t|]
+
+
         let (|Ptr|_|) (t : Type) =
             if t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<ptr<_>> then
-                Some (t.GetGenericArguments().[0])
+                Some (t.GetGenericArguments().[0], StorageClass.Function)
+            elif t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<parameter<_>> then
+                Some (t.GetGenericArguments().[0], StorageClass.Function)
+            elif t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<input<_>> then
+                Some (t.GetGenericArguments().[0], StorageClass.Input)
+            elif t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<output<_>> then
+                Some (t.GetGenericArguments().[0], StorageClass.Output)
+            elif t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<uniform<_>> then
+                Some (t.GetGenericArguments().[0], StorageClass.Uniform)
             else 
                 None
 
@@ -692,6 +708,105 @@ module SpirVCompiler =
                 | Byte | UInt16 | UInt32 | UInt64 -> Some()
                 | _ -> None
 
+
+        type FakeCompiler() =
+            interface ICompiler<ShaderState> with
+                member x.CompileIntrinsicType(_) = failwith ""
+                member x.CompileIntrinsicFunction(_) = failwith ""
+                member x.CompileIntrinsicFunctionDefinition(_) = failwith ""
+                member x.CompileIntrinsicPropertyGet(_) = failwith ""
+                member x.CompileIntrinsicPropertySet(_) = failwith ""
+                member x.CompileIntrinsicConstructor(_) = failwith ""
+                member x.CompileFunctionDeclaration _ _ _ _ = failwith ""
+                member x.CompileTypeDeclaration _ _ = failwith ""
+                member x.CompileVariableDeclaration _ _ _ = failwith ""
+                member x.CompileConstantDeclaration _ _ _ = failwith ""
+                member x.CompileFieldDeclaration _ = failwith ""
+                member x.CompileApplication _ _ _ = failwith ""
+                member x.CompilePreamble() = failwith ""
+
+                member x.CompileValue _ _ = failwith ""
+                member x.FilterFunctionArguments _ = failwith ""
+                member x.ProcessCode  _ = failwith ""
+                member x.ProcessFunctionBody e = compile { return e }
+                member x.InitialState() = ShaderState.emptyShaderState
+                member x.ResetState s = { emptyShaderState with counters = s.counters }
+
+    type CustomField(parent : Type, index : int, name : string, fieldType : Type) =
+        inherit FieldInfo()
+
+        member x.Index = index
+
+        override x.Name = name
+        override x.FieldType = fieldType
+        override x.DeclaringType = parent
+        override x.Attributes = FieldAttributes.Public
+
+        override x.FieldHandle = failwith "not supported"
+        override x.GetValue(_) = failwith "not supported"
+        override x.SetValue(_,_,_,_,_) = failwith "not supported"
+        override x.ReflectedType = failwith "not supported"
+        override x.GetCustomAttributes(_) = failwith "not supported"
+        override x.GetCustomAttributes(_,_) = failwith "not supported"
+        override x.IsDefined(_,_) = failwith "not supported"
+
+    type CustomStruct(name : string, fields : list<string * Type>) as this =
+        inherit Type()
+        let guid = Guid.NewGuid()
+
+        let fieldMap = fields |> List.mapi (fun i (n,t) -> n, CustomField(this, i, n, t)) |> Map.ofList
+
+
+        override x.GUID = guid
+        override x.Name = name
+        override x.FullName = name
+        override x.IsArrayImpl() = false
+        override x.IsByRefImpl() = false
+        override x.IsPointerImpl() = false
+        override x.IsPrimitiveImpl() = false
+        override x.IsCOMObjectImpl() = false
+        override x.HasElementTypeImpl() = false
+        override x.Assembly = typeof<CustomStruct>.Assembly
+        override x.Module = typeof<CustomStruct>.Module
+        override x.UnderlyingSystemType = x :> Type
+        override x.BaseType = typeof<obj>
+
+        override x.GetField(n,_) = 
+            match Map.tryFind n fieldMap with
+                | Some f -> f :> FieldInfo
+                | _ -> null
+
+        override x.GetFields(_) =
+            fieldMap |> Map.toArray |> Array.map (fun (_,f) -> f :> FieldInfo)
+
+        override x.GetCustomAttributes(_,_) = [||]
+        override x.GetCustomAttributes(_) = [||]
+        override x.IsDefined(_,_) = false
+
+        override x.Namespace = failwith "not supported"
+        override x.AssemblyQualifiedName = failwith "not supported"
+        override x.InvokeMember(_,_,_,_,_,_,_,_) = failwith "not supported"
+        override x.GetConstructorImpl(_,_,_,_,_) = failwith "not supported"
+        override x.GetConstructors(_) = failwith "not supported"
+        override x.GetMethodImpl(_,_,_,_,_,_) = failwith "not supported"
+        override x.GetMethods(_) = failwith "not supported"
+        override x.GetInterface(_,_) = failwith "not supported"
+        override x.GetInterfaces() = failwith "not supported"
+        override x.GetEvent(_,_) = failwith "not supported"
+        override x.GetEvents(_) = failwith "not supported"
+        override x.GetPropertyImpl(_,_,_,_,_,_) = failwith "not supported"
+        override x.GetProperties(_) = failwith "not supported"
+        override x.GetNestedType(_,_) = failwith "not supported"
+        override x.GetNestedTypes(_) = failwith "not supported"
+        override x.GetMembers(_) = failwith "not supported"
+        override x.GetAttributeFlagsImpl() = failwith "not supported"
+        override x.GetElementType() = failwith "not supported"
+
+
+
+        member x.Fields = fields
+
+
     let rec compileType (t : Type) =
         spirvType {
             let! cache = tryFindTypeId t
@@ -702,95 +817,136 @@ module SpirVCompiler =
                     do! setTypeId t id
 
                     match t with
-                        | Ptr(t) ->
-                            let! i = compileType t
-                            yield OpTypePointer(id, StorageClass.Function, i)
-                        | Bool -> yield OpTypeBool(id)
-                        | SByte -> yield OpTypeInt(id, 8u, 1u)
-                        | Int16 -> yield OpTypeInt(id, 16u, 1u)
-                        | Int32 -> yield OpTypeInt(id, 32u, 1u)
-                        | Int64 -> yield OpTypeInt(id, 64u, 1u)
-                        | Byte -> yield OpTypeInt(id, 8u, 0u)
-                        | UInt16 -> yield OpTypeInt(id, 16u, 0u)
-                        | UInt32 -> yield OpTypeInt(id, 32u, 0u)
-                        | UInt64 -> yield OpTypeInt(id, 64u, 0u)
-                        | IntPtr -> yield OpTypeInt(id, 8u * uint32 IntPtr.Size, 1u)
-
-                        | Float32 -> yield OpTypeFloat(id, 32u)
-                        | Float64 -> yield OpTypeFloat(id, 64u)
-                        | Decimal -> yield OpTypeFloat(id, 64u)
-
-                        | Unit -> yield OpTypeVoid(id)
-
-                        | Enum -> 
-                            // TODO: enums don't have to be int32
-                            //let f = t.GetFields(BindingFlags.NonPublic ||| BindingFlags.Instance ||| BindingFlags.Public) |> Seq.head
-                            yield OpTypeInt(id, 32u, 1u)
-
-                        | VectorOf(d,ct) ->
-                            let! comp = compileType ct
-                            yield OpTypeVector(id, comp, uint32 d)
-
-                        | MatrixOf(d, ct) ->
-                            let vecType = t.GetProperty("C0").PropertyType
-                            let! colType = compileType vecType
-                            yield OpTypeMatrix(id, colType, uint32 d.X)
-
-                        | FixedArrayType(l, et) ->
-                            let! e = compileType et
-                            yield OpTypeArray(id, e, uint32 l)
-
+                        | :? CustomStruct as s ->
+                            let! fieldTypes = s.Fields |> List.mapSpv (fun (n,t) -> compileType t)
+                            yield OpTypeStruct(id, fieldTypes |> List.toArray)
+                                    
+                            yield OpName(id, s.Name)
+                            for (i,(n,_)) in s.Fields |> List.mapi (fun i f -> (i,f)) do
+                                yield OpMemberName(id, uint32 i, n)
+                                            
+                            return id
+                                                                
                         | _ ->
 
-                            if FSharpType.IsRecord t then
-                                let fields = FSharpType.GetRecordFields t |> Array.toList
-                                let! fieldTypes = fields |> List.mapSpv (fun f -> compileType f.PropertyType)
+                            let rec argsAndRet (t : Type) =
+                                try
+                                    if FSharpType.IsFunction t then
+                                        let arg, rest = FSharpType.GetFunctionElements t
+                                        let args, ret = argsAndRet rest
+                                        arg::args, ret
+                                    else
+                                        [], t
+                                with e ->
+                                    [], t
 
-                                yield OpTypeStruct(id, List.toArray fieldTypes)
-                                yield OpName(id, t.Name)
+                            let args, ret = argsAndRet t
 
-                                let fieldNames = fields |> List.mapi (fun i f -> i, f.Name)
-                                for (i,n) in fieldNames do
-                                    yield OpMemberName(id, uint32 i, n)
+                            match args with
+                                | [] ->
+                                    match t with
+                                        | Ptr(t, c) ->
+                                            let! i = compileType t
+                                            yield OpTypePointer(id, c, i)
+                                        | Bool -> yield OpTypeBool(id)
+                                        | SByte -> yield OpTypeInt(id, 8u, 1u)
+                                        | Int16 -> yield OpTypeInt(id, 16u, 1u)
+                                        | Int32 -> yield OpTypeInt(id, 32u, 1u)
+                                        | Int64 -> yield OpTypeInt(id, 64u, 1u)
+                                        | Byte -> yield OpTypeInt(id, 8u, 0u)
+                                        | UInt16 -> yield OpTypeInt(id, 16u, 0u)
+                                        | UInt32 -> yield OpTypeInt(id, 32u, 0u)
+                                        | UInt64 -> yield OpTypeInt(id, 64u, 0u)
+                                        | IntPtr -> yield OpTypeInt(id, 8u * uint32 IntPtr.Size, 1u)
 
-                            elif FSharpType.IsUnion t then
-                                let cases = FSharpType.GetUnionCases t |> Array.toList
+                                        | Float32 -> yield OpTypeFloat(id, 32u)
+                                        | Float64 -> 
+                                            if doubleAsFloat then yield OpTypeFloat(id, 32u)
+                                            else yield OpTypeFloat(id, 64u)
+                                        | Decimal ->
+                                            if doubleAsFloat then yield OpTypeFloat(id, 32u)
+                                            else yield OpTypeFloat(id, 64u)
 
-                                let allFields =
-                                    cases 
-                                        |> List.collect (fun c -> 
-                                            c.GetFields()
-                                                |> Array.toList
-                                                |> List.map(fun f ->
-                                                    (c.Tag, c.Name, f)
-                                                )
-                                        )
-                                        |> Seq.groupBy (fun (_,_,f) -> f.PropertyType, f.Name)
-                                        |> Seq.map (fun ((fType, fName), cases) ->
+                                        | Unit -> yield OpTypeVoid(id)
+
+                                        | Enum -> 
+                                            // TODO: enums don't have to be int32
+                                            //let f = t.GetFields(BindingFlags.NonPublic ||| BindingFlags.Instance ||| BindingFlags.Public) |> Seq.head
+                                            yield OpTypeInt(id, 32u, 1u)
+
+                                        | VectorOf(d,ct) ->
+                                            let! comp = compileType ct
+                                            yield OpTypeVector(id, comp, uint32 d)
+
+                                        | MatrixOf(d, ct) ->
+                                            let vecType = t.GetProperty("C0").PropertyType
+                                            let! colType = compileType vecType
+                                            yield OpTypeMatrix(id, colType, uint32 d.X)
+
+                                        | FixedArrayType(l, et) ->
+                                            let! e = compileType et
+                                            yield OpTypeArray(id, e, uint32 l)
+
+                                        | _ ->
+
+                                            if FSharpType.IsRecord t then
+                                                let fields = FSharpType.GetRecordFields t |> Array.toList
+                                                let! fieldTypes = fields |> List.mapSpv (fun f -> compileType f.PropertyType)
+
+                                                yield OpTypeStruct(id, List.toArray fieldTypes)
+                                                yield OpName(id, t.Name)
+
+                                                let fieldNames = fields |> List.mapi (fun i f -> i, f.Name)
+                                                for (i,n) in fieldNames do
+                                                    yield OpMemberName(id, uint32 i, n)
+
+                                            elif FSharpType.IsUnion t then
+                                                let cases = FSharpType.GetUnionCases t |> Array.toList
+
+                                                let allFields =
+                                                    cases 
+                                                        |> List.collect (fun c -> 
+                                                            c.GetFields()
+                                                                |> Array.toList
+                                                                |> List.map(fun f ->
+                                                                    (c.Tag, c.Name, f)
+                                                                )
+                                                        )
+                                                        |> Seq.groupBy (fun (_,_,f) -> f.PropertyType, f.Name)
+                                                        |> Seq.map (fun ((fType, fName), cases) ->
                                     
-                                            ()
-                                        )
+                                                            ()
+                                                        )
 
-                                failwithf "union-types not supported atm."
+                                                failwithf "union-types not supported atm."
 
-                            elif FSharpType.IsFunction t then
-                                failwithf "functions not supported atm."
+                                            elif FSharpType.IsFunction t then
+                                                failwithf "functions not supported atm."
 
-                            elif t.IsArray then
-                                failwith "arrays not supported atm."
+                                            elif t.IsArray then
+                                                failwith "arrays not supported atm."
 
-                            else
-                                let fields = t.GetFields(BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance) |> Array.toList
-                                let! fieldTypes = fields |> List.mapSpv (fun f -> compileType f.FieldType)
+                                            else
+                                                let fields = t.GetFields(BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance) |> Array.toList
+                                                let! fieldTypes = fields |> List.mapSpv (fun f -> compileType f.FieldType)
 
-                                yield OpTypeStruct(id, List.toArray fieldTypes)
-                                yield OpName(id, t.Name)
+                                                yield OpTypeStruct(id, List.toArray fieldTypes)
+                                                yield OpName(id, t.Name)
 
-                                let fieldNames = fields |> List.mapi (fun i f -> i, f.Name)
-                                for (i,n) in fieldNames do
-                                    yield OpMemberName(id, uint32 i, n)
+                                                let fieldNames = fields |> List.mapi (fun i f -> i, f.Name)
+                                                for (i,n) in fieldNames do
+                                                    yield OpMemberName(id, uint32 i, n)
 
-                    return id
+                                    return id
+                                | args ->
+                                    let args = args |> List.filter (fun t -> t <> typeof<unit>)
+                                    let! argTypes = args |> List.mapSpv compileType
+                                    let! retType = ret |> compileType
+
+                                    yield OpTypeFunction(id, retType, List.toArray argTypes)
+
+                                    return id
+
         }
 
     let rec compileConstant (t : Type) (value : obj) =
@@ -803,7 +959,11 @@ module SpirVCompiler =
                 match t with
                
                     | Num -> 
-                        yield OpConstant(tid, id, value |> getDwords)
+                        match value with
+                            | :? float as v when doubleAsFloat ->
+                                yield OpConstant(tid, id, v |> float32 |> getDwords)
+                            | _ -> 
+                                yield OpConstant(tid, id, value |> getDwords)
 
                     | Bool ->
                         if unbox value then yield OpConstantTrue(tid, id)
@@ -837,11 +997,20 @@ module SpirVCompiler =
                                 | _ -> failwithf "cannot subtract types: %A and %A" a.Type b.Type
 
                         | Mul ->
-                            match a.Type with
-                                | Integral | VectorOf(_,Integral) -> yield OpIMul(tid, id, ia, ib)
-                                | Fractional | VectorOf(_,Fractional) -> yield OpFMul(tid, id, ia, ib)
-                                | _ -> failwithf "cannot multiply types: %A and %A" a.Type b.Type
+                            if a.Type = b.Type then
+                                match a.Type with
+                                    | Integral | VectorOf(_,Integral) -> yield OpIMul(tid, id, ia, ib)
+                                    | Fractional | VectorOf(_,Fractional) -> yield OpFMul(tid, id, ia, ib)
+                                    | MatrixOf(size,bt) when size.X = size.Y -> yield OpMatrixTimesMatrix(tid, id, ia, ib)
 
+                                    | _ -> failwithf "cannot multiply types: %A and %A" a.Type b.Type
+                            else
+                                match a.Type, b.Type with
+                                    | MatrixOf(ms, mt), VectorOf(vd, vt) when vt = mt && ms.X = vd ->
+                                        let! resType = compileType (a.Type.GetProperty("C0").PropertyType)
+                                        yield OpMatrixTimesVector(resType, id, ia, ib)
+                                    | _ ->
+                                        failwithf "cannot multiply types: %A and %A" a.Type b.Type 
                         | Div ->
                             match a.Type with
                                 | SignedIntegral | VectorOf(_,SignedIntegral) -> yield OpSDiv(tid, id, ia, ib)
@@ -928,6 +1097,40 @@ module SpirVCompiler =
                     return Some id
 
 
+                | (MethodQuote <@ sqrt @> _ | MethodQuote <@ Fun.Sqrt : float -> float @> _), [a] ->
+                    let! glsl = glslId
+                    if glsl > 0u then
+                        let! ia = compileExpression false a
+                        let! tid = compileType retType
+                        let! id = newId
+                        yield OpExtInst(tid, id, glsl, uint32 GLSLExtInstruction.GLSLstd450Sqrt, [|ia|])
+                        return Some id
+                    else
+                        return None
+
+                | (MethodQuote <@ exp @> _ | MethodQuote <@ Fun.Exp : float -> float @> _), [a] ->
+                    let! glsl = glslId
+                    if glsl > 0u then
+                        let! ia = compileExpression false a
+                        let! tid = compileType retType
+                        let! id = newId
+                        yield OpExtInst(tid, id, glsl, uint32 GLSLExtInstruction.GLSLstd450Exp, [|ia|])
+                        return Some id
+                    else
+                        return None
+
+                | (MethodQuote <@ pow : float -> float -> float @> _ | MethodQuote <@ Fun.Pow : float * float -> float @> _), [x;e] ->
+                    let! glsl = glslId
+                    if glsl > 0u then
+                        let! ix = compileExpression false x
+                        let! ie = compileExpression false e
+                        let! tid = compileType retType
+                        let! id = newId
+                        yield OpExtInst(tid, id, glsl, uint32 GLSLExtInstruction.GLSLstd450Pow, [|ix; ie|])
+                        return Some id
+                     else
+                        return None
+
                 | _ ->
                     return None
         }
@@ -993,6 +1196,8 @@ module SpirVCompiler =
                     yield OpPhi(t, id, [|b;lb; tid;lt|])
                     return! ret id
 
+                
+
                 // foreach-loops have to be matched as first pattern since they consist of a number of expressions
                 // and may be 'destroyed' otherwise.
                 | ForEach(var,seq,body) ->
@@ -1044,13 +1249,13 @@ module SpirVCompiler =
                             // variable we skip its initialization
                             | FixedArrayType(et,d), NewObject(_) ->
                                 let! tid = compileType (makePtrType v.Type)
-                                let! vid = getVarId v
+                                let! vid = newMutableVarId v
                                 yield OpVariable(tid, vid, StorageClass.Function, None)
 
                             | _ ->
                                 if v.IsMutable then
                                     let! tid = compileType (makePtrType v.Type)
-                                    let! vid = getVarId v
+                                    let! vid = newMutableVarId v
                                     let! e = compileExpression false e
                                     yield OpVariable(tid, vid, StorageClass.Function, Some e)
                                 else
@@ -1074,7 +1279,7 @@ module SpirVCompiler =
 
                     let! tid = compileType v.Type
                     let! ptid = compileType <| (makePtrType v.Type)
-                    let! vid = getVarId v
+                    let! vid = newMutableVarId v
                     let! bid = compileType typeof<bool>
 
                     let! one = compileExpression false (Microsoft.FSharp.Quotations.Expr.Value(1 :> obj, typeof<int>))
@@ -1188,11 +1393,15 @@ module SpirVCompiler =
 
                 | VarSet(v,e) ->
                     let! vid = getVarId v
-                    let! eid = compileExpression false e
+                    match vid with
+                        | LocationId vid ->
+                            let! eid = compileExpression false e
 
-                    yield OpStore(vid, eid, None)
+                            yield OpStore(vid, eid, None)
 
-                    return! ret 0u
+                            return! ret 0u
+                        | _ ->
+                            return failwithf "cannot mutabte immutable binding %A" v
 
 
 
@@ -1269,14 +1478,62 @@ module SpirVCompiler =
                     return! ret c
                 | Var(v) ->
                     let! id = getVarId v
-                    if v.IsMutable then
+                    match id with
+                        | LocationId id ->
+                            let! rid = newId
+                            let! tid = compileType v.Type
+                            yield OpLoad(tid, rid, id, None)
+                            return! ret rid
+                        | ValueId id ->
+                            return! ret id
+                
+                | FieldGet(Some (Var v), field) ->
+                    let! vid = getVarId v
+                    match vid with
+                        | LocationId vid ->
+                            let index = 
+                                match field with
+                                    | :? CustomField as c -> c.Index
+                                    | _ ->
+                                        field.DeclaringType.GetFields(BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance) |> Array.findIndex (fun fi -> fi = field)
 
-                        let! rid = newId
-                        let! tid = compileType v.Type
-                        yield OpLoad(tid, rid, id, None)
-                        return! ret rid
-                    else
-                        return! ret id
+                            let! ci = compileConstant typeof<uint32> (uint32 index)
+                            let! pt = compileType (makePtrType field.FieldType)
+                            let! pid = newId
+                            yield OpInBoundsAccessChain(pt, pid, vid, [|ci|])
+
+                            let! t = compileType field.FieldType
+                            let! id = newId
+                            yield OpLoad(t, id, pid, None)
+
+                            return! ret id
+
+                        | ValueId target ->
+                            let! t = compileType field.FieldType
+                            let! id = newId
+                            match field with
+                                | :? CustomField as c -> 
+                                    yield OpCompositeExtract(t, id, target, [|uint32 c.Index|])
+
+                                | _ ->
+                                    let index = field.DeclaringType.GetFields(BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance) |> Array.findIndex (fun fi -> fi = field)
+                                    yield OpCompositeExtract(t, id, target, [|uint32 index|])
+
+                            return! ret id
+
+                | FieldGet(Some target, field) ->
+                    let! t = compileType field.FieldType
+                    let! target = compileExpression false target
+                    let! id = newId
+                    match field with
+                        | :? CustomField as c -> 
+                            yield OpCompositeExtract(t, id, target, [|uint32 c.Index|])
+
+                        | _ ->
+                            let index = field.DeclaringType.GetFields(BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance) |> Array.findIndex (fun fi -> fi = field)
+                            yield OpCompositeExtract(t, id, target, [|uint32 index|])
+
+                    return! ret id
 
                 // property-getters and setters having indices are compiled using their respective
                 // Get-/SetMethod.
@@ -1289,24 +1546,414 @@ module SpirVCompiler =
                     match t with
                         | None -> return! Expr.Call(pi.GetMethod, indices) |> compileExpression last 
                         | Some t -> return! Expr.Call(t, pi.GetMethod, indices) |> compileExpression last
-
                             
                 | _ ->
                     return failwithf "unsupported expr: %A" e
 
         }
 
+    let compileFunction (e : Expr) =
+        spirv {
+            match e with
+                | MethodLambda(args, body) ->
+                    let! funcType = compileType e.Type
+                    let! resType = compileType body.Type
 
+                    let! id = newId
+                    yield OpFunction(resType, id, FunctionControl.None, funcType)
+                    for a in args do
+                        let! vid = newMutableVarId a
+                        let! at = compileType (makeParameterType a.Type)
+                        yield OpFunctionParameter(at, vid)
+
+                    let! _ = compileExpression true body
+
+                    yield OpFunctionEnd
+                    
+                | _ ->
+                    ()
+
+            
+        }
+
+
+    let getBuiltInInput (t : ShaderType) (last : Option<ShaderType>) (s : string) =
+        match s, last with
+            | "PointSize", Some _ -> 
+                Some ("gl_PointSize", BuiltIn.PointSize)
+
+            | "ClipDistance", Some _  -> 
+                Some ("gl_ClipDistance", BuiltIn.ClipDistance)
+
+            | _ ->
+                match t with
+                    | Vertex ->
+                        match s with
+                            | "VertexId" -> Some ("gl_VertexID", BuiltIn.VertexId)
+                            | "InstanceId" -> Some ("gl_InstanceID", BuiltIn.InstanceId)
+                            | _ -> None
+
+                    | TessControl ->
+                        match s with
+                            | "PatchVertices" -> Some ("gl_PatchVerticesIn", BuiltIn.PatchVertices)
+                            | "PrimitiveId" -> Some ("gl_PrimitiveID", BuiltIn.PrimitiveId)
+                            | "InvocationId" -> Some ("gl_InvocationID", BuiltIn.InvocationId)
+                            | _ -> None
+                    | TessEval ->
+                        match s with
+                            | "TessCoord" -> Some ("gl_TessCoord", BuiltIn.TessCoord)
+                            | "PatchVertices" -> Some ("gl_PatchVerticesIn", BuiltIn.PatchVertices)
+                            | "PrimitiveId" -> Some ("gl_PrimitiveID", BuiltIn.PrimitiveId)
+                            | "TessLevelInner" -> Some ("gl_TessLevelInner", BuiltIn.TessLevelInner)
+                            | "TessLevelOuter" -> Some ("gl_TessLevelOuter", BuiltIn.TessLevelOuter)
+                            | _ -> None
+
+                    | Geometry(_) ->
+                        match s with
+                            | "PrimitiveId" -> Some ("gl_PrimitiveIDIn", BuiltIn.PrimitiveId)
+                            | "InvocationId" -> Some ("gl_InvocationID", BuiltIn.InvocationId)
+                            | _ -> None
+
+                    | Fragment ->
+                        match s with
+                            | "FragCoord" -> Some ("gl_FragCoord", BuiltIn.FragCoord)
+                            | "FrontFacing" -> Some ("gl_FrontFacing", BuiltIn.FrontFacing)
+                            | "PointCoord" -> Some ("gl_PointCoord", BuiltIn.PointCoord)
+                            | "SampleId" -> Some ("gl_SampleID", BuiltIn.SampleId)
+                            | "SamplePosition" -> Some ("gl_SamplePosition", BuiltIn.SamplePosition)
+                            | "SampleMask" -> Some ("gl_SampleMaskIn", BuiltIn.SampleMask)
+                            | "PrimitiveId" -> Some ("gl_PrimitiveID", BuiltIn.PrimitiveId)
+                            | "Layer" -> Some ("gl_Layer", BuiltIn.Layer)
+                            | "ViewportIndex" -> Some ("gl_ViewportIndex", BuiltIn.ViewportIndex)
+                            | _ -> None
+
+    let getBuiltInOutput (t : ShaderType) (next : Option<ShaderType>) (s : string) =
+        match s, next with
+            | "Positions", Some Fragment -> 
+                Some ("gl_Position", BuiltIn.Position)
+
+            | "PointSize", Some _ -> 
+                Some ("gl_PointSize", BuiltIn.PointSize)
+
+            | "ClipDistance", Some _  -> 
+                Some ("gl_ClipDistance", BuiltIn.ClipDistance)
+
+            | _ ->
+                match t with
+                    | Vertex ->
+                        None
+
+                    | TessControl ->
+                        match s with
+                            | "TessLevelInner" -> Some ("gl_TessLevelInner", BuiltIn.TessLevelInner)
+                            | "TessLevelOuter" -> Some ("gl_TessLevelOuter", BuiltIn.TessLevelOuter)
+                            | _ -> None
+
+                    | TessEval ->
+                        None
+
+                    | Geometry(_) ->
+                        match s with
+                            | "Layer" -> Some ("gl_Layer", BuiltIn.Layer)
+                            | "ViewportIndex" -> Some ("gl_ViewportIndex", BuiltIn.ViewportIndex)
+                            | "PrimitiveId" -> Some ("gl_PrimitiveID", BuiltIn.PrimitiveId)
+                            | _ -> None
+
+                    | Fragment ->
+                        match s with
+                            | "Depth" -> Some ("gl_FragDepth", BuiltIn.FragDepth)
+                            | _ -> None
+
+    let compileShaderFunction (last : Option<ShaderType>) (shaderType : ShaderType) (next : Option<ShaderType>) (uniforms : list<Var>) (inputs : list<Either<int, BuiltIn> * Var>) (outputs : list<Either<int, BuiltIn> * Var>) (body : Expr) =
+        spirv {
+
+            let model =
+                match shaderType with
+                    | ShaderType.Vertex -> ExecutionModel.Vertex
+                    | ShaderType.TessControl -> ExecutionModel.TessellationControl
+                    | ShaderType.TessEval -> ExecutionModel.TessellationEvaluation
+                    | ShaderType.Geometry _ -> ExecutionModel.Geometry
+                    | ShaderType.Fragment -> ExecutionModel.Fragment
+
+
+            yield OpCapability Capability.Shader
+
+            let! glslExt = newId
+            yield OpExtInstImport(glslExt, "GLSL.std.450")
+            do! setGlslId glslExt
+
+            yield OpMemoryModel(AddressingModel.Logical, MemoryModel.GLSL450)
+
+            let! entry = newId
+            yield OpEntryPoint(model, entry, "main")
+
+            match shaderType with
+                | Fragment ->
+                    yield OpExecutionMode(entry, ExecutionMode.OriginLowerLeft, None)
+
+                | _ ->
+                    // TODO: special annotations per stage
+                    ()
+
+
+            //yield OpSource(SourceLanguage.Unknown, 100u, "FShade")
+            yield OpSourceExtension("GL_ARB_separate_shader_objects")
+            yield OpSourceExtension("GL_ARB_shading_language_420pack")
+
+            yield OpName(entry, "main")
+
+            for (_,i) in inputs do
+                let! id = newMutableVarId i
+                yield OpName(id, i.Name)
+
+            for (_,o) in outputs do
+                let! id = newMutableVarId o
+                yield OpName(id, o.Name)
+
+
+            for (loc, i) in inputs do
+                let! tid = compileType (makeInputType i.Type)
+                let! vid = getVarId i
+                match vid with
+                    | LocationId vid ->
+                        yield OpVariable(tid, vid, StorageClass.Input, None)
+
+                        match loc with
+                            | Left loc -> yield OpDecorate(vid, Decoration.Location, [|uint32 loc|])
+                            | Right b -> yield OpDecorate(vid, Decoration.BuiltIn, [|uint32 (int b)|])
+
+                    | _ -> 
+                        failwith "impossible"
+
+            for (loc, o) in outputs do
+                let! tid = compileType (makeOutputType o.Type)
+                let! vid = getVarId o
+                match vid with
+                    | LocationId vid ->
+                        yield OpVariable(tid, vid, StorageClass.Output, None)
+
+                        match loc with
+                            | Left loc -> yield OpDecorate(vid, Decoration.Location, [|uint32 loc|])
+                            | Right b -> yield OpDecorate(vid, Decoration.BuiltIn, [|uint32 (int b)|])
+                    | _ -> 
+                        failwith "impossible"
+
+            for (u) in uniforms do
+                let! tid = compileType (makeUniformType u.Type)
+                let! vid = newMutableVarId u
+                yield OpVariable(tid, vid, StorageClass.Uniform, None)
+                // TODO: descriptorsets and bindings here
+                //yield OpDecorate(vid, Decoration.Location, [|uint32 loc|])
+
+
+
+
+            let! tVoid = compileType typeof<unit>
+            let! entryType = compileType typeof<unit -> unit>
+            yield OpFunction(tVoid, entry, FunctionControl.None, entryType)
+
+            let! _ = compileExpression true body
+
+            yield OpFunctionEnd
+
+
+
+        }
+
+
+    let compileShader (last : Option<ShaderType>) (next : Option<ShaderType>) (shader : Compiled<Shader, ShaderState>) : Compiled<Module, ShaderState> =
+        compile {
+            let! s = shader
+
+
+            // uniform grouping
+            let uniformGroups = 
+                s.uniforms  
+                    |> Seq.choose(fun (u,v) ->
+                        match u with
+                            | UserUniform(t,o) -> Some (uniform, t, v.Name,v)
+                            | Attribute(scope, t, n) -> Some (scope, t, n,v)
+                            | SamplerUniform(t,sem, n,_) -> None
+                       ) 
+                    |> Seq.groupBy(fun (s,_,_,_) -> s)
+                    |> Seq.map (fun (g,v) -> (g, v |> Seq.map (fun (_,t,n,v) -> (t,n,v)) |> Seq.toList))
+                    |> Map.ofSeq
+
+            let bufferVariables = 
+                uniformGroups |> Map.map (fun scope fields ->
+                    let t = CustomStruct(scope.Name, fields |> List.map (fun (t,n,_) -> n,t))   
+                    Var(sprintf "_%s" scope.Name, t)
+                )
+
+            let variableParents =
+                uniformGroups 
+                    |> Map.toList
+                    |> List.collect (fun (scope, fields) ->
+                        fields |> List.map (fun (_,_,v) ->
+                            v, Map.find scope bufferVariables
+                        )
+                       )
+                    |> Map.ofList
+
+            let body =
+                s.body.Substitute (fun vi ->
+                    match Map.tryFind vi variableParents with
+                        | Some buffer ->
+                            Expr.FieldGet(Expr.Var buffer, buffer.Type.GetField(vi.Name)) |> Some
+                        | None ->
+                            None
+                )
+
+            let uniforms =
+                List.concat [
+                    bufferVariables 
+                        |> Map.toList |> List.map snd
+
+                    s.uniforms 
+                        |> List.choose (fun (u,v) -> 
+                            match u with
+                                | SamplerUniform(_) -> Some v
+                                | _ -> None
+                            )
+                ]
+
+
+
+            // IO builtIns
+            let inputs = s.inputs |> Map.toSeq |> Seq.sortBy(fun (_,n) -> n.Name) |> Seq.map snd |> Seq.toList
+            let outputs = s.outputs |> Map.toSeq |> Seq.sortBy(fun (_,(_,n)) -> n.Name) |> Seq.map snd |> Seq.toList
+
+            let inputRemap = 
+                s.inputs
+                    |> Map.toList 
+                    |> List.choose (fun (sem,i) ->
+                        match getBuiltInInput s.shaderType last sem with
+                            | Some (name, builtin) ->
+                                Some (i, (Var(name,i.Type), builtin))
+                            | _ ->
+                                None
+                       )
+                    |> Map.ofList
+
+            let outputRemap = 
+                s.outputs
+                    |> Map.toList 
+                    |> List.choose (fun (sem,(_,o)) ->
+                        match getBuiltInOutput s.shaderType next sem with
+                            | Some (name, builtin) ->
+                                Some (o, (Var(name,o.Type), builtin))
+                            | _ ->
+                                None
+                       )
+                    |> Map.ofList
+
+            let remap = Map.union inputRemap outputRemap
+
+            let body =
+                body.Substitute(fun vi ->
+                    match Map.tryFind vi remap with
+                        | Some (v, builtin) ->
+                            Some (Expr.Var v)
+                        | None ->
+                            None
+                )
+
+            let mutable location = 0
+            let inputs = 
+                inputs |> List.map (fun i ->
+                    match Map.tryFind i inputRemap with
+                        | Some (ni, b) -> (Right b, ni)
+                        | None -> 
+                            let l = location
+                            location <- location + 1
+                            (Left l, i)
+                )
+
+
+            let mutable location = 0
+            let outputs = 
+                outputs |> List.map (fun (loc, i) ->
+                    match Map.tryFind i outputRemap with
+                        | Some (ni, b) -> (Right b, ni)
+                        | None -> 
+                            let l = location
+                            location <- location + 1
+                            (Left l, i)
+                )
+
+
+
+            // compile to instructions
+            let res = compileShaderFunction last s.shaderType next uniforms inputs outputs body
+            let (state,_) = res.build SpirVState.Empty
+
+
+
+            return { 
+                magic = 0x07230203u
+                version = 0x00010000u
+                generatorMagic = 0xDEADBEEFu
+                bound = state.currentId
+                reserved = 0u
+                instructions = (RevList.toList state.typeInstructions) @ (RevList.toList state.instructions)
+            }
+        }
+
+    let vs (e : Compiled<Effect,_>) =
+        compile {
+            let! e = e
+            return e.vertexShader.Value
+        }
 
     let testCode = 
         <@ 
-            if (0 < 2 |> not) && 3 > 2 then 1 else 2
+            let ipos = V4d.Zero
+            let mutable op = V4d.Zero
+
+            op <- ipos
         @>
 
+
+    type Vertex =
+        {
+            [<Semantic("Positions")>] pos : V4d
+            [<Semantic("WorldPosition")>] wp : V4d
+            [<Semantic("Normals")>] n : V3d
+        }
+
+    let sh (v : Vertex) =
+        vertex {
+            let m : M44d = uniform?PerModel?ModelTrafo
+            let vp : M44d = uniform?PerView?ViewProjTrafo
+            let nm : M33d = uniform?PerModel?NormalMatrix
+
+            let wp = m * v.pos
+
+            return { v with pos = vp * wp; wp = wp; n = nm * v.n }
+        }
+
     let runTest() =
-        let res = compileExpression true testCode 
-        let (s,_) = res.build SpirVState.Empty
+        
+        let e = toEffect sh |> vs |> compileShader None (Some Fragment)
+
+        match e.runCompile (emptyCompilerState (FakeCompiler() :> ICompiler<_>)) with
+            | Success(_,compiled) ->
+                printfn "// Module Version 10000"
+                printfn "// Id's are bound by: %A" compiled.bound
+                let str = InstructionPrinter.toString compiled.instructions
+
+                if System.IO.File.Exists @"C:\Users\Schorsch\Desktop\test.spv" then
+                    System.IO.File.Delete @"C:\Users\Schorsch\Desktop\test.spv"
+
+                use s = System.IO.File.OpenWrite(@"C:\Users\Schorsch\Desktop\test.spv")
+                let writer = new System.IO.BinaryWriter(s)
+                SpirV.Serializer.write compiled writer
 
 
-        let str = InstructionPrinter.toString ((RevList.toList s.typeInstructions) @ (RevList.toList s.instructions))
-        printfn "%s" str
+
+
+                printfn "%s" str
+
+            | Error e ->
+                failwith e
+
