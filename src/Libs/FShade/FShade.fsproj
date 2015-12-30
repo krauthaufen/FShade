@@ -86,6 +86,7 @@
     <Compile Include="SPIRV\SpirVTypes.fs" />
     <Compile Include="SPIRV\SpirV.fs" />
     <Compile Include="SPIRV\Ast.fs" />
+    <Compile Include="SPIRV\Compiler.fs" />
     <None Include="SPIRV\Test.fsx" />
     <Content Include="app.config" />
     <EmbeddedResource Include="Resources.resx" />

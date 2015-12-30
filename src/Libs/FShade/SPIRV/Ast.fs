@@ -547,6 +547,15 @@ module Expr =
                 | All -> Bool
                 | Any -> Bool
 
+        let fieldType (t : Type) (field : string) =
+            match t with
+                | Struct(_,fields) ->
+                    fields |> List.pick (fun (t,f) ->
+                        if f = field then Some t
+                        else None
+                    )
+                | _ -> failwith "expected a struct type"
+
         [<AbstractClass>]
         type AbstractExpression(t : Type) =
             member x.Type = t
@@ -629,7 +638,17 @@ module Expr =
             override x.Rebuild args =
                 GlslCallInstruction(instruction, resType, args) :> Expr
 
+        type FieldAccessInstruction(target : Expr, fieldName : string) =
+            inherit DerivedExpression(fieldType target.Type fieldName, [target])
 
+            member x.FieldName = fieldName
+            member x.FieldType = x.Type
+            member x.Target = target
+
+            override x.Rebuild args =
+                match args with
+                    | [t] -> FieldAccessInstruction(t, fieldName) :> Expr
+                    | _ -> failwith "impossible"
 
         type NewObjectExpression(t : Type, args : list<Expr>) =
             inherit DerivedExpression(t, args)
@@ -808,6 +827,7 @@ module Expr =
 
     let Dot(l : Expr, r : Expr) = BinaryExpression(Dot, l, r) :> Expr
     let GlslCall(f : GLSLExtInstruction, resType : Type, args : list<Expr>) = GlslCallInstruction(f, resType, args) :> Expr
+    let FieldAccess(e : Expr, fieldName : string) = FieldAccessInstruction(e, fieldName) :> Expr
 
     module Glsl =
         let Cross(l : Expr, r : Expr) =
@@ -979,7 +999,10 @@ module Expr =
                 | :? ContinueExpression -> Some()
                 | _ -> None
 
-
+        let (|FieldAccess|_|) (e : Expr) =
+            match e with
+                | :? FieldAccessInstruction as e -> Some(e.Target, e.FieldName)
+                | _ -> None
 
 [<AutoOpen>]
 module SpirVBuilders =
@@ -1461,7 +1484,20 @@ module SpirV =
 
 
         arr
-            
+   
+   
+    let private findFieldIndexAndType (t : Type) (field : string) =
+        match t with
+            | Struct(_,fields) ->
+                fields 
+                |> List.mapi (fun i (t,n) -> (i,t,n))
+                |> List.pick (fun (i,t,n) ->
+                    if field = n then Some (i,t)
+                    else None
+                )
+            | _ ->
+                failwith "expected a struct type"
+         
 
     let rec private compileConstant (t : Type) (data : byte[]) =
         spirv {
@@ -1910,6 +1946,28 @@ module SpirV =
                             yield OpExtInst(tid, id, glsl, uint32 (int f), args)
                             return Some id
 
+                        | FieldAccess(Var(v), fieldName) ->
+                            let (index,fieldType) = findFieldIndexAndType v.Type fieldName
+
+                            let! tid = getTypeId fieldType
+                            let! targetId = getVarId v
+                            let! id = newId
+                            yield OpInBoundsPtrAccessChain(tid, id, targetId, 0u, [|uint32 index|])
+                            return Some id
+
+                        | FieldAccess(target, fieldName) ->
+                            let (index,fieldType) = findFieldIndexAndType target.Type fieldName
+
+                            let! tid = getTypeId fieldType
+                            let! targetId = compileExpr target
+                            match targetId with
+                                | Some targetId ->
+                                    let! id = newId
+                                    yield OpInBoundsAccessChain(tid, id, targetId, [|uint32 index|])
+                                    return Some id
+                                | _ ->
+                                    return failwith "expected value for field access"
+
                         | Block(statements) ->
                             let mutable lastId = -1
 
@@ -2320,6 +2378,10 @@ module SpirV =
 
         let m = new Var("m", myType, true)
 
+
+        let ub0t = Struct("PerModel", [Type.M44f, "ModelViewProjTrafo"])
+        let ub0 = Var("perModel", ub0t, true)
+
         let ex = 
             Expr.Let(v, Expr.Value(Type.UInt8, 1uy), 
                 Expr.Let(m, Expr.NewObject(myType, [Expr.Value(Type.V2f, V2f.Zero); Expr.Value(Type.Int32, 0)]),
@@ -2336,9 +2398,9 @@ module SpirV =
         let i = Var("Positions", Type.V4f, true)
 
 
-        let body = Expr.VarSet(pos, Expr.Var i)
+        let body = Expr.VarSet(pos, Expr.Mul(Expr.FieldAccess(Expr.Var ub0, "ModelViewProjTrafo"), Expr.Var i))
 
-        let res = compileShader (Map.ofList [0, (i, None)]) (Map.ofList [-1, (pos, Some BuiltIn.Position)]) Map.empty ExecutionModel.Vertex body
+        let res = compileShader (Map.ofList [0, (i, None)]) (Map.ofList [-1, (pos, Some BuiltIn.Position)]) (Map.ofList [(0,0), ub0]) ExecutionModel.Vertex body
 
         let(s,_) = res.build SpirVState.Empty
 
@@ -2384,4 +2446,8 @@ module SpirV =
         typeInstructions @ instructions 
             |> InstructionPrinter.toString 
             |> printfn "%s"
+
+
+
+
 
