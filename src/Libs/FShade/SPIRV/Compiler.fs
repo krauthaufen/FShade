@@ -1927,7 +1927,7 @@ module SpirVCompiler =
             return { 
                 magic = 0x07230203u
                 version = 0x00010000u
-                generatorMagic = 0xDEADBEEFu
+                generatorMagic = (0xFADEu <<< 16) ||| 1u
                 bound = state.currentId
                 reserved = 0u
                 instructions = (RevList.toList state.typeInstructions) @ (RevList.toList state.instructions)
