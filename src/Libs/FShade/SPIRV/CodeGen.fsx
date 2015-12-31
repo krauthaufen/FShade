@@ -804,6 +804,24 @@ module Writer =
 
 
 
+
+        printfn "        member x.WithResultType(t : uint32) ="
+        printfn "            match x with"
+
+        for o in spec.OpCodes do
+            if o.Name <> "Bad" then
+                let argCount = o.Operands |> List.length
+                if o.HasResultType then
+                    let args = List.init (argCount-1) (fun i -> sprintf "a%d" i) |> String.concat ","
+                    printfn "                | %s(_,%s) -> %s(t,%s)" o.Name args o.Name args
+
+        printfn "                | _ -> x"
+        printfn ""
+        printfn ""
+
+
+
+
         printfn "        member x.ResultId ="
         printfn "            match x with"
 
@@ -821,6 +839,34 @@ module Writer =
         printfn "                | _ -> None"
         printfn ""
         printfn ""
+
+
+
+        printfn "        member x.WithResultId(id : uint32) ="
+        printfn "            match x with"
+
+        for o in spec.OpCodes do
+            if o.Name <> "Bad" then
+                let argCount = o.Operands |> List.length
+                if o.HasResult then
+                    if o.HasResultType then
+                        let args = List.init (argCount-2) (sprintf "a%d") |> String.concat ","
+                        if args.Length = 0 then
+                            printfn "                | %s(tid,_) -> %s(tid,id)" o.Name o.Name
+                        else
+                            printfn "                | %s(tid,_,%s) -> %s(tid,id,%s)" o.Name args o.Name args
+                    else
+                        let args = List.init (argCount-1) (sprintf "a%d") |> String.concat ","
+                        if args.Length = 0 then
+                            printfn "                | %s(_) -> %s(id)" o.Name o.Name
+                        else
+                            printfn "                | %s(_,%s) -> %s(id,%s)" o.Name args o.Name args
+
+        printfn "                | _ -> x"
+        printfn ""
+        printfn ""
+
+
 
 
         printfn "        member x.Operands ="

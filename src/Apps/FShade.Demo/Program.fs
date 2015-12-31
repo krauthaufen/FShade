@@ -194,7 +194,7 @@ module Dead =
 [<EntryPoint>]
 let main argv = 
 
-    FShade.SpirV.New.SpirVCompiler.runTest()
+    FShade.SpirV.New.SpirVCompilerTest.runTest()
 
     Environment.Exit 0
 

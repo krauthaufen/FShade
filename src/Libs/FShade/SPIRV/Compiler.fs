@@ -10,6 +10,7 @@ open Microsoft.FSharp.NativeInterop
 open Microsoft.FSharp.Reflection
 open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Quotations.Patterns
+open Microsoft.FSharp.Quotations.ExprShape
 open Aardvark.Base
 open Aardvark.Base.TypeInfo.Patterns
 open SpirV
@@ -1096,6 +1097,15 @@ module SpirVCompiler =
 
                     return Some id
 
+                | (MethodQuote <@ Vec.xyz : V4d -> V3d @> _ | Method("get_XYZ",[Vector])), [a] ->
+                    let! ia = compileExpression false a
+                    let! tid = compileType retType
+                    let! id = newId
+
+                    yield OpVectorShuffle(tid, id, ia, ia, [|0u;1u;2u|])
+
+
+                    return Some id
 
                 | (MethodQuote <@ sqrt @> _ | MethodQuote <@ Fun.Sqrt : float -> float @> _), [a] ->
                     let! glsl = glslId
@@ -1535,6 +1545,19 @@ module SpirVCompiler =
 
                     return! ret id
 
+                | NewObject(ctor, args) ->
+                    match ctor.DeclaringType with
+                        | VectorOf(d,t) ->
+                            let! args = args |> List.mapSpv (compileExpression false)
+                            
+                            let! tid = compileType ctor.DeclaringType
+                            let! id = newId
+
+                            yield OpCompositeConstruct(tid, id, List.toArray args)
+                            return! ret id
+                        | _ ->
+                            return failwithf "construction of %A not implemented" ctor.DeclaringType
+
                 // property-getters and setters having indices are compiled using their respective
                 // Get-/SetMethod.
                 | PropertySet(t, pi, indices, value) ->
@@ -1664,7 +1687,7 @@ module SpirVCompiler =
                             | "Depth" -> Some ("gl_FragDepth", BuiltIn.FragDepth)
                             | _ -> None
 
-    let compileShaderFunction (last : Option<ShaderType>) (shaderType : ShaderType) (next : Option<ShaderType>) (uniforms : list<Var>) (inputs : list<Either<int, BuiltIn> * Var>) (outputs : list<Either<int, BuiltIn> * Var>) (body : Expr) =
+    let compileShaderFunction (last : Option<ShaderType>) (shaderType : ShaderType) (next : Option<ShaderType>) (uniforms : list<int * int * Var>) (inputs : list<Either<int, BuiltIn> * Var>) (outputs : list<Either<int, BuiltIn> * Var>) (body : Expr) =
         spirv {
 
             let model =
@@ -1738,10 +1761,17 @@ module SpirVCompiler =
                     | _ -> 
                         failwith "impossible"
 
-            for (u) in uniforms do
+
+            let mutable binding = 0
+            for (ds, b, u) in uniforms do
                 let! tid = compileType (makeUniformType u.Type)
                 let! vid = newMutableVarId u
                 yield OpVariable(tid, vid, StorageClass.Uniform, None)
+
+                yield OpName(vid, u.Name)
+                yield OpDecorate(vid, Decoration.DescriptorSet, [| uint32 ds |])
+                yield OpDecorate(vid, Decoration.Binding, [| uint32 b |])
+                binding <- binding + 1
                 // TODO: descriptorsets and bindings here
                 //yield OpDecorate(vid, Decoration.Location, [|uint32 loc|])
 
@@ -1761,10 +1791,8 @@ module SpirVCompiler =
         }
 
 
-    let compileShader (last : Option<ShaderType>) (next : Option<ShaderType>) (shader : Compiled<Shader, ShaderState>) : Compiled<Module, ShaderState> =
+    let compileShader (last : Option<ShaderType>) (next : Option<ShaderType>) (s : Shader) : Compiled<Module, ShaderState> =
         compile {
-            let! s = shader
-
 
             // uniform grouping
             let uniformGroups = 
@@ -1817,7 +1845,13 @@ module SpirVCompiler =
                             )
                 ]
 
-
+            let! uniforms = 
+                uniforms |> List.mapC (fun u ->
+                    compile {
+                        let! ds = nextCounter "DS"
+                        return (ds, 0, u)
+                    }
+                )
 
             // IO builtIns
             let inputs = s.inputs |> Map.toSeq |> Seq.sortBy(fun (_,n) -> n.Name) |> Seq.map snd |> Seq.toList
@@ -1884,6 +1918,7 @@ module SpirVCompiler =
 
 
             // compile to instructions
+
             let res = compileShaderFunction last s.shaderType next uniforms inputs outputs body
             let (state,_) = res.build SpirVState.Empty
 
@@ -1899,12 +1934,237 @@ module SpirVCompiler =
             }
         }
 
+
+    type CompiledEffect =
+        {
+            modules : Map<ShaderType, Module>
+        }
+
+    let private compileEffectInternal (neededOutputs : Map<string, Type>) (e : Compiled<Effect, ShaderState>) =
+        compile {
+            let! e = e
+
+            let hasgs = match e.geometryShader with | Some _ -> true | _ -> false
+            let! fsUsed,fsCode = match e.fragmentShader with
+                                    | Some(fs) -> compile {
+                                                    let additional =
+                                                        neededOutputs 
+                                                            |> Map.remove "Depth"
+                                                            |> Map.filter (fun k t ->
+                                                                match Map.tryFind k fs.outputs with
+                                                                    | Some _ -> false
+                                                                    | None -> true
+                                                            )
+                                                    let fs = addOutputs additional fs
+
+                                                    let unused = fs.outputs |> Map.filter (fun k (t,v) -> 
+                                                                    match t with
+                                                                        | Some t -> false
+                                                                        | None -> not <| Map.containsKey k neededOutputs
+                                                                 ) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
+
+                                                    let fs = removeOutputs unused fs
+
+                                                    // TODO: needed here?
+                                                    //let fs = adjustToConfig config fs ((if hasgs then Geometry(None, TriangleStrip) else Vertex) |> Some) None
+
+                                                    let last = ((if hasgs then Geometry(None, TriangleStrip) else Vertex) |> Some)
+                                                   
+                                                   
+                                                    let! fsc = compileShader last None fs
+
+                                                    let used = seq { yield ("Positions",typeof<V4d>); yield! fs.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k,v.Type)) } |> Map.ofSeq
+                                                    return used, Some fsc
+                                                  }
+                                    | None -> compile { return Map.ofList [("Positions",typeof<V4d>)], None }
+
+            do! resetCompilerState
+            let! gsUsed,gsCode = match e.geometryShader with
+                                    | Some(gs, t) -> compile {
+                                                    let additional = fsUsed |> Map.filter (fun k _ -> not <| Map.containsKey k gs.outputs)
+                                                    let gs = addOutputs additional gs
+
+                                                    let unused = gs.outputs |> Map.filter (fun k v -> not <| Map.containsKey k fsUsed) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
+                                                    let gs = removeOutputs unused gs
+
+                                                    //let gs = adjustToConfig config gs (Some Vertex) (Some Fragment)
+                                                    let! gsc = compileShader (Some Vertex) (Some Fragment) gs
+
+                                                    let used = gs.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k, if v.Type.IsArray then v.Type.GetElementType() else v.Type)) |> Map.ofSeq
+                                                
+     
+                                                    return used,Some (gsc,t)
+                                                  }
+                                    | None -> compile { return fsUsed,None }
+
+            do! resetCompilerState
+
+
+            
+            let uniformBufferUnion (a : Map<UniformScope, list<Type * string>>) (b : Map<UniformScope, list<Type * string>>) =
+                let mutable result = a
+
+                for (KeyValue(s,list)) in b do
+                    match Map.tryFind s result with
+                        | Some l ->
+                            let o = System.Collections.Generic.HashSet(List.concat [l |> Seq.toList; list]) |> Seq.toList
+                            result <- Map.add s o result
+                        | None -> 
+                            result <- Map.add s list result
+                result
+
+
+            let! tessUsed, tessCode = match e.tessControlShader, e.tessEvalShader with
+                                        | None, None -> compile { return gsUsed, None }
+                                        | Some tcs, Some tev ->
+                                            compile {
+                                                let additional = gsUsed |> Map.filter (fun k _ -> not <| Map.containsKey k tev.outputs)
+                                                let unused = tev.outputs |> Map.filter (fun k v -> not <| Map.containsKey k gsUsed) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
+
+                                                let tev = addOutputs additional tev
+                                                let tev = removeOutputs unused tev
+
+                                                let tevUsed = tev.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k, if v.Type.IsArray then v.Type.GetElementType() else v.Type)) |> Map.ofSeq
+                                                let tevUsed = Map.remove "TessCoord" tevUsed
+                                                let tevUsed = Map.add "TessLevelInner" typeof<float[]> tevUsed
+                                                let tevUsed = Map.add "TessLevelOuter" typeof<float[]> tevUsed
+
+                                                let additional = tevUsed |> Map.filter (fun k _ -> not <| Map.containsKey k tcs.outputs)
+                                                let unused = tcs.outputs |> Map.filter (fun k v -> not <| Map.containsKey k tevUsed) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
+
+                                                let tcs = addOutputs additional tcs
+                                                let tcs = removeOutputs unused tcs
+
+                                                let tcsUsed = tcs.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k, if v.Type.IsArray then v.Type.GetElementType() else v.Type)) |> Map.ofSeq
+                                                
+
+
+                                                let id = Var("gl_InvocationID", typeof<int>)
+                                                let rec substitute e =
+                                                    match e with
+                                                        | VarSet(v,value) ->
+                                                            match Map.tryFindKey (fun _ (_,vi) -> vi = v) tcs.outputs with
+                                                                | Some s when s <> "TessLevelInner" && s <> "TessLevelOuter" ->
+                                                                    let set = getMethodInfo <@ LanguagePrimitives.IntrinsicFunctions.SetArray @>
+                                                                    let set = set.MakeGenericMethod [|value.Type|]
+
+                                                                    let newVar =
+                                                                        if s = "Positions" then 
+                                                                            Var("gl_OutPosition", v.Type.MakeArrayType())
+                                                                        else
+                                                                            Var(v.Name, v.Type.MakeArrayType())
+
+                                                                    Expr.Call(set, [Expr.Var newVar; Expr.Var id; value])
+       
+                                                                | _ -> e
+
+                                                        | ShapeVar(v) -> e
+                                                        | ShapeCombination(o,args) -> RebuildShapeCombination(o, args |> List.map substitute)
+                                                        | ShapeLambda(v,b) -> Expr.Lambda(v, substitute b)
+
+                                                let newTcs = substitute tcs.body
+                                                let tcs = { tcs with body = newTcs }
+
+                                                //let tev = adjustToConfig config tev (Some Vertex) (Some Fragment)
+                                                //let tcs = adjustToConfig config tcs (Some Vertex) (Some Fragment)
+
+
+                                                let! tevc = compileShader (Some Vertex) (Some Fragment) tev
+                                                let! tcsc = compileShader (Some Vertex) (Some Fragment) tcs
+
+                                                
+                                                let glPos = System.Text.RegularExpressions.Regex("gl_Position\[(?<index>[^\]]+)\]")
+                                                let glOutPos = System.Text.RegularExpressions.Regex("gl_OutPosition\[(?<index>[^\]]+)\]")
+
+//                                                let tevCode = glPos.Replace(tevc.code, (fun (m : System.Text.RegularExpressions.Match) -> 
+//                                                    let id = m.Groups.["index"].Value
+//                                                    sprintf "gl_in[%s].gl_Position" id
+//                                                ))
+//
+//                                                let tcsCode = glPos.Replace(tcsc.code, (fun (m : System.Text.RegularExpressions.Match) -> 
+//                                                    let id = m.Groups.["index"].Value
+//                                                    sprintf "gl_in[%s].gl_Position" id
+//                                                ))
+//
+//                                                let tcsCode = glOutPos.Replace(tcsCode, (fun (m : System.Text.RegularExpressions.Match) -> 
+//                                                    let id = m.Groups.["index"].Value
+//                                                    sprintf "gl_out[%s].gl_Position" id
+//                                                ))
+//
+//                                                let agg = { code = sprintf "\r\n#ifdef TessControl\r\n%s\r\n#endif\r\n#ifdef TessEval\r\n%s\r\n#endif\r\n" tcsCode tevCode
+//                                                            usedTypes = PersistentHashSet.union tevc.usedTypes tcsc.usedTypes
+//                                                            uniformBuffers = uniformBufferUnion tevc.uniformBuffers tcsc.uniformBuffers
+//                                                            uniforms = Map.union tevc.uniforms tcsc.uniforms }
+//               
+                                                let tcsUsed = Map.remove "InvocationId" tcsUsed
+
+                                                return tcsUsed,Some (tcsc, tevc)
+                                            }
+
+                                        | _ -> compile { return! error "invalid tessellation setup" }
+
+            do! resetCompilerState
+
+            let! vsCode = compile {
+                            let vs = 
+                                match e.vertexShader with
+                                    | Some(vs) -> vs
+                                    | None -> { shaderType = ShaderType.Vertex; uniforms = []; inputs = Map.empty; outputs = Map.empty; body = Expr.Value(()); inputTopology = None; debugInfo = None }
+
+                            let additional = tessUsed |> Map.filter (fun k _ -> not <| Map.containsKey k vs.outputs)
+                            let vs = addOutputs additional vs
+
+                            let unused = vs.outputs |> Map.filter (fun k v -> not <| Map.containsKey k tessUsed) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
+                            let vs = removeOutputs unused vs
+
+                            //let vs = adjustToConfig config vs None ((if hasgs then Geometry(None, TriangleStrip) else Fragment) |> Some) 
+                            
+                            let! vsc = compileShader None (Some (if hasgs then Geometry(None, TriangleStrip) else Fragment)) vs
+                            return Some vsc
+                          }
+
+            let map = Map.empty
+
+            let map =
+                match fsCode with
+                    | Some fs -> 
+                        map |> Map.add ShaderType.Fragment fs
+                    | _ -> map
+
+            let map =
+                match gsCode with
+                    | Some(gs,t) ->
+                        map |> Map.add (ShaderType.Geometry(None, t)) gs
+                    | _ -> map
+
+            let map =
+                match tessCode with
+                    | Some(tcs,tev) ->
+                        map |> Map.add ShaderType.TessControl tcs
+                            |> Map.add ShaderType.TessEval tev
+                    | _ -> map
+
+            let map =
+                match vsCode with
+                    | Some vs -> 
+                        map |> Map.add ShaderType.Vertex vs
+                    | _ -> map
+
+            return { modules = map }
+        }
+
+
+    let compileEffect (neededOutputs : Map<string, Type>) (e : Compiled<Effect, ShaderState>) : Error<CompiledEffect> =
+        e |> compileEffectInternal neededOutputs |> runCompile (FakeCompiler() :> ICompiler<_>)
+
+
     let vs (e : Compiled<Effect,_>) =
         compile {
             let! e = e
             return e.vertexShader.Value
         }
 
+module SpirVCompilerTest =
     let testCode = 
         <@ 
             let ipos = V4d.Zero
@@ -1919,9 +2179,10 @@ module SpirVCompiler =
             [<Semantic("Positions")>] pos : V4d
             [<Semantic("WorldPosition")>] wp : V4d
             [<Semantic("Normals")>] n : V3d
+            [<Semantic("Colors")>] c : V4d
         }
 
-    let sh (v : Vertex) =
+    let trafo (v : Vertex) =
         vertex {
             let m : M44d = uniform?PerModel?ModelTrafo
             let vp : M44d = uniform?PerView?ViewProjTrafo
@@ -1932,27 +2193,48 @@ module SpirVCompiler =
             return { v with pos = vp * wp; wp = wp; n = nm * v.n }
         }
 
+    let vertexColor (v : Vertex) =
+        fragment {
+            return v.c
+        }
+
+    let constructedColor (v : Vertex) =
+        fragment {
+            return V4d(v.c.XYZ, 1.0)
+        }
+
     let runTest() =
-        
-        let e = toEffect sh |> vs |> compileShader None (Some Fragment)
 
-        match e.runCompile (emptyCompilerState (FakeCompiler() :> ICompiler<_>)) with
-            | Success(_,compiled) ->
-                printfn "// Module Version 10000"
-                printfn "// Id's are bound by: %A" compiled.bound
-                let str = InstructionPrinter.toString compiled.instructions
+        let effect =
+            SequentialComposition.compose [
+                trafo |> toEffect
+                constructedColor |> toEffect
+            ]
 
-                if System.IO.File.Exists @"C:\Users\Schorsch\Desktop\test.spv" then
-                    System.IO.File.Delete @"C:\Users\Schorsch\Desktop\test.spv"
+        let res = SpirVCompiler.compileEffect (Map.ofList ["Colors", typeof<V4d>]) effect
 
-                use s = System.IO.File.OpenWrite(@"C:\Users\Schorsch\Desktop\test.spv")
-                let writer = new System.IO.BinaryWriter(s)
-                SpirV.Serializer.write compiled writer
+        match res with
+            | Success(compiled) ->
+                for (stage, m) in Map.toSeq compiled.modules do
+                    printfn "%A:" stage
+                    printfn "    // Id's are bound by: %A" m.bound
+                    let str = InstructionPrinter.toString m.instructions
+                    printfn "%s" (String.indent 1 str)
 
+                    let file =
+                        match stage with
+                            | Vertex -> "vert.spv"
+                            | Fragment -> "frag.spv"
+                            | _ -> "other.spv"
 
+                    let path = System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop)
+                    let file = System.IO.Path.Combine(path, file)
+                    if System.IO.File.Exists file then
+                        System.IO.File.Delete file
 
-
-                printfn "%s" str
+                    use s = System.IO.File.OpenWrite(file)
+                    let writer = new System.IO.BinaryWriter(s)
+                    SpirV.Serializer.write m writer
 
             | Error e ->
                 failwith e
