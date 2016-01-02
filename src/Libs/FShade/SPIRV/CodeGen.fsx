@@ -497,6 +497,8 @@ module Reader =
             "OpAtomicFlagClear", 319
         ]
 
+    
+
     let readSpec() =
 
         let wordCountRx = Regex @"(?<value>[0-9]+)(?<v>[ \t]*\+[ \t]*variable)?"
@@ -754,6 +756,8 @@ module Writer =
                 | "interface" -> "_interface"
                 | n -> n
 
+    
+
 
     let writeOpDefinition (spec : SpirVSpec) =
 
@@ -801,6 +805,53 @@ module Writer =
         printfn "                | _ -> None"
         printfn ""
         printfn ""
+
+
+
+        printfn "        member x.SubstituteIds(f : uint32 -> uint32) ="
+        printfn "            match x with"
+
+        for o in spec.OpCodes do
+            if o.Name <> "Bad" then
+                let argCount = o.Operands |> List.length
+//
+//                let res =
+//                    if o.HasResultType then ["tid", "f tid"]
+//                    else []
+//
+//                let res =
+//                    if o.HasResult then res @ ["rid", "f rid"]
+//                    else res
+
+                let res = []
+
+                let operands =
+                    o.Operands |> List.mapi (fun i o ->
+                        let name = sprintf "a%d" i
+                        if o.Type = OperandClass.OperandId then
+                            if o.Optional then
+                                (name, sprintf "Option.map f %s" name)
+                            else
+                                (name, sprintf "f %s" name)
+                        elif o.Type = OperandClass.OperandVariableIds then
+                            (name, sprintf "Array.map f %s" name)
+                        else
+                            (name, name)
+                    )
+
+
+                let res = res @ operands
+
+                let left = res |> List.map fst |> String.concat ", "
+                let right = res |> List.map snd |> String.concat ", "
+                if left.Length > 0 then
+                    printfn "                | %s(%s) -> %s(%s)" o.Name left o.Name right
+                else
+                    printfn "                | %s -> %s" o.Name o.Name
+
+        printfn ""
+        printfn ""
+
 
 
 
@@ -906,7 +957,6 @@ module Writer =
 
         printfn ""
         printfn ""
-
 
 
 

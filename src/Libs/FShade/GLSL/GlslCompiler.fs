@@ -177,7 +177,9 @@ module GLSL =
                         | Method("op_Subtraction", [Num|Vector|Matrix; Num|Vector|Matrix]) -> return Some "({0} - {1})"
                         | Method("op_Multiply", [Num|Vector|Matrix; Num|Vector|Matrix]) -> return Some "{0} * {1}"
                         | Method("op_Division", [Num|Vector|Matrix; Num|Vector|Matrix]) -> return Some "{0} / {1}"
-                        | Method("op_Modulus", [Num; Num]) -> return Some "{0} % {1}"
+                        | Method("op_Modulus", [Integral; Integral]) -> return Some "{0} % {1}"
+                        | Method("op_Modulus", [_; _]) -> return Some "mod({0},{1})"
+
                         | Method("op_LessThan", [Num; Num]) -> return Some "{0} < {1}"
                         | Method("op_GreaterThan", [Num; Num]) -> return Some "{0} > {1}"
                         | Method("op_GreaterThanOrEqual", [Num; Num]) -> return Some "{0} >= {1}"

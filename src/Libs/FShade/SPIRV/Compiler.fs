@@ -147,6 +147,7 @@ module InstructionPrinter =
 
                 let fieldTypes = fields |> Array.mapi (fun i id -> (match Map.tryFind id current with | Some a -> a | None -> SpirVType.Unit), getMemberName i) |> Array.toList
                 let t = Struct(name, fieldTypes)
+
                 buildTypeMap (Map.add id t current) rest
 
             | OpTypeFunction(id, ret, args) :: rest ->
@@ -296,6 +297,73 @@ module SpirVBuilders =
             | _ -> None
 
 
+    type Precedence =
+        | Header = 0
+        | Debug = 1
+        | Annotation = 2
+        | Types = 3
+        | Constants = 4
+        | Default = 5
+
+    let instructionPrecedence (i : Instruction) : Precedence =
+        match i with
+            | OpSourceContinued(a0) -> Precedence.Header
+            | OpSource(a0, a1, a2) -> Precedence.Header
+            | OpSourceExtension(a0) -> Precedence.Header
+            | OpName(a0, a1) -> Precedence.Debug
+            | OpMemberName(a0, a1, a2) -> Precedence.Debug
+            | OpString(a0, a1) -> Precedence.Debug
+            | OpLine(a0, a1, a2) -> Precedence.Debug
+            | OpExtension(a0) -> Precedence.Header
+            | OpExtInstImport(a0, a1) -> Precedence.Header
+            | OpExtInst(a0, a1, a2, a3, a4) -> Precedence.Header
+            | OpMemoryModel(a0, a1) -> Precedence.Header
+            | OpEntryPoint(a0, a1, a2) -> Precedence.Header
+            | OpExecutionMode(a0, a1, a2) -> Precedence.Header
+            | OpCapability(a0) -> Precedence.Header
+            | OpTypeVoid(a0) -> Precedence.Types
+            | OpTypeBool(a0) -> Precedence.Types
+            | OpTypeInt(a0, a1, a2) -> Precedence.Types
+            | OpTypeFloat(a0, a1) -> Precedence.Types
+            | OpTypeVector(a0, a1, a2) -> Precedence.Types
+            | OpTypeMatrix(a0, a1, a2) -> Precedence.Types
+            | OpTypeImage(a0, a1, a2, a3, a4, a5, a6, a7, a8) -> Precedence.Types
+            | OpTypeSampler(a0) -> Precedence.Types
+            | OpTypeSampledImage(a0, a1) -> Precedence.Types
+            | OpTypeArray(a0, a1, a2) -> Precedence.Types
+            | OpTypeRuntimeArray(a0, a1) -> Precedence.Types
+            | OpTypeStruct(a0, a1) -> Precedence.Types
+            | OpTypeOpaque(a0, a1) -> Precedence.Types
+            | OpTypePointer(a0, a1, a2) -> Precedence.Types
+            | OpTypeFunction(a0, a1, a2) -> Precedence.Types
+            | OpTypeEvent(a0) -> Precedence.Types
+            | OpTypeDeviceEvent(a0) -> Precedence.Types
+            | OpTypeReserveId(a0) -> Precedence.Types
+            | OpTypeQueue(a0) -> Precedence.Types
+            | OpTypePipe(a0, a1) -> Precedence.Types
+            | OpTypeForwardPointer(a0, a1) -> Precedence.Types
+            | OpConstantTrue(a0, a1) -> Precedence.Constants
+            | OpConstantFalse(a0, a1) -> Precedence.Constants
+            | OpConstant(a0, a1, a2) -> Precedence.Constants
+            | OpConstantComposite(a0, a1, a2) -> Precedence.Constants
+            | OpConstantSampler(a0, a1, a2, a3, a4) -> Precedence.Constants
+            | OpConstantNull(a0, a1) -> Precedence.Constants
+            | OpSpecConstantTrue(a0, a1) -> Precedence.Constants
+            | OpSpecConstantFalse(a0, a1) -> Precedence.Constants
+            | OpSpecConstant(a0, a1, a2) -> Precedence.Constants
+            | OpSpecConstantComposite(a0, a1, a2) -> Precedence.Constants
+            | OpSpecConstantOp(a0, a1, a2, a3) -> Precedence.Constants
+            | OpNoLine -> Precedence.Debug
+
+            | OpDecorate(_) -> Precedence.Annotation
+            | OpMemberDecorate(_) -> Precedence.Annotation
+            | OpGroupDecorate(_) -> Precedence.Annotation
+            | OpGroupMemberDecorate(_) -> Precedence.Annotation
+            | OpDecorationGroup(_) -> Precedence.Annotation
+
+            | _ -> Precedence.Default
+
+
     type RevList<'a> =
         | Snoc of RevList<'a> * 'a
         | Nil
@@ -326,13 +394,18 @@ module SpirVBuilders =
         {
             currentId : uint32
             glslExtId : uint32
-            typeInstructions : RevList<Instruction>
-            instructions : RevList<Instruction>
+            instructions : Map<Precedence, RevList<Instruction>>
             typeCache : HashMap<Type, uint32>
+            constantCache : HashMap<Type * obj, uint32>
             labelIds : Map<Label, uint32>
             variableIds : Map<Var, VariableId>
             variableDeclarationLabels : Map<Var, uint32>
             currentScope : list<Scope>
+
+            inputs : Set<Var>
+            outputs : Set<Var>
+            uniforms : Set<Var>
+
       
         } with
             
@@ -340,13 +413,17 @@ module SpirVBuilders =
                 {
                     currentId = 1u
                     glslExtId = 0u
-                    typeInstructions = Nil
-                    instructions = Nil
+                    instructions = Map.empty
                     typeCache = HashMap.empty
+                    constantCache = HashMap.empty
                     labelIds = Map.empty
                     variableIds = Map.empty
                     variableDeclarationLabels = Map.empty
                     currentScope = []
+
+                    inputs = Set.empty
+                    outputs = Set.empty
+                    uniforms = Set.empty
                 }
 
 
@@ -364,11 +441,12 @@ module SpirVBuilders =
         { build = fun s ->
             s, s.glslExtId
         }
-
-    let lastInstruction =
-        { build = fun s ->
-            s, (match s.instructions with | Snoc(_,i) -> Some i | Nil -> None)
-        }
+//
+//    let lastInstruction =
+//        { build = fun s ->
+//            Map.
+//            s, (match s.instructions |> Map.toList with | Snoc(_,i) -> Some i | Nil -> None)
+//        }
 
     let tryFindTypeId (t : Type) =
         { build = fun s ->
@@ -380,6 +458,18 @@ module SpirVBuilders =
     let setTypeId (t : Type) (id : uint32) =
         { build = fun s ->
             { s with typeCache = HashMap.add t id s.typeCache }, ()
+        }
+
+    let tryFindConstantId (t : Type) (v : obj) =
+        { build = fun s ->
+            match HashMap.tryFind (t,v) s.constantCache with
+                | Some id -> s, Some id
+                | _ -> s, None
+        }
+
+    let setConstantId (t : Type) (v : obj) (id : uint32) =
+        { build = fun s ->
+            { s with constantCache = HashMap.add (t,v) id s.constantCache }, ()
         }
 
     let pushScope newScope =
@@ -445,18 +535,46 @@ module SpirVBuilders =
     let fail str : SpirV<'a> =
         failwith str
 
+    let isInput (v : Var) =
+        { build = fun s ->
+            s, Set.contains v s.inputs
+        }
+
+    let isOutput (v : Var) =
+        { build = fun s ->
+            s, Set.contains v s.outputs
+        }
+
+    let isUniform (v : Var) =
+        { build = fun s ->
+            s, Set.contains v s.uniforms
+        }
+
     type SpirVBuilder() =
 
         member x.Yield(i : Instruction) =
             { build = fun s ->
-                { s with instructions = Snoc(s.instructions, i) }, ()
+                let p = instructionPrecedence i
+                
+                match Map.tryFind p s.instructions with
+                    | Some instructions ->
+                        { s with instructions = Map.add p (Snoc(instructions, i)) s.instructions }, ()
+                    | _ ->
+                        { s with instructions = Map.add p (Snoc(Nil, i)) s.instructions }, ()
             }
 
         member x.YieldFrom(i : seq<Instruction>) =
             { build = fun s ->
-                let mutable c = s.instructions
-                for e in i do c <- Snoc(c, e)
-                { s with instructions = c }, ()
+                let mutable s = s
+                for e in i do 
+                    let p = instructionPrecedence e
+                    match Map.tryFind p s.instructions with
+                        | Some instructions ->
+                            s <- { s with instructions = Map.add p (Snoc(instructions, e)) s.instructions }
+                        | _ ->
+                            s <- { s with instructions = Map.add p (Snoc(Nil, e)) s.instructions }
+
+                s, ()
             }
 
 
@@ -498,63 +616,6 @@ module SpirVBuilders =
             v
 
     let spirv = SpirVBuilder()
-
-
-    type SpirVTypeBuilder() =
-
-        member x.Yield(i : Instruction) =
-            { build = fun s ->
-                { s with typeInstructions = Snoc(s.typeInstructions, i) }, ()
-            }
-
-        member x.YieldFrom(i : seq<Instruction>) =
-            { build = fun s ->
-                let mutable c = s.typeInstructions
-                for e in i do c <- Snoc(c, e)
-                { s with typeInstructions = c }, ()
-            }
-
-
-        member x.Bind(m : SpirV<'a>, f : 'a -> SpirV<'b>) =
-            { build = fun s ->
-                let (s,v) = m.build s
-                (f v).build s
-            }
-
-        member x.Zero() =
-            { build = fun s -> s, () }
-
-
-        member x.Combine(l : SpirV<unit>, r : SpirV<'a>) =
-            { build = fun s -> 
-                let (s, ()) = l.build s
-                r.build s
-            }
-
-        member x.Delay(f : unit -> SpirV<'a>) =
-            { build = fun s ->
-                (f ()).build s
-            }
-
-        member x.For(seq : seq<'a>, f : 'a -> SpirV<unit>) =
-            { build = fun s ->
-                let mutable c = s
-                for e in seq do
-                    let (s,()) = (f e).build c
-                    c <- s
-                c, ()
-            } 
-
-
-        member x.Return(v : 'a) =
-            { build = fun s -> s, v }
-
-        member x.ReturnFrom(v : SpirV<'a>) =
-            v
-
-    let spirvType = SpirVTypeBuilder()
-
-
 
     module List =
         let mapSpv (f : 'a -> SpirV<'b>) (l : list<'a>) =
@@ -809,7 +870,7 @@ module SpirVCompiler =
 
 
     let rec compileType (t : Type) =
-        spirvType {
+        spirv {
             let! cache = tryFindTypeId t
             match cache with
                 | Some id -> return id
@@ -823,9 +884,13 @@ module SpirVCompiler =
                             yield OpTypeStruct(id, fieldTypes |> List.toArray)
                                     
                             yield OpName(id, s.Name)
-                            for (i,(n,_)) in s.Fields |> List.mapi (fun i f -> (i,f)) do
+                            for (i,(n,t)) in s.Fields |> List.mapi (fun i f -> (i,f)) do
                                 yield OpMemberName(id, uint32 i, n)
-                                            
+                                match t with
+                                    | Matrix(_) ->
+                                        yield OpMemberDecorate(id, uint32 i, Decoration.RowMajor, [||])   
+                                    | _ ->
+                                        ()
                             return id
                                                                 
                         | _ ->
@@ -952,27 +1017,33 @@ module SpirVCompiler =
 
     let rec compileConstant (t : Type) (value : obj) =
         spirv {
-            if t = typeof<unit> then
-                return 0u
-            else
-                let! tid = compileType t
-                let! id = newId
-                match t with
+            let! c = tryFindConstantId t value
+
+            match c with
+                | Some id -> return id
+                | _ ->
+                    if t = typeof<unit> then
+                        return 0u
+                    else
+                        let! tid = compileType t
+                        let! id = newId
+                        do! setConstantId t value id
+                        match t with
                
-                    | Num -> 
-                        match value with
-                            | :? float as v when doubleAsFloat ->
-                                yield OpConstant(tid, id, v |> float32 |> getDwords)
-                            | _ -> 
-                                yield OpConstant(tid, id, value |> getDwords)
+                            | Num -> 
+                                match value with
+                                    | :? float as v when doubleAsFloat ->
+                                        yield OpConstant(tid, id, v |> float32 |> getDwords)
+                                    | _ -> 
+                                        yield OpConstant(tid, id, value |> getDwords)
 
-                    | Bool ->
-                        if unbox value then yield OpConstantTrue(tid, id)
-                        else yield OpConstantFalse(tid, id)
+                            | Bool ->
+                                if unbox value then yield OpConstantTrue(tid, id)
+                                else yield OpConstantFalse(tid, id)
 
-                    | _ -> failwithf "constants of type %A not implemented" t
+                            | _ -> failwithf "constants of type %A not implemented" t
 
-                return id
+                        return id
         }
 
     let rec compileIntrinsicCall (retType : Type) (m : MethodInfo) (args : list<Expr>) =
@@ -1402,12 +1473,53 @@ module SpirVCompiler =
                     return! compileExpression last a  
 
                 | VarSet(v,e) ->
+                    
                     let! vid = getVarId v
+                    let! eid = compileExpression false e
+                    let! o = isOutput v
+
                     match vid with
                         | LocationId vid ->
-                            let! eid = compileExpression false e
+                            if o && v.Name = "gl_Position" then
+                                let! zero = compileConstant typeof<uint32> 0u
+                                let! one = compileConstant typeof<uint32> 1u
+                                let! two = compileConstant typeof<uint32> 2u
+                                let! three = compileConstant typeof<uint32> 3u
 
-                            yield OpStore(vid, eid, None)
+
+                                let! ft = compileType typeof<float>
+                                let! ot = compileType e.Type
+                                let! half = compileConstant typeof<float> 0.5
+
+                                let! oldZ = newId
+                                yield OpCompositeExtract(ft, oldZ, eid, [|two|])
+
+                                let! halfZ = newId
+                                yield OpFMul(ft, halfZ, oldZ, half)
+
+                                let! newZ = newId
+                                yield OpFAdd(ft, newZ, halfZ, half)
+
+                                let! newX = newId
+                                let! oldY = newId
+                                let! newW = newId
+
+                                yield OpCompositeExtract(ft, newX, eid, [|zero|])
+                                yield OpCompositeExtract(ft, oldY, eid, [|one|])
+                                yield OpCompositeExtract(ft, newW, eid, [|three|])
+
+                                let! newY = newId
+                                yield OpFNegate(ft, newY, oldY)
+
+                                let! newP = newId
+                                yield OpCompositeConstruct(ot, newP, [|newX; newY; newZ; newW |])
+                                yield OpStore(vid, newP, None)
+
+
+                                ()
+
+                            else
+                                yield OpStore(vid, eid, None)
 
                             return! ret 0u
                         | _ ->
@@ -1698,16 +1810,25 @@ module SpirVCompiler =
                     | ShaderType.Geometry _ -> ExecutionModel.Geometry
                     | ShaderType.Fragment -> ExecutionModel.Fragment
 
-
-            yield OpCapability Capability.Shader
+            do! { 
+                build = fun s -> 
+                    { s with 
+                        inputs = inputs |> List.map snd |> Set.ofList 
+                        outputs = outputs |> List.map snd |> Set.ofList
+                        uniforms = uniforms |> List.map (fun (_,_,v) -> v) |> Set.ofList
+                    }, () 
+                }
 
             let! glslExt = newId
+            let! entry = newId
+            yield OpCapability Capability.Shader
+
             yield OpExtInstImport(glslExt, "GLSL.std.450")
             do! setGlslId glslExt
 
             yield OpMemoryModel(AddressingModel.Logical, MemoryModel.GLSL450)
 
-            let! entry = newId
+                    
             yield OpEntryPoint(model, entry, "main")
 
             match shaderType with
@@ -1719,7 +1840,7 @@ module SpirVCompiler =
                     ()
 
 
-            //yield OpSource(SourceLanguage.Unknown, 100u, "FShade")
+            yield OpSource(SourceLanguage.GLSL, 140u, "")
             yield OpSourceExtension("GL_ARB_separate_shader_objects")
             yield OpSourceExtension("GL_ARB_shading_language_420pack")
 
@@ -1781,6 +1902,8 @@ module SpirVCompiler =
             let! tVoid = compileType typeof<unit>
             let! entryType = compileType typeof<unit -> unit>
             yield OpFunction(tVoid, entry, FunctionControl.None, entryType)
+            let! l = getLabelId <| Label()
+            yield OpLabel(l)
 
             let! _ = compileExpression true body
 
@@ -1930,7 +2053,7 @@ module SpirVCompiler =
                 generatorMagic = (0xFADEu <<< 16) ||| 1u
                 bound = state.currentId
                 reserved = 0u
-                instructions = (RevList.toList state.typeInstructions) @ (RevList.toList state.instructions)
+                instructions = state.instructions |> Map.toList |> List.collect (snd >> RevList.toList)
             }
         }
 
