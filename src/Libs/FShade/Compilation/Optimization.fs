@@ -249,23 +249,30 @@ module Optimization =
                             { inputs = newInputs; outputs = newOutputs; uniforms = s.uniforms; shaderType = s.shaderType; body = b; inputTopology = s.inputTopology; debugInfo = s.debugInfo }
                         | _ -> failwith "invalid input-topology for tessellation shader"
 
-                | _ -> let b = s.body
+                | _ -> 
+                    let b = s.body
 
-                       let inputs = wanted |> Seq.map(fun (KeyValue(k,v)) -> 
-                                                let k = getInputName k s.shaderType
 
-                                                match Map.tryFind k s.inputs with
-                                                    | Some var -> k,var
-                                                    | None -> k,Var(k, v)
-                                              ) |> Seq.toList
+                    let mutable inputs = s.inputs
 
-                       let outputs = wanted |> Seq.map(fun (KeyValue(k,v)) -> k,(None, Var(k + "Out", v))) |> Seq.toList
+                    let newInputs =
+                        wanted 
+                            |> Map.toList
+                            |> List.map (fun (k,v) -> 
+                                let k = getInputName k s.shaderType
+                                match Map.tryFind k inputs with
+                                    | Some var -> k,var
+                                    | None -> 
+                                        let var = Var(k, v)
+                                        inputs <- Map.add k var inputs
+                                        k,var
+                               )
+  
+                    let outputs = wanted |> Seq.map(fun (KeyValue(k,v)) -> k,(None, Var(k + "Out", v))) |> Seq.toList
 
-                       let b = List.zip inputs outputs |> List.fold (fun b ((_,i),(_,(_,o))) -> Expr.Sequential(Expr.VarSet(o, Expr.Var(i)), b)) b
+                    let b = List.zip newInputs outputs |> List.fold (fun b ((_,i),(_,(_,o))) -> Expr.Sequential(Expr.VarSet(o, Expr.Var(i)), b)) b
+                    let newOutputs = seq { yield! s.outputs |> Map.toSeq; yield! outputs } |> Map.ofSeq
 
-                       let newInputs = seq { yield! s.inputs |> Map.toSeq; yield! inputs } |> Map.ofSeq
-                       let newOutputs = seq { yield! s.outputs |> Map.toSeq; yield! outputs } |> Map.ofSeq
-
-                       { inputs = newInputs; outputs = newOutputs; uniforms = s.uniforms; shaderType = s.shaderType; body = b; inputTopology = s.inputTopology; debugInfo = s.debugInfo }
+                    { inputs = inputs; outputs = newOutputs; uniforms = s.uniforms; shaderType = s.shaderType; body = b; inputTopology = s.inputTopology; debugInfo = s.debugInfo }
         else
             s
