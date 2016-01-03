@@ -335,6 +335,12 @@
                     "Description": "'Name'",
                     "Type": 9,
                     "Optional": false
+                },
+                {
+                    "Name": "iface",
+                    "Description": "'Interface'",
+                    "Type": 2,
+                    "Optional": false
                 }
             ]
         },

@@ -2350,7 +2350,7 @@ module SpirV =
                 yield OpName(vid, v.Name)
 
             let! id = compileFunction "main" Type.Unit [] body
-            yield OpEntryPoint(model, id, "main")
+            yield OpEntryPoint(model, id, "main", [||])
 
 
 

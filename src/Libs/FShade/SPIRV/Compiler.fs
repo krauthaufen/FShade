@@ -318,7 +318,7 @@ module SpirVBuilders =
             | OpExtInstImport(a0, a1) -> Precedence.Header
             | OpExtInst(a0, a1, a2, a3, a4) -> Precedence.Header
             | OpMemoryModel(a0, a1) -> Precedence.Header
-            | OpEntryPoint(a0, a1, a2) -> Precedence.Header
+            | OpEntryPoint(a0, a1, a2, a3) -> Precedence.Header
             | OpExecutionMode(a0, a1, a2) -> Precedence.Header
             | OpCapability(a0) -> Precedence.Header
             | OpTypeVoid(a0) -> Precedence.Types
@@ -1491,28 +1491,27 @@ module SpirVCompiler =
                                 let! ot = compileType e.Type
                                 let! half = compileConstant typeof<float> 0.5
 
-                                let! oldZ = newId
-                                yield OpCompositeExtract(ft, oldZ, eid, [|two|])
-
-                                let! halfZ = newId
-                                yield OpFMul(ft, halfZ, oldZ, half)
-
-                                let! newZ = newId
-                                yield OpFAdd(ft, newZ, halfZ, half)
-
                                 let! newX = newId
                                 let! oldY = newId
+                                let! oldZ = newId
                                 let! newW = newId
 
                                 yield OpCompositeExtract(ft, newX, eid, [|zero|])
                                 yield OpCompositeExtract(ft, oldY, eid, [|one|])
+                                yield OpCompositeExtract(ft, oldZ, eid, [|two|])
                                 yield OpCompositeExtract(ft, newW, eid, [|three|])
+
+                                let! zw = newId
+                                yield OpFAdd(ft, zw, oldZ, newW)
+
+                                let! newZ = newId
+                                yield OpFMul(ft, newZ, zw, half)
 
                                 let! newY = newId
                                 yield OpFNegate(ft, newY, oldY)
 
                                 let! newP = newId
-                                yield OpCompositeConstruct(ot, newP, [|newX; newY; newZ; newW |])
+                                yield OpCompositeConstruct(ot, newP, [| newX; newY; newZ; newW |])
                                 yield OpStore(vid, newP, None)
 
 
@@ -1829,7 +1828,7 @@ module SpirVCompiler =
             yield OpMemoryModel(AddressingModel.Logical, MemoryModel.GLSL450)
 
                     
-            yield OpEntryPoint(model, entry, "main")
+            yield OpEntryPoint(model, entry, "main", [||])
 
             match shaderType with
                 | Fragment ->

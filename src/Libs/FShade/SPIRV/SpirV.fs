@@ -741,7 +741,7 @@ type Instruction =
     | OpExtInstImport of result : uint32 * name : string
     | OpExtInst of resultType : uint32 * result : uint32 * set : uint32 * instruction : uint32 * operands : uint32[]
     | OpMemoryModel of addressing : AddressingModel * memory : MemoryModel
-    | OpEntryPoint of executionModel : ExecutionModel * entryPoint : uint32 * name : string
+    | OpEntryPoint of executionModel : ExecutionModel * entryPoint : uint32 * name : string * iface : uint32[]
     | OpExecutionMode of entryPoint : uint32 * mode : ExecutionMode * modes : Option<uint32>
     | OpCapability of capability : Capability
     | OpTypeVoid of result : uint32
@@ -1262,7 +1262,7 @@ module InstructionExtensions =
                 | OpExtInstImport(a0, a1) -> OpExtInstImport(f a0, a1)
                 | OpExtInst(a0, a1, a2, a3, a4) -> OpExtInst(f a0, f a1, f a2, a3, Array.map f a4)
                 | OpMemoryModel(a0, a1) -> OpMemoryModel(a0, a1)
-                | OpEntryPoint(a0, a1, a2) -> OpEntryPoint(a0, f a1, a2)
+                | OpEntryPoint(a0, a1, a2, a3) -> OpEntryPoint(a0, f a1, a2, Array.map f a3)
                 | OpExecutionMode(a0, a1, a2) -> OpExecutionMode(f a0, a1, a2)
                 | OpCapability(a0) -> OpCapability(a0)
                 | OpTypeVoid(a0) -> OpTypeVoid(f a0)
@@ -2275,7 +2275,7 @@ module InstructionExtensions =
                 | OpExtInstImport(_,name) -> [name :> obj]
                 | OpExtInst(_,_,set,instruction,operands) -> [set :> obj; instruction :> obj; operands :> obj]
                 | OpMemoryModel(addressing,memory) -> [addressing :> obj; memory :> obj]
-                | OpEntryPoint(executionModel,entryPoint,name) -> [executionModel :> obj; entryPoint :> obj; name :> obj]
+                | OpEntryPoint(executionModel,entryPoint,name,iface) -> [executionModel :> obj; entryPoint :> obj; name :> obj; iface :> obj]
                 | OpExecutionMode(entryPoint,mode,modes) -> [entryPoint :> obj; mode :> obj; modes :> obj]
                 | OpCapability(capability) -> [capability :> obj]
                 | OpTypeVoid(_) -> []
@@ -2948,12 +2948,14 @@ module Serializer =
                     writeOpHeader 14 3 target
                     target.Write(uint32 (int addressing))
                     target.Write(uint32 (int memory))
-                | OpEntryPoint(executionModel, entryPoint, name) -> 
-                    let wordCount = 3 + (name.Length + 4 &&& ~~~3) / 4
+                | OpEntryPoint(executionModel, entryPoint, name, iface) -> 
+                    let wordCount = 3 + (((name.Length + 4) &&& ~~~3) / 4) + iface.Length
                     writeOpHeader 15 wordCount target
                     target.Write(uint32 (int executionModel))
                     target.Write(entryPoint)
                     writeString name target
+                    for v in iface do
+                        target.Write(v)
                 | OpExecutionMode(entryPoint, mode, modes) -> 
                     let wordCount = 3 + (if modes.IsSome then 1 else 0)
                     writeOpHeader 16 wordCount target
@@ -4787,11 +4789,22 @@ module Serializer =
                         let memory = unbox<MemoryModel> (int (source.ReadUInt32()))
                         yield OpMemoryModel(addressing, memory)
                     | 15 ->
-                        let nameSize = max 0 (size - 3)
                         let executionModel = unbox<ExecutionModel> (int (source.ReadUInt32()))
                         let entryPoint = source.ReadUInt32()
-                        let name = readString source nameSize
-                        yield OpEntryPoint(executionModel, entryPoint, name)
+                        let mutable words = 1
+                        let name =
+                            let mutable data = Array.empty 
+                            let mutable read = source.ReadBytes(4)
+                            while read |> Array.forall (fun a -> a <> 0uy) do
+                                data <- Array.append data read
+                                read <- source.ReadBytes(4)
+                                words <- words + 1
+
+                            data |> Array.filter (fun b -> b <> 0uy) |> System.Text.ASCIIEncoding.ASCII.GetString
+
+                        let ifaceSize = max 0 (size - 3 - words)
+                        let iface = Array.init ifaceSize (fun _ -> source.ReadUInt32())
+                        yield OpEntryPoint(executionModel, entryPoint, name, iface)
                     | 16 ->
                         let modesSize = max 0 (size - 3)
                         let entryPoint = source.ReadUInt32()
