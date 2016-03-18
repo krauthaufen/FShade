@@ -194,11 +194,6 @@ module Dead =
 [<EntryPoint>]
 let main argv = 
 
-    FShade.SpirV.New.SpirVCompilerTest.runTest()
-
-    Environment.Exit 0
-
-
     let effect = [Shaders.simpleTrafoShader |> toEffect
                   Shaders.textureShader |> toEffect] |> compose
 
@@ -207,49 +202,6 @@ let main argv =
                   Simple.pointSurface (V2d(0.06, 0.08)) |> toEffect
                   Simple.white |> toEffect
                   ] |> compose
-
-    let effect = [Dead.BillboardTrafo |> toEffect; Dead.BillboardGeometry V2d.II id |> toEffect; Dead.BillboardFragment V4d.IIII |> toEffect] |> compose
-
-//    match GLSL.compileEffect effect with
-//        | Success (uniforms, code) ->
-//            for (k,v) in uniforms |> Map.toSeq do
-//                if v.IsSamplerUniform then
-//                    let sem,sam = v.Value |> unbox<string * SamplerState>
-//                    printfn "%s -> %s:\r\n%A" sem k sam
-//
-//            printfn "%s" code
-//        | Error e ->
-//            printfn "ERROR: %A" e
-//
-
-    //FShade.Resources.Icon |> printfn "%A"
-
-
-    let config =
-        {
-            GLSL.languageVersion = Version(1,4,0)
-            GLSL.enabledExtensions = Set.ofList ["GL_ARB_separate_shader_objects"; "GL_ARB_shading_language_420pack" ]
-
-            GLSL.createUniformBuffers = true
-            GLSL.createGlobalUniforms = false
-            GLSL.createBindings = true
-            GLSL.createDescriptorSets = true
-            GLSL.createInputLocations = true
-            GLSL.createRowMajorMatrices = true
-            GLSL.createPerStageUniforms = true
-
-            GLSL.flipHandedness = true
-            GLSL.depthRange = Range1d(0.0,1.0)
-        }
-
-    let res = effect |> GLSL.compileEffect410 (Map.ofList ["Colors", typeof<V4d>; "Depth", typeof<float>])
-    match res with
-        | Success (_,code) ->
-            printfn "%s" code
-        | Error e ->
-            failwith e
-
-    Environment.Exit 0
 
 
     let w = new Window()
@@ -270,7 +222,7 @@ let main argv =
 //    let sg = Sg.fileTexture "DiffuseTexture" @"C:\Users\haaser\Development\WorkDirectory\Server\pattern.jpg" sg
 //    let sg = Sg.fileTexture "NormalMap"      @"C:\Users\haaser\Development\WorkDirectory\Server\bump.jpg" sg
 
-    //let sg = Sg.uniform "CameraLocation" V3d.III sg
+    let sg = Sg.uniform "Color" (V4f(1,1,1,1)) sg
 
 
     w.Scene <- sg

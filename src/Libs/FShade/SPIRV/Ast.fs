@@ -1751,7 +1751,7 @@ module SpirV =
                                     | Float(_) | Vector(Float(_),_) -> 
                                         yield OpFOrdLessThan(tid, id, lid, rid)
 
-                                    | _ -> failwith "comparison for %A not supported" l.Type
+                                    | _ -> failwithf "comparison for %A not supported" l.Type
                             else
                                 failwithf "cannot compare %A to %A" l.Type r.Type
 
@@ -1767,7 +1767,7 @@ module SpirV =
                                     | Float(_) | Vector(Float(_),_) -> 
                                         yield OpFOrdLessThanEqual(tid, id, lid, rid)
 
-                                    | _ -> failwith "comparison for %A not supported" l.Type
+                                    | _ -> failwithf "comparison for %A not supported" l.Type
                             else
                                 failwithf "cannot compare %A to %A" l.Type r.Type
                                 
@@ -1783,7 +1783,7 @@ module SpirV =
                                     | Float(_) | Vector(Float(_),_) -> 
                                         yield OpFOrdGreaterThan(tid, id, lid, rid)
 
-                                    | _ -> failwith "comparison for %A not supported" l.Type
+                                    | _ -> failwithf "comparison for %A not supported" l.Type
                             else
                                 failwithf "cannot compare %A to %A" l.Type r.Type
                                 
@@ -1799,7 +1799,7 @@ module SpirV =
                                     | Float(_) | Vector(Float(_),_) -> 
                                         yield OpFOrdGreaterThanEqual(tid, id, lid, rid)
 
-                                    | _ -> failwith "comparison for %A not supported" l.Type
+                                    | _ -> failwithf "comparison for %A not supported" l.Type
                             else
                                 failwithf "cannot compare %A to %A" l.Type r.Type
                             
@@ -1815,7 +1815,7 @@ module SpirV =
                                     | Bool | Vector(Bool, _) ->
                                         yield OpLogicalEqual(tid, id, lid, rid)
 
-                                    | _ -> failwith "equality for %A not supported" l.Type
+                                    | _ -> failwithf "equality for %A not supported" l.Type
                             else
                                 failwithf "cannot equal %A to %A" l.Type r.Type
 
@@ -1831,7 +1831,7 @@ module SpirV =
                                     | Bool | Vector(Bool, _) ->
                                         yield OpLogicalNotEqual(tid, id, lid, rid)
 
-                                    | _ -> failwith "equality for %A not supported" l.Type
+                                    | _ -> failwithf "equality for %A not supported" l.Type
                             else
                                 failwithf "cannot equal %A to %A" l.Type r.Type
 
@@ -1842,7 +1842,7 @@ module SpirV =
                                 match l.Type with
                                     | Bool -> yield OpLogicalAnd(tid, id, lid, rid)
                                     | Vector(Bool,_) -> yield OpLogicalAnd(tid, id, lid, rid)
-                                    | _ -> failwith "logics for %A not supported" l.Type
+                                    | _ -> failwithf "logics for %A not supported" l.Type
                             else
                                 failwithf "cannot and %A and %A" l.Type r.Type
 
@@ -1851,7 +1851,7 @@ module SpirV =
                                 match l.Type with
                                     | Bool -> yield OpLogicalOr(tid, id, lid, rid)
                                     | Vector(Bool,_) -> yield OpLogicalOr(tid, id, lid, rid)
-                                    | _ -> failwith "logics for %A not supported" l.Type
+                                    | _ -> failwithf "logics for %A not supported" l.Type
                             else
                                 failwithf "cannot and %A and %A" l.Type r.Type
 

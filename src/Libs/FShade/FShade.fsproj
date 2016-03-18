@@ -10,10 +10,11 @@
     <RootNamespace>FShade</RootNamespace>
     <AssemblyName>FShade</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
-    <TargetFSharpCoreVersion>4.3.1.0</TargetFSharpCoreVersion>
+    <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
     <Name>FShade</Name>
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\..\Solutions\</SolutionDir>
     <RestorePackages>true</RestorePackages>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -88,7 +89,6 @@
     <Compile Include="SPIRV\Ast.fs" />
     <Compile Include="SPIRV\Compiler.fs" />
     <None Include="SPIRV\Test.fsx" />
-    <Content Include="app.config" />
     <EmbeddedResource Include="Resources.resx" />
     <Compile Include="Resources.fs" />
   </ItemGroup>

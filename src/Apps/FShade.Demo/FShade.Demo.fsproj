@@ -11,8 +11,9 @@
     <AssemblyName>FShade.Demo</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <TargetFSharpCoreVersion>4.3.1.0</TargetFSharpCoreVersion>
+    <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
     <Name>FShade.Demo</Name>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -38,46 +39,6 @@
     </DocumentationFile>
     <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
-  <ItemGroup>
-    <Content Include="OpenTK.dll.config">
-      <Paket>True</Paket>
-    </Content>
-    <Reference Include="mscorlib" />
-    <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Drawing" />
-    <Reference Include="System.Numerics" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="Shaders.fs" />
-    <Compile Include="Program.fs" />
-    <None Include="App.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\Libs\FShade.Compiler\FShade.Compiler.fsproj">
-      <Name>FShade.Compiler</Name>
-      <Project>{843b90d4-d949-4a93-9717-467ebc4530c4}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\..\Libs\FShade.Debug\FShade.Debug.fsproj">
-      <Name>FShade.Debug</Name>
-      <Project>{55f1a5a0-f789-4b6a-9968-6da3dc29f6c3}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\FShade.DemoRenderer\FShade.DemoRenderer.fsproj">
-      <Name>FShade.DemoRenderer</Name>
-      <Project>{d68f8db7-bcb3-41cd-b25b-a6205616118e}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\..\Libs\FShade\FShade.fsproj">
-      <Name>FShade</Name>
-      <Project>{ec6da69c-e93a-4481-9bb6-440482b1eeb1}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-  </ItemGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
   </PropertyGroup>
@@ -173,4 +134,41 @@
       </ItemGroup>
     </When>
   </Choose>
+  <ItemGroup>
+    <Content Include="OpenTK.dll.config">
+      <Paket>True</Paket>
+    </Content>
+    <Compile Include="Shaders.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="mscorlib" />
+    <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Numerics" />
+    <ProjectReference Include="..\..\Libs\FShade.Compiler\FShade.Compiler.fsproj">
+      <Name>FShade.Compiler</Name>
+      <Project>{843b90d4-d949-4a93-9717-467ebc4530c4}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Libs\FShade.Debug\FShade.Debug.fsproj">
+      <Name>FShade.Debug</Name>
+      <Project>{55f1a5a0-f789-4b6a-9968-6da3dc29f6c3}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\FShade.DemoRenderer\FShade.DemoRenderer.fsproj">
+      <Name>FShade.DemoRenderer</Name>
+      <Project>{d68f8db7-bcb3-41cd-b25b-a6205616118e}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Libs\FShade\FShade.fsproj">
+      <Name>FShade</Name>
+      <Project>{ec6da69c-e93a-4481-9bb6-440482b1eeb1}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+  </ItemGroup>
 </Project>
