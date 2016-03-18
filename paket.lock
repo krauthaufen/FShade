@@ -1,28 +1,33 @@
 NUGET
-  remote: https://vrvis.myget.org/F/aardvark_public/api/v2
+  remote: https://vrvis.myget.org/F/aardvark_public
   specs:
-    Aardvark.Base (1.6.27)
+    Aardvark.Base (2.0.0)
       DevILSharp (>= 0.0.11 < 0.1.0)
-    Aardvark.Base.Essentials (1.6.27)
-      Aardvark.Base (>= 1.6.27)
+    Aardvark.Base.Essentials (2.0.0)
+      Aardvark.Base (>= 2.0.0)
       Rx-Linq (>= 2.2.5 < 2.3.0)
       System.Collections.Immutable (>= 1.1.36 < 1.2.0)
-    Aardvark.Base.FSharp (1.6.27)
-      Aardvark.Base (>= 1.6.27)
+    Aardvark.Base.FSharp (2.0.0)
+      Aardvark.Base (>= 2.0.0)
       DevILSharp (>= 0.0.11 < 0.1.0)
-      FSharp.Compiler.Service (>= 0.0.90 < 0.1.0)
-      RegexProvider (>= 0.0.5 < 0.1.0)
-    Aardvark.Base.Incremental (1.6.27)
-      Aardvark.Base (1.6.27)
-      Aardvark.Base.Essentials (1.6.27)
-      Aardvark.Base.FSharp (1.6.27)
-  remote: https://www.nuget.org/api/v2
+      FSharp.Compiler.Service (>= 2.0.0.6 < 2.0.1.0)
+    Aardvark.Base.Incremental (2.0.0)
+      Aardvark.Base (>= 2.0.0)
+      Aardvark.Base.Essentials (>= 2.0.0)
+      Aardvark.Base.FSharp (>= 2.0.0)
+      FsPickler.Json (>= 1.8.0 < 1.9.0)
+      Rx-Core (>= 2.2.5 < 2.3.0)
+      Rx-Linq (>= 2.2.5 < 2.3.0)
+  remote: http://api.nuget.org/v3/index.json
   specs:
     DevILSharp (0.0.13)
-    FSharp.Compiler.Service (0.0.90)
-    Newtonsoft.Json (7.0.1)
-    OpenTK (1.1.1589.5942)
-    RegexProvider (0.0.5)
+    FSharp.Compiler.Service (2.0.0.6)
+    FsPickler (1.8.1)
+    FsPickler.Json (1.8.1)
+      FsPickler (1.8.1)
+      Newtonsoft.Json (>= 6.0.5)
+    Newtonsoft.Json (8.0.3)
+    OpenTK (1.1.2225)
     Rx-Core (2.2.5)
       Rx-Interfaces (>= 2.2.5)
     Rx-Interfaces (2.2.5)
@@ -95,24 +100,26 @@ NUGET
 GROUP Build
 CONTENT: NONE
 NUGET
-  remote: https://www.nuget.org/api/v2
+  remote: http://api.nuget.org/v3/index.json
   specs:
     Chessie (0.4.0) - content: none
       FSharp.Core
     FAKE (4.17.1) - content: none
     FSharp.Core (4.0.0.1) - content: none
     Mono.Cecil (0.9.5.4) - content: none
-    Newtonsoft.Json (8.0.2) - content: none
-    Paket.Core (2.48.0) - content: none
+    Newtonsoft.Json (8.0.3) - content: none
+    SourceLink.Fake (1.1.0) - content: none
+  remote: https://vrvis.myget.org/F/aardvark_public
+  specs:
+    Paket.Core.Temp (2.52.16) - content: none
       Chessie
       FSharp.Core
       Newtonsoft.Json
-    SourceLink.Fake (1.1.0) - content: none
 GITHUB
   remote: vrvis/Aardvark.Fake
   specs:
-    FULLPROJECT (c7b101ac7f9321fd271d1ccf622894d5450abfc4)
+    FULLPROJECT (409363863813ee317b85d0b75057e39a1f5c3dff)
       FAKE (>= 4.17.0 < 4.18.0)
       Mono.Cecil (>= 0.9.5.4 < 0.9.6.0)
-      Paket.Core (>= 2.48.0 < 2.49.0)
+      Paket.Core.Temp (>= 2.52.10 < 2.53.0)
       SourceLink.Fake (>= 1.1.0 < 1.2.0)
