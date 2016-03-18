@@ -4,9 +4,9 @@ authors Georg Haaser
 description
     F# embedded shaders
 dependencies
-    Aardvark.Base ~> 1.6.0
-    Aardvark.Base.FSharp ~> 1.6.0
-    FSharp.Compiler.Service ~> 0.0.90
+    Aardvark.Base ~> 2.0.0
+    Aardvark.Base.FSharp ~> 2.0.0
+    FSharp.Compiler.Service ~> 2.0.0.6
 files
     ..\bin\Release\FShade.dll ==> lib\net45
     ..\bin\Release\FShade.pdb ==> lib\net45

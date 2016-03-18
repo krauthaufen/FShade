@@ -84,6 +84,9 @@ module Expressions =
         compile {
             match e with
 
+                | Patterns.WithValue(_,_,e) ->
+                    return! compileExpression lastExpression isStatement e
+
                 | Call(None, Method("op_LessAmpGreater", _), [a;b]) ->
                     let! a = compileExpression false false a
                     let! b = compileExpression false false b
@@ -542,7 +545,7 @@ module Expressions =
                     return ret v
 
                 // values of type unit can only appear on statement-level and can therefore always be omitted
-                | Value(_,t) when t = typeof<unit> -> return ""
+                | Value(_,t)  when t = typeof<unit> -> return ""
 
                 // property-getters and setters having indices are compiled using their respective
                 // Get-/SetMethod.
