@@ -17,7 +17,7 @@ type Type =
     | Vector of compType : Type * dim : int
     | Matrix of colType : Type * dim : int
     | Array of elementType : Type * length : int
-    | Struct of name : string * fields : list<Type * string>
+    | Struct of name : string * fields : list<Type * string * list<Decoration * uint32[]>>
     | Image of sampledType : Type * dim : Dim * depth : int * arrayed : bool * ms : int * sampled : bool * format : int
     | SampledImage of Type
     | Ptr of StorageClass * Type
@@ -99,16 +99,41 @@ module Type =
 
 module InstructionPrinter =
     
+    module private Map =
+        let update (f : Option<'v> -> 'v) (key : 'k) (m : Map<'k, 'v>) =
+            let old = Map.tryFind key m
+            m |> Map.add key (f old)
 
-    let rec private buildNameMaps (current : Map<uint32, string>) (currentMembers : Map<uint32 * uint32, string>) (s : list<Instruction>) =
+    let rec private buildNameMaps (current : Map<uint32, string>) (currentMembers : Map<uint32 * uint32, string * list<Decoration * uint32[]>>) (s : list<Instruction>) =
+        
+        let addMemberName (id : uint32) (idx : uint32) (name : string) m =
+            let key = id, idx
+            match Map.tryFind key m with
+                | Some (_,dec) -> Map.add key (name, dec) m
+                | _ -> Map.add key (name, []) m
+
+        let addMemberDecoration (id : uint32) (idx : uint32) (dec : Decoration) (args : uint32[]) m =
+            let key = id, idx
+            match Map.tryFind key m with
+                | Some (n,old) -> Map.add key (n, (dec,args)::old) m
+                | _ -> Map.add key ("", [dec, args]) m
+
         match s with
             | [] -> current, currentMembers
-            | OpName(id, name) :: rest -> buildNameMaps (Map.add id name current) currentMembers rest
-            | OpMemberName(id, idx, name) :: rest -> buildNameMaps current (Map.add (id,idx) name currentMembers) rest
+            | OpName(id, name) :: rest -> 
+                buildNameMaps (Map.add id name current) currentMembers rest
+
+            | OpMemberName(id, idx, name) :: rest -> 
+                buildNameMaps current (addMemberName id idx name currentMembers) rest
+
+            | OpMemberDecorate(id, idx, dec, args) :: rest ->
+                buildNameMaps current (addMemberDecoration id idx dec args currentMembers) rest
+
+
             | _ :: rest -> buildNameMaps current currentMembers rest
 
-    let rec private buildTypeMap (names : Map<uint32, string>) (memberNames : Map<uint32 * uint32, string>) (current : Map<uint32, Type>) (s : list<Instruction>) =
-        let buildTypeMap c s = buildTypeMap names memberNames c s
+    let rec private buildTypeMap (names : Map<uint32, string>) (memberNamesAndDecorations : Map<uint32 * uint32, string * list<Decoration * uint32[]>>) (current : Map<uint32, Type>) (s : list<Instruction>) =
+        let buildTypeMap c s = buildTypeMap names memberNamesAndDecorations c s
 
         match s with
             | [] -> current
@@ -132,17 +157,23 @@ module InstructionPrinter =
                 buildTypeMap (Map.add id (Ptr(c, inner)) current) rest
 
             | OpTypeStruct(id, fields) :: rest ->
-                let getMemberName (i : int) =
-                    match Map.tryFind (id, uint32 i) memberNames with
+                let getMemberNameAndDecorations (i : int) =
+                    match Map.tryFind (id, uint32 i) memberNamesAndDecorations with
                         | Some n -> n
-                        | None -> sprintf "f%d" i
+                        | None -> (sprintf "f%d" i, [])
 
                 let name =
                     match Map.tryFind id names with
                         | Some n -> n
                         | _ -> sprintf "struct%d" (int id)
 
-                let fieldTypes = fields |> Array.mapi (fun i id -> current.[id], getMemberName i) |> Array.toList
+                let fieldTypes = 
+                    fields 
+                        |> Array.mapi (fun i id -> 
+                            let (name, dec) = getMemberNameAndDecorations i
+                            current.[id], name, dec
+                        ) 
+                        |> Array.toList
                 let t = Struct(name, fieldTypes)
                 buildTypeMap (Map.add id t current) rest
 
@@ -550,7 +581,7 @@ module Expr =
         let fieldType (t : Type) (field : string) =
             match t with
                 | Struct(_,fields) ->
-                    fields |> List.pick (fun (t,f) ->
+                    fields |> List.pick (fun (t,f,_) ->
                         if f = field then Some t
                         else None
                     )
@@ -1429,13 +1460,17 @@ module SpirV =
                         | Struct(name, fields) ->
                             
                             let! fields = 
-                                fields |> List.mapSpvi (fun i (t,n) -> spirv { let! tid = getTypeId t in return (tid, i, n)})
+                                fields |> List.mapSpvi (fun i (t,n,d) -> spirv { let! tid = getTypeId t in return (tid, i, n,d)})
 
                             let! id = newId
-                            yield OpTypeStruct(id, fields |> List.map (fun (t,_,_) -> t) |> List.toArray)
+                            yield OpTypeStruct(id, fields |> List.map (fun (t,_,_,_) -> t) |> List.toArray)
 
-                            for (_,i,n) in fields do
+                            for (_,i,n,_) in fields do
                                 yield OpMemberName(id, uint32 i, n)
+
+                            for (_,i,_,d) in fields do
+                                for (dec, args) in d do
+                                    yield OpMemberDecorate(id, uint32 i, dec, args)
 
                             yield OpName(id, name)
 
@@ -1490,7 +1525,7 @@ module SpirV =
         match t with
             | Struct(_,fields) ->
                 fields 
-                |> List.mapi (fun i (t,n) -> (i,t,n))
+                |> List.mapi (fun i (t,n,_) -> (i,t,n))
                 |> List.pick (fun (i,t,n) ->
                     if field = n then Some (i,t)
                     else None
@@ -1550,7 +1585,7 @@ module SpirV =
                     let mutable offset = 0
 
                     for i in 0..fields.Length-1 do
-                        let (t,_) = fields.[i]
+                        let (t,_,_) = fields.[i]
                         let! (iid, size) = compileConstant t (skip offset data)
                         offset <- offset + size
                         ids.[i] <- iid
@@ -2369,7 +2404,7 @@ module SpirV =
         test2()
 
 
-        let myType = Struct("sepp", [Type.V2f, "v0"; Type.Int32, "v1"])
+        let myType = Struct("sepp", [Type.V2f, "v0", []; Type.Int32, "v1", []])
 
         let v = new Var("a", Type.UInt8, true)
         let v2 = new Var("b", Type.UInt8, true)
@@ -2379,7 +2414,7 @@ module SpirV =
         let m = new Var("m", myType, true)
 
 
-        let ub0t = Struct("PerModel", [Type.M44f, "ModelViewProjTrafo"])
+        let ub0t = Struct("PerModel", [Type.M44f, "ModelViewProjTrafo", []])
         let ub0 = Var("perModel", ub0t, true)
 
         let ex = 
