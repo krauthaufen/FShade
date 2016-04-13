@@ -245,6 +245,10 @@ module GLSL =
                         | MethodQuote <@ Vec.zw : V4d -> V2d @> _ -> return Some "({0}).zw"
                         | MethodQuote <@ Vec.xyz : V4d -> V3d @> _ -> return Some "({0}).xyz"
                         | MethodQuote <@ Vec.yzw : V4d -> V3d @> _ -> return Some "({0}).yzw"
+                        
+                        | MethodQuote <@ V2d.Distance : _ * _ -> float @> _ -> return Some "distance({0}, {1})"
+                        | MethodQuote <@ V3d.Distance : _ * _ -> float @> _ -> return Some "distance({0}, {1})"
+                        | MethodQuote <@ V4d.Distance : _ * _ -> float @> _ -> return Some "distance({0}, {1})"
 
                         | MethodQuote <@ Vec.anySmaller : V3d -> V3d -> bool @> _ -> return Some "any(lessThan({0},{1}))"
                         | MethodQuote <@ Vec.anyGreater : V3d -> V3d -> bool @> _ -> return Some "any(greaterThan({0},{1}))"
@@ -261,6 +265,15 @@ module GLSL =
                         | MethodQuote <@ Mat.det : M33d -> float @> _ -> return Some "determinant({0})"
                         | MethodQuote <@ Mat.transformPos : M44d -> V3d -> V3d @> _ -> return Some "({0} * vec4({1}, 1.0)).xyz"
                         | MethodQuote <@ Mat.transformDir : M44d -> V3d -> V3d @> _ -> return Some "({0} * vec4({1}, 0.0)).xyz"
+
+                        | MethodQuote <@ M33d.FromCols : _ * _ * _ -> M33d @> _ -> return Some "mat3({0}, {1}, {2})"
+                        | MethodQuote <@ M44d.FromCols : _ * _ * _ * _ -> M44d @> _ -> return Some "mat4({0}, {1}, {2}, {3})"
+                        | MethodQuote <@ M33d.FromRows : _ * _ * _ -> M33d @> _ -> return Some "transpose(mat3({0}, {1}, {2}))"
+                        | MethodQuote <@ M44d.FromRows : _ * _ * _ * _ -> M44d @> _ -> return Some "transpose(mat4({0}, {1}, {2}, {3}))"
+                        
+                        | MethodQuote <@ M44d.Transpose @> _ -> return Some "transpose({0})"
+                        | Method("get_Transposed", [Matrix]) -> return Some "transpose({0})"
+
 
                         | MethodQuote <@ ref @> [_] -> return Some "{0}"
                         | MethodQuote <@ LanguagePrimitives.IntrinsicFunctions.GetArray @> [_] -> return Some "{0}[{1}]"
