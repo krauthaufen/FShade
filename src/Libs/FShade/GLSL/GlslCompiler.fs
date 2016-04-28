@@ -282,8 +282,8 @@ module GLSL =
                         | MethodQuote <@ discard @> [] -> return Some "discard;\r\n"
                         | MethodQuote <@ ddx<int> @> _ -> return Some "dFdx({0})"
                         | MethodQuote <@ ddy<int> @> _ -> return Some "dFdy({0})"
-                        | MethodQuote <@ endPrimitive @> _ -> return Some "EndPrimitive()​"
-                        | MethodQuote <@ restartStrip @> _ -> return Some "EndPrimitive()​"
+                        | MethodQuote <@ endPrimitive @> _ -> return Some "EndPrimitive()"
+                        | MethodQuote <@ restartStrip @> _ -> return Some "EndPrimitive()"
 
                         //SamplerType(dim, isArray, isShadow, isMS, valueType) 
                         | Method("Sample", [SamplerType(dim, isArray, isShadow, isMS, valueType); _]) -> 
