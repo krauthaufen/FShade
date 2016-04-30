@@ -124,6 +124,20 @@ module Expressions =
                     let! f = asFunction (Expr.Let(v, e, Expr.Var v))
                     return f
 
+
+                | Let(var, NewObject(ctor, []), body) when ctor.DeclaringType.IsValueType ->
+                    if isStatement then
+                        do! addBound var
+                        let! b = compileExpression lastExpression true body
+                        do! removeBound var
+
+                        let! t = compileType var.Type
+                        let! d = compileVariableDeclaration t var.Name None
+
+                        return sprintf "%s;\r\n%s" d b
+                    else
+                        return! asFunction e
+
                 | Let(var, DefaultValue(t), body) when t.IsValueType ->
                     if isStatement then
                         do! addBound var
