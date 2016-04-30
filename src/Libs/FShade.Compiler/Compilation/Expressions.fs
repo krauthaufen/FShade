@@ -124,6 +124,19 @@ module Expressions =
                     let! f = asFunction (Expr.Let(v, e, Expr.Var v))
                     return f
 
+                | Let(var, DefaultValue(t), body) when t.IsValueType ->
+                    if isStatement then
+                        do! addBound var
+                        let! b = compileExpression lastExpression true body
+                        do! removeBound var
+
+                        let! t = compileType var.Type
+                        let! d = compileVariableDeclaration t var.Name None
+
+                        return sprintf "%s;\r\n%s" d b
+                    else
+                        return! asFunction e
+
                 // lets simply become variable-declarations. Since F# supports
                 // hiding of variables but C doesn't there is a global renaming-pass
                 // sequentially numbering variables when they collide.
@@ -562,6 +575,8 @@ module Expressions =
 
                 | Coerce(e, _) ->
                     return! compileExpression lastExpression isStatement e
+
+                
 
                 | _ -> return! error "unknown expression: %A" e
         }
