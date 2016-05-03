@@ -146,8 +146,7 @@ module SamplerTypes =
         static member IsMultisampled = true
 
         member x.Sample(coord : V2d, slice : int) : V4d = failwith ""
-        member x.SampleLevel(coord : V2d, level : float) : V4d = failwith ""
-    
+            
 
 
     type Sampler2dMSArray(tex : ISemanticValue, state : SamplerState) =
@@ -259,6 +258,7 @@ module SamplerTypes =
         static member IsMultisampled = false
 
         member x.Sample(coord : V2d) : V4d = failwith ""
+        member x.SampleLevel(coord : V2d, level : float) : V4d = failwith ""
     
 
 
