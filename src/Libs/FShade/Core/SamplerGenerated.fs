@@ -146,6 +146,7 @@ module SamplerTypes =
         static member IsMultisampled = true
 
         member x.Sample(coord : V2d, slice : int) : V4d = failwith ""
+        member x.SampleLevel(coord : V2d, level : float) : V4d = failwith ""
     
 
 

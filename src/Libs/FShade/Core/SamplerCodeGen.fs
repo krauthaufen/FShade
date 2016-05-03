@@ -43,6 +43,7 @@ type __name__(tex : ISemanticValue, state : SamplerState) =
     static member IsMultisampled = __isMS__
 
     member x.Sample(__sampleArgs__) : __valueType__ = failwith ""
+    member x.SampleLevel(__sampleArgs__, level : float) : __valueType__ = failwith ""
 """
     
     let createType (t : SamplerType) (d : SamplerDimension) (a : bool) (m : bool) (s : bool) =
