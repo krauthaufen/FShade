@@ -132,7 +132,7 @@ module GLSL =
                     sampleArgs + rest
 
                 let plainArgs() =
-                    args |> List.mapi (fun i _ -> sprintf "{%d}" (i + 1)) |> String.concat ", " |> sprintf "{0}, %s"
+                    args |> List.mapi (fun i _ -> sprintf "{%d}" i) |> String.concat ", "
                         
 
                 let functionName = 
@@ -238,8 +238,8 @@ module GLSL =
                                         | "V4i" -> "i"
                                         | _ -> ""
 
-                                if arr then return sprintf "%ssampler%sArray%s%s" typePrefix dimStr shadowSuffix msSuffix |> Some
-                                else return sprintf "%ssampler%s%s%s" typePrefix dimStr shadowSuffix msSuffix |> Some
+                                if arr then return sprintf "%ssampler%s%sArray%s" typePrefix dimStr msSuffix shadowSuffix |> Some
+                                else return sprintf "%ssampler%s%s%s" typePrefix dimStr msSuffix shadowSuffix |> Some
 
                             | _ -> return None
                 }

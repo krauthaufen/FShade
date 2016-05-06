@@ -83,7 +83,7 @@ module Shaders =
         }
 
     let diffuseNearest = 
-        sampler2dArrayShadow {
+        sampler2d {
             texture     uniform.DiffuseTexture
 
             filter      Filter.MinMagMipPoint
@@ -97,9 +97,13 @@ module Shaders =
             if v.tc.X > 0.5 then
                 return diffuseLinear.Sample(v.tc)
             else 
-                let s = diffuseNearest.Sample(v.tc, 0, 0.5)
+                //let v = v.tc * V2d(diffuseNearest.Size) |> V2i
+                let s = diffuseNearest.Gather(v.tc, 0)
 
-                return V4d(s,s,s,1.0)
+                let dx0 = (s.Y - s.X) * 0.5 + 0.5
+                let dy0 = (s.X - s.W) * 0.5 + 0.5
+
+                return V4d(dx0, dy0, 1.0, 1.0)
         }
     
 
