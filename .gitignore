@@ -189,3 +189,4 @@ UpgradeLog*.htm
 
 # Microsoft Fakes
 
+/.paket/paket.exe

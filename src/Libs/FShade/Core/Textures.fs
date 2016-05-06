@@ -50,17 +50,3 @@ module Textures =
         [<CustomOperation("filter")>]
         member x.Filter((t : ShaderTextureHandle, h : SamplerState), f : Filter) = t,{ h with Filter = Some f }
        
-    type Sampler2dBuilder() =
-        inherit SamplerBaseBuilder()
-
-        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
-            Sampler2d(t, s)
-
-    type SamplerCubeBuilder() =
-        inherit SamplerBaseBuilder()
-
-        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
-            SamplerCube(t, s)
-
-    let sampler2d = Sampler2dBuilder()
-    let samplerCube = SamplerCubeBuilder()

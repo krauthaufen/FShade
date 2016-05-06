@@ -92,12 +92,21 @@ module Shaders =
             borderColor C4f.Red
         }
 
+
+
     let textureShader (v : Vertex) =
         fragment {
+
             if v.tc.X > 0.5 then
                 return diffuseLinear.Sample(v.tc)
             else 
-                return diffuseNearest.Sample(v.tc)
+                let tc = v.tc * V2d diffuseNearest.Size |> V2i
+                let s = diffuseNearest.[tc]
+
+//                let dx0 = (s.Y - s.X) * 0.5 + 0.5
+//                let dy0 = (s.X - s.W) * 0.5 + 0.5
+
+                return s //V4d(dx0, dy0, 1.0, 1.0)
         }
     
 

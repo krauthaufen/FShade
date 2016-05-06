@@ -80,6 +80,96 @@ module GLSL =
 
     let nextBindingIndex = nextCounter bindingCounterName
 
+    
+    let (|TextureLookup|_|) (mi : MethodInfo) =
+        match mi with
+            | Method(name, ((SamplerType(dim, isArray, isShadow, isMS, valueType)::_) as args)) ->
+                let coordComponents =
+                    match dim with
+                        | SamplerDimension.Sampler1d -> 1
+                        | SamplerDimension.Sampler2d -> 2
+                        | SamplerDimension.Sampler3d -> 3
+                        | SamplerDimension.SamplerCube -> 3
+                        | _ -> failwithf "unknown sampler dimension: %A" dim
+
+
+                let sampleArgs() = 
+                    let consumedArgs, sampleArgs =
+                        match isArray, isShadow with
+                            | true, true -> 4, sprintf "{0}, vec%d({1}, {2}, {3})" (coordComponents + 2)
+                            | true, false -> 3, sprintf "{0}, vec%d({1}, {2})" (coordComponents + 1)
+                            | false, true -> 3, sprintf "{0}, vec%d({1}, {2})" (coordComponents + 1)
+                            | false, false -> 2, "{0}, {1}"
+
+                    let args = List.skip consumedArgs args
+
+                    let rest =
+                        match args with
+                            | [] -> ""
+                            | _ ->
+                                args |> List.mapi (fun i _ -> sprintf "{%d}" (i + consumedArgs)) |> String.concat ", " |> sprintf ", %s"
+
+
+                    sampleArgs + rest
+
+                let projArgs() =
+                    let consumedArgs, sampleArgs =
+                        match isArray, isShadow with
+                            | true, true -> 4, sprintf "{0}, vec%d({1}, {2}, {3})" (coordComponents + 3)
+                            | true, false -> 3, sprintf "{0}, vec%d({1}, {2})" (coordComponents + 2)
+                            | false, true -> 3, sprintf "{0}, vec%d({1}, {2})" (coordComponents + 2)
+                            | false, false -> 2, "{0}, {1}"
+
+                    let args = List.skip consumedArgs args
+
+                    let rest =
+                        match args with
+                            | [] -> ""
+                            | _ ->
+                                args |> List.mapi (fun i _ -> sprintf "{%d}" (i + consumedArgs)) |> String.concat ", " |> sprintf ", %s"
+
+
+                    sampleArgs + rest
+
+                let plainArgs(skip : int) =
+                    args |> List.skip skip |> List.mapi (fun i _ -> sprintf "{%d}" (skip + i)) |> String.concat ", "
+                        
+
+                let argCount = List.length args - 1
+
+                let functionName = 
+                    match name with
+                        | "get_Size" -> 
+                            if isMS then "textureSize({0})"
+                            else "textureSize({0}, 0)"
+
+                        | "get_MipMapLevels" -> 
+                            if isMS then "1"
+                            else "textureQueryLevels({0})"
+
+                        | "GetSize" -> 
+                            if isMS then "textureSize({0})"
+                            else "textureSize({0}, {1})"
+
+
+                        | "Sample" -> sprintf "texture(%s)" (sampleArgs())
+                        | "SampleOffset" -> sprintf "textureOffset(%s)" (sampleArgs())
+                        | "SampleProj" -> sprintf "textureProj(%s)" (projArgs())
+                        | "SampleLevel" -> sprintf "textureLod(%s)" (sampleArgs())
+                        | "SampleGrad" -> sprintf "textureGrad(%s)" (sampleArgs())
+                        | "Gather" -> sprintf "textureGather(%s)" (plainArgs 0)
+                        | "GatherOffset" -> sprintf "textureGatherOffset(%s)" (plainArgs 0)
+                        | "Read" -> sprintf "texelFetch(%s)" (plainArgs 0)
+
+                        | "get_Item" when argCount = 1 -> sprintf "texelFetch(%s, 0)" (plainArgs 0)
+                        | "get_Item" -> sprintf "texelFetch({0}, ivec%d(%s), 0)" argCount (plainArgs 1)
+                        | name -> failwithf "unknown sampler function %A" name
+
+                Some functionName
+            | _ ->
+                None
+
+
     type Compiler(config : CompilerConfiguration) =
         let funDefCache = GenericMemoCache()
 
@@ -160,12 +250,11 @@ module GLSL =
                                 let msSuffix = if ms then "MS" else ""
                                 let typePrefix = 
                                     match valueType.Name with
-                                        | "V4d" -> ""
                                         | "V4i" -> "i"
-                                        | _ -> failwith "unsupported sampler value-type"
+                                        | _ -> ""
 
-                                if arr then return sprintf "%ssampler%s%sArray%s" typePrefix dimStr shadowSuffix msSuffix |> Some
-                                else return sprintf "%ssampler%s%s%s" typePrefix dimStr shadowSuffix msSuffix |> Some
+                                if arr then return sprintf "%ssampler%s%sArray%s" typePrefix dimStr msSuffix shadowSuffix |> Some
+                                else return sprintf "%ssampler%s%s%s" typePrefix dimStr msSuffix shadowSuffix |> Some
 
                             | _ -> return None
                 }
@@ -298,25 +387,20 @@ module GLSL =
                         | MethodQuote <@ endPrimitive @> _ -> return Some "EndPrimitive()"
                         | MethodQuote <@ restartStrip @> _ -> return Some "EndPrimitive()"
 
-                        //SamplerType(dim, isArray, isShadow, isMS, valueType) 
-                        | Method("Sample", [SamplerType(dim, isArray, isShadow, isMS, valueType); _]) -> 
-                            if config.languageVersion > Version(1,2) then
-                                return Some "texture({0}, {1})"
-                            else
-                                let samplerFun =
-                                    match dim with
-                                        | SamplerDimension.Sampler1d -> "texture1D"
-                                        | SamplerDimension.Sampler2d -> "texture2D"
-                                        | SamplerDimension.Sampler3d -> "texture3D"
-                                        | SamplerDimension.SamplerCube-> "textureCube"
-                                        | _ -> failwith "unsupported sampler type"
 
-                                return Some (sprintf "%s({0}, {1})" samplerFun)
+                        | TextureLookup(fmt) when config.languageVersion > Version(1,2) -> return Some fmt
 
-                        | Method("Sample", [SamplerType(_,true,_,_,_); _; _]) -> return Some "texture({0}, vec3({1}, {2}))"
-                        | Method("SampleLevel", [SamplerType(_); _; _]) -> return Some "textureLod({0}, {1}, {2})"
-                        | Method("SampleLevel", [SamplerType(_,true,_,_,_); _; _; _]) -> return Some "textureLod({0}, vec3({1}, {2}), {3})"
+                        
+                        | Method("Sample", SamplerType(dim, isArray, isShadow, isMS, valueType)::args) -> 
+                            let samplerFun =
+                                match dim with
+                                    | SamplerDimension.Sampler1d -> "texture1D"
+                                    | SamplerDimension.Sampler2d -> "texture2D"
+                                    | SamplerDimension.Sampler3d -> "texture3D"
+                                    | SamplerDimension.SamplerCube-> "textureCube"
+                                    | _ -> failwith "unsupported sampler type"
 
+                            return Some (sprintf "%s({0}, {1})" samplerFun)
 
                         | Method("get_Length", [FixedArrayType(s,t)]) -> return Some (sprintf "%d" s)
                         | Method("get_Item", [FixedArrayType(s,t);v]) -> return Some "{0}[{1}]"
@@ -447,7 +531,9 @@ module GLSL =
                                     |> Seq.map (fun name -> t.GetField(name, BindingFlags.Instance ||| BindingFlags.Public ||| BindingFlags.NonPublic))
                                     |> Seq.mapC (fun fi -> compileValue fi.FieldType (fi.GetValue(o)))
 
-                            return sprintf "vec%d(%s)" d (String.concat ", " fieldValues) |> Some
+                            let! name = compileType t
+
+                            return sprintf "%s(%s)" name (String.concat ", " fieldValues) |> Some
                         | Float32|Float64 ->
                             let d = Convert.ToDouble(o)
                             return d.ToString(System.Globalization.CultureInfo.InvariantCulture) |> Some
