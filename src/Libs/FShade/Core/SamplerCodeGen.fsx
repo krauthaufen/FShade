@@ -180,12 +180,13 @@ let run() =
                 | false, true -> ["cmp", returnType]
                 | false, false -> []
 
-        samplerFunction 
-            "regular sampled texture-lookup"
-            SampleVariants.Bias
-            "Sample"
-            (["coord", coordType] @ additionalArgs)
-            returnType
+        if not m then
+            samplerFunction 
+                "regular sampled texture-lookup"
+                SampleVariants.Bias
+                "Sample"
+                (["coord", coordType] @ additionalArgs)
+                returnType
 
         // Cubemap, multisample, and buffer samplers are not allowed
         if d <> SamplerDimension.SamplerCube && not m then
@@ -205,12 +206,13 @@ let run() =
                 (["coord", projCoordType] @ additionalArgs)
                 returnType
 
-        samplerFunction 
-            "sampled texture-lookup with given level"
-            SampleVariants.None
-            "SampleLevel"
-            (["coord", coordType] @ additionalArgs @ ["level", "float"])
-            returnType
+        if not m && not (a && s && d = SamplerDimension.SamplerCube) then
+            samplerFunction 
+                "sampled texture-lookup with given level"
+                SampleVariants.None
+                "SampleLevel"
+                (["coord", coordType] @ additionalArgs @ ["level", "float"])
+                returnType
 
         // This function works for sampler types that are not multisample, buffer texture, or cubemap array samplers
         if d <> SamplerDimension.SamplerCube && not m then
@@ -248,22 +250,35 @@ let run() =
 
 
 
-        if m then
-            samplerFunction 
-                "non-sampled texture read"
-                SampleVariants.None
-                "Read"
-                (["coord", texelCoordType; "lod", "int"; "sample", "int"])
-                returnType
-        else
-            samplerFunction 
-                "non-sampled texture read"
-                SampleVariants.None
-                "Read"
-                (["coord", texelCoordType; "lod", "int"])
-                returnType
+        if d <> SamplerDimension.SamplerCube then
+            if m then
+                samplerFunction 
+                    "non-sampled texture read"
+                    SampleVariants.None
+                    "Read"
+                    (["coord", texelCoordType; "sample", "int"])
+                    returnType
+            else
+                samplerFunction 
+                    "non-sampled texture read"
+                    SampleVariants.None
+                    "Read"
+                    (["coord", texelCoordType; "lod", "int"])
+                    returnType
 
-                        
+
+            if not s && not a && not m then
+                line  "member x.Item"
+                line  "    with get (coord : %s) : %s = failwith \"\"" texelCoordType returnType 
+                line  ""
+
+                if coordComponents > 1 then
+                    let argNames = ["cx"; "cy"; "cz"; "cw"]
+                    let args = argNames |> List.take coordComponents |> List.map (sprintf "%s : int") |> String.concat ", "
+                    line  "member x.Item"
+                    line  "    with get (%s) : %s = failwith \"\"" args returnType 
+                    line  ""
+
         stop()
 
 

@@ -23,17 +23,8 @@ type Sampler1dArrayShadowMS(tex : ISemanticValue, state : SamplerState) =
     /// the size for the sampler
     member x.Size : int = failwith ""
     
-    /// regular sampled texture-lookup
-    member x.Sample(coord : float, slice : int, cmp : float) : float = failwith ""
-    
-    /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : float, slice : int, cmp : float, lodBias : float) : float = failwith ""
-    
-    /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : float, slice : int, cmp : float, level : float) : float = failwith ""
-    
     /// non-sampled texture read
-    member x.Read(coord : int, lod : int, sample : int) : float = failwith ""
+    member x.Read(coord : int, sample : int) : float = failwith ""
     
 
 type Sampler1dArrayMS(tex : ISemanticValue, state : SamplerState) =
@@ -57,17 +48,8 @@ type Sampler1dArrayMS(tex : ISemanticValue, state : SamplerState) =
     /// the size for the sampler
     member x.Size : int = failwith ""
     
-    /// regular sampled texture-lookup
-    member x.Sample(coord : float, slice : int) : V4d = failwith ""
-    
-    /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : float, slice : int, lodBias : float) : V4d = failwith ""
-    
-    /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : float, slice : int, level : float) : V4d = failwith ""
-    
     /// non-sampled texture read
-    member x.Read(coord : int, lod : int, sample : int) : V4d = failwith ""
+    member x.Read(coord : int, sample : int) : V4d = failwith ""
     
 
 type Sampler1dArrayShadow(tex : ISemanticValue, state : SamplerState) =
@@ -177,17 +159,8 @@ type Sampler1dShadowMS(tex : ISemanticValue, state : SamplerState) =
     /// the size for the sampler
     member x.Size : int = failwith ""
     
-    /// regular sampled texture-lookup
-    member x.Sample(coord : float, cmp : float) : float = failwith ""
-    
-    /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : float, cmp : float, lodBias : float) : float = failwith ""
-    
-    /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : float, cmp : float, level : float) : float = failwith ""
-    
     /// non-sampled texture read
-    member x.Read(coord : int, lod : int, sample : int) : float = failwith ""
+    member x.Read(coord : int, sample : int) : float = failwith ""
     
 
 type Sampler1dMS(tex : ISemanticValue, state : SamplerState) =
@@ -211,17 +184,8 @@ type Sampler1dMS(tex : ISemanticValue, state : SamplerState) =
     /// the size for the sampler
     member x.Size : int = failwith ""
     
-    /// regular sampled texture-lookup
-    member x.Sample(coord : float) : V4d = failwith ""
-    
-    /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : float, lodBias : float) : V4d = failwith ""
-    
-    /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : float, level : float) : V4d = failwith ""
-    
     /// non-sampled texture read
-    member x.Read(coord : int, lod : int, sample : int) : V4d = failwith ""
+    member x.Read(coord : int, sample : int) : V4d = failwith ""
     
 
 type Sampler1dShadow(tex : ISemanticValue, state : SamplerState) =
@@ -321,6 +285,9 @@ type Sampler1d(tex : ISemanticValue, state : SamplerState) =
     /// non-sampled texture read
     member x.Read(coord : int, lod : int) : V4d = failwith ""
     
+    member x.Item
+        with get (coord : int) : V4d = failwith ""
+    
 
 type Sampler2dArrayShadowMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -343,17 +310,8 @@ type Sampler2dArrayShadowMS(tex : ISemanticValue, state : SamplerState) =
     /// the size for the sampler
     member x.Size : V2i = failwith ""
     
-    /// regular sampled texture-lookup
-    member x.Sample(coord : V2d, slice : int, cmp : float) : float = failwith ""
-    
-    /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V2d, slice : int, cmp : float, lodBias : float) : float = failwith ""
-    
-    /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, slice : int, cmp : float, level : float) : float = failwith ""
-    
     /// non-sampled texture read
-    member x.Read(coord : V2i, lod : int, sample : int) : float = failwith ""
+    member x.Read(coord : V2i, sample : int) : float = failwith ""
     
 
 type Sampler2dArrayMS(tex : ISemanticValue, state : SamplerState) =
@@ -377,17 +335,8 @@ type Sampler2dArrayMS(tex : ISemanticValue, state : SamplerState) =
     /// the size for the sampler
     member x.Size : V2i = failwith ""
     
-    /// regular sampled texture-lookup
-    member x.Sample(coord : V2d, slice : int) : V4d = failwith ""
-    
-    /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V2d, slice : int, lodBias : float) : V4d = failwith ""
-    
-    /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, slice : int, level : float) : V4d = failwith ""
-    
     /// non-sampled texture read
-    member x.Read(coord : V2i, lod : int, sample : int) : V4d = failwith ""
+    member x.Read(coord : V2i, sample : int) : V4d = failwith ""
     
 
 type Sampler2dArrayShadow(tex : ISemanticValue, state : SamplerState) =
@@ -509,17 +458,8 @@ type Sampler2dShadowMS(tex : ISemanticValue, state : SamplerState) =
     /// the size for the sampler
     member x.Size : V2i = failwith ""
     
-    /// regular sampled texture-lookup
-    member x.Sample(coord : V2d, cmp : float) : float = failwith ""
-    
-    /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V2d, cmp : float, lodBias : float) : float = failwith ""
-    
-    /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, cmp : float, level : float) : float = failwith ""
-    
     /// non-sampled texture read
-    member x.Read(coord : V2i, lod : int, sample : int) : float = failwith ""
+    member x.Read(coord : V2i, sample : int) : float = failwith ""
     
 
 type Sampler2dMS(tex : ISemanticValue, state : SamplerState) =
@@ -543,17 +483,8 @@ type Sampler2dMS(tex : ISemanticValue, state : SamplerState) =
     /// the size for the sampler
     member x.Size : V2i = failwith ""
     
-    /// regular sampled texture-lookup
-    member x.Sample(coord : V2d) : V4d = failwith ""
-    
-    /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V2d, lodBias : float) : V4d = failwith ""
-    
-    /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, level : float) : V4d = failwith ""
-    
     /// non-sampled texture read
-    member x.Read(coord : V2i, lod : int, sample : int) : V4d = failwith ""
+    member x.Read(coord : V2i, sample : int) : V4d = failwith ""
     
 
 type Sampler2dShadow(tex : ISemanticValue, state : SamplerState) =
@@ -665,6 +596,12 @@ type Sampler2d(tex : ISemanticValue, state : SamplerState) =
     /// non-sampled texture read
     member x.Read(coord : V2i, lod : int) : V4d = failwith ""
     
+    member x.Item
+        with get (coord : V2i) : V4d = failwith ""
+    
+    member x.Item
+        with get (cx : int, cy : int) : V4d = failwith ""
+    
 
 type Sampler3dShadowMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -687,17 +624,8 @@ type Sampler3dShadowMS(tex : ISemanticValue, state : SamplerState) =
     /// the size for the sampler
     member x.Size : V3i = failwith ""
     
-    /// regular sampled texture-lookup
-    member x.Sample(coord : V3d, cmp : float) : float = failwith ""
-    
-    /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V3d, cmp : float, lodBias : float) : float = failwith ""
-    
-    /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, cmp : float, level : float) : float = failwith ""
-    
     /// non-sampled texture read
-    member x.Read(coord : V3i, lod : int, sample : int) : float = failwith ""
+    member x.Read(coord : V3i, sample : int) : float = failwith ""
     
 
 type Sampler3dMS(tex : ISemanticValue, state : SamplerState) =
@@ -721,17 +649,8 @@ type Sampler3dMS(tex : ISemanticValue, state : SamplerState) =
     /// the size for the sampler
     member x.Size : V3i = failwith ""
     
-    /// regular sampled texture-lookup
-    member x.Sample(coord : V3d) : V4d = failwith ""
-    
-    /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V3d, lodBias : float) : V4d = failwith ""
-    
-    /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, level : float) : V4d = failwith ""
-    
     /// non-sampled texture read
-    member x.Read(coord : V3i, lod : int, sample : int) : V4d = failwith ""
+    member x.Read(coord : V3i, sample : int) : V4d = failwith ""
     
 
 type Sampler3dShadow(tex : ISemanticValue, state : SamplerState) =
@@ -831,6 +750,12 @@ type Sampler3d(tex : ISemanticValue, state : SamplerState) =
     /// non-sampled texture read
     member x.Read(coord : V3i, lod : int) : V4d = failwith ""
     
+    member x.Item
+        with get (coord : V3i) : V4d = failwith ""
+    
+    member x.Item
+        with get (cx : int, cy : int, cz : int) : V4d = failwith ""
+    
 
 type SamplerCubeArrayShadowMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -853,18 +778,6 @@ type SamplerCubeArrayShadowMS(tex : ISemanticValue, state : SamplerState) =
     /// the size for the sampler
     member x.Size : V2i = failwith ""
     
-    /// regular sampled texture-lookup
-    member x.Sample(coord : V3d, slice : int, cmp : float) : float = failwith ""
-    
-    /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V3d, slice : int, cmp : float, lodBias : float) : float = failwith ""
-    
-    /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, slice : int, cmp : float, level : float) : float = failwith ""
-    
-    /// non-sampled texture read
-    member x.Read(coord : V3i, lod : int, sample : int) : float = failwith ""
-    
 
 type SamplerCubeArrayMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -886,18 +799,6 @@ type SamplerCubeArrayMS(tex : ISemanticValue, state : SamplerState) =
     
     /// the size for the sampler
     member x.Size : V2i = failwith ""
-    
-    /// regular sampled texture-lookup
-    member x.Sample(coord : V3d, slice : int) : V4d = failwith ""
-    
-    /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V3d, slice : int, lodBias : float) : V4d = failwith ""
-    
-    /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, slice : int, level : float) : V4d = failwith ""
-    
-    /// non-sampled texture read
-    member x.Read(coord : V3i, lod : int, sample : int) : V4d = failwith ""
     
 
 type SamplerCubeArrayShadow(tex : ISemanticValue, state : SamplerState) =
@@ -926,12 +827,6 @@ type SamplerCubeArrayShadow(tex : ISemanticValue, state : SamplerState) =
     
     /// regular sampled texture-lookup with lod-bias
     member x.Sample(coord : V3d, slice : int, cmp : float, lodBias : float) : float = failwith ""
-    
-    /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, slice : int, cmp : float, level : float) : float = failwith ""
-    
-    /// non-sampled texture read
-    member x.Read(coord : V3i, lod : int) : float = failwith ""
     
 
 type SamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
@@ -964,9 +859,6 @@ type SamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : V3d, slice : int, level : float) : V4d = failwith ""
     
-    /// non-sampled texture read
-    member x.Read(coord : V3i, lod : int) : V4d = failwith ""
-    
 
 type SamplerCubeShadowMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -989,18 +881,6 @@ type SamplerCubeShadowMS(tex : ISemanticValue, state : SamplerState) =
     /// the size for the sampler
     member x.Size : V2i = failwith ""
     
-    /// regular sampled texture-lookup
-    member x.Sample(coord : V3d, cmp : float) : float = failwith ""
-    
-    /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V3d, cmp : float, lodBias : float) : float = failwith ""
-    
-    /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, cmp : float, level : float) : float = failwith ""
-    
-    /// non-sampled texture read
-    member x.Read(coord : V3i, lod : int, sample : int) : float = failwith ""
-    
 
 type SamplerCubeMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -1022,18 +902,6 @@ type SamplerCubeMS(tex : ISemanticValue, state : SamplerState) =
     
     /// the size for the sampler
     member x.Size : V2i = failwith ""
-    
-    /// regular sampled texture-lookup
-    member x.Sample(coord : V3d) : V4d = failwith ""
-    
-    /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V3d, lodBias : float) : V4d = failwith ""
-    
-    /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, level : float) : V4d = failwith ""
-    
-    /// non-sampled texture read
-    member x.Read(coord : V3i, lod : int, sample : int) : V4d = failwith ""
     
 
 type SamplerCubeShadow(tex : ISemanticValue, state : SamplerState) =
@@ -1066,9 +934,6 @@ type SamplerCubeShadow(tex : ISemanticValue, state : SamplerState) =
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : V3d, cmp : float, level : float) : float = failwith ""
     
-    /// non-sampled texture read
-    member x.Read(coord : V3i, lod : int) : float = failwith ""
-    
 
 type SamplerCube(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -1100,9 +965,6 @@ type SamplerCube(tex : ISemanticValue, state : SamplerState) =
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : V3d, level : float) : V4d = failwith ""
     
-    /// non-sampled texture read
-    member x.Read(coord : V3i, lod : int) : V4d = failwith ""
-    
 
 type IntSampler1dArrayMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -1125,17 +987,8 @@ type IntSampler1dArrayMS(tex : ISemanticValue, state : SamplerState) =
     /// the size for the sampler
     member x.Size : int = failwith ""
     
-    /// regular sampled texture-lookup
-    member x.Sample(coord : float, slice : int) : V4i = failwith ""
-    
-    /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : float, slice : int, lodBias : float) : V4i = failwith ""
-    
-    /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : float, slice : int, level : float) : V4i = failwith ""
-    
     /// non-sampled texture read
-    member x.Read(coord : int, lod : int, sample : int) : V4i = failwith ""
+    member x.Read(coord : int, sample : int) : V4i = failwith ""
     
 
 type IntSampler1dArray(tex : ISemanticValue, state : SamplerState) =
@@ -1202,17 +1055,8 @@ type IntSampler1dMS(tex : ISemanticValue, state : SamplerState) =
     /// the size for the sampler
     member x.Size : int = failwith ""
     
-    /// regular sampled texture-lookup
-    member x.Sample(coord : float) : V4i = failwith ""
-    
-    /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : float, lodBias : float) : V4i = failwith ""
-    
-    /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : float, level : float) : V4i = failwith ""
-    
     /// non-sampled texture read
-    member x.Read(coord : int, lod : int, sample : int) : V4i = failwith ""
+    member x.Read(coord : int, sample : int) : V4i = failwith ""
     
 
 type IntSampler1d(tex : ISemanticValue, state : SamplerState) =
@@ -1263,6 +1107,9 @@ type IntSampler1d(tex : ISemanticValue, state : SamplerState) =
     /// non-sampled texture read
     member x.Read(coord : int, lod : int) : V4i = failwith ""
     
+    member x.Item
+        with get (coord : int) : V4i = failwith ""
+    
 
 type IntSampler2dArrayMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -1285,17 +1132,8 @@ type IntSampler2dArrayMS(tex : ISemanticValue, state : SamplerState) =
     /// the size for the sampler
     member x.Size : V2i = failwith ""
     
-    /// regular sampled texture-lookup
-    member x.Sample(coord : V2d, slice : int) : V4i = failwith ""
-    
-    /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V2d, slice : int, lodBias : float) : V4i = failwith ""
-    
-    /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, slice : int, level : float) : V4i = failwith ""
-    
     /// non-sampled texture read
-    member x.Read(coord : V2i, lod : int, sample : int) : V4i = failwith ""
+    member x.Read(coord : V2i, sample : int) : V4i = failwith ""
     
 
 type IntSampler2dArray(tex : ISemanticValue, state : SamplerState) =
@@ -1368,17 +1206,8 @@ type IntSampler2dMS(tex : ISemanticValue, state : SamplerState) =
     /// the size for the sampler
     member x.Size : V2i = failwith ""
     
-    /// regular sampled texture-lookup
-    member x.Sample(coord : V2d) : V4i = failwith ""
-    
-    /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V2d, lodBias : float) : V4i = failwith ""
-    
-    /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, level : float) : V4i = failwith ""
-    
     /// non-sampled texture read
-    member x.Read(coord : V2i, lod : int, sample : int) : V4i = failwith ""
+    member x.Read(coord : V2i, sample : int) : V4i = failwith ""
     
 
 type IntSampler2d(tex : ISemanticValue, state : SamplerState) =
@@ -1435,6 +1264,12 @@ type IntSampler2d(tex : ISemanticValue, state : SamplerState) =
     /// non-sampled texture read
     member x.Read(coord : V2i, lod : int) : V4i = failwith ""
     
+    member x.Item
+        with get (coord : V2i) : V4i = failwith ""
+    
+    member x.Item
+        with get (cx : int, cy : int) : V4i = failwith ""
+    
 
 type IntSampler3dMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -1457,17 +1292,8 @@ type IntSampler3dMS(tex : ISemanticValue, state : SamplerState) =
     /// the size for the sampler
     member x.Size : V3i = failwith ""
     
-    /// regular sampled texture-lookup
-    member x.Sample(coord : V3d) : V4i = failwith ""
-    
-    /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V3d, lodBias : float) : V4i = failwith ""
-    
-    /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, level : float) : V4i = failwith ""
-    
     /// non-sampled texture read
-    member x.Read(coord : V3i, lod : int, sample : int) : V4i = failwith ""
+    member x.Read(coord : V3i, sample : int) : V4i = failwith ""
     
 
 type IntSampler3d(tex : ISemanticValue, state : SamplerState) =
@@ -1518,6 +1344,12 @@ type IntSampler3d(tex : ISemanticValue, state : SamplerState) =
     /// non-sampled texture read
     member x.Read(coord : V3i, lod : int) : V4i = failwith ""
     
+    member x.Item
+        with get (coord : V3i) : V4i = failwith ""
+    
+    member x.Item
+        with get (cx : int, cy : int, cz : int) : V4i = failwith ""
+    
 
 type IntSamplerCubeArrayMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -1539,18 +1371,6 @@ type IntSamplerCubeArrayMS(tex : ISemanticValue, state : SamplerState) =
     
     /// the size for the sampler
     member x.Size : V2i = failwith ""
-    
-    /// regular sampled texture-lookup
-    member x.Sample(coord : V3d, slice : int) : V4i = failwith ""
-    
-    /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V3d, slice : int, lodBias : float) : V4i = failwith ""
-    
-    /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, slice : int, level : float) : V4i = failwith ""
-    
-    /// non-sampled texture read
-    member x.Read(coord : V3i, lod : int, sample : int) : V4i = failwith ""
     
 
 type IntSamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
@@ -1583,9 +1403,6 @@ type IntSamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : V3d, slice : int, level : float) : V4i = failwith ""
     
-    /// non-sampled texture read
-    member x.Read(coord : V3i, lod : int) : V4i = failwith ""
-    
 
 type IntSamplerCubeMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -1607,18 +1424,6 @@ type IntSamplerCubeMS(tex : ISemanticValue, state : SamplerState) =
     
     /// the size for the sampler
     member x.Size : V2i = failwith ""
-    
-    /// regular sampled texture-lookup
-    member x.Sample(coord : V3d) : V4i = failwith ""
-    
-    /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V3d, lodBias : float) : V4i = failwith ""
-    
-    /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, level : float) : V4i = failwith ""
-    
-    /// non-sampled texture read
-    member x.Read(coord : V3i, lod : int, sample : int) : V4i = failwith ""
     
 
 type IntSamplerCube(tex : ISemanticValue, state : SamplerState) =
@@ -1650,9 +1455,6 @@ type IntSamplerCube(tex : ISemanticValue, state : SamplerState) =
     
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : V3d, level : float) : V4i = failwith ""
-    
-    /// non-sampled texture read
-    member x.Read(coord : V3i, lod : int) : V4i = failwith ""
     
 
 [<AutoOpen>]

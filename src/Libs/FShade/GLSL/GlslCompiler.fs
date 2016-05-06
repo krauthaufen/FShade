@@ -131,23 +131,38 @@ module GLSL =
 
                     sampleArgs + rest
 
-                let plainArgs() =
-                    args |> List.mapi (fun i _ -> sprintf "{%d}" i) |> String.concat ", "
+                let plainArgs(skip : int) =
+                    args |> List.skip skip |> List.mapi (fun i _ -> sprintf "{%d}" (skip + i)) |> String.concat ", "
                         
+
+                let argCount = List.length args - 1
 
                 let functionName = 
                     match name with
-                        | "get_Size" -> "textureSize({0}, 0)"
-                        | "get_MipMapLevels" -> "textureQueryLevels({0})"
-                        | "GetSize" -> "textureSize({0}, {1})"
+                        | "get_Size" -> 
+                            if isMS then "textureSize({0})"
+                            else "textureSize({0}, 0)"
+
+                        | "get_MipMapLevels" -> 
+                            if isMS then "1"
+                            else "textureQueryLevels({0})"
+
+                        | "GetSize" -> 
+                            if isMS then "textureSize({0})"
+                            else "textureSize({0}, {1})"
+
+
                         | "Sample" -> sprintf "texture(%s)" (sampleArgs())
                         | "SampleOffset" -> sprintf "textureOffset(%s)" (sampleArgs())
                         | "SampleProj" -> sprintf "textureProj(%s)" (projArgs())
                         | "SampleLevel" -> sprintf "textureLod(%s)" (sampleArgs())
                         | "SampleGrad" -> sprintf "textureGrad(%s)" (sampleArgs())
-                        | "Gather" -> sprintf "textureGather(%s)" (plainArgs())
-                        | "GatherOffset" -> sprintf "textureGatherOffset(%s)" (plainArgs())
-                        | "Read" -> sprintf "texelFetch(%s)" (plainArgs())
+                        | "Gather" -> sprintf "textureGather(%s)" (plainArgs 0)
+                        | "GatherOffset" -> sprintf "textureGatherOffset(%s)" (plainArgs 0)
+                        | "Read" -> sprintf "texelFetch(%s)" (plainArgs 0)
+
+                        | "get_Item" when argCount = 1 -> sprintf "texelFetch(%s, 0)" (plainArgs 0)
+                        | "get_Item" -> sprintf "texelFetch({0}, ivec%d(%s), 0)" argCount (plainArgs 1)
                         | name -> failwithf "unknown sampler function %A" name
 
                 Some functionName
@@ -516,7 +531,9 @@ module GLSL =
                                     |> Seq.map (fun name -> t.GetField(name, BindingFlags.Instance ||| BindingFlags.Public ||| BindingFlags.NonPublic))
                                     |> Seq.mapC (fun fi -> compileValue fi.FieldType (fi.GetValue(o)))
 
-                            return sprintf "vec%d(%s)" d (String.concat ", " fieldValues) |> Some
+                            let! name = compileType t
+
+                            return sprintf "%s(%s)" name (String.concat ", " fieldValues) |> Some
                         | Float32|Float64 ->
                             let d = Convert.ToDouble(o)
                             return d.ToString(System.Globalization.CultureInfo.InvariantCulture) |> Some
