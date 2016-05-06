@@ -235,11 +235,10 @@ module GLSL =
                                 let msSuffix = if ms then "MS" else ""
                                 let typePrefix = 
                                     match valueType.Name with
-                                        | "V4d" -> ""
                                         | "V4i" -> "i"
-                                        | _ -> failwith "unsupported sampler value-type"
+                                        | _ -> ""
 
-                                if arr then return sprintf "%ssampler%s%sArray%s" typePrefix dimStr shadowSuffix msSuffix |> Some
+                                if arr then return sprintf "%ssampler%sArray%s%s" typePrefix dimStr shadowSuffix msSuffix |> Some
                                 else return sprintf "%ssampler%s%s%s" typePrefix dimStr shadowSuffix msSuffix |> Some
 
                             | _ -> return None

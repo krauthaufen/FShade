@@ -67,8 +67,8 @@
     <Compile Include="Core\Types.fs" />
     <Compile Include="Core\ShaderDebug.fs" />
     <None Include="Core\SamplerCodeGen.fsx" />
-    <Compile Include="Core\SamplerGenerated.fs" />
     <Compile Include="Core\Textures.fs" />
+    <Compile Include="Core\SamplerGenerated.fs" />
     <Compile Include="Core\MemoCache.fs" />
     <Compile Include="Frontend\Primitives.fs" />
     <Compile Include="Frontend\Builders.fs" />

@@ -198,10 +198,10 @@ let main argv =
                   Shaders.textureShader |> toEffect] |> compose
 
 
-    let effect = [Simple.trafo |> toEffect
-                  Simple.pointSurface (V2d(0.06, 0.08)) |> toEffect
-                  Simple.white |> toEffect
-                  ] |> compose
+//    let effect = [Simple.trafo |> toEffect
+//                  Simple.pointSurface (V2d(0.06, 0.08)) |> toEffect
+//                  Simple.white |> toEffect
+//                  ] |> compose
 
 
     let w = new Window()
@@ -218,9 +218,9 @@ let main argv =
 
 
     FShade.Debug.EffectEditor.runTray()
-//
-//    let sg = Sg.fileTexture "DiffuseTexture" @"C:\Users\haaser\Development\WorkDirectory\Server\pattern.jpg" sg
-//    let sg = Sg.fileTexture "NormalMap"      @"C:\Users\haaser\Development\WorkDirectory\Server\bump.jpg" sg
+
+    let sg = Sg.fileTexture "DiffuseTexture" @"E:\Development\WorkDirectory\DataSVN\pattern.jpg" sg
+    let sg = Sg.fileTexture "NormalMap"      @"E:\Development\WorkDirectory\DataSVN\bump.jpg" sg
 
     let sg = Sg.uniform "Color" (V4f(1,1,1,1)) sg
 

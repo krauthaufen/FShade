@@ -96,7 +96,7 @@ let run() =
         let shadow = if s then "Shadow" else ""
 
 
-        let name = sprintf "%sSampler%s%s%s%s" prefix dim ms arr shadow
+        let name = sprintf "%sSampler%s%s%s%s" prefix dim arr shadow ms
 
         let returnType =
             match t with
@@ -209,7 +209,7 @@ let run() =
             "sampled texture-lookup with given level"
             SampleVariants.None
             "SampleLevel"
-            (["coord", projCoordType] @ additionalArgs @ ["level", "float"])
+            (["coord", coordType] @ additionalArgs @ ["level", "float"])
             returnType
 
         // This function works for sampler types that are not multisample, buffer texture, or cubemap array samplers
@@ -267,8 +267,50 @@ let run() =
         stop()
 
 
-        let str = builder.ToString()
-        let fileName = Path.Combine(__SOURCE_DIRECTORY__, "SamplerGenerated.fs")
-        File.WriteAllText(fileName, str)
+    line  "[<AutoOpen>]"
+    start "module SamplerBuilders = "
 
-        ()
+    for (t,d,a,m,s) in allCombinations do
+        let prefix =
+            match t with
+                | SamplerType.Float -> ""
+                | SamplerType.Int -> "Int"
+                | _ -> ""
+
+        let dim =
+            match d with
+                | SamplerDimension.Sampler1d -> "1d"
+                | SamplerDimension.Sampler2d -> "2d"
+                | SamplerDimension.Sampler3d -> "3d"
+                | SamplerDimension.SamplerCube -> "Cube"
+                | _ -> "2d"
+
+        let ms = if m then "MS" else ""
+        let arr = if a then "Array" else ""
+        let shadow = if s then "Shadow" else ""
+
+
+        let typeName = sprintf "%sSampler%s%s%s%s" prefix dim arr shadow ms
+        let builderName = sprintf "%sBuilder" typeName
+        let valueName = 
+            match t with
+                | SamplerType.Float -> sprintf "sampler%s%s%s%s" dim arr shadow ms
+                | _ -> sprintf "intSampler%s%s%s%s" dim arr shadow ms
+
+        start "type %s() = " builderName
+        line  "inherit SamplerBaseBuilder()"
+        line  "member x.Run((t : ShaderTextureHandle, s : SamplerState)) ="
+        line  "    %s(t, s)" typeName
+        stop  ()
+        line  "let %s = %s()" valueName builderName
+        line  ""
+
+    stop ()
+
+
+
+    let str = builder.ToString()
+    let fileName = Path.Combine(__SOURCE_DIRECTORY__, "SamplerGenerated.fs")
+    File.WriteAllText(fileName, str)
+
+    ()

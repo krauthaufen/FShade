@@ -2,7 +2,7 @@ namespace FShade
 open Aardvark.Base
 
 
-type Sampler1dMSArrayShadow(tex : ISemanticValue, state : SamplerState) =
+type Sampler1dArrayShadowMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
         member x.Texture = tex
         member x.State = state
@@ -30,13 +30,13 @@ type Sampler1dMSArrayShadow(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : float, slice : int, cmp : float, lodBias : float) : float = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, slice : int, cmp : float, level : float) : float = failwith ""
+    member x.SampleLevel(coord : float, slice : int, cmp : float, level : float) : float = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : int, lod : int, sample : int) : float = failwith ""
     
 
-type Sampler1dMSArray(tex : ISemanticValue, state : SamplerState) =
+type Sampler1dArrayMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
         member x.Texture = tex
         member x.State = state
@@ -64,7 +64,7 @@ type Sampler1dMSArray(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : float, slice : int, lodBias : float) : V4d = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, slice : int, level : float) : V4d = failwith ""
+    member x.SampleLevel(coord : float, slice : int, level : float) : V4d = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : int, lod : int, sample : int) : V4d = failwith ""
@@ -104,7 +104,7 @@ type Sampler1dArrayShadow(tex : ISemanticValue, state : SamplerState) =
     member x.SampleOffset(coord : float, slice : int, cmp : float, offset : int, lodBias : float) : float = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, slice : int, cmp : float, level : float) : float = failwith ""
+    member x.SampleLevel(coord : float, slice : int, cmp : float, level : float) : float = failwith ""
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : float, slice : int, cmp : float, dTdx : float, dTdy : float) : float = failwith ""
@@ -147,7 +147,7 @@ type Sampler1dArray(tex : ISemanticValue, state : SamplerState) =
     member x.SampleOffset(coord : float, slice : int, offset : int, lodBias : float) : V4d = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, slice : int, level : float) : V4d = failwith ""
+    member x.SampleLevel(coord : float, slice : int, level : float) : V4d = failwith ""
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : float, slice : int, dTdx : float, dTdy : float) : V4d = failwith ""
@@ -156,7 +156,7 @@ type Sampler1dArray(tex : ISemanticValue, state : SamplerState) =
     member x.Read(coord : int, lod : int) : V4d = failwith ""
     
 
-type Sampler1dMSShadow(tex : ISemanticValue, state : SamplerState) =
+type Sampler1dShadowMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
         member x.Texture = tex
         member x.State = state
@@ -184,7 +184,7 @@ type Sampler1dMSShadow(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : float, cmp : float, lodBias : float) : float = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, cmp : float, level : float) : float = failwith ""
+    member x.SampleLevel(coord : float, cmp : float, level : float) : float = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : int, lod : int, sample : int) : float = failwith ""
@@ -218,7 +218,7 @@ type Sampler1dMS(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : float, lodBias : float) : V4d = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, level : float) : V4d = failwith ""
+    member x.SampleLevel(coord : float, level : float) : V4d = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : int, lod : int, sample : int) : V4d = failwith ""
@@ -264,7 +264,7 @@ type Sampler1dShadow(tex : ISemanticValue, state : SamplerState) =
     member x.SampleProj(coord : V2d, cmp : float, lodBias : float) : float = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, cmp : float, level : float) : float = failwith ""
+    member x.SampleLevel(coord : float, cmp : float, level : float) : float = failwith ""
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : float, cmp : float, dTdx : float, dTdy : float) : float = failwith ""
@@ -313,7 +313,7 @@ type Sampler1d(tex : ISemanticValue, state : SamplerState) =
     member x.SampleProj(coord : V2d, lodBias : float) : V4d = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, level : float) : V4d = failwith ""
+    member x.SampleLevel(coord : float, level : float) : V4d = failwith ""
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : float, dTdx : float, dTdy : float) : V4d = failwith ""
@@ -322,7 +322,7 @@ type Sampler1d(tex : ISemanticValue, state : SamplerState) =
     member x.Read(coord : int, lod : int) : V4d = failwith ""
     
 
-type Sampler2dMSArrayShadow(tex : ISemanticValue, state : SamplerState) =
+type Sampler2dArrayShadowMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
         member x.Texture = tex
         member x.State = state
@@ -350,13 +350,13 @@ type Sampler2dMSArrayShadow(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : V2d, slice : int, cmp : float, lodBias : float) : float = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, slice : int, cmp : float, level : float) : float = failwith ""
+    member x.SampleLevel(coord : V2d, slice : int, cmp : float, level : float) : float = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : V2i, lod : int, sample : int) : float = failwith ""
     
 
-type Sampler2dMSArray(tex : ISemanticValue, state : SamplerState) =
+type Sampler2dArrayMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
         member x.Texture = tex
         member x.State = state
@@ -384,7 +384,7 @@ type Sampler2dMSArray(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : V2d, slice : int, lodBias : float) : V4d = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, slice : int, level : float) : V4d = failwith ""
+    member x.SampleLevel(coord : V2d, slice : int, level : float) : V4d = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : V2i, lod : int, sample : int) : V4d = failwith ""
@@ -424,7 +424,7 @@ type Sampler2dArrayShadow(tex : ISemanticValue, state : SamplerState) =
     member x.SampleOffset(coord : V2d, slice : int, cmp : float, offset : V2i, lodBias : float) : float = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, slice : int, cmp : float, level : float) : float = failwith ""
+    member x.SampleLevel(coord : V2d, slice : int, cmp : float, level : float) : float = failwith ""
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V2d, slice : int, cmp : float, dTdx : V2d, dTdy : V2d) : float = failwith ""
@@ -473,7 +473,7 @@ type Sampler2dArray(tex : ISemanticValue, state : SamplerState) =
     member x.SampleOffset(coord : V2d, slice : int, offset : V2i, lodBias : float) : V4d = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, slice : int, level : float) : V4d = failwith ""
+    member x.SampleLevel(coord : V2d, slice : int, level : float) : V4d = failwith ""
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V2d, slice : int, dTdx : V2d, dTdy : V2d) : V4d = failwith ""
@@ -488,7 +488,7 @@ type Sampler2dArray(tex : ISemanticValue, state : SamplerState) =
     member x.Read(coord : V2i, lod : int) : V4d = failwith ""
     
 
-type Sampler2dMSShadow(tex : ISemanticValue, state : SamplerState) =
+type Sampler2dShadowMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
         member x.Texture = tex
         member x.State = state
@@ -516,7 +516,7 @@ type Sampler2dMSShadow(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : V2d, cmp : float, lodBias : float) : float = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, cmp : float, level : float) : float = failwith ""
+    member x.SampleLevel(coord : V2d, cmp : float, level : float) : float = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : V2i, lod : int, sample : int) : float = failwith ""
@@ -550,7 +550,7 @@ type Sampler2dMS(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : V2d, lodBias : float) : V4d = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, level : float) : V4d = failwith ""
+    member x.SampleLevel(coord : V2d, level : float) : V4d = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : V2i, lod : int, sample : int) : V4d = failwith ""
@@ -596,7 +596,7 @@ type Sampler2dShadow(tex : ISemanticValue, state : SamplerState) =
     member x.SampleProj(coord : V3d, cmp : float, lodBias : float) : float = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, cmp : float, level : float) : float = failwith ""
+    member x.SampleLevel(coord : V2d, cmp : float, level : float) : float = failwith ""
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V2d, cmp : float, dTdx : V2d, dTdy : V2d) : float = failwith ""
@@ -651,7 +651,7 @@ type Sampler2d(tex : ISemanticValue, state : SamplerState) =
     member x.SampleProj(coord : V3d, lodBias : float) : V4d = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, level : float) : V4d = failwith ""
+    member x.SampleLevel(coord : V2d, level : float) : V4d = failwith ""
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V2d, dTdx : V2d, dTdy : V2d) : V4d = failwith ""
@@ -666,7 +666,7 @@ type Sampler2d(tex : ISemanticValue, state : SamplerState) =
     member x.Read(coord : V2i, lod : int) : V4d = failwith ""
     
 
-type Sampler3dMSShadow(tex : ISemanticValue, state : SamplerState) =
+type Sampler3dShadowMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
         member x.Texture = tex
         member x.State = state
@@ -694,7 +694,7 @@ type Sampler3dMSShadow(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : V3d, cmp : float, lodBias : float) : float = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V4d, cmp : float, level : float) : float = failwith ""
+    member x.SampleLevel(coord : V3d, cmp : float, level : float) : float = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : V3i, lod : int, sample : int) : float = failwith ""
@@ -728,7 +728,7 @@ type Sampler3dMS(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : V3d, lodBias : float) : V4d = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V4d, level : float) : V4d = failwith ""
+    member x.SampleLevel(coord : V3d, level : float) : V4d = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : V3i, lod : int, sample : int) : V4d = failwith ""
@@ -774,7 +774,7 @@ type Sampler3dShadow(tex : ISemanticValue, state : SamplerState) =
     member x.SampleProj(coord : V4d, cmp : float, lodBias : float) : float = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V4d, cmp : float, level : float) : float = failwith ""
+    member x.SampleLevel(coord : V3d, cmp : float, level : float) : float = failwith ""
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V3d, cmp : float, dTdx : V3d, dTdy : V3d) : float = failwith ""
@@ -823,7 +823,7 @@ type Sampler3d(tex : ISemanticValue, state : SamplerState) =
     member x.SampleProj(coord : V4d, lodBias : float) : V4d = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V4d, level : float) : V4d = failwith ""
+    member x.SampleLevel(coord : V3d, level : float) : V4d = failwith ""
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V3d, dTdx : V3d, dTdy : V3d) : V4d = failwith ""
@@ -832,7 +832,7 @@ type Sampler3d(tex : ISemanticValue, state : SamplerState) =
     member x.Read(coord : V3i, lod : int) : V4d = failwith ""
     
 
-type SamplerCubeMSArrayShadow(tex : ISemanticValue, state : SamplerState) =
+type SamplerCubeArrayShadowMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
         member x.Texture = tex
         member x.State = state
@@ -860,13 +860,13 @@ type SamplerCubeMSArrayShadow(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : V3d, slice : int, cmp : float, lodBias : float) : float = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V4d, slice : int, cmp : float, level : float) : float = failwith ""
+    member x.SampleLevel(coord : V3d, slice : int, cmp : float, level : float) : float = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : V3i, lod : int, sample : int) : float = failwith ""
     
 
-type SamplerCubeMSArray(tex : ISemanticValue, state : SamplerState) =
+type SamplerCubeArrayMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
         member x.Texture = tex
         member x.State = state
@@ -894,7 +894,7 @@ type SamplerCubeMSArray(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : V3d, slice : int, lodBias : float) : V4d = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V4d, slice : int, level : float) : V4d = failwith ""
+    member x.SampleLevel(coord : V3d, slice : int, level : float) : V4d = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : V3i, lod : int, sample : int) : V4d = failwith ""
@@ -928,7 +928,7 @@ type SamplerCubeArrayShadow(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : V3d, slice : int, cmp : float, lodBias : float) : float = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V4d, slice : int, cmp : float, level : float) : float = failwith ""
+    member x.SampleLevel(coord : V3d, slice : int, cmp : float, level : float) : float = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : V3i, lod : int) : float = failwith ""
@@ -962,13 +962,13 @@ type SamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : V3d, slice : int, lodBias : float) : V4d = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V4d, slice : int, level : float) : V4d = failwith ""
+    member x.SampleLevel(coord : V3d, slice : int, level : float) : V4d = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : V3i, lod : int) : V4d = failwith ""
     
 
-type SamplerCubeMSShadow(tex : ISemanticValue, state : SamplerState) =
+type SamplerCubeShadowMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
         member x.Texture = tex
         member x.State = state
@@ -996,7 +996,7 @@ type SamplerCubeMSShadow(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : V3d, cmp : float, lodBias : float) : float = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V4d, cmp : float, level : float) : float = failwith ""
+    member x.SampleLevel(coord : V3d, cmp : float, level : float) : float = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : V3i, lod : int, sample : int) : float = failwith ""
@@ -1030,7 +1030,7 @@ type SamplerCubeMS(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : V3d, lodBias : float) : V4d = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V4d, level : float) : V4d = failwith ""
+    member x.SampleLevel(coord : V3d, level : float) : V4d = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : V3i, lod : int, sample : int) : V4d = failwith ""
@@ -1064,7 +1064,7 @@ type SamplerCubeShadow(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : V3d, cmp : float, lodBias : float) : float = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V4d, cmp : float, level : float) : float = failwith ""
+    member x.SampleLevel(coord : V3d, cmp : float, level : float) : float = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : V3i, lod : int) : float = failwith ""
@@ -1098,13 +1098,13 @@ type SamplerCube(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : V3d, lodBias : float) : V4d = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V4d, level : float) : V4d = failwith ""
+    member x.SampleLevel(coord : V3d, level : float) : V4d = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : V3i, lod : int) : V4d = failwith ""
     
 
-type IntSampler1dMSArray(tex : ISemanticValue, state : SamplerState) =
+type IntSampler1dArrayMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
         member x.Texture = tex
         member x.State = state
@@ -1132,7 +1132,7 @@ type IntSampler1dMSArray(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : float, slice : int, lodBias : float) : V4i = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, slice : int, level : float) : V4i = failwith ""
+    member x.SampleLevel(coord : float, slice : int, level : float) : V4i = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : int, lod : int, sample : int) : V4i = failwith ""
@@ -1172,7 +1172,7 @@ type IntSampler1dArray(tex : ISemanticValue, state : SamplerState) =
     member x.SampleOffset(coord : float, slice : int, offset : int, lodBias : float) : V4i = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, slice : int, level : float) : V4i = failwith ""
+    member x.SampleLevel(coord : float, slice : int, level : float) : V4i = failwith ""
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : float, slice : int, dTdx : float, dTdy : float) : V4i = failwith ""
@@ -1209,7 +1209,7 @@ type IntSampler1dMS(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : float, lodBias : float) : V4i = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, level : float) : V4i = failwith ""
+    member x.SampleLevel(coord : float, level : float) : V4i = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : int, lod : int, sample : int) : V4i = failwith ""
@@ -1255,7 +1255,7 @@ type IntSampler1d(tex : ISemanticValue, state : SamplerState) =
     member x.SampleProj(coord : V2d, lodBias : float) : V4i = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, level : float) : V4i = failwith ""
+    member x.SampleLevel(coord : float, level : float) : V4i = failwith ""
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : float, dTdx : float, dTdy : float) : V4i = failwith ""
@@ -1264,7 +1264,7 @@ type IntSampler1d(tex : ISemanticValue, state : SamplerState) =
     member x.Read(coord : int, lod : int) : V4i = failwith ""
     
 
-type IntSampler2dMSArray(tex : ISemanticValue, state : SamplerState) =
+type IntSampler2dArrayMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
         member x.Texture = tex
         member x.State = state
@@ -1292,7 +1292,7 @@ type IntSampler2dMSArray(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : V2d, slice : int, lodBias : float) : V4i = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, slice : int, level : float) : V4i = failwith ""
+    member x.SampleLevel(coord : V2d, slice : int, level : float) : V4i = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : V2i, lod : int, sample : int) : V4i = failwith ""
@@ -1332,7 +1332,7 @@ type IntSampler2dArray(tex : ISemanticValue, state : SamplerState) =
     member x.SampleOffset(coord : V2d, slice : int, offset : V2i, lodBias : float) : V4i = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, slice : int, level : float) : V4i = failwith ""
+    member x.SampleLevel(coord : V2d, slice : int, level : float) : V4i = failwith ""
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V2d, slice : int, dTdx : V2d, dTdy : V2d) : V4i = failwith ""
@@ -1375,7 +1375,7 @@ type IntSampler2dMS(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : V2d, lodBias : float) : V4i = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, level : float) : V4i = failwith ""
+    member x.SampleLevel(coord : V2d, level : float) : V4i = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : V2i, lod : int, sample : int) : V4i = failwith ""
@@ -1421,7 +1421,7 @@ type IntSampler2d(tex : ISemanticValue, state : SamplerState) =
     member x.SampleProj(coord : V3d, lodBias : float) : V4i = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, level : float) : V4i = failwith ""
+    member x.SampleLevel(coord : V2d, level : float) : V4i = failwith ""
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V2d, dTdx : V2d, dTdy : V2d) : V4i = failwith ""
@@ -1464,7 +1464,7 @@ type IntSampler3dMS(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : V3d, lodBias : float) : V4i = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V4d, level : float) : V4i = failwith ""
+    member x.SampleLevel(coord : V3d, level : float) : V4i = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : V3i, lod : int, sample : int) : V4i = failwith ""
@@ -1510,7 +1510,7 @@ type IntSampler3d(tex : ISemanticValue, state : SamplerState) =
     member x.SampleProj(coord : V4d, lodBias : float) : V4i = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V4d, level : float) : V4i = failwith ""
+    member x.SampleLevel(coord : V3d, level : float) : V4i = failwith ""
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V3d, dTdx : V3d, dTdy : V3d) : V4i = failwith ""
@@ -1519,7 +1519,7 @@ type IntSampler3d(tex : ISemanticValue, state : SamplerState) =
     member x.Read(coord : V3i, lod : int) : V4i = failwith ""
     
 
-type IntSamplerCubeMSArray(tex : ISemanticValue, state : SamplerState) =
+type IntSamplerCubeArrayMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
         member x.Texture = tex
         member x.State = state
@@ -1547,7 +1547,7 @@ type IntSamplerCubeMSArray(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : V3d, slice : int, lodBias : float) : V4i = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V4d, slice : int, level : float) : V4i = failwith ""
+    member x.SampleLevel(coord : V3d, slice : int, level : float) : V4i = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : V3i, lod : int, sample : int) : V4i = failwith ""
@@ -1581,7 +1581,7 @@ type IntSamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : V3d, slice : int, lodBias : float) : V4i = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V4d, slice : int, level : float) : V4i = failwith ""
+    member x.SampleLevel(coord : V3d, slice : int, level : float) : V4i = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : V3i, lod : int) : V4i = failwith ""
@@ -1615,7 +1615,7 @@ type IntSamplerCubeMS(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : V3d, lodBias : float) : V4i = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V4d, level : float) : V4i = failwith ""
+    member x.SampleLevel(coord : V3d, level : float) : V4i = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : V3i, lod : int, sample : int) : V4i = failwith ""
@@ -1649,9 +1649,306 @@ type IntSamplerCube(tex : ISemanticValue, state : SamplerState) =
     member x.Sample(coord : V3d, lodBias : float) : V4i = failwith ""
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V4d, level : float) : V4i = failwith ""
+    member x.SampleLevel(coord : V3d, level : float) : V4i = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : V3i, lod : int) : V4i = failwith ""
+    
+
+[<AutoOpen>]
+module SamplerBuilders = 
+    type Sampler1dArrayShadowMSBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            Sampler1dArrayShadowMS(t, s)
+
+    let sampler1dArrayShadowMS = Sampler1dArrayShadowMSBuilder()
+    
+    type Sampler1dArrayMSBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            Sampler1dArrayMS(t, s)
+
+    let sampler1dArrayMS = Sampler1dArrayMSBuilder()
+    
+    type Sampler1dArrayShadowBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            Sampler1dArrayShadow(t, s)
+
+    let sampler1dArrayShadow = Sampler1dArrayShadowBuilder()
+    
+    type Sampler1dArrayBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            Sampler1dArray(t, s)
+
+    let sampler1dArray = Sampler1dArrayBuilder()
+    
+    type Sampler1dShadowMSBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            Sampler1dShadowMS(t, s)
+
+    let sampler1dShadowMS = Sampler1dShadowMSBuilder()
+    
+    type Sampler1dMSBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            Sampler1dMS(t, s)
+
+    let sampler1dMS = Sampler1dMSBuilder()
+    
+    type Sampler1dShadowBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            Sampler1dShadow(t, s)
+
+    let sampler1dShadow = Sampler1dShadowBuilder()
+    
+    type Sampler1dBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            Sampler1d(t, s)
+
+    let sampler1d = Sampler1dBuilder()
+    
+    type Sampler2dArrayShadowMSBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            Sampler2dArrayShadowMS(t, s)
+
+    let sampler2dArrayShadowMS = Sampler2dArrayShadowMSBuilder()
+    
+    type Sampler2dArrayMSBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            Sampler2dArrayMS(t, s)
+
+    let sampler2dArrayMS = Sampler2dArrayMSBuilder()
+    
+    type Sampler2dArrayShadowBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            Sampler2dArrayShadow(t, s)
+
+    let sampler2dArrayShadow = Sampler2dArrayShadowBuilder()
+    
+    type Sampler2dArrayBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            Sampler2dArray(t, s)
+
+    let sampler2dArray = Sampler2dArrayBuilder()
+    
+    type Sampler2dShadowMSBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            Sampler2dShadowMS(t, s)
+
+    let sampler2dShadowMS = Sampler2dShadowMSBuilder()
+    
+    type Sampler2dMSBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            Sampler2dMS(t, s)
+
+    let sampler2dMS = Sampler2dMSBuilder()
+    
+    type Sampler2dShadowBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            Sampler2dShadow(t, s)
+
+    let sampler2dShadow = Sampler2dShadowBuilder()
+    
+    type Sampler2dBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            Sampler2d(t, s)
+
+    let sampler2d = Sampler2dBuilder()
+    
+    type Sampler3dShadowMSBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            Sampler3dShadowMS(t, s)
+
+    let sampler3dShadowMS = Sampler3dShadowMSBuilder()
+    
+    type Sampler3dMSBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            Sampler3dMS(t, s)
+
+    let sampler3dMS = Sampler3dMSBuilder()
+    
+    type Sampler3dShadowBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            Sampler3dShadow(t, s)
+
+    let sampler3dShadow = Sampler3dShadowBuilder()
+    
+    type Sampler3dBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            Sampler3d(t, s)
+
+    let sampler3d = Sampler3dBuilder()
+    
+    type SamplerCubeArrayShadowMSBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            SamplerCubeArrayShadowMS(t, s)
+
+    let samplerCubeArrayShadowMS = SamplerCubeArrayShadowMSBuilder()
+    
+    type SamplerCubeArrayMSBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            SamplerCubeArrayMS(t, s)
+
+    let samplerCubeArrayMS = SamplerCubeArrayMSBuilder()
+    
+    type SamplerCubeArrayShadowBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            SamplerCubeArrayShadow(t, s)
+
+    let samplerCubeArrayShadow = SamplerCubeArrayShadowBuilder()
+    
+    type SamplerCubeArrayBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            SamplerCubeArray(t, s)
+
+    let samplerCubeArray = SamplerCubeArrayBuilder()
+    
+    type SamplerCubeShadowMSBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            SamplerCubeShadowMS(t, s)
+
+    let samplerCubeShadowMS = SamplerCubeShadowMSBuilder()
+    
+    type SamplerCubeMSBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            SamplerCubeMS(t, s)
+
+    let samplerCubeMS = SamplerCubeMSBuilder()
+    
+    type SamplerCubeShadowBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            SamplerCubeShadow(t, s)
+
+    let samplerCubeShadow = SamplerCubeShadowBuilder()
+    
+    type SamplerCubeBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            SamplerCube(t, s)
+
+    let samplerCube = SamplerCubeBuilder()
+    
+    type IntSampler1dArrayMSBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            IntSampler1dArrayMS(t, s)
+
+    let intSampler1dArrayMS = IntSampler1dArrayMSBuilder()
+    
+    type IntSampler1dArrayBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            IntSampler1dArray(t, s)
+
+    let intSampler1dArray = IntSampler1dArrayBuilder()
+    
+    type IntSampler1dMSBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            IntSampler1dMS(t, s)
+
+    let intSampler1dMS = IntSampler1dMSBuilder()
+    
+    type IntSampler1dBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            IntSampler1d(t, s)
+
+    let intSampler1d = IntSampler1dBuilder()
+    
+    type IntSampler2dArrayMSBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            IntSampler2dArrayMS(t, s)
+
+    let intSampler2dArrayMS = IntSampler2dArrayMSBuilder()
+    
+    type IntSampler2dArrayBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            IntSampler2dArray(t, s)
+
+    let intSampler2dArray = IntSampler2dArrayBuilder()
+    
+    type IntSampler2dMSBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            IntSampler2dMS(t, s)
+
+    let intSampler2dMS = IntSampler2dMSBuilder()
+    
+    type IntSampler2dBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            IntSampler2d(t, s)
+
+    let intSampler2d = IntSampler2dBuilder()
+    
+    type IntSampler3dMSBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            IntSampler3dMS(t, s)
+
+    let intSampler3dMS = IntSampler3dMSBuilder()
+    
+    type IntSampler3dBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            IntSampler3d(t, s)
+
+    let intSampler3d = IntSampler3dBuilder()
+    
+    type IntSamplerCubeArrayMSBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            IntSamplerCubeArrayMS(t, s)
+
+    let intSamplerCubeArrayMS = IntSamplerCubeArrayMSBuilder()
+    
+    type IntSamplerCubeArrayBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            IntSamplerCubeArray(t, s)
+
+    let intSamplerCubeArray = IntSamplerCubeArrayBuilder()
+    
+    type IntSamplerCubeMSBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            IntSamplerCubeMS(t, s)
+
+    let intSamplerCubeMS = IntSamplerCubeMSBuilder()
+    
+    type IntSamplerCubeBuilder() = 
+        inherit SamplerBaseBuilder()
+        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
+            IntSamplerCube(t, s)
+
+    let intSamplerCube = IntSamplerCubeBuilder()
     
 
