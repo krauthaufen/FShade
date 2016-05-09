@@ -202,6 +202,8 @@ module GLSL =
                         return! error "cannot create zero for type: %A" t
             }
 
+        let rowMajor = config.createRowMajorMatrices
+
         member x.Config = config
 
         interface ICompiler<CompilerState> with
@@ -315,6 +317,7 @@ module GLSL =
                         | MethodQuote <@ exp @> _ -> return Some "exp({0})"
                         | MethodQuote <@ floor @> _ -> return Some "floor({0})"
                         | MethodQuote <@ log @> _ -> return Some "log({0})"
+                        | MethodQuote <@ log10 @> _ -> return Some "log10({0})"
                         | MethodQuote <@ not @> _ -> return Some "(!{0})"
                         | MethodQuote <@ round @> _ -> return Some "round({0})"
                         | MethodQuote <@ sign @> _ -> return Some "sign({0})"
@@ -327,6 +330,8 @@ module GLSL =
                         | MethodQuote <@ max @> _ -> return Some "max({0}, {1})"
                         | MethodQuote <@ pow : int -> int -> int @> _ -> return Some "pow({0}, {1})"
                         | MethodQuote <@ clamp : int -> int -> int -> int @> _ -> return Some "clamp({2}, {0}, {1})"
+                        | MethodQuote <@ pown : int -> int -> int @> _ -> return Some "pow({0}, {1})"
+                        | MethodQuote <@ ( ** ) : float -> float -> float @> _ -> return Some "pow({0}, {1})"
 
                         | MethodQuote <@ GenericValues.zero : int @> [t] -> 
                             let! zero = compileZero t
@@ -373,6 +378,7 @@ module GLSL =
                         | MethodQuote <@ M33d.FromRows : _ * _ * _ -> M33d @> _ -> return Some "transpose(mat3({0}, {1}, {2}))"
                         | MethodQuote <@ M44d.FromRows : _ * _ * _ * _ -> M44d @> _ -> return Some "transpose(mat4({0}, {1}, {2}, {3}))"
                         
+
                         | MethodQuote <@ M44d.Transpose @> _ -> return Some "transpose({0})"
                         | Method("get_Transposed", [Matrix]) -> return Some "transpose({0})"
 
@@ -436,7 +442,20 @@ module GLSL =
                 compile {
                     match p with
                         | VectorSwizzle(name) -> return "({0})." + name.ToLower() |> Some
-                        | MatrixElement(x,y) -> return sprintf "({0})._%d%d" (x+1) (y+1) |> Some
+                        | MatrixElement(x,y) -> 
+                            if rowMajor then
+                                return sprintf "({0})[%d][%d]" (x+1) (y+1) |> Some
+                            else
+                                return sprintf "({0})[%d][%d]" (y+1) (x+1) |> Some
+
+                        | MatrixRow(bt, dim, r) -> 
+                            if rowMajor then return sprintf "({0})[%d]" r |> Some
+                            else return List.init dim.Y (fun i -> sprintf "({0})[%d][%d]" i r) |> String.concat ", " |> sprintf "vec%d(%s)" dim.Y |> Some
+
+                        | MatrixCol(bt, dim, c) -> 
+                            if rowMajor then return List.init dim.Y (fun i -> sprintf "({0})[%d][%d]" i c) |> String.concat ", " |> sprintf "vec%d(%s)" dim.Y |> Some
+                            else return sprintf "({0})[%d]" c |> Some
+
                         | _ -> return None   
                 }
 
@@ -444,7 +463,10 @@ module GLSL =
                 compile {
                     match p with
                         | VectorSwizzle(name) -> return "({0})." + name.ToLower() + " = {1}" |> Some
-                        | MatrixElement(x,y) -> return sprintf "({0})._%d%d = {1}" (x+1) (y+1) |> Some
+                        | MatrixElement(x,y) -> return sprintf "({0})[%d][%d] = {1}" (x+1) (y+1) |> Some
+                        | MatrixRow(bt, dim, r) when rowMajor -> return sprintf "({0})[%d] = {1}" r |> Some
+                        | MatrixCol(bt, dim, r) when not rowMajor -> return sprintf "({0})[%d] = {1}" r |> Some
+
                         | _ -> return None   
                 }
 

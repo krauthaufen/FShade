@@ -21,6 +21,9 @@ module ReflectionPatterns =
 
 
     let matrixElementRx = System.Text.RegularExpressions.Regex("M(?<x>[0-3])(?<y>[0-3])")
+    let matrixColRx = System.Text.RegularExpressions.Regex("C(?<n>[0-3])")
+    let matrixRowRx = System.Text.RegularExpressions.Regex("R(?<n>[0-3])")
+
     let (|MatrixElement|_|) (p : MemberInfo) =
         match p.DeclaringType with
             | Matrix -> let m = matrixElementRx.Match p.Name
@@ -30,3 +33,24 @@ module ReflectionPatterns =
                             None
             | _ -> None
 
+    let (|MatrixCol|_|) (p : MemberInfo) =
+        match p.DeclaringType with
+            | MatrixOf (dim, bt) -> 
+                let m = matrixColRx.Match p.Name
+                if m.Success then
+                    let ci = m.Groups.["n"].Value |> Int32.Parse
+                    Some(bt, dim, ci)
+                else
+                    None
+            | _ -> None  
+
+    let (|MatrixRow|_|) (p : MemberInfo) =
+        match p.DeclaringType with
+            | MatrixOf (dim, bt) -> 
+                let m = matrixRowRx.Match p.Name
+                if m.Success then
+                    let ri = m.Groups.["n"].Value |> Int32.Parse
+                    Some(bt, dim, ri)
+                else
+                    None
+            | _ -> None  
