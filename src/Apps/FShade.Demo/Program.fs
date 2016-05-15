@@ -198,6 +198,18 @@ let main argv =
                   Shaders.textureShader |> toEffect] |> compose
 
 
+    let res = GLSL.compileEffect { GLSL.version410 with treatUniformsAsInputs = true } (Map.ofList["Colors", typeof<V4d>]) effect
+    match res with
+        | Success (uniforms, code) ->
+            for (name,getter) in Map.toSeq uniforms do
+                match getter with
+                    | AttributeGetter(name, t) -> printfn "%s : %A" name t
+                    | _ -> ()
+            printfn "%s" code
+        | _ ->
+            ()
+
+    Environment.Exit 0
 //    let effect = [Simple.trafo |> toEffect
 //                  Simple.pointSurface (V2d(0.06, 0.08)) |> toEffect
 //                  Simple.white |> toEffect

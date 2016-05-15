@@ -33,9 +33,12 @@ module GLSL =
 
             flipHandedness : bool
             depthRange : Range1d
+
+            treatUniformsAsInputs : bool
+
         }
 
-    let private version410 =
+    let version410 =
         {
             languageVersion = Version(4,1,0)
             enabledExtensions = Set.empty
@@ -49,9 +52,10 @@ module GLSL =
             createPerStageUniforms = false
             flipHandedness = false
             depthRange = Range1d(-1.0,1.0)
+            treatUniformsAsInputs = false
         }
 
-    let private version120 =
+    let version120 =
         {
             languageVersion = Version(1,2,0)
             enabledExtensions = Set.empty
@@ -65,6 +69,7 @@ module GLSL =
             createPerStageUniforms = false
             flipHandedness = false
             depthRange = Range1d(-1.0,1.0)
+            treatUniformsAsInputs = false
         }
 
     let private descriptorSetCounterName = "DescriptorSetCounter"
@@ -589,6 +594,7 @@ module GLSL =
 
             member x.ProcessFunctionBody (body : Expr) =
                 compile {
+                    
                     let! r = substituteUniforms body
                     return r
                 }
@@ -957,16 +963,15 @@ module GLSL =
 
                     let declareGlobal (elements : seq<string>) =
                         elements 
-                            |> Seq.map (fun l -> "uniform " + l) 
+                            |> Seq.map (fun l -> uniformLayoutPrefix + "uniform " + l) 
                             |> String.concat "\r\n" 
-                            |> sprintf "%s%s" uniformLayoutPrefix
 
                     match buffer.Parent with
                         | None ->
                             if config.createGlobalUniforms then return elements |> declareGlobal
                             else return elements |> declareBuffer "Global"
                         | Some _ -> 
-                            let name = buffer.Name
+                            let name = buffer.FullName
                             if config.createUniformBuffers then return elements |> declareBuffer name
                             else return elements |> declareGlobal
 
@@ -1012,7 +1017,7 @@ module GLSL =
             let! state = compilerState : Compiled<ShaderState, ShaderState>
             let! config = config
 
-
+            let uniformsAsInputs = config.treatUniformsAsInputs
 
             let uniforms' = 
                 [
@@ -1020,34 +1025,83 @@ module GLSL =
                     yield! state.uniforms |> HashMap.toSeq
                 ]
 
-            let inputs = s.inputs |> Seq.sortBy(fun (KeyValue(_,n)) -> n.Name)
-            let outputs = s.outputs |> Seq.sortBy(fun (KeyValue(_,(_,n))) -> n.Name)
-            let uniforms = 
-                uniforms'  
-                    |> Seq.map(fun (u,v) ->
-                        match u with
-                            | UserUniform(t,o) -> (uniform, t, v.Name)
-                            | Attribute(scope, t, n) -> (scope, t, n)
-                            | SamplerUniform(t,sem, n,_) -> (uniform, t, n)
-                       ) 
-                    |> Seq.groupBy(fun (s,_,_) -> s)
-                    |> Seq.map (fun (g,v) -> (g, v |> Seq.map (fun (_,t,n) -> (t,n)) |> Seq.toList))
-                    |> Map.ofSeq
+            let inputs = 
+                s.inputs |> Map.map (fun sem v ->
+                    match v.Type with
+                        | Fractional | VectorOf(_,Fractional) | MatrixOf(_,Fractional) ->
+                            v, false
+                        | _ ->
+                            v, true
 
+
+                )
+
+            let uniforms, inputs =
+                if not uniformsAsInputs then 
+                    let uniforms = 
+                        uniforms'  
+                            |> Seq.map(fun (u,v) ->
+                                match u with
+                                    | UserUniform(t,o) -> (uniform, t, v.Name)
+                                    | Attribute(scope, t, n) -> (scope, t, n)
+                                    | SamplerUniform(t,sem, n,_) -> (uniform, t, n)
+                               ) 
+                            |> Seq.groupBy(fun (s,_,_) -> s)
+                            |> Seq.map (fun (g,v) -> (g, v |> Seq.map (fun (_,t,n) -> (t,n)) |> Seq.toList))
+                            |> Map.ofSeq
+
+                    uniforms, inputs
+                else
+                    let newInputs = 
+                        uniforms' |> List.choose (fun (u,v) ->
+                            match u with
+                                | Attribute(scope, t, n) -> Some(n, (Var(n,t), true))
+                                | _ -> None
+                        )
+                        |> Map.ofList
+
+                    let newUniforms =
+                        uniforms'  
+                            |> Seq.choose(fun (u,v) ->
+                                match u with
+                                    | UserUniform(t,o) -> Some (uniform, t, v.Name)
+                                    | Attribute(scope, t, n) -> None
+                                    | SamplerUniform(t,sem, n,_) -> Some(uniform, t, n)
+                               ) 
+                            |> Seq.groupBy(fun (s,_,_) -> s)
+                            |> Seq.map (fun (g,v) -> (g, v |> Seq.map (fun (_,t,n) -> (t,n)) |> Seq.toList))
+                            |> Map.ofSeq   
+
+                    newUniforms, Map.union inputs newInputs
+
+            do! modifyCompilerState (fun s -> { s with inputs = inputs |> Seq.map (fun (KeyValue(n,(v,_))) -> n,v) |> Map.ofSeq })
+
+            let inputs = inputs |> Map.toSeq|> Seq.sortBy snd
+            let outputs = s.outputs |> Seq.sortBy(fun (KeyValue(_,(_,n))) -> n.Name)
 
             let! inputs = 
                 inputs 
-                    |> Seq.mapCs 0  (fun i (KeyValue(_,n)) -> 
+                    |> Seq.mapCs 0  (fun i (_,(n, flat)) -> 
                         compile {
-                    
+                            let flat = s.shaderType = ShaderType.Fragment && flat
+
                             let modifier =
                                 if config.createInputLocations then
-                                    sprintf "layout(location = %d) in" i
+                                    let ink =
+                                        if flat then "flat in"
+                                        else "in"
+
+                                    sprintf "layout(location = %d) %s" i ink
                                 else
-                                    if config.languageVersion > Version(1,2) then "in"
+                                    if config.languageVersion > Version(1,2) then 
+                                        if flat then "flat in"
+                                        else "in"
                                     else
                                         if s.shaderType = ShaderType.Vertex then "attribute" 
+                                        elif flat then "flat varying"
                                         else "varying"
+                            
+
 
                             let size =
                                 match n.Type with
@@ -1101,11 +1155,11 @@ module GLSL =
             let outputs = String.concat "\r\n" outputs
 
 
-            let uniformGetters = uniforms' |> Seq.choose(fun (u,v) ->
+            let uniformGetters = uniforms' |> Seq.map(fun (u,v) ->
                                                     match u with
-                                                        | UserUniform(t,o) -> Some (v.Name, UniformGetter(o, t))
-                                                        | SamplerUniform(t,sem, n,sam) -> Some (n, UniformGetter((sem, sam), t))
-                                                        | _ -> None
+                                                        | UserUniform(t,o) -> (v.Name, UniformGetter(o, t))
+                                                        | SamplerUniform(t,sem, n,sam) -> (n, UniformGetter((sem, sam), t))
+                                                        | Attribute(scope, t, n) -> (n, AttributeGetter(n, t))
                                                 )
                                            |> Map.ofSeq
 
@@ -1182,6 +1236,8 @@ module GLSL =
             let! e = e
             let! config = config
 
+
+
             let hasgs = match e.geometryShader with | Some _ -> true | _ -> false
             let! fsUsed,fsCode = match e.fragmentShader with
                                     | Some(fs) -> compile {
@@ -1207,7 +1263,10 @@ module GLSL =
 
                                                     let! fsc = compileShader "PS" fs
 
-                                                    let used = seq { yield ("Positions",typeof<V4d>); yield! fs.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k,v.Type)) } |> Map.ofSeq
+                                                    let! s = compilerState
+                                                    let used = seq { yield ("Positions",typeof<V4d>); yield! s.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k,v.Type)) } |> Map.ofSeq
+                                                    
+                                                    
                                                     return used, Some fsc
                                                   }
                                     | None -> compile { return Map.ofList [("Positions",typeof<V4d>)], None }
@@ -1224,7 +1283,8 @@ module GLSL =
                                                     let gs = adjustToConfig config gs (Some Vertex) (Some Fragment)
                                                     let! gsc = compileShader "GS" gs
 
-                                                    let used = gs.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k, if v.Type.IsArray then v.Type.GetElementType() else v.Type)) |> Map.ofSeq
+                                                    let! s = compilerState
+                                                    let used = s.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k, if v.Type.IsArray then v.Type.GetElementType() else v.Type)) |> Map.ofSeq
                                                 
                                                     let glPos = System.Text.RegularExpressions.Regex("gl_Position\[(?<index>[^\]]+)\]")
                                                     let gsc = { code = glPos.Replace(gsc.code, fun (m : System.Text.RegularExpressions.Match) -> 
@@ -1234,7 +1294,6 @@ module GLSL =
                                                                 usedTypes = gsc.usedTypes
                                                                 uniformBuffers = gsc.uniformBuffers
                                                                 uniforms = gsc.uniforms }
-
 
                                                     return used,Some (gsc,t)
                                                   }
@@ -1341,6 +1400,8 @@ module GLSL =
                
                                                 let tcsUsed = Map.remove "InvocationId" tcsUsed
 
+                   
+
                                                 return tcsUsed,Some agg
                                             }
 
@@ -1363,6 +1424,8 @@ module GLSL =
                             let vs = adjustToConfig config vs None ((if hasgs then Geometry(None, TriangleStrip) else Fragment) |> Some) 
                             
                             let! vsc = compileShader "VS" vs
+
+                            
                             return Some vsc
                           }
 

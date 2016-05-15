@@ -98,7 +98,8 @@ module Shaders =
         fragment {
 
             if v.tc.X > 0.5 then
-                return diffuseLinear.Sample(v.tc)
+                let vv = uniform.ModelTrafo * V4d.Zero
+                return vv + diffuseLinear.Sample(v.tc)
             else 
                 let tc = v.tc * V2d diffuseNearest.Size |> V2i
                 let s = diffuseNearest.[tc]

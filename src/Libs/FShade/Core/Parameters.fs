@@ -41,6 +41,17 @@ module Parameters =
 
             member x.Parent = parent
             member x.Name = name
+            member x.FullName = 
+                let rec build (name : string) (s : UniformScope) =
+                    match s.Parent with
+                        | None -> 
+                            if name.Length = 0 then "Global"
+                            else name
+                        | Some p ->
+                            build (s.Name + name) p
+
+                build "" x
+
             member x.GetChildScope(n : string) =
                 lock childScopes (fun () ->
                     match childScopes.TryGetValue n with

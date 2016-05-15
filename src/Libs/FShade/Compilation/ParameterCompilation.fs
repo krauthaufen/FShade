@@ -77,22 +77,31 @@ module ParameterCompilation =
 
                     | _ -> None
 
-    let rec substituteUniforms (e : Expr) =
+    let rec substituteUniforms' (f : Uniform -> Compiled<Expr, _>) (e : Expr) =
         transform {
             match e with
-                | Uniform(u) -> let! v = getUniform u
-                                return Expr.Var v
+                | Uniform(u) -> 
+                    let! v = f u //getUniform u
+                    return v
 
                 | ShapeCombination(o, args) ->
-                    let! args = args |> List.mapC substituteUniforms
+                    let! args = args |> List.mapC (substituteUniforms' f)
                     return RebuildShapeCombination(o, args)
 
                 | ShapeLambda(v,b) -> 
-                    let! b = substituteUniforms b
+                    let! b = substituteUniforms' f b
                     return Expr.Lambda(v, b)
 
                 | _ -> return e
         }
+
+    let rec substituteUniforms (e : Expr) =
+        e |> substituteUniforms' (fun u ->
+            transform {
+                let! u = getUniform u
+                return Expr.Var u
+            }
+        )
 
     let rec substituteInputs (inputType : Type) (index : Option<Expr>) (e : Expr) =
         transform {
