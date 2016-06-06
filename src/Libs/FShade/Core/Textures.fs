@@ -49,4 +49,8 @@ module Textures =
              
         [<CustomOperation("filter")>]
         member x.Filter((t : ShaderTextureHandle, h : SamplerState), f : Filter) = t,{ h with Filter = Some f }
-       
+
+        [<CustomOperation("comparison")>]
+        member x.Comparison((t : ShaderTextureHandle, h : SamplerState), f : ComparisonFunction) = t,{ h with Comparison = Some f }
+
+                       

@@ -298,10 +298,6 @@ module GLES =
                             let v = v |> unbox<SamplerState>
                             return GlslSamplers.compileSamplerState name v
 
-                        | v when t = typeof<SamplerComparisonState> ->
-                            let v = v |> unbox<SamplerComparisonState>
-                            return GlslSamplers.compileSamplerComparisonState name v
-
 
                         | _ -> return! error "unsupported constant type: %A" t 
                 }

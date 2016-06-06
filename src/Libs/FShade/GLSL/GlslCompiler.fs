@@ -520,10 +520,6 @@ module GLSL =
                             let v = v |> unbox<SamplerState>
                             return GlslSamplers.compileSamplerState name v
 
-                        | v when t = typeof<SamplerComparisonState> ->
-                            let v = v |> unbox<SamplerComparisonState>
-                            return GlslSamplers.compileSamplerComparisonState name v
-
                         | v when t.IsArray ->
                             let contentType = t.GetElementType()
                             let arr = v |> unbox<Array>

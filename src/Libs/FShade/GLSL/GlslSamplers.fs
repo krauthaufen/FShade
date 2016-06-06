@@ -103,21 +103,3 @@ module GlslSamplers =
         setters <- setters + (v.MaxLod |> compileOption (fun a -> sprintf "\tMaxLOD = %f;\r\n" a))
                             
         sprintf "SamplerState %s\r\n{\r\n%s};\r\n" name setters
-
-    let compileSamplerComparisonState (name : string) (v : SamplerComparisonState) =
-        let mutable setters = ""
-
-        setters <- setters + (compileFilter v.Filter)
-        setters <- setters + (compileCompareFunc v.Comparison)
-
-        setters <- setters + (compileWrapMode "AddressU" v.AddressU)
-        setters <- setters + (compileWrapMode "AddressV" v.AddressV)
-        setters <- setters + (compileWrapMode "AddressW" v.AddressW)
-
-        setters <- setters + (v.MipLodBias |> compileOption (fun b -> sprintf "\tMipLODBias = %f;\r\n" b))
-        setters <- setters + (v.MaxAnisotropy |> compileOption (fun a -> sprintf "\tMaxAnisotropy = %d;\r\n" a))
-        setters <- setters + (compileBorderColor v.BorderColor)
-        setters <- setters + (v.MinLod |> compileOption (fun a -> sprintf "\tMinLOD = %f;\r\n" a))
-        setters <- setters + (v.MaxLod |> compileOption (fun a -> sprintf "\tMaxLOD = %f;\r\n" a))
-                            
-        sprintf "SamplerComparisonState %s\r\n{\r\n%s};\r\n" name setters
