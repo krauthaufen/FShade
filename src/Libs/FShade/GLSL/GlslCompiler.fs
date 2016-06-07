@@ -1232,6 +1232,11 @@ module GLSL =
             let! e = e
             let! config = config
 
+            let removeIntrinsics (shaderType : ShaderType) (nextType) (m : Map<string, Option<string> * Var>) =
+                m |> Map.filter (fun key value -> 
+                    let isIntrinsic = getIntrinsicOutputName config shaderType nextType key
+                    Option.isNone isIntrinsic // only remove intrinsics
+                )
 
 
             let hasgs = match e.geometryShader with | Some _ -> true | _ -> false
@@ -1251,7 +1256,9 @@ module GLSL =
                                                                     match t with
                                                                         | Some t -> false
                                                                         | None -> not <| Map.containsKey k neededOutputs
-                                                                 ) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
+                                                                 ) 
+                                                                 |> removeIntrinsics ShaderType.Fragment None
+                                                                 |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq 
 
                                                     let fs = removeOutputs unused fs
 
@@ -1272,8 +1279,12 @@ module GLSL =
                                     | Some(gs, t) -> compile {
                                                     let additional = fsUsed |> Map.filter (fun k _ -> not <| Map.containsKey k gs.outputs)
                                                     let gs = addOutputs additional gs
-
-                                                    let unused = gs.outputs |> Map.filter (fun k v -> not <| Map.containsKey k fsUsed) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
+                                                    
+                                                    let unused = 
+                                                        gs.outputs |> Map.filter (fun k v -> not <| Map.containsKey k fsUsed) 
+                                                            |> removeIntrinsics gs.shaderType (Some ShaderType.Fragment)
+                                                            |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
+                                                            
                                                     let gs = removeOutputs unused gs
 
                                                     let gs = adjustToConfig config gs (Some Vertex) (Some Fragment)
@@ -1317,7 +1328,11 @@ module GLSL =
                                         | Some tcs, Some tev ->
                                             compile {
                                                 let additional = gsUsed |> Map.filter (fun k _ -> not <| Map.containsKey k tev.outputs)
-                                                let unused = tev.outputs |> Map.filter (fun k v -> not <| Map.containsKey k gsUsed) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
+                                                let unused = 
+                                                    tev.outputs 
+                                                        |> Map.filter (fun k v -> not <| Map.containsKey k gsUsed)
+                                                        |> removeIntrinsics tev.shaderType (Some Fragment)
+                                                        |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
 
                                                 let tev = addOutputs additional tev
                                                 let tev = removeOutputs unused tev
@@ -1328,7 +1343,11 @@ module GLSL =
                                                 let tevUsed = Map.add "TessLevelOuter" typeof<float[]> tevUsed
 
                                                 let additional = tevUsed |> Map.filter (fun k _ -> not <| Map.containsKey k tcs.outputs)
-                                                let unused = tcs.outputs |> Map.filter (fun k v -> not <| Map.containsKey k tevUsed) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
+                                                let unused = 
+                                                    tcs.outputs 
+                                                        |> Map.filter (fun k v -> not <| Map.containsKey k tevUsed) 
+                                                        |> removeIntrinsics tcs.shaderType (Some Fragment)    
+                                                        |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
 
                                                 let tcs = addOutputs additional tcs
                                                 let tcs = removeOutputs unused tcs
@@ -1414,10 +1433,15 @@ module GLSL =
                             let additional = tessUsed |> Map.filter (fun k _ -> not <| Map.containsKey k vs.outputs)
                             let vs = addOutputs additional vs
 
-                            let unused = vs.outputs |> Map.filter (fun k v -> not <| Map.containsKey k tessUsed) |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
+                            let nextShader = (if hasgs then Geometry(None, TriangleStrip) else Fragment) |> Some
+                            let unused = 
+                                vs.outputs |> Map.filter (fun k v -> not <| Map.containsKey k tessUsed) 
+                                 |> removeIntrinsics vs.shaderType nextShader
+                                 |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
+
                             let vs = removeOutputs unused vs
 
-                            let vs = adjustToConfig config vs None ((if hasgs then Geometry(None, TriangleStrip) else Fragment) |> Some) 
+                            let vs = adjustToConfig config vs None nextShader
                             
                             let! vsc = compileShader "VS" vs
 

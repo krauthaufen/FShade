@@ -149,7 +149,7 @@ module SequentialComposition =
 
 
     let private composeBinaryGeometryVertex (l : Shader * OutputTopology) (r : Shader) : Compiled<Shader * OutputTopology, 'a> =
-        failwith ""
+        failwith "trying to compose geometryshader with vertex shader"
 
     let private composeBinaryGeometry (l : Shader * OutputTopology) (r : Shader * OutputTopology) : Compiled<Shader * OutputTopology, 'a> =
         failwith "geometry composition not possible atm"

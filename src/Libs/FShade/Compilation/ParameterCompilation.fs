@@ -157,18 +157,28 @@ module ParameterCompilation =
                         transform { 
                             let! v = getOutput e.Type sem t
 
-                            if sem = "Positions" then
-                                let! vi = getOutput e.Type "_Positions_" t
-                                return [
-                                    vi, Expr.Var(v)
-                                    v, e
-                                ]
+                            if v.Type.IsArray then
+                                match e with
+                                    | NewArray(t,args) -> 
+                                          let set = getMethodInfo <@ LanguagePrimitives.IntrinsicFunctions.SetArray @>
+                                          let set = set.MakeGenericMethod [|t|]
+                                          return args |> List.mapi (fun i ei -> 
+                                            Expr.Call(set, [Expr.Var v; Expr.Value i; ei])
+                                          )
+                                    | _ -> return! error "outputs cannot be nonprimitive arrays"
                             else
-                                return [v,e]
+                                if sem = "Positions" then
+                                    let! vi = getOutput e.Type "_Positions_" t
+                                    return [
+                                        Expr.VarSet (vi, Expr.Var(v))
+                                        Expr.VarSet (v, e)
+                                    ]
+                                else
+                                    return [Expr.VarSet (v,e)]
                         })
 
 
-                    let result = outputs |> List.fold (fun a (v,e) -> Expr.Sequential(Expr.VarSet(v,e), a)) (Expr.Value(()))
+                    let result = outputs |> List.fold (fun a e -> Expr.Sequential(e, a)) (Expr.Value(()))
                     return result
 
                 | ShapeCombination(o, args) ->
