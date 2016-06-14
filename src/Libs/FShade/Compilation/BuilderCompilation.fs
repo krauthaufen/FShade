@@ -20,6 +20,13 @@ module BuilderCompilation =
                 b.Substitute(fun vi -> if vi = v then Some value else None)
             | _ -> e
               
+    let private tryGetPrimitiveVertexId (prop : PropertyInfo) =
+        let att = prop.GetCustomAttribute<PrimitiveIndexAttribute>()
+        if isNull att then 
+            None
+        else
+            Some att.Index
+
     let rec private removeBuilderCallsInternal (e : Expr) =
         transform {
             match e with
@@ -71,12 +78,9 @@ module BuilderCompilation =
                 | Let(v, PropertyGet(Some p, pi, []), body)  when p.Type.GetInterface("Primitive`1") <> null ->
                     
                     let index = 
-                        match pi.Name with
-                            | "P0" | "Value" -> 0
-                            | "P1"           -> 1
-                            | "P2"           -> 2
-                            | "P3"           -> 3
-                            | _              -> -1                   
+                        match tryGetPrimitiveVertexId pi with
+                            | Some id -> id
+                            | _ -> -1                
 
                     if index < 0 then
                         return! error "invalid input property" 
@@ -94,7 +98,6 @@ module BuilderCompilation =
 
                 //PropertyGet (Some (Value (<null>)), TessCoord, [])
                 | MemberFieldGet(PropertyGet(Some p, pi, []), m) when p.Type.GetInterface("Primitive`1") <> null ->
-                    
 
                     //p.Value.abc
                     let t = m.Type.MakeArrayType()
@@ -102,12 +105,9 @@ module BuilderCompilation =
                     let! i = getInput t n
                     let i = Expr.Var(i)
 
-                    match pi.Name with
-                        | "P0" | "Value" -> return Expr.ArrayAccess(i, Expr.Value(0))
-                        | "P1"           -> return Expr.ArrayAccess(i, Expr.Value(1))
-                        | "P2"           -> return Expr.ArrayAccess(i, Expr.Value(2))
-                        | "P3"           -> return Expr.ArrayAccess(i, Expr.Value(3))
-                        | _              -> return! error "invalid input property"
+                    match tryGetPrimitiveVertexId pi with
+                        | Some index -> return Expr.ArrayAccess(i, Expr.Value(index))
+                        | _          -> return! error "invalid input property"
 
                 | MemberFieldGet(PropertyGet(Some p, pi, [index]), m) when p.Type.GetInterface("Primitive`1") <> null && pi.Name = "Item"->
                     let t = m.Type.MakeArrayType()

@@ -2,6 +2,12 @@
 
 open Aardvark.Base
 
+[<AllowNullLiteral>]
+type PrimitiveIndexAttribute(index : int) =
+    inherit System.Attribute()
+
+    member x.Index = index
+
 [<AutoOpen>]
 module Primitives =
 
@@ -13,6 +19,7 @@ module Primitives =
         member x.Item
             with get (i : int) : 'a = shaderOnlyAccess()
 
+        [<PrimitiveIndex(0)>]
         member x.Value : 'a = shaderOnlyAccess()
 
         static member VertexCount = 1
@@ -23,8 +30,11 @@ module Primitives =
 
         member x.Item
             with get (i : int) : 'a = shaderOnlyAccess()
-
+            
+        [<PrimitiveIndex(0)>]
         member x.P0 : 'a = shaderOnlyAccess()
+
+        [<PrimitiveIndex(1)>]
         member x.P1 : 'a = shaderOnlyAccess()
 
         static member VertexCount = 2
@@ -35,13 +45,65 @@ module Primitives =
 
         member x.Item
             with get (i : int) : 'a = shaderOnlyAccess()
-
+            
+        [<PrimitiveIndex(0)>]
         member x.P0 : 'a = shaderOnlyAccess()
+
+        [<PrimitiveIndex(1)>]
         member x.P1 : 'a = shaderOnlyAccess()
+
+        [<PrimitiveIndex(2)>]
         member x.P2 : 'a = shaderOnlyAccess()
 
         static member VertexCount = 3
         static member InputTopology = InputTopology.Triangle
+
+    type LineAdjacency<'a> = Triangle of 'a * 'a * 'a * 'a with
+        interface Primitive<'a>
+
+        member x.Item
+            with get (i : int) : 'a = shaderOnlyAccess()
+            
+            
+        [<PrimitiveIndex(1)>]
+        member x.P0 : 'a = shaderOnlyAccess()
+
+        [<PrimitiveIndex(2)>]
+        member x.P1 : 'a = shaderOnlyAccess()
+
+        [<PrimitiveIndex(0)>]
+        member x.Left : 'a = shaderOnlyAccess()
+
+        [<PrimitiveIndex(3)>]
+        member x.Right : 'a = shaderOnlyAccess()
+
+        static member VertexCount = 4
+        static member InputTopology = InputTopology.LineAdjacency
+
+    type TriangleAdjacency<'a> = Triangle of 'a * 'a * 'a * 'a * 'a * 'a with
+        interface Primitive<'a>
+
+        member x.Item
+            with get (i : int) : 'a = shaderOnlyAccess()
+            
+        [<PrimitiveIndex(0)>]
+        member x.P0 : 'a = shaderOnlyAccess()
+        [<PrimitiveIndex(2)>]
+        member x.P1 : 'a = shaderOnlyAccess()
+        [<PrimitiveIndex(4)>]
+        member x.P2 : 'a = shaderOnlyAccess()
+        
+        [<PrimitiveIndex(1)>]
+        member x.N01 : 'a = shaderOnlyAccess()
+        [<PrimitiveIndex(3)>]
+        member x.N12 : 'a = shaderOnlyAccess()
+        [<PrimitiveIndex(5)>]
+        member x.N20 : 'a = shaderOnlyAccess()
+
+        static member VertexCount = 6
+        static member InputTopology = InputTopology.TriangleAdjacency
+
+
 
     type Patch3<'a> = Patch4 of 'a * 'a * 'a with
         interface Primitive<'a>

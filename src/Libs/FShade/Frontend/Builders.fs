@@ -125,7 +125,11 @@ module Builders =
             member x.ShaderType = ShaderType.Fragment
 
     type GeometryBuilder(size : Option<int>, top : OutputTopology) =
-        inherit BaseBuilder()
+        member x.For(a : Arr<'d, 'a>, f : 'a -> unit) : unit =
+            for i in a do f i
+
+        member x.For(a : seq<'a>, f : 'a -> unit) : unit =
+            for i in a do f i
 
         member x.Size = size
 
