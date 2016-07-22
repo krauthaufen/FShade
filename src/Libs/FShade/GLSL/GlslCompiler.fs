@@ -1272,7 +1272,7 @@ module GLSL =
                                                     
                                                     return used, Some fsc
                                                   }
-                                    | None -> compile { return Map.ofList [("Positions",typeof<V4d>)], None }
+                                    | None -> compile { return neededOutputs, None }
 
             do! resetCompilerState
             let! gsUsed,gsCode = match e.geometryShader with
