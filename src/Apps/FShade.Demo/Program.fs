@@ -23,7 +23,9 @@ module Simple =
                [<Semantic("Tangents")>] t : V3d
                [<Semantic("BiNormals")>] b : V3d
                [<Semantic("TexCoords")>] tc : V2d
-               [<Semantic("Colors")>] color : V4d }
+               [<Semantic("Colors")>] color : V4d 
+               [<ClipDistance>] cd : float[] 
+              }
 
     let DiffuseColorTexture =
            sampler2d {
@@ -80,10 +82,10 @@ module Simple =
                     let p10 = V3d(pxyz + V3d(  sx, -sy, 0.0 ))
                     let p11 = V3d(pxyz + V3d(  sx,  sy, 0.0 ))
 
-                    yield { p.Value with p = uniform.ViewProjTrafo * V4d(p00 * pos.W, pos.W); tc = V2d.OO }
-                    yield { p.Value with p = uniform.ViewProjTrafo * V4d(p10 * pos.W, pos.W); tc = V2d.IO }
-                    yield { p.Value with p = uniform.ViewProjTrafo * V4d(p01 * pos.W, pos.W); tc = V2d.OI }
-                    yield { p.Value with p = uniform.ViewProjTrafo * V4d(p11 * pos.W, pos.W); tc = V2d.II }
+                    yield { p.Value with p = uniform.ViewProjTrafo * V4d(p00 * pos.W, pos.W); tc = V2d.OO; cd = [|1.0; 2.0|] } 
+                    yield { p.Value with p = uniform.ViewProjTrafo * V4d(p10 * pos.W, pos.W); tc = V2d.IO; cd = [|1.0; 2.0|] }
+                    yield { p.Value with p = uniform.ViewProjTrafo * V4d(p01 * pos.W, pos.W); tc = V2d.OI; cd = [|1.0; 2.0|] }
+                    yield { p.Value with p = uniform.ViewProjTrafo * V4d(p11 * pos.W, pos.W); tc = V2d.II; cd = [|1.0; 2.0|] }
 
         }
             
@@ -194,11 +196,11 @@ module Dead =
 [<EntryPoint>]
 let main argv = 
 
-    let effect = [Shaders.simpleTrafoShader |> toEffect
-                  Shaders.textureShader |> toEffect] |> compose
+    let effect = [Simple.pointSurface (V2d(0.06, 0.08)) |> toEffect
+                  Simple.white |> toEffect
+                  ] |> compose
 
-
-    let res = GLSL.compileEffect { GLSL.version410 with treatUniformsAsInputs = true } (Map.ofList["Colors", typeof<V4d>]) effect
+    let res = GLSL.compileEffect GLSL.version410 (Map.ofList["Colors", typeof<V4d>]) effect
     match res with
         | Success (uniforms, code) ->
             for (name,getter) in Map.toSeq uniforms do

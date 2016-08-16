@@ -125,15 +125,33 @@ module BuilderCompilation =
                     let semantics = FSharpTypeExt.GetRecordFields(t) |> Seq.map (fun m -> m.Semantic, m.AssignedTarget) |> Seq.toList
                     let setters = List.zip semantics fields
 
-                    let! outputs = setters |> List.mapC (fun ((s,t),v) ->
-                                    transform {
-                                        let! v = removeBuilderCallsInternal v
-                                        let! o = getOutput v.Type s t
-                                        return (o,v)
-                                    })
+                    let! outputs = 
+                        setters |> List.collectC (fun ((s,t),v) ->
+                            transform {
+                                let! o = getOutput v.Type s t
+                                
+                                if v.Type.IsArray then
+                                    
+                                    let! v = removeBuilderCallsInternal v
+                                    match v with
+                                        | NewArray(t, args) ->
+                                            let set = getMethodInfo <@ LanguagePrimitives.IntrinsicFunctions.SetArray @>
+                                            let set = set.MakeGenericMethod [|t|]
+                                            return args |> List.mapi (fun i ei -> 
+                                                Expr.Call(set, [Expr.Var o; Expr.Value i; ei])
+                                            )
+                                        | _ ->
+                                            return! error "outputs cannot be nonprimitive arrays"
+                                else
+                                    let! v = removeBuilderCallsInternal v
+                                    let! o = getOutput v.Type s t
+                                
+                                    return [Expr.VarSet(o,v)] //[o,v]
+                            }
+                        )
 
                     let emit = Expr.Call(getMethodInfo <@ emitVertex @>, [])
-                    let result = outputs |> List.fold (fun a (v,e) -> Expr.Sequential(Expr.VarSet(v,e), a)) emit
+                    let result = outputs |> List.fold (fun a (e) -> Expr.Sequential(e, a)) emit
                     return result
 
                 | BuilderCall(b, mi, [Let(v, e, inner)]) when mi.Name = "Return" ->
