@@ -196,7 +196,8 @@ module Dead =
 [<EntryPoint>]
 let main argv = 
 
-    let effect = [Simple.pointSurface (V2d(0.06, 0.08)) |> toEffect
+    let effect = [Simple.trafo |> toEffect
+                  Simple.pointSurface (V2d(0.06, 0.08)) |> toEffect
                   Simple.white |> toEffect
                   ] |> compose
 

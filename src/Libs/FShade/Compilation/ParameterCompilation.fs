@@ -165,7 +165,7 @@ module ParameterCompilation =
                                           return args |> List.mapi (fun i ei -> 
                                             Expr.Call(set, [Expr.Var v; Expr.Value i; ei])
                                           )
-                                    | _ -> return! error "outputs cannot be nonprimitive arrays"
+                                    | _ -> return []
                             else
                                 if sem = "Positions" then
                                     let! vi = getOutput e.Type "_Positions_" t

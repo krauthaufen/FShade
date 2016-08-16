@@ -141,7 +141,8 @@ module BuilderCompilation =
                                                 Expr.Call(set, [Expr.Var o; Expr.Value i; ei])
                                             )
                                         | _ ->
-                                            return! error "outputs cannot be nonprimitive arrays"
+                                            return []
+                                            //return! error "outputs cannot be nonprimitive arrays"
                                 else
                                     let! v = removeBuilderCallsInternal v
                                     let! o = getOutput v.Type s t
