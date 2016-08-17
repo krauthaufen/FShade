@@ -3,14 +3,14 @@
 open System
 open System.Text.RegularExpressions
 open System.Runtime.InteropServices
-open OpenTK.Graphics.OpenGL4
+open OpenTK.Graphics.OpenGL
 open FShade
 open Aardvark.Base
 
 module OpenGlResourceManager =
     open FShade.SamplerStateModule
 
-    type private GLShaderType = OpenTK.Graphics.OpenGL4.ShaderType
+    type private GLShaderType = OpenTK.Graphics.OpenGL.ShaderType
 
     let private translateShaderType (t : ShaderType) =
         match t with
@@ -201,11 +201,11 @@ module OpenGlResourceManager =
 
         let getInputs () =
             let mutable count = 0
-            GL.GetProgram(handle, GetProgramParameterName.ActiveAttributes, &count)
+            GL.GetProgram(handle, ProgramParameter.ActiveAttributes, &count)
             let count = count
             [ for i in 0..count-1 do
                 let mutable size = 0
-                let mutable t = ActiveAttribType.None
+                let mutable t = ActiveAttribType.Float
                 let mutable len = 0
                 let sb = System.Text.StringBuilder()
 
@@ -217,7 +217,7 @@ module OpenGlResourceManager =
 
         let getUniformBlocks() =
             let mutable count = 0
-            GL.GetProgram(handle, GetProgramParameterName.ActiveUniformBlocks, &count)
+            GL.GetProgram(handle, ProgramParameter.ActiveUniformBlocks, &count)
             let count = count
 
             [ for i in 0..count-1 do
@@ -275,7 +275,7 @@ module OpenGlResourceManager =
 
         let getSamplers() =
             let mutable count = 0
-            GL.GetProgram(handle, GetProgramParameterName.ActiveUniforms, &count)
+            GL.GetProgram(handle, ProgramParameter.ActiveUniforms, &count)
             let count = count
 
             [ for i in 0..count-1 do
@@ -350,7 +350,7 @@ module OpenGlResourceManager =
 
         GL.LinkProgram(handle)
         let mutable status = 0
-        GL.GetProgram(handle, GetProgramParameterName.LinkStatus, &status)
+        GL.GetProgram(handle, ProgramParameter.LinkStatus, &status)
 
         if status = 1 then
             OpenGlProgram handle
@@ -499,34 +499,34 @@ module OpenGlResourceManager =
 
 
 
-        GL.SamplerParameter(handle, SamplerParameterName.TextureWrapS, warpMode state.AddressU |> int)
-        GL.SamplerParameter(handle, SamplerParameterName.TextureWrapT, warpMode state.AddressV |> int)
-        GL.SamplerParameter(handle, SamplerParameterName.TextureWrapR, warpMode state.AddressW |> int)
-        GL.SamplerParameter(handle, SamplerParameterName.TextureMinFilter, minFilter |> int)
-        GL.SamplerParameter(handle, SamplerParameterName.TextureMagFilter, magFilter |> int)
-        if anis > 0 then GL.SamplerParameter(handle, SamplerParameterName.TextureMaxAnisotropyExt, anis)
+        GL.SamplerParameter(handle, SamplerParameter.TextureWrapS, warpMode state.AddressU |> int)
+        GL.SamplerParameter(handle, SamplerParameter.TextureWrapT, warpMode state.AddressV |> int)
+        GL.SamplerParameter(handle, SamplerParameter.TextureWrapR, warpMode state.AddressW |> int)
+        GL.SamplerParameter(handle, SamplerParameter.TextureMinFilter, minFilter |> int)
+        GL.SamplerParameter(handle, SamplerParameter.TextureMagFilter, magFilter |> int)
+        if anis > 0 then GL.SamplerParameter(handle, SamplerParameter.TextureMaxAnisotropyExt, anis)
         
         match state.MipLodBias with
             | Some bias ->
-                GL.SamplerParameter(handle, SamplerParameterName.TextureLodBias, bias |> float32)
+                GL.SamplerParameter(handle, SamplerParameter.TextureLodBias, bias |> float32)
             | None ->
                 ()
 
         match state.MinLod with
             | Some min ->
-                GL.SamplerParameter(handle, SamplerParameterName.TextureMinLod, min |> float32)
+                GL.SamplerParameter(handle, SamplerParameter.TextureMinLod, min |> float32)
             | None ->
                 ()
 
         match state.MaxLod with
             | Some max ->
-                GL.SamplerParameter(handle, SamplerParameterName.TextureMaxLod, max |> float32)
+                GL.SamplerParameter(handle, SamplerParameter.TextureMaxLod, max |> float32)
             | None ->
                 ()
 
         match state.BorderColor with
             | Some color ->
-                GL.SamplerParameter(handle, SamplerParameterName.TextureBorderColor, [|color.R; color.G; color.B; color.A|])
+                GL.SamplerParameter(handle, SamplerParameter.TextureBorderColor, [|color.R; color.G; color.B; color.A|])
             | None ->
                 ()
 

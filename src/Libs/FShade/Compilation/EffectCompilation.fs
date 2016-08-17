@@ -178,42 +178,10 @@ module EffectCompilation =
             | Some s -> Some { s with debugInfo = Some info }
             | None -> None
 
-    let private withDebugInfo (newEffect : Effect) (info : ShaderDebugInfo) =
+    let withDebugInfo (newEffect : Effect) (info : ShaderDebugInfo) =
         { vertexShader = shaderWithDebugInfo newEffect.vertexShader info
           tessControlShader = shaderWithDebugInfo newEffect.tessControlShader info
           tessEvalShader = shaderWithDebugInfo newEffect.tessEvalShader info
           geometryShader = match newEffect.geometryShader with | Some (gs,t) -> Some ({ gs with debugInfo = Some info }, t) | _ -> None
           fragmentShader = shaderWithDebugInfo newEffect.fragmentShader info
           originals = newEffect.originals }
-
-    let debugInfoToEffect (info : ShaderDebugInfo) =
-        try 
-            let quot = Fsi.compileUntyped info.opened info.functionCode
-            match quot with 
-                | Fsi.FsiSuccess quot ->
-                    let mutable result = quot
-                    for (t,n,v) in info.closure do
-                        let (arg,ret) = FSharpTypeExt.GetFunctionElements(result.GetType())
-                        let funType = typedefof<_ -> _>.MakeGenericType [|arg;ret|]
-
-                        let i = funType.GetMethod("Invoke" , [|t|])
-                        result <- i.Invoke(result, [|v|])
-
-
-                    let mi = getMethodInfo <@ toEffect @>
-                    let (a,b) = FSharpTypeExt.GetFunctionElements(result.GetType())
-                    let mi = mi.MakeGenericMethod [|a; b.GetGenericArguments().[0]|]
-
-                    let rr = mi.Invoke(null, [|result|])
-                    let compiled = rr |> unbox<Compiled<Effect,ShaderState>>
-
-                    compile {
-                        let! c = compiled
-
-                        return withDebugInfo c info
-                    }
-                | Fsi.FsiError e ->
-                    compile { return! error "%A" e }
-
-        with e ->
-            compile { return! error "%A" e }

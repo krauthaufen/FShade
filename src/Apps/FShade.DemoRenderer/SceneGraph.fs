@@ -10,7 +10,7 @@ open FShade.Debug
 
 module SceneGraph =
     open FShade.Demo.OpenGlResourceManager
-    open OpenTK.Graphics.OpenGL4
+    open OpenTK.Graphics.OpenGL
     open System.Drawing
 
     type TraversalState =
@@ -96,7 +96,7 @@ module SceneGraph =
             GL.UseProgram(state.shader.Handle)
             
             for (i,b) in uniformBuffers do
-                GL.BindBufferRange(BufferRangeTarget.UniformBuffer, i, b.Handle, 0n, b.Size |> nativeint)
+                GL.BindBufferRange(BufferTarget.UniformBuffer, i, b.Handle, 0n, b.Size |> nativeint)
 
             for (i,t,s) in samplers do
                 GL.ActiveTexture((int TextureUnit.Texture0 + i) |> unbox)
@@ -107,7 +107,7 @@ module SceneGraph =
             if isIndexed then
                 GL.DrawElements(BeginMode.Triangles, faceVertexCount, DrawElementsType.UnsignedInt, 0)
             else
-                GL.DrawArrays(PrimitiveType.Triangles, 0, faceVertexCount)
+                GL.DrawArrays(BeginMode.Triangles, 0, faceVertexCount)
 
             for (i,_,_) in samplers do
                 GL.ActiveTexture((int TextureUnit.Texture0 + i) |> unbox)
@@ -115,7 +115,7 @@ module SceneGraph =
                 GL.BindSampler(i, 0)
 
             for (i, _) in uniformBuffers do
-                GL.BindBufferRange(BufferRangeTarget.UniformBuffer, i, 0, 0n, 0n)
+                GL.BindBufferRange(BufferTarget.UniformBuffer, i, 0, 0n, 0n)
 
 
         interface ISg with

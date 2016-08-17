@@ -75,7 +75,7 @@ module EffectEditor =
 
                         Report.BeginTimed "compiling shader"
 
-                        let shaders = newDebugInfos |> List.map debugInfoToEffect |> List.map (GLSL.run410)
+                        let shaders = newDebugInfos |> List.map DebugInfo.toEffect |> List.map (GLSL.run410)
                         let shaders = List.zip shaders newDebugInfos
 
                         let countLines (str : string) = (lineBreak.Split str |> Array.length)

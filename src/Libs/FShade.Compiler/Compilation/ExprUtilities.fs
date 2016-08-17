@@ -102,5 +102,7 @@ module ExprUtilities =
             | Value(_,_) | Var(_) | Application(_,_) | Lambda(_,_) ->
                 Range1i(0,0)
 
+            | Coerce(a,b) -> estimateNumberOfCallsTo mi a
+
             | _ ->
                 Range1i(-1,-1)

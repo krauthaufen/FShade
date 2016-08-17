@@ -2,6 +2,8 @@
 
 open System
 open Newtonsoft.Json
+open FShade
+
 
 module CLI =
     type Range = ZeroToInf
@@ -442,7 +444,7 @@ module FSCC =
                                     []
                             elif ext = ".fs" then
                                 let code = System.IO.File.ReadAllText p
-                                match Aardvark.Base.Fsi.compileModule code with
+                                match Fsi.compileModule code with
                                     | Fsi.FsiSuccess m -> [Success m]
                                     | Fsi.FsiError e -> [Error e.AsString]
                             else 
@@ -516,7 +518,7 @@ module FSCC =
             let n = t.GetNestedTypes() |> Array.collect flattenNesting
             [[|t|]; n] |> Array.concat
 
-        match Aardvark.Base.Fsi.compileModule code with
+        match Fsi.compileModule code with
             | Fsi.FsiSuccess m ->
                 let allTypes = [|m|] |> Array.collect flattenNesting
        

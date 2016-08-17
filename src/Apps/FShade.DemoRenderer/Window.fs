@@ -3,7 +3,7 @@
 open OpenTK
 open OpenTK.Input
 open OpenTK.Graphics
-open OpenTK.Graphics.OpenGL4
+open OpenTK.Graphics.OpenGL
 open System.Diagnostics
 open FShade.Demo.SceneGraph
 open Aardvark.Base
