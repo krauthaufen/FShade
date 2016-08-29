@@ -186,7 +186,10 @@ module Dead =
                 if s then
                     return c
                 else
-                    return v.color
+                    if v.id < 100 then
+                        return v.color
+                    else 
+                        return V4d(0.0, 1.0, 0.0, 1.0)
             else
                 discard()
                 return V4d(0,0,0,0)

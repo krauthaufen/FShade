@@ -744,7 +744,11 @@ module GLSL =
 
         { s with body = body; inputs = newInputs; outputs = newOutputs}
 
-
+    let private perVertexGSInputs =
+        Set.ofList [
+            "PointSize"
+            "ClipDistance"
+        ]
 
     let rec private substituteGeometryInput (f : Var -> Expr -> Option<Expr>) (code : Expr) =
         match code with
@@ -774,7 +778,7 @@ module GLSL =
                     let replacement = Var(name, v.Type)
 
                     match s.shaderType with
-                        | Geometry _ -> 
+                        | Geometry _ when not (Set.contains sem perVertexGSInputs) -> 
                             body <- body |> substituteGeometryInput (fun vi i -> 
                                 if vi = v then 
                                     Some (Expr.Var replacement) 
