@@ -746,6 +746,18 @@ module GLSL =
 
 
 
+    let rec private substituteGeometryInput (f : Var -> Expr -> Option<Expr>) (code : Expr) =
+        match code with
+
+            | Call(None, MethodQuote <@ LanguagePrimitives.IntrinsicFunctions.GetArray @> _, [Var v; index]) ->
+                match f v index with
+                    | Some e -> e
+                    | _ -> code
+
+            | ShapeLambda(v, b) -> Expr.Lambda(v, substituteGeometryInput f b)
+            | ShapeVar(v) -> Expr.Var v
+            | ShapeCombination(o, args) -> RebuildShapeCombination(o, args |> List.map (substituteGeometryInput f))
+
     let private liftIntrinsics (config : CompilerConfiguration) (s : Shader)  (last : Option<ShaderType>) (next : Option<ShaderType>)=
         
         let s =
@@ -760,7 +772,17 @@ module GLSL =
             match getIntrinsicInputName config s.shaderType last sem with
                 | Some name -> 
                     let replacement = Var(name, v.Type)
-                    body <- body.Substitute(fun vi -> 
+
+                    match s.shaderType with
+                        | Geometry _ -> 
+                            body <- body |> substituteGeometryInput (fun vi i -> 
+                                if vi = v then 
+                                    Some (Expr.Var replacement) 
+                                else 
+                                    None
+                            )
+                        | _ ->
+                            body <- body.Substitute(fun vi -> 
                                 if vi = v then 
                                     Some (Expr.Var(replacement))
                                 else

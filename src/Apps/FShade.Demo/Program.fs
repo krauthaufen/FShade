@@ -24,6 +24,7 @@ module Simple =
                [<Semantic("BiNormals")>] b : V3d
                [<Semantic("TexCoords")>] tc : V2d
                [<Semantic("Colors")>] color : V4d 
+               [<PrimitiveId>] id : int
                [<ClipDistance>] cd : float[] 
               }
 
@@ -111,6 +112,7 @@ module Dead =
             [<Color>] color : V4d
             [<SemanticAttribute("DiffuseColorCoordinate")>] texCoord : V2d
             [<SemanticAttribute("ViewPosition")>] viewPos : V4d
+            [<PrimitiveId>] id : int
         }
 
     type UniformScope with
@@ -127,6 +129,7 @@ module Dead =
                 texCoord = V2d(0,0)
                 color = v.color
                 viewPos = vp
+                id = 0
             }
         }
 
@@ -165,10 +168,10 @@ module Dead =
             let BLO =   uniform.ProjTrafo * BottomLeft
             let BRO =   uniform.ProjTrafo * BottomRight
         
-            yield { position = TLO; color = c; texCoord = V2d(0, 1); viewPos = vp }
-            yield { position = TRO; color = c; texCoord = V2d(1, 1); viewPos = vp }
-            yield { position = BLO; color = c; texCoord = V2d(0, 0); viewPos = vp }
-            yield { position = BRO; color = c; texCoord = V2d(1, 0); viewPos = vp }
+            yield { v.Value with position = TLO; color = c; texCoord = V2d(0, 1); viewPos = vp }
+            yield { v.Value with position = TRO; color = c; texCoord = V2d(1, 1); viewPos = vp }
+            yield { v.Value with position = BLO; color = c; texCoord = V2d(0, 0); viewPos = vp }
+            yield { v.Value with position = BRO; color = c; texCoord = V2d(1, 0); viewPos = vp }
             }
 
     let BillboardFragment (color: V4d) (v : BillboardVertex) =
@@ -196,9 +199,9 @@ module Dead =
 [<EntryPoint>]
 let main argv = 
 
-    let effect = [Simple.trafo |> toEffect
-                  Simple.pointSurface (V2d(0.06, 0.08)) |> toEffect
-                  Simple.white |> toEffect
+    let effect = [Dead.BillboardTrafo |> toEffect
+                  Dead.BillboardGeometry (V2d(0.06, 0.08)) (fun a -> a) |> toEffect
+                  Dead.BillboardFragment V4d.IIII |> toEffect
                   ] |> compose
 
     let res = GLSL.compileEffect GLSL.version410 (Map.ofList["Colors", typeof<V4d>]) effect
@@ -212,7 +215,7 @@ let main argv =
         | _ ->
             ()
 
-    //Environment.Exit 0
+    // Environment.Exit 0
     let effect = [Simple.trafo   |> toEffect
                   Simple.normals |> toEffect
                   Simple.texture |> toEffect
