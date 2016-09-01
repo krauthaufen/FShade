@@ -27,7 +27,7 @@ module GLSL =
             createBindings : bool
             createDescriptorSets : bool
             createInputLocations : bool
-            createRowMajorMatrices : bool
+            expectRowMajorMatrices : bool
 
             createPerStageUniforms : bool
 
@@ -48,7 +48,7 @@ module GLSL =
             createBindings = false
             createDescriptorSets = false
             createInputLocations = true
-            createRowMajorMatrices = false
+            expectRowMajorMatrices = true
             createPerStageUniforms = false
             flipHandedness = false
             depthRange = Range1d(-1.0,1.0)
@@ -65,7 +65,7 @@ module GLSL =
             createBindings = false
             createDescriptorSets = false
             createInputLocations = false
-            createRowMajorMatrices = true
+            expectRowMajorMatrices = true
             createPerStageUniforms = false
             flipHandedness = false
             depthRange = Range1d(-1.0,1.0)
@@ -207,7 +207,7 @@ module GLSL =
                         return! error "cannot create zero for type: %A" t
             }
 
-        let rowMajor = config.createRowMajorMatrices
+        let expectRowMajor = config.expectRowMajorMatrices
 
         member x.Config = config
 
@@ -271,6 +271,8 @@ module GLSL =
                     match mi with
                         | Method("op_Addition", [Num|Vector|Matrix; Num|Vector|Matrix]) -> return Some "({0} + {1})"
                         | Method("op_Subtraction", [Num|Vector|Matrix; Num|Vector|Matrix]) -> return Some "({0} - {1})"
+                        
+                        | Method("op_Multiply", [Matrix|Vector; Vector|Matrix]) when expectRowMajor -> return Some "{1} * {0}"
                         | Method("op_Multiply", [Num|Vector|Matrix; Num|Vector|Matrix]) -> return Some "{0} * {1}"
                         | Method("op_Division", [Num|Vector|Matrix; Num|Vector|Matrix]) -> return Some "{0} / {1}"
                         | Method("op_Modulus", [Integral; Integral]) -> return Some "{0} % {1}"
@@ -375,14 +377,30 @@ module GLSL =
                         | MethodQuote <@ Mat.transpose : M33d -> M33d @> _ -> return Some "transpose({0})"
                         | MethodQuote <@ Mat.inverse : M33d -> M33d @> _ -> return Some "inverse({0})"
                         | MethodQuote <@ Mat.det : M33d -> float @> _ -> return Some "determinant({0})"
-                        | MethodQuote <@ Mat.transformPos : M44d -> V3d -> V3d @> _ -> return Some "({0} * vec4({1}, 1.0)).xyz"
-                        | MethodQuote <@ Mat.transformDir : M44d -> V3d -> V3d @> _ -> return Some "({0} * vec4({1}, 0.0)).xyz"
 
-                        | MethodQuote <@ M33d.FromCols : _ * _ * _ -> M33d @> _ -> return Some "mat3({0}, {1}, {2})"
-                        | MethodQuote <@ M44d.FromCols : _ * _ * _ * _ -> M44d @> _ -> return Some "mat4({0}, {1}, {2}, {3})"
-                        | MethodQuote <@ M33d.FromRows : _ * _ * _ -> M33d @> _ -> return Some "transpose(mat3({0}, {1}, {2}))"
-                        | MethodQuote <@ M44d.FromRows : _ * _ * _ * _ -> M44d @> _ -> return Some "transpose(mat4({0}, {1}, {2}, {3}))"
-                        
+                        | MethodQuote <@ Mat.transformPos : M44d -> V3d -> V3d @> _ -> 
+                            if expectRowMajor then return Some "(vec4({1}, 1.0) * {0}).xyz"
+                            else return Some "({0} * vec4({1}, 1.0)).xyz"
+
+                        | MethodQuote <@ Mat.transformDir : M44d -> V3d -> V3d @> _ -> 
+                            if expectRowMajor then return Some "(vec4({1}, 0.0) * {0}).xyz"
+                            else return Some "({0} * vec4({1}, 0.0)).xyz"
+
+                        | MethodQuote <@ M33d.FromCols : _ * _ * _ -> M33d @> _ -> 
+                            if expectRowMajor then return Some "transpose(mat3({0}, {1}, {2}))"
+                            else return Some "mat3({0}, {1}, {2})"
+
+                        | MethodQuote <@ M44d.FromCols : _ * _ * _ * _ -> M44d @> _ -> 
+                            if expectRowMajor then return Some "transpose(mat4({0}, {1}, {2}, {3}))"
+                            else return Some "mat4({0}, {1}, {2}, {3})"
+
+                        | MethodQuote <@ M33d.FromRows : _ * _ * _ -> M33d @> _ -> 
+                            if expectRowMajor then return Some "mat3({0}, {1}, {2})"
+                            else return Some "transpose(mat3({0}, {1}, {2}))"
+
+                        | MethodQuote <@ M44d.FromRows : _ * _ * _ * _ -> M44d @> _ -> 
+                            if expectRowMajor then return Some "mat4({0}, {1}, {2}, {3})"
+                            else return Some "transpose(mat4({0}, {1}, {2}, {3}))"
 
                         | MethodQuote <@ M44d.Transpose @> _ -> return Some "transpose({0})"
                         | Method("get_Transposed", [Matrix]) -> return Some "transpose({0})"
@@ -448,18 +466,16 @@ module GLSL =
                     match p with
                         | VectorSwizzle(name) -> return "({0})." + name.ToLower() |> Some
                         | MatrixElement(x,y) -> 
-                            if rowMajor then
-                                return sprintf "({0})[%d][%d]" (x+1) (y+1) |> Some
-                            else
-                                return sprintf "({0})[%d][%d]" (y+1) (x+1) |> Some
+                            if expectRowMajor then return sprintf "({0})[%d][%d]" (x+1) (y+1) |> Some
+                            else return sprintf "({0})[%d][%d]" (y+1) (x+1) |> Some
 
                         | MatrixRow(bt, dim, r) -> 
-                            if rowMajor then return sprintf "({0})[%d]" r |> Some
-                            else return List.init dim.Y (fun i -> sprintf "({0})[%d][%d]" i r) |> String.concat ", " |> sprintf "vec%d(%s)" dim.Y |> Some
+                            if expectRowMajor then return sprintf "({0})[%d]" (r+1) |> Some 
+                            else return List.init dim.X (fun i -> sprintf "({0})[%d][%d]" (i+1) (r+1)) |> String.concat ", " |> sprintf "vec%d(%s)" dim.X |> Some
 
                         | MatrixCol(bt, dim, c) -> 
-                            if rowMajor then return List.init dim.Y (fun i -> sprintf "({0})[%d][%d]" i c) |> String.concat ", " |> sprintf "vec%d(%s)" dim.Y |> Some
-                            else return sprintf "({0})[%d]" c |> Some
+                            if expectRowMajor then return List.init dim.Y (fun i -> sprintf "({0})[%d][%d]" (i+1) (c+1)) |> String.concat ", " |> sprintf "vec%d(%s)" dim.Y |> Some
+                            else return sprintf "({0})[%d]" (c+1) |> Some 
 
                         | _ -> return None   
                 }
@@ -468,9 +484,10 @@ module GLSL =
                 compile {
                     match p with
                         | VectorSwizzle(name) -> return "({0})." + name.ToLower() + " = {1}" |> Some
-                        | MatrixElement(x,y) -> return sprintf "({0})[%d][%d] = {1}" (x+1) (y+1) |> Some
-                        | MatrixRow(bt, dim, r) when rowMajor -> return sprintf "({0})[%d] = {1}" r |> Some
-                        | MatrixCol(bt, dim, r) when not rowMajor -> return sprintf "({0})[%d] = {1}" r |> Some
+                        | MatrixElement(x,y) -> 
+                            if expectRowMajor then return sprintf "({0})[%d][%d] = {1}" (x+1) (y+1) |> Some
+                            else return sprintf "({0})[%d][%d] = {1}" (y+1) (x+1) |> Some
+
 
                         | _ -> return None   
                 }
@@ -966,13 +983,13 @@ module GLSL =
 
                     let! elements = elements |> Seq.mapC (fun (t,n) ->
                         compile {
-                            let prefix =
-                                if config.createRowMajorMatrices then
-                                    match t with
-                                        | MatrixOf(s, bt) -> "layout(row_major) "
-                                        | _ -> ""
-                                else
-                                    ""
+                            let prefix = ""
+//                                if config.createRowMajorMatrices then
+//                                    match t with
+//                                        | MatrixOf(s, bt) -> "layout(row_major) "
+//                                        | _ -> ""
+//                                else
+//                                    ""
                             let! r = compileVariableDeclaration t n
                             return prefix + r + ";"
                         })

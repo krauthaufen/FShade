@@ -20,7 +20,7 @@ module ReflectionPatterns =
             | _ -> None
 
 
-    let matrixElementRx = System.Text.RegularExpressions.Regex("M(?<x>[0-3])(?<y>[0-3])")
+    let matrixElementRx = System.Text.RegularExpressions.Regex("M(?<y>[0-3])(?<x>[0-3])")
     let matrixColRx = System.Text.RegularExpressions.Regex("C(?<n>[0-3])")
     let matrixRowRx = System.Text.RegularExpressions.Regex("R(?<n>[0-3])")
 

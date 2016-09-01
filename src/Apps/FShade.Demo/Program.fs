@@ -218,7 +218,7 @@ let main argv =
         | _ ->
             ()
 
-    // Environment.Exit 0
+    Environment.Exit 0
     let effect = [Simple.trafo   |> toEffect
                   Simple.normals |> toEffect
                   Simple.texture |> toEffect
