@@ -272,27 +272,27 @@ module GLSL =
                         | Method("op_Addition", [Num|Vector|Matrix; Num|Vector|Matrix]) -> return Some "({0} + {1})"
                         | Method("op_Subtraction", [Num|Vector|Matrix; Num|Vector|Matrix]) -> return Some "({0} - {1})"
                         
-                        | Method("op_Multiply", [Matrix|Vector; Vector|Matrix]) when expectRowMajor -> return Some "{1} * {0}"
-                        | Method("op_Multiply", [Num|Vector|Matrix; Num|Vector|Matrix]) -> return Some "{0} * {1}"
-                        | Method("op_Division", [Num|Vector|Matrix; Num|Vector|Matrix]) -> return Some "{0} / {1}"
-                        | Method("op_Modulus", [Integral; Integral]) -> return Some "{0} % {1}"
+                        | Method("op_Multiply", [Matrix|Vector; Vector|Matrix]) when expectRowMajor -> return Some "({1} * {0})"
+                        | Method("op_Multiply", [Num|Vector|Matrix; Num|Vector|Matrix]) -> return Some "({0} * {1})"
+                        | Method("op_Division", [Num|Vector|Matrix; Num|Vector|Matrix]) -> return Some "({0} / {1})"
+                        | Method("op_Modulus", [Integral; Integral]) -> return Some "({0} % {1})"
                         | Method("op_Modulus", [_; _]) -> return Some "mod({0},{1})"
 
-                        | Method("op_LessThan", [Num; Num]) -> return Some "{0} < {1}"
-                        | Method("op_GreaterThan", [Num; Num]) -> return Some "{0} > {1}"
-                        | Method("op_GreaterThanOrEqual", [Num; Num]) -> return Some "{0} >= {1}"
-                        | Method("op_LessThanOrEqual", [Num; Num]) -> return Some "{0} <= {1}"
-                        | Method("op_Equality", [_; _]) -> return Some "{0} == {1}"
+                        | Method("op_LessThan", [Num; Num]) -> return Some "({0} < {1})"
+                        | Method("op_GreaterThan", [Num; Num]) -> return Some "({0} > {1})"
+                        | Method("op_GreaterThanOrEqual", [Num; Num]) -> return Some "({0} >= {1})"
+                        | Method("op_LessThanOrEqual", [Num; Num]) -> return Some "({0} <= {1})"
+                        | Method("op_Equality", [_; _]) -> return Some "({0} == {1})"
                         | Method("op_Dereference", [Ref(_)]) -> return Some "{0}"
                         | Method("op_ColonEquals", [Ref(_);_]) -> return Some "{0} = {1};\r\n"
-                        | Method("op_UnaryNegation", [_]) -> return Some "-{0}"
+                        | Method("op_UnaryNegation", [_]) -> return Some "(-{0})"
 
-                        | Method("op_RightShift", [Num; Num]) -> return Some "{0} >> {1}"
-                        | Method("op_LeftShift", [Num; Num]) -> return Some "{0} << {1}"
-                        | Method("op_BitwiseAnd", [Num; Num]) -> return Some "{0} & {1}"
-                        | Method("op_BitwiseOr", [Num; Num]) -> return Some "{0} | {1}"
-                        | Method("op_ExclusiveOr", [Num; Num]) -> return Some "{0} ^ {1}"
-                        | Method("op_LogicalNot", [Num]) -> return Some "~{0}"
+                        | Method("op_RightShift", [Num; Num]) -> return Some "({0} >> {1})"
+                        | Method("op_LeftShift", [Num; Num]) -> return Some "({0} << {1})"
+                        | Method("op_BitwiseAnd", [Num; Num]) -> return Some "({0} & {1})"
+                        | Method("op_BitwiseOr", [Num; Num]) -> return Some "({0} | {1})"
+                        | Method("op_ExclusiveOr", [Num; Num]) -> return Some "({0} ^ {1})"
+                        | Method("op_LogicalNot", [Num]) -> return Some "(~{0})"
 
                         | Method("get_Length", [Vector]) -> return Some "length({0})"
                         | Method("get_LengthSquared", [Vector]) -> return Some "dot({0}, {0})"
@@ -354,11 +354,11 @@ module GLSL =
                         | MethodQuote <@ Vec.reflect : V3d -> V3d -> V3d @> _ -> return Some "reflect({0}, {1})"
                         | MethodQuote <@ Vec.refract : V3d -> V3d -> float -> V3d @> _ -> return Some "refract({0}, {1}, {2})"
 
-                        | MethodQuote <@ Vec.xy : V3d -> V2d @> _ -> return Some "({0}).xy"
-                        | MethodQuote <@ Vec.yz : V3d -> V2d @> _ -> return Some "({0}).yz"
-                        | MethodQuote <@ Vec.zw : V4d -> V2d @> _ -> return Some "({0}).zw"
-                        | MethodQuote <@ Vec.xyz : V4d -> V3d @> _ -> return Some "({0}).xyz"
-                        | MethodQuote <@ Vec.yzw : V4d -> V3d @> _ -> return Some "({0}).yzw"
+                        | MethodQuote <@ Vec.xy : V3d -> V2d @> _ -> return Some "{0}.xy"
+                        | MethodQuote <@ Vec.yz : V3d -> V2d @> _ -> return Some "{0}.yz"
+                        | MethodQuote <@ Vec.zw : V4d -> V2d @> _ -> return Some "{0}.zw"
+                        | MethodQuote <@ Vec.xyz : V4d -> V3d @> _ -> return Some "{0}.xyz"
+                        | MethodQuote <@ Vec.yzw : V4d -> V3d @> _ -> return Some "{0}.yzw"
                         
                         | MethodQuote <@ V2d.Distance : _ * _ -> float @> _ -> return Some "distance({0}, {1})"
                         | MethodQuote <@ V3d.Distance : _ * _ -> float @> _ -> return Some "distance({0}, {1})"
@@ -464,18 +464,18 @@ module GLSL =
             member x.CompileIntrinsicPropertyGet(p : MemberInfo) = 
                 compile {
                     match p with
-                        | VectorSwizzle(name) -> return "({0})." + name.ToLower() |> Some
+                        | VectorSwizzle(name) -> return "{0}." + name.ToLower() |> Some
                         | MatrixElement(x,y) -> 
-                            if expectRowMajor then return sprintf "({0})[%d][%d]" (x+1) (y+1) |> Some
-                            else return sprintf "({0})[%d][%d]" (y+1) (x+1) |> Some
+                            if expectRowMajor then return sprintf "{0}[%d][%d]" (x+1) (y+1) |> Some
+                            else return sprintf "{0}[%d][%d]" (y+1) (x+1) |> Some
 
                         | MatrixRow(bt, dim, r) -> 
-                            if expectRowMajor then return sprintf "({0})[%d]" (r+1) |> Some 
-                            else return List.init dim.X (fun i -> sprintf "({0})[%d][%d]" (i+1) (r+1)) |> String.concat ", " |> sprintf "vec%d(%s)" dim.X |> Some
+                            if expectRowMajor then return sprintf "{0}[%d]" (r+1) |> Some 
+                            else return List.init dim.X (fun i -> sprintf "{0}[%d][%d]" (i+1) (r+1)) |> String.concat ", " |> sprintf "vec%d(%s)" dim.X |> Some
 
                         | MatrixCol(bt, dim, c) -> 
-                            if expectRowMajor then return List.init dim.Y (fun i -> sprintf "({0})[%d][%d]" (i+1) (c+1)) |> String.concat ", " |> sprintf "vec%d(%s)" dim.Y |> Some
-                            else return sprintf "({0})[%d]" (c+1) |> Some 
+                            if expectRowMajor then return List.init dim.Y (fun i -> sprintf "{0}[%d][%d]" (i+1) (c+1)) |> String.concat ", " |> sprintf "vec%d(%s)" dim.Y |> Some
+                            else return sprintf "{0}[%d]" (c+1) |> Some 
 
                         | _ -> return None   
                 }
@@ -483,10 +483,10 @@ module GLSL =
             member x.CompileIntrinsicPropertySet(p : MemberInfo) = 
                 compile {
                     match p with
-                        | VectorSwizzle(name) -> return "({0})." + name.ToLower() + " = {1}" |> Some
+                        | VectorSwizzle(name) -> return "{0}." + name.ToLower() + " = {1}" |> Some
                         | MatrixElement(x,y) -> 
-                            if expectRowMajor then return sprintf "({0})[%d][%d] = {1}" (x+1) (y+1) |> Some
-                            else return sprintf "({0})[%d][%d] = {1}" (y+1) (x+1) |> Some
+                            if expectRowMajor then return sprintf "{0}[%d][%d] = {1}" (x+1) (y+1) |> Some
+                            else return sprintf "{0}[%d][%d] = {1}" (y+1) (x+1) |> Some
 
 
                         | _ -> return None   
