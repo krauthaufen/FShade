@@ -86,6 +86,8 @@ module GLSL =
     let nextBindingIndex = nextCounter bindingCounterName
 
     
+    let private vecFields = [| "x"; "y"; "z"; "w" |]
+
     let (|TextureLookup|_|) (mi : MethodInfo) =
         match mi with
             | Method(name, ((SamplerType(dim, isArray, isShadow, isMS, valueType)::_) as args)) ->
@@ -466,16 +468,16 @@ module GLSL =
                     match p with
                         | VectorSwizzle(name) -> return "{0}." + name.ToLower() |> Some
                         | MatrixElement(x,y) -> 
-                            if expectRowMajor then return sprintf "{0}[%d][%d]" (x+1) (y+1) |> Some
-                            else return sprintf "{0}[%d][%d]" (y+1) (x+1) |> Some
+                            if expectRowMajor then return sprintf "{0}[%d][%d]" x y |> Some
+                            else return sprintf "{0}[%d][%d]" y x |> Some
 
                         | MatrixRow(bt, dim, r) -> 
-                            if expectRowMajor then return sprintf "{0}[%d]" (r+1) |> Some 
-                            else return List.init dim.X (fun i -> sprintf "{0}[%d][%d]" (i+1) (r+1)) |> String.concat ", " |> sprintf "vec%d(%s)" dim.X |> Some
+                            if expectRowMajor then return sprintf "{0}[%d]" r |> Some 
+                            else return List.init dim.X (fun i -> sprintf "{0}[%d][%d]" i r) |> String.concat ", " |> sprintf "vec%d(%s)" dim.X |> Some
 
                         | MatrixCol(bt, dim, c) -> 
-                            if expectRowMajor then return List.init dim.Y (fun i -> sprintf "{0}[%d][%d]" (i+1) (c+1)) |> String.concat ", " |> sprintf "vec%d(%s)" dim.Y |> Some
-                            else return sprintf "{0}[%d]" (c+1) |> Some 
+                            if expectRowMajor then return List.init dim.Y (fun i -> sprintf "{0}[%d][%d]" i c) |> String.concat ", " |> sprintf "vec%d(%s)" dim.Y |> Some
+                            else return sprintf "{0}[%d]" c |> Some 
 
                         | _ -> return None   
                 }
@@ -485,8 +487,18 @@ module GLSL =
                     match p with
                         | VectorSwizzle(name) -> return "{0}." + name.ToLower() + " = {1}" |> Some
                         | MatrixElement(x,y) -> 
-                            if expectRowMajor then return sprintf "{0}[%d][%d] = {1}" (x+1) (y+1) |> Some
-                            else return sprintf "{0}[%d][%d] = {1}" (y+1) (x+1) |> Some
+                            if expectRowMajor then return sprintf "{0}[%d][%d] = {1}" x y |> Some
+                            else return sprintf "{0}[%d][%d] = {1}" y x |> Some
+
+
+                        | MatrixRow(bt, dim, r) -> 
+                            if expectRowMajor then return sprintf "{0}[%d] = {1}" r |> Some 
+                            else return List.init dim.X (fun i -> sprintf "{0}[%d][%d] = {1}.%s" i r vecFields.[i]) |> String.concat "; " |> Some
+
+                        | MatrixCol(bt, dim, c) -> 
+                            if expectRowMajor then return List.init dim.Y (fun i -> sprintf "{0}[%d][%d] = {1}.%s" i c vecFields.[i]) |> String.concat "; " |> Some
+                            else return sprintf "{0}[%d] = {1}" c |> Some 
+
 
 
                         | _ -> return None   
