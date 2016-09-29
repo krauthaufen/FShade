@@ -121,15 +121,24 @@ module SequentialComposition =
         let uniformMap = uniforms |> List.map (fun (a,b) -> b.Name, b) |> Map.ofList
 
 
+        let uniformMap =
+            (l.uniforms |> List.map (fun (u,v) -> v, uniformMap.[v.Name])) @
+            (r.uniforms |> List.map (fun (u,v) -> v, uniformMap.[v.Name]))
+            |> Map.ofList
 
-        let b0 = b0.Substitute(fun vi -> 
-                    match Map.tryFind vi.Name l.inputs with
-                        | Some i -> 
-                            match Map.tryFind vi.Name inputs with
-                                | Some v -> v |> Expr.Var |> Some
-                                | _ -> None
-                        | None -> None
-                )
+
+        let b0 = 
+            b0.Substitute(fun vi -> 
+                match Map.tryFind vi uniformMap with
+                    | Some n -> Some (Expr.Var n)
+                    | _ -> 
+                        match Map.tryFind vi.Name l.inputs with
+                            | Some i -> 
+                                match Map.tryFind vi.Name inputs with
+                                    | Some v -> v |> Expr.Var |> Some
+                                    | _ -> None
+                            | None -> None
+            )
 //
 //        let b0 = b0.Substitute(fun vi -> 
 //                    match Map.tryFind vi.Name outputs with
