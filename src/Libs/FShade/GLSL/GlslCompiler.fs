@@ -954,19 +954,32 @@ module GLSL =
                     return! compileVariableDeclaration t name None
         }
 
+    let private uniqueMap (s : seq<Type * string>) =
+        let mutable res = Map.empty
+        for (t,n) in s do
+            match Map.tryFind n res with
+                | Some t' when t' <> t -> 
+                    failwithf "[FShade] detected uniform '%s' with conflicting types: %A vs %A" n t t'
+                | _ ->
+                     res <- Map.add n t res
+
+        res
+
     let private compileUniforms (uniforms : Map<UniformScope, list<Type * string>>) =
         compile {
             let! config = config
 
+            let uniforms = uniforms |> Map.map (fun s l -> l |> uniqueMap)
+
             let textures = 
                 uniforms 
                     |> Map.toSeq 
-                    |> Seq.collect (fun (_,elements) -> elements |> Seq.filter(function ((SamplerType _),_) -> true | _ -> false))
+                    |> Seq.collect (fun (_,elements) -> elements |> Map.toSeq |> Seq.filter(function (_,(SamplerType _)) -> true | _ -> false))
                     |> Seq.toList
 
             let uniformBuffers =
                 uniforms
-                    |> Map.map (fun scope elements -> elements |> List.filter (function (SamplerType(_),_) -> false | _ -> true))
+                    |> Map.map (fun scope elements -> elements |> Map.toList |> List.filter (function (_,SamplerType(_)) -> false | _ -> true))
                     |> Map.filter (fun _ e -> not <| List.isEmpty e)
 
             let! ds = 
@@ -993,7 +1006,7 @@ module GLSL =
                                     return ""
                         }
 
-                    let! elements = elements |> Seq.mapC (fun (t,n) ->
+                    let! elements = elements |> Seq.mapC (fun (n,t) ->
                         compile {
                             let prefix = ""
 //                                if config.createRowMajorMatrices then
@@ -1028,7 +1041,7 @@ module GLSL =
 
                 })
 
-            let! textureDecls = textures |> Seq.mapCi (fun i (t,n) ->
+            let! textureDecls = textures |> Seq.mapCi (fun i (n,t) ->
                 compile {
                     let! textureLayoutPrefix =
                         compile {
@@ -1057,6 +1070,7 @@ module GLSL =
 
             return (String.concat "\r\n" bufferDecls) + (String.concat "\r\n" textureDecls)
         }
+
 
     let private compileShader (entryName : string) (s : Shader) =
         compile {

@@ -222,6 +222,7 @@ module SequentialComposition =
                         | Some l, Some r -> transform { let! fs = composeBinarySimple l r in return Some fs }
                         | None, None -> transform { return None }
 
+
             return { vertexShader = vs; geometryShader = gs; tessControlShader = tcs; tessEvalShader = tev; fragmentShader = fs; originals = List.concat [l.originals; r.originals] }
         }
 
