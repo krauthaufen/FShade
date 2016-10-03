@@ -38,12 +38,22 @@ module Renaming =
                         let! b = sequentialVariableNamesInternal b
                         return Expr.Let(newVar, value, b)
 
+                | ExprShape.ShapeLambda(v,b) ->
+                    let! n = getUniqueName v.Name
+                    if n = v.Name then
+                        let! b = sequentialVariableNamesInternal b
+                        return Expr.Lambda(v,b)
+                    else
+                        let newVar = Var(n, v.Type, v.IsMutable)
+                        let b = b.Substitute(fun vi -> if vi = v then newVar |> Expr.Var |> Some else None)
+                        let! b = sequentialVariableNamesInternal b
+                        return Expr.Lambda(newVar, b)
+
                 | ExprShape.ShapeCombination(o, args) -> 
                     let! args = args |> List.mapC sequentialVariableNamesInternal
                     return ExprShape.RebuildShapeCombination(o, args)
-                | ExprShape.ShapeLambda(v,b) ->
-                    let! b = sequentialVariableNamesInternal b
-                    return Expr.Lambda(v,b)
+
+
                 | _ -> return e
         }
 
@@ -86,6 +96,7 @@ module Renaming =
     /// languages not supporting that. sequentialVariableNames applies sequential names
     /// to all colliding definitions by adding a numbered suffix.
     /// </summary>
-    let sequentialVariableNames (e : Expr) =
-        let m = sequentialVariableNamesInternal e
-        liftWithUserState { indices = Map.empty } m
+    let sequentialVariableNames (args : list<Var>) (e : Expr) =
+        let comp = sequentialVariableNamesInternal e
+        let map = args |> List.map (fun v -> v.Name, 1) |> Map.ofList
+        liftWithUserState { indices = map } comp

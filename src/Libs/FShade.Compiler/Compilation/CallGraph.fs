@@ -18,7 +18,7 @@ module CallGraph =
 
     let compileFunction (name : string) (args : list<Var>) (body : Expr) =
         compile {
-            let! body = sequentialVariableNames body
+            let! body = sequentialVariableNames args body
             
             
 
