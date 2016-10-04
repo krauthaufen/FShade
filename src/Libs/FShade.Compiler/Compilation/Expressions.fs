@@ -312,7 +312,7 @@ module Expressions =
                             let! i = compileExpression lastExpression false ifTrue
                             let! e = compileExpression lastExpression false ifFalse
 
-                            return sprintf "(%s) ? (%s) : (%s)" c i e
+                            return sprintf "((%s) ? (%s) : (%s))" c i e
                     else
                         let! i = compileExpression lastExpression true ifTrue
                         let! e = compileExpression lastExpression true ifFalse
