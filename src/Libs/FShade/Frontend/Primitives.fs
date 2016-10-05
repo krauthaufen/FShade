@@ -154,3 +154,7 @@ module Primitives =
     let inline ddx< ^a when ^a : (static member (-) : ^a -> ^a -> ^a) > (v : ^a) : ^a = failwith "_"
     let inline ddy< ^a when ^a : (static member (-) : ^a -> ^a -> ^a) > (v : ^a) : ^a = failwith "_"
     let discard () : unit = failwith "_"
+
+
+    let getInnerTessLevel (i : int) : float = failwith ""
+    let getOuterTessLevel (i : int) : float = failwith ""

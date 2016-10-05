@@ -413,6 +413,8 @@ module GLSL =
                         | MethodQuote <@ LanguagePrimitives.IntrinsicFunctions.SetArray @> [_] -> return Some "{0}[{1}] = {2}"
                         | MethodQuote <@ emitVertex @> [] -> return Some "EmitVertex();\r\n"
                         | MethodQuote <@ discard @> [] -> return Some "discard;\r\n"
+                        | MethodQuote <@ getInnerTessLevel @> _ -> return Some "gl_TessLevelInner[{0}]"
+                        | MethodQuote <@ getOuterTessLevel @> _ -> return Some "gl_TessLevelOuter[{0}]"
                         | MethodQuote <@ ddx<int> @> _ -> return Some "dFdx({0})"
                         | MethodQuote <@ ddy<int> @> _ -> return Some "dFdy({0})"
                         | MethodQuote <@ endPrimitive @> _ -> return Some "EndPrimitive()"
