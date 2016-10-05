@@ -83,7 +83,9 @@ module BuilderCompilation =
                             | _ -> -1                
 
                     if index < 0 then
-                        return! error "invalid input property" 
+                        let! body = removeBuilderCallsInternal body
+                        return Expr.Let(v, Expr.PropertyGet(p, pi, []), body)
+                        //return! error "invalid input property" 
                     else
                         let i = Expr.Value(index)
                         let vi = Var(v.Name, typeof<int>)

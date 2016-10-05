@@ -105,14 +105,17 @@ module Primitives =
 
 
 
-    type Patch3<'a> = Patch4 of 'a * 'a * 'a with
+    type Patch3<'a> = Patch3 of 'a * 'a * 'a with
         interface Primitive<'a>
 
         member x.Item
             with get (i : int) : 'a = shaderOnlyAccess()
 
+        [<PrimitiveIndex(0)>]
         member x.P0 : 'a = shaderOnlyAccess()
+        [<PrimitiveIndex(1)>]
         member x.P1 : 'a = shaderOnlyAccess()
+        [<PrimitiveIndex(2)>]
         member x.P2 : 'a = shaderOnlyAccess()
 
 
@@ -127,9 +130,14 @@ module Primitives =
         member x.Item
             with get (i : int) : 'a = shaderOnlyAccess()
 
+
+        [<PrimitiveIndex(0)>]
         member x.P0 : 'a = shaderOnlyAccess()
+        [<PrimitiveIndex(1)>]
         member x.P1 : 'a = shaderOnlyAccess()
+        [<PrimitiveIndex(2)>]
         member x.P2 : 'a = shaderOnlyAccess()
+        [<PrimitiveIndex(3)>]
         member x.P3 : 'a = shaderOnlyAccess()
 
         member x.TessCoord : V3d = shaderOnlyAccess()
