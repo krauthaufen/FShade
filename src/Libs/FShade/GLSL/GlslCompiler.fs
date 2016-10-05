@@ -1406,7 +1406,7 @@ module GLSL =
                                                 let unused = 
                                                     tev.outputs 
                                                         |> Map.filter (fun k v -> not <| Map.containsKey k gsUsed)
-                                                        |> removeIntrinsics tev.shaderType (Some Fragment)
+                                                        |> removeIntrinsics tev.shaderType (Some nextStage)
                                                         |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
 
                                                 let tev = addOutputs additional tev
