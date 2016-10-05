@@ -1392,6 +1392,12 @@ module GLSL =
                 result
 
 
+
+            let nextStage =
+                match e.geometryShader with
+                    | Some _ -> ShaderType.Geometry(None, OutputTopology.TriangleStrip)
+                    | _ -> ShaderType.Fragment
+
             let! tessUsed, tessCode = match e.tessControlShader, e.tessEvalShader with
                                         | None, None -> compile { return gsUsed, None }
                                         | Some tcs, Some tev ->
@@ -1451,8 +1457,8 @@ module GLSL =
                                                 let newTcs = substitute tcs.body
                                                 let tcs = { tcs with body = newTcs }
 
-                                                let tev = adjustToConfig config tev (Some Vertex) (Some Fragment)
-                                                let tcs = adjustToConfig config tcs (Some Vertex) (Some Fragment)
+                                                let tcs = adjustToConfig config tcs (Some Vertex) (Some TessEval)
+                                                let tev = adjustToConfig config tev (Some TessControl) (Some nextStage)
 
 
                                                 let! tevc = compileShader "TEV" tev
@@ -1493,6 +1499,11 @@ module GLSL =
 
             do! resetCompilerState
 
+            let nextStage =
+                match e.tessControlShader with
+                    | Some _ -> TessControl
+                    | _ -> nextStage
+
             let! vsCode = compile {
                             let vs = 
                                 match e.vertexShader with
@@ -1502,15 +1513,15 @@ module GLSL =
                             let additional = tessUsed |> Map.filter (fun k _ -> not <| Map.containsKey k vs.outputs)
                             let vs = addOutputs additional vs
 
-                            let nextShader = (if hasgs then Geometry(None, TriangleStrip) else Fragment) |> Some
+                            //let nextShader = (if hasgs then Geometry(None, TriangleStrip) else Fragment) |> Some
                             let unused = 
                                 vs.outputs |> Map.filter (fun k v -> not <| Map.containsKey k tessUsed) 
-                                 |> removeIntrinsics vs.shaderType nextShader
+                                 |> removeIntrinsics vs.shaderType (Some nextStage)
                                  |> Seq.map(fun (KeyValue(k,(_,v))) -> v) |> Set.ofSeq
 
                             let vs = removeOutputs unused vs
 
-                            let vs = adjustToConfig config vs None nextShader
+                            let vs = adjustToConfig config vs None (Some nextStage)
                             
                             let! vsc = compileShader "VS" vs
 
