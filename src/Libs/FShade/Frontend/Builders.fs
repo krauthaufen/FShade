@@ -36,6 +36,8 @@ module Intrinsics =
     let Depth = "Depth"
     [<Literal>] 
     let Color = "Colors"
+    [<Literal>] 
+    let SecondaryColor = "Color2"
 
     [<Literal>] 
     let TessLevelInner = "TessLevelInner"
@@ -73,6 +75,7 @@ module InstrinsicAttributes =
     type TessCoordAttribute() = inherit SemanticAttribute(Intrinsics.TessCoord)
     type DepthAttribute() = inherit SemanticAttribute(Intrinsics.Depth)
     type ColorAttribute() = inherit SemanticAttribute(Intrinsics.Color)
+    type SecondaryColorAttribute() = inherit SemanticAttribute(Intrinsics.SecondaryColor)
     type TessLevelInnerAttribute() = inherit SemanticAttribute(Intrinsics.TessLevelInner)
     type TessLevelOuterAttribute() = inherit SemanticAttribute(Intrinsics.TessLevelOuter)
     type FrontFacingAttribute() = inherit SemanticAttribute(Intrinsics.FrontFacing)

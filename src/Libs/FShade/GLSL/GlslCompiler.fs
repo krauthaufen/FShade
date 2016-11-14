@@ -226,6 +226,7 @@ module GLSL =
                         match t with
                             | Bool -> return Some "bool"
                             | Int32 -> return Some "int"
+                            | UInt32 -> return Some "uint"
                             | Float32 -> return Some "float"
                             | Float64 -> return Some "float"
                             | Unit -> return Some "void"
@@ -314,6 +315,10 @@ module GLSL =
                         | Method("Log", [Num]) -> return Some "log({0})"
                         | Method("Log2", [Num]) -> return Some "log2({0})"
 
+                        | Method("IntBitsToFloat", [Integral|Vector]) -> return Some "intBitsToFloat({0})"
+                        | Method("UintBitsToFloat", [Integral|Vector]) -> return Some "uintBitsToFloat({0})"
+                        | Method("FloatBitsToInt", [Num|Vector]) -> return Some "floatBitsToInt({0})"
+                        | Method("FloatBitsToUint", [Num|Vector]) -> return Some "floatBitsToUint({0})"
 
                         | MethodQuote <@ abs @> _ -> return Some "abs({0})"
                         | MethodQuote <@ acos @> _ -> return Some "acos({0})"
