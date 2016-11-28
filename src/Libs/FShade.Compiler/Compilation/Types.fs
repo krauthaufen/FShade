@@ -37,7 +37,7 @@ module Types =
                                 if FSharpTypeExt.IsTuple t then
                                     let! argTypes = FSharpTypeExt.GetTupleElements t |> Seq.mapC compileType
                                     let argTypes = argTypes |> Seq.map saneTypeName
-                                    return sprintf "tup_%s" (String.concat "_" argTypes)
+                                    return sprintf "tup_%s" (String.concat "" argTypes)
                                 else
                                     //could use FSharpTypeExt.IsFunction here but that seems to be extremely slow.
                                     if t.Name.StartsWith "FSharpFunc" then
