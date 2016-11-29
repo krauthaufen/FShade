@@ -29,6 +29,61 @@ module ExprUtilities =
 
         Range1i(min, max)
 
+//
+//    let rec evaluateConstants (constants : Map<Var, obj>) (e : Expr) =
+//        match e with
+//            | Value(v, t) -> 
+//                e
+//
+//            | Var(v) ->
+//                match Map.tryFind v constants with
+//                    | Some value -> Expr.Value(value, v.Type)
+//                    | None -> e
+//
+//            | Let(v, expr, body) ->
+//                let expr = evaluateConstants constants expr
+//                match expr with
+//                    | Value(o,t) -> 
+//                        if v.IsMutable then evaluateConstants constants body
+//                        else evaluateConstants (Map.add v o constants) body
+//
+//                    | _ -> 
+//                        Expr.Let(v, expr, evaluateConstants constants body)
+//
+//            | IfThenElse(cond, i, e) ->
+//                match evaluateConstants constants cond with
+//                    | Call(None, Method("op_Equality",_), ([Value(value,_);Var(v)]|[Var(v);Value(value,_)])) when not v.IsMutable ->
+//                        Expr.IfThenElse(cond, evaluateConstants (Map.add v value constants) i, evaluateConstants constants e)
+//
+//                    | Call(None, Method("op_Inequality",_), ([Value(value,_);Var(v)]|[Var(v);Value(value,_)])) when not v.IsMutable ->
+//                        Expr.IfThenElse(cond, evaluateConstants constants i, evaluateConstants (Map.add v value constants) e)
+//
+//                    | Value(v,_) -> 
+//                        if unbox v then evaluateConstants constants i
+//                        else evaluateConstants constants e
+//
+//                    | cond ->
+//                        Expr.IfThenElse(cond, evaluateConstants constants i, evaluateConstants constants e)
+//
+//            | WhileLoop(guard, body) ->
+//                let guard = evaluateConstants constants guard
+//                match guard with
+//                    | Value(v,_) ->
+//                        if unbox v then failwith "nontermination detected"
+//                        else Expr.Value(())
+//                    | guard ->
+//                        Expr.WhileLoop(guard, evaluateConstants constants body)
+//
+//            | Sequential(Call(None, Method("unroll",_), []), ForIntegerRangeLoop(v, s, e, body)) ->
+//                let s = evaluateConstants constants s
+//                let e = evaluateConstants constants e
+//                
+//
+//            | ForIntegerRangeLoop(v, s, e, body) ->
+//                let s = evaluateConstants constants s
+//                let e = evaluateConstants constants e
+//                Expr.ForIntegerRangeLoop(v, s, e, evaluateConstants constants body)
+//
 
     let rec estimateNumberOfCallsTo (mi : MethodInfo) (e : Expr) =
         

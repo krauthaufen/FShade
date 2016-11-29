@@ -128,24 +128,29 @@ module Builders =
             member x.ShaderType = ShaderType.Fragment
 
     type GeometryBuilder(size : Option<int>, top : OutputTopology) =
-        member x.For(a : Arr<'d, 'a>, f : 'a -> unit) : unit =
-            for i in a do f i
+        member x.For(a : Arr<'d, 'a>, f : 'a -> seq<Primitive<'b>>) : seq<Primitive<'b>> =
+            a |> Seq.collect f
 
-        member x.For(a : seq<'a>, f : 'a -> unit) : unit =
-            for i in a do f i
+        member x.For(a : seq<'a>, f : 'a -> seq<Primitive<'b>>) : seq<Primitive<'b>> =
+            a |> Seq.collect f
 
         member x.Size = size
 
-        member x.Yield(v : 'a) : seq<Primitive<'a>> = failwith ""
+        member x.Yield(v : 'a) : seq<Primitive<'a>> = 
+            failwith ""
+
         member x.For(p : Primitive<'a>, f : 'a -> seq<Primitive<'b>>) : seq<Primitive<'b>> =
             failwith ""
+
         member x.Delay(f : unit -> 'a) = f()
+
         member x.Quote() = ()
 
         member x.Combine(l : seq<Primitive<'a>>, r : seq<Primitive<'a>>) : seq<Primitive<'a>> =
             failwith ""
 
-        member x.Zero() : seq<Primitive<'a>> = Seq.empty
+        member x.Zero() : seq<Primitive<'a>> = 
+            Seq.empty
 
         interface IShaderBuilder with
             member x.ShaderType = ShaderType.Geometry (size, top)
