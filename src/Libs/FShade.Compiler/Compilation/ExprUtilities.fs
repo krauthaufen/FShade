@@ -105,7 +105,7 @@ module ExprUtilities =
             | ForIntegerRangeLoop(v, Value((:? int as min), _), Value((:? int as max), _), body) ->
                 let inner = estimateNumberOfCallsTo mi body
 
-                let cnt = max - min
+                let cnt = 1 + max - min
                 Range1i(cnt * inner.Min, cnt * inner.Max)
 
             | ForIntegerRangeLoop(v, min, max, body) ->
