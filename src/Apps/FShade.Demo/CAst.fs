@@ -409,7 +409,7 @@ module CExpr =
                     return CExpr.CItem(t, index)
 
                 | NewObject(ctor, args) ->
-                    
+                    return failwith "not implemented"
 
                 | e -> 
                     return! CompilerState.asFunction e
