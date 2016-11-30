@@ -94,21 +94,24 @@ module ShaderState =
         transform {
             let! s = compilerState
             
-
             match HashMap.tryFind uniform s.uniforms with
-                | None -> match uniform with
-                            | Attribute(_,t,n) -> let v = Var(n, t)
-                                                  do! addUniform uniform v
-                                                  return v
-                            | UserUniform(t,e) -> 
-                                let! res = getUserUniform t e
-                                do! addUniform uniform res
-                                return res
+                | None -> 
+                    match uniform with
+                        | Attribute(_,t,n) -> 
+                            let v = Var(n, t)
+                            do! addUniform uniform v
+                            return v
 
-                            | SamplerUniform(t,sem, n,sam) ->
-                                let v = Var(n, t)
-                                do! addUniform uniform v
-                                return v
+                        | UserUniform(t,e) -> 
+                            let! res = getUserUniform t e
+                            do! addUniform uniform res
+                            return res
 
-                | Some v -> return v
+                        | SamplerUniform(t, sem, n, sam) ->
+                            let v = Var(n, t)
+                            do! addUniform uniform v
+                            return v
+
+                | Some v -> 
+                    return v
         }

@@ -212,13 +212,10 @@ module BuilderCompilation =
         }
 
     let removeBuilderCalls (e : Expr) =
-        transform {
-            let! e = match e with
-                        | Application(Lambda(var,b),value) ->
-                            b.Substitute(fun vi -> if vi = var then Some value else None) |> removeBuilderCallsInternal
+        match e with
+            | Application(Lambda(var,b),value) ->
+                b.Substitute(fun vi -> if vi = var then Some value else None) |> removeBuilderCallsInternal
 
-                        | _ -> removeBuilderCallsInternal e
-
-            return e
-        }
+            | _ -> 
+                removeBuilderCallsInternal e
 

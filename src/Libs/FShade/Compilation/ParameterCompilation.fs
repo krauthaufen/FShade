@@ -106,14 +106,17 @@ module ParameterCompilation =
     let rec substituteInputs (inputType : Type) (index : Option<Expr>) (e : Expr) =
         transform {
             match e with
-                | Input inputType (t,sem) -> match index with
-                                                | None -> let! v = getInput t sem
-                                                          return Expr.Var(v)
-                                                | Some i -> let! v = getInput (t.MakeArrayType()) sem
-                                                            return Expr.ArrayAccess(Expr.Var(v), i)
+                | Input inputType (t,sem) -> 
+                    match index with
+                        | None -> 
+                            let! v = getInput t sem
+                            return Expr.Var(v)
+
+                        | Some i -> 
+                            let! v = getInput (t.MakeArrayType()) sem
+                            return Expr.ArrayAccess(Expr.Var(v), i)
 
                 | ShapeCombination(o, args) ->
-                    
                     let! args = args |> List.mapC (substituteInputs inputType index)
                     return RebuildShapeCombination(o, args)
 

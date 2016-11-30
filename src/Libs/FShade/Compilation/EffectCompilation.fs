@@ -38,17 +38,20 @@ module EffectCompilation =
 
                     let uniforms  = state.uniforms |> HashMap.toList
 
-                    let builder = match state.builder with
-                                        | Some b -> 
-                                            match Expr.tryEval b with
-                                                | Some b -> b|> unbox<IShaderBuilder>
-                                                | None -> failwith "could not evaluate IShaderBuilder"
-                                        | None -> failwith ""
+                    let builder = 
+                        match state.builder with
+                            | Some b -> 
+                                match Expr.tryEval b with
+                                    | Some b -> b|> unbox<IShaderBuilder>
+                                    | None -> failwith "could not evaluate IShaderBuilder"
+                            | None -> 
+                                failwith "could not get builder"
 
 
                     return { shaderType = builder.ShaderType; uniforms = uniforms; inputs = state.inputs; outputs = state.outputs; body = body; inputTopology = inputTopology; debugInfo = None }
 
-                | _ -> return! error "not a function"
+                | _ -> 
+                    return! error "not a function"
         }
 
     let createPassingShader (prim : Type) (id : Var)=
@@ -185,3 +188,4 @@ module EffectCompilation =
           geometryShader = match newEffect.geometryShader with | Some (gs,t) -> Some ({ gs with debugInfo = Some info }, t) | _ -> None
           fragmentShader = shaderWithDebugInfo newEffect.fragmentShader info
           originals = newEffect.originals }
+
