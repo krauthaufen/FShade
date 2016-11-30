@@ -468,6 +468,7 @@ module CModule =
 
             let mutable initialState =
                 {
+                    backend         = null
                     cnames          = args |> List.map (fun a -> a, a.Name) |> Map.ofList
                     currentSuffixes = args |> List.map (fun a -> a.Name, 1) |> Map.ofList
                     usedTypes       = PSet.empty
