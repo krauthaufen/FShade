@@ -841,17 +841,30 @@ module NewStuff =
 [<EntryPoint>]
 let main argv = 
 
-    let evilShader (tri : Triangle<Dead.BillboardVertex>) =
-        triangle {
-            for v in tri do
-                yield { v with position = v.position - tri.P0.position }
-            
-        }
+//    let evilShader (tri : Triangle<Dead.BillboardVertex>) =
+//        triangle {
+//            for v in tri do
+//                yield { v with position = v.position - tri.P0.position }
+//            
+//        }
+//
+//
+//    let e = NewStuff.Effect.ofFunction (evilShader)
+//    printfn "%A" e
 
+    let testModule = 
+        FShade.Compiler.CModule.ofLambda "test" <@ fun (a : int) -> 
+            let x = 
+                let y = a * 3
+                y + 5
 
-    let e = NewStuff.Effect.ofFunction (evilShader)
-    printfn "%A" e
+            let mutable res = 0
+            for i in 0 .. x do
+                res <- res + 3
 
+            res
+        @>
+    printfn "%A" testModule
     Environment.Exit 0
 
 

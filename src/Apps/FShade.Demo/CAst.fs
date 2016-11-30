@@ -77,6 +77,9 @@ type CExpr =
     | CEqual of CExpr * CExpr
     | CNotEqual of CExpr * CExpr
 
+    | CNewVector of t : CTypeRef * d : int * components : list<CExpr>
+    | CNewMatrix of t : CTypeRef * rows : int * cols : int * components : list<CExpr>
+
     | CField of target : CExpr * fieldName : string
     | CItem of target : CExpr * index : CExpr 
 
@@ -134,6 +137,48 @@ open Microsoft.FSharp.Quotations.Patterns
 open Microsoft.FSharp.Quotations.DerivedPatterns
 open FShade.Utils
 
+
+[<AutoOpen>]
+module private Helpers = 
+    open System.Text.RegularExpressions
+
+    let rx = Regex @"(?<name>.*)`[0-9]+"
+
+
+
+    let rec typeName (t : Type) =
+        let selfName = 
+            if t.IsGenericType then
+                let m = rx.Match t.Name
+                let targs = t.GetGenericArguments() |> Seq.map typeName |> String.concat "_"
+                m.Groups.["name"].Value + "_" + targs
+            else
+                t.Name
+
+        if t.IsNested then (typeName t.DeclaringType) + "_" + selfName
+        else t.Namespace.Replace('.', '_') + "_" + selfName
+
+    let rec methodName (mi : MethodInfo) =
+        let selfName =
+            if mi.IsGenericMethod then
+                let m = rx.Match mi.Name
+                let targs = mi.GetGenericArguments() |> Seq.map typeName |> String.concat "_"
+                m.Groups.["name"].Value + "_" + targs
+            else
+                mi.Name
+        (typeName mi.DeclaringType) + "_" + selfName
+
+
+    let (|ArrOf|_|) (t : Type) =
+        if t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<Arr<_,_>> then
+            let targs = t.GetGenericArguments()
+            let len = targs.[0] |> getSize
+            let content = targs.[1]
+            Some(len, content)
+        else
+            None
+
+
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module CType =
     open Aardvark.Base.TypeInfo
@@ -160,38 +205,11 @@ module CType =
 
         ]
 
-    [<AutoOpen>]
-    module private Helpers = 
-        open System.Text.RegularExpressions
-
-        let rx = Regex @"(?<name>.*)`[0-9]+"
-
-        let typeCache =
-            let dict = System.Collections.Concurrent.ConcurrentDictionary<Type, CTypeRef>()
-            for (k,v) in Dictionary.toSeq primitiveTypes do
-                dict.[k] <- v
-            dict
-
-        let rec typeName (t : Type) =
-            let selfName = 
-                if t.IsGenericType then
-                    let m = rx.Match t.Name
-                    let targs = t.GetGenericArguments() |> Seq.map typeName |> String.concat "_"
-                    m.Groups.["name"].Value + "_" + targs
-                else
-                    t.Name
-
-            if t.IsNested then (typeName t.DeclaringType) + "_" + selfName
-            else t.Namespace.Replace('.', '_') + "_" + selfName
-
-        let (|ArrOf|_|) (t : Type) =
-            if t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<Arr<_,_>> then
-                let targs = t.GetGenericArguments()
-                let len = targs.[0] |> getSize
-                let content = targs.[1]
-                Some(len, content)
-            else
-                None
+    let private typeCache =
+        let dict = System.Collections.Concurrent.ConcurrentDictionary<Type, CTypeRef>()
+        for (k,v) in Dictionary.toSeq primitiveTypes do
+            dict.[k] <- v
+        dict
 
     let rec ofType (t : Type) : CTypeRef =
         typeCache.GetOrAdd(t, fun t ->
@@ -206,7 +224,7 @@ module CType =
 
 type ExternalFunction =
     | ExtMethod of MethodInfo
-    | ExtCustom of list<Var> * Expr
+    | ExtCustom of string * list<Var> * Expr
 
 [<AllowNullLiteral>]
 type IBackend =
@@ -238,22 +256,22 @@ module CompilerState =
             helperIndex     = 0
         }
 
-    let newCName (v : Var) =
+    let cName (v : Var) =
         state {
             let! s = State.get
-            match Map.tryFind v.Name s.currentSuffixes with
-                | Some i -> 
-                    let name = v.Name + (string i)
-                    do! State.put { s with currentSuffixes = Map.add v.Name (i + 1) s.currentSuffixes; cnames = Map.add v name s.cnames }
-                    return v.Name + (string i)
-
+            match Map.tryFind v s.cnames with
+                | Some n -> return n
                 | None ->
-                    do! State.put { s with currentSuffixes = Map.add v.Name 1 s.currentSuffixes; cnames = Map.add v v.Name s.cnames }
-                    return v.Name
-        }
+                    match Map.tryFind v.Name s.currentSuffixes with
+                        | Some i -> 
+                            let name = v.Name + (string i)
+                            do! State.put { s with currentSuffixes = Map.add v.Name (i + 1) s.currentSuffixes; cnames = Map.add v name s.cnames }
+                            return v.Name + (string i)
 
-    let getCName (v : Var) =
-        State.get |> State.map (fun s -> Map.find v s.cnames)
+                        | None ->
+                            do! State.put { s with currentSuffixes = Map.add v.Name 1 s.currentSuffixes; cnames = Map.add v v.Name s.cnames }
+                            return v.Name
+        }
 
     let useType (t : CTypeRef) =
         State.modify(fun s -> { s with usedTypes = PSet.add t s.usedTypes })
@@ -270,7 +288,7 @@ module CompilerState =
             let parameters = vars |> List.map (fun v -> { name = v.Name; ctype = CType.ofType v.Type; modifier = CParameterModifier.In }) |> List.toArray
             let signature = { name = name; parameters = parameters; returnType = CType.ofType e.Type }
 
-            do! State.put { s with helperIndex = s.helperIndex + 1; usedFunctions = HashMap.add signature (ExtCustom(vars, e)) s.usedFunctions }
+            do! State.put { s with helperIndex = s.helperIndex + 1; usedFunctions = HashMap.add signature (ExtCustom(name, vars, e)) s.usedFunctions }
 
             let args = 
                 vars 
@@ -286,13 +304,48 @@ module CVar =
     let ofVar (v : Var) : State<CompilerState, CVar> =
         state {
             let ctype = CType.ofType v.Type
-            let! name = CompilerState.getCName v
+            let! name = CompilerState.cName v
             return { name = name; ctype = ctype }
         }
-    
+
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module CExpr =
+    open Aardvark.Base.TypeInfo
+    open Aardvark.Base.TypeInfo.Patterns
+
+    let private vecFields =
+        let names =
+            Dictionary.ofList [
+                typeof<V2i>, ["X"; "Y"]
+                typeof<V3i>, ["X"; "Y"; "Z"]
+                typeof<V4i>, ["X"; "Y"; "Z"; "W"]
+                typeof<V2f>, ["X"; "Y"]
+                typeof<V3f>, ["X"; "Y"; "Z"]
+                typeof<V4f>, ["X"; "Y"; "Z"; "W"]
+                typeof<V2d>, ["X"; "Y"]
+                typeof<V3d>, ["X"; "Y"; "Z"]
+                typeof<V4d>, ["X"; "Y"; "Z"; "W"]
+                typeof<V2l>, ["X"; "Y"]
+                typeof<V3l>, ["X"; "Y"; "Z"]
+                typeof<V4l>, ["X"; "Y"; "Z"; "W"]
+
+                
+                typeof<C3b>, ["R"; "G"; "B"]
+                typeof<C4b>, ["R"; "G"; "B"; "A"]
+                typeof<C3us>, ["R"; "G"; "B"]
+                typeof<C4us>, ["R"; "G"; "B"; "A"]
+                typeof<C3ui>, ["R"; "G"; "B"]
+                typeof<C4ui>, ["R"; "G"; "B"; "A"]
+                typeof<C3f>, ["R"; "G"; "B"]
+                typeof<C4f>, ["R"; "G"; "B"; "A"]
+                typeof<C3d>, ["R"; "G"; "B"]
+                typeof<C4d>, ["R"; "G"; "B"; "A"]
+            ]
+
+        names  |> Dictionary.map (fun t n ->
+            n |> List.map (fun n -> t.GetField(n)) |> List.toArray
+        )
 
     let rec ofExpr (e : Expr) =
         state {
@@ -329,7 +382,13 @@ module CExpr =
                         | Some v -> 
                             return CExpr.CValue(ct, v)
                         | None ->
-                            return failwith "not implemented"
+                            match vecFields.TryGetValue t with
+                                | (true, fields) -> 
+                                    let! values = fields |> Array.toList |> List.mapS (fun f -> Expr.Value(f.GetValue(v), f.FieldType) |> ofExpr)
+                                    return CNewVector(ct, fields.Length, values)
+
+                                | _ ->
+                                    return failwith "not implemented"
 
                 | Call(None, mi, args) ->
                     let! args = args |> List.mapS ofExpr
@@ -362,7 +421,8 @@ module CExpr =
 
                         | _ -> 
                             let! s = State.get
-                            match s.backend.CompileIntrinsicFunction mi with
+                            let intrinsic = if isNull s.backend then None else s.backend.CompileIntrinsicFunction mi
+                            match intrinsic with
                                 | Some fmt -> 
                                     return fmt (List.toArray args)
                                 | None -> 
@@ -411,56 +471,171 @@ module CExpr =
                 | NewObject(ctor, args) ->
                     return failwith "not implemented"
 
+
+
                 | e -> 
                     return! CompilerState.asFunction e
         }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module CStatement =
-    let rec ofExpr (e : Expr) =
+    let rec ofExprInternal (last : bool) (e : Expr) =
+        let ret (s : CStatement) =
+            if last then CSequential[s; CReturn]
+            else s
+
         state {
             match e with
                 | VarSet(v, value) ->
                     let! var = CVar.ofVar v
                     let! value = CExpr.ofExpr value
 
-                    return CWrite(CLExpr.CVar var, value)
+                    return CWrite(CLExpr.CVar var, value) |> ret
 
                 | Value(null, u) when u = typeof<unit> ->
-                    return CNop
+                    if last then return CReturn
+                    else return CNop
 
                 | ForIntegerRangeLoop(v, min, max, body) ->
                     let! v = CVar.ofVar v
                     let! min = CExpr.ofExpr min
                     let! max = CExpr.ofExpr max
-                    let! body = ofExpr body
+                    let! body = ofExprInternal false body
 
                     return CFor(
                         CDeclare(v, Some min),              // int i = min
                         CLequal(CExpr.CVar v, max),         // i <= max
                         CPostIncrement(CLExpr.CVar v),      // i++
                         body
-                    )
+                    ) |> ret
 
                 | WhileLoop(guard, body) ->
                     let! guard = CExpr.ofExpr guard
-                    let! body = ofExpr body
-                    return CWhile(guard, body)
+                    let! body = ofExprInternal false body
+                    return CWhile(guard, body) |> ret
                     
                 | IfThenElse(guard, ifTrue, ifFalse) ->
                     let! guard = CExpr.ofExpr guard
-                    let! ifTrue = ofExpr ifTrue
-                    let! ifFalse = ofExpr ifFalse
+                    let! ifTrue = ofExprInternal last ifTrue
+                    let! ifFalse = ofExprInternal last ifFalse
                     return CIfThenElse(guard, ifTrue, ifFalse)
                     
+                | Sequential(l, r) ->
+                    let! l = ofExprInternal false l
+                    let! r = ofExprInternal last r
+                    return CSequential [l;r]
+
+                | Let(v, e, body) ->
+                    let! v = CVar.ofVar v
+                    let! e = CExpr.ofExpr e
+                    let! body = ofExprInternal last body
+                    return CSequential [CStatement.CDeclare(v, Some e); body]
+
+                | e when last ->
+                    let! v = CExpr.ofExpr e
+                    return CStatement.CReturnValue v
 
                 | _ ->
                     return failwith ""
         }
 
+    let ofExpr (e : Expr) =
+        ofExprInternal true e
+
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module CModule =
+
+    type private DefTree =
+        | DefNode of CDef * list<DefTree>
+
+    let rec private compileInternal (cache : Dict<ExternalFunction, DefTree>, state : byref<CompilerState>, f : ExternalFunction) =
+        match cache.TryGetValue f with
+            | (true, t) -> t
+            | _ -> 
+                let name, args, body =
+                    match f with
+                        | ExtCustom(name, args, body) -> name, args, body
+                        | ExtMethod mi ->
+                            let name = methodName mi
+                            match Expr.TryGetReflectedDefinition mi with
+                                | Some def ->
+                                    match def with
+                                        | Lambdas(args, body) -> name, List.concat args, body
+                                        | b -> name, [], b
+
+                                | None -> 
+                                    failwithf "no reflected definition for %A" mi
+
+                let parTypes = args |> List.map (fun a -> a.Type |> CType.ofType)
+                let ret = CType.ofType body.Type
+                let body = CStatement.ofExpr body
+
+                
+                let mutable initialState =
+                    {
+                        state with
+                            cnames          = args |> List.map (fun a -> a, a.Name) |> Map.ofList
+                            currentSuffixes = args |> List.map (fun a -> a.Name, 1) |> Map.ofList
+                            usedFunctions   = HashMap.empty
+                    }
+
+                let body = body.Run(&initialState)
+
+                let signature =
+                    { 
+                        name        = name
+                        returnType  = ret
+                        parameters  = List.map2 (fun (v : Var) (ct : CTypeRef) -> { name = v.Name; ctype = ct; modifier = CParameterModifier.In }) args parTypes |> List.toArray
+                    }
+
+                let used =
+                    initialState.usedFunctions 
+                        |> HashMap.toSeq
+                        |> Seq.map (fun (signature, def) ->
+                            compileInternal(cache, &initialState, def)
+                        )
+                        |> Seq.toList
+
+                let t = DefNode(CDef.CFunction(signature, body), used)
+                cache.[f] <- t
+                t
+
+    let ofLambda (name : string) (e : Expr) : CModule =
+        let args, body = 
+            match e with
+                | Lambdas(args, body) -> List.concat args, body
+                | b -> [], b
+
+        let mutable initialState =
+            {
+                backend         = null
+                cnames          = Map.empty
+                currentSuffixes = Map.empty
+                usedTypes       = PSet.empty
+                usedFunctions   = HashMap.empty
+                helperIndex     = 0
+            }
+
+        let tree = compileInternal(Dict(), &initialState, ExtCustom(name, args, body))
+
+        let rec flatten (DefNode(self, children)) =
+            (children |> List.collect flatten) @ [self]
+
+        flatten tree
+
     let ofFunctions (functions : list<string * list<Var> * Expr>) : CModule =
+        let mutable initialState =
+            {
+                backend         = null
+                cnames          = Map.empty
+                currentSuffixes = Map.empty
+                usedTypes       = PSet.empty
+                usedFunctions   = HashMap.empty
+                helperIndex     = 0
+            }
+
+
+
         functions |> List.map (fun (name, args, body) ->
             let parTypes = args |> List.map (fun a -> a.Type |> CType.ofType)
             let ret = CType.ofType body.Type
