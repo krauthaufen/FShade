@@ -838,6 +838,10 @@ module NewStuff =
         let inline ofFunction (f : 'a -> Expr<'b>) =
             Shader.ofFunction f |> ofShader
 
+
+type Bla = { a : int; b : int }
+type Blubb = Sepp of int | Heinz of float
+
 [<EntryPoint>]
 let main argv = 
 
@@ -854,15 +858,7 @@ let main argv =
 
     let testModule = 
         FShade.Compiler.CModule.ofLambda "test" <@ fun (a : int) -> 
-            let x = 
-                let y = a * 3
-                y + 5
-
-            let mutable res = 0
-            for i in 0 .. x do
-                res <- res + 3
-
-            res
+            (Sepp a, 1)
         @>
     printfn "%A" testModule
     Environment.Exit 0
