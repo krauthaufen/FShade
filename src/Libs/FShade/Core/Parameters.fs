@@ -18,7 +18,15 @@ module Parameters =
         [<NoComparison>]
         type Uniform = Attribute of UniformScope * Type * string
                      | SamplerUniform of Type * string * string * SamplerState
-                     | UserUniform of Type * obj
+                     | SamplerArray of Type * int * string * list<string * SamplerState>
+                     | UserUniform of Type * obj with
+
+                member x.Type =
+                    match x with
+                        | Attribute(_,t,_) -> t
+                        | SamplerUniform(t,_,_,_) -> t
+                        | UserUniform(t,_) -> t
+                        | SamplerArray(t,_,_,_) -> t
 
         and UniformScope(parent : Option<UniformScope>, name : string) = 
             let id = System.Threading.Interlocked.Increment(&id)

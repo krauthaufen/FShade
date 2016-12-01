@@ -16,6 +16,31 @@ module ParameterCompilation =
     open FShade.Parameters.Uniforms
     open Aardvark.Base.TypeInfo.Patterns
 
+    module private Peano = 
+        let private peanoTypes =
+            let s = typedefof<S<_>>
+            Seq.initInfinite id 
+                |> Seq.scan (fun last _ -> s.MakeGenericType [|last|]) typeof<Z>
+                |> Seq.cache
+
+        let getPeanoType (i : int) =
+            Seq.item i peanoTypes
+
+        let getArrayType (i : int) (content : Type) =
+            typedefof<Arr<_,_>>.MakeGenericType [| getPeanoType i; content |]
+           
+
+
+
+    let (|ArrayOf|_|) (t : Type) =
+        if t.IsArray then Some(t.GetElementType())
+        else None
+
+
+    let (|ArrOf|_|) (t : Type) =
+        if t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<Arr<_,_>> then Some (t.GetGenericArguments().[1])
+        else None
+
     let (|Uniform|_|) (e : Expr) =
         match detectUniform e with
             | Some u -> Uniform(u) |> Some
@@ -27,15 +52,27 @@ module ParameterCompilation =
                             | SamplerType(_) ->
                                 match Expr.tryEval e with
                                     | Some sam ->
-                                        let t = sam.GetType()
-                                        match t with
-                                            | SamplerType(_) ->
-                                                let sam = sam |> unbox<ISampler>
-                                                let tex = sam.Texture
-                                                let textureUniform = SamplerUniform(t, tex.Semantic, pi.Name, sam.State)
-                                                Uniform(textureUniform) |> Some
-                                            | _ -> None
+                                        let sam = sam |> unbox<ISampler>
+                                        let tex = sam.Texture
+                                        let textureUniform = SamplerUniform(sam.GetType(), tex.Semantic, pi.Name, sam.State)
+                                        Uniform(textureUniform) |> Some
                                     | None -> None
+
+                            | ArrayOf((SamplerType _ as t)) ->
+                                match Expr.tryEval e with
+                                    | Some sam ->
+                                        let arr = sam |> unbox<Array>
+                                        let samplers = 
+                                            List.init arr.Length (fun i -> 
+                                                let sam1 = arr.GetValue i |> unbox<ISampler>
+                                                let tex = sam1.Texture
+                                                tex.Semantic, sam1.State
+                                            )
+
+                                        let t = Peano.getArrayType arr.Length t
+                                        Some (SamplerArray(t, arr.Length, pi.Name, samplers))
+                                    | None -> None
+
                             | _ -> None
 
                     | Call(None, Method("op_Dynamic", [UniformScopeType; String]), [scope; Value(s,_)]) ->
