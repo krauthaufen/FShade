@@ -176,7 +176,13 @@ module private Helpers =
 
     let rec typeName (t : Type) =
         typeNameCache.GetOrAdd(t, fun t ->
-            if FSharpTypeExt.IsTuple t then
+            if t.IsArray then
+                "arr" + typeName(t.GetElementType())
+
+            elif t.IsByRef then
+                typeName(t.GetElementType())
+
+            elif FSharpTypeExt.IsTuple t then
                 let elements = FSharpTypeExt.GetTupleElements t |> Seq.map typeName |> String.concat "_"
                 "tup_" + elements
 
