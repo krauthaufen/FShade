@@ -97,6 +97,8 @@ module TypeGraph =
                                                             let! fieldType = compileType t
                                                             return (fieldType, n, None, ValueArgument)
                                                         })
+
+
                                         return! compileFunctionDeclaration typeName name args body
                                     }
                              )

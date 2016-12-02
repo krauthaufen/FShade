@@ -61,11 +61,11 @@
     <Compile Include="Compilation\Types.fs" />
     <Compile Include="Compilation\Methods.fs" />
     <Compile Include="Compilation\Expressions.fs" />
+    <Compile Include="Compilation\ExprUtilities.fs" />
     <Compile Include="Compilation\LambdaFunctions.fs" />
     <Compile Include="Compilation\CallGraph.fs" />
     <Compile Include="Compilation\TypeGraph.fs" />
     <Compile Include="Compilation\Main.fs" />
-    <Compile Include="Compilation\ExprUtilities.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />

@@ -5,6 +5,10 @@ open System.Reflection
 open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Quotations.Patterns
 
+open System.Reflection
+type Preprocessor private() =
+    static member unroll() = ()
+
 module ExprUtilities =
 
     let private (.+) (l : Range1i) (r : Range1i) =
@@ -29,61 +33,150 @@ module ExprUtilities =
 
         Range1i(min, max)
 
-//
-//    let rec evaluateConstants (constants : Map<Var, obj>) (e : Expr) =
-//        match e with
-//            | Value(v, t) -> 
-//                e
-//
-//            | Var(v) ->
-//                match Map.tryFind v constants with
-//                    | Some value -> Expr.Value(value, v.Type)
-//                    | None -> e
-//
-//            | Let(v, expr, body) ->
-//                let expr = evaluateConstants constants expr
-//                match expr with
-//                    | Value(o,t) -> 
-//                        if v.IsMutable then evaluateConstants constants body
-//                        else evaluateConstants (Map.add v o constants) body
-//
-//                    | _ -> 
-//                        Expr.Let(v, expr, evaluateConstants constants body)
-//
-//            | IfThenElse(cond, i, e) ->
-//                match evaluateConstants constants cond with
-//                    | Call(None, Method("op_Equality",_), ([Value(value,_);Var(v)]|[Var(v);Value(value,_)])) when not v.IsMutable ->
-//                        Expr.IfThenElse(cond, evaluateConstants (Map.add v value constants) i, evaluateConstants constants e)
-//
-//                    | Call(None, Method("op_Inequality",_), ([Value(value,_);Var(v)]|[Var(v);Value(value,_)])) when not v.IsMutable ->
-//                        Expr.IfThenElse(cond, evaluateConstants constants i, evaluateConstants (Map.add v value constants) e)
-//
-//                    | Value(v,_) -> 
-//                        if unbox v then evaluateConstants constants i
-//                        else evaluateConstants constants e
-//
-//                    | cond ->
-//                        Expr.IfThenElse(cond, evaluateConstants constants i, evaluateConstants constants e)
-//
-//            | WhileLoop(guard, body) ->
-//                let guard = evaluateConstants constants guard
-//                match guard with
-//                    | Value(v,_) ->
-//                        if unbox v then failwith "nontermination detected"
-//                        else Expr.Value(())
-//                    | guard ->
-//                        Expr.WhileLoop(guard, evaluateConstants constants body)
-//
-//            | Sequential(Call(None, Method("unroll",_), []), ForIntegerRangeLoop(v, s, e, body)) ->
-//                let s = evaluateConstants constants s
-//                let e = evaluateConstants constants e
-//                
-//
-//            | ForIntegerRangeLoop(v, s, e, body) ->
-//                let s = evaluateConstants constants s
-//                let e = evaluateConstants constants e
-//                Expr.ForIntegerRangeLoop(v, s, e, evaluateConstants constants body)
-//
+
+    let private isValue (e : Expr) =
+        match e with
+            | Value _ -> true
+            | _ -> false
+
+    let private getValue(e : Expr) =
+        match e with
+            | Value(o,_) -> o
+            | _ -> failwith "not a constant"
+
+    let rec evaluateConstants (constants : Map<Var, obj>) (e : Expr) =
+        match e with
+            | Sequential(Sequential(a, (Call(None, MethodQuote <@ Preprocessor.unroll : unit -> unit @> _, []) as b)), c) ->
+                Expr.Sequential(a, Expr.Sequential(b,c)) |> evaluateConstants constants
+
+            | Sequential((Call(None, MethodQuote <@ Preprocessor.unroll : unit -> unit @> _, []) as a), Sequential(b,c)) ->
+                Expr.Sequential(Expr.Sequential(a,b), c) |> evaluateConstants constants
+
+            // a value remains a value
+            | Value(v, t) -> 
+                e
+
+            // a variable is constant here iff we know a constant value
+            | Var(v) ->
+                match Map.tryFind v constants with
+                    | Some value -> Expr.Value(value, v.Type)
+                    | None -> e
+
+            // remove let-expressions whenever the value is constant
+            // and the variable is not mutable
+            | Let(v, expr, body) ->
+                let expr = evaluateConstants constants expr
+                match expr with
+                    | Value(o,t) -> 
+                        if v.IsMutable then Expr.Let(v, expr, evaluateConstants constants body)
+                        else evaluateConstants (Map.add v o constants) body
+                    | _ -> 
+                        Expr.Let(v, expr, evaluateConstants constants body)
+
+            // calls are constant iff all arguments are constant
+            | Call(target, mi, args) ->
+                let target =
+                    match target with
+                        | Some t -> Some (evaluateConstants constants t)
+                        | None -> None
+
+                let args = args |> List.map (evaluateConstants constants)
+
+                let allConstant = 
+                    match target with
+                        | Some t -> t :: args |> List.forall isValue
+                        | None -> args |> List.forall isValue
+                        
+                // only evaluate operators (TODO: find a good heuristic)
+                if allConstant && mi.Name.StartsWith "op_" then
+                    try
+                        let result = 
+                            match target with
+                                | Some t -> mi.Invoke(getValue t, args |> List.map getValue |> List.toArray)
+                                | None -> mi.Invoke(null, args |> List.map getValue |> List.toArray)
+                        Expr.Value(result, e.Type)
+
+                    with _ ->
+                        match target with
+                            | Some t -> Expr.Call(t, mi, args)
+                            | None -> Expr.Call(mi, args)
+                else
+                    match target with
+                        | Some t -> Expr.Call(t, mi, args)
+                        | None -> Expr.Call(mi, args)
+
+
+            // if then else is a little tricky
+            | IfThenElse(cond, i, e) ->
+                match evaluateConstants constants cond with
+
+                    | Call(None, Method("op_Equality",_), ([Value(value,_);Var(v)]|[Var(v);Value(value,_)])) when not v.IsMutable ->
+                        Expr.IfThenElse(cond, evaluateConstants (Map.add v value constants) i, evaluateConstants constants e)
+
+                    | Call(None, Method("op_Inequality",_), ([Value(value,_);Var(v)]|[Var(v);Value(value,_)])) when not v.IsMutable ->
+                        Expr.IfThenElse(cond, evaluateConstants constants i, evaluateConstants (Map.add v value constants) e)
+
+                    | Value(v,_) -> 
+                        if unbox v then evaluateConstants constants i
+                        else evaluateConstants constants e
+
+                    | cond ->
+                        Expr.IfThenElse(cond, evaluateConstants constants i, evaluateConstants constants e)
+
+            | WhileLoop(guard, body) ->
+                let guard = evaluateConstants constants guard
+                match guard with
+                    | Value(v,_) ->
+                        if unbox v then failwith "nontermination detected"
+                        else Expr.Value(())
+                    | guard ->
+                        Expr.WhileLoop(guard, evaluateConstants constants body)
+
+            | Sequential(Call(None, MethodQuote <@ Preprocessor.unroll : unit -> unit @> _, []), ForIntegerRangeLoop(v, s, e, body)) ->
+                let s = evaluateConstants constants s
+                let e = evaluateConstants constants e
+
+                match s, e with
+                    | Value(s,_), Value(e,_) ->
+                        let s = unbox<int> s
+                        let e = unbox<int> e
+
+                        if e < s then 
+                            Expr.Value(())
+                        else
+                            let mutable res = evaluateConstants (Map.add v (s :> obj) constants) body
+                            for i in s + 1 .. e do
+                                res <- Expr.Sequential(res, evaluateConstants (Map.add v (i :> obj) constants) body)
+
+                            res
+                    | _ ->
+                        Log.warn "[FShade] could not unroll loop"
+                        Expr.ForIntegerRangeLoop(v, s, e, evaluateConstants constants body)
+
+            | Sequential(a,b) ->
+                let a = evaluateConstants constants a
+                let b = evaluateConstants constants b
+                Expr.Sequential(a, b)
+  
+
+            | ForIntegerRangeLoop(v, s, e, body) ->
+                let s = evaluateConstants constants s
+                let e = evaluateConstants constants e
+                Expr.ForIntegerRangeLoop(v, s, e, evaluateConstants constants body)
+
+            | ExprShape.ShapeCombination(o, args) ->
+                let args = args |> List.map (evaluateConstants constants)
+                ExprShape.RebuildShapeCombination(o, args)
+
+            | ExprShape.ShapeLambda(v, b) ->
+                Expr.Lambda(v, evaluateConstants constants b)
+
+            | ExprShape.ShapeVar(v) ->
+                match Map.tryFind v constants with
+                    | Some value -> Expr.Value(value, v.Type)
+                    | None -> e
+
+                
 
     let rec estimateNumberOfCallsTo (mi : MethodInfo) (e : Expr) =
         
