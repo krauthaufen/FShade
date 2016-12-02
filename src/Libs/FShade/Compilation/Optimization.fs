@@ -99,6 +99,11 @@ module Optimization =
                     do! found
                     return! eliminateDeadCodeInternal c
 
+                | Sequential(l,r) ->
+                    let! r = eliminateDeadCodeInternal r
+                    let! l = eliminateDeadCodeInternal l
+                    return Expr.Sequential(l, r)
+
                 | ShapeCombination(o, args) ->
                     let! args = args |> List.rev |> List.mapC eliminateDeadCodeInternal
                     return RebuildShapeCombination(o, args |> List.rev)

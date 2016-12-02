@@ -45,27 +45,33 @@ module SequentialComposition =
             | Sequential(VarSet(v,value), Value(_, Unit)) ->
                 match Map.tryFind v mapping with
                     | Some r -> Expr.Let(r, value, cont)
-                    | None -> if Set.contains v hidden then
-                                cont
-                                else 
-                                Expr.Sequential(Expr.VarSet(v,value), cont)
+                    | None -> 
+                        if Set.contains v hidden then
+                            cont
+                        else 
+                            Expr.Sequential(Expr.VarSet(v,value), cont)
 
             | Sequential(VarSet(v,value), b) ->
                 let b = outputsToVariables mapping hidden cont b
                 match Map.tryFind v mapping with
                     | Some r -> Expr.Let(r, value, b)
-                    | None -> if Set.contains v hidden then
-                                b
-                                else 
-                                Expr.Sequential(Expr.VarSet(v,value), b)
+                    | None -> 
+                        if Set.contains v hidden then
+                            b
+                        else 
+                            Expr.Sequential(Expr.VarSet(v,value), b)
 
             | VarSet(v,value) ->
                 match Map.tryFind v mapping with
                     | Some r -> Expr.Let(r, value, cont)
-                    | None -> if Set.contains v hidden then
-                                cont
-                                else 
-                                Expr.Sequential(Expr.VarSet(v,value), cont)
+                    | None -> 
+                        if Set.contains v hidden then
+                            cont
+                        else 
+                            Expr.Sequential(Expr.VarSet(v,value), cont)
+
+            | Sequential(l, r) ->
+                Expr.Sequential(l, outputsToVariables mapping hidden cont r)
 
 
             | ShapeLambda(v,b) -> Expr.Lambda(v, outputsToVariables mapping hidden cont b)
