@@ -152,7 +152,7 @@ module Parameters =
             let att = x.GetCustomAttributes<InterpolationAttribute>(true) |> Seq.toList
             match att with
                 | x::_ -> x.Qualifier
-                | _ -> Interpolation.Perspective
+                | _ -> Interpolation.Default
   
         member x.AssignedTarget =
             let att = x.GetCustomAttributes<SemanticAttribute>(true) |> Seq.toList
