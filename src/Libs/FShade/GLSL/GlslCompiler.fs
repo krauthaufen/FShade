@@ -1163,14 +1163,17 @@ module GLSL =
                                 else "varying"
 
                             let inPrefix =
-                                match n.interpolation with
-                                    | Interpolation.Default -> ""
-                                    | Interpolation.Centroid -> "centroid "
-                                    | Interpolation.NoPerspective -> "noperspective "
-                                    | Interpolation.Flat -> "flat "
-                                    | Interpolation.Sample -> "sample "
-                                    | Interpolation.Perspective -> "smooth "
-                                    | i -> failwithf "[FShade] bad interpolation mode: %A" i
+                                if s.shaderType = ShaderType.Fragment then
+                                    match n.interpolation with
+                                        | Interpolation.Default -> ""
+                                        | Interpolation.Centroid -> "centroid "
+                                        | Interpolation.NoPerspective -> "noperspective "
+                                        | Interpolation.Flat -> "flat "
+                                        | Interpolation.Sample -> "sample "
+                                        | Interpolation.Perspective -> "smooth "
+                                        | i -> failwithf "[FShade] bad interpolation mode: %A" i
+                                else
+                                    ""
 
                             let modifier =
                                 if config.createInputLocations then
