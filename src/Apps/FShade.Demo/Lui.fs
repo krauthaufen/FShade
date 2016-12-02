@@ -311,14 +311,17 @@ module LightmapIrradiance =
             let lc = V2d(v.lc.X, 1.0-v.lc.Y)
             
             let mutable irr = V3d.Zero
+
+            Preprocessor.unroll(0, 16)
             for i in 0..uniform?LayerCount-1 do
-                let layer = match st with
-                            | SampleType.Nearest -> LightmapSampling.sampleNearest(lc, lightmapPointSampler.[i])
-                            | SampleType.Bilinear -> LightmapSampling.sampleBilinear(lc, lightmapLinearSampler.[i])
-                            //| SampleType.Gauss3x3 -> LightmapSampling.sampleGauss3x3(lc, lightmapLinearSampler.[i])
-                            | SampleType.Poisson16 -> LightmapSampling.samplePoisson16(lc, lightmapLinearSampler.[i])
-                            | SampleType.PoissonGauss16 -> LightmapSampling.samplePoissonGauss16(lc, lightmapLinearSampler.[i])
-                            | _ -> V3d.OOO
+                let layer = 
+                    match st with
+                        | SampleType.Nearest -> LightmapSampling.sampleNearest(lc, lightmapPointSampler.[i])
+                        | SampleType.Bilinear -> LightmapSampling.sampleBilinear(lc, lightmapLinearSampler.[i])
+                        //| SampleType.Gauss3x3 -> LightmapSampling.sampleGauss3x3(lc, lightmapLinearSampler.[i])
+                        | SampleType.Poisson16 -> LightmapSampling.samplePoisson16(lc, lightmapLinearSampler.[i])
+                        | SampleType.PoissonGauss16 -> LightmapSampling.samplePoissonGauss16(lc, lightmapLinearSampler.[i])
+                        | _ -> V3d.OOO
                 let layerIntensity = uniform.LayerIntensity.[i]
                 irr <- irr + layer * layerIntensity
 

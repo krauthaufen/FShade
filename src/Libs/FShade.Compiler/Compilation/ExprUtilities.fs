@@ -7,7 +7,27 @@ open Microsoft.FSharp.Quotations.Patterns
 
 open System.Reflection
 type Preprocessor private() =
+    static let unrolls = typeof<Preprocessor>.GetMethods(BindingFlags.Static ||| BindingFlags.Public) |> Seq.filter (fun mi -> mi.Name = "unroll") |> HashSet.ofSeq
+    
+    static member internal UnrollMethods = unrolls
+
     static member unroll() = ()
+    static member unroll(min : int, max : int) = ()
+
+[<AutoOpen>]
+module PreprocessorPatterns = 
+    let (|Unroll|_|) (e : Expr) =
+        match e with
+            | Call(None, mi, args) when Preprocessor.UnrollMethods.Contains mi ->
+                if Preprocessor.UnrollMethods.Contains mi then
+                    match args with
+                        | [] -> Some(None, None)
+                        | [min; max] -> Some(Some min, Some max)
+                        | _ -> failwithf "[FShade] unknown unroll method"
+                else
+                    None
+            | _ ->
+                None
 
 module ExprUtilities =
 
@@ -46,10 +66,11 @@ module ExprUtilities =
 
     let rec evaluateConstants (constants : Map<Var, obj>) (e : Expr) =
         match e with
-            | Sequential(Sequential(a, (Call(None, MethodQuote <@ Preprocessor.unroll : unit -> unit @> _, []) as b)), c) ->
+
+            | Sequential(Sequential(a, (Unroll _ as b)), c) ->
                 Expr.Sequential(a, Expr.Sequential(b,c)) |> evaluateConstants constants
 
-            | Sequential((Call(None, MethodQuote <@ Preprocessor.unroll : unit -> unit @> _, []) as a), Sequential(b,c)) ->
+            | Sequential((Unroll _  as a), Sequential(b,c)) ->
                 Expr.Sequential(Expr.Sequential(a,b), c) |> evaluateConstants constants
 
             // a value remains a value
@@ -132,21 +153,78 @@ module ExprUtilities =
                     | guard ->
                         Expr.WhileLoop(guard, evaluateConstants constants body)
 
-            | Sequential(Call(None, MethodQuote <@ Preprocessor.unroll : unit -> unit @> _, []), ForIntegerRangeLoop(v, s, e, body)) ->
+            | Sequential(Unroll(min, max), ForIntegerRangeLoop(v, s, e, body)) ->
                 let s = evaluateConstants constants s
                 let e = evaluateConstants constants e
 
-                match s, e with
-                    | Value(s,_), Value(e,_) ->
-                        let s = unbox<int> s
-                        let e = unbox<int> e
+                let min = min |> Option.map (evaluateConstants constants)
+                let max = max |> Option.map (evaluateConstants constants)
 
-                        if e < s then 
+                let si =
+                    match s with
+                        | Value(s,_) -> s |> unbox<int> |> Some
+                        | _ -> None   
+                                    
+                let ei =
+                    match e with
+                        | Value(e,_) -> e |> unbox<int> |> Some
+                        | _ -> None
+
+                let firstIndex =
+                    match si with
+                        | Some i -> Some i
+                        | _ ->
+                            match min with
+                                | Some(Value(s,_)) -> unbox<int> s |> Some
+                                | _ -> None
+
+                let lastIndex =
+                    match ei with
+                        | Some e -> Some e
+                        | _ ->
+                            match max with
+                                | Some(Value(e,_)) -> unbox<int> e |> Some
+                                | _ -> None
+
+                match firstIndex, lastIndex with
+                    | Some first, Some last ->
+                        if last < first then 
                             Expr.Value(())
                         else
-                            let mutable res = evaluateConstants (Map.add v (s :> obj) constants) body
-                            for i in s + 1 .. e do
-                                res <- Expr.Sequential(res, evaluateConstants (Map.add v (i :> obj) constants) body)
+                            let loopBody (i : int) = 
+                                match si, ei with
+                                    | Some _, Some _ -> 
+                                        evaluateConstants (Map.add v (i :> obj) constants) body
+
+                                    | Some min, None ->
+                                        let ve = Expr.Var v
+                                        let body = 
+                                            Expr.IfThenElse(
+                                                <@@ %%e >= (%%ve : int) @@>,
+                                                body, Expr.Value(())
+                                            )
+                                        evaluateConstants (Map.add v (i :> obj) constants) body
+                                    | None, Some max ->
+                                        let ve = Expr.Var v
+                                        let body = 
+                                            Expr.IfThenElse(
+                                                <@@ %%s <= (%%ve : int)@@>,
+                                                body, Expr.Value(())
+                                            )
+                                        evaluateConstants (Map.add v (i :> obj) constants) body
+
+                                    | None, None ->
+                                        let ve = Expr.Var v
+                                        let body = 
+                                            Expr.IfThenElse(
+                                                <@@ %%s <= (%%ve : int) && %%e >= (%%ve : int) @@>,
+                                                body, Expr.Value(())
+                                            )
+                                        evaluateConstants (Map.add v (i :> obj) constants) body
+
+                            let mutable res = loopBody first
+                            for i in first + 1 .. last do
+                                res <- Expr.Sequential(res, loopBody i)
 
                             res
                     | _ ->
