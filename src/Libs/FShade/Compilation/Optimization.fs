@@ -141,7 +141,7 @@ module Optimization =
         let b = eliminateDeadCode b
 
         let free = b.GetFreeVars() |> Set.ofSeq
-        let inputs = s.inputs |> Map.filter(fun k v -> Set.contains v free)
+        let inputs = s.inputs |> Map.filter(fun k v -> Set.contains v.var free)
         let outputs = s.outputs |> Map.filter(fun k (_,v) -> Set.contains v free)
         let uniforms = s.uniforms |> List.filter(fun (k,v) -> Set.contains v free)
 
@@ -243,11 +243,11 @@ module Optimization =
 
                                                     match Map.tryFind k s.inputs with
                                                         | Some var -> k,var
-                                                        | None -> k,Var(k, v.MakeArrayType())
+                                                        | None -> k, { var = Var(k, v.MakeArrayType()); interpolation = Interpolation.Default }
                                                     ) |> Seq.toList
 
                             let outputs = wanted |> Seq.map(fun (KeyValue(k,v)) -> k,(None, Var(k + "Out", v))) |> Seq.toList
-                            let b = List.zip inputs outputs |> List.fold (fun b ((_,i),(_,(_,o))) -> Expr.Sequential(Expr.VarSet(o, TessellationMethods.pass s.shaderType i n), b)) b
+                            let b = List.zip inputs outputs |> List.fold (fun b ((_,i),(_,(_,o))) -> Expr.Sequential(Expr.VarSet(o, TessellationMethods.pass s.shaderType i.var n), b)) b
                             let newInputs = seq { yield! s.inputs |> Map.toSeq; yield! inputs } |> Map.ofSeq
                             let newOutputs = seq { yield! s.outputs |> Map.toSeq; yield! outputs } |> Map.ofSeq
 
@@ -268,14 +268,14 @@ module Optimization =
                                 match Map.tryFind k inputs with
                                     | Some var -> k,var
                                     | None -> 
-                                        let var = Var(k, v)
+                                        let var = { var = Var(k, v); interpolation = Interpolation.Default }
                                         inputs <- Map.add k var inputs
-                                        k,var
+                                        k, var
                                )
   
                     let outputs = wanted |> Seq.map(fun (KeyValue(k,v)) -> k,(None, Var(k + "Out", v))) |> Seq.toList
 
-                    let b = List.zip newInputs outputs |> List.fold (fun b ((_,i),(_,(_,o))) -> Expr.Sequential(Expr.VarSet(o, Expr.Var(i)), b)) b
+                    let b = List.zip newInputs outputs |> List.fold (fun b ((_,i),(_,(_,o))) -> Expr.Sequential(Expr.VarSet(o, Expr.Var(i.var)), b)) b
                     let newOutputs = seq { yield! s.outputs |> Map.toSeq; yield! outputs } |> Map.ofSeq
 
                     { inputs = inputs; outputs = newOutputs; uniforms = s.uniforms; shaderType = s.shaderType; body = b; inputTopology = s.inputTopology; debugInfo = s.debugInfo }

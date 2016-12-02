@@ -759,10 +759,11 @@ module GLSL =
         let newInputs = 
             match last with
                 | Some stage ->
-                    s.inputs |> Map.toList |> List.map(fun (k,v) -> k,v.Name,Var(sprintf "%s%s" k (stageName stage), v.Type, v.IsMutable))
-                | None -> s.inputs |> Map.toList |> List.map (fun (k,v) -> k,v.Name,v)
+                    s.inputs |> Map.toList |> List.map(fun (k,v) -> k,v.var.Name, { v with var = Var(sprintf "%s%s" k (stageName stage), v.var.Type, v.var.IsMutable) })
+                | None -> 
+                    s.inputs |> Map.toList |> List.map (fun (k,v) -> k,v.var.Name, v)
 
-        let inputRepl = newInputs |> List.map (fun (_,k,v) -> (k,Expr.Var v)) |> Map.ofList
+        let inputRepl = newInputs |> List.map (fun (_,k,v) -> (k,Expr.Var v.var)) |> Map.ofList
         let newInputs = newInputs |> List.map (fun (k,_,v) -> (k,v)) |> Map.ofList
 
         let newOutputs = 
@@ -811,19 +812,19 @@ module GLSL =
         for KeyValue(sem, v) in s.inputs do
             match getIntrinsicInputName config s.shaderType last sem with
                 | Some name -> 
-                    let replacement = Var(name, v.Type)
+                    let replacement = Var(name, v.var.Type)
 
                     match s.shaderType with
                         | Geometry _ when not (Set.contains sem perVertexGSInputs) -> 
                             body <- body |> substituteGeometryInput (fun vi i -> 
-                                if vi = v then 
+                                if vi = v.var then 
                                     Some (Expr.Var replacement) 
                                 else 
                                     None
                             )
                         | _ ->
                             body <- body.Substitute(fun vi -> 
-                                if vi = v then 
+                                if vi = v.var then 
                                     Some (Expr.Var(replacement))
                                 else
                                     None
@@ -832,14 +833,14 @@ module GLSL =
                 | _ -> 
                     if sem = "Positions" && s.shaderType = ShaderType.Fragment then
                         let sem = "_Positions_"
-                        let replacement = Var(sem, v.Type)
+                        let replacement = Var(sem, v.var.Type)
                         body <- body.Substitute(fun vi -> 
-                                    if vi = v then 
+                                    if vi = v.var then 
                                         Some (Expr.Var(replacement))
                                     else
                                         None
                                 )
-                        inputs <- Map.add sem replacement inputs
+                        inputs <- Map.add sem { var = replacement; interpolation = Interpolation.Default } inputs
                     else
                         inputs <- Map.add sem v inputs
 
@@ -1099,11 +1100,11 @@ module GLSL =
 
             let inputs = 
                 s.inputs |> Map.map (fun sem v ->
-                    match v.Type with
+                    match v.var.Type with
                         | Fractional | VectorOf(_,Fractional) | MatrixOf(_,Fractional) ->
-                            v, false
+                            v
                         | _ ->
-                            v, true
+                            { v with interpolation = Interpolation.Flat }
 
 
                 )
@@ -1128,7 +1129,7 @@ module GLSL =
                     let newInputs = 
                         uniforms' |> List.choose (fun (u,v) ->
                             match u with
-                                | Attribute(scope, t, n) -> Some(n, (Var(n,t), true))
+                                | Attribute(scope, t, n) -> Some(n, ({ var = Var(n,t); interpolation = Interpolation.Flat }))
                                 | _ -> None
                         )
                         |> Map.ofList
@@ -1148,43 +1149,45 @@ module GLSL =
 
                     newUniforms, Map.union inputs newInputs
 
-            do! modifyCompilerState (fun s -> { s with inputs = inputs |> Seq.map (fun (KeyValue(n,(v,_))) -> n,v) |> Map.ofSeq })
+            do! modifyCompilerState (fun s -> { s with inputs = inputs |> Seq.map (fun (KeyValue(n,v)) -> n,v) |> Map.ofSeq })
 
             let inputs = inputs |> Map.toSeq|> Seq.sortBy snd
             let outputs = s.outputs |> Seq.sortBy(fun (KeyValue(_,(_,n))) -> n.Name)
 
             let! inputs = 
                 inputs 
-                    |> Seq.mapCs 0  (fun i (_,(n, flat)) -> 
+                    |> Seq.mapCs 0  (fun i (_,n) -> 
                         compile {
-                            let flat = s.shaderType = ShaderType.Fragment && flat
+                            let inKeyword =
+                                if config.languageVersion > Version(1,2) then "in"
+                                else "varying"
+
+                            let inPrefix =
+                                match n.interpolation with
+                                    | Interpolation.Default -> ""
+                                    | Interpolation.Centroid -> "centroid "
+                                    | Interpolation.NoPerspective -> "noperspective "
+                                    | Interpolation.Flat -> "flat "
+                                    | Interpolation.Sample -> "sample "
+                                    | Interpolation.Perspective -> "smooth "
+                                    | i -> failwithf "[FShade] bad interpolation mode: %A" i
 
                             let modifier =
                                 if config.createInputLocations then
-                                    let ink =
-                                        if flat then "flat in"
-                                        else "in"
-
-                                    sprintf "layout(location = %d) %s" i ink
+                                    sprintf "layout(location = %d) %s%s" i inPrefix inKeyword
                                 else
-                                    if config.languageVersion > Version(1,2) then 
-                                        if flat then "flat in"
-                                        else "in"
-                                    else
-                                        if s.shaderType = ShaderType.Vertex then "attribute" 
-                                        elif flat then "flat varying"
-                                        else "varying"
+                                    sprintf "%s%s" inPrefix inKeyword
                             
 
-
                             let size =
-                                match n.Type with
+                                match n.var.Type with
                                     | MatrixOf(size, t) ->
                                         if size.X = 4 then size.Y
                                         elif size.X = 3 then size.Y
                                         else 1
                                     | _ -> 1
 
+                            let n = n.var
                             if n.Type.IsArray then
                                 let t = n.Type.GetElementType()
                                 let! r = compileVariableDeclaration t n.Name
@@ -1346,7 +1349,7 @@ module GLSL =
                                                     let! fsc = compileShader "PS" fs
 
                                                     let! s = compilerState
-                                                    let used = seq { yield ("Positions",typeof<V4d>); yield! s.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k,v.Type)) } |> Map.ofSeq
+                                                    let used = seq { yield ("Positions",typeof<V4d>); yield! s.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k,v.var.Type)) } |> Map.ofSeq
                                                     
                                                     
                                                     return used, Some fsc
@@ -1370,7 +1373,7 @@ module GLSL =
                                                     let! gsc = compileShader "GS" gs
 
                                                     let! s = compilerState
-                                                    let used = s.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k, if v.Type.IsArray then v.Type.GetElementType() else v.Type)) |> Map.ofSeq
+                                                    let used = s.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k, if v.var.Type.IsArray then v.var.Type.GetElementType() else v.var.Type)) |> Map.ofSeq
                                                 
                                                     let glPos = System.Text.RegularExpressions.Regex("gl_Position\[(?<index>[^\]]+)\]")
                                                     let gsc = { code = glPos.Replace(gsc.code, fun (m : System.Text.RegularExpressions.Match) -> 
@@ -1422,7 +1425,7 @@ module GLSL =
                                                 let tev = addOutputs additional tev
                                                 let tev = removeOutputs unused tev
 
-                                                let tevUsed = tev.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k, if v.Type.IsArray then v.Type.GetElementType() else v.Type)) |> Map.ofSeq
+                                                let tevUsed = tev.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k, if v.var.Type.IsArray then v.var.Type.GetElementType() else v.var.Type)) |> Map.ofSeq
                                                 let tevUsed = Map.remove "TessCoord" tevUsed
                                                 let tevUsed = Map.add "TessLevelInner" typeof<float[]> tevUsed
                                                 let tevUsed = Map.add "TessLevelOuter" typeof<float[]> tevUsed
@@ -1437,7 +1440,7 @@ module GLSL =
                                                 let tcs = addOutputs additional tcs
                                                 let tcs = removeOutputs unused tcs
 
-                                                let tcsUsed = tcs.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k, if v.Type.IsArray then v.Type.GetElementType() else v.Type)) |> Map.ofSeq
+                                                let tcsUsed = tcs.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k, if v.var.Type.IsArray then v.var.Type.GetElementType() else v.var.Type)) |> Map.ofSeq
                                                 
 
 

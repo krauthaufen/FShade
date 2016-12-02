@@ -143,11 +143,15 @@ module ParameterCompilation =
     let rec substituteInputs (inputType : Type) (index : Option<Expr>) (e : Expr) =
         transform {
             match e with
-                | Input inputType (t,sem) -> match index with
-                                                | None -> let! v = getInput t sem
-                                                          return Expr.Var(v)
-                                                | Some i -> let! v = getInput (t.MakeArrayType()) sem
-                                                            return Expr.ArrayAccess(Expr.Var(v), i)
+                | Input inputType (t,sem, interpolation) -> 
+                    match index with
+                        | None -> 
+                            let! v = getInput t interpolation sem
+                            return Expr.Var(v.var)
+
+                        | Some i -> 
+                            let! v = getInput (t.MakeArrayType()) interpolation sem
+                            return Expr.ArrayAccess(Expr.Var(v.var), i)
 
                 | ShapeCombination(o, args) ->
                     
@@ -166,8 +170,8 @@ module ParameterCompilation =
         transform {
             match e with
                 | MemberFieldGet(Var vi, fi) when vi = v ->
-                    let! v = getInput (fi.Type.MakeArrayType()) fi.Semantic
-                    return Expr.ArrayAccess(Expr.Var(v), Expr.Var(index))
+                    let! v = getInput (fi.Type.MakeArrayType()) fi.Interpolation fi.Semantic
+                    return Expr.ArrayAccess(Expr.Var(v.var), Expr.Var(index))
 
                 | ShapeCombination(o, args) ->
                     

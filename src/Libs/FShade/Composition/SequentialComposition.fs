@@ -19,8 +19,8 @@ module SequentialComposition =
         let free = s.body.GetFreeVars() |> Set.ofSeq
         let uniformSet = s.uniforms |> Seq.map(fun (_,u) -> u) |> Set.ofSeq
 
-        let mapValue (v : Var) (m : Map<string, Var>) =
-            match Map.tryFindKey (fun _ vi -> vi = v) m with
+        let mapValue (v : Var) (m : Map<string, ShaderInput>) =
+            match Map.tryFindKey (fun _ vi -> vi.var = v) m with
                 | Some _ -> true
                 | None -> false
 
@@ -105,7 +105,7 @@ module SequentialComposition =
             match Map.tryFind n l.outputs with
                 | Some (_,o) -> let v = Var(n + "C", o.Type)
                                 mapping <- Map.add o v mapping
-                                b1 <- b1.Substitute(fun vi -> if vi = i then v |> Expr.Var |> Some else None)
+                                b1 <- b1.Substitute(fun vi -> if vi = i.var then v |> Expr.Var |> Some else None)
                 | None -> unmatched <- Map.add n i unmatched
 
         //hide hidden and mapping since mutables cannot be captured
@@ -141,7 +141,7 @@ module SequentialComposition =
                         match Map.tryFind vi.Name l.inputs with
                             | Some i -> 
                                 match Map.tryFind vi.Name inputs with
-                                    | Some v -> v |> Expr.Var |> Some
+                                    | Some v -> v.var |> Expr.Var |> Some
                                     | _ -> None
                             | None -> None
             )

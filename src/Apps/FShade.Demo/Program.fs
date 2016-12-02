@@ -846,6 +846,9 @@ type Blubb = Sepp of int | Heinz of float
 
 [<EntryPoint>]
 let main argv = 
+
+    
+
 //
 //    let evilShader (tri : Triangle<Dead.BillboardVertex>) =
 //        triangle {
@@ -869,8 +872,10 @@ let main argv =
 
     let effect = 
         compose [
-            Simple.trafo |> toEffect
-            Simple.texture |> toEffect
+//            Effects.Trafo.Effect,
+//            Effects.ConstantColor.Effect(C4f.White),
+            Lui.LightmapIrradiance.ps(Lui.LightmapIrradiance.SampleType.Poisson16) |> toEffect
+            Lui.IrradianceOutput.ps |> toEffect
         ] 
 
     let res = GLSL.compileEffect GLSL.version410 (Map.ofList["Colors", typeof<V4d>]) effect

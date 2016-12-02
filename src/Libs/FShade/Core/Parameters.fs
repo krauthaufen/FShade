@@ -122,6 +122,19 @@ module Parameters =
 
         new(s : string) = SemanticAttribute(s, None)
 
+    type Interpolation =
+        | Default           = 0
+        | Perspective       = 1
+        | NoPerspective     = 2
+        | Flat              = 3
+        | Centroid          = 4
+        | Sample            = 5
+
+    [<AllowNullLiteral; AttributeUsage(AttributeTargets.Property ||| AttributeTargets.Field)>]
+    type InterpolationAttribute(qualifier : Interpolation) =
+        inherit Attribute()
+        member x.Qualifier = qualifier
+
     type System.Reflection.MemberInfo with
         member x.Type =
             match x with
@@ -135,7 +148,12 @@ module Parameters =
                 | x::_ -> x.Semantic
                 | _ -> x.Name
 
-        
+        member x.Interpolation =
+            let att = x.GetCustomAttributes<InterpolationAttribute>(true) |> Seq.toList
+            match att with
+                | x::_ -> x.Qualifier
+                | _ -> Interpolation.Perspective
+  
         member x.AssignedTarget =
             let att = x.GetCustomAttributes<SemanticAttribute>(true) |> Seq.toList
             match att with

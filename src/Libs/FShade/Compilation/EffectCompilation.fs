@@ -126,11 +126,11 @@ module EffectCompilation =
                         | ShapeCombination(o, args) -> RebuildShapeCombination(o, args |> List.map padTessLevels)
                         | _ -> e
 
-                let id = Var("InvocationId", typeof<int>)
+                let id = { var = Var("InvocationId", typeof<int>); interpolation = Interpolation.Default }
                 let mi = getMethodInfo <@ (=) : int -> int -> bool @>
                 let mi = mi.MakeGenericMethod [| typeof<int> |]
 
-                let newBody = Expr.IfThenElse(Expr.Call(mi, [Expr.Var id; Expr.Value(0)]),
+                let newBody = Expr.IfThenElse(Expr.Call(mi, [Expr.Var id.var; Expr.Value(0)]),
                                 padTessLevels s.body,
                                 Expr.Value(())
                                )
