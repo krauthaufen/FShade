@@ -112,6 +112,11 @@ module ShaderState =
                             do! addUniform uniform v
                             return v
 
+                        | SamplerArray(t, len, n, sam) ->
+                            let tv = t.GetGenericArguments().[1].MakeArrayType()
+                            let v = Var(n,tv)
+                            do! addUniform uniform v
+                            return v
                 | Some v -> 
                     return v
         }

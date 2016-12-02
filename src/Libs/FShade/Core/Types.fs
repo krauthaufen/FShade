@@ -37,8 +37,14 @@ module Types =
 
         member x.IsSamplerUniform =
             match x with
-                | UniformGetter(value, _) -> value.GetType() = typeof<string * SamplerState>
+                | UniformGetter(value, _) when not (isNull value) -> value.GetType() = typeof<string * SamplerState>
                 | _ -> false
+
+        member x.IsSamplerArrayUniform =
+            match x with
+                | UniformGetter(value, _) when not (isNull value) -> value.GetType() = typeof<list<string * SamplerState>>
+                | _ -> false
+
 
         member x.Value =
             match x with
