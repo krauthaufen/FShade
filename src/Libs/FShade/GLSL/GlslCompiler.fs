@@ -981,12 +981,12 @@ module GLSL =
             let textures = 
                 uniforms 
                     |> Map.toSeq 
-                    |> Seq.collect (fun (_,elements) -> elements |> Map.toSeq |> Seq.filter(function (_,(SamplerType _)) -> true | _ -> false))
+                    |> Seq.collect (fun (_,elements) -> elements |> Map.toSeq |> Seq.filter(function (_,(SamplerType(_) | ArrOf (SamplerType _))) -> true | _ -> false))
                     |> Seq.toList
 
             let uniformBuffers =
                 uniforms
-                    |> Map.map (fun scope elements -> elements |> Map.toList |> List.filter (function (_,SamplerType(_)) -> false | _ -> true))
+                    |> Map.map (fun scope elements -> elements |> Map.toList |> List.filter (function (_,(SamplerType(_) | ArrOf (SamplerType _))) -> false | _ -> true))
                     |> Map.filter (fun _ e -> not <| List.isEmpty e)
 
             let! ds = 
@@ -1117,6 +1117,7 @@ module GLSL =
                                     | UserUniform(t,o) -> (uniform, t, v.Name)
                                     | Attribute(scope, t, n) -> (scope, t, n)
                                     | SamplerUniform(t,sem, n,_) -> (uniform, t, n)
+                                    | SamplerArray(t, len, n, _) -> (uniform, t, n)
                                ) 
                             |> Seq.groupBy(fun (s,_,_) -> s)
                             |> Seq.map (fun (g,v) -> (g, v |> Seq.map (fun (_,t,n) -> (t,n)) |> Seq.toList))
@@ -1139,6 +1140,7 @@ module GLSL =
                                     | UserUniform(t,o) -> Some (uniform, t, v.Name)
                                     | Attribute(scope, t, n) -> None
                                     | SamplerUniform(t,sem, n,_) -> Some(uniform, t, n)
+                                    | SamplerArray(t, len, n, _) -> Some(uniform, t, n)
                                ) 
                             |> Seq.groupBy(fun (s,_,_) -> s)
                             |> Seq.map (fun (g,v) -> (g, v |> Seq.map (fun (_,t,n) -> (t,n)) |> Seq.toList))
@@ -1232,6 +1234,7 @@ module GLSL =
                                                         | UserUniform(t,o) -> (v.Name, UniformGetter(o, t))
                                                         | SamplerUniform(t,sem, n,sam) -> (n, UniformGetter((sem, sam), t))
                                                         | Attribute(scope, t, n) -> (n, AttributeGetter(n, t))
+                                                        | SamplerArray(t, len, n, sam) -> (n, UniformGetter(sam, t))
                                                 )
                                            |> Map.ofSeq
 

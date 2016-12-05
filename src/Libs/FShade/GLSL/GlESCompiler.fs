@@ -497,6 +497,7 @@ module GLES =
                                                 | UserUniform(t,o) -> (uniform, t, v.Name)
                                                 | Attribute(scope, t, n) -> (scope, t, n)
                                                 | SamplerUniform(t,sem, n,_) -> (uniform, t, n)
+                                                | SamplerArray(t, len, n, _) -> (uniform, t, n)
                                         ) 
                                       |> Seq.groupBy(fun (s,_,_) -> s)
                                       |> Seq.map (fun (g,v) -> (g, v |> Seq.map (fun (_,t,n) -> (t,n)) |> Seq.toList))

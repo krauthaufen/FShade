@@ -1924,6 +1924,7 @@ module SpirVCompiler =
                             | UserUniform(t,o) -> Some (uniform, t, v.Name,v)
                             | Attribute(scope, t, n) -> Some (scope, t, n,v)
                             | SamplerUniform(t,sem, n,_) -> None
+                            | SamplerArray(t, len, n, _) -> None
                        ) 
                     |> Seq.groupBy(fun (s,_,_,_) -> s)
                     |> Seq.map (fun (g,v) -> (g, v |> Seq.map (fun (_,t,n,v) -> (t,n,v)) |> Seq.toList))
@@ -1963,6 +1964,7 @@ module SpirVCompiler =
                         |> List.choose (fun (u,v) -> 
                             match u with
                                 | SamplerUniform(_) -> Some v
+                                | SamplerArray(_) -> Some v
                                 | _ -> None
                             )
                 ]
