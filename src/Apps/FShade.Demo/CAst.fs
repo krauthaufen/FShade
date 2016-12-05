@@ -703,14 +703,43 @@ module CExpr =
                     let v = pi.GetValue(null)
                     return! ofExpr (Expr.Value(v, pi.PropertyType))
                     
-                | MemberFieldGet(t, fi) ->
+
+                | FieldGet(Some t, fi) ->
                     let! t = ofExpr t
                     return CExpr.CField(t, fi.Name)
 
+                | PropertyGet(Some target, pi, []) ->
+                    if FSharpTypeExt.IsRecord target.Type then 
+                        let! t = ofExpr target
+                        return CExpr.CField(t, pi.Name)
+
+                    elif FSharpTypeExt.IsUnion target.Type then
+                        let! t = ofExpr target
+                        let ci = FSharpTypeExt.GetUnionCases target.Type |> Array.find (fun ci -> ci.GetFields() |> Array.exists (fun fi -> fi = pi))
+                        return CExpr.CField(t, ci.Name + "_" + pi.Name)
+
+                    elif FSharpTypeExt.IsTuple target.Type then
+                        let! t = ofExpr target
+                        return CExpr.CField(t, pi.Name)
+
+                    else
+                        return! ofExpr (Expr.Call(target, pi.GetMethod, []))
+
                 | PropertyGet(Some t, pi, [index]) when pi.Name = "Item" ->
-                    let! t = ofExpr t
-                    let! index = ofExpr index
-                    return CExpr.CItem(t, index)
+                    if t.Type.IsArray || (t.Type.IsGenericType && t.Type.GetGenericTypeDefinition() = typedefof<Arr<_,_>>) then
+                        let! t = ofExpr t
+                        let! index = ofExpr index
+                        return CExpr.CItem(t, index)
+                    else
+                        return! ofExpr (Expr.Call(t, pi.GetMethod, [index]))
+
+                | PropertyGet(Some t, pi, indices) ->
+                    return! ofExpr (Expr.Call(t, pi.GetMethod, indices))
+
+                | PropertyGet(None, pi, indices) ->
+                    return! ofExpr (Expr.Call(pi.GetMethod, indices))
+                    
+
 
                 | TupleGet(e, i) ->
                     let! e = ofExpr e
@@ -939,6 +968,7 @@ module CStatement =
 
 
                 | e when last ->
+                    
                     let! v = CExpr.ofExpr e
                     return CStatement.CReturnValue v
 
@@ -952,16 +982,31 @@ module CStatement =
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module CModule =
 
-    type private DefTree =
-        | DefNode of CDef * list<DefTree>
+    [<ReferenceEquality; NoComparison>]
+    type private DefTree = { def : CDef; needed : list<DefTree>; mutable level : int }
 
-    let rec private compileInternal (cache : Dict<ExternalFunction, DefTree>, state : byref<CompilerState>, f : ExternalFunction) =
+    let private flatten (t : DefTree) =
+        let rec flatten (seen : System.Collections.Generic.HashSet<DefTree>) (t : DefTree) =
+            if seen.Add t then
+                t :: (t.needed |> List.collect (flatten seen))
+            else
+                []
+
+        let seen = HashSet.empty
+        
+        flatten seen t 
+            |> List.sortByDescending (fun t -> t.level)
+            |> List.map  (fun t -> t.def)
+
+    let rec private compileInternal (cache : Dict<ExternalFunction, DefTree>, level : int, state : byref<CompilerState>, f : ExternalFunction) =
         match cache.TryGetValue f with
-            | (true, t) -> t
+            | (true, t) -> 
+                t.level <- max t.level level
+                t
             | _ -> 
                 match f with
                     | ExtCompiled(s,d) ->
-                        DefNode(CDef.CFunction(s,d), [])
+                        { def = CDef.CFunction(s,d); needed = []; level = level }
                     | _ ->
                         let name, args, body =
                             match f with
@@ -1005,13 +1050,14 @@ module CModule =
                             initialState.customFunctions 
                                 |> HashMap.toSeq
                                 |> Seq.map (fun (signature, def) ->
-                                    compileInternal(cache, &initialState, def)
+                                    compileInternal(cache, level + 1, &initialState, def)
                                 )
                                 |> Seq.toList
 
-                        let t = DefNode(CDef.CFunction(signature, body), used)
+                        let t = { def = CDef.CFunction(signature, body); needed = used; level = level }
                         cache.[f] <- t
                         t
+
 
     let ofLambda (name : string) (e : Expr) : CModule =
         let args, body = 
@@ -1021,17 +1067,11 @@ module CModule =
 
         let mutable initialState = CompilerState.empty
 
-        let tree = compileInternal(Dict(), &initialState, ExtCustom(name, args, body))
-
-        let rec flatten (DefNode(self, children)) =
-            (children |> List.collect flatten) @ [self]
-
+        let tree = compileInternal(Dict(), 0, &initialState, ExtCustom(name, args, body))
         flatten tree
 
     let ofFunctions (functions : list<string * list<Var> * Expr>) : CModule =
         let mutable initialState = CompilerState.empty
-
-
 
         functions |> List.map (fun (name, args, body) ->
             let parTypes = args |> List.map (fun a -> a.Type |> CType.ofType)
