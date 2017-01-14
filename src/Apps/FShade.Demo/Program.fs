@@ -858,9 +858,13 @@ let main argv =
 
     let testModule = 
         FShade.Compiler.CModule.ofLambda "test" <@ fun (a : int) -> 
-            (Sepp a, 1)
+            (Sepp a, float 1)
         @>
     printfn "%A" testModule
+
+    let code = FShade.Compiler.GLSL.CModule.glsl testModule
+    printfn "%s" code
+
     Environment.Exit 0
 
 
