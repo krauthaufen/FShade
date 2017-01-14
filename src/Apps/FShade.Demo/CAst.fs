@@ -1,5 +1,6 @@
 ﻿namespace FShade.Compiler
 
+
 type CPointerModifier =
     | None  = 0x00
     | Const = 0x01
@@ -45,6 +46,20 @@ type CVar =
         ctype : CTypeRef 
     }
 
+type CGlobalAnnotation =
+    | CConst
+    | CUniform
+    | CLocation of int
+    | CRowMajor of bool
+    | CIn
+    | COut
+
+type CGlobal =
+    {
+        globalName          : string
+        globalType          : CTypeRef
+        globalAnnotations   : list<CGlobalAnnotation>
+    }
 
 type CPrimitiveValue =
     | Null
@@ -55,6 +70,7 @@ type CPrimitiveValue =
 
 type CExpr =
     | CVar of CVar
+    | CGlobal of CGlobal
     | CValue of CTypeRef * CPrimitiveValue
     | CCall of func : CFunctionRef * args : CExpr[]
     | CConditional of cond : CExpr * ifTrue : CExpr * ifFalse : CExpr
@@ -90,8 +106,16 @@ type CExpr =
     | CField of target : CExpr * fieldName : string
     | CItem of target : CExpr * index : CExpr 
 
+
+type CDefExpr =
+    | CDefExprEmpty
+    | CDefExpr of CExpr
+    | CDefExprArray of elementType : CTypeRef * values : list<CExpr>
+
+
 type CLExpr =
     | CVar of CVar
+    | CGlobal of CGlobal
     | CField of CLExpr * string
     | CItem of CLExpr * CExpr
     | CPtr of CExpr
@@ -99,7 +123,7 @@ type CLExpr =
 type CStatement =
     | CNop
     | CDo of CExpr
-    | CDeclare of var : CVar * value : Option<CExpr>
+    | CDeclare of var : CVar * value : CDefExpr
     | CWrite of var : CLExpr * value : CExpr
 
     | CPostIncrement of v : CLExpr
@@ -119,18 +143,11 @@ type CStatement =
     | CIfThenElse of cond : CExpr * ifTrue : CStatement * ifFalse : CStatement
     | CSwitch of value : CExpr * cases : array<CPrimitiveValue * CStatement>
 
-
-
-type CGlobalKind =
-    | CUniform
-    | CInput
-    | COutput
-    | CConstant
-
 type CDef =
-    | CGlobal of kind : CGlobalKind * variable : CVar * initializer : Option<CExpr>
+    | CGlobal of variable : CGlobal * initializer : CDefExpr
     | CFunction of signature : CFunctionRef * body : CStatement
     | CStruct of name : string * fields : list<CTypeRef * string>
+    | CNoDef
 
 type CModule = list<CDef>
 
@@ -145,6 +162,41 @@ open Microsoft.FSharp.Quotations.Patterns
 open Microsoft.FSharp.Quotations.DerivedPatterns
 open FShade.Utils
 
+
+[<AutoOpen>]
+module QuotationExtensions =
+
+    module Peano = 
+        let private peanoTypes =
+            let s = typedefof<S<_>>
+            Seq.initInfinite id 
+                |> Seq.scan (fun last _ -> s.MakeGenericType [|last|]) typeof<Z>
+                |> Seq.cache
+
+        let getPeanoType (i : int) =
+            Seq.item i peanoTypes
+
+        let getArrayType (i : int) (content : Type) =
+            typedefof<Arr<_,_>>.MakeGenericType [| getPeanoType i; content |]
+           
+    type Expr with
+        static member NewFixedArray(t : Type, values : list<Expr>) =
+            let len = values |> List.length
+            let arrType = Peano.getArrayType len t
+            let seqType = typedefof<seq<_>>.MakeGenericType t
+            let ctor = arrType.GetConstructor [| seqType |]
+            Expr.NewObject(ctor, [Expr.Coerce(Expr.NewArray(t, values), seqType)])
+
+    let (|NewFixedArray|_|) (e : Expr) =
+        match e with
+            | NewObject(ctor, [Coerce(NewArray(et, args),_)]) ->
+                if ctor.DeclaringType.IsGenericType && ctor.DeclaringType.GetGenericTypeDefinition() = typedefof<Arr<_,_>> then
+                    let len = Peano.getSize (ctor.DeclaringType.GetGenericArguments().[0])
+                    Some(len, et, args)
+                else 
+                    None
+            | _ ->
+                None
 
 [<AutoOpen>]
 module private Helpers = 
@@ -297,20 +349,38 @@ module CType =
                 | MatrixOf(s, t)    -> CMatrix(ofType t, s.Y, s.X)
                 | ArrOf(len, t)     -> CArray(ofType t, len)
                 | Ref t             -> ofType t
+                | t when t.IsArray  -> CTypeRef.CPointer(CPointerModifier.None, ofType (t.GetElementType()))
                 | t                 -> CCustomType(typeName t, toSystemType t)
         )
 
 
 type ExternalFunction =
-    | ExtCtor of ConstructorInfo
-    | ExtMethod of MethodInfo
-    | ExtCustom of string * list<Var> * Expr
+    | ExtCtor of CFunctionRef * ConstructorInfo
+    | ExtMethod of CFunctionRef * MethodInfo
+    | ExtCustom of CFunctionRef * string * list<Var> * Expr
     | ExtCompiled of CFunctionRef * CStatement
+    | ExtAll of list<ExternalFunction>
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module ExternalFunction =
+    let custom (name : string) (args : list<Var>) (body : Expr) =
+        let signature =
+            {
+                name = name
+                returnType = CType.ofType body.Type
+                parameters = args |> List.map (fun v -> { name = v.Name; ctype = CType.ofType v.Type; modifier = CParameterModifier.In }) |> List.toArray
+            }
+        ExternalFunction.ExtCustom(signature, name, args, body)
+
+type ExternalGlobal =
+    | ExtDeclare of CGlobal
+    | ExtInit of CGlobal * Expr
 
 [<AllowNullLiteral>]
 type IBackend =
     abstract member CompileIntrinsicFunction : MethodInfo -> Option<CExpr[] -> CExpr>
     abstract member CompileIntrinsicType : Type -> Option<CTypeRef>
+    abstract member IsIntrinsicValue : CGlobal -> bool
 
 type FunctionCompilerState =
     {
@@ -318,8 +388,9 @@ type FunctionCompilerState =
         fHelperIndex         : int
         fNames               : Map<Var, string>
         fCurrentSuffixes     : Map<string, int>
-        fCustomFunctions     : HashMap<CFunctionRef, ExternalFunction>
+        fCustomFunctions     : HashMap<obj, ExternalFunction>
         fUsedTypes           : pset<SystemType>
+        fUsedGlobals         : HashMap<obj, ExternalGlobal>
     }
 
 type CompilerState =
@@ -361,9 +432,9 @@ module CompilerState =
     let useExtMethod (f : CFunctionRef) (mi : MethodBase) =
         match mi with
             | :? MethodInfo as mi ->
-                State.modify(fun s -> { s with fCustomFunctions = HashMap.add f (ExtMethod mi) s.fCustomFunctions })
+                State.modify(fun s -> { s with fCustomFunctions = HashMap.add (mi :> obj) (ExtMethod(f, mi)) s.fCustomFunctions })
             | :? ConstructorInfo as ci ->
-                State.modify(fun s -> { s with fCustomFunctions = HashMap.add f (ExtCtor ci) s.fCustomFunctions })
+                State.modify(fun s -> { s with fCustomFunctions = HashMap.add (mi :> obj) (ExtCtor(f, ci)) s.fCustomFunctions })
             | _ ->
                 failwithf "cannot use method %A" mi
 
@@ -376,7 +447,7 @@ module CompilerState =
             let parameters = vars |> List.map (fun v -> { name = v.Name; ctype = CType.ofType v.Type; modifier = CParameterModifier.ByRef }) |> List.toArray
             let signature = { name = name; parameters = parameters; returnType = CType.ofType e.Type }
 
-            do! State.put { s with fHelperIndex = s.fHelperIndex + 1; fCustomFunctions = HashMap.add signature (ExtCustom(name, vars, e)) s.fCustomFunctions }
+            do! State.put { s with fHelperIndex = s.fHelperIndex + 1; fCustomFunctions = HashMap.add (signature :> obj) (ExtCustom(signature, name, vars, e)) s.fCustomFunctions }
 
             let args = 
                 vars 
@@ -385,6 +456,7 @@ module CompilerState =
 
             return CExpr.CCall(signature, args)
         }
+
 
     let private ctorCache = System.Collections.Concurrent.ConcurrentDictionary<Type, CFunctionRef * CStatement>() 
     let private unionCache = System.Collections.Concurrent.ConcurrentDictionary<Type, System.Collections.Generic.Dictionary<UnionCaseInfo, CFunctionRef * CStatement>>()
@@ -401,6 +473,83 @@ module CompilerState =
             let! s = State.get
             do! State.put { s with fUsedTypes = PSet.add st s.fUsedTypes }
             return CType.ofType t
+        }
+
+    let useGlobal (g : CGlobal) (value : Option<Expr>) =
+        state {
+            let! s = State.get
+            match value with
+                | Some v ->
+                    do! State.put { s with fUsedGlobals = HashMap.add (g :> obj) (ExtInit(g, v)) s.fUsedGlobals }
+                | None ->
+                    do! State.put { s with fUsedGlobals = HashMap.add (g :> obj) (ExtDeclare(g)) s.fUsedGlobals }
+        }
+
+
+    let rec tryDeconstructValue (t : Type) (v : obj) =
+
+        if FSharpTypeExt.IsRecord t then
+            let fields = FSharpTypeExt.GetRecordFields t |> Array.toList
+            let values = fields |> List.map (fun f -> Expr.Value(f.GetValue(v), f.PropertyType))
+            Some (Expr.NewRecord(t, values))
+
+        elif FSharpTypeExt.IsUnion t then
+            let case, values = FSharpValue.GetUnionFields(v, t, true)
+            let values = Array.toList values
+            let fields = case.GetFields() |> Array.toList
+            let args = List.map2 (fun (fi : PropertyInfo) (v : obj) -> Expr.Value(v, fi.PropertyType)) fields values
+            Some (Expr.NewUnionCase(case, args))
+
+        elif FSharpTypeExt.IsTuple t then
+            let elements = FSharpTypeExt.GetTupleElements t |> Array.toList
+            let values = elements |> List.mapi (fun i t -> Expr.Value(FSharpValue.GetTupleField(v, i), t))
+            Some (Expr.NewTuple(values))
+
+
+        else
+            match v with
+                | :? Array as arr -> 
+                    let element = t.GetElementType()
+                    let values = List.init arr.Length (fun i -> Expr.Value(arr.GetValue(i), element))
+                    Some(Expr.NewFixedArray(element, values))
+
+                | :? System.Collections.IEnumerable as e ->
+                    let element = t.GetInterface(typedefof<seq<_>>.Name).GetGenericArguments().[0]
+
+                    let all = System.Collections.Generic.List<Expr>()
+                    let ee = e.GetEnumerator()
+                    while ee.MoveNext() do
+                        all.Add (Expr.Value(ee.Current, element))
+                            
+                    Some(Expr.NewFixedArray(element, CSharpList.toList all))
+
+
+                | _ -> 
+                    None
+
+    let asConstant (t : Type) (o : obj) =
+        state {
+            let! s = State.get
+            let name = "helper" + string s.fHelperIndex
+            match tryDeconstructValue t o with
+                | Some initializer ->
+                    let! ct = 
+                        match initializer with
+                            | NewArray(t,values) ->
+                                getAndUseType (Peano.getArrayType values.Length t)
+                            | NewFixedArray(l,t,values) ->
+                                getAndUseType initializer.Type
+                            | _ ->
+                                getAndUseType initializer.Type
+
+                    let g = { globalName = name; globalType = ct; globalAnnotations = [CConst] }
+
+                    do! State.put { s with fHelperIndex = s.fHelperIndex + 1; fUsedGlobals = HashMap.add o (ExtInit(g, initializer)) s.fUsedGlobals }
+
+                    return CExpr.CGlobal(g) |> Some
+                | _ ->
+                    return None
+
         }
 
 
@@ -426,7 +575,7 @@ module CompilerState =
                             CWrite(CLExpr.CField(CLExpr.CVar res, sprintf "Item%d" i), CExpr.CVar v)
                         )
                     CSequential [
-                        yield CDeclare(res, None)
+                        yield CDeclare(res, CDefExprEmpty)
                         yield! writeArgs
                         yield CReturnValue (CExpr.CVar res)
                     ]
@@ -435,7 +584,7 @@ module CompilerState =
             )
 
         State.custom (fun s ->
-            let s = { s with fCustomFunctions = HashMap.add signature (ExtCompiled(signature, def)) s.fCustomFunctions }
+            let s = { s with fCustomFunctions = HashMap.add ((t, "ctor") :> obj) (ExtCompiled(signature, def)) s.fCustomFunctions }
             s, signature
         )
 
@@ -461,7 +610,7 @@ module CompilerState =
                             CWrite(CLExpr.CField(CLExpr.CVar res, a.name), CExpr.CVar v)
                         )
                     CSequential [
-                        yield CDeclare(res, None)
+                        yield CDeclare(res, CDefExprEmpty)
                         yield! writeArgs
                         yield CReturnValue (CExpr.CVar res)
                     ]
@@ -470,7 +619,7 @@ module CompilerState =
             )
 
         State.custom (fun s ->
-            let s = { s with fCustomFunctions = HashMap.add signature (ExtCompiled(signature, def)) s.fCustomFunctions }
+            let s = { s with fCustomFunctions = HashMap.add ((t, "ctor") :> obj) (ExtCompiled(signature, def)) s.fCustomFunctions }
             s, signature
         )
 
@@ -501,7 +650,7 @@ module CompilerState =
                                     CWrite(CLExpr.CField(CLExpr.CVar res, ci.Name + "_" + a.name), CExpr.CVar v)
                                 )
                             CSequential [
-                                yield CDeclare(res, None)
+                                yield CDeclare(res, CDefExprEmpty)
                                 yield CWrite(CLExpr.CField(CLExpr.CVar res, "tag"), CExpr.CValue(CTypeRef.CInt(true, 32), CPrimitiveValue.CIntegral(int64 ci.Tag)))
                                 yield! writeArgs
                                 yield CReturnValue (CExpr.CVar res)
@@ -515,7 +664,7 @@ module CompilerState =
 
         let signature, def = dict.[ci]
         State.custom (fun s ->
-            let s = { s with fCustomFunctions = HashMap.add signature (ExtCompiled(signature, def)) s.fCustomFunctions }
+            let s = { s with fCustomFunctions = HashMap.add ((ci, "ctor") :> obj) (ExtCompiled(signature, def)) s.fCustomFunctions }
             s, signature
         )
 
@@ -523,7 +672,7 @@ module CompilerState =
 module CVar =
     let ofVar (v : Var) : State<FunctionCompilerState, CVar> =
         state {
-            let ctype = CType.ofType v.Type
+            let! ctype = CompilerState.getAndUseType v.Type
             let! name = CompilerState.cName v
             return { name = name; ctype = ctype }
         }
@@ -535,6 +684,8 @@ module CLExpr =
 
     let rec ofCExpr (e : CExpr) : CLExpr =
         match e with
+            | CExpr.CGlobal g -> 
+                CLExpr.CGlobal g
             | CExpr.CVar(v) -> 
                 CLExpr.CVar v
             | CExpr.CField(e, field) ->
@@ -550,6 +701,7 @@ module CLExpr =
 
     let rec toCExpr (e : CLExpr) =
         match e with
+            | CLExpr.CGlobal g -> CExpr.CGlobal g
             | CLExpr.CVar v -> CExpr.CVar v
             | CLExpr.CField(e,f) -> CExpr.CField(toCExpr e, f)
             | CLExpr.CItem(e,f) -> CExpr.CItem(toCExpr e, f)
@@ -656,13 +808,20 @@ module CExpr =
                         | Some v -> 
                             return CExpr.CValue(ct, v)
                         | None ->
+                            // TODO: intrinsic ctors (mat, etc.)
                             match vecFields.TryGetValue t with
                                 | (true, fields) -> 
                                     let! values = fields |> Array.toList |> List.mapS (fun f -> Expr.Value(f.GetValue(v), f.FieldType) |> ofExpr)
                                     return CNewVector(ct, fields.Length, values)
 
                                 | _ ->
-                                    return failwith "not implemented"
+                                    
+                                    let! c = CompilerState.asConstant t v
+                                    match c with
+                                        | Some c -> 
+                                            return c
+                                        | None ->
+                                            return failwithf "cannot compile value %A (of type %A)" v t
 
                 | Call(None, mi, args) ->
                     let! args = args |> List.mapS ofExpr
@@ -871,6 +1030,30 @@ module CExpr =
                 | e -> 
                     return failwithf "unexpected expression %A" e
         }
+        
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module CDefExpr = 
+    let rec ofExpr (e : Expr) =
+        state {
+            match e with
+                | NewArray(t, elements) ->
+                    let! ct = CompilerState.getAndUseType t
+                    let! elements = elements |> List.mapS CExpr.ofExpr
+                    return CDefExprArray(ct, elements)
+
+                | NewFixedArray(l, t, elements) ->
+                    let! ct = CompilerState.getAndUseType t
+                    let! elements = elements |> List.mapS CExpr.ofExpr
+                    return CDefExprArray(ct, elements)
+                    
+                | DefaultValue t ->
+                    let! ct = CompilerState.getAndUseType t
+                    return CDefExprEmpty
+
+                | e -> 
+                    let! value = CExpr.ofExpr e
+                    return CDefExpr(value)
+        }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module CStatement =
@@ -898,7 +1081,7 @@ module CStatement =
                     let! body = ofExprInternal false body
 
                     return CFor(
-                        CDeclare(v, Some min),              // int i = min
+                        CDeclare(v, CDefExpr min),          // int i = min
                         CLequal(CExpr.CVar v, max),         // i <= max
                         CPostIncrement(CLExpr.CVar v),      // i++
                         body
@@ -921,10 +1104,11 @@ module CStatement =
                     return CSequential [l;r]
 
                 | Let(v, e, body) ->
-                    let! v = CVar.ofVar v
-                    let! e = CExpr.ofExpr e
                     let! body = ofExprInternal last body
-                    return CSequential [CStatement.CDeclare(v, Some e); body]
+                    let! v = CVar.ofVar v
+                    let! e = CDefExpr.ofExpr e
+                    return CSequential [CStatement.CDeclare(v, e); body]
+
 
                 | LetRecursive(bindings, body) ->
                     return failwith "recursive bindings are not supported"
@@ -933,7 +1117,7 @@ module CStatement =
                     let! v = CVar.ofVar (Var("temp", t))
                     return 
                         CSequential [
-                            CDeclare(v, None)
+                            CDeclare(v, CDefExprEmpty)
                             CReturnValue (CExpr.CVar v)
                         ]
 
@@ -949,7 +1133,7 @@ module CStatement =
 
                     return 
                         CSequential [
-                            yield CDeclare(v, None)
+                            yield CDeclare(v, CDefExprEmpty)
                             for i in 0 .. args.Length - 1 do
                                 let value = args.[i]
                                 let index = CExpr.CValue(CTypeRef.CInt(true, 32), CPrimitiveValue.CIntegral (int64 i))
@@ -961,38 +1145,38 @@ module CStatement =
                             yield CReturnValue(CExpr.CVar v)
                         ]
 
-                | Let(v, DefaultValue _, body) ->
-                    let! v = CVar.ofVar v
-                    let! body = ofExprInternal last body
-                    return 
-                        CSequential [
-                            CDeclare(v, None)
-                            body
-                        ]
-
-                | Let(v, NewArray(et, args), body) ->
-                    let et = CType.ofType et
-                    let! args = args |> List.mapS CExpr.ofExpr
-                    let args = args |> List.toArray
-
-                    let len = args.Length
-                    let ct = CTypeRef.CArray(et, len)
-                    let! name = CompilerState.cName v
-                    let v = { name = name; ctype = ct }
-
-                    return 
-                        CSequential [
-                            yield CDeclare(v, None)
-                            for i in 0 .. args.Length - 1 do
-                                let value = args.[i]
-                                let index = CExpr.CValue(CTypeRef.CInt(true, 32), CPrimitiveValue.CIntegral (int64 i))
-                                yield 
-                                    CStatement.CWrite(
-                                        CLExpr.CItem(CLExpr.CVar v, index),
-                                        value
-                                    )
-                            yield CReturnValue(CExpr.CVar v)
-                        ]
+//                | Let(v, DefaultValue _, body) ->
+//                    let! v = CVar.ofVar v
+//                    let! body = ofExprInternal last body
+//                    return 
+//                        CSequential [
+//                            CDeclare(v, CDefExprEmpty)
+//                            body
+//                        ]
+//
+//                | Let(v, NewArray(et, args), body) ->
+//                    let et = CType.ofType et
+//                    let! args = args |> List.mapS CExpr.ofExpr
+//                    let args = args |> List.toArray
+//
+//                    let len = args.Length
+//                    let ct = CTypeRef.CArray(et, len)
+//                    let! name = CompilerState.cName v
+//                    let v = { name = name; ctype = ct }
+//
+//                    return 
+//                        CSequential [
+//                            yield CDeclare(v, CDefExprEmpty)
+//                            for i in 0 .. args.Length - 1 do
+//                                let value = args.[i]
+//                                let index = CExpr.CValue(CTypeRef.CInt(true, 32), CPrimitiveValue.CIntegral (int64 i))
+//                                yield 
+//                                    CStatement.CWrite(
+//                                        CLExpr.CItem(CLExpr.CVar v, index),
+//                                        value
+//                                    )
+//                            yield CReturnValue(CExpr.CVar v)
+//                        ]
 
                 | DefaultValue _ -> return failwith "default value in expr"
                 | NewArray _ -> return failwith "array-value in expr"
@@ -1066,9 +1250,16 @@ module CModule =
             |> List.sortByDescending (fun t -> t.level)
             |> List.map  (fun t -> t.def)
 
-    let rec private typeTree (cache : Dict<SystemType, DefTree>, level : int, t : SystemType) =
+    type private GraphCache =
+        {
+            functionCache   : Dict<ExternalFunction, DefTree>
+            typeCache       : Dict<SystemType, DefTree>
+            globalCache     : Dict<ExternalGlobal, DefTree>
+        }
+
+    let rec private typeGraph (cache : GraphCache, level : int, t : SystemType) =
         state {
-            match cache.TryGetValue t with
+            match cache.typeCache.TryGetValue t with
                 | (true, t) ->
                     t.level <- max t.level level
                     return Some t
@@ -1077,7 +1268,7 @@ module CModule =
                         | TCustom(name, fields) ->
                             let! dependentOn = 
                                 fields |> List.chooseS (fun (t,_) ->
-                                    typeTree(cache, level + 1, t)
+                                    typeGraph(cache, level + 1, t)
                                 )
 
                             let fields = 
@@ -1089,41 +1280,27 @@ module CModule =
                             let res = { def = CDef.CStruct(name, fields); needed = dependentOn; level = level }
                     
 
-                            cache.[t] <- res
+                            cache.typeCache.[t] <- res
                             return Some res
                         | _ ->
                             return None
         }
 
-    and private wrapDef (typeCache : Dict<SystemType, DefTree>, cache : Dict<ExternalFunction, DefTree>, level : int, functionState : FunctionCompilerState, def : CDef) =
+    and private functionGraph (cache : GraphCache, level : int, f : ExternalFunction) =
         state {
-            let! usedFunctions =
-                functionState.fCustomFunctions 
-                    |> HashMap.toList
-                    |> List.mapS (fun (signature, def) ->
-                        compileInternal(typeCache, cache, level + 1, def)
-                    )
-
-            let! usedTypes =
-                functionState.fUsedTypes 
-                    |> PSet.toList
-                    |> List.chooseS (fun st ->
-                        typeTree(typeCache, level + 1, st)
-                    )
-
-            let t = { def = def; needed = usedFunctions @ usedTypes; level = level }
-            return t
-        }
-
-    and private compileInternal (typeCache : Dict<SystemType, DefTree>, cache : Dict<ExternalFunction, DefTree>, level : int, f : ExternalFunction) =
-        state {
-            match cache.TryGetValue f with
+            match cache.functionCache.TryGetValue f with
                 | (true, t) -> 
                     t.level <- max t.level level
                     return t
                 | _ -> 
 
-                    match f with
+                    match f with    
+                        | ExtAll functions ->
+                            let! functions = functions |> List.mapS (fun f -> functionGraph(cache, level + 1, f))
+                            let tree = { def = CNoDef; needed = functions; level = level }
+                            cache.functionCache.[f] <- tree
+                            return tree
+
                         | ExtCompiled(s,d) ->
                             let compile =
                                 state {
@@ -1150,26 +1327,27 @@ module CModule =
                                     fCurrentSuffixes    = Map.empty
                                     fCustomFunctions    = HashMap.empty
                                     fUsedTypes          = PSet.empty
+                                    fUsedGlobals        = HashMap.empty
                                 }
 
                             let def = compile.Run(&functionState)
-                            let! tree = wrapDef(typeCache, cache, level, functionState, def)
-                            cache.[f] <- tree
+                            let! tree = wrapDef(cache, level, functionState, def)
+                            cache.functionCache.[f] <- tree
                             return tree
 
                         | _ ->
-                            let name, args, body =
+                            let signature, name, args, body =
                                 match f with
-                                    | ExtCompiled _ -> failwith "impossible"
+                                    | ExtCompiled _ | ExtAll _ -> failwith "impossible"
                                     | ExtCtor _ -> failwith "not implemented"
-                                    | ExtCustom(name, args, body) -> name, args, body
-                                    | ExtMethod mi ->
+                                    | ExtCustom(signature,name, args, body) -> signature, name, args, body
+                                    | ExtMethod(signature, mi) ->
                                         let name = methodName mi
                                         match Expr.TryGetReflectedDefinition mi with
                                             | Some def ->
                                                 match def with
-                                                    | Lambdas(args, body) -> name, List.concat args, body
-                                                    | b -> name, [], b
+                                                    | Lambdas(args, body) -> signature, name, List.concat args, body
+                                                    | b -> signature, name, [], b
 
                                             | None -> 
                                                 failwithf "no reflected definition for %A" mi
@@ -1191,26 +1369,110 @@ module CModule =
                                     fCurrentSuffixes    = args |> List.map (fun a -> a.Name, 1) |> Map.ofList
                                     fCustomFunctions    = HashMap.empty
                                     fUsedTypes          = PSet.empty
+                                    fUsedGlobals        = HashMap.empty
                                 }
 
 
                             // compile the function
-                            
                             let ret, parTypes, body = compile.Run(&functionState)
                             let state = { state with helperIndex = functionState.fHelperIndex }
                             do! State.put state
 
-                            let signature =
-                                { 
-                                    name        = name
-                                    returnType  = ret
-                                    parameters  = List.map2 (fun (v : Var) (ct : CTypeRef) -> { name = v.Name; ctype = ct; modifier = CParameterModifier.In }) args parTypes |> List.toArray
-                                }
-
                             let def = CDef.CFunction(signature, body)
-                            let! tree = wrapDef(typeCache, cache, level, functionState, def)
-                            cache.[f] <- tree
+                            let! tree = wrapDef(cache, level, functionState, def)
+                            cache.functionCache.[f] <- tree
                             return tree
+        }
+
+    and private globalGraph(cache : GraphCache, level : int, g : ExternalGlobal) =
+        state {
+            match cache.globalCache.TryGetValue g with
+                | (true, t) -> 
+                    t.level <- max t.level level
+                    return t
+                | _ ->
+                    
+                    let compile =
+                        state {
+                            match g with
+                                | ExtDeclare g ->
+                                    match g.globalType with
+                                        | CCustomType(_,st) -> do! CompilerState.useType st
+                                        | _ -> ()
+
+                                    return CDef.CGlobal(g, CDefExprEmpty)
+
+                                | ExtInit(g, e) ->
+                                    match g.globalType with
+                                        | CCustomType(_,st) -> do! CompilerState.useType st
+                                        | _ -> ()
+
+                                    let! def = CDefExpr.ofExpr e
+                                    return CDef.CGlobal(g, def)
+
+//                                | ExtDeclareArray(g, arr) ->
+//                                    match g.globalType with
+//                                        | CCustomType(_,st) -> do! CompilerState.useType st
+//                                        | _ -> ()
+//
+//                                    let et = arr.GetType().GetElementType()
+//                                    let valueExpressions = 
+//                                        List.init arr.Length (fun i ->
+//                                            let v = arr.GetValue(i)
+//                                            Expr.Value(v, et)
+//                                        )
+//
+//                                    let! values = valueExpressions |> List.mapS CExpr.ofExpr
+//                                    let! ct = CompilerState.getAndUseType et
+//                                    return CDef.CGlobal(g, Some (CDefExprArray(ct, values)))
+                                    
+                                    
+                        }
+
+                    let! state = State.get
+                    let mutable functionState =
+                        {
+                            fBackend            = state.backend
+                            fHelperIndex        = state.helperIndex
+                            fNames              = Map.empty
+                            fCurrentSuffixes    = Map.empty
+                            fCustomFunctions    = HashMap.empty
+                            fUsedTypes          = PSet.empty
+                            fUsedGlobals        = HashMap.empty
+                        }
+
+                    let def = compile.Run(&functionState)
+                    let! tree = wrapDef(cache, level, functionState, def)
+                    do! State.put { state with helperIndex = functionState.fHelperIndex }
+                    cache.globalCache.[g] <- tree
+                    return tree
+        }
+
+    and private wrapDef (cache : GraphCache, level : int, functionState : FunctionCompilerState, def : CDef) =
+        state {
+            let! usedFunctions =
+                functionState.fCustomFunctions 
+                    |> HashMap.toList
+                    |> List.mapS (fun (signature, def) ->
+                        functionGraph(cache, level + 1, def)
+                    )
+
+            let! usedTypes =
+                functionState.fUsedTypes 
+                    |> PSet.toList
+                    |> List.chooseS (fun st ->
+                        typeGraph(cache, level + 1, st)
+                    )
+
+            let! usedGlobals =
+                functionState.fUsedGlobals
+                    |> HashMap.toList
+                    |> List.mapS (fun (_,g) ->
+                        globalGraph(cache, level + 1, g)
+                    )
+
+            let t = { def = def; needed = usedFunctions @ usedTypes @ usedGlobals; level = level }
+            return t
         }
 
 
@@ -1221,9 +1483,25 @@ module CModule =
                 | b -> [], b
 
         let mutable initialState = CompilerState.empty
-        let tree = compileInternal(Dict(), Dict(), 0, ExtCustom(name, args, body)).Run(&initialState)
+        let cache = { typeCache = Dict(); functionCache = Dict(); globalCache = Dict() }
+        let tree = functionGraph(cache, 0, ExternalFunction.custom name args body).Run(&initialState)
         flatten tree
 
+    let ofLambdas (e : list<string * Expr>) : CModule =
+        let functions =
+            e |> List.map (fun (name, e) ->
+                let args, body = 
+                    match e with
+                        | Lambdas(args, body) -> List.concat args, body
+                        | b -> [], b
+
+                ExternalFunction.custom name args body
+            )
+
+        let mutable initialState = CompilerState.empty
+        let cache = { typeCache = Dict(); functionCache = Dict(); globalCache = Dict() }
+        let tree = functionGraph(cache, 0, ExtAll(functions)).Run(&initialState)
+        flatten tree
 
 module GLSL =
     module String =
@@ -1272,6 +1550,7 @@ module GLSL =
     module CExpr = 
         let rec glsl (e : CExpr) =
             match e with
+                | CExpr.CGlobal g -> g.globalName
                 | CExpr.CVar v -> v.name
 
                 | CExpr.CValue(_,CPrimitiveValue.CBool(v))          -> if v then "true" else "false"
@@ -1329,6 +1608,13 @@ module GLSL =
     module CLExpr =
         let glsl (e : CLExpr) = e |> CLExpr.toCExpr |> CExpr.glsl
 
+    module CDefExpr =
+        let glsl (e : CDefExpr) =
+            match e with
+                | CDefExpr e -> CExpr.glsl e
+                | CDefExprArray(t, args) ->
+                    args |> List.map CExpr.glsl |> String.concat ", " |> sprintf "{ %s }"
+
     module CStatement =
         let rec glsl (s : CStatement) =
             match s with
@@ -1340,10 +1626,14 @@ module GLSL =
                 | CStatement.CDeclare(v,e) ->
                     let assign =
                         match e with
-                            | Some e -> " = " + (CExpr.glsl e)
-                            | None -> ""
+                            | CDefExprEmpty -> ""
+                            | e -> " = " + (CDefExpr.glsl e)
 
-                    sprintf "%s %s%s" (CType.glsl v.ctype) v.name assign
+                    match v.ctype with
+                        | CArray(t, len) ->
+                            sprintf "%s %s[%d]%s" (CType.glsl t) v.name len assign
+                        | _ -> 
+                            sprintf "%s %s%s" (CType.glsl v.ctype) v.name assign
 
                 | CStatement.CWrite(l, v) ->
                     (CLExpr.glsl l) + " = " + (CExpr.glsl v)
@@ -1396,27 +1686,34 @@ module GLSL =
             let definitions = 
                 m |> List.map (fun d ->
                     match d with
+                        | CNoDef ->
+                            ""
+
                         | CDef.CFunction(signature, body) ->
                             let ret = CType.glsl signature.returnType
                             let args = signature.parameters |> Array.map CParameter.glsl |> String.concat ", "
                             let body = CStatement.glsl body
                             sprintf "%s %s(%s)\r\n{\r\n%s;\r\n}" ret signature.name args (String.indent body)
 
-                        | CDef.CGlobal(kind, v, e) ->
+                        | CDef.CGlobal(g, initializer) ->
+                            
+                            let isConstant = g.globalAnnotations |> List.exists (fun a -> a = CConst)
 
-                            let prefix =
-                                match kind with
-                                    | CGlobalKind.CConstant -> "const"
-                                    | CGlobalKind.CInput -> "in"
-                                    | CGlobalKind.COutput -> "out"
-                                    | CGlobalKind.CUniform -> "uniform"
+                            // TODO: respect annotations
+                            let prefix = 
+                                if isConstant then "const "
+                                else ""
 
                             let assign =
-                                match e with
-                                    | Some e -> CExpr.glsl e |> sprintf " = %s"
-                                    | None -> ""
+                                match initializer with
+                                    | CDefExprEmpty -> ""
+                                    | e -> CDefExpr.glsl e |> sprintf " = %s"
 
-                            sprintf "%s %s %s%s;" prefix (CType.glsl v.ctype) v.name assign
+                            match g.globalType with
+                                | CArray(t, len) ->
+                                    sprintf "%s%s %s[%d]%s;" prefix (CType.glsl t) g.globalName len assign
+                                | _ -> 
+                                    sprintf "%s%s %s%s;" prefix (CType.glsl g.globalType) g.globalName assign
 
                         | CDef.CStruct(name, fields) ->
                             let fields = fields |> List.map (fun (t,n) -> sprintf "    %s %s;" (CType.glsl t) n) |> String.concat "\r\n"

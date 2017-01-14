@@ -856,10 +856,36 @@ let main argv =
 //    let e = NewStuff.Effect.ofFunction (evilShader)
 //    printfn "%A" e
 
+    let arr = [| Sepp 1; Heinz 2.0; Sepp 3 |]
+
     let testModule = 
-        FShade.Compiler.CModule.ofLambda "test" <@ fun (a : int) -> 
-            (Sepp a, float 1)
-        @>
+        FShade.Compiler.CModule.ofLambdas [
+            "test", <@@ fun (a : int) -> 
+                (arr.[a], float 1)
+            @@>
+        
+            "heinz", <@@ fun (a : int) (b : float) ->
+                Heinz (2.0 * b)
+            @@>
+
+            "blubber", <@@ fun (a : int * int) ->
+                let (x,y) = a
+                x + y
+            @@>
+
+            "bla", <@@ fun (a : Blubb) ->
+                match a with
+                    | Heinz v -> v
+                    | Sepp _ -> 1.0
+            @@>
+
+            "seppy", <@@ fun (a : int) ->
+                let arr = Arr<4 N, int> [| 1;2;3;4 |]
+                arr.[a]
+            @@>
+
+        ]
+
     printfn "%A" testModule
 
     let code = FShade.Compiler.GLSL.CModule.glsl testModule
