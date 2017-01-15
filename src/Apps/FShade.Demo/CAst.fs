@@ -40,6 +40,13 @@ type CFunctionRef =
         parameters  : CParameter[]
     }
 
+type CIntrinsicFunction =
+    {
+        name        : string
+        tag         : obj
+        arguments   : Option<list<int>>
+    }
+
 type CVar = 
     { 
         name : string
@@ -73,6 +80,7 @@ type CExpr =
     | CGlobal of CGlobal
     | CValue of CTypeRef * CPrimitiveValue
     | CCall of func : CFunctionRef * args : CExpr[]
+    | CCallInrinsic of func : CIntrinsicFunction * args : CExpr[]
     | CConditional of cond : CExpr * ifTrue : CExpr * ifFalse : CExpr
 
     | CNeg of CExpr
@@ -147,6 +155,7 @@ type CDef =
     | CGlobal of variable : CGlobal * initializer : CDefExpr
     | CFunction of signature : CFunctionRef * body : CStatement
     | CStruct of name : string * fields : list<CTypeRef * string>
+    | CShader of name : string * inputs : list<CGlobal> * outputs : list<CGlobal> * body : CStatement
     | CNoDef
 
 type CModule = list<CDef>
@@ -277,10 +286,6 @@ module private Helpers =
             None
 
 
-    let (>>=) (l : State<'s, 'a>) (r : 'a -> State<'s, 'b>) =
-        l |> State.bind r
-
-
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module CType =
     open Aardvark.Base.TypeInfo
@@ -376,15 +381,28 @@ type ExternalGlobal =
     | ExtDeclare of CGlobal
     | ExtInit of CGlobal * Expr
 
-[<AllowNullLiteral>]
-type IBackend =
-    abstract member CompileIntrinsicFunction : MethodInfo -> Option<CExpr[] -> CExpr>
+[<AllowNullLiteral; AbstractClass>]
+type Backend() =
+    let functionCache = System.Collections.Concurrent.ConcurrentDictionary<MethodInfo, Option<CIntrinsicFunction>>()
+    let typeCache = System.Collections.Concurrent.ConcurrentDictionary<Type, Option<CTypeRef>>()
+
+    abstract member CompileIntrinsicFunction : MethodInfo -> Option<CIntrinsicFunction>
     abstract member CompileIntrinsicType : Type -> Option<CTypeRef>
     abstract member IsIntrinsicValue : CGlobal -> bool
 
+    member x.TryGetIntrinsicFunction (mi : MethodInfo) =
+        functionCache.GetOrAdd(mi, fun mi ->
+            x.CompileIntrinsicFunction mi
+        )
+
+    member x.TryGetIntrinsicType (t : Type) =
+        typeCache.GetOrAdd(t, fun t ->
+            x.CompileIntrinsicType t
+        )
+
 type FunctionCompilerState =
     {
-        fBackend             : IBackend
+        fBackend             : Backend
         fHelperIndex         : int
         fNames               : Map<Var, string>
         fCurrentSuffixes     : Map<string, int>
@@ -393,9 +411,17 @@ type FunctionCompilerState =
         fUsedGlobals         : HashMap<obj, ExternalGlobal>
     }
 
+    member x.TryGetIntrinsicFunction (mi : MethodInfo) =
+        if isNull x.fBackend then 
+            None
+        else
+            x.fBackend.TryGetIntrinsicFunction mi
+
+
+
 type CompilerState =
     {
-        backend             : IBackend
+        backend             : Backend
         helperIndex         : int
     }
 
@@ -860,10 +886,10 @@ module CExpr =
 
                         | _ -> 
                             let! s = State.get
-                            let intrinsic = if isNull s.fBackend then None else s.fBackend.CompileIntrinsicFunction mi
+                            let intrinsic = s.TryGetIntrinsicFunction mi //if isNull s.fBackend then None else s.fBackend.CompileIntrinsicFunction mi
                             match intrinsic with
                                 | Some fmt -> 
-                                    return fmt (List.toArray args)
+                                    return CExpr.CCallInrinsic(fmt, List.toArray args)
                                 | None -> 
                                     let parameters =
                                         mi.GetParameters() |> Array.map (fun p ->
@@ -880,9 +906,11 @@ module CExpr =
                     let args = t :: args |> List.toArray
 
                     let! s = State.get
-                    let intrinsic = if isNull s.fBackend then None else s.fBackend.CompileIntrinsicFunction mi
+                    let intrinsic = s.TryGetIntrinsicFunction mi //if isNull s.fBackend then None else s.fBackend.CompileIntrinsicFunction mi
                     match intrinsic with
-                        | Some fmt -> return fmt args
+                        | Some fmt -> 
+                            return CExpr.CCallInrinsic(fmt, args)
+
                         | None ->
                             let thisParameter = { name = "self"; ctype = CType.ofType target.Type; modifier = CParameterModifier.ByRef }
                             let parameters =
@@ -1319,6 +1347,7 @@ module CModule =
                                     return CDef.CFunction(s,d)
                                 }
 
+                            let! state = State.get
                             let mutable functionState =
                                 {
                                     fBackend            = Unchecked.defaultof<_>
@@ -1476,18 +1505,18 @@ module CModule =
         }
 
 
-    let ofLambda (name : string) (e : Expr) : CModule =
+    let ofLambda (backend : Backend) (name : string) (e : Expr) : CModule =
         let args, body = 
             match e with
                 | Lambdas(args, body) -> List.concat args, body
                 | b -> [], b
 
-        let mutable initialState = CompilerState.empty
+        let mutable initialState = { CompilerState.empty with backend = backend }
         let cache = { typeCache = Dict(); functionCache = Dict(); globalCache = Dict() }
         let tree = functionGraph(cache, 0, ExternalFunction.custom name args body).Run(&initialState)
         flatten tree
 
-    let ofLambdas (e : list<string * Expr>) : CModule =
+    let ofLambdas (backend : Backend) (e : list<string * Expr>) : CModule =
         let functions =
             e |> List.map (fun (name, e) ->
                 let args, body = 
@@ -1498,7 +1527,7 @@ module CModule =
                 ExternalFunction.custom name args body
             )
 
-        let mutable initialState = CompilerState.empty
+        let mutable initialState = { CompilerState.empty with backend = backend }
         let cache = { typeCache = Dict(); functionCache = Dict(); globalCache = Dict() }
         let tree = functionGraph(cache, 0, ExtAll(functions)).Run(&initialState)
         flatten tree
@@ -1563,6 +1592,14 @@ module GLSL =
                     let args = args |> Array.map glsl |> String.concat ", "
                     sprintf "%s(%s)" f.name args
 
+                | CExpr.CCallInrinsic(f, args) ->
+                    let args = 
+                        match f.arguments with
+                            | Some order -> order |> List.map (fun i -> glsl args.[i]) |> String.concat ", "
+                            | _ -> args |> Array.map glsl |> String.concat ", "
+                    sprintf "%s(%s)" f.name args
+                    
+
                 | CExpr.CConditional(cond, i, e) ->
                     let cond = glsl cond
                     let i = glsl i
@@ -1611,6 +1648,7 @@ module GLSL =
     module CDefExpr =
         let glsl (e : CDefExpr) =
             match e with
+                | CDefExprEmpty -> ""
                 | CDefExpr e -> CExpr.glsl e
                 | CDefExprArray(t, args) ->
                     args |> List.map CExpr.glsl |> String.concat ", " |> sprintf "{ %s }"
@@ -1688,6 +1726,13 @@ module GLSL =
                     match d with
                         | CNoDef ->
                             ""
+
+                        | CDef.CShader(name, inputs, outputs, body) ->
+                            let shader = sprintf "void %s()\r\n{\r\n%s\r\n}" name (CStatement.glsl body)
+
+                            let inputs = glsl (inputs |> List.map (fun g -> CDef.CGlobal(g, CDefExprEmpty)))
+                            let outputs = glsl (outputs |> List.map (fun g -> CDef.CGlobal(g, CDefExprEmpty)))
+                            sprintf "%s\r\n%s\r\n%s" inputs outputs shader
 
                         | CDef.CFunction(signature, body) ->
                             let ret = CType.glsl signature.returnType
