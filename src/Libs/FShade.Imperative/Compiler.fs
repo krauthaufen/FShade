@@ -13,58 +13,7 @@ open Aardvark.Base
 open Aardvark.Base.TypeInfo
 open Aardvark.Base.TypeInfo.Patterns
 
-open FShade.Types
-open FShade.Parameters
-open FShade.Primitives
-open FShade.Builders
-
-type EntryPoint =
-    {
-        conditional : Option<string>
-        entryName   : string
-        inputs      : list<Var>
-        outputs     : list<Var>
-        arguments   : list<Var>
-        body        : Expr
-    }
-
-type Module = { entries : list<EntryPoint> }
-
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module EntryPoint =
-
-    let ofLambda (name : string) (e : Expr) =
-        match e with
-            | Lambdas(args, body) ->
-                let args = List.concat args
-                {
-                    conditional = None
-                    entryName = name
-                    inputs = []
-                    outputs = []
-                    arguments = args
-                    body = body
-                }
-            | e ->
-                {
-                    conditional = None
-                    entryName = name
-                    inputs = []
-                    outputs = []
-                    arguments = []
-                    body = e
-                }
-                
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module Module =
-
-    let ofLambda (name : string) (e : Expr) =
-        { entries = [EntryPoint.ofLambda name e] }
-
-    let ofLambdas (l : list<string * Expr>) =
-        { entries = l |> List.map (uncurry EntryPoint.ofLambda) }
-
-
+open FShade.Imperative
 
 module Compiler =
     open Aardvark.Base.Monads.State
@@ -108,6 +57,8 @@ module Compiler =
                 | EntryFunction f ->
                     CFunctionSignature.ofFunction f.entryName f.arguments f.body.Type
 
+    type ConstantDefinition = { cName : string; cType : Type; cValue : Expr }
+
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module FunctionDefinition =
         let ofMethodBase (mi : MethodBase) =
@@ -118,14 +69,23 @@ module Compiler =
                 | _ ->
                     failwithf "[FShade] cannot call function %A since it is not reflectable" mi
 
+    type ModuleState =
+        {
+            constantIndex       : int
+            usedTypes           : HashMap<obj, CType>
+        }
+
     type CompilerState =
         {
             backend             : Backend
             nameIndices         : Map<string, int>
             variableNames       : Map<Var, string>
+            fixedNames          : Set<string>
 
             usedFunctions       : HashMap<obj, FunctionDefinition>
-            usedTypes           : HashMap<obj, CType>
+            usedConstants       : HashMap<obj, ConstantDefinition>
+
+            moduleState         : ModuleState
         }
 
     module Constructors =
@@ -324,15 +284,23 @@ module Compiler =
                     | Some name -> 
                         s, name
                     | None ->
-                        match Map.tryFind v.Name s.nameIndices with
-                            | Some index ->
-                                let name = v.Name + string index
-                                let state = { s with nameIndices = Map.add v.Name (index + 1) s.nameIndices; variableNames = Map.add v name s.variableNames }
-                                state, name
-                            | None ->
-                                let state = { s with nameIndices = Map.add v.Name 1 s.nameIndices; variableNames = Map.add v v.Name s.variableNames }
-                                state, v.Name
+                        if Set.contains v.Name s.fixedNames then
+                            s, v.Name
+                        else
+                            match Map.tryFind v.Name s.nameIndices with
+                                | Some index ->
+                                    let name = v.Name + string index
+                                    let state = { s with nameIndices = Map.add v.Name (index + 1) s.nameIndices; variableNames = Map.add v name s.variableNames }
+                                    state, name
+                                | None ->
+                                    let state = { s with nameIndices = Map.add v.Name 1 s.nameIndices; variableNames = Map.add v v.Name s.variableNames }
+                                    state, v.Name
 
+            )
+
+        let fixName (n : string) =
+            State.modify (fun s ->
+                { s with fixedNames = Set.add n s.fixedNames; nameIndices = Map.add n 1 s.nameIndices }
             )
 
         let useFunction (key : obj) (f : FunctionDefinition) =
@@ -345,6 +313,22 @@ module Compiler =
                 { s with usedFunctions = HashMap.add ((key, "ctor") :> obj) f s.usedFunctions }, f.Signature
             )
 
+        let useConstant (key : obj) (e : Expr) =
+            state {
+                let ct = CType.ofType e.Type
+                let! s = State.get
+                match HashMap.tryFind key s.usedConstants with
+                    | None -> 
+                        let name = sprintf "_constant%d" s.moduleState.constantIndex
+                        let c = { cName = name; cType = e.Type; cValue = e }
+                        do! State.put { s with usedConstants = HashMap.add key c s.usedConstants; moduleState = { s.moduleState with constantIndex = s.moduleState.constantIndex + 1 } }
+                    
+                        return CVar { name = name; ctype = ct }
+                    | Some c ->
+                        return CVar { name = c.cName; ctype = ct }
+
+            }
+
         let tryGetIntrinsic (mi : MethodBase) =
             State.get |> State.map (fun s ->
                 if isNull s.backend then None
@@ -356,9 +340,15 @@ module Compiler =
             backend             = b
             nameIndices         = Map.empty
             variableNames       = Map.empty
+            fixedNames          = Set.empty
 
             usedFunctions       = HashMap.empty
-            usedTypes           = HashMap.empty
+            usedConstants       = HashMap.empty
+            moduleState =
+                {
+                    constantIndex = 0
+                    usedTypes = HashMap.empty
+                }
         }
 
     let toCType (t : Type) =
@@ -367,7 +357,16 @@ module Compiler =
 
             match cType with
                 | CStruct _ ->
-                    { s with CompilerState.usedTypes = HashMap.add (t :> obj) cType s.usedTypes }, cType
+                    { s with moduleState = { s.moduleState with ModuleState.usedTypes = HashMap.add (t :> obj) cType s.moduleState.usedTypes } }, cType
+                | _ ->
+                    s, cType
+        )
+
+    let useCType (cType : CType) =
+        State.custom (fun s ->
+            match cType with
+                | CStruct _ ->
+                    { s with moduleState = { s.moduleState with ModuleState.usedTypes = HashMap.add (cType :> obj) cType s.moduleState.usedTypes } }, cType
                 | _ ->
                     s, cType
         )
@@ -377,6 +376,33 @@ module Compiler =
             let! ctype = toCType v.Type
             let! name = CompilerState.variableName v
             return { name = name; ctype = ctype }
+        }
+
+    let toFixedCVar (v : Var) =
+        state {
+            let! ctype = toCType v.Type
+            let! name = CompilerState.variableName v
+            return { name = name; ctype = ctype }
+        }
+    let toCUniform (v : Uniform) =
+        state {
+            match v with
+                | Global(n, t) ->
+                    let! ctype = toCType t
+                    do! CompilerState.fixName n
+                    return CGlobal(ctype, n)
+
+                | Buffer(n, fields) ->
+                    let! fields = 
+                        fields |> List.mapS (fun (n, t) ->
+                            state {
+                                do! CompilerState.fixName n
+                                let! ct = toCType t
+                                return ct, n
+                            }
+                        )
+
+                    return CBuffer(n, fields)
         }
 
     let rec tryDeconstructValue (t : Type) (v : obj) =
@@ -415,9 +441,8 @@ module Compiler =
         state {
             let free = e.GetFreeVars() |> Seq.toList
             if free.Length = 0 then
-                let! name = CompilerState.newName "value"
-                // TODO: support constants
-                return failwithf "[FShade] constants not implemented %A" e
+                return! CompilerState.useConstant e e
+
             else
                 let! name = CompilerState.newName "helper"
                 let definition = ManagedFunction(name, free, e)
@@ -585,7 +610,7 @@ module Compiler =
             | Method("op_Equality", _), [l;r]           -> CExpr.CEqual(l, r) |> Some
             | Method("op_Inequality", _), [l;r]         -> CExpr.CNotEqual(l, r) |> Some
 
-            | MethodQuote <@ fun (a : Arr<1 N, int>) -> a.[0] @> _, [arr; index]
+            | Method("get_Item", [ArrOf(_,_); _]), [arr; index]
             | Method("GetArray", _), [arr; index] -> 
                 CExpr.CItem(ct, arr, index) |> Some
 
@@ -982,6 +1007,7 @@ module Compiler =
             // ensure that all inputs, outputs, arguments have their correct names
             let! inputs     = f.inputs |> List.mapS toCVar
             let! outputs    = f.outputs |> List.mapS toCVar
+            let! uniforms   = f.uniforms |> List.mapS toCUniform
             let! args       = f.arguments |> List.mapS toCVar
 
             // compile the body
@@ -993,13 +1019,14 @@ module Compiler =
                 cEntryName   = f.entryName
                 cInputs      = inputs
                 cOutputs     = outputs
+                cUniforms    = uniforms
                 cArguments   = args
                 cReturnType  = ret
                 cBody        = body
             }
         }
 
-    let toCValueDef (f : FunctionDefinition) =
+    let functionToCValueDef (f : FunctionDefinition) =
         state {
             match f with
                 | ManagedFunction(name, args, body) ->
@@ -1016,6 +1043,16 @@ module Compiler =
                     
         }
 
+    let constantToCValueDef (c : ConstantDefinition) =
+        state {
+            let! ct = toCType c.cType
+            let! e = toCRExpr c.cValue
+            match e with
+                | Some e ->
+                    return CValueDef.CConstant(ct, c.cName, e)
+                | None ->
+                    return failwithf "[FShade] constants must have a value %A" c
+        }
 
     type TypeGraph private(v : Option<CTypeDef>) =
         let mutable level = 0
@@ -1064,13 +1101,13 @@ module Compiler =
 
     type ValueGraphCache(b : Backend) =
         let store = Dict<obj, ValueGraph>()
-        let mutable typeStore : HashMap<obj, CType> = HashMap.empty
+        let mutable moduleState : ModuleState = { usedTypes = HashMap.empty; constantIndex = 0 }
 
         member x.Backend = b
 
-        member x.UsedTypes
-            with get() = typeStore
-            and set v = typeStore <- v
+        member x.ModuleState
+            with get() = moduleState
+            and set v = moduleState <- v
 
         member x.GetOrAdd(def : 'a, create : 'a -> ValueGraph) =
             store.GetOrCreate(def :> obj, fun _ ->
@@ -1130,14 +1167,30 @@ module Compiler =
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module ValueGraph = 
-        let rec ofFunction (cache : ValueGraphCache) (f : FunctionDefinition) : ValueGraph =
-            cache.GetOrAdd(f, fun f -> 
-                let mutable state = { emptyState cache.Backend with usedTypes = cache.UsedTypes }
-                let def = toCValueDef(f).Run(&state)
+        let rec ofConstant (cache : ValueGraphCache) (c : ConstantDefinition) : ValueGraph =
+            cache.GetOrAdd(c, fun c -> 
+                let mutable state = { emptyState cache.Backend with moduleState = cache.ModuleState }
+                let def = constantToCValueDef(c).Run(&state)
                 let usedFunctions = state.usedFunctions |> HashMap.toSeq |> Seq.map snd |> Seq.toList
+                let usedConstants = state.usedConstants |> HashMap.toSeq |> Seq.map snd |> Seq.toList
                 let entry = ValueGraph(def)
                 entry.AddDependencies (usedFunctions |> List.map (ofFunction cache))
-                cache.UsedTypes <- state.usedTypes
+                entry.AddDependencies (usedConstants |> List.map (ofConstant cache))
+                cache.ModuleState <- state.moduleState
+
+                entry
+            )
+            
+        and ofFunction (cache : ValueGraphCache) (f : FunctionDefinition) : ValueGraph =
+            cache.GetOrAdd(f, fun f -> 
+                let mutable state = { emptyState cache.Backend with moduleState = cache.ModuleState }
+                let def = functionToCValueDef(f).Run(&state)
+                let usedFunctions = state.usedFunctions |> HashMap.toSeq |> Seq.map snd |> Seq.toList
+                let usedConstants = state.usedConstants |> HashMap.toSeq |> Seq.map snd |> Seq.toList
+                let entry = ValueGraph(def)
+                entry.AddDependencies (usedFunctions |> List.map (ofFunction cache))
+                entry.AddDependencies (usedConstants |> List.map (ofConstant cache))
+                cache.ModuleState <- state.moduleState
 
                 entry
             )
@@ -1163,7 +1216,7 @@ module Compiler =
     let compile (b : Backend) (m : Module) : CModule =
         let cache = ValueGraphCache b
         let valueGraph = m.entries |> List.map EntryFunction |> ValueGraph.ofFunctions cache
-        let usedTypes = cache.UsedTypes |> HashMap.toSeq |> Seq.map snd |> Seq.toList
+        let usedTypes = cache.ModuleState.usedTypes |> HashMap.toSeq |> Seq.map snd |> Seq.toList
         let typeCache = TypeGraphCache b
         let typeGraph = TypeGraph.ofTypes typeCache usedTypes
 
@@ -1172,6 +1225,5 @@ module Compiler =
 
         {
             types = types
-            uniforms = Map.empty
             values = values
         }

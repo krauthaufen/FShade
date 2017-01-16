@@ -11,6 +11,12 @@ module GLSL =
             let lines = lineBreak.Split str
             let prefix = "    "
             lines |> Seq.map (fun l -> if l.Length > 0 then prefix + l else l) |> String.concat "\r\n"
+
+    type Config =
+        {
+            perStageUniforms    : bool
+            locations           : bool
+        }
   
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -165,9 +171,15 @@ module GLSL =
                 | CNop -> ""
                 | CDo e -> CExpr.glsl e
                 | CDeclare(v, r) ->
-                    match r with
-                        | Some r -> sprintf "%s %s = %s" (CType.glsl v.ctype) v.name (CRExpr.glsl r)
-                        | None -> sprintf "%s %s" (CType.glsl v.ctype) v.name
+                    match v.ctype with
+                        | CArray(t, l) ->
+                            match r with
+                                | Some r -> sprintf "%s %s[%d] = %s" (CType.glsl t) v.name l (CRExpr.glsl r)
+                                | None -> sprintf "%s %s[%d]" (CType.glsl t) v.name l
+                        | _ -> 
+                            match r with
+                                | Some r -> sprintf "%s %s = %s" (CType.glsl v.ctype) v.name (CRExpr.glsl r)
+                                | None -> sprintf "%s %s" (CType.glsl v.ctype) v.name
 
                 | CWrite(l, v) ->
                     sprintf "%s = %s" (CLExpr.glsl l) (CExpr.glsl v)
@@ -201,40 +213,62 @@ module GLSL =
                     sprintf "if(%s)\r\n{\r\n%s;\r\n}\r\nelse\r\n{\r\n%s;\r\n}" (CExpr.glsl c) (i |> glsl |> String.indent) (e |> glsl |> String.indent)
 
                 | CSwitch _ -> string s
-                
+               
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module CUniform =
+        let glsl (u : CUniform) =
+            match u with
+                | CGlobal(t, n) ->
+                    sprintf "uniform %s %s;" (CType.glsl t) n
+                | CBuffer(n, fields) ->
+                    let fields = fields |> List.map (fun (t, n) -> sprintf "%s %s;" (CType.glsl t) n) |> String.concat "\r\n"
+                    sprintf "uniform %s\r\n{\r\n%s\r\n}" n (String.indent fields)
     
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module CEntryDef =
-        let glsl (e : CEntryDef) =
+        let glsl (c : Config) (e : CEntryDef) =
             let before, after = 
                 match e.cConditional with
-                    | Some cond -> (sprintf "\r\n#ifdef %s\r\n" cond, "#endif\r\n")
-                    | None -> ("", "")
+                    | Some cond -> ([sprintf "#ifdef %s" cond], ["#endif"])
+                    | None -> ([], [])
 
-            let inputs = e.cInputs |> List.map (fun v -> sprintf "in %s %s;" (CType.glsl v.ctype) v.name) |> String.concat "\r\n"
-            let outputs = e.cOutputs |> List.map (fun v -> sprintf "out %s %s;" (CType.glsl v.ctype) v.name) |> String.concat "\r\n"
+            let inputs = 
+                e.cInputs |> List.mapi (fun i v -> 
+                    if c.locations then  sprintf "layout(location = %d) in %s %s;" i (CType.glsl v.ctype) v.name
+                    else sprintf "in %s %s;" (CType.glsl v.ctype) v.name
+                )
+            let outputs = 
+                e.cOutputs |> List.mapi (fun i v -> 
+                    if c.locations then  sprintf "layout(location = %d) out %s %s;" i (CType.glsl v.ctype) v.name
+                    else sprintf "out %s %s;" (CType.glsl v.ctype) v.name
+                )
+            let uniforms = e.cUniforms |> List.map CUniform.glsl
             let args = e.cArguments |> List.map (fun v -> sprintf "%s %s" (CType.glsl v.ctype) v.name) |> String.concat ", " 
 
             String.concat "\r\n" [
-                before
-                inputs
-                outputs
-                sprintf "%s %s(%s)\r\n{\r\n%s;\r\n}" (CType.glsl e.cReturnType) e.cEntryName args (e.cBody |> CStatement.glsl |> String.indent)
-                after
+                yield! before
+                if c.perStageUniforms then
+                    yield! uniforms
+                yield! inputs
+                yield! outputs
+                yield sprintf "%s %s(%s)\r\n{\r\n%s;\r\n}" (CType.glsl e.cReturnType) e.cEntryName args (e.cBody |> CStatement.glsl |> String.indent)
+                yield! after
             ]
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module CValueDef =
-        let glsl (d : CValueDef) =
+        let glsl (c : Config) (d : CValueDef) =
             match d with
                 | CEntryDef e -> 
-                    CEntryDef.glsl e
+                    CEntryDef.glsl c e
 
                 | CFunctionDef(signature, body) ->
                     sprintf "%s\r\n{\r\n%s;\r\n}" (CFunctionSignature.glsl signature) (body |> CStatement.glsl |> String.indent)
 
                 | CConstant(t, n, init) ->
-                    sprintf "%s %s = %s;" (CType.glsl t) n (CRExpr.glsl init)
+                    match t with
+                        | CArray(t,l) -> sprintf "const %s %s[%d] = %s;" (CType.glsl t) n l (CRExpr.glsl init)
+                        | _ -> sprintf "const %s %s = %s;" (CType.glsl t) n (CRExpr.glsl init)
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module CTypeDef =
@@ -246,11 +280,15 @@ module GLSL =
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module CModule =
-        let glsl (m : CModule) =
+        let glsl (c : Config) (m : CModule) =
             let definitions =
                 List.concat [
-                    m.types |> List.map CTypeDef.glsl
-                    m.values |> List.map CValueDef.glsl
+                    yield m.types |> List.map CTypeDef.glsl
+
+                    if not c.perStageUniforms then
+                        yield m.uniforms |> List.map CUniform.glsl
+
+                    yield m.values |> List.map (CValueDef.glsl c)
                 ]
 
             definitions |> String.concat "\r\n\r\n"

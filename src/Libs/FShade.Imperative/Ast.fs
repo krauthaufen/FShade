@@ -433,7 +433,9 @@ type CStatement =
     | CSwitch of value : CExpr * cases : array<CLiteral * CStatement>
 
 
-
+type CUniform =
+    | CGlobal of ctype : CType * name : string
+    | CBuffer of name : string * fields : list<CType * string>
 
 type CEntryDef =
     {
@@ -441,13 +443,12 @@ type CEntryDef =
         cEntryName   : string
         cInputs      : list<CVar>
         cOutputs     : list<CVar>
+        cUniforms    : list<CUniform>
         cArguments   : list<CVar>
         cReturnType  : CType
         cBody        : CStatement
     }
 
-type CUniformDef =
-    | CUniform of ctype : CType * name : string
 
 type CValueDef =
     | CConstant of ctype : CType * name : string * init : CRExpr
@@ -461,6 +462,45 @@ type CTypeDef =
 type CModule =
     {
         types       : list<CTypeDef>
-        uniforms    : Map<string, list<CUniformDef>>
         values      : list<CValueDef>
-    }
+    } with
+
+    member x.uniforms =
+        let globalTable = Dictionary.empty
+        let bufferTable : Dictionary<string, Dictionary<string, CType>> = Dictionary.empty
+
+
+        let flip (a,b) = b, a
+        for e in x.values do
+            match e with
+                | CEntryDef e ->
+                    for u in e.cUniforms do
+                        match u with
+                            | CGlobal(t, n) -> 
+                                match globalTable.TryGetValue n with
+                                    | (true, ot) ->
+                                        if ot <> t then failwithf "[FShade] conflicting uniform type for %A (%A vs %A)" n ot t
+                                    | _ ->
+                                        globalTable.[n] <- t
+
+                            | CBuffer(n, fields) ->
+                                match bufferTable.TryGetValue n with
+                                    | (true, existing) -> 
+                                        for (t, n) in fields do
+                                            match existing.TryGetValue n with
+                                                | (true, ot) ->
+                                                    if ot <> t then failwithf "[FShade] conflicting uniform type for %A (%A vs %A)" n ot t
+                                                | _ ->
+                                                   existing.[n] <- t 
+                                            ()
+
+                                    | _ ->
+                                        bufferTable.[n] <- Dictionary.ofList (List.map flip fields)
+
+                | _ ->
+                    ()
+
+        List.concat [
+            globalTable |> Dictionary.toList |> List.map (flip >> CGlobal)
+            bufferTable |> Dictionary.toList |> List.map (fun (n,fs) -> CBuffer(n, fs |> Dictionary.toList |> List.map flip))
+        ]
