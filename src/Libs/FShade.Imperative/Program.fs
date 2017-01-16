@@ -43,7 +43,13 @@ let main args =
                     m * a + v
                 else
                     let y = Case1 { a = 10; b = int a.Y }
-                    V4d(a.X |> clamp 0.0 1.0, cos 0.0, 0.0, 0.0)
+                    match y with
+                        | Case1 v ->
+                            V4d(-a.X |> clamp 0.0 1.0, cos 0.0, float v.a, 0.0)
+                        | Case2 a ->
+                            V4d(1.0, 0.0, 0.0, 0.0)
+                        | Case3 _ ->
+                            V4d(1.0, 0.0, 0.0, 0.0)
             @@>
         ]
 

@@ -742,6 +742,21 @@ module Compiler =
                 | PropertyGet(None, pi, args) ->
                     return! Expr.Call(pi.GetMethod, args) |> toCExpr
 
+                | PropertyGet(Some t, pi, []) ->
+                    if FSharpType.IsRecord(pi.DeclaringType, true) then
+                        let! t = toCExpr t
+                        return CField(ct, t, pi.Name)
+
+                    elif FSharpType.IsUnion(pi.DeclaringType.BaseType, true) then
+                        let case = 
+                            FSharpType.GetUnionCases(pi.DeclaringType.BaseType, true)
+                                |> Seq.find (fun ci -> ci.Name = pi.DeclaringType.Name)
+                        let! t = toCExpr t
+                        return CField(ct, t, case.Name + "_" + pi.Name)
+                        
+                    else
+                        return! Expr.Call(t, pi.GetMethod, []) |> toCExpr
+                    
                 | PropertyGet(Some t, pi, args) ->
                     return! Expr.Call(t, pi.GetMethod, args) |> toCExpr
                     
