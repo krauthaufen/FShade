@@ -219,11 +219,53 @@ module CLiteral =
             | :? string as v        -> CLiteral.CString(v) |> Some
             | _                     -> None
 
+type CVecComponent =
+    | X = 0
+    | Y = 1
+    | Z = 2
+    | W = 3
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module CVecComponent =
+    let private all = [CVecComponent.X; CVecComponent.Y; CVecComponent.Z; CVecComponent.W]
+    let first (n : int) = List.take n all
+
+    let xy = [CVecComponent.X; CVecComponent.Y]
+    let yz = [CVecComponent.Y; CVecComponent.Z]
+    let zw = [CVecComponent.Z; CVecComponent.W]
+    let xyz = [CVecComponent.X; CVecComponent.Y; CVecComponent.Z]
+    let yzw = [CVecComponent.Y; CVecComponent.Z; CVecComponent.W]
+
+type CIntrinsic =
+    {
+        intrinsicName   : string
+        tag             : obj
+        arguments       : Option<list<int>>
+    }
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module CIntrinsic =
+    let simple (name : string) =
+        {
+            intrinsicName = name
+            tag = name :> obj
+            arguments = None
+        }
+
+    let custom (name : string) (args : list<int>)=
+        {
+            intrinsicName = name
+            tag = name :> obj
+            arguments = Some args
+        }
+
+
 /// represents a c-style expression
 type CExpr =
     | CVar of CVar
     | CValue of CType * CLiteral
     | CCall of func : CFunctionSignature * args : CExpr[]
+    | CCallIntrinsic of t : CType * func : CIntrinsic * args : CExpr[]
     | CConditional of ctype : CType * cond : CExpr * ifTrue : CExpr * ifFalse : CExpr
 
     | CNeg of CType * CExpr
@@ -234,6 +276,18 @@ type CExpr =
     | CMul of CType * CExpr * CExpr
     | CDiv of CType * CExpr * CExpr
     | CMod of CType * CExpr * CExpr
+
+    | CTranspose of CType * CExpr
+    | CMulMatMat of CType * CExpr * CExpr
+    | CMulMatVec of CType * CExpr * CExpr
+    | CDot of CType * CExpr * CExpr
+    | CCross of CType * CExpr * CExpr
+    | CVecSwizzle of CType * CExpr * list<CVecComponent>
+    | CMatrixElement of t : CType * m : CExpr * r : int * c : int
+    | CNewVector of t : CType * d : int * components : list<CExpr>
+    | CMatrixFromRows of t : CType * rows : list<CExpr>
+    | CMatrixFromCols of t : CType * cols : list<CExpr>
+    | CVecLength of t : CType * v : CExpr
 
     | CConvert of CType * CExpr
 
@@ -250,9 +304,6 @@ type CExpr =
     | CEqual of CExpr * CExpr
     | CNotEqual of CExpr * CExpr
 
-    | CNewVector of t : CType * d : int * components : list<CExpr>
-    | CNewMatrix of t : CType * rows : int * cols : int * components : list<CExpr>
-
     | CAddressOf of t : CType * target : CExpr
     | CField of t : CType * target : CExpr * fieldName : string
     | CItem of t : CType * target : CExpr * index : CExpr 
@@ -262,6 +313,7 @@ type CExpr =
             | CVar v -> v.ctype
             | CValue(t,_) -> t
             | CCall(f,_) -> f.returnType
+            | CCallIntrinsic(t,_,_) -> t
             | CConditional(t,_,_,_) -> t
             | CNeg(t,_) -> t
             | CNot(t,_) -> t
@@ -279,8 +331,20 @@ type CExpr =
             | CLess _ | CLequal _ | CGreater _ | CGequal _ -> CType.CBool
             | CEqual _ | CNotEqual _ -> CType.CBool
 
+            | CTranspose(t,_) -> t
+            | CMulMatMat(t,_,_) -> t
+            | CMulMatVec(t,_,_) -> t
+            | CDot(t,_,_) -> t
+            | CCross(t,_,_) -> t
+            | CVecSwizzle(t,_,_) -> t
+            | CMatrixElement(t,_,_,_) -> t
             | CNewVector(t,_,_) -> t
-            | CNewMatrix(t,_,_,_) -> t
+            | CMatrixFromRows(t,_) -> t
+            | CMatrixFromCols(t,_) -> t
+            | CVecLength(t,_) -> t
+
+
+
             | CAddressOf(t,_) -> t
             | CField(t,_,_) -> t
             | CItem(t,_,_) -> t
@@ -330,6 +394,14 @@ module CLExpr =
             | CItem(t, e, index) -> CLItem(t, ofExpr e, index)
             | CAddressOf(t, e) -> CLPtr(t, e)
             | _ -> failwithf "[FShade] cannot convert CExpr toCLExpr (%A)" e
+            
+    let rec ofExprSafe (e : CExpr) =
+        match e with
+            | CVar v ->  CLVar v |> Some
+            | CField(t, e, name) -> CLField(t, ofExpr e, name) |> Some
+            | CItem(t, e, index) -> CLItem(t, ofExpr e, index) |> Some
+            | CAddressOf(t, e) -> CLPtr(t, e) |> Some
+            | _ -> None
 
     let rec toExpr (e : CLExpr) =
         match e with

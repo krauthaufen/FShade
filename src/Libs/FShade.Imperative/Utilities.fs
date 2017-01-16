@@ -13,6 +13,8 @@ open Aardvark.Base
 [<AutoOpen>]
 module private Helpers = 
     open System.Text.RegularExpressions
+    open Aardvark.Base.TypeInfo
+    open Aardvark.Base.TypeInfo.Patterns
 
     let rx = Regex @"(?<name>.*)`[0-9]+"
 
@@ -131,3 +133,174 @@ module private Helpers =
                     None
             | _ ->
                 None
+
+    let rec tryGetMethodInfo (e : Expr) =
+        match e with
+            | Patterns.Call(_,mi,_) -> 
+                if mi.IsGenericMethod then mi.GetGenericMethodDefinition() |> Some
+                else mi |> Some
+            | ExprShape.ShapeCombination(_, args) -> 
+                args |> List.tryPick tryGetMethodInfo
+            | ExprShape.ShapeLambda(_,b) ->
+                tryGetMethodInfo b
+            | _ -> None
+
+    let getMethodInfo (e : Expr) =
+        match tryGetMethodInfo e with
+            | Some mi -> mi
+            | None -> failwithf "[FShade] could not find a method-call in expression %A" e
+
+
+    let private conversionMethods =
+        HashSet.ofList [
+            getMethodInfo <@ int8 @> 
+            getMethodInfo <@ uint8 @> 
+            getMethodInfo <@ int16 @> 
+            getMethodInfo <@ uint16 @>  
+            getMethodInfo <@ int @> 
+            getMethodInfo <@ int32 @> 
+            getMethodInfo <@ uint32 @> 
+            getMethodInfo <@ int64 @> 
+            getMethodInfo <@ uint64 @> 
+            getMethodInfo <@ nativeint @> 
+            getMethodInfo <@ unativeint @> 
+            getMethodInfo <@ float @> 
+            getMethodInfo <@ float32 @> 
+        ]
+
+    let (|ConversionMethod|_|) (mi : MethodInfo) =
+        let meth = 
+            if mi.IsGenericMethod then mi.GetGenericMethodDefinition()
+            else mi
+        if conversionMethods.Contains meth then
+            let input = mi.GetParameters().[0]
+            let output = mi.ReturnType
+            Some(input.ParameterType, output)
+        else
+            None
+
+    let (|EnumerableOf|_|) (t : Type) =
+        if t.IsArray then
+            Some (t.GetElementType())
+
+        elif t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<seq<_>> then 
+            Some (t.GetGenericArguments().[0])
+
+        else
+            let iface = t.GetInterface(typedefof<seq<_>>.Name)
+            if isNull iface then
+                None
+            else
+                Some (iface.GetGenericArguments().[0])
+
+    let rec private deconstructTuples x =
+        match x with
+            | NewTuple(args) -> args |> List.collect deconstructTuples
+            | _ -> [x]
+
+    let rec inlineUselessAbstractions(e : Expr) =
+        match e with
+            | Application(Lambda(v,b),a) ->
+                let b = b.Substitute(fun vi -> if vi = v then Some a else None)
+                inlineUselessAbstractions b
+
+            | Application(Let(f,l0, b), a) ->
+                let b = b.Substitute(fun vi -> if vi = f then Some l0 else None)
+                inlineUselessAbstractions (Expr.Application(b,a))
+            | _ ->
+                    
+                e
+
+    /// detects pipe-expressions like (a |> sin, a |> clamp 0 1, sin <| a + b, etc.)
+    let (|Pipe|_|) (e : Expr) =
+        match e with
+            | Call(None, Method("op_PipeLeft", _), [Lambda(v,l);r]) ->
+                let e = l.Substitute(fun vi -> if vi = v then Some r else None)
+                Pipe(e) |> Some
+
+            | Call(None, Method("op_PipeRight", _), [l;Lambda(v, r)]) ->
+                let e = r.Substitute(fun vi -> if vi = v then Some l else None)
+                Pipe(e) |> Some
+
+            | Call(None, Method("op_PipeLeft", _), [PropertyGet(t,p, []);r]) ->
+                let r = deconstructTuples r
+                match t with
+                    | None -> 
+                        let mi = p.DeclaringType.GetMethod(p.Name, r |> Seq.map (fun ai -> ai.Type) |> Seq.toArray)
+                        if mi <> null then(Expr.Call(mi, r)) |> Some
+                        else failwith "function is not a method"
+                    | Some t -> 
+                        failwith "function is not a method"
+
+            | Call(None, Method("op_PipeRight", _), [l;PropertyGet(t,p, [])]) ->
+                let l = deconstructTuples l
+                match t with
+                    | None -> 
+                        let mi = p.DeclaringType.GetMethod(p.Name, l |> Seq.map (fun ai -> ai.Type) |> Seq.toArray)
+                        if mi <> null then(Expr.Call(mi, l)) |> Some
+                        else failwith "function is not a method"
+                    | Some t -> 
+                        failwith "function is not a method"
+
+            | Call(None, Method("op_PipeLeft", _), [f;r]) ->
+
+                let e = Expr.Application(f, r) |> inlineUselessAbstractions
+                Pipe(e) |> Some
+
+            | Call(None, Method("op_PipeRight", _), [l;f]) ->
+                let e = Expr.Application(f, l) |> inlineUselessAbstractions
+                Pipe(e) |> Some
+
+
+            | _ -> None
+
+    /// F# creates mutable copies for structs when accessing properties/methods
+    /// since mutating the original is not possible (and not desired).
+    /// since everything is mutable in C we don't care for those copies making the
+    /// code less readable and more complicated
+    let (|LetCopyOfStruct|_|) (e : Expr) =
+        match e with
+            | Let(v, e, b) when v.IsMutable && v.Type.IsValueType && v.Name = "copyOfStruct" ->
+                // TODO: find a better way for detecting this
+                let mutable count = 0
+                let newBody = b.Substitute(fun vi -> if v = vi then count <- count + 1; Some e else None) 
+                if count = 0 then Some b
+                elif count = 1 then Some newBody
+                else None
+            | _ ->
+                None
+
+    let (|ReducibleExpression|_|) (e : Expr) =
+        match e with
+            | LetCopyOfStruct e     -> Some e
+            | Pipe e                -> Some e
+
+            | _                     -> None
+
+    let (|VectorValue|_|) (v : obj) =
+        match v with
+            | :? V2d as v -> Some (typeof<float>, [| v.X :> obj; v.Y :> obj|])
+            | :? V3d as v -> Some (typeof<float>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
+            | :? V4d as v -> Some (typeof<float>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
+            | :? V2f as v -> Some (typeof<float32>, [| v.X :> obj; v.Y :> obj|])
+            | :? V3f as v -> Some (typeof<float32>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
+            | :? V4f as v -> Some (typeof<float32>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
+            | :? V2i as v -> Some (typeof<int>, [| v.X :> obj; v.Y :> obj|])
+            | :? V3i as v -> Some (typeof<int>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
+            | :? V4i as v -> Some (typeof<int>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
+            | :? V2l as v -> Some (typeof<int64>, [| v.X :> obj; v.Y :> obj|])
+            | :? V3l as v -> Some (typeof<int64>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
+            | :? V4l as v -> Some (typeof<int64>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
+
+            | :? C3b as v -> Some (typeof<uint8>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
+            | :? C4b as v -> Some (typeof<uint8>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
+            | :? C3us as v -> Some (typeof<uint16>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
+            | :? C4us as v -> Some (typeof<uint16>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
+            | :? C3ui as v -> Some (typeof<uint32>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
+            | :? C4ui as v -> Some (typeof<uint32>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
+            | :? C3f as v -> Some (typeof<float32>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
+            | :? C4f as v -> Some (typeof<float32>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
+            | :? C3d as v -> Some (typeof<float>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
+            | :? C4d as v -> Some (typeof<float>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
+
+            | _ -> None
