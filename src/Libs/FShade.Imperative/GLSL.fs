@@ -201,3 +201,58 @@ module GLSL =
                     sprintf "if(%s)\r\n{\r\n%s;\r\n}\r\nelse\r\n{\r\n%s;\r\n}" (CExpr.glsl c) (i |> glsl |> String.indent) (e |> glsl |> String.indent)
 
                 | CSwitch _ -> string s
+                
+    
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module CEntryDef =
+        let glsl (e : CEntryDef) =
+            let before, after = 
+                match e.cConditional with
+                    | Some cond -> (sprintf "\r\n#ifdef %s\r\n" cond, "#endif\r\n")
+                    | None -> ("", "")
+
+            let inputs = e.cInputs |> List.map (fun v -> sprintf "in %s %s;" (CType.glsl v.ctype) v.name) |> String.concat "\r\n"
+            let outputs = e.cOutputs |> List.map (fun v -> sprintf "out %s %s;" (CType.glsl v.ctype) v.name) |> String.concat "\r\n"
+            let args = e.cArguments |> List.map (fun v -> sprintf "%s %s" (CType.glsl v.ctype) v.name) |> String.concat ", " 
+
+            String.concat "\r\n" [
+                before
+                inputs
+                outputs
+                sprintf "%s %s(%s)\r\n{\r\n%s;\r\n}" (CType.glsl e.cReturnType) e.cEntryName args (e.cBody |> CStatement.glsl |> String.indent)
+                after
+            ]
+
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module CValueDef =
+        let glsl (d : CValueDef) =
+            match d with
+                | CEntryDef e -> 
+                    CEntryDef.glsl e
+
+                | CFunctionDef(signature, body) ->
+                    sprintf "%s\r\n{\r\n%s;\r\n}" (CFunctionSignature.glsl signature) (body |> CStatement.glsl |> String.indent)
+
+                | CConstant(t, n, init) ->
+                    sprintf "%s %s = %s;" (CType.glsl t) n (CRExpr.glsl init)
+
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module CTypeDef =
+        let glsl (d : CTypeDef) =
+            match d with
+                | CStructDef(name, fields) ->
+                    let fields = fields |> List.map (fun (t, n) -> sprintf "%s %s;" (CType.glsl t) n) |> String.concat "\r\n"
+                    sprintf "struct %s\r\n{\r\n%s\r\n}" name (String.indent fields)
+
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module CModule =
+        let glsl (m : CModule) =
+            let definitions =
+                List.concat [
+                    m.types |> List.map CTypeDef.glsl
+                    m.values |> List.map CValueDef.glsl
+                ]
+
+            definitions |> String.concat "\r\n\r\n"
+
+        

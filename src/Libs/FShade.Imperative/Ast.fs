@@ -431,3 +431,36 @@ type CStatement =
     | CDoWhile of guard : CExpr * body : CStatement
     | CIfThenElse of cond : CExpr * ifTrue : CStatement * ifFalse : CStatement
     | CSwitch of value : CExpr * cases : array<CLiteral * CStatement>
+
+
+
+
+type CEntryDef =
+    {
+        cConditional : Option<string>
+        cEntryName   : string
+        cInputs      : list<CVar>
+        cOutputs     : list<CVar>
+        cArguments   : list<CVar>
+        cReturnType  : CType
+        cBody        : CStatement
+    }
+
+type CUniformDef =
+    | CUniform of ctype : CType * name : string
+
+type CValueDef =
+    | CConstant of ctype : CType * name : string * init : CRExpr
+    | CFunctionDef of signature : CFunctionSignature * body : CStatement
+    | CEntryDef of CEntryDef
+
+type CTypeDef =
+    | CStructDef of name : string * fields : list<CType * string>
+
+
+type CModule =
+    {
+        types       : list<CTypeDef>
+        uniforms    : Map<string, list<CUniformDef>>
+        values      : list<CValueDef>
+    }

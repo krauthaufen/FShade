@@ -7,11 +7,6 @@ open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Quotations.Patterns
 open Microsoft.FSharp.Quotations.DerivedPatterns
 
-type MyUnion =
-    | Case1 of int
-    | Case2 of float
-    | Case3 of int * float
-
 type GLSLBackend private() =
     inherit Compiler.Backend()
     static let instance = GLSLBackend() :> Compiler.Backend
@@ -28,30 +23,33 @@ type GLSLBackend private() =
     override x.TryGetIntrinsicCtor (c : ConstructorInfo) =
         None
 
+type MyRecord =
+    { a : int; b : int }
+
+type MyUnion =
+    | Case1 of MyRecord
+    | Case2 of float
+    | Case3 of int * float
+
 [<EntryPoint>]
 let main args =
     
     let v = V4d(1.0, 3.0, 2.0, 4.0)
     let test = 
-        <@
-            fun (m : M44d) (a : V4d) ->
+        Module.ofLambdas [
+            "sepp", <@@ fun (m : M44d) (a : V4d) ->
                 if m.M00 > 1.0 then
                     let x = Case3(1,2.0)
                     m * a + v
                 else
+                    let y = Case1 { a = 10; b = int a.Y }
                     V4d(a.X |> clamp 0.0 1.0, cos 0.0, 0.0, 0.0)
-        @>
+            @@>
+        ]
 
-    match test with
-        | Lambdas(v,b) ->
-            let s = Compiler.toCStatement true b
-            let mutable state = Compiler.emptyState GLSLBackend.Instance
-            let s = s.Run(&state)
+    let m = Compiler.compile GLSLBackend.Instance test
+    let str = FShade.Imperative.GLSL.CModule.glsl m
+    printfn "%s" str
 
-            let str = FShade.Imperative.GLSL.CStatement.glsl s
-
-            printfn "%s" str
-        | _ ->
-            printfn "ERROR"
 
     0

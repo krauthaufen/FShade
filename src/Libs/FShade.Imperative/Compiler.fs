@@ -13,6 +13,58 @@ open Aardvark.Base
 open Aardvark.Base.TypeInfo
 open Aardvark.Base.TypeInfo.Patterns
 
+open FShade.Types
+open FShade.Parameters
+open FShade.Primitives
+open FShade.Builders
+
+type EntryPoint =
+    {
+        conditional : Option<string>
+        entryName   : string
+        inputs      : list<Var>
+        outputs     : list<Var>
+        arguments   : list<Var>
+        body        : Expr
+    }
+
+type Module = { entries : list<EntryPoint> }
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module EntryPoint =
+
+    let ofLambda (name : string) (e : Expr) =
+        match e with
+            | Lambdas(args, body) ->
+                let args = List.concat args
+                {
+                    conditional = None
+                    entryName = name
+                    inputs = []
+                    outputs = []
+                    arguments = args
+                    body = body
+                }
+            | e ->
+                {
+                    conditional = None
+                    entryName = name
+                    inputs = []
+                    outputs = []
+                    arguments = []
+                    body = e
+                }
+                
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module Module =
+
+    let ofLambda (name : string) (e : Expr) =
+        { entries = [EntryPoint.ofLambda name e] }
+
+    let ofLambdas (l : list<string * Expr>) =
+        { entries = l |> List.map (uncurry EntryPoint.ofLambda) }
+
+
 
 module Compiler =
     open Aardvark.Base.Monads.State
@@ -43,12 +95,18 @@ module Compiler =
     type FunctionDefinition = 
         | ManagedFunction of name : string * args : list<Var> * body : Expr
         | CompiledFunction of signature : CFunctionSignature * body : CStatement
+        | EntryFunction of EntryPoint
 
         member x.Signature =
             match x with
-                | CompiledFunction(s,_) -> s
+                | CompiledFunction(s,_) -> 
+                    s
+
                 | ManagedFunction(name,args,body) ->
                     CFunctionSignature.ofFunction name args body.Type
+
+                | EntryFunction f ->
+                    CFunctionSignature.ofFunction f.entryName f.arguments f.body.Type
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module FunctionDefinition =
@@ -309,7 +367,7 @@ module Compiler =
 
             match cType with
                 | CStruct _ ->
-                    { s with usedTypes = HashMap.add (t :> obj) cType s.usedTypes }, cType
+                    { s with CompilerState.usedTypes = HashMap.add (t :> obj) cType s.usedTypes }, cType
                 | _ ->
                     s, cType
         )
@@ -902,4 +960,203 @@ module Compiler =
                             else
                                 return CNop
 
+        }
+
+    let toCEntryDef (f : EntryPoint) =
+        state {
+            // ensure that all inputs, outputs, arguments have their correct names
+            let! inputs     = f.inputs |> List.mapS toCVar
+            let! outputs    = f.outputs |> List.mapS toCVar
+            let! args       = f.arguments |> List.mapS toCVar
+
+            // compile the body
+            let! body = toCStatement true f.body
+            let! ret = toCType f.body.Type
+
+            return {
+                cConditional = f.conditional
+                cEntryName   = f.entryName
+                cInputs      = inputs
+                cOutputs     = outputs
+                cArguments   = args
+                cReturnType  = ret
+                cBody        = body
+            }
+        }
+
+    let toCValueDef (f : FunctionDefinition) =
+        state {
+            match f with
+                | ManagedFunction(name, args, body) ->
+                    let signature = f.Signature
+                    let! body = toCStatement true body
+                    return CFunctionDef(signature, body)
+
+                | CompiledFunction(signature, body) ->
+                    return CFunctionDef(signature, body)
+                
+                | EntryFunction e ->
+                    let! e = toCEntryDef e
+                    return CEntryDef(e) 
+                    
+        }
+
+
+    type TypeGraph private(v : Option<CTypeDef>) =
+        let mutable level = 0
+        let dependencies = HashSet<TypeGraph>()
+
+        member x.Definition = v
+        member x.Dependencies = dependencies :> seq<_>
+
+        member private x.MinLevel (l : int) =
+            if l > level then
+                level <- l
+                for d in dependencies do d.MinLevel (level + 1)
+
+        member x.Level
+            with get() = level
+
+        member x.AddDependencies (l : list<TypeGraph>) =
+            dependencies.UnionWith l
+            for d in l do d.MinLevel (level + 1)
+
+        new() = TypeGraph(None)
+        new(d : CTypeDef) = TypeGraph(Some d)
+        
+    type ValueGraph private(v : Option<CValueDef>) =
+        let mutable level = 0
+        let dependencies = HashSet<ValueGraph>()
+
+        member x.Definition = v
+        member x.Dependencies = dependencies :> seq<_>
+
+        member private x.MinLevel (l : int) =
+            if l > level then
+                level <- l
+                for d in dependencies do d.MinLevel (level + 1)
+
+        member x.Level
+            with get() = level
+
+        member x.AddDependencies (l : list<ValueGraph>) =
+            dependencies.UnionWith l
+            for d in l do d.MinLevel (level + 1)
+
+
+        new() = ValueGraph(None)
+        new(d : CValueDef) = ValueGraph(Some d)
+
+    type ValueGraphCache(b : Backend) =
+        let store = Dict<obj, ValueGraph>()
+        let mutable typeStore : HashMap<obj, CType> = HashMap.empty
+
+        member x.Backend = b
+
+        member x.UsedTypes
+            with get() = typeStore
+            and set v = typeStore <- v
+
+        member x.GetOrAdd(def : 'a, create : 'a -> ValueGraph) =
+            store.GetOrCreate(def :> obj, fun _ ->
+                create def
+            )
+
+    type TypeGraphCache(b : Backend) =
+        let store = Dict<obj, TypeGraph>()
+
+        member x.Backend = b
+
+        member x.GetOrAdd(def : 'a, create : 'a -> TypeGraph) =
+            store.GetOrCreate(def :> obj, fun _ ->
+                create def
+            )
+
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module TypeGraph = 
+        let rec ofType (cache : TypeGraphCache) (t : CType) : TypeGraph =
+            cache.GetOrAdd(t, fun t ->
+                match t with
+                    | CStruct(name, fields, _) ->
+                        let res = TypeGraph(CStructDef(name, fields))
+                        let nested = fields |> List.map (fst >> ofType cache)
+                        res.AddDependencies nested
+                        res
+
+                    | CVector(t, _) 
+                    | CMatrix(t, _, _) 
+                    | CPointer(_, t) 
+                    | CArray(t,_) ->
+                        let res = TypeGraph()
+                        res.AddDependencies [ofType cache t]
+                        res
+                        
+                    | _ ->
+                        TypeGraph()
+            )
+
+        let ofTypes (cache : TypeGraphCache) (ts : list<CType>) : TypeGraph =
+            let deps = ts |> List.map (ofType cache)
+            let res = TypeGraph()
+            res.AddDependencies deps
+            res
+
+        let toList (g : TypeGraph) =
+            let rec build (visited : HashSet<TypeGraph>) (g : TypeGraph) =
+                if visited.Add g then
+                    g.Dependencies |> Seq.iter (build visited)
+
+            let all = HashSet()
+            build all g
+            all 
+                |> Seq.toList
+                |> List.sortByDescending (fun g -> g.Level) 
+                |> List.choose (fun g -> g.Definition)
+
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module ValueGraph = 
+        let rec ofFunction (cache : ValueGraphCache) (f : FunctionDefinition) : ValueGraph =
+            cache.GetOrAdd(f, fun f -> 
+                let mutable state = { emptyState cache.Backend with usedTypes = cache.UsedTypes }
+                let def = toCValueDef(f).Run(&state)
+                let usedFunctions = state.usedFunctions |> HashMap.toSeq |> Seq.map snd |> Seq.toList
+                let entry = ValueGraph(def)
+                entry.AddDependencies (usedFunctions |> List.map (ofFunction cache))
+                cache.UsedTypes <- state.usedTypes
+
+                entry
+            )
+
+        let ofFunctions (cache : ValueGraphCache) (fs : list<FunctionDefinition>) : ValueGraph =
+            let deps = fs |> List.map (ofFunction cache)
+            let res = ValueGraph()
+            res.AddDependencies deps
+            res
+
+        let toList (g : ValueGraph) =
+            let rec build (visited : HashSet<ValueGraph>) (g : ValueGraph) =
+                if visited.Add g then
+                    g.Dependencies |> Seq.iter (build visited)
+
+            let all = HashSet()
+            build all g
+            all 
+                |> Seq.toList
+                |> List.sortByDescending (fun g -> g.Level) 
+                |> List.choose (fun g -> g.Definition)
+
+    let compile (b : Backend) (m : Module) : CModule =
+        let cache = ValueGraphCache b
+        let valueGraph = m.entries |> List.map EntryFunction |> ValueGraph.ofFunctions cache
+        let usedTypes = cache.UsedTypes |> HashMap.toSeq |> Seq.map snd |> Seq.toList
+        let typeCache = TypeGraphCache b
+        let typeGraph = TypeGraph.ofTypes typeCache usedTypes
+
+        let values = ValueGraph.toList valueGraph
+        let types = TypeGraph.toList typeGraph
+
+        {
+            types = types
+            uniforms = Map.empty
+            values = values
         }

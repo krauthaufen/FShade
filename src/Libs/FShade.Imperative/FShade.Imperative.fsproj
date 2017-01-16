@@ -52,6 +52,13 @@
     <Compile Include="GLSL.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FShade\FShade.fsproj">
+      <Name>FShade</Name>
+      <Project>{ec6da69c-e93a-4481-9bb6-440482b1eeb1}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+  </ItemGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
   </PropertyGroup>
