@@ -354,8 +354,8 @@ module Linker =
             compile.Run(&state) |> flatten
 
 
-    let compile (backend : Compiler.Backend) (e : list<EntryPoint>) =
-        let values, types = ValueCompiler.ofEntries backend e
+    let compileAndLink (backend : Compiler.Backend) (m : Module) =
+        let values, types = ValueCompiler.ofEntries backend m.entries
         let types = TypeCompiler.ofTypes types
 
         {

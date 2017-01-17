@@ -267,7 +267,7 @@ module GLSL =
                 
                 
             let decorations =
-                if c.locations then (sprintf "layout(location = %d)" index) :: decorations
+                if c.locations && prefix <> "" then (sprintf "layout(location = %d)" index) :: decorations
                 else decorations
                 
             let decorations = String.concat " " decorations
