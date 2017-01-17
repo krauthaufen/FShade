@@ -463,6 +463,8 @@ module Compiler =
                     let! globals = State.get |> State.map (fun s -> s.moduleState.globalParameters)
                     let free = free |> PSet.toList
  
+                    let newVariables = HashSet()
+
                     let args = 
                         free |> List.choose (fun f ->
                             match f with
@@ -470,7 +472,10 @@ module Compiler =
                                     Some v
                                 | CompilerState.Free.Global(n, t, isMutable) ->
                                     if Set.contains n globals then None
-                                    else Some (Var(n,t, isMutable))
+                                    else 
+                                        let v = Var(n, t, isMutable)
+                                        newVariables.Add v |> ignore
+                                        Some v
                         )
 
                     let! name = CompilerState.newName "helper"
@@ -480,8 +485,21 @@ module Compiler =
                         if List.length args = List.length free then CompilerState.useGlobalFunction (e :> obj) definition
                         else CompilerState.useLocalFunction (e :> obj) definition
 
-                    let! args = args |> List.mapS (toCVar >> State.map CVar) |>> List.toArray
-                    return CCall(signature, args)
+                    let! args = 
+                        args |> List.mapS (fun v ->
+                            state {
+                                let! s = State.get
+                                if newVariables.Contains v then
+                                    do! State.put { s with variableNames = Map.add v v.Name s.variableNames }
+                                    let! t = toCType v.Type
+                                    return CVar { ctype = t; name = v.Name }
+                                else
+                                    let! v = toCVar v
+                                    return CVar v
+                            }
+                        ) 
+
+                    return CCall(signature, List.toArray args)
             }
 
         let rec zero (t : CType) =
@@ -697,13 +715,12 @@ module Compiler =
                     if Set.contains name s.moduleState.globalParameters then
                         do! State.put { s with usedGlobals = PSet.add name s.usedGlobals }
 
-                    let v = CVar { ctype = ct; name = name }
                     match index with
                         | Some idx -> 
                             let! idx = toCExpr idx
-                            return CItem(ct, v, idx)
+                            return CReadInput(ct, name, Some idx)
                         | _ ->
-                            return v
+                            return CReadInput(ct, name, None)
 
 
                 | Var v ->
@@ -942,9 +959,9 @@ module Compiler =
                     match index with
                         | Some idx ->
                             let! idx = toCExpr idx 
-                            return CWrite(CLItem(value.ctype, v, idx), value)
+                            return CWriteOutput(name, Some idx, value)
                         | None ->
-                            return CWrite(v, value)
+                            return CWriteOutput(name, None, value)
 
 
                 | AddressSet(a, v) ->
@@ -1089,6 +1106,7 @@ module Compiler =
                     cArguments   = args
                     cReturnType  = ret
                     cBody        = body
+                    cDecorations = f.decorations
                 }
         }
 

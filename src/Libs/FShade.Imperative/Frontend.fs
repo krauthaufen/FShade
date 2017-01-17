@@ -27,8 +27,17 @@ type MemoryType =
     | Global = 1
     | Local = 2
 
+type ShaderType = 
+    | Vertex  = 0
+    | Geometry = 1 
+    | TessControl = 2
+    | TessEval = 3
+    | Fragment = 4
+    | Compute = 5 
+
+
 [<RequireQualifiedAccess>]
-type Decoration =
+type ParameterDecoration =
     | Interpolation of InterpolationMode
     | Memory of MemoryType
     | Const
@@ -45,9 +54,33 @@ type EntryParameter =
         paramType           : Type
         paramName           : string
         paramSemantic       : string
-        paramDecorations    : Set<Decoration>
+        paramDecorations    : Set<ParameterDecoration>
     }
 
+type ShaderStageDescription =
+    {
+        prev : Option<ShaderType>
+        self : ShaderType
+        next : Option<ShaderType>
+    }
+
+[<RequireQualifiedAccess>]
+type EntryDecoration =
+    | Stages of ShaderStageDescription
+    | InputTopology of int
+
+
+type EntryPoint =
+    {
+        conditional : Option<string>
+        entryName   : string
+        inputs      : list<EntryParameter>
+        outputs     : list<EntryParameter>
+        uniforms    : list<Uniform>
+        arguments   : list<EntryParameter>
+        body        : Expr
+        decorations : list<EntryDecoration>
+    }
 
 [<AutoOpen>]
 module ExpressionExtensions =
@@ -134,19 +167,6 @@ module ExpressionExtensions =
             | _ ->
                 None
 
-type EntryPoint =
-    {
-        conditional : Option<string>
-        entryName   : string
-        inputs      : list<EntryParameter>
-        outputs     : list<EntryParameter>
-        uniforms    : list<Uniform>
-        arguments   : list<EntryParameter>
-        body        : Expr
-    }
-
-type Module = { entries : list<EntryPoint> }
-
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module EntryPoint =
     open Aardvark.Base.Monads.State
@@ -187,41 +207,39 @@ module EntryPoint =
         }
 
     let ofLambda (name : string) (e : Expr) =
-        match e with
-            | Lambdas(args, body) ->
-                let args = 
-                    match List.concat args with
-                        | [v] when v.Type = typeof<unit> -> []
-                        | a -> a
+        let args, body = 
+            match e with
+                | Lambdas(args, body) ->
+                    let args = 
+                        match List.concat args with
+                            | [v] when v.Type = typeof<unit> -> []
+                            | a -> a
 
-                let parameters, body = substituteVarsWithReads (Set.ofList args) body |> State.run Map.empty
-                let args = 
-                    args |> List.map (fun a -> 
-                        match Map.tryFind a parameters with
-                            | Some p -> p
-                            | None -> { paramType = a.Type; paramName = a.Name; paramSemantic = a.Name; paramDecorations = Set.empty }
-                    )
+                    let parameters, body = substituteVarsWithReads (Set.ofList args) body |> State.run Map.empty
+                    let args = 
+                        args |> List.map (fun a -> 
+                            match Map.tryFind a parameters with
+                                | Some p -> p
+                                | None -> { paramType = a.Type; paramName = a.Name; paramSemantic = a.Name; paramDecorations = Set.empty }
+                        )
+                    args, body
+                | e ->
+                    [], e
 
-                {
-                    conditional = None
-                    entryName = name
-                    inputs = []
-                    outputs = []
-                    uniforms = []
-                    arguments = args
-                    body = body
-                }
-            | e ->
-                {
-                    conditional = None
-                    entryName = name
-                    inputs = []
-                    outputs = []
-                    uniforms = []
-                    arguments = []
-                    body = e
-                }
-                
+        {
+            conditional = None
+            entryName = name
+            inputs = []
+            outputs = []
+            uniforms = []
+            arguments = args
+            body = body
+            decorations = []
+        }
+      
+
+type Module = { entries : list<EntryPoint> }
+       
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Module =
 

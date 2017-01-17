@@ -1,9 +1,10 @@
 ﻿namespace FShade.Imperative
 
+open System
 open Aardvark.Base
 
 module GLSL =
-    
+
     module private String =
         let private lineBreak = System.Text.RegularExpressions.Regex("\r\n")
 
@@ -14,11 +15,60 @@ module GLSL =
 
     type Config =
         {
+            version             : Version
             perStageUniforms    : bool
             locations           : bool
             uniformBuffers      : bool
         }
+
+    let version120 = Version(1,2,0)
+
+    type ParameterKind =
+        | In
+        | Out
+        | Other
+
+    type State =
+        {
+            config          : Config
+            stages          : ShaderStageDescription
+            parameters      : Map<string, ParameterKind>
+        }
+ 
   
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module State =
+        let ofConfig (c : Config) =
+            {
+                config = c
+                stages = { prev = None; self = ShaderType.Compute; next = None }
+                parameters = Map.empty
+            }
+
+        let parameterName (name : string) (s : State) =
+            let c = s.config
+            if c.version > version120 && c.locations then
+                name
+            else
+                match Map.tryFind name s.parameters with
+                    | Some kind -> 
+                        match kind, s.stages with
+                            | In, { prev = None }                   -> name
+                            | In, { prev = Some _; self = s }       -> name + string s
+
+                            | Out, { next = Some n }                -> name + string n
+                            | Out, { next = None }                  -> name
+                            | Other, _                              -> name
+
+                    | None -> 
+                        name
+
+
+            
+
+
+
+
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module CType =
@@ -89,7 +139,8 @@ module GLSL =
         let swizzle (l : list<CVecComponent>) =
             l |> Seq.map componentNames |> String.concat ""
 
-        let rec glsl (e : CExpr) =
+        let rec glsl (c : State) (e : CExpr) =
+            let glsl = glsl c
             match e with
                 | CVar v -> 
                     v.name
@@ -100,6 +151,13 @@ module GLSL =
                 | CCall(f, args) ->
                     let args = args |> Seq.map glsl |> String.concat ", "
                     sprintf "%s(%s)" f.name args
+
+                | CReadInput(_, name, idx) ->
+                    let name = c |> State.parameterName name
+                    match idx with
+                        | Some idx -> sprintf "%s[%s]" name (glsl idx)
+                        | None -> name
+
 
                 | CCallIntrinsic(_, f, args) ->
                     let args = args |> Seq.map glsl |> String.concat ", "
@@ -155,63 +213,70 @@ module GLSL =
                     
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module CLExpr = 
-        let glsl (e : CLExpr) = 
-            e |> CLExpr.toExpr |> CExpr.glsl
+        let glsl (c : State) (e : CLExpr) = 
+            e |> CLExpr.toExpr |> CExpr.glsl c
                      
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module CRExpr =
-        let glsl (e : CRExpr) =
+        let glsl (c : State) (e : CRExpr) =
             match e with
-                | CRArray(t, args) -> args |> List.map CExpr.glsl |> String.concat ", " |> sprintf "{ %s }"
-                | CRExpr e -> CExpr.glsl e
+                | CRArray(t, args) -> args |> List.map (CExpr.glsl c) |> String.concat ", " |> sprintf "{ %s }"
+                | CRExpr e -> CExpr.glsl c e
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module CStatement =
-        let rec glsl (s : CStatement) =
+        let rec glsl (c : State) (s : CStatement) =
              match s with
                 | CNop -> ""
-                | CDo e -> CExpr.glsl e
+                | CDo e -> CExpr.glsl c e
                 | CDeclare(v, r) ->
                     match v.ctype with
                         | CArray(t, l) ->
                             match r with
-                                | Some r -> sprintf "%s %s[%d] = %s" (CType.glsl t) v.name l (CRExpr.glsl r)
+                                | Some r -> sprintf "%s %s[%d] = %s" (CType.glsl t) v.name l (CRExpr.glsl c r)
                                 | None -> sprintf "%s %s[%d]" (CType.glsl t) v.name l
                         | _ -> 
                             match r with
-                                | Some r -> sprintf "%s %s = %s" (CType.glsl v.ctype) v.name (CRExpr.glsl r)
+                                | Some r -> sprintf "%s %s = %s" (CType.glsl v.ctype) v.name (CRExpr.glsl c r)
                                 | None -> sprintf "%s %s" (CType.glsl v.ctype) v.name
 
+                | CWriteOutput(name, idx, value) ->
+                    let name = c |> State.parameterName name
+                    match idx with
+                        | Some idx -> sprintf "%s[%s] = %s" name (CExpr.glsl c idx) (CExpr.glsl c value)
+                        | None -> sprintf "%s = %s" name (CExpr.glsl c value)
+                            
+
                 | CWrite(l, v) ->
-                    sprintf "%s = %s" (CLExpr.glsl l) (CExpr.glsl v)
+                    sprintf "%s = %s" (CLExpr.glsl c l) (CExpr.glsl c v)
 
                 | CIncrement(pre, l) ->
-                    if pre then sprintf "++%s" (CLExpr.glsl l)
-                    else sprintf "%s++" (CLExpr.glsl l)
+                    if pre then sprintf "++%s" (CLExpr.glsl c l)
+                    else sprintf "%s++" (CLExpr.glsl c l)
 
                 | CDecrement(pre, l) ->
-                    if pre then sprintf "--%s" (CLExpr.glsl l)
-                    else sprintf "%s--" (CLExpr.glsl l)
+                    if pre then sprintf "--%s" (CLExpr.glsl c l)
+                    else sprintf "%s--" (CLExpr.glsl c l)
 
                 | CSequential s ->
-                    s |> List.map glsl |> String.concat ";\r\n"
+                    s |> List.map (glsl c) |> String.concat ";\r\n"
 
                 | CReturn -> "return"
                 | CBreak -> "break"
                 | CContinue -> "continue"
-                | CReturnValue v -> sprintf "return %s" (CExpr.glsl v)
+                | CReturnValue v -> sprintf "return %s" (CExpr.glsl c v)
 
                 | CFor(init, cond, step, body) ->
-                    sprintf "for(%s; %s; %s)\r\n{\r\n%s;\r\n}" (glsl init) (CExpr.glsl cond) (glsl step) (body |> glsl |> String.indent)
+                    sprintf "for(%s; %s; %s)\r\n{\r\n%s;\r\n}" (glsl c init) (CExpr.glsl c cond) (glsl c step) (body |> glsl c |> String.indent)
 
                 | CWhile(guard, body) ->
-                    sprintf "while(%s)\r\n{\r\n%s\r\n}" (CExpr.glsl guard) (body |> glsl |> String.indent)
+                    sprintf "while(%s)\r\n{\r\n%s\r\n}" (CExpr.glsl c guard) (body |> glsl c |> String.indent)
 
                 | CDoWhile(guard, body) ->
-                    sprintf "do\r\n{\r\n%s\r\n}\r\nwhile(%s)" (body |> glsl |> String.indent) (CExpr.glsl guard)
+                    sprintf "do\r\n{\r\n%s\r\n}\r\nwhile(%s)" (body |> glsl c |> String.indent) (CExpr.glsl c guard)
 
-                | CIfThenElse(c, i, e) ->
-                    sprintf "if(%s)\r\n{\r\n%s;\r\n}\r\nelse\r\n{\r\n%s;\r\n}" (CExpr.glsl c) (i |> glsl |> String.indent) (e |> glsl |> String.indent)
+                | CIfThenElse(cond, i, e) ->
+                    sprintf "if(%s)\r\n{\r\n%s;\r\n}\r\nelse\r\n{\r\n%s;\r\n}" (CExpr.glsl c cond) (i |> glsl c |> String.indent) (e |> glsl c |> String.indent)
 
                 | CSwitch _ -> string s
                
@@ -243,16 +308,17 @@ module GLSL =
                     |> List.map (fun u -> sprintf "uniform %s %s;" (CType.glsl u.cUniformType) u.cUniformName)
                     |> String.concat "\r\n"
 
+
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module CEntryParameter =
-        let glsl (c : Config) (prefix : string) (index : int) (p : CEntryParameter) =
+        let glsl (state : State) (c : Config) (kind : ParameterKind) (index : int) (p : CEntryParameter) =
             let decorations =
                 p.cParamDecorations 
                 |> Set.toList
                 |> List.choose (fun d ->
                     match d with
-                        | Decoration.Const -> Some "const"
-                        | Decoration.Interpolation m ->
+                        | ParameterDecoration.Const -> Some "const"
+                        | ParameterDecoration.Interpolation m ->
                             match m with
                                 | InterpolationMode.Centroid -> Some "centroid"
                                 | InterpolationMode.Flat -> Some "flat"
@@ -260,35 +326,75 @@ module GLSL =
                                 | InterpolationMode.Perspective -> Some "perspective"
                                 | InterpolationMode.Sample -> Some "sample"
                                 | _ -> None
-                        | Decoration.Memory _ ->
+                        | ParameterDecoration.Memory _ ->
                             None
 
                 )
-                
-                
-            let decorations =
-                if c.locations && prefix <> "" then (sprintf "layout(location = %d)" index) :: decorations
-                else decorations
-                
-            let decorations = String.concat " " decorations
 
-            if decorations = "" then
-                sprintf "%s%s %s" prefix (CType.glsl p.cParamType) p.cParamName
-            else
-                sprintf "%s %s%s %s" decorations prefix (CType.glsl p.cParamType) p.cParamName
+            let decorations =
+                match kind with
+                    | Other -> 
+                        decorations
+
+                    | _ ->
+                        if c.locations && c.version > version120 then 
+                            sprintf "layout(location = %d)" index :: decorations
+                        else 
+                            decorations
+                
+            let decorations = 
+                match decorations with
+                    | [] -> ""
+                    | _ -> String.concat " " decorations + " "
+
+            let name = state |> State.parameterName p.cParamName
+
+            let prefix =
+                if c.version > version120 then
+                    match kind with
+                        | In -> "in "
+                        | Out -> "out "
+                        | Other -> ""
+                else
+                    match kind with
+                        | In -> "varying "
+                        | Out -> "varying "
+                        | Other -> ""
+                    
+
+            sprintf "%s%s%s %s;" decorations prefix (CType.glsl p.cParamType) name
     
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module CEntryDef =
         let glsl (c : Config) (e : CEntryDef) =
+            let state =
+                { 
+                    config = c
 
-            let inputs = e.cInputs |> List.mapi (CEntryParameter.glsl c "in ")
-            let outputs = e.cOutputs |> List.mapi (CEntryParameter.glsl c "out ")
-            let args = e.cArguments |> List.mapi (CEntryParameter.glsl c "") |> String.concat ", " 
+                    parameters = 
+                        Map.ofList [
+                            yield! e.cInputs |> List.map (fun p -> p.cParamName, In)
+                            yield! e.cOutputs |> List.map (fun p -> p.cParamName, Out)
+                        ]
+
+                    stages =
+                        e.cDecorations 
+                        |> List.tryPick (function EntryDecoration.Stages t -> Some t | _ -> None) 
+                        |> Option.defaultValue {
+                            prev = None
+                            self = ShaderType.Vertex
+                            next = None
+                        }
+                }
+
+            let inputs = e.cInputs |> List.mapi (CEntryParameter.glsl state c In)
+            let outputs = e.cOutputs |> List.mapi (CEntryParameter.glsl state c Out)
+            let args = e.cArguments |> List.mapi (CEntryParameter.glsl state c Other) |> String.concat ", " 
 
             String.concat "\r\n" [
                 yield! inputs
                 yield! outputs
-                yield sprintf "%s %s(%s)\r\n{\r\n%s;\r\n}" (CType.glsl e.cReturnType) e.cEntryName args (e.cBody |> CStatement.glsl |> String.indent)
+                yield sprintf "%s %s(%s)\r\n{\r\n%s;\r\n}" (CType.glsl e.cReturnType) e.cEntryName args (e.cBody |> CStatement.glsl state |> String.indent)
             ]
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -303,12 +409,12 @@ module GLSL =
                     CEntryDef.glsl c e
 
                 | CFunctionDef(signature, body) ->
-                    sprintf "%s\r\n{\r\n%s;\r\n}\r\n" (CFunctionSignature.glsl signature) (body |> CStatement.glsl |> String.indent)
+                    sprintf "%s\r\n{\r\n%s;\r\n}\r\n" (CFunctionSignature.glsl signature) (body |> CStatement.glsl (State.ofConfig c) |> String.indent)
 
                 | CConstant(t, n, init) ->
                     match t with
-                        | CArray(t,l) -> sprintf "const %s %s[%d] = %s;" (CType.glsl t) n l (CRExpr.glsl init)
-                        | _ -> sprintf "const %s %s = %s;" (CType.glsl t) n (CRExpr.glsl init)
+                        | CArray(t,l) -> sprintf "const %s %s[%d] = %s;" (CType.glsl t) n l (CRExpr.glsl (State.ofConfig c) init)
+                        | _ -> sprintf "const %s %s = %s;" (CType.glsl t) n (CRExpr.glsl (State.ofConfig c) init)
 
                 | CUniformDef us ->
                     if c.perStageUniforms then

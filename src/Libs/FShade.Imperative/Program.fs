@@ -63,6 +63,7 @@ let lambdaTest() =
         testModule
             |> Linker.compileAndLink GLSLBackend.Instance
             |> GLSL.CModule.glsl { 
+                GLSL.Config.version = Version(4,1,0)
                 GLSL.Config.locations = true
                 GLSL.Config.perStageUniforms = false
                 GLSL.Config.uniformBuffers = true 
@@ -99,6 +100,7 @@ let entryTest() =
             inputs = inputs
             uniforms = uniforms |> List.map (fun p -> { uniformName = p.paramName; uniformType = p.paramType; uniformBuffer = Some "BlaBuffer" })
             arguments = []
+            decorations = [ EntryDecoration.Stages { prev = None; self = ShaderType.Fragment; next = Some ShaderType.Fragment } ]
         }
 
     let seppEntry = 
@@ -111,6 +113,7 @@ let entryTest() =
             inputs = inputs
             uniforms = uniforms |> List.map (fun p -> { uniformName = p.paramName; uniformType = p.paramType; uniformBuffer = Some "BlaBuffer" })
             arguments = []
+            decorations = [ EntryDecoration.Stages { prev = Some ShaderType.Vertex; self = ShaderType.Fragment; next = None } ]
         }
 
     // define a simple module consisting of two entry-points
@@ -122,7 +125,8 @@ let entryTest() =
         mainModule
             |> Linker.compileAndLink GLSLBackend.Instance
             |> GLSL.CModule.glsl { 
-                GLSL.Config.locations = true
+                GLSL.Config.version = Version(4,1,0)
+                GLSL.Config.locations = false
                 GLSL.Config.perStageUniforms = false
                 GLSL.Config.uniformBuffers = true 
             }
@@ -131,7 +135,7 @@ let entryTest() =
 
 [<EntryPoint>]
 let main args =
-    lambdaTest()
-    //entryTest()
+    //lambdaTest()
+    entryTest()
 
     0

@@ -268,6 +268,8 @@ type CExpr =
     | CCallIntrinsic of t : CType * func : CIntrinsic * args : CExpr[]
     | CConditional of ctype : CType * cond : CExpr * ifTrue : CExpr * ifFalse : CExpr
 
+    | CReadInput of ctype : CType * name : string * index : Option<CExpr>
+
     | CNeg of CType * CExpr
     | CNot of CType * CExpr
 
@@ -315,6 +317,7 @@ type CExpr =
             | CCall(f,_) -> f.returnType
             | CCallIntrinsic(t,_,_) -> t
             | CConditional(t,_,_,_) -> t
+            | CReadInput(t,_,_) -> t
             | CNeg(t,_) -> t
             | CNot(t,_) -> t
             | CAdd(t,_,_) -> t
@@ -423,6 +426,8 @@ type CStatement =
     | CSequential of list<CStatement>
     | CReturn
 
+    | CWriteOutput of string * Option<CExpr> * CExpr
+
     | CReturnValue of CExpr
     | CBreak
     | CContinue
@@ -438,7 +443,7 @@ type CEntryParameter =
         cParamType           : CType
         cParamName           : string
         cParamSemantic       : string
-        cParamDecorations    : Set<Decoration>
+        cParamDecorations    : Set<ParameterDecoration>
     }
 
 type CUniform =
@@ -475,6 +480,7 @@ type CEntryDef =
         cArguments   : list<CEntryParameter>
         cReturnType  : CType
         cBody        : CStatement
+        cDecorations : list<EntryDecoration>
     }
 
 
