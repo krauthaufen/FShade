@@ -159,10 +159,3 @@ module Primitives =
     let getInnerTessLevel (i : int) : float = failwith ""
     let getOuterTessLevel (i : int) : float = failwith ""
 
-open System.Reflection
-
-type Preprocessor private() =
-    static let methods = typeof<Preprocessor>.GetMethods(BindingFlags.Public ||| BindingFlags.Static)
-
-    static member unroll() = ()
-    static member unroll(min : int, max : int) = ()

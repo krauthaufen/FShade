@@ -137,6 +137,7 @@ module LambdaFunctions =
 
             let! bodiesCode = bodies |> List.mapC (fun (id, b) ->
                 compile {
+                    let b = FShade.ExprUtilities.evaluateConstants Map.empty b
                     let! code = compileExpression true true b
                     return (id,code,b)
                 })

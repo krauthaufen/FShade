@@ -104,8 +104,8 @@ module BuilderCompilation =
                     //p.Value.abc
                     let t = m.Type.MakeArrayType()
                     let n = m.Semantic
-                    let! i = getInput t n
-                    let i = Expr.Var(i)
+                    let! i = getInput t pi.Interpolation n
+                    let i = Expr.Var(i.var)
 
                     match tryGetPrimitiveVertexId pi with
                         | Some index -> return Expr.ArrayAccess(i, Expr.Value(index))
@@ -114,8 +114,8 @@ module BuilderCompilation =
                 | MemberFieldGet(PropertyGet(Some p, pi, [index]), m) when p.Type.GetInterface("Primitive`1") <> null && pi.Name = "Item"->
                     let t = m.Type.MakeArrayType()
                     let n = m.Semantic
-                    let! i = getInput t n
-                    let i = Expr.Var(i)
+                    let! i = getInput t pi.Interpolation n
+                    let i = Expr.Var(i.var)
                     return Expr.ArrayAccess(i, index)
 
                 | BuilderCall(b, mi, [Let(v, e, inner)]) when mi.Name = "Yield" ->

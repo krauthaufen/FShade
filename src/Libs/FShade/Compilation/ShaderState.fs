@@ -10,7 +10,7 @@ open FShade.Compiler
 module ShaderState =
 
     [<NoComparison>]
-    type ShaderState = { inputs : Map<string, Var>; outputs : Map<string, Option<string> * Var>; uniforms : HashMap<Uniform, Var>; builder : Option<Expr>; counters : Map<string, int> }
+    type ShaderState = { inputs : Map<string, ShaderInput>; outputs : Map<string, Option<string> * Var>; uniforms : HashMap<Uniform, Var>; builder : Option<Expr>; counters : Map<string, int> }
 
     let addInput n i =
         modifyCompilerState(fun (s : ShaderState) -> { s with inputs = Map.add n i s.inputs })
@@ -70,14 +70,16 @@ module ShaderState =
             do! putCompilerState { s with counters = Map.remove counterName s.counters }
         }
 
-    let getInput t sem =
+    let getInput t i sem =
         transform {
             let! s = compilerState
             match Map.tryFind sem s.inputs with
-                | None -> let v = Var(sem, t)
-                          do! addInput sem v
-                          return v
-                | Some v -> return v
+                | None -> 
+                    let v = { var = Var(sem, t); interpolation = i }
+                    do! addInput sem v
+                    return v
+                | Some v -> 
+                    return v
         }
 
     let getOutput t sem target =

@@ -80,7 +80,6 @@
     <Compile Include="Composition\SequentialComposition.fs" />
     <Compile Include="GLSL\GlslSamplers.fs" />
     <Compile Include="GLSL\GlslCompiler.fs" />
-    <Compile Include="GLSL\GlESCompiler.fs" />
     <None Include="SPIRV\spirv.json" />
     <None Include="SPIRV\spirv-enums.json" />
     <None Include="SPIRV\CodeGen.fsx" />
