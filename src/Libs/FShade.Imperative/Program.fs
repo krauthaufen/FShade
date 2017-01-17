@@ -61,7 +61,9 @@ let main args =
 
     let testCode = 
         <@ fun (p : V4d) (ModelTrafo : float, ViewProjTrafo : float) ->
-            let w = ModelTrafo * p
+            let w = 
+                let test = ModelTrafo * p
+                2.0 * test
             ViewProjTrafo * w
         @>
 
@@ -109,7 +111,7 @@ let main args =
 
 
     let compiled = Compiler.compile GLSLBackend.Instance { entries = [testEntry; seppEntry] }
-    let config = { GLSL.Config.locations = true; GLSL.Config.perStageUniforms = false }
+    let config = { GLSL.Config.locations = true; GLSL.Config.perStageUniforms = true }
     let str = FShade.Imperative.GLSL.CModule.glsl config compiled
     printfn "%s" str
 //    let m = Compiler.compile GLSLBackend.Instance test

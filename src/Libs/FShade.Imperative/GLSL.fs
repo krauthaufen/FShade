@@ -242,13 +242,11 @@ module GLSL =
                     if c.locations then  sprintf "layout(location = %d) out %s %s;" i (CType.glsl v.ctype) v.name
                     else sprintf "out %s %s;" (CType.glsl v.ctype) v.name
                 )
-            let uniforms = e.cUniforms |> List.map CUniform.glsl
+
             let args = e.cArguments |> List.map (fun v -> sprintf "%s %s" (CType.glsl v.ctype) v.name) |> String.concat ", " 
 
             String.concat "\r\n" [
                 yield! before
-                if c.perStageUniforms then
-                    yield! uniforms
                 yield! inputs
                 yield! outputs
                 yield sprintf "%s %s(%s)\r\n{\r\n%s;\r\n}" (CType.glsl e.cReturnType) e.cEntryName args (e.cBody |> CStatement.glsl |> String.indent)
@@ -285,7 +283,22 @@ module GLSL =
                 List.concat [
                     yield m.types |> List.map CTypeDef.glsl
 
-                    if not c.perStageUniforms then
+
+                    if c.perStageUniforms then
+                        for v in m.values do
+                            match v with
+                                | CEntryDef e ->
+                                    let before, after =
+                                        match e.cConditional with
+                                            | Some c -> [sprintf "#ifdef %s" c], ["#endif"]
+                                            | None -> [], []
+
+                                    yield before
+                                    yield e.cUniforms |> List.map (CUniform.glsl)
+                                    yield after
+                                | _ ->
+                                    ()
+                    else
                         yield m.uniforms |> List.map CUniform.glsl
 
                     yield m.values |> List.map (CValueDef.glsl c)

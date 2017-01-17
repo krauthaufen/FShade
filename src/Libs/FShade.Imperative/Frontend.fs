@@ -14,6 +14,13 @@ type Uniform =
     | Buffer of name : string * fields : list<string * Type>
     | Global of name : string * t : Type
 
+type Input =
+    {
+        inputType       : Type
+        inputName       : string
+        inputSemantic   : string
+    }
+
 type EntryPoint =
     {
         conditional : Option<string>

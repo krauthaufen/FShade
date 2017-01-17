@@ -270,10 +270,60 @@ module private Helpers =
             | _ ->
                 None
 
+    let (|FSharpTypeProperty|_|) (pi : PropertyInfo) =
+        if FSharpType.IsRecord(pi.DeclaringType, true) then 
+            if FSharpType.GetRecordFields(pi.DeclaringType, true) |> Array.exists (fun p -> p = pi) then
+                Some ()
+            else
+                None
+
+        elif pi.DeclaringType.BaseType <> null && FSharpType.IsUnion(pi.DeclaringType.BaseType, true) then
+            let isUnionField =
+                FSharpType.GetUnionCases(pi.DeclaringType.BaseType, true)
+                    |> Seq.collect (fun c -> c.GetFields())
+                    |> Seq.exists (fun p -> p = pi)
+
+            if isUnionField then Some ()
+            else None
+
+        else
+            None
+
+    let rec (|Trivial|_|) (e : Expr) =
+        match e with
+            | Var _ 
+            | Value _
+            | FieldGet(None, _)
+            | PropertyGet(None, _, [])
+            | TupleGet(Trivial, _)
+            | PropertyGet(Some Trivial, FSharpTypeProperty, [])
+            | FieldGet(Some Trivial, _) ->
+                Some ()
+            | _ ->
+                None
+
+    /// detects direct applications of lambdas and replaces them with let
+    /// bindings or inlines the expression if either the argument is trivial or it occurs
+    /// only once in the lambda-body
+    let (|LambdaApp|_|) (e : Expr) =
+        match e with
+            | Application(Lambda(v,b), arg) ->
+                let mutable cnt = 0
+                let nb = b.Substitute(fun vi -> if vi = v then cnt <- cnt + 1; Some arg else None)
+                
+                match arg with
+                    | Trivial | _ when cnt <= 1 -> nb |> Some
+                    | _ ->  Expr.Let(v, e, b) |> Some
+
+            | _ ->
+                None
+
+
     let (|ReducibleExpression|_|) (e : Expr) =
         match e with
             | LetCopyOfStruct e     -> Some e
             | Pipe e                -> Some e
+            | LambdaApp e           -> Some e
 
             | _                     -> None
 

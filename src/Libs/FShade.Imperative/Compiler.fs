@@ -82,6 +82,8 @@ module Compiler =
             variableNames       : Map<Var, string>
             fixedNames          : Set<string>
 
+            globalVariables     : Set<Var>
+
             usedFunctions       : HashMap<obj, FunctionDefinition>
             usedConstants       : HashMap<obj, ConstantDefinition>
 
@@ -335,13 +337,22 @@ module Compiler =
                 else s.backend.TryGetIntrinsic mi
             )
 
+        let getFreeVars (e : Expr) =
+            State.get |> State.map (fun s ->
+                let free = e.GetFreeVars() |> Set.ofSeq
+                if Set.isEmpty free then
+                    None
+                else
+                    Some (Set.difference free s.globalVariables)
+            )
+
     let emptyState (b : Backend) =
         {
             backend             = b
             nameIndices         = Map.empty
             variableNames       = Map.empty
             fixedNames          = Set.empty
-
+            globalVariables     = Set.empty
             usedFunctions       = HashMap.empty
             usedConstants       = HashMap.empty
             moduleState =
@@ -439,18 +450,19 @@ module Compiler =
 
     let rec asExternal (e : Expr) =
         state {
-            let free = e.GetFreeVars() |> Seq.toList
-            if free.Length = 0 then
-                return! CompilerState.useConstant e e
+            let! free = CompilerState.getFreeVars e
+            match free with
+                | None ->
+                    return! CompilerState.useConstant e e
+                | Some free -> 
+                    let! name = CompilerState.newName "helper"
+                    let free = Set.toList free
+                    let definition = ManagedFunction(name, free, e)
 
-            else
-                let! name = CompilerState.newName "helper"
-                let definition = ManagedFunction(name, free, e)
+                    let! signature = CompilerState.useFunction (e :> obj) definition
 
-                let! signature = CompilerState.useFunction (e :> obj) definition
-
-                let! args = free |> List.mapS (toCVar >> State.map CVar) |>> List.toArray
-                return CCall(signature, args)
+                    let! args = free |> List.mapS (toCVar >> State.map CVar) |>> List.toArray
+                    return CCall(signature, args)
         }
 
     let rec zero (t : CType) =
