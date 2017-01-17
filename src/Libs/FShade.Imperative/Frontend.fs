@@ -8,33 +8,7 @@ open Microsoft.FSharp.Quotations.Patterns
 open Microsoft.FSharp.Quotations.DerivedPatterns
 
 open Aardvark.Base
-//
-//
-//type Uniform =
-//    | Buffer of name : string * fields : list<string * Type>
-//    | Global of name : string * t : Type
-
-type InterpolationMode =
-    | Default           = 0
-    | Perspective       = 1
-    | NoPerspective     = 2
-    | Flat              = 3
-    | Centroid          = 4
-    | Sample            = 5
-
-type MemoryType =
-    | None = 0
-    | Global = 1
-    | Local = 2
-
-type ShaderType = 
-    | Vertex  = 0
-    | Geometry = 1 
-    | TessControl = 2
-    | TessEval = 3
-    | Fragment = 4
-    | Compute = 5 
-
+open FShade
 
 [<RequireQualifiedAccess>]
 type ParameterDecoration =
@@ -172,7 +146,7 @@ module EntryPoint =
     open Aardvark.Base.Monads.State
     open Microsoft.FSharp.Quotations.ExprShape
     
-    let rec substituteVarsWithReads (args : Set<Var>) (e : Expr) =
+    let rec private substituteVarsWithReads (args : Set<Var>) (e : Expr) =
         state {
             match e with
                 | ShapeVar(v) ->

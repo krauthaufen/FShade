@@ -194,7 +194,6 @@ module Builders =
 
     let (|BuilderCall|_|) (e : Expr) =
         match e with
-
             | Call(Some t, mi, args) when typeof<IShaderBuilder>.IsAssignableFrom t.Type ->
                 BuilderCall(t, mi, args) |> Some
             | _ -> None

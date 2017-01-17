@@ -446,6 +446,19 @@ type CEntryParameter =
         cParamDecorations    : Set<ParameterDecoration>
     }
 
+
+type CEntryDef =
+    {
+        cEntryName   : string
+        cInputs      : list<CEntryParameter>
+        cOutputs     : list<CEntryParameter>
+        cArguments   : list<CEntryParameter>
+        cReturnType  : CType
+        cBody        : CStatement
+        cDecorations : list<EntryDecoration>
+    }
+
+
 type CUniform =
     {
         cUniformType         : CType
@@ -471,19 +484,6 @@ module CUniform =
 
         res |> CSharpList.toList
 
-
-type CEntryDef =
-    {
-        cEntryName   : string
-        cInputs      : list<CEntryParameter>
-        cOutputs     : list<CEntryParameter>
-        cArguments   : list<CEntryParameter>
-        cReturnType  : CType
-        cBody        : CStatement
-        cDecorations : list<EntryDecoration>
-    }
-
-
 type CValueDef =
     | CConstant of ctype : CType * name : string * init : CRExpr
     | CFunctionDef of signature : CFunctionSignature * body : CStatement
@@ -495,29 +495,11 @@ type CTypeDef =
     | CStructDef of name : string * fields : list<CType * string>
 
 
-
-
-
 type CModule =
     {
         types       : list<CTypeDef>
         values      : list<CValueDef>
-    } with
-//
-//    member x.entries =
-//        let rec allEntries (c : CValueDef) =
-//            match c with
-//                | CEntryDef e -> 
-//                    [None, e]
-//
-//                | CConditionalDef(c, inner) ->
-//                    inner |> List.collect (fun i -> i |> allEntries |> List.map (fun (_,e) -> (Some c, e)))
-//
-//                | _ ->
-//                    []
-//
-//        x.values |> List.collect allEntries
-
+    }
     member x.uniforms =
         let rec allUniforms (c : CValueDef) =
             match c with

@@ -6,6 +6,7 @@ open FShade.Imperative
 open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Quotations.Patterns
 open Microsoft.FSharp.Quotations.DerivedPatterns
+open FShade
 
 type GLSLBackend private() =
     inherit Compiler.Backend()
