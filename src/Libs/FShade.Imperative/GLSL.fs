@@ -16,6 +16,7 @@ module GLSL =
         {
             perStageUniforms    : bool
             locations           : bool
+            uniformBuffers      : bool
         }
   
 
@@ -216,57 +217,104 @@ module GLSL =
                
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module CUniform =
-        let glsl (u : CUniform) =
-            match u with
-                | CGlobal(t, n) ->
-                    sprintf "uniform %s %s;" (CType.glsl t) n
-                | CBuffer(n, fields) ->
-                    let fields = fields |> List.map (fun (t, n) -> sprintf "%s %s;" (CType.glsl t) n) |> String.concat "\r\n"
-                    sprintf "uniform %s\r\n{\r\n%s\r\n}" n (String.indent fields)
+        let glsl (c : Config) (uniforms : list<CUniform>) =
+            if c.uniformBuffers then
+                let buffers =
+                    uniforms 
+                        |> List.groupBy (fun u -> u.cUniformBuffer)
+
+                let definitions = 
+                    buffers |> List.map (fun (name, fields) ->
+                        let fields = fields |> List.map (fun u -> sprintf "%s %s;" (CType.glsl u.cUniformType) u.cUniformName)
+
+                        match name with
+                            | None ->
+                                fields |> List.map (sprintf "uniform %s") |> String.concat "\r\n"
+                            | Some n ->
+                                let fields = fields |> String.concat "\r\n"
+                                sprintf "uniform %s\r\n{\r\n%s\r\n}" n (String.indent fields)
+
+
+                    )
+
+                String.concat "\r\n\r\n" definitions
+            else
+                uniforms
+                    |> List.map (fun u -> sprintf "uniform %s %s;" (CType.glsl u.cUniformType) u.cUniformName)
+                    |> String.concat "\r\n"
+
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module CEntryParameter =
+        let glsl (c : Config) (prefix : string) (index : int) (p : CEntryParameter) =
+            let decorations =
+                p.cParamDecorations 
+                |> Set.toList
+                |> List.choose (fun d ->
+                    match d with
+                        | Decoration.Const -> Some "const"
+                        | Decoration.Interpolation m ->
+                            match m with
+                                | InterpolationMode.Centroid -> Some "centroid"
+                                | InterpolationMode.Flat -> Some "flat"
+                                | InterpolationMode.NoPerspective -> Some "noperspective"
+                                | InterpolationMode.Perspective -> Some "perspective"
+                                | InterpolationMode.Sample -> Some "sample"
+                                | _ -> None
+                        | Decoration.Memory _ ->
+                            None
+
+                )
+                
+                
+            let decorations =
+                if c.locations then (sprintf "layout(location = %d)" index) :: decorations
+                else decorations
+                
+            let decorations = String.concat " " decorations
+
+            if decorations = "" then
+                sprintf "%s%s %s" prefix (CType.glsl p.cParamType) p.cParamName
+            else
+                sprintf "%s %s%s %s" decorations prefix (CType.glsl p.cParamType) p.cParamName
     
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module CEntryDef =
         let glsl (c : Config) (e : CEntryDef) =
-            let before, after = 
-                match e.cConditional with
-                    | Some cond -> ([sprintf "#ifdef %s" cond], ["#endif"])
-                    | None -> ([], [])
 
-            let inputs = 
-                e.cInputs |> List.mapi (fun i v -> 
-                    if c.locations then  sprintf "layout(location = %d) in %s %s;" i (CType.glsl v.ctype) v.name
-                    else sprintf "in %s %s;" (CType.glsl v.ctype) v.name
-                )
-            let outputs = 
-                e.cOutputs |> List.mapi (fun i v -> 
-                    if c.locations then  sprintf "layout(location = %d) out %s %s;" i (CType.glsl v.ctype) v.name
-                    else sprintf "out %s %s;" (CType.glsl v.ctype) v.name
-                )
-
-            let args = e.cArguments |> List.map (fun v -> sprintf "%s %s" (CType.glsl v.ctype) v.name) |> String.concat ", " 
+            let inputs = e.cInputs |> List.mapi (CEntryParameter.glsl c "in ")
+            let outputs = e.cOutputs |> List.mapi (CEntryParameter.glsl c "out ")
+            let args = e.cArguments |> List.mapi (CEntryParameter.glsl c "") |> String.concat ", " 
 
             String.concat "\r\n" [
-                yield! before
                 yield! inputs
                 yield! outputs
                 yield sprintf "%s %s(%s)\r\n{\r\n%s;\r\n}" (CType.glsl e.cReturnType) e.cEntryName args (e.cBody |> CStatement.glsl |> String.indent)
-                yield! after
             ]
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module CValueDef =
-        let glsl (c : Config) (d : CValueDef) =
+        let rec glsl (c : Config) (d : CValueDef) =
             match d with
+                | CConditionalDef(d, inner) ->
+                    let inner = inner |> List.map (glsl c) |> String.concat "\r\n"
+                    sprintf "\r\n#ifdef %s\r\n%s\r\n\r\n#endif\r\n" d inner
+
                 | CEntryDef e -> 
                     CEntryDef.glsl c e
 
                 | CFunctionDef(signature, body) ->
-                    sprintf "%s\r\n{\r\n%s;\r\n}" (CFunctionSignature.glsl signature) (body |> CStatement.glsl |> String.indent)
+                    sprintf "%s\r\n{\r\n%s;\r\n}\r\n" (CFunctionSignature.glsl signature) (body |> CStatement.glsl |> String.indent)
 
                 | CConstant(t, n, init) ->
                     match t with
                         | CArray(t,l) -> sprintf "const %s %s[%d] = %s;" (CType.glsl t) n l (CRExpr.glsl init)
                         | _ -> sprintf "const %s %s = %s;" (CType.glsl t) n (CRExpr.glsl init)
+
+                | CUniformDef us ->
+                    if c.perStageUniforms then
+                        CUniform.glsl c us
+                    else
+                        ""
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module CTypeDef =
@@ -283,23 +331,9 @@ module GLSL =
                 List.concat [
                     yield m.types |> List.map CTypeDef.glsl
 
-
-                    if c.perStageUniforms then
-                        for v in m.values do
-                            match v with
-                                | CEntryDef e ->
-                                    let before, after =
-                                        match e.cConditional with
-                                            | Some c -> [sprintf "#ifdef %s" c], ["#endif"]
-                                            | None -> [], []
-
-                                    yield before
-                                    yield e.cUniforms |> List.map (CUniform.glsl)
-                                    yield after
-                                | _ ->
-                                    ()
-                    else
-                        yield m.uniforms |> List.map CUniform.glsl
+                    if not c.perStageUniforms then
+                        let uniforms = m.uniforms
+                        yield [ CUniform.glsl c uniforms ]
 
                     yield m.values |> List.map (CValueDef.glsl c)
                 ]

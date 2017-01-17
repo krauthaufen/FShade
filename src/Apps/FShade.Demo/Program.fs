@@ -864,7 +864,7 @@ let main argv =
     let backend = 
         let simple (name : string) = Some { name = name; tag = null; arguments = None }
 
-        { new FShade.Compiler.IBackend() with
+        { new FShade.Compiler.Backend() with
             member x.CompileIntrinsicFunction mi = 
                 match mi with
                     | MethodQuote <@ ( ** ) @> _        -> simple "pow"

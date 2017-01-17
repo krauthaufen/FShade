@@ -59,17 +59,21 @@ let main args =
             @@>
         ]
 
+    let data = Arr<4 N, float> [| 1.0; 2.0; 3.0; 4.0 |]
+
     let testCode = 
-        <@ fun (p : V4d) (ModelTrafo : float, ViewProjTrafo : float) ->
+        <@ fun (p : V4d) (modelTrafo : float) (viewProjTrafo : float) ->
+            let x = Case1 { a = 1; b = 3 }
             let w = 
-                let test = ModelTrafo * p
-                2.0 * test
-            ViewProjTrafo * w
+                let test = modelTrafo * p
+                data.[1] * test
+            data.[1] * viewProjTrafo * w
         @>
 
     let seppCode = 
-        <@ fun (tc : V2d) (ModelTrafo : float, Seppy : float) ->
-            ModelTrafo * (Seppy * tc)
+        <@ fun (tc : V2d) (modelTrafo : float) (seppy : float) ->
+            let x = Case1 { a = 1; b = 3 }
+            data.[1] * modelTrafo * (seppy * tc)
         @>
 
     let rec removeUselessLets (e : Expr) = 
@@ -79,39 +83,50 @@ let main args =
         
 
 
+
+
     let testEntry = 
-        match testCode with
-            | Lambdas([inputs; uniforms], body) -> 
-                {
-                    conditional = Some "Vertex"
-                    entryName   = "main"
-                    inputs      = inputs
-                    outputs     = []
-                    uniforms    = [ Buffer("BlaBuffer", uniforms |> List.map (fun v -> (v.Name, v.Type))) ]
-                    arguments   = [] 
-                    body        = removeUselessLets body
-                }
-            | _ ->
-                failwith ""
+        let entry = EntryPoint.ofLambda "main" testCode
+
+        let inputs, uniforms = entry.arguments |> List.splitAt 1
+
+        { entry with
+            conditional = Some "Vertex"
+            inputs = inputs
+            uniforms = uniforms |> List.map (fun p -> { uniformName = p.paramName; uniformType = p.paramType; uniformBuffer = Some "BlaBuffer" })
+            arguments = []
+        }
 
     let seppEntry = 
-        match seppCode with
-            | Lambdas([inputs; uniforms], body) ->
-                {
-                    conditional = Some "Pixel"
-                    entryName   = "main"
-                    inputs      = inputs
-                    outputs     = []
-                    uniforms    = [ Buffer("BlaBuffer", uniforms |> List.map (fun v -> (v.Name, v.Type))) ]
-                    arguments   = [] 
-                    body        = removeUselessLets body
-                }
-            | _ ->
-                failwith ""
+        let entry = EntryPoint.ofLambda "main" seppCode
+
+        let inputs, uniforms = entry.arguments |> List.splitAt 1
+
+        { entry with
+            conditional = Some "Pixel"
+            inputs = inputs
+            uniforms = uniforms |> List.map (fun p -> { uniformName = p.paramName; uniformType = p.paramType; uniformBuffer = Some "BlaBuffer" })
+            arguments = []
+        }
+//
+//
+//        match seppCode with
+//            | Lambdas([inputs; uniforms], body) ->
+//                {
+//                    conditional = Some "Pixel"
+//                    entryName   = "main"
+//                    inputs      = inputs
+//                    outputs     = []
+//                    uniforms    = [ Buffer("BlaBuffer", uniforms |> List.map (fun v -> (v.Name, v.Type))) ]
+//                    arguments   = [] 
+//                    body        = removeUselessLets body
+//                }
+//            | _ ->
+//                failwith ""
 
 
-    let compiled = Compiler.compile GLSLBackend.Instance { entries = [testEntry; seppEntry] }
-    let config = { GLSL.Config.locations = true; GLSL.Config.perStageUniforms = true }
+    let compiled = Linker.compile GLSLBackend.Instance [testEntry; seppEntry]
+    let config = { GLSL.Config.locations = true; GLSL.Config.perStageUniforms = true; GLSL.Config.uniformBuffers = true }
     let str = FShade.Imperative.GLSL.CModule.glsl config compiled
     printfn "%s" str
 //    let m = Compiler.compile GLSLBackend.Instance test

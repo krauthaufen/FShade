@@ -18,14 +18,6 @@ open FShade.Imperative
 module Compiler =
     open Aardvark.Base.Monads.State
 
-    [<AutoOpen>]
-    module private Helpers =
-        let inline (>>=) (m : State<'s, 'a>) (f : 'a -> State<'s, 'b>) =
-            m |> State.bind f
-
-        let inline (|>>) (m : State<'s, 'a>) (f : 'a -> 'b) =
-            m |> State.map f
-
     [<AllowNullLiteral; AbstractClass>]
     type Backend() =
         let intrinsicFunctions = System.Collections.Concurrent.ConcurrentDictionary<MethodBase, Option<CIntrinsic>>()
@@ -44,7 +36,6 @@ module Compiler =
     type FunctionDefinition = 
         | ManagedFunction of name : string * args : list<Var> * body : Expr
         | CompiledFunction of signature : CFunctionSignature * body : CStatement
-        | EntryFunction of EntryPoint
 
         member x.Signature =
             match x with
@@ -53,9 +44,6 @@ module Compiler =
 
                 | ManagedFunction(name,args,body) ->
                     CFunctionSignature.ofFunction name args body.Type
-
-                | EntryFunction f ->
-                    CFunctionSignature.ofFunction f.entryName f.arguments f.body.Type
 
     type ConstantDefinition = { cName : string; cType : Type; cValue : Expr }
 
@@ -71,22 +59,25 @@ module Compiler =
 
     type ModuleState =
         {
+            backend             : Backend
             constantIndex       : int
             usedTypes           : HashMap<obj, CType>
+
+            globalFunctions     : HashMap<obj, FunctionDefinition>
+            globalConstants     : HashMap<obj, ConstantDefinition>
+
+            globalParameters    : Set<string>
         }
 
     type CompilerState =
         {
-            backend             : Backend
             nameIndices         : Map<string, int>
             variableNames       : Map<Var, string>
-            fixedNames          : Set<string>
-
-            globalVariables     : Set<Var>
+            reservedNames       : Set<string>
 
             usedFunctions       : HashMap<obj, FunctionDefinition>
-            usedConstants       : HashMap<obj, ConstantDefinition>
-
+            usedConstants       : pset<ConstantDefinition>
+            usedGlobals         : pset<string>
             moduleState         : ModuleState
         }
 
@@ -286,80 +277,102 @@ module Compiler =
                     | Some name -> 
                         s, name
                     | None ->
-                        if Set.contains v.Name s.fixedNames then
-                            s, v.Name
-                        else
-                            match Map.tryFind v.Name s.nameIndices with
-                                | Some index ->
-                                    let name = v.Name + string index
-                                    let state = { s with nameIndices = Map.add v.Name (index + 1) s.nameIndices; variableNames = Map.add v name s.variableNames }
-                                    state, name
-                                | None ->
-                                    let state = { s with nameIndices = Map.add v.Name 1 s.nameIndices; variableNames = Map.add v v.Name s.variableNames }
-                                    state, v.Name
+                        match Map.tryFind v.Name s.nameIndices with
+                            | Some index ->
+                                let name = v.Name + string index
+                                let state = { s with nameIndices = Map.add v.Name (index + 1) s.nameIndices; variableNames = Map.add v name s.variableNames }
+                                state, name
+                            | None ->
+                                let state = { s with nameIndices = Map.add v.Name 1 s.nameIndices; variableNames = Map.add v v.Name s.variableNames }
+                                state, v.Name
 
             )
 
-        let fixName (n : string) =
+        let reserveName (n : string) =
             State.modify (fun s ->
-                { s with fixedNames = Set.add n s.fixedNames; nameIndices = Map.add n 1 s.nameIndices }
+                { s with reservedNames = Set.add n s.reservedNames; nameIndices = Map.add n 1 s.nameIndices }
             )
 
-        let useFunction (key : obj) (f : FunctionDefinition) =
+        let useLocalFunction (key : obj) (f : FunctionDefinition) =
             State.custom (fun s ->
                 { s with usedFunctions = HashMap.add key f s.usedFunctions }, f.Signature
             )
 
-        let useCtor (key : obj) (f : FunctionDefinition) =
+        let useGlobalFunction (key : obj) (f : FunctionDefinition) =
             State.custom (fun s ->
-                { s with usedFunctions = HashMap.add ((key, "ctor") :> obj) f s.usedFunctions }, f.Signature
+                { s with moduleState = { s.moduleState with globalFunctions = HashMap.add key f s.moduleState.globalFunctions } }, f.Signature
             )
+
+        let useCtor (key : obj) (f : FunctionDefinition) =
+            useGlobalFunction ((key, "ctor") :> obj) f
 
         let useConstant (key : obj) (e : Expr) =
             state {
                 let ct = CType.ofType e.Type
                 let! s = State.get
-                match HashMap.tryFind key s.usedConstants with
+                match HashMap.tryFind key s.moduleState.globalConstants with
                     | None -> 
                         let name = sprintf "_constant%d" s.moduleState.constantIndex
                         let c = { cName = name; cType = e.Type; cValue = e }
-                        do! State.put { s with usedConstants = HashMap.add key c s.usedConstants; moduleState = { s.moduleState with constantIndex = s.moduleState.constantIndex + 1 } }
+                        do! State.put { 
+                                s with 
+                                    moduleState = { s.moduleState with globalConstants = HashMap.add key c s.moduleState.globalConstants; constantIndex = s.moduleState.constantIndex + 1 } 
+                                    usedConstants = PSet.add c s.usedConstants
+                            }
                     
                         return CVar { name = name; ctype = ct }
                     | Some c ->
+                        do! State.put { s with usedConstants = PSet.add c s.usedConstants }
                         return CVar { name = c.cName; ctype = ct }
 
             }
 
         let tryGetIntrinsic (mi : MethodBase) =
             State.get |> State.map (fun s ->
-                if isNull s.backend then None
-                else s.backend.TryGetIntrinsic mi
+                if isNull s.moduleState.backend then None
+                else s.moduleState.backend.TryGetIntrinsic mi
             )
 
-        let getFreeVars (e : Expr) =
-            State.get |> State.map (fun s ->
-                let free = e.GetFreeVars() |> Set.ofSeq
-                if Set.isEmpty free then
-                    None
-                else
-                    Some (Set.difference free s.globalVariables)
-            )
+        type Free =
+            | Variable of Var
+            | Global of name : string * t : Type * isMutable : bool
 
-    let emptyState (b : Backend) =
+        let rec free (e : Expr) : pset<Free> =
+            match e with
+                | Let(v,e,b) ->
+                    let fe = free e
+                    let fb = free b
+                    PSet.union fe (PSet.remove (Variable v) fb)
+
+                | ReadInput(name,idx) ->
+                    match idx with
+                        | Some idx -> free idx |> PSet.add (Global(name, e.Type, false))
+                        | None -> PSet.ofList [ Global(name, e.Type, false) ]
+
+                | WriteOutput(name,idx,value) ->
+                    match idx with
+                        | Some idx -> PSet.union (free idx) (free value) |> PSet.add (Global(name, e.Type, true))
+                        | None -> (free value) |> PSet.add (Global(name, e.Type, true))
+                    
+
+                | ExprShape.ShapeCombination(o, args) ->
+                    args |> List.fold (fun m e -> PSet.union m (free e)) PSet.empty
+
+                | ExprShape.ShapeLambda(v, b) ->
+                    free b |> PSet.remove (Variable v)
+
+                | ExprShape.ShapeVar v ->
+                    PSet.ofList [ Variable v ]
+
+    let emptyState (m : ModuleState) =
         {
-            backend             = b
             nameIndices         = Map.empty
             variableNames       = Map.empty
-            fixedNames          = Set.empty
-            globalVariables     = Set.empty
+            reservedNames       = Set.empty
             usedFunctions       = HashMap.empty
-            usedConstants       = HashMap.empty
-            moduleState =
-                {
-                    constantIndex = 0
-                    usedTypes = HashMap.empty
-                }
+            usedConstants       = PSet.empty
+            usedGlobals         = PSet.empty
+            moduleState         = m
         }
 
     let toCType (t : Type) =
@@ -372,16 +385,9 @@ module Compiler =
                 | _ ->
                     s, cType
         )
-
-    let useCType (cType : CType) =
-        State.custom (fun s ->
-            match cType with
-                | CStruct _ ->
-                    { s with moduleState = { s.moduleState with ModuleState.usedTypes = HashMap.add (cType :> obj) cType s.moduleState.usedTypes } }, cType
-                | _ ->
-                    s, cType
-        )
-
+        
+    /// converts a variable to a CVar using the cached name or by
+    /// creating a fresh name for it (and caching it)
     let toCVar (v : Var) =
         state {
             let! ctype = toCType v.Type
@@ -389,282 +395,294 @@ module Compiler =
             return { name = name; ctype = ctype }
         }
 
-    let toFixedCVar (v : Var) =
+    /// converts an EntryParameter to a CEntryParameter 
+    /// NOTE that names are not treated here
+    let toCEntryParameter (p : EntryParameter) =
         state {
-            let! ctype = toCType v.Type
-            let! name = CompilerState.variableName v
-            return { name = name; ctype = ctype }
+            let! ctype = toCType p.paramType
+            return {
+                cParamType           = ctype
+                cParamName           = p.paramName
+                cParamSemantic       = p.paramSemantic
+                cParamDecorations    = p.paramDecorations
+            }
         }
+        
+    /// converts an Uniform to a CUniform
+    /// NOTE that names are not treated here
     let toCUniform (v : Uniform) =
         state {
-            match v with
-                | Global(n, t) ->
-                    let! ctype = toCType t
-                    do! CompilerState.fixName n
-                    return CGlobal(ctype, n)
-
-                | Buffer(n, fields) ->
-                    let! fields = 
-                        fields |> List.mapS (fun (n, t) ->
-                            state {
-                                do! CompilerState.fixName n
-                                let! ct = toCType t
-                                return ct, n
-                            }
-                        )
-
-                    return CBuffer(n, fields)
+            let! ct = toCType v.uniformType
+            return {
+                cUniformType = ct
+                cUniformName = v.uniformName
+                cUniformBuffer = v.uniformBuffer
+            }
         }
 
-    let rec tryDeconstructValue (t : Type) (v : obj) =
-        if FSharpType.IsTuple t then
-            let elements = FSharpType.GetTupleElements t |> Array.toList
-            let arguments =
-                elements |> List.mapi (fun i t ->
-                    Expr.Value(FSharpValue.GetTupleField(v, i), t)
-                )
-            Expr.NewTuple(arguments) |> Some
+    [<AutoOpen>]
+    module Helpers = 
+        let rec tryDeconstructValue (t : Type) (v : obj) =
+            if FSharpType.IsTuple t then
+                let elements = FSharpType.GetTupleElements t |> Array.toList
+                let arguments =
+                    elements |> List.mapi (fun i t ->
+                        Expr.Value(FSharpValue.GetTupleField(v, i), t)
+                    )
+                Expr.NewTuple(arguments) |> Some
 
-        elif FSharpType.IsRecord(t, true) then
-            let fields = FSharpType.GetRecordFields(t, true) |> Array.toList
-            let arguments = 
-                fields |> List.map (fun pi ->
-                    Expr.Value(pi.GetValue(v), pi.PropertyType)
-                )
-            Expr.NewRecord(t, arguments) |> Some
+            elif FSharpType.IsRecord(t, true) then
+                let fields = FSharpType.GetRecordFields(t, true) |> Array.toList
+                let arguments = 
+                    fields |> List.map (fun pi ->
+                        Expr.Value(pi.GetValue(v), pi.PropertyType)
+                    )
+                Expr.NewRecord(t, arguments) |> Some
 
-        elif FSharpType.IsUnion(t, true) then
-            let case, fields = FSharpValue.GetUnionFields(v, t)
-            let arguments = 
-                List.map2 (fun (value : obj) (pi : PropertyInfo) -> Expr.Value(value, pi.PropertyType)) (Array.toList fields) (Array.toList (case.GetFields()))
+            elif FSharpType.IsUnion(t, true) then
+                let case, fields = FSharpValue.GetUnionFields(v, t)
+                let arguments = 
+                    List.map2 (fun (value : obj) (pi : PropertyInfo) -> Expr.Value(value, pi.PropertyType)) (Array.toList fields) (Array.toList (case.GetFields()))
       
-            Expr.NewUnionCase(case, arguments) |> Some
+                Expr.NewUnionCase(case, arguments) |> Some
 
-        else 
-            match v with
-                | VectorValue(bt, args) ->
-                    let ctor = t.GetConstructor(Array.create args.Length bt)
-                    Expr.NewObject(ctor, args |> Array.toList |> List.map (fun v -> Expr.Value(v, bt))) |> Some
+            else 
+                match v with
+                    | VectorValue(bt, args) ->
+                        let ctor = t.GetConstructor(Array.create args.Length bt)
+                        Expr.NewObject(ctor, args |> Array.toList |> List.map (fun v -> Expr.Value(v, bt))) |> Some
+                    | _ ->
+                        None
+
+        let rec asExternal (e : Expr) =
+            state {
+                let free = CompilerState.free e
+                if PSet.isEmpty free then
+                    return! CompilerState.useConstant e e
+                else
+                    let! globals = State.get |> State.map (fun s -> s.moduleState.globalParameters)
+                    let free = free |> PSet.toList
+ 
+                    let args = 
+                        free |> List.choose (fun f ->
+                            match f with
+                                | CompilerState.Free.Variable v ->
+                                    Some v
+                                | CompilerState.Free.Global(n, t, isMutable) ->
+                                    if Set.contains n globals then None
+                                    else Some (Var(n,t, isMutable))
+                        )
+
+                    let! name = CompilerState.newName "helper"
+                    let definition = ManagedFunction(name, args, e)
+
+                    let! signature = 
+                        if List.length args = List.length free then CompilerState.useGlobalFunction (e :> obj) definition
+                        else CompilerState.useLocalFunction (e :> obj) definition
+
+                    let! args = args |> List.mapS (toCVar >> State.map CVar) |>> List.toArray
+                    return CCall(signature, args)
+            }
+
+        let rec zero (t : CType) =
+            match t with
+                | CVoid             -> CValue(t, CLiteral.Null)
+                | CType.CBool       -> CValue(t, CLiteral.CBool false)
+                | CInt _            -> CValue(t, CIntegral 0L)
+                | CFloat _          -> CValue(t, CFractional 0.0)
+                | CVector(bt, d)    -> CNewVector(t, d, List.replicate d (zero bt))
+                | CMatrix(bt, r, c) -> CMatrixFromRows(t, zero (CVector(bt, c)) |> List.replicate r)
+                | _                 -> failwithf "[FShade] cannot create zero-value for type %A" t
+
+        let rec one (t : CType) =
+            match t with
+                | CType.CBool       -> CValue(t, CLiteral.CBool true)
+                | CInt _            -> CValue(t, CIntegral 1L)
+                | CFloat _          -> CValue(t, CFractional 1.0)
+                | CVector(bt, d)    -> CNewVector(t, d, List.replicate d (one bt))
+                | _                 -> failwithf "[FShade] cannot create one-value for type %A" t
+
+        let rec tryGetBuiltInMethod (mi : MethodInfo) (args : list<CExpr>) =
+            let ct = CType.ofType mi.ReturnType
+            match mi, args with
+                | Method("op_UnaryNegation", _), [l]        -> CExpr.CNeg(ct, l) |> Some
+                | MethodQuote <@ not @> _, [l]              -> CExpr.CNot(ct, l) |> Some
+
+                | Method("op_Addition", _), [l;r]           -> CExpr.CAdd(ct, l, r) |> Some
+                | Method("op_Subtraction", _), [l;r]        -> CExpr.CSub(ct, l, r) |> Some
+                | Method("op_Division", _), [l;r]           -> CExpr.CDiv(ct, l, r) |> Some
+                | Method("op_Modulus", _), [l;r]            -> CExpr.CMod(ct, l, r) |> Some
+
+            
+                | Method("op_Multiply", _), [l;r] ->
+                    let lt = l.ctype
+                    let rt = r.ctype 
+                    match lt, rt with
+                        | CMatrix _, CMatrix _              -> CMulMatMat(ct, l, r) |> Some
+                        | CMatrix _, CVector _              -> CMulMatVec(ct, l, r) |> Some
+                        | CVector _, CMatrix(b,rows,cols)   -> CMulMatVec(ct, CTranspose(CMatrix(b,cols,rows), r), l) |> Some
+                        | _                                 -> CExpr.CMul(ct, l, r) |> Some
+
+                // transpose
+                | MethodQuote <@ Mat.transpose : M44d -> M44d @> _, [m]    
+                | Method("Transpose", [MatrixOf _]) , [m]
+                | Method("get_Transposed", _), [m] -> 
+                    match ct with
+                        | CMatrix(b,r,c) -> CTranspose(CMatrix(b,c,r), m) |> Some
+                        | _ -> None
+                   
+                // dot         
+                | MethodQuote <@ Vec.dot : V4d -> V4d -> float @> _, [l;r]
+                | Method("Dot", [VectorOf _; VectorOf _]), [l;r] ->
+                    CDot(ct, l, r) |> Some
+              
+                // length         
+                | MethodQuote <@ Vec.length : V4d -> float @> _, [v]
+                | Method("get_Length", [VectorOf _]), [v] ->
+                    CVecLength(ct, v) |> Some
+
+                 // lengthSquared     
+                | MethodQuote <@ Vec.lengthSquared : V4d -> float @> _, [v]
+                | Method("get_LengthSquared", [VectorOf _]), [v] ->
+                    CDot(ct, v, v) |> Some
+                               
+
+                // cross              
+                | MethodQuote <@ Vec.cross : V3d -> V3d -> V3d @> _, [l;r]
+                | Method("Cross", [VectorOf _; VectorOf _]), [l;r] ->
+                    CCross(ct, l, r) |> Some
+
+                // transformDir
+                | MethodQuote <@ Mat.transformDir : M44d -> V3d -> V3d @> _, [m;v] 
+                | Method("TransformDir", [MatrixOf _; VectorOf _]), [m;v] ->
+                    match ct, v.ctype with
+                        | CVector(rt, rd), CVector(t, d) ->
+                            let res = CMulMatVec(CVector(rt, rd + 1), m, CNewVector(CVector(t, d + 1), d, [v; zero t]))
+                            CVecSwizzle(ct, res, CVecComponent.first rd) |> Some
+                        | _ ->
+                            None
+
+                // transformPos
+                | MethodQuote <@ Mat.transformPos : M44d -> V3d -> V3d @> _, [m;v] 
+                | Method("TransformPos", [MatrixOf _; VectorOf _]), [m;v] ->
+                    match ct, v.ctype with
+                        | CVector(rt, rd), CVector(t, d) ->
+                            let res = CMulMatVec(CVector(rt, rd + 1), m, CNewVector(CVector(t, d + 1), d, [v; one t]))
+                            CVecSwizzle(ct, res, CVecComponent.first rd) |> Some
+                        | _ ->
+                            None
+
+                // vector swizzles
+                | (MethodQuote <@ Vec.xy : V4d -> V2d @> _ | Method("get_XY", [VectorOf _])), [v] -> CVecSwizzle(ct, v, CVecComponent.xy) |> Some
+                | (MethodQuote <@ Vec.yz : V4d -> V2d @> _ | Method("get_YZ", [VectorOf _])), [v] -> CVecSwizzle(ct, v, CVecComponent.yz) |> Some
+                | (MethodQuote <@ Vec.zw : V4d -> V2d @> _ | Method("get_ZW", [VectorOf _])), [v] -> CVecSwizzle(ct, v, CVecComponent.zw) |> Some
+                | (MethodQuote <@ Vec.xyz : V4d -> V3d @> _ | Method("get_XYZ", [VectorOf _])), [v] -> CVecSwizzle(ct, v, CVecComponent.xyz) |> Some
+                | (MethodQuote <@ Vec.yzw : V4d -> V3d @> _ | Method("get_YZW", [VectorOf _])), [v] -> CVecSwizzle(ct, v, CVecComponent.yzw) |> Some
+
+                // matrix creation
+                | Method("FromRows", _), rows -> CMatrixFromRows(ct, rows) |> Some
+                | Method("FromCols", _), rows -> CMatrixFromCols(ct, rows) |> Some
+
+                // matrix swizzles
+                | Method("get_R0", [MatrixOf _]), [m] -> 
+                    match m.ctype, ct with
+                        | CMatrix(_,r,c), CVector(t, d) -> CNewVector(ct, d, List.init c (fun c -> CMatrixElement(t, m, 0, c))) |> Some
+                        | _ -> None
+
+                | Method("get_R1", [MatrixOf _]), [m] -> 
+                    match m.ctype, ct with
+                        | CMatrix(_,r,c), CVector(t, d) -> CNewVector(ct, d, List.init c (fun c -> CMatrixElement(t, m, 1, c))) |> Some
+                        | _ -> None
+                    
+                | Method("get_R2", [MatrixOf _]), [m] -> 
+                    match m.ctype, ct with
+                        | CMatrix(_,r,c), CVector(t, d) -> CNewVector(ct, d, List.init c (fun c -> CMatrixElement(t, m, 2, c))) |> Some
+                        | _ -> None
+                    
+                | Method("get_R3", [MatrixOf _]), [m] -> 
+                    match m.ctype, ct with
+                        | CMatrix(_,r,c), CVector(t, d) -> CNewVector(ct, d, List.init c (fun c -> CMatrixElement(t, m, 3, c))) |> Some
+                        | _ -> None
+
+                | Method("get_C0", [MatrixOf _]), [m] -> 
+                    match m.ctype, ct with
+                        | CMatrix(_,r,c), CVector(t, d) -> CNewVector(ct, d, List.init r (fun r -> CMatrixElement(t, m, r, 0))) |> Some
+                        | _ -> None
+
+                | Method("get_C1", [MatrixOf _]), [m] -> 
+                    match m.ctype, ct with
+                        | CMatrix(_,r,c), CVector(t, d) -> CNewVector(ct, d, List.init r (fun r -> CMatrixElement(t, m, r, 1))) |> Some
+                        | _ -> None
+
+                | Method("get_C2", [MatrixOf _]), [m] -> 
+                    match m.ctype, ct with
+                        | CMatrix(_,r,c), CVector(t, d) -> CNewVector(ct, d, List.init r (fun r -> CMatrixElement(t, m, r, 2))) |> Some
+                        | _ -> None
+
+                | Method("get_C3", [MatrixOf _]), [m] -> 
+                    match m.ctype, ct with
+                        | CMatrix(_,r,c), CVector(t, d) -> CNewVector(ct, d, List.init r (fun r -> CMatrixElement(t, m, r, 3))) |> Some
+                        | _ -> None
+
+
+
+
+                | Method("op_BooleanAnd", _), [l;r]         -> CExpr.CAnd(l, r) |> Some
+                | Method("op_BooleanOr", _), [l;r]          -> CExpr.COr(l, r) |> Some
+
+                | Method("op_BitwiseAnd", _), [l;r]         -> CExpr.CBitAnd(ct, l, r) |> Some
+                | Method("op_BitwiseOr", _), [l;r]          -> CExpr.CBitOr(ct, l, r) |> Some
+                | Method("op_ExclusiveOr", _), [l;r]        -> CExpr.CBitXor(ct, l, r) |> Some
+
+                | Method("op_LessThan", _), [l;r]           -> CExpr.CLess(l, r) |> Some
+                | Method("op_LessThanOrEqual", _), [l;r]    -> CExpr.CLequal(l, r) |> Some
+                | Method("op_GreaterThan", _), [l;r]        -> CExpr.CGreater(l, r) |> Some
+                | Method("op_GreaterThanOrEqual", _), [l;r] -> CExpr.CGequal(l, r) |> Some
+                | Method("op_Equality", _), [l;r]           -> CExpr.CEqual(l, r) |> Some
+                | Method("op_Inequality", _), [l;r]         -> CExpr.CNotEqual(l, r) |> Some
+
+                | Method("get_Item", [ArrOf(_,_); _]), [arr; index]
+                | Method("GetArray", _), [arr; index] -> 
+                    CExpr.CItem(ct, arr, index) |> Some
+
+
+                | ConversionMethod(_,o), [arg]              -> CExpr.CConvert(CType.ofType o, arg) |> Some
+                | _ -> None
+
+        let rec tryGetBuiltInCtor (ctor : ConstructorInfo) (args : list<CExpr>) =
+            match ctor.DeclaringType with
+                | VectorOf(d, t) ->
+                    CNewVector(CType.ofType ctor.DeclaringType, d, args) |> Some
+
                 | _ ->
                     None
 
-    let rec asExternal (e : Expr) =
-        state {
-            let! free = CompilerState.getFreeVars e
-            match free with
-                | None ->
-                    return! CompilerState.useConstant e e
-                | Some free -> 
-                    let! name = CompilerState.newName "helper"
-                    let free = Set.toList free
-                    let definition = ManagedFunction(name, free, e)
+        let rec tryGetBuiltInField (fi : FieldInfo) (arg : CExpr) =
+            let ct = CType.ofType fi.FieldType
+            match fi.DeclaringType, fi.Name with
+                | VectorOf _, "X" -> CVecSwizzle(ct, arg, [CVecComponent.X]) |> Some
+                | VectorOf _, "Y" -> CVecSwizzle(ct, arg, [CVecComponent.Y]) |> Some
+                | VectorOf _, "Z" -> CVecSwizzle(ct, arg, [CVecComponent.Z]) |> Some
+                | VectorOf _, "W" -> CVecSwizzle(ct, arg, [CVecComponent.W]) |> Some
 
-                    let! signature = CompilerState.useFunction (e :> obj) definition
+                | MatrixOf _, "M00" -> CMatrixElement(ct, arg, 0, 0) |> Some
+                | MatrixOf _, "M01" -> CMatrixElement(ct, arg, 0, 1) |> Some
+                | MatrixOf _, "M02" -> CMatrixElement(ct, arg, 0, 2) |> Some
+                | MatrixOf _, "M03" -> CMatrixElement(ct, arg, 0, 3) |> Some
+                | MatrixOf _, "M10" -> CMatrixElement(ct, arg, 1, 0) |> Some
+                | MatrixOf _, "M11" -> CMatrixElement(ct, arg, 1, 1) |> Some
+                | MatrixOf _, "M12" -> CMatrixElement(ct, arg, 1, 2) |> Some
+                | MatrixOf _, "M13" -> CMatrixElement(ct, arg, 1, 3) |> Some
+                | MatrixOf _, "M20" -> CMatrixElement(ct, arg, 2, 0) |> Some
+                | MatrixOf _, "M21" -> CMatrixElement(ct, arg, 2, 1) |> Some
+                | MatrixOf _, "M22" -> CMatrixElement(ct, arg, 2, 2) |> Some
+                | MatrixOf _, "M23" -> CMatrixElement(ct, arg, 2, 3) |> Some
+                | MatrixOf _, "M30" -> CMatrixElement(ct, arg, 3, 0) |> Some
+                | MatrixOf _, "M31" -> CMatrixElement(ct, arg, 3, 1) |> Some
+                | MatrixOf _, "M32" -> CMatrixElement(ct, arg, 3, 2) |> Some
+                | MatrixOf _, "M33" -> CMatrixElement(ct, arg, 3, 3) |> Some
 
-                    let! args = free |> List.mapS (toCVar >> State.map CVar) |>> List.toArray
-                    return CCall(signature, args)
-        }
-
-    let rec zero (t : CType) =
-        match t with
-            | CVoid             -> CValue(t, CLiteral.Null)
-            | CType.CBool       -> CValue(t, CLiteral.CBool false)
-            | CInt _            -> CValue(t, CIntegral 0L)
-            | CFloat _          -> CValue(t, CFractional 0.0)
-            | CVector(bt, d)    -> CNewVector(t, d, List.replicate d (zero bt))
-            | CMatrix(bt, r, c) -> CMatrixFromRows(t, zero (CVector(bt, c)) |> List.replicate r)
-            | _                 -> failwithf "[FShade] cannot create zero-value for type %A" t
-
-    let rec one (t : CType) =
-        match t with
-            | CType.CBool       -> CValue(t, CLiteral.CBool true)
-            | CInt _            -> CValue(t, CIntegral 1L)
-            | CFloat _          -> CValue(t, CFractional 1.0)
-            | CVector(bt, d)    -> CNewVector(t, d, List.replicate d (one bt))
-            | _                 -> failwithf "[FShade] cannot create one-value for type %A" t
-
-    let rec tryGetBuiltInMethod (mi : MethodInfo) (args : list<CExpr>) =
-        let ct = CType.ofType mi.ReturnType
-        match mi, args with
-            | Method("op_UnaryNegation", _), [l]        -> CExpr.CNeg(ct, l) |> Some
-            | MethodQuote <@ not @> _, [l]              -> CExpr.CNot(ct, l) |> Some
-
-            | Method("op_Addition", _), [l;r]           -> CExpr.CAdd(ct, l, r) |> Some
-            | Method("op_Subtraction", _), [l;r]        -> CExpr.CSub(ct, l, r) |> Some
-            | Method("op_Division", _), [l;r]           -> CExpr.CDiv(ct, l, r) |> Some
-            | Method("op_Modulus", _), [l;r]            -> CExpr.CMod(ct, l, r) |> Some
-
-            
-            | Method("op_Multiply", _), [l;r] ->
-                let lt = l.ctype
-                let rt = r.ctype 
-                match lt, rt with
-                    | CMatrix _, CMatrix _              -> CMulMatMat(ct, l, r) |> Some
-                    | CMatrix _, CVector _              -> CMulMatVec(ct, l, r) |> Some
-                    | CVector _, CMatrix(b,rows,cols)   -> CMulMatVec(ct, CTranspose(CMatrix(b,cols,rows), r), l) |> Some
-                    | _                                 -> CExpr.CMul(ct, l, r) |> Some
-
-            // transpose
-            | MethodQuote <@ Mat.transpose : M44d -> M44d @> _, [m]    
-            | Method("Transpose", [MatrixOf _]) , [m]
-            | Method("get_Transposed", _), [m] -> 
-                match ct with
-                    | CMatrix(b,r,c) -> CTranspose(CMatrix(b,c,r), m) |> Some
-                    | _ -> None
-                   
-            // dot         
-            | MethodQuote <@ Vec.dot : V4d -> V4d -> float @> _, [l;r]
-            | Method("Dot", [VectorOf _; VectorOf _]), [l;r] ->
-                CDot(ct, l, r) |> Some
-              
-            // length         
-            | MethodQuote <@ Vec.length : V4d -> float @> _, [v]
-            | Method("get_Length", [VectorOf _]), [v] ->
-                CVecLength(ct, v) |> Some
-
-             // lengthSquared     
-            | MethodQuote <@ Vec.lengthSquared : V4d -> float @> _, [v]
-            | Method("get_LengthSquared", [VectorOf _]), [v] ->
-                CDot(ct, v, v) |> Some
-                               
-
-            // cross              
-            | MethodQuote <@ Vec.cross : V3d -> V3d -> V3d @> _, [l;r]
-            | Method("Cross", [VectorOf _; VectorOf _]), [l;r] ->
-                CCross(ct, l, r) |> Some
-
-            // transformDir
-            | MethodQuote <@ Mat.transformDir : M44d -> V3d -> V3d @> _, [m;v] 
-            | Method("TransformDir", [MatrixOf _; VectorOf _]), [m;v] ->
-                match ct, v.ctype with
-                    | CVector(rt, rd), CVector(t, d) ->
-                        let res = CMulMatVec(CVector(rt, rd + 1), m, CNewVector(CVector(t, d + 1), d, [v; zero t]))
-                        CVecSwizzle(ct, res, CVecComponent.first rd) |> Some
-                    | _ ->
-                        None
-
-            // transformPos
-            | MethodQuote <@ Mat.transformPos : M44d -> V3d -> V3d @> _, [m;v] 
-            | Method("TransformPos", [MatrixOf _; VectorOf _]), [m;v] ->
-                match ct, v.ctype with
-                    | CVector(rt, rd), CVector(t, d) ->
-                        let res = CMulMatVec(CVector(rt, rd + 1), m, CNewVector(CVector(t, d + 1), d, [v; one t]))
-                        CVecSwizzle(ct, res, CVecComponent.first rd) |> Some
-                    | _ ->
-                        None
-
-            // vector swizzles
-            | (MethodQuote <@ Vec.xy : V4d -> V2d @> _ | Method("get_XY", [VectorOf _])), [v] -> CVecSwizzle(ct, v, CVecComponent.xy) |> Some
-            | (MethodQuote <@ Vec.yz : V4d -> V2d @> _ | Method("get_YZ", [VectorOf _])), [v] -> CVecSwizzle(ct, v, CVecComponent.yz) |> Some
-            | (MethodQuote <@ Vec.zw : V4d -> V2d @> _ | Method("get_ZW", [VectorOf _])), [v] -> CVecSwizzle(ct, v, CVecComponent.zw) |> Some
-            | (MethodQuote <@ Vec.xyz : V4d -> V3d @> _ | Method("get_XYZ", [VectorOf _])), [v] -> CVecSwizzle(ct, v, CVecComponent.xyz) |> Some
-            | (MethodQuote <@ Vec.yzw : V4d -> V3d @> _ | Method("get_YZW", [VectorOf _])), [v] -> CVecSwizzle(ct, v, CVecComponent.yzw) |> Some
-
-            // matrix creation
-            | Method("FromRows", _), rows -> CMatrixFromRows(ct, rows) |> Some
-            | Method("FromCols", _), rows -> CMatrixFromCols(ct, rows) |> Some
-
-            // matrix swizzles
-            | Method("get_R0", [MatrixOf _]), [m] -> 
-                match m.ctype, ct with
-                    | CMatrix(_,r,c), CVector(t, d) -> CNewVector(ct, d, List.init c (fun c -> CMatrixElement(t, m, 0, c))) |> Some
-                    | _ -> None
-
-            | Method("get_R1", [MatrixOf _]), [m] -> 
-                match m.ctype, ct with
-                    | CMatrix(_,r,c), CVector(t, d) -> CNewVector(ct, d, List.init c (fun c -> CMatrixElement(t, m, 1, c))) |> Some
-                    | _ -> None
-                    
-            | Method("get_R2", [MatrixOf _]), [m] -> 
-                match m.ctype, ct with
-                    | CMatrix(_,r,c), CVector(t, d) -> CNewVector(ct, d, List.init c (fun c -> CMatrixElement(t, m, 2, c))) |> Some
-                    | _ -> None
-                    
-            | Method("get_R3", [MatrixOf _]), [m] -> 
-                match m.ctype, ct with
-                    | CMatrix(_,r,c), CVector(t, d) -> CNewVector(ct, d, List.init c (fun c -> CMatrixElement(t, m, 3, c))) |> Some
-                    | _ -> None
-
-            | Method("get_C0", [MatrixOf _]), [m] -> 
-                match m.ctype, ct with
-                    | CMatrix(_,r,c), CVector(t, d) -> CNewVector(ct, d, List.init r (fun r -> CMatrixElement(t, m, r, 0))) |> Some
-                    | _ -> None
-
-            | Method("get_C1", [MatrixOf _]), [m] -> 
-                match m.ctype, ct with
-                    | CMatrix(_,r,c), CVector(t, d) -> CNewVector(ct, d, List.init r (fun r -> CMatrixElement(t, m, r, 1))) |> Some
-                    | _ -> None
-
-            | Method("get_C2", [MatrixOf _]), [m] -> 
-                match m.ctype, ct with
-                    | CMatrix(_,r,c), CVector(t, d) -> CNewVector(ct, d, List.init r (fun r -> CMatrixElement(t, m, r, 2))) |> Some
-                    | _ -> None
-
-            | Method("get_C3", [MatrixOf _]), [m] -> 
-                match m.ctype, ct with
-                    | CMatrix(_,r,c), CVector(t, d) -> CNewVector(ct, d, List.init r (fun r -> CMatrixElement(t, m, r, 3))) |> Some
-                    | _ -> None
-
-
-
-
-            | Method("op_BooleanAnd", _), [l;r]         -> CExpr.CAnd(l, r) |> Some
-            | Method("op_BooleanOr", _), [l;r]          -> CExpr.COr(l, r) |> Some
-
-            | Method("op_BitwiseAnd", _), [l;r]         -> CExpr.CBitAnd(ct, l, r) |> Some
-            | Method("op_BitwiseOr", _), [l;r]          -> CExpr.CBitOr(ct, l, r) |> Some
-            | Method("op_ExclusiveOr", _), [l;r]        -> CExpr.CBitXor(ct, l, r) |> Some
-
-            | Method("op_LessThan", _), [l;r]           -> CExpr.CLess(l, r) |> Some
-            | Method("op_LessThanOrEqual", _), [l;r]    -> CExpr.CLequal(l, r) |> Some
-            | Method("op_GreaterThan", _), [l;r]        -> CExpr.CGreater(l, r) |> Some
-            | Method("op_GreaterThanOrEqual", _), [l;r] -> CExpr.CGequal(l, r) |> Some
-            | Method("op_Equality", _), [l;r]           -> CExpr.CEqual(l, r) |> Some
-            | Method("op_Inequality", _), [l;r]         -> CExpr.CNotEqual(l, r) |> Some
-
-            | Method("get_Item", [ArrOf(_,_); _]), [arr; index]
-            | Method("GetArray", _), [arr; index] -> 
-                CExpr.CItem(ct, arr, index) |> Some
-
-
-            | ConversionMethod(_,o), [arg]              -> CExpr.CConvert(CType.ofType o, arg) |> Some
-            | _ -> None
-
-    let rec tryGetBuiltInCtor (ctor : ConstructorInfo) (args : list<CExpr>) =
-        match ctor.DeclaringType with
-            | VectorOf(d, t) ->
-                CNewVector(CType.ofType ctor.DeclaringType, d, args) |> Some
-
-            | _ ->
-                None
-
-    let rec tryGetBuiltInField (fi : FieldInfo) (arg : CExpr) =
-        let ct = CType.ofType fi.FieldType
-        match fi.DeclaringType, fi.Name with
-            | VectorOf _, "X" -> CVecSwizzle(ct, arg, [CVecComponent.X]) |> Some
-            | VectorOf _, "Y" -> CVecSwizzle(ct, arg, [CVecComponent.Y]) |> Some
-            | VectorOf _, "Z" -> CVecSwizzle(ct, arg, [CVecComponent.Z]) |> Some
-            | VectorOf _, "W" -> CVecSwizzle(ct, arg, [CVecComponent.W]) |> Some
-
-            | MatrixOf _, "M00" -> CMatrixElement(ct, arg, 0, 0) |> Some
-            | MatrixOf _, "M01" -> CMatrixElement(ct, arg, 0, 1) |> Some
-            | MatrixOf _, "M02" -> CMatrixElement(ct, arg, 0, 2) |> Some
-            | MatrixOf _, "M03" -> CMatrixElement(ct, arg, 0, 3) |> Some
-            | MatrixOf _, "M10" -> CMatrixElement(ct, arg, 1, 0) |> Some
-            | MatrixOf _, "M11" -> CMatrixElement(ct, arg, 1, 1) |> Some
-            | MatrixOf _, "M12" -> CMatrixElement(ct, arg, 1, 2) |> Some
-            | MatrixOf _, "M13" -> CMatrixElement(ct, arg, 1, 3) |> Some
-            | MatrixOf _, "M20" -> CMatrixElement(ct, arg, 2, 0) |> Some
-            | MatrixOf _, "M21" -> CMatrixElement(ct, arg, 2, 1) |> Some
-            | MatrixOf _, "M22" -> CMatrixElement(ct, arg, 2, 2) |> Some
-            | MatrixOf _, "M23" -> CMatrixElement(ct, arg, 2, 3) |> Some
-            | MatrixOf _, "M30" -> CMatrixElement(ct, arg, 3, 0) |> Some
-            | MatrixOf _, "M31" -> CMatrixElement(ct, arg, 3, 1) |> Some
-            | MatrixOf _, "M32" -> CMatrixElement(ct, arg, 3, 2) |> Some
-            | MatrixOf _, "M33" -> CMatrixElement(ct, arg, 3, 3) |> Some
-
-            | _ -> None
-
+                | _ -> None
 
     let rec toCExpr (e : Expr) =
         state {
@@ -673,6 +691,20 @@ module Compiler =
             match e with
                 | ReducibleExpression e ->
                     return! toCExpr e
+
+                | ReadInput(name, index) ->
+                    let! s = State.get
+                    if Set.contains name s.moduleState.globalParameters then
+                        do! State.put { s with usedGlobals = PSet.add name s.usedGlobals }
+
+                    let v = CVar { ctype = ct; name = name }
+                    match index with
+                        | Some idx -> 
+                            let! idx = toCExpr idx
+                            return CItem(ct, v, idx)
+                        | _ ->
+                            return v
+
 
                 | Var v ->
                     let! v = toCVar v
@@ -706,7 +738,7 @@ module Compiler =
 
                 | NewUnionCase(ci, fields) ->
                     let ctors = ci.DeclaringType |> Constructors.union
-                    let! ctor = ctors |> HashMap.find ci |> CompilerState.useFunction ci
+                    let! ctor = ctors |> HashMap.find ci |> CompilerState.useGlobalFunction ci
                     let! fields = fields |> List.mapS toCExpr |>> List.toArray
                     return CCall(ctor, fields)
 
@@ -721,7 +753,7 @@ module Compiler =
                                 | Some i -> 
                                     return CCallIntrinsic(ct, i, List.toArray args)
                                 | None -> 
-                                    let! ctor = ctor |> Constructors.custom |> CompilerState.useFunction ctor
+                                    let! ctor = ctor |> Constructors.custom |> CompilerState.useGlobalFunction ctor
                                     return CCall(ctor, List.toArray args)
 
 
@@ -761,7 +793,7 @@ module Compiler =
                                             | None -> args
                                     return CCallIntrinsic(ct, i, List.toArray args)
                                 | _ ->
-                                    let! def = mi |> FunctionDefinition.ofMethodBase |> CompilerState.useFunction mi
+                                    let! def = mi |> FunctionDefinition.ofMethodBase |> CompilerState.useGlobalFunction mi
                                     return CCall(def, List.toArray args)
 
 
@@ -904,6 +936,17 @@ module Compiler =
                 | ReducibleExpression e ->
                     return! toCStatement last e
 
+                | WriteOutput(name, index, value) ->
+                    let! value = toCExpr value
+                    let v = CLExpr.CLVar { ctype = value.ctype; name = name }
+                    match index with
+                        | Some idx ->
+                            let! idx = toCExpr idx 
+                            return CWrite(CLItem(value.ctype, v, idx), value)
+                        | None ->
+                            return CWrite(v, value)
+
+
                 | AddressSet(a, v) ->
                     let! a = toCLExpr a
                     let! v = toCExpr v
@@ -1014,31 +1057,42 @@ module Compiler =
 
         }
 
-    let toCEntryDef (f : EntryPoint) =
+
+    let compileUniforms (u : list<Uniform>) =
+        state {
+            let! us = u |> List.mapS toCUniform
+            return CUniformDef us
+        }
+
+    let compileEntry (f : EntryPoint) =
         state {
             // ensure that all inputs, outputs, arguments have their correct names
-            let! inputs     = f.inputs |> List.mapS toCVar
-            let! outputs    = f.outputs |> List.mapS toCVar
-            let! uniforms   = f.uniforms |> List.mapS toCUniform
-            let! args       = f.arguments |> List.mapS toCVar
+            for i in f.inputs do do! CompilerState.reserveName i.paramName
+            for o in f.outputs do do! CompilerState.reserveName o.paramName
+            for a in f.arguments do do! CompilerState.reserveName a.paramName
+            for u in f.uniforms do do! CompilerState.reserveName u.uniformName
+            
+            let! inputs     = f.inputs |> List.mapS toCEntryParameter
+            let! outputs    = f.outputs |> List.mapS toCEntryParameter
+            let! args       = f.arguments |> List.mapS toCEntryParameter
+
 
             // compile the body
             let! body = toCStatement true f.body
             let! ret = toCType f.body.Type
 
-            return {
-                cConditional = f.conditional
-                cEntryName   = f.entryName
-                cInputs      = inputs
-                cOutputs     = outputs
-                cUniforms    = uniforms
-                cArguments   = args
-                cReturnType  = ret
-                cBody        = body
-            }
+            return
+                CEntryDef {
+                    cEntryName   = f.entryName
+                    cInputs      = inputs
+                    cOutputs     = outputs
+                    cArguments   = args
+                    cReturnType  = ret
+                    cBody        = body
+                }
         }
 
-    let functionToCValueDef (f : FunctionDefinition) =
+    let compileFunction (f : FunctionDefinition) =
         state {
             match f with
                 | ManagedFunction(name, args, body) ->
@@ -1048,14 +1102,10 @@ module Compiler =
 
                 | CompiledFunction(signature, body) ->
                     return CFunctionDef(signature, body)
-                
-                | EntryFunction e ->
-                    let! e = toCEntryDef e
-                    return CEntryDef(e) 
                     
         }
 
-    let constantToCValueDef (c : ConstantDefinition) =
+    let compileConstant (c : ConstantDefinition) =
         state {
             let! ct = toCType c.cType
             let! e = toCRExpr c.cValue
@@ -1064,178 +1114,4 @@ module Compiler =
                     return CValueDef.CConstant(ct, c.cName, e)
                 | None ->
                     return failwithf "[FShade] constants must have a value %A" c
-        }
-
-    type TypeGraph private(v : Option<CTypeDef>) =
-        let mutable level = 0
-        let dependencies = HashSet<TypeGraph>()
-
-        member x.Definition = v
-        member x.Dependencies = dependencies :> seq<_>
-
-        member private x.MinLevel (l : int) =
-            if l > level then
-                level <- l
-                for d in dependencies do d.MinLevel (level + 1)
-
-        member x.Level
-            with get() = level
-
-        member x.AddDependencies (l : list<TypeGraph>) =
-            dependencies.UnionWith l
-            for d in l do d.MinLevel (level + 1)
-
-        new() = TypeGraph(None)
-        new(d : CTypeDef) = TypeGraph(Some d)
-        
-    type ValueGraph private(v : Option<CValueDef>) =
-        let mutable level = 0
-        let dependencies = HashSet<ValueGraph>()
-
-        member x.Definition = v
-        member x.Dependencies = dependencies :> seq<_>
-
-        member private x.MinLevel (l : int) =
-            if l > level then
-                level <- l
-                for d in dependencies do d.MinLevel (level + 1)
-
-        member x.Level
-            with get() = level
-
-        member x.AddDependencies (l : list<ValueGraph>) =
-            dependencies.UnionWith l
-            for d in l do d.MinLevel (level + 1)
-
-
-        new() = ValueGraph(None)
-        new(d : CValueDef) = ValueGraph(Some d)
-
-    type ValueGraphCache(b : Backend) =
-        let store = Dict<obj, ValueGraph>()
-        let mutable moduleState : ModuleState = { usedTypes = HashMap.empty; constantIndex = 0 }
-
-        member x.Backend = b
-
-        member x.ModuleState
-            with get() = moduleState
-            and set v = moduleState <- v
-
-        member x.GetOrAdd(def : 'a, create : 'a -> ValueGraph) =
-            store.GetOrCreate(def :> obj, fun _ ->
-                create def
-            )
-
-    type TypeGraphCache(b : Backend) =
-        let store = Dict<obj, TypeGraph>()
-
-        member x.Backend = b
-
-        member x.GetOrAdd(def : 'a, create : 'a -> TypeGraph) =
-            store.GetOrCreate(def :> obj, fun _ ->
-                create def
-            )
-
-    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-    module TypeGraph = 
-        let rec ofType (cache : TypeGraphCache) (t : CType) : TypeGraph =
-            cache.GetOrAdd(t, fun t ->
-                match t with
-                    | CStruct(name, fields, _) ->
-                        let res = TypeGraph(CStructDef(name, fields))
-                        let nested = fields |> List.map (fst >> ofType cache)
-                        res.AddDependencies nested
-                        res
-
-                    | CVector(t, _) 
-                    | CMatrix(t, _, _) 
-                    | CPointer(_, t) 
-                    | CArray(t,_) ->
-                        let res = TypeGraph()
-                        res.AddDependencies [ofType cache t]
-                        res
-                        
-                    | _ ->
-                        TypeGraph()
-            )
-
-        let ofTypes (cache : TypeGraphCache) (ts : list<CType>) : TypeGraph =
-            let deps = ts |> List.map (ofType cache)
-            let res = TypeGraph()
-            res.AddDependencies deps
-            res
-
-        let toList (g : TypeGraph) =
-            let rec build (visited : HashSet<TypeGraph>) (g : TypeGraph) =
-                if visited.Add g then
-                    g.Dependencies |> Seq.iter (build visited)
-
-            let all = HashSet()
-            build all g
-            all 
-                |> Seq.toList
-                |> List.sortByDescending (fun g -> g.Level) 
-                |> List.choose (fun g -> g.Definition)
-
-    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-    module ValueGraph = 
-        let rec ofConstant (cache : ValueGraphCache) (c : ConstantDefinition) : ValueGraph =
-            cache.GetOrAdd(c, fun c -> 
-                let mutable state = { emptyState cache.Backend with moduleState = cache.ModuleState }
-                let def = constantToCValueDef(c).Run(&state)
-                let usedFunctions = state.usedFunctions |> HashMap.toSeq |> Seq.map snd |> Seq.toList
-                let usedConstants = state.usedConstants |> HashMap.toSeq |> Seq.map snd |> Seq.toList
-                let entry = ValueGraph(def)
-                entry.AddDependencies (usedFunctions |> List.map (ofFunction cache))
-                entry.AddDependencies (usedConstants |> List.map (ofConstant cache))
-                cache.ModuleState <- state.moduleState
-
-                entry
-            )
-            
-        and ofFunction (cache : ValueGraphCache) (f : FunctionDefinition) : ValueGraph =
-            cache.GetOrAdd(f, fun f -> 
-                let mutable state = { emptyState cache.Backend with moduleState = cache.ModuleState }
-                let def = functionToCValueDef(f).Run(&state)
-                let usedFunctions = state.usedFunctions |> HashMap.toSeq |> Seq.map snd |> Seq.toList
-                let usedConstants = state.usedConstants |> HashMap.toSeq |> Seq.map snd |> Seq.toList
-                let entry = ValueGraph(def)
-                entry.AddDependencies (usedFunctions |> List.map (ofFunction cache))
-                entry.AddDependencies (usedConstants |> List.map (ofConstant cache))
-                cache.ModuleState <- state.moduleState
-
-                entry
-            )
-
-        let ofFunctions (cache : ValueGraphCache) (fs : list<FunctionDefinition>) : ValueGraph =
-            let deps = fs |> List.map (ofFunction cache)
-            let res = ValueGraph()
-            res.AddDependencies deps
-            res
-
-        let toList (g : ValueGraph) =
-            let rec build (visited : HashSet<ValueGraph>) (g : ValueGraph) =
-                if visited.Add g then
-                    g.Dependencies |> Seq.iter (build visited)
-
-            let all = HashSet()
-            build all g
-            all 
-                |> Seq.toList
-                |> List.sortByDescending (fun g -> g.Level) 
-                |> List.choose (fun g -> g.Definition)
-
-    let compile (b : Backend) (m : Module) : CModule =
-        let cache = ValueGraphCache b
-        let valueGraph = m.entries |> List.map EntryFunction |> ValueGraph.ofFunctions cache
-        let usedTypes = cache.ModuleState.usedTypes |> HashMap.toSeq |> Seq.map snd |> Seq.toList
-        let typeCache = TypeGraphCache b
-        let typeGraph = TypeGraph.ofTypes typeCache usedTypes
-
-        let values = ValueGraph.toList valueGraph
-        let types = TypeGraph.toList typeGraph
-
-        {
-            types = types
-            values = values
         }

@@ -17,6 +17,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FShade.DemoRenderer", "Apps
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FShade.Debug", "Libs\FShade.Debug\FShade.Debug.fsproj", "{55F1A5A0-F789-4B6A-9968-6DA3DC29F6C3}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FShade.Imperative", "Libs\FShade.Imperative\FShade.Imperative.fsproj", "{1223C55B-5634-4764-B5BD-BF9AD95C073B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -43,6 +45,10 @@ Global
 		{55F1A5A0-F789-4B6A-9968-6DA3DC29F6C3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{55F1A5A0-F789-4B6A-9968-6DA3DC29F6C3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{55F1A5A0-F789-4B6A-9968-6DA3DC29F6C3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1223C55B-5634-4764-B5BD-BF9AD95C073B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1223C55B-5634-4764-B5BD-BF9AD95C073B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1223C55B-5634-4764-B5BD-BF9AD95C073B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1223C55B-5634-4764-B5BD-BF9AD95C073B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -53,5 +59,6 @@ Global
 		{2867B916-7CC3-4A30-8059-CB99AA653EE3} = {1CDADF81-6D9C-49DA-963F-1FACD296F1E4}
 		{D68F8DB7-BCB3-41CD-B25B-A6205616118E} = {1CDADF81-6D9C-49DA-963F-1FACD296F1E4}
 		{55F1A5A0-F789-4B6A-9968-6DA3DC29F6C3} = {01E9F782-F660-4822-8D9D-B780F398D3B4}
+		{1223C55B-5634-4764-B5BD-BF9AD95C073B} = {01E9F782-F660-4822-8D9D-B780F398D3B4}
 	EndGlobalSection
 EndGlobal

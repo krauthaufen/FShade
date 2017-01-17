@@ -433,18 +433,46 @@ type CStatement =
     | CSwitch of value : CExpr * cases : array<CLiteral * CStatement>
 
 
+type CEntryParameter =
+    {
+        cParamType           : CType
+        cParamName           : string
+        cParamSemantic       : string
+        cParamDecorations    : Set<Decoration>
+    }
+
 type CUniform =
-    | CGlobal of ctype : CType * name : string
-    | CBuffer of name : string * fields : list<CType * string>
+    {
+        cUniformType         : CType
+        cUniformName         : string
+        cUniformBuffer       : Option<string>
+    }
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module CUniform =
+    let mergeMany (groups : seq<list<CUniform>>) =
+        let all = Dictionary.empty
+        let res = CSharpList.empty
+        for uniforms in groups do
+            for u in uniforms do
+                match all.TryGetValue u.cUniformName with
+                    | (true, o) ->
+                        if o.cUniformType <> u.cUniformType then
+                            failwithf "[FShade] conflicting uniform type for %A (%A vs %A)" u.cUniformName o.cUniformType u.cUniformType
+
+                    | _ ->
+                        all.[u.cUniformName] <- u
+                        res.Add u
+
+        res |> CSharpList.toList
+
 
 type CEntryDef =
     {
-        cConditional : Option<string>
         cEntryName   : string
-        cInputs      : list<CVar>
-        cOutputs     : list<CVar>
-        cUniforms    : list<CUniform>
-        cArguments   : list<CVar>
+        cInputs      : list<CEntryParameter>
+        cOutputs     : list<CEntryParameter>
+        cArguments   : list<CEntryParameter>
         cReturnType  : CType
         cBody        : CStatement
     }
@@ -454,9 +482,14 @@ type CValueDef =
     | CConstant of ctype : CType * name : string * init : CRExpr
     | CFunctionDef of signature : CFunctionSignature * body : CStatement
     | CEntryDef of CEntryDef
+    | CConditionalDef of string * list<CValueDef>
+    | CUniformDef of list<CUniform>
 
 type CTypeDef =
     | CStructDef of name : string * fields : list<CType * string>
+
+
+
 
 
 type CModule =
@@ -464,43 +497,32 @@ type CModule =
         types       : list<CTypeDef>
         values      : list<CValueDef>
     } with
+//
+//    member x.entries =
+//        let rec allEntries (c : CValueDef) =
+//            match c with
+//                | CEntryDef e -> 
+//                    [None, e]
+//
+//                | CConditionalDef(c, inner) ->
+//                    inner |> List.collect (fun i -> i |> allEntries |> List.map (fun (_,e) -> (Some c, e)))
+//
+//                | _ ->
+//                    []
+//
+//        x.values |> List.collect allEntries
 
     member x.uniforms =
-        let globalTable = Dictionary.empty
-        let bufferTable : Dictionary<string, Dictionary<string, CType>> = Dictionary.empty
+        let rec allUniforms (c : CValueDef) =
+            match c with
+                | CConditionalDef(c, inner) ->
+                    inner |> List.collect allUniforms
 
-
-        let flip (a,b) = b, a
-        for e in x.values do
-            match e with
-                | CEntryDef e ->
-                    for u in e.cUniforms do
-                        match u with
-                            | CGlobal(t, n) -> 
-                                match globalTable.TryGetValue n with
-                                    | (true, ot) ->
-                                        if ot <> t then failwithf "[FShade] conflicting uniform type for %A (%A vs %A)" n ot t
-                                    | _ ->
-                                        globalTable.[n] <- t
-
-                            | CBuffer(n, fields) ->
-                                match bufferTable.TryGetValue n with
-                                    | (true, existing) -> 
-                                        for (t, n) in fields do
-                                            match existing.TryGetValue n with
-                                                | (true, ot) ->
-                                                    if ot <> t then failwithf "[FShade] conflicting uniform type for %A (%A vs %A)" n ot t
-                                                | _ ->
-                                                   existing.[n] <- t 
-                                            ()
-
-                                    | _ ->
-                                        bufferTable.[n] <- Dictionary.ofList (List.map flip fields)
+                | CUniformDef us ->
+                    [us]
 
                 | _ ->
-                    ()
+                    []
 
-        List.concat [
-            globalTable |> Dictionary.toList |> List.map (flip >> CGlobal)
-            bufferTable |> Dictionary.toList |> List.map (fun (n,fs) -> CBuffer(n, fs |> Dictionary.toList |> List.map flip))
-        ]
+        x.values |> List.collect allUniforms |> CUniform.mergeMany
+

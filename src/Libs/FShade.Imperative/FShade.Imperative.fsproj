@@ -50,6 +50,7 @@
     <Compile Include="Frontend.fs" />
     <Compile Include="Ast.fs" />
     <Compile Include="Compiler.fs" />
+    <Compile Include="Linker.fs" />
     <Compile Include="GLSL.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

@@ -354,3 +354,13 @@ module private Helpers =
             | :? C4d as v -> Some (typeof<float>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
 
             | _ -> None
+
+    open Aardvark.Base.Monads.State
+    let inline (>>=) (m : State<'s, 'a>) (f : 'a -> State<'s, 'b>) =
+        m |> State.bind f
+
+    let inline (>>>=) (m : 'a -> State<'s, 'b>) (f : 'b -> State<'s, 'c>) =
+        m >> State.bind f
+
+    let inline (|>>) (m : State<'s, 'a>) (f : 'a -> 'b) =
+        m |> State.map f
