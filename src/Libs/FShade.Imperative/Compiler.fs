@@ -13,6 +13,7 @@ open Aardvark.Base
 open Aardvark.Base.TypeInfo
 open Aardvark.Base.TypeInfo.Patterns
 
+open FShade
 open FShade.Imperative
 
 module Compiler =
@@ -710,6 +711,21 @@ module Compiler =
                 | ReducibleExpression e ->
                     return! toCExpr e
 
+                | AddressSet _
+                | DefaultValue _
+                | FieldSet _
+                | ForInteger _
+                | LetRecursive _
+                | Let _
+                | NewArray _
+                | PropertySet _
+                | Sequential _
+                | TryFinally _
+                | TryWith _
+                | VarSet _
+                | WhileLoop _ ->
+                    return! asExternal e
+
                 | ReadInput(name, index) ->
                     let! s = State.get
                     if Set.contains name s.moduleState.globalParameters then
@@ -874,20 +890,7 @@ module Compiler =
                     let! e = toCExpr e
                     return CAddressOf(CPointer(CPointerModifier.None, e.ctype), e)
 
-                | AddressSet _
-                | DefaultValue _
-                | FieldSet _
-                | ForIntegerRangeLoop _
-                | LetRecursive _
-                | Let _
-                | NewArray _
-                | PropertySet _
-                | Sequential _
-                | TryFinally _
-                | TryWith _
-                | VarSet _
-                | WhileLoop _ ->
-                    return! asExternal e
+
 
                 | Application _ 
                 | Lambda _ ->
@@ -953,6 +956,56 @@ module Compiler =
                 | ReducibleExpression e ->
                     return! toCStatement last e
 
+                | ForInteger(v, first, step, last, b) ->
+                    let! v = toCVar v
+                    let! first = toCRExpr first
+                    let! step = toCExpr step
+                    let! last = toCExpr last
+                    let! body = toCStatement false b
+
+                    let increment =
+                        match step with
+                            | CValue(_, CIntegral 1L)   -> CIncrement(false, CLVar v)   // i++
+                            | CValue(_, CIntegral -1L)  -> CDecrement(false, CLVar v)   // i--
+                            | CNeg(_,step)              -> CWrite(CLVar v, CExpr.CSub(v.ctype, CVar v, step))   // i = i - <step>
+                            | step                      -> CWrite(CLVar v, CExpr.CAdd(v.ctype, CVar v, step))   // i = i + <step>
+
+                    let stepPositive =
+                        match step with
+                            | CValue(_, CIntegral v) -> 
+                                if v = 0L then failwithf "[FShade] infinite loop detected: %A" e
+                                Some (v > 0L)
+                            | _ ->
+                                None
+
+                    let condition =
+                        match stepPositive with
+                            | Some true ->
+                                match last with
+                                    // i <= last - 1 --> i < last
+                                    | CSub(_, last, CValue(ct, CIntegral 1L)) -> CLess(CVar v, last)
+                                    | _ -> CLequal(CVar v, last)
+
+                            | Some false ->
+                                match last with
+                                    // i >= last + 1 --> i > last
+                                    | CAdd(_, last, CValue(ct, CIntegral 1L)) -> CGreater(CVar v, last)
+                                    | _ -> CGequal(CVar v, last)
+                                
+                            | None -> 
+                                // i <> last
+                                CNotEqual(CVar v, last)
+
+
+                    return 
+                        CFor(
+                            CDeclare(v, first),                 // int i = <first>
+                            condition,                          
+                            increment,
+                            body                              
+                        )
+
+
                 | WriteOutput(name, index, value) ->
                     let! value = toCExpr value
                     let v = CLExpr.CLVar { ctype = value.ctype; name = name }
@@ -1015,19 +1068,6 @@ module Compiler =
                         | None ->
                             return! Expr.Call(t, pi.SetMethod, i @ [a]) |> toCStatement last
 
-                | ForIntegerRangeLoop(v, s, e, b) ->
-                    let! v = toCVar v
-                    let! s = toCRExpr s
-                    let! e = toCExpr e
-                    let! body = toCStatement false b
-
-                    return 
-                        CFor(
-                            CDeclare(v, s),                 // int v = s
-                            CLequal(CVar v, e),             // v <= e
-                            CIncrement(false, CLVar v),     // v++
-                            body                              
-                        )
 
                 | WhileLoop(guard, body) ->
                     let! guard = toCExpr guard

@@ -41,7 +41,8 @@ type ShaderStageDescription =
 [<RequireQualifiedAccess>]
 type EntryDecoration =
     | Stages of ShaderStageDescription
-    | InputTopology of int
+    | InputTopology of InputTopology
+    | OutputTopology of OutputTopology
 
 
 type EntryPoint =

@@ -1,4 +1,4 @@
-﻿namespace FShade.Imperative
+﻿namespace FShade
 
 open System
 open System.Reflection
@@ -9,131 +9,27 @@ open Microsoft.FSharp.Quotations.Patterns
 
 open Aardvark.Base
 
+module Peano = 
+    let private peanoTypes =
+        let s = typedefof<S<_>>
+        Seq.initInfinite id 
+            |> Seq.scan (fun last _ -> s.MakeGenericType [|last|]) typeof<Z>
+            |> Seq.cache
+
+    let getPeanoType (i : int) =
+        Seq.item i peanoTypes
+
+    let getArrayType (i : int) (content : Type) =
+        typedefof<Arr<_,_>>.MakeGenericType [| getPeanoType i; content |]
+           
+    let getSize (t : Type) =
+        Aardvark.Base.Peano.getSize t
 
 [<AutoOpen>]
-module private Helpers = 
-    open System.Text.RegularExpressions
-    open Aardvark.Base.TypeInfo
+module ReflectionPatterns =
     open Aardvark.Base.TypeInfo.Patterns
 
-    let rx = Regex @"(?<name>.*)`[0-9]+"
-
-
-    let private typeNameCache = System.Collections.Concurrent.ConcurrentDictionary<Type, string>()
-    let private methodNameCache = System.Collections.Concurrent.ConcurrentDictionary<MethodBase, string>()
-
-    let private builtIn =
-        [
-            typeof<unit>, "bool"
-            typeof<System.Void>, "void"
-            typeof<bool>, "bool"
-
-            typeof<int8>, "int8"
-            typeof<int16>, "int16"
-            typeof<int32>, "int32"
-            typeof<int64>, "int64"
-            typeof<uint8>, "uint8"
-            typeof<uint16>, "uint16"
-            typeof<uint32>, "uint32"
-            typeof<uint64>, "uint64"
-            typeof<float16>, "float16"
-            typeof<float32>, "float32"
-            typeof<float>, "double"
-
-        ]
-
-    do for (t,n) in builtIn do
-        typeNameCache.[t] <- n
-
-
-    let rec typeName (t : Type) =
-        typeNameCache.GetOrAdd(t, fun t ->
-            if FSharpType.IsTuple(t) then
-                let elements = FSharpType.GetTupleElements t |> Seq.map typeName |> String.concat "_"
-                "tup_" + elements
-
-            else
-                let selfName = 
-                    if t.IsGenericType then
-                        let m = rx.Match t.Name
-                        let targs = t.GetGenericArguments()
-                        let targstr = targs |> Seq.map typeName |> String.concat "_"
-                        m.Groups.["name"].Value + string targs.Length + "_" + targstr
-                    else
-                        t.Name
-
-                if t.IsNested then 
-                    (typeName t.DeclaringType) + "_" + selfName
-                else 
-                    if isNull t.Namespace then selfName
-                    else t.Namespace.Replace('.', '_') + "_" + selfName
-        )
-
-    let methodName (mi : MethodBase) =
-        methodNameCache.GetOrAdd(mi, fun mi -> 
-            match mi with
-                | :? MethodInfo as mi -> 
-                    let selfName =
-                        if mi.IsGenericMethod then
-                            let m = rx.Match mi.Name
-                            let targs = mi.GetGenericArguments() |> Seq.map typeName |> String.concat "_"
-                            m.Groups.["name"].Value + "_" + targs
-                        else
-                            mi.Name
-                    (typeName mi.DeclaringType) + "_" + selfName
-
-                | :? ConstructorInfo as ci ->
-                    
-                    let args = ci.GetParameters() |> Array.map (fun p -> typeName p.ParameterType) |> String.concat "_"
-                    "new_" + (typeName mi.DeclaringType) + "_" + args
-
-                | _ ->
-                    failwithf "[FShade] cannot get method name for unknown method-type %A" mi
-                    
-        )
-
-    let (|ArrOf|_|) (t : Type) =
-        if t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<Arr<_,_>> then
-            let targs = t.GetGenericArguments()
-            let len = targs.[0] |> getSize
-            let content = targs.[1]
-            Some(len, content)
-        else
-            None
-
-
-    module Peano = 
-        let private peanoTypes =
-            let s = typedefof<S<_>>
-            Seq.initInfinite id 
-                |> Seq.scan (fun last _ -> s.MakeGenericType [|last|]) typeof<Z>
-                |> Seq.cache
-
-        let getPeanoType (i : int) =
-            Seq.item i peanoTypes
-
-        let getArrayType (i : int) (content : Type) =
-            typedefof<Arr<_,_>>.MakeGenericType [| getPeanoType i; content |]
-           
-    type Expr with
-        static member NewFixedArray(t : Type, values : list<Expr>) =
-            let len = values |> List.length
-            let arrType = Peano.getArrayType len t
-            let seqType = typedefof<seq<_>>.MakeGenericType t
-            let ctor = arrType.GetConstructor [| seqType |]
-            Expr.NewObject(ctor, [Expr.Coerce(Expr.NewArray(t, values), seqType)])
-
-    let (|NewFixedArray|_|) (e : Expr) =
-        match e with
-            | NewObject(ctor, [Coerce(NewArray(et, args),_)]) ->
-                if ctor.DeclaringType.IsGenericType && ctor.DeclaringType.GetGenericTypeDefinition() = typedefof<Arr<_,_>> then
-                    let len = Peano.getSize (ctor.DeclaringType.GetGenericArguments().[0])
-                    Some(len, et, args)
-                else 
-                    None
-            | _ ->
-                None
-
+     //extracts the (optional) top-most method call from an expression
     let rec tryGetMethodInfo (e : Expr) =
         match e with
             | Patterns.Call(_,mi,_) -> 
@@ -145,11 +41,12 @@ module private Helpers =
                 tryGetMethodInfo b
             | _ -> None
 
+    /// extracts the top-most method-call from an expression.
+    /// When no method-call is found the method will raise an exception
     let getMethodInfo (e : Expr) =
         match tryGetMethodInfo e with
             | Some mi -> mi
             | None -> failwithf "[FShade] could not find a method-call in expression %A" e
-
 
     let private conversionMethods =
         HashSet.ofList [
@@ -167,6 +64,19 @@ module private Helpers =
             getMethodInfo <@ float @> 
             getMethodInfo <@ float32 @> 
         ]
+
+    let (|ArrOf|_|) (t : Type) =
+        if t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<Arr<_,_>> then
+            let targs = t.GetGenericArguments()
+            let len = targs.[0] |> Peano.getSize
+            let content = targs.[1]
+            Some(len, content)
+        else
+            None
+
+    let (|ArrayOf|_|) (t : Type) =
+        if t.IsArray then Some(t.GetElementType())
+        else None
 
     let (|ConversionMethod|_|) (mi : MethodInfo) =
         let meth = 
@@ -193,12 +103,182 @@ module private Helpers =
             else
                 Some (iface.GetGenericArguments().[0])
 
+    let (|FSharpTypeProperty|_|) (pi : PropertyInfo) =
+        if FSharpType.IsRecord(pi.DeclaringType, true) then 
+            if FSharpType.GetRecordFields(pi.DeclaringType, true) |> Array.exists (fun p -> p = pi) then
+                Some ()
+            else
+                None
+
+        elif pi.DeclaringType.BaseType <> null && FSharpType.IsUnion(pi.DeclaringType.BaseType, true) then
+            let isUnionField =
+                FSharpType.GetUnionCases(pi.DeclaringType.BaseType, true)
+                    |> Seq.collect (fun c -> c.GetFields())
+                    |> Seq.exists (fun p -> p = pi)
+
+            if isUnionField then Some ()
+            else None
+
+        else
+            None
+
+    let (|VectorValue|_|) (v : obj) =
+        match v with
+            | :? V2d as v -> Some (typeof<float>, [| v.X :> obj; v.Y :> obj|])
+            | :? V3d as v -> Some (typeof<float>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
+            | :? V4d as v -> Some (typeof<float>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
+            | :? V2f as v -> Some (typeof<float32>, [| v.X :> obj; v.Y :> obj|])
+            | :? V3f as v -> Some (typeof<float32>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
+            | :? V4f as v -> Some (typeof<float32>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
+            | :? V2i as v -> Some (typeof<int>, [| v.X :> obj; v.Y :> obj|])
+            | :? V3i as v -> Some (typeof<int>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
+            | :? V4i as v -> Some (typeof<int>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
+            | :? V2l as v -> Some (typeof<int64>, [| v.X :> obj; v.Y :> obj|])
+            | :? V3l as v -> Some (typeof<int64>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
+            | :? V4l as v -> Some (typeof<int64>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
+
+            | :? C3b as v -> Some (typeof<uint8>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
+            | :? C4b as v -> Some (typeof<uint8>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
+            | :? C3us as v -> Some (typeof<uint16>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
+            | :? C4us as v -> Some (typeof<uint16>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
+            | :? C3ui as v -> Some (typeof<uint32>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
+            | :? C4ui as v -> Some (typeof<uint32>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
+            | :? C3f as v -> Some (typeof<float32>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
+            | :? C4f as v -> Some (typeof<float32>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
+            | :? C3d as v -> Some (typeof<float>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
+            | :? C4d as v -> Some (typeof<float>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
+
+            | _ -> None
+
+    let (|SwitchableType|_|) (t : Type) =
+        match t with
+            | Integral 
+            | Enum -> Some ()
+            | _ -> None
+
+[<AutoOpen>]
+module ExprExtensions =
+
+    module private Methods = 
+        let getArray = getMethodInfo <@ Microsoft.FSharp.Core.LanguagePrimitives.IntrinsicFunctions.GetArray @>
+        let setArray = getMethodInfo <@ Microsoft.FSharp.Core.LanguagePrimitives.IntrinsicFunctions.SetArray @>
+        let unboxGeneric = getArray.DeclaringType.GetMethod "UnboxGeneric"
+
+    type Expr with
+
+        /// creates an array-indexing expression using the supplied arguments
+        static member ArrayAccess(arr : Expr, index : Expr) =
+            let get = Methods.getArray.MakeGenericMethod([| arr.Type.GetElementType() |])
+            Expr.Call(get, [arr;index])
+
+        /// creates a new fixed-size-array using the given element-type and values
+        static member NewFixedArray(et : Type, values : list<Expr>) =
+            let len = values |> List.length
+            let arrType = Peano.getArrayType len et
+            let seqType = typedefof<seq<_>>.MakeGenericType et
+            let ctor = arrType.GetConstructor [| seqType |]
+            Expr.NewObject(ctor, [Expr.Coerce(Expr.NewArray(et, values), seqType)])
+
+        /// creates a ForEach-Expression using the standard layout as used by F#-quotations
+        static member ForEach(v : Var, seq : Expr, body : Expr) =
+            let sType = typeof<System.Collections.Generic.IEnumerable<obj>>.GetGenericTypeDefinition().MakeGenericType([|v.Type|])
+            let eType = typeof<System.Collections.Generic.IEnumerator<obj>>.GetGenericTypeDefinition().MakeGenericType([|v.Type|])
+            let e = Var("enumerator", eType)
+
+            let unboxDisposable = Methods.unboxGeneric.MakeGenericMethod([|typeof<IDisposable>|])
+
+            let getEnumerator = sType.GetMethod("GetEnumerator")
+            let dispose = typeof<IDisposable>.GetMethod("Dispose")
+            let moveNext = typeof<System.Collections.IEnumerator>.GetMethod("MoveNext")
+
+            Expr.Let(e, Expr.Call(Expr.Coerce(seq, sType), getEnumerator, []),
+                Expr.TryFinally(
+                    Expr.WhileLoop(Expr.Call(Expr.Var e, moveNext, []),
+                        Expr.Let(v, Expr.PropertyGet(Expr.Var e, eType.GetProperty("Current"), []),
+                            body
+                        )
+                    ),
+                    Expr.IfThenElse(Expr.TypeTest(Expr.Coerce(Expr.Var e, typeof<obj>), typeof<IDisposable>),
+                        Expr.Call(Expr.Call(unboxDisposable, [Expr.Coerce(Expr.Var e, typeof<obj>)]), dispose, []),
+                        Expr.Value(())
+                    )
+                )
+            )
+
+        /// tries to evaluate the supplied expression and returns its value on success
+        static member TryEval(e : Expr) =
+            let reduce (a : Option<obj>[]) =
+                match a |> Array.forall(fun o -> o.IsSome) with
+                    | true -> a |> Array.map (fun o -> o.Value) |> Some
+                    | false -> None
+
+            match e with
+                | Patterns.PropertyGet(t , p, args) ->
+                    match t with
+                        | Some(t) -> 
+                            let args = args |> List.map Expr.TryEval |> List.toArray
+                            match Expr.TryEval t, args |> reduce with
+                                | Some t, Some args -> p.GetValue(t, args) |> Some
+                                | _ -> None
+                        | None -> 
+                            let args = args |> List.map Expr.TryEval |> List.toArray
+                            match args |> reduce with
+                                | Some args -> p.GetValue(null, args) |> Some
+                                | _ -> None
+
+                | Patterns.FieldGet(t,f) ->
+                    match t with
+                        | Some(t) -> 
+                            match Expr.TryEval t with
+                                | Some t -> f.GetValue(t) |> Some
+                                | None -> None
+                        | None -> 
+                            f.GetValue(null) |> Some
+                | Patterns.Call(t, mi, args) ->
+                    match t with
+                        | Some(t) -> 
+                            let args = args |> List.map Expr.TryEval |> List.toArray
+                            let t = Expr.TryEval t
+                            match t, args |> reduce with
+                                | Some t, Some args -> mi.Invoke(t, args) |> Some
+                                | _ -> None
+
+                        | None -> 
+                            let args = args |> List.map Expr.TryEval |> List.toArray
+                            match args |> reduce with
+                                | Some args -> mi.Invoke(null, args) |> Some
+                                | _ -> None
+
+                | Patterns.Let(var,value,body) ->
+                    let value = Expr.TryEval value
+                    match value with
+                        | Some value ->
+                            let body = body.Substitute(fun vi -> if vi = var then Expr.Value(value, vi.Type) |> Some else None)
+                            Expr.TryEval body
+                        | None -> None
+
+                | Patterns.Value(v,_) ->
+                    v |> Some
+
+                | _ -> None
+
+    let (|NewFixedArray|_|) (e : Expr) =
+        match e with
+            | NewObject(ctor, [Coerce(NewArray(et, args),_)]) ->
+                if ctor.DeclaringType.IsGenericType && ctor.DeclaringType.GetGenericTypeDefinition() = typedefof<Arr<_,_>> then
+                    let len = Peano.getSize (ctor.DeclaringType.GetGenericArguments().[0])
+                    Some(len, et, args)
+                else 
+                    None
+            | _ ->
+                None
+
     let rec private deconstructTuples x =
         match x with
             | NewTuple(args) -> args |> List.collect deconstructTuples
             | _ -> [x]
 
-    let rec inlineUselessAbstractions(e : Expr) =
+    let rec private inlineUselessAbstractions(e : Expr) =
         match e with
             | Application(Lambda(v,b),a) ->
                 let b = b.Substitute(fun vi -> if vi = v then Some a else None)
@@ -211,6 +291,30 @@ module private Helpers =
                     
                 e
 
+    /// detects the type of an expression
+    let (|ExprOf|) (e : Expr) =
+        ExprOf(e.Type)
+
+    /// detects FieldGet and PropertyGet expressions having no indexers
+    let (|MemberFieldGet|_|) (e : Expr) =
+        match e with
+            | PropertyGet(Some t,p,[]) ->
+                Some(t, p :> MemberInfo)
+            | FieldGet(Some t, f) ->
+                Some(t, f :> MemberInfo)
+            | _ -> 
+                None
+                
+    /// detects FieldSet and PropertySet expressions having no indexers
+    let (|MemberFieldSet|_|) (e : Expr) =
+        match e with
+            | PropertySet(Some t,p,[] , v) ->
+                Some(t, p :> MemberInfo, v)
+            | FieldSet(Some t, f, v) ->
+                Some(t, f :> MemberInfo, v)
+            | _ ->
+                None
+               
     /// detects pipe-expressions like (a |> sin, a |> clamp 0 1, sin <| a + b, etc.)
     let (|Pipe|_|) (e : Expr) =
         match e with
@@ -270,25 +374,7 @@ module private Helpers =
             | _ ->
                 None
 
-    let (|FSharpTypeProperty|_|) (pi : PropertyInfo) =
-        if FSharpType.IsRecord(pi.DeclaringType, true) then 
-            if FSharpType.GetRecordFields(pi.DeclaringType, true) |> Array.exists (fun p -> p = pi) then
-                Some ()
-            else
-                None
-
-        elif pi.DeclaringType.BaseType <> null && FSharpType.IsUnion(pi.DeclaringType.BaseType, true) then
-            let isUnionField =
-                FSharpType.GetUnionCases(pi.DeclaringType.BaseType, true)
-                    |> Seq.collect (fun c -> c.GetFields())
-                    |> Seq.exists (fun p -> p = pi)
-
-            if isUnionField then Some ()
-            else None
-
-        else
-            None
-
+    /// detects a trivial (low runtime) expression like Var/Value/FieldGet/PropertyGet(for f# types)/etc.
     let rec (|Trivial|_|) (e : Expr) =
         match e with
             | Var _ 
@@ -318,7 +404,7 @@ module private Helpers =
             | _ ->
                 None
 
-
+    /// reduces an expression
     let (|ReducibleExpression|_|) (e : Expr) =
         match e with
             | LetCopyOfStruct e     -> Some e
@@ -327,35 +413,187 @@ module private Helpers =
 
             | _                     -> None
 
-    let (|VectorValue|_|) (v : obj) =
-        match v with
-            | :? V2d as v -> Some (typeof<float>, [| v.X :> obj; v.Y :> obj|])
-            | :? V3d as v -> Some (typeof<float>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
-            | :? V4d as v -> Some (typeof<float>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
-            | :? V2f as v -> Some (typeof<float32>, [| v.X :> obj; v.Y :> obj|])
-            | :? V3f as v -> Some (typeof<float32>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
-            | :? V4f as v -> Some (typeof<float32>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
-            | :? V2i as v -> Some (typeof<int>, [| v.X :> obj; v.Y :> obj|])
-            | :? V3i as v -> Some (typeof<int>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
-            | :? V4i as v -> Some (typeof<int>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
-            | :? V2l as v -> Some (typeof<int64>, [| v.X :> obj; v.Y :> obj|])
-            | :? V3l as v -> Some (typeof<int64>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
-            | :? V4l as v -> Some (typeof<int64>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
+    let (|OptionalCoerce|_|) (e : Expr) =
+        match e with
+            | Coerce(e,t) -> Some(e,t)
+            | _ -> Some(e, e.Type)
 
-            | :? C3b as v -> Some (typeof<uint8>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
-            | :? C4b as v -> Some (typeof<uint8>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
-            | :? C3us as v -> Some (typeof<uint16>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
-            | :? C4us as v -> Some (typeof<uint16>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
-            | :? C3ui as v -> Some (typeof<uint32>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
-            | :? C4ui as v -> Some (typeof<uint32>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
-            | :? C3f as v -> Some (typeof<float32>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
-            | :? C4f as v -> Some (typeof<float32>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
-            | :? C3d as v -> Some (typeof<float>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
-            | :? C4d as v -> Some (typeof<float>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
+    /// detects foreach expressions using the F# standard-layout
+    let (|ForEach|_|) (e : Expr) =
+        match e with
+            | Let(e, Call(Some(OptionalCoerce(seq,_)), Method("GetEnumerator",_), []),
+                    TryFinally(
+                        WhileLoop(Call(Some (Var e1), Method("MoveNext",_), []),
+                            Let(i, PropertyGet(Some (Var e2), current, []), b)
+                        ),
+                        IfThenElse(TypeTest(OptionalCoerce(Var e3, oType0), dType),
+                            Call(Some (Call(None, Method("UnboxGeneric",_), [OptionalCoerce(e4, oType1)])), Method("Dispose",_), []),
+                            Value(_)
+                        )
+                    )
+                ) when e1 = e && e2 = e && e3 = e && current.Name = "Current" && oType0 = typeof<obj> && oType1 = typeof<obj> && dType = typeof<System.IDisposable> ->
+                Some(i, seq, b)
+            | _ -> 
+                None
+
+    let (|CreateRange|_|) (e : Expr) =
+        match e with
+            | Call(None, Method("op_RangeStep",_), [first; step; last]) -> Some(first, step, last)
+            | Call(None, Method("op_Range",_), [first; last]) -> Some(first, Expr.Value(1), last)
+            | _ -> None
+
+    let rec (|RangeSequence|_|) (e : Expr) =
+        match e with
+            | Call(None, Method(("ToArray" | "ToList"), _), [RangeSequence(first, step, last)]) ->
+                Some(first, step, last)
+
+            | Call(None, Method("CreateSequence",_), [RangeSequence(first, step, last)]) ->
+                Some(first, step, last)
+
+            | CreateRange(first, step, last) ->
+                Some(first, step, last)
+                
+
+            | _ -> 
+                None
+
+
+    let (|ForInteger|_|) (e : Expr) =
+        match e with
+            | ForIntegerRangeLoop(v,first,last,body) -> 
+                Some(v,first,Expr.Value(1),last,body)
+
+
+
+            | Let(seq, RangeSequence(first, step, last), ForEach(v, Var seq1, body)) when seq = seq1 ->
+                Some(v, first, step, last, body)
+
 
             | _ -> None
 
+    let rec private findSwitchCases (value : Expr) (label : Option<obj>) (e : Expr) =
+        match label,e with
+            | None, IfThenElse(Call(None, Method("op_Equality", [SwitchableType; SwitchableType]), [a;Value(c,SwitchableType)]),ifTrue,ifFalse) when a = value -> 
+                    
+                let l = findSwitchCases value (Some c) ifTrue
+                let r = findSwitchCases value None ifFalse
+                match l,r with
+                    | Some l, Some r -> List.concat [l; r] |> Some
+                    | _ -> None
+
+            | Some l, e -> Some [(l,e)]
+            | None, e -> Some [(null,e)]
+
+    /// detects ifthenelse cascades which use only equality on integral types
+    let (|Switch|_|) (e : Expr) =
+        match e with
+            | IfThenElse(Call(None, Method("op_Equality", [SwitchableType; SwitchableType]), [a;Value(c,SwitchableType)]),_,_) -> 
+                match findSwitchCases a None e with
+                    | Some(cases) -> Switch(a, cases) |> Some
+                    | _ -> None
+            | _ -> None
+
+    let rec private findAlternatives (e : Expr) =
+        match e with
+            | IfThenElse(c,i,e) ->
+                (Some c,i)::findAlternatives e
+            | _ -> 
+                [None,e]
+
+    /// detects ifthenelse cascades and returns them as list
+    let (|Alternatives|_|) (e : Expr) =
+        match e with
+            | IfThenElse(_, _, IfThenElse(_,_,_)) -> 
+                let alts = findAlternatives e
+
+                let e = alts |> List.filter(fun (c,_) -> c.IsNone) |> List.head |> snd
+                let c = alts |> List.choose(fun (c,b) -> match c with | Some c -> Some(c,b) | _ -> None)
+
+                Alternatives(c, e) |> Some
+
+            | _ -> None
+
+[<AutoOpen>]
+module private Helpers = 
+    open System.Text.RegularExpressions
+    open Aardvark.Base.TypeInfo
+    open Aardvark.Base.TypeInfo.Patterns
     open Aardvark.Base.Monads.State
+
+    let rx = Regex @"(?<name>.*)`[0-9]+"
+
+    let private typeNameCache = System.Collections.Concurrent.ConcurrentDictionary<Type, string>()
+    let private methodNameCache = System.Collections.Concurrent.ConcurrentDictionary<MethodBase, string>()
+
+    let private builtIn =
+        [
+            typeof<unit>, "bool"
+            typeof<System.Void>, "void"
+            typeof<bool>, "bool"
+
+            typeof<int8>, "int8"
+            typeof<int16>, "int16"
+            typeof<int32>, "int32"
+            typeof<int64>, "int64"
+            typeof<uint8>, "uint8"
+            typeof<uint16>, "uint16"
+            typeof<uint32>, "uint32"
+            typeof<uint64>, "uint64"
+            typeof<float16>, "float16"
+            typeof<float32>, "float32"
+            typeof<float>, "double"
+
+        ]
+
+    do for (t,n) in builtIn do
+        typeNameCache.[t] <- n
+
+    let rec typeName (t : Type) =
+        typeNameCache.GetOrAdd(t, fun t ->
+            if FSharpType.IsTuple(t) then
+                let elements = FSharpType.GetTupleElements t |> Seq.map typeName |> String.concat "_"
+                "tup_" + elements
+
+            else
+                let selfName = 
+                    if t.IsGenericType then
+                        let m = rx.Match t.Name
+                        let targs = t.GetGenericArguments()
+                        let targstr = targs |> Seq.map typeName |> String.concat "_"
+                        m.Groups.["name"].Value + string targs.Length + "_" + targstr
+                    else
+                        t.Name
+
+                if t.IsNested then 
+                    (typeName t.DeclaringType) + "_" + selfName
+                else 
+                    if isNull t.Namespace then selfName
+                    else t.Namespace.Replace('.', '_') + "_" + selfName
+        )
+
+    let methodName (mi : MethodBase) =
+        methodNameCache.GetOrAdd(mi, fun mi -> 
+            match mi with
+                | :? MethodInfo as mi -> 
+                    let selfName =
+                        if mi.IsGenericMethod then
+                            let m = rx.Match mi.Name
+                            let targs = mi.GetGenericArguments() |> Seq.map typeName |> String.concat "_"
+                            m.Groups.["name"].Value + "_" + targs
+                        else
+                            mi.Name
+                    (typeName mi.DeclaringType) + "_" + selfName
+
+                | :? ConstructorInfo as ci ->
+                    
+                    let args = ci.GetParameters() |> Array.map (fun p -> typeName p.ParameterType) |> String.concat "_"
+                    "new_" + (typeName mi.DeclaringType) + "_" + args
+
+                | _ ->
+                    failwithf "[FShade] cannot get method name for unknown method-type %A" mi
+                    
+        )
+
     let inline (>>=) (m : State<'s, 'a>) (f : 'a -> State<'s, 'b>) =
         m |> State.bind f
 

@@ -56,7 +56,10 @@ let lambdaTest() =
             @@>
 
             "heinz", <@@ fun () ->
-                arr2.[0]
+                let mutable a = 0
+                for i in 10 .. -1 .. 0 do
+                    a <- a + 1
+                arr2.[a]
             @@>
         ]
 
@@ -134,9 +137,24 @@ let entryTest() =
 
     printfn "%s" glslCode
 
+let forLoopTest() =
+    let expression =    
+        <@ 
+            let mutable a = 0
+            for i in 10 .. -1 .. 0 do
+                a <- a + 1
+        @>
+
+    match expression with
+        | Let(_,_,ForInteger(v, first, step, last, body)) ->
+            printfn "%A .. %A .. %A" first step last
+        | _ -> 
+            printfn "ERROR: %A" expression
+
 [<EntryPoint>]
 let main args =
-    //lambdaTest()
-    entryTest()
+    //forLoopTest()
+    lambdaTest()
+    //entryTest()
 
     0

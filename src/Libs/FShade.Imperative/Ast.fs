@@ -13,6 +13,8 @@ open Aardvark.Base
 open Aardvark.Base.TypeInfo
 open Aardvark.Base.TypeInfo.Patterns
 
+open FShade
+
 /// represents a pointer modifier (const, etc.)
 type CPointerModifier =
     | None      = 0x00

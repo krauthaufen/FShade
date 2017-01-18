@@ -349,7 +349,7 @@ module Shader =
 
         // figure out the used builder-type
         let builder = 
-            match Expr.tryEval state.builder with
+            match Expr.TryEval state.builder with
                 | Some (:? IShaderBuilder as v) -> v
                 | _ -> failwithf "[FShade] could not evaluate shader-builder %A" state.builder
 

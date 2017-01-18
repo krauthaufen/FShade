@@ -101,12 +101,15 @@
     </When>
   </Choose>
   <ItemGroup>
-    <Compile Include="UniformScope.fs" />
-    <Compile Include="Samplers.fs" />
     <None Include="SamplerCodeGen.fsx" />
-    <Compile Include="SamplerGenerated.fs" />
+    <Compile Include="SamplerState.fs" />
+    <Compile Include="Core.fs" />
+    <Compile Include="Samplers.fs" />
+    <Compile Include="Reflection.fs" />
+    <Compile Include="Intrinsics.fs" />
     <Compile Include="Frontend.fs" />
     <Compile Include="Shader.fs" />
+    <Compile Include="Compiler.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
