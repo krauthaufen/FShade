@@ -11,7 +11,22 @@ open FShade.Utils
 open FShade.Compiler
 
 
+
+
 module GLSL =
+
+    // yeah. fuck you for real
+    let doubleToRealStringFuckYouDotNet (d : float) =
+        let str = d.ToString(System.Globalization.CultureInfo.InvariantCulture).ToUpper()
+        if str.Contains "." then
+            str
+        else
+            // 1E-100 => 1.0E-100
+            if str.Contains "E" then
+                str.Replace("E", ".0E")
+            else
+                str + ".0"
+
 
     // The GLSL-Compiler does not need any additional state so we simply use
     // ShaderState here.
@@ -595,7 +610,9 @@ module GLSL =
                             return sprintf "%s(%s)" name (String.concat ", " fieldValues) |> Some
                         | Float32|Float64 ->
                             let d = Convert.ToDouble(o)
-                            return d.ToString(System.Globalization.CultureInfo.InvariantCulture) |> Some
+                            let str = doubleToRealStringFuckYouDotNet d
+                            return Some str
+
                         | Num ->
                             return o.ToString() |> Some
                         | Bool ->
