@@ -1978,7 +1978,7 @@ module SpirVCompiler =
                 )
 
             // IO builtIns
-            let inputs = s.inputs |> Map.toSeq |> Seq.sortBy(fun (_,n) -> n.Name) |> Seq.map snd |> Seq.toList
+            let inputs = s.inputs |> Map.toSeq |> Seq.sortBy(fun (_,n) -> n.var.Name) |> Seq.map snd |> Seq.toList
             let outputs = s.outputs |> Map.toSeq |> Seq.sortBy(fun (_,(_,n)) -> n.Name) |> Seq.map snd |> Seq.toList
 
             let inputRemap = 
@@ -1987,7 +1987,7 @@ module SpirVCompiler =
                     |> List.choose (fun (sem,i) ->
                         match getBuiltInInput s.shaderType last sem with
                             | Some (name, builtin) ->
-                                Some (i, (Var(name,i.Type), builtin))
+                                Some (i.var, (Var(name,i.var.Type), builtin))
                             | _ ->
                                 None
                        )
@@ -2019,12 +2019,12 @@ module SpirVCompiler =
             let mutable location = 0
             let inputs = 
                 inputs |> List.map (fun i ->
-                    match Map.tryFind i inputRemap with
+                    match Map.tryFind i.var inputRemap with
                         | Some (ni, b) -> (Right b, ni)
                         | None -> 
                             let l = location
                             location <- location + 1
-                            (Left l, i)
+                            (Left l, i.var)
                 )
 
 
@@ -2097,7 +2097,7 @@ module SpirVCompiler =
                                                    
                                                     let! fsc = compileShader last None fs
 
-                                                    let used = seq { yield ("Positions",typeof<V4d>); yield! fs.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k,v.Type)) } |> Map.ofSeq
+                                                    let used = seq { yield ("Positions",typeof<V4d>); yield! fs.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k,v.var.Type)) } |> Map.ofSeq
                                                     return used, Some fsc
                                                   }
                                     | None -> compile { return Map.ofList [("Positions",typeof<V4d>)], None }
@@ -2114,7 +2114,7 @@ module SpirVCompiler =
                                                     //let gs = adjustToConfig config gs (Some Vertex) (Some Fragment)
                                                     let! gsc = compileShader (Some Vertex) (Some Fragment) gs
 
-                                                    let used = gs.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k, if v.Type.IsArray then v.Type.GetElementType() else v.Type)) |> Map.ofSeq
+                                                    let used = gs.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k, if v.var.Type.IsArray then v.var.Type.GetElementType() else v.var.Type)) |> Map.ofSeq
                                                 
      
                                                     return used,Some (gsc,t)
@@ -2148,7 +2148,7 @@ module SpirVCompiler =
                                                 let tev = addOutputs additional tev
                                                 let tev = removeOutputs unused tev
 
-                                                let tevUsed = tev.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k, if v.Type.IsArray then v.Type.GetElementType() else v.Type)) |> Map.ofSeq
+                                                let tevUsed = tev.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k, if v.var.Type.IsArray then v.var.Type.GetElementType() else v.var.Type)) |> Map.ofSeq
                                                 let tevUsed = Map.remove "TessCoord" tevUsed
                                                 let tevUsed = Map.add "TessLevelInner" typeof<float[]> tevUsed
                                                 let tevUsed = Map.add "TessLevelOuter" typeof<float[]> tevUsed
@@ -2159,7 +2159,7 @@ module SpirVCompiler =
                                                 let tcs = addOutputs additional tcs
                                                 let tcs = removeOutputs unused tcs
 
-                                                let tcsUsed = tcs.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k, if v.Type.IsArray then v.Type.GetElementType() else v.Type)) |> Map.ofSeq
+                                                let tcsUsed = tcs.inputs |> Seq.map (fun (KeyValue(k,v)) -> (k, if v.var.Type.IsArray then v.var.Type.GetElementType() else v.var.Type)) |> Map.ofSeq
                                                 
 
 

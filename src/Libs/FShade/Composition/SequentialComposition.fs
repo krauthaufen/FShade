@@ -19,8 +19,8 @@ module SequentialComposition =
         let free = s.body.GetFreeVars() |> Set.ofSeq
         let uniformSet = s.uniforms |> Seq.map(fun (_,u) -> u) |> Set.ofSeq
 
-        let mapValue (v : Var) (m : Map<string, Var>) =
-            match Map.tryFindKey (fun _ vi -> vi = v) m with
+        let mapValue (v : Var) (m : Map<string, ShaderInput>) =
+            match Map.tryFindKey (fun _ vi -> vi.var = v) m with
                 | Some _ -> true
                 | None -> false
 
@@ -45,27 +45,33 @@ module SequentialComposition =
             | Sequential(VarSet(v,value), Value(_, Unit)) ->
                 match Map.tryFind v mapping with
                     | Some r -> Expr.Let(r, value, cont)
-                    | None -> if Set.contains v hidden then
-                                cont
-                                else 
-                                Expr.Sequential(Expr.VarSet(v,value), cont)
+                    | None -> 
+                        if Set.contains v hidden then
+                            cont
+                        else 
+                            Expr.Sequential(Expr.VarSet(v,value), cont)
 
             | Sequential(VarSet(v,value), b) ->
                 let b = outputsToVariables mapping hidden cont b
                 match Map.tryFind v mapping with
                     | Some r -> Expr.Let(r, value, b)
-                    | None -> if Set.contains v hidden then
-                                b
-                                else 
-                                Expr.Sequential(Expr.VarSet(v,value), b)
+                    | None -> 
+                        if Set.contains v hidden then
+                            b
+                        else 
+                            Expr.Sequential(Expr.VarSet(v,value), b)
 
             | VarSet(v,value) ->
                 match Map.tryFind v mapping with
                     | Some r -> Expr.Let(r, value, cont)
-                    | None -> if Set.contains v hidden then
-                                cont
-                                else 
-                                Expr.Sequential(Expr.VarSet(v,value), cont)
+                    | None -> 
+                        if Set.contains v hidden then
+                            cont
+                        else 
+                            Expr.Sequential(Expr.VarSet(v,value), cont)
+
+            | Sequential(l, r) ->
+                Expr.Sequential(l, outputsToVariables mapping hidden cont r)
 
 
             | ShapeLambda(v,b) -> Expr.Lambda(v, outputsToVariables mapping hidden cont b)
@@ -99,7 +105,7 @@ module SequentialComposition =
             match Map.tryFind n l.outputs with
                 | Some (_,o) -> let v = Var(n + "C", o.Type)
                                 mapping <- Map.add o v mapping
-                                b1 <- b1.Substitute(fun vi -> if vi = i then v |> Expr.Var |> Some else None)
+                                b1 <- b1.Substitute(fun vi -> if vi = i.var then v |> Expr.Var |> Some else None)
                 | None -> unmatched <- Map.add n i unmatched
 
         //hide hidden and mapping since mutables cannot be captured
@@ -135,7 +141,7 @@ module SequentialComposition =
                         match Map.tryFind vi.Name l.inputs with
                             | Some i -> 
                                 match Map.tryFind vi.Name inputs with
-                                    | Some v -> v |> Expr.Var |> Some
+                                    | Some v -> v.var |> Expr.Var |> Some
                                     | _ -> None
                             | None -> None
             )

@@ -17,6 +17,9 @@ module Types =
     type InputTopology = Point | Line | LineAdjacency | Triangle | TriangleAdjacency | Patch of int
     type ShaderType = Vertex | Geometry of Option<int> * OutputTopology | Fragment | TessControl | TessEval
 
+
+    type ShaderInput = { var : Var; interpolation : Interpolation }
+
     [<NoComparison>]
     type SourceFileInfo = { sourceFilePath : string; startLine : int; startCol : int; endLine : int; endCol : int }
 
@@ -24,7 +27,7 @@ module Types =
     type ShaderDebugInfo = { sourceFileInfo : SourceFileInfo; functionCode : string; opened : list<string>; argumentType : Type; argumentName : string; closure : list<Type * string * obj> }
 
     [<NoComparison>]
-    type Shader = { shaderType : ShaderType; uniforms : list<Uniform * Var>; inputs : Map<string, Var>; outputs : Map<string, Option<string> * Var>; body : Expr; inputTopology : Option<InputTopology>; debugInfo : Option<ShaderDebugInfo> }
+    type Shader = { shaderType : ShaderType; uniforms : list<Uniform * Var>; inputs : Map<string, ShaderInput>; outputs : Map<string, Option<string> * Var>; body : Expr; inputTopology : Option<InputTopology>; debugInfo : Option<ShaderDebugInfo> }
 
     [<NoComparison>]
     type Effect = { vertexShader : Option<Shader>; geometryShader : Option<Shader * OutputTopology>; tessControlShader : Option<Shader>; tessEvalShader : Option<Shader>; fragmentShader : Option<Shader>; originals : list<Shader> }
@@ -68,15 +71,17 @@ module Types =
     [<NoComparison>]
     type PositionOnlyVertex = { [<Semantic("Positions")>] positionOnly : V4d }
 
+    
+
 
 
     let (|Input|_|) (t : Type) (e : Expr) =
         match e with
             | MemberFieldGet(Value(_,valueType), m) when valueType = t ->
-                Input(m.Type, m.Semantic) |> Some
+                Input(m.Type, m.Semantic, m.Interpolation) |> Some
 
             | MemberFieldGet(Var(v), m) when v.Type = t ->
-                Input(m.Type, m.Semantic) |> Some
+                Input(m.Type, m.Semantic, m.Interpolation) |> Some
 
             | _ -> None
  

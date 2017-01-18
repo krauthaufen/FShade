@@ -18,10 +18,10 @@ module CallGraph =
 
     let compileFunction (name : string) (args : list<Var>) (body : Expr) =
         compile {
+            let body = FShade.ExprUtilities.evaluateConstants Map.empty body
             let! body = sequentialVariableNames args body
             
             
-
             let! args = args |> List.mapC (fun a -> 
                 compile { 
                     let! argumentType = compileType a.Type
@@ -99,7 +99,6 @@ module CallGraph =
                                                     newThis::(List.tail args), body
                                                 else
                                                     args, body
-
 
                                             let! body = processFunctionBody body
                                             return! compileFunction name args body

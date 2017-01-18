@@ -64,6 +64,7 @@
   -->
   <ItemGroup>
     <Compile Include="Shaders.fs" />
+    <Compile Include="Lui.fs" />
     <Compile Include="CAst.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

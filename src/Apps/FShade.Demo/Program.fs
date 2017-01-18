@@ -842,6 +842,7 @@ module NewStuff =
 type Bla = { a : int; b : int }
 type Blubb = Sepp of int | Heinz of float
 
+open FShade.Compiler
 [<EntryPoint>]
 let main argv = 
 
@@ -856,11 +857,61 @@ let main argv =
 //    let e = NewStuff.Effect.ofFunction (evilShader)
 //    printfn "%A" e
 
+    let arr = [| Sepp 1; Heinz 2.0; Sepp 3 |]
+
+
+
+    let backend = 
+        let simple (name : string) = Some { name = name; tag = null; arguments = None }
+
+        { new FShade.Compiler.Backend() with
+            member x.CompileIntrinsicFunction mi = 
+                match mi with
+                    | MethodQuote <@ ( ** ) @> _        -> simple "pow"
+                    | MethodQuote <@ sin @> _           -> simple "sin"
+                    | MethodQuote <@ cos @> _           -> simple "cos"
+                    | MethodQuote <@ tan @> _           -> simple "tan"
+                    | MethodQuote <@ pown @> _          -> simple "pow"
+                    | Method("get_Length", _)           -> simple "length"
+                    | Method("get_LengthSquared", _)    -> Some { name = "dot"; tag = null; arguments = Some [0; 0] }
+                    | _ ->
+                        None
+            member x.CompileIntrinsicType _ = None
+            member x.IsIntrinsicValue _ = false
+        }
+
     let testModule = 
-        FShade.Compiler.CModule.ofLambda "test" <@ fun (a : int) -> 
-            (Sepp a, 1)
-        @>
+        FShade.Compiler.CModule.ofLambdas backend [
+            "test", <@@ fun (a : int) -> 
+                (arr.[a], sin (sin (float 1)))
+            @@>
+        
+            "heinz", <@@ fun (a : int) (b : float) ->
+                Heinz (2.0 * b)
+            @@>
+
+            "blubber", <@@ fun (a : int * int) ->
+                let (x,y) = a
+                x + y
+            @@>
+
+            "bla", <@@ fun (a : Blubb) ->
+                match a with
+                    | Heinz v -> v
+                    | Sepp _ -> 3.0
+            @@>
+
+            "seppy", <@@ fun (a : V2d) ->
+                a.Length
+            @@>
+
+        ]
+
     printfn "%A" testModule
+
+    let code = FShade.Compiler.GLSL.CModule.glsl testModule
+    printfn "%s" code
+
     Environment.Exit 0
 
 
