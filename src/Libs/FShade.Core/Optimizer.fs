@@ -140,6 +140,15 @@ module Optimizer =
 
         onlySideEffects Set.empty e
  
+    let rec fix (m : State<EliminationState, 'a>) =
+        state {
+            let! initial = State.get
+            let! res = m
+            let! final = State.get
+            if initial = final then return res
+            else return! fix m
+        }
+
     let rec eliminateDeadCode (e : Expr) : State<EliminationState, Expr> =
         state {
             match e with
@@ -206,9 +215,7 @@ module Optimizer =
                     let! step = eliminateDeadCode step
                     let! first = eliminateDeadCode first
 
-
-                    let! _ = eliminateDeadCode body
-                    let! body = eliminateDeadCode body
+                    let! body = fix (eliminateDeadCode body)
 
                     match body with
                         | Unit -> 
@@ -331,7 +338,20 @@ module Optimizer =
                 | WhileLoop(guard, body) ->
                     // TODO: fix
 
-                    return failwith ""
+                    let step =
+                        state {
+                            let! body = eliminateDeadCode body
+                            match body with
+                                | Unit -> 
+                                    return! eliminateDeadCode (onlySideEffects guard)
+                                | _ ->
+                                    let! guard = eliminateDeadCode guard
+                                    return Expr.WhileLoop(guard, body)
+                        }
+
+                    return! fix step
+
+                    //return failwith ""
 //                    let! guardState, guard = State.withLocalState (eliminateDeadCode guard)
 //                    let! _ = eliminateDeadCode body
 //                    let! body = eliminateDeadCode body
