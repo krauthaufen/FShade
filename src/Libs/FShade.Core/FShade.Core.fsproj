@@ -6,7 +6,7 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>0f39c812-b7fb-4210-9e83-19d85a1cd10d</ProjectGuid>
-    <OutputType>Library</OutputType>
+    <OutputType>Exe</OutputType>
     <RootNamespace>FShade.Core</RootNamespace>
     <AssemblyName>FShade.Core</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
@@ -109,7 +109,8 @@
     <Compile Include="Intrinsics.fs" />
     <Compile Include="Frontend.fs" />
     <Compile Include="Shader.fs" />
-    <Compile Include="Compiler.fs" />
+    <Compile Include="Optimizer.fs" />
+    <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />

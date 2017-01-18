@@ -131,7 +131,7 @@ let entryTest() =
             |> GLSL.CModule.glsl { 
                 GLSL.Config.version = Version(4,1,0)
                 GLSL.Config.locations = false
-                GLSL.Config.perStageUniforms = false
+                GLSL.Config.perStageUniforms = true
                 GLSL.Config.uniformBuffers = true 
             }
 
@@ -154,7 +154,7 @@ let forLoopTest() =
 [<EntryPoint>]
 let main args =
     //forLoopTest()
-    lambdaTest()
-    //entryTest()
+    //lambdaTest()
+    entryTest()
 
     0

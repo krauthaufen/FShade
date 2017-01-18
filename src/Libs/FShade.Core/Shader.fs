@@ -44,6 +44,7 @@ module Shader =
                 | _ ->
                     x.inputs.[p.paramSemantic] <- p
 
+
         member x.AddOutput(p : IOParameter) =
             match x.outputs.TryGetValue p.paramSemantic with
                 | (true, old) ->
@@ -367,7 +368,55 @@ module Shader =
         let e = f Unchecked.defaultof<'a>
         ofExpr typeof<'a> e
 
+    let toEntryPoint (prev : Option<ShaderType>) (s : Shader) (next : Option<ShaderType>) =
+        let inputs = 
+            s.shaderInputs |> List.map (fun i -> 
+                { 
+                    paramName = i.paramSemantic
+                    paramSemantic = i.paramSemantic
+                    paramType = i.paramType
+                    paramDecorations = Set.ofList [ParameterDecoration.Interpolation i.paramInterpolation]
+                }
+            )
 
+        let outputs = 
+            s.shaderOutptus |> List.map (fun i -> 
+                { 
+                    paramName = i.paramSemantic
+                    paramSemantic = i.paramSemantic
+                    paramType = i.paramType
+                    paramDecorations = Set.empty
+                }
+            )
+
+        let uniforms =
+            s.shaderUniforms |> List.map (fun u ->
+                let uniformBuffer = 
+                    match u.uniformValue with
+                        | Attribute(scope, name) -> Some scope.FullName
+                        | _ -> None
+                { 
+                    uniformName = u.uniformName
+                    uniformType = u.uniformType
+                    uniformBuffer = uniformBuffer
+                }
+            )
+
+        {
+            conditional = s.shaderType |> string |> Some
+            entryName   = "main"
+            inputs      = inputs
+            outputs     = outputs
+            uniforms    = uniforms
+            arguments   = []
+            body        = s.shaderBody
+            decorations = 
+                List.concat [
+                    [ EntryDecoration.Stages { prev = prev; self = s.shaderType; next = next } ]
+                    s.shaderInputTopology |> Option.map EntryDecoration.InputTopology |> Option.toList
+                    s.shaderOutputTopology |> Option.map EntryDecoration.OutputTopology |> Option.toList
+                ]
+        }
 
 [<NoComparison>]
 type Effect = 
@@ -431,5 +480,18 @@ module Effect =
 
     let inline ofFunction (f : 'a -> Expr<'b>) =
         Shader.ofFunction f |> ofShader
+
+    let toModule (e : Effect) =
+        let rec compileAll (prev : Option<ShaderType>) (list : list<Shader>) =
+            match list with
+                | [] -> []
+                | [last] -> [ Shader.toEntryPoint prev last None ]
+                | current :: next :: rest ->
+                    (Shader.toEntryPoint prev current (Some next.shaderType)) ::
+                    compileAll (Some current.shaderType) (next :: rest)
+
+        let entries = compileAll None e.shaders
+
+        { entries = entries }
 
 

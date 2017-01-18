@@ -166,6 +166,9 @@ module ExprExtensions =
 
     type Expr with
 
+        static member Unit =
+            Expr.Value(())
+
         /// creates an array-indexing expression using the supplied arguments
         static member ArrayAccess(arr : Expr, index : Expr) =
             let get = Methods.getArray.MakeGenericMethod([| arr.Type.GetElementType() |])
@@ -204,6 +207,21 @@ module ExprExtensions =
                     )
                 )
             )
+
+        static member ForInteger(v : Var, first : Expr, step : Expr, last : Expr, body : Expr) =
+            match step with
+                | Value((:? int as i), _) when i = 1 -> 
+                    Expr.ForIntegerRangeLoop(v, first, last, body)
+
+                | _ ->
+                    // TODO: maybe bad
+                    let range = <@@ [(%%first : int) .. (%%step : int) .. (%%last : int)] @@>
+                    match range with
+                        | Call(None, Method("ToList",_), [s]) ->
+                            Expr.ForEach(v, s, body)
+                        | _ ->
+                            Expr.ForEach(v, range, body)
+                            
 
         /// tries to evaluate the supplied expression and returns its value on success
         static member TryEval(e : Expr) =

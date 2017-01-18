@@ -861,7 +861,6 @@ module Compiler =
                     
                 | PropertyGet(Some t, pi, args) ->
                     return! Expr.Call(t, pi.GetMethod, args) |> toCExpr
-                    
 
                 | Coerce(e, t) ->
                     let! e = toCExpr e
@@ -956,6 +955,9 @@ module Compiler =
                 | ReducibleExpression e ->
                     return! toCStatement last e
 
+                | Quotations.DerivedPatterns.Unit ->
+                    return CNop
+
                 | ForInteger(v, first, step, last, b) ->
                     let! v = toCVar v
                     let! first = toCRExpr first
@@ -983,6 +985,7 @@ module Compiler =
                             | Some true ->
                                 match last with
                                     // i <= last - 1 --> i < last
+                                    | CValue(ct, CIntegral value) -> CLess(CVar v, CValue(ct, CIntegral (value + 1L)))
                                     | CSub(_, last, CValue(ct, CIntegral 1L)) -> CLess(CVar v, last)
                                     | _ -> CLequal(CVar v, last)
 
@@ -1084,7 +1087,7 @@ module Compiler =
                     let! ce = toCRExpr e
                     match ce with
                         | Some (CRExpr e) ->
-                            if last then
+                            if last && e.ctype <> CType.CVoid then
                                 return CReturnValue e
                             else
                                 return CDo e

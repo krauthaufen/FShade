@@ -104,6 +104,7 @@ module Optimization =
                     let! l = eliminateDeadCodeInternal l
                     return Expr.Sequential(l, r)
 
+
                 | ShapeCombination(o, args) ->
                     let! args = args |> List.rev |> List.mapC eliminateDeadCodeInternal
                     return RebuildShapeCombination(o, args |> List.rev)
@@ -112,7 +113,7 @@ module Optimization =
                     let! b = eliminateDeadCodeInternal b
                     return Expr.Lambda(v, b)
 
-                | Var v -> 
+                | ShapeVar v -> 
                     do! addUsed v
                     return e
 
