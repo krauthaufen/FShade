@@ -29,18 +29,26 @@ type GLSLBackend private() =
 
 [<EntryPoint>]
 let main args =
-    
-
     let optimized = 
         Optimizer.eliminateDeadCode 
             <@
                 let mutable a = 0
                 let mutable b = 0
-                for i in 0 .. 10 do
-                    for y in 0 .. 56 do 
-                        a <- a + 1
-                        b <- b + 1
+                for i in 0 .. 2 .. 10 do
+                    a <- a + b
+                    b <- b + a
                 sink(a,a)
+
+                let mutable y = 0 
+                let mutable z = 1
+                if (z <- z + 1; y < 10) then
+                    y <- 10
+                else
+                    y <- 100
+
+                sink(z,z)
+
+                ()
             @>
     
     let _, optimized = optimized |> State.run Optimizer.EliminationState.empty

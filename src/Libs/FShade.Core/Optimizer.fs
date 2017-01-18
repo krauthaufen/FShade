@@ -28,174 +28,53 @@ module Optimizer =
                 | None -> State.value None
 
 
-    let hasSideEffect (e : Expr) =
-        // TODO: validate
-        let rec hasSideEffect (locals : Set<Var>) (e : Expr) =
-            match e with
-                | Let(v, e, b) ->
-                    hasSideEffect locals e || 
-                    hasSideEffect (Set.add v locals) b
-                  
-                | LetRecursive(bindings, body) ->
-                    bindings |> List.exists (snd >> hasSideEffect locals) ||
-                    hasSideEffect (bindings |> List.map fst |> Set.ofList) body
-                 
-                | FieldSet _ -> true
-                | PropertySet _ -> true   
-                | VarSet(v,_) when not (Set.contains v locals) -> true
-                | Call(_, mi, _) when mi.ReturnType = typeof<unit> -> true
-
-
-                | ShapeCombination(_, args) -> args |> List.exists (hasSideEffect locals)
-                | ShapeVar _ -> false
-                | ShapeLambda _ -> false 
-
-        hasSideEffect Set.empty e
-
-    let inline isPure (e : Expr) = not (hasSideEffect e)
-
-
-    type DependencyState =
-        {
-            staticDeps : Set<Var>
-            controlFlowDeps : Set<Var>
-            dependencies : Map<Var, Set<Var>>
-        }
-
-    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-    module DependencyState =
-
-        let empty = 
-            {
-                staticDeps = Set.empty
-                controlFlowDeps = Set.empty
-                dependencies = Map.empty
-            }
-
-        let add (v : Var) (others : Set<Var>) =
-            State.modify (fun s ->
-                match Map.tryFind v s.dependencies with
-                    | Some old -> { s with dependencies = Map.add v (Set.union old others) s.dependencies }
-                    | None -> { s with dependencies = Map.add v others s.dependencies }
-            )
-
-        let set (v : Var) (others : Set<Var>) =
-            State.modify (fun s ->
-                { s with dependencies = Map.add v others s.dependencies }
-            )
-
-        let get (v : Var) =
-            State.get |> State.map (fun s ->
-                match Map.tryFind v s.dependencies with
-                    | Some all -> Set.add v all |> Set.union s.controlFlowDeps
-                    | None -> Set.add v s.controlFlowDeps
-            )
-
-        let addStatic (d : Set<Var>) =
-            State.modify (fun s -> { s with staticDeps = Set.union s.staticDeps d })
-
-        type UseBuilder(deps : Set<Var>) =
-            inherit StateBuilder()
-
-            member x.Run(m : State<DependencyState, 'a>) =
-                state {
-                    let! old = State.get
-                    do! State.modify (fun s -> { s with controlFlowDeps = Set.union deps s.controlFlowDeps })
-                    let! res = m
-                    do! State.modify (fun s -> { s with controlFlowDeps = old.controlFlowDeps })
-                    return res
-                }
-
-
-        let useDeps (deps : Set<Var>)  =
-            UseBuilder(deps)
-
-
-    // let x = a + b + c
-    // a <- a + x
-
-    // let mutable a = ()
-    //
-    // for i in 0 .. 10 do
-    //      a <- if a < 0 then b <- b + 1
-    //
-    // a
-
-    let rec buildDependencies (e : Expr) : State<DependencyState, Set<Var>> =
-        state {
-            match e with
-                | Let(v,e,b) ->
-                    let! e = buildDependencies e
-                    do! DependencyState.add v e
-                    let! b = buildDependencies b
-                    return Set.union e b |> Set.remove v
-
-                | VarSet(v, e) ->
-                    let! e = buildDependencies e
-                    do! DependencyState.set v e
-                    return Set.empty
-
-                | Sequential(l, r) ->
-                    let! l = buildDependencies l
-                    return! buildDependencies r
-                    
-                | IfThenElse(cond, i, e) ->
-                    let! cond = buildDependencies cond
-
-                    return!
-                        DependencyState.useDeps cond {
-                            let! i = buildDependencies i
-                            let! e = buildDependencies e
-                            return Set.union i e
-                        }
-
-                | ForInteger(v, first, step, last, body) ->
-                    let! first = buildDependencies first
-                    let! step = buildDependencies step
-                    let! last = buildDependencies last
-                    let deps = Set.unionMany [first; step; last]
-
-                    return!
-                        DependencyState.useDeps deps {
-                            let! _ = buildDependencies body
-                            return Set.empty
-                        }
-
-                | Value _ ->
-                    return Set.empty 
-
-                | Call(None, mi, args) when e.Type = typeof<unit> ->
-                    let! argDeps = args |> List.mapS buildDependencies |> State.map Set.unionMany
-                    do! DependencyState.addStatic argDeps
-                    return Set.empty
-
-                | FieldSet(Some e,_,v) ->
-                    let! eDeps = buildDependencies e
-                    let! vDeps = buildDependencies v
-                    do! DependencyState.addStatic (Set.union eDeps vDeps)
-                    return Set.empty
-
-                | PropertySet(Some e, _, idx, v) ->
-                    let! eDeps = buildDependencies e
-                    let! idx = idx |> List.mapS buildDependencies |> State.map Set.unionMany
-                    let! vDeps = buildDependencies v
-                    do! DependencyState.addStatic (Set.unionMany [eDeps; idx; vDeps])
-                    return Set.empty
-                
-
-                | ShapeCombination(_, args) ->
-                    let! deps = args |> List.mapS buildDependencies
-                    if e.Type = typeof<unit> then return Set.empty
-                    else return Set.unionMany deps
-
-                | ShapeLambda(v, b) ->
-                    let! b = buildDependencies b
-                    return b |> Set.remove v
-
-                | ShapeVar(v) ->
-                    return! DependencyState.get v
-                    
-        }
+//    let hasSideEffect (e : Expr) =
+//        // TODO: validate
+//        let rec hasSideEffect (locals : Set<Var>) (e : Expr) =
+//            match e with
+//                | Let(v, e, b) ->
+//                    hasSideEffect locals e || 
+//                    hasSideEffect (Set.add v locals) b
+//                  
+//                | LetRecursive(bindings, body) ->
+//                    bindings |> List.exists (snd >> hasSideEffect locals) ||
+//                    hasSideEffect (bindings |> List.map fst |> Set.ofList) body
+//                 
+//                | FieldSet _ -> true
+//                | PropertySet _ -> true   
+//                | VarSet(v,_) when not (Set.contains v locals) -> true
+//                | Call(_, mi, _) when mi.ReturnType = typeof<unit> -> true
+//
+//
+//                | ShapeCombination(_, args) -> args |> List.exists (hasSideEffect locals)
+//                | ShapeVar _ -> false
+//                | ShapeLambda _ -> false 
+//
+//        hasSideEffect Set.empty e
+//
+//    let hasExternalSideEffect (e : Expr) =
+//        // TODO: validate
+//        let rec hasSideEffect (locals : Set<Var>) (e : Expr) =
+//            match e with
+//                | Let(v, e, b) ->
+//                    hasSideEffect locals e || 
+//                    hasSideEffect (Set.add v locals) b
+//                  
+//                | LetRecursive(bindings, body) ->
+//                    bindings |> List.exists (snd >> hasSideEffect locals) ||
+//                    hasSideEffect (bindings |> List.map fst |> Set.ofList) body
+//                 
+////                | FieldSet _ -> true
+////                | PropertySet _ -> true   
+////                | VarSet(v,_) when not (Set.contains v locals) -> true
+//                | Call(_, mi, _) when mi.ReturnType = typeof<unit> -> true
+//
+//
+//                | ShapeCombination(_, args) -> args |> List.exists (hasSideEffect locals)
+//                | ShapeVar _ -> false
+//                | ShapeLambda _ -> false 
+//
+//        hasSideEffect Set.empty e
 
 
     type EliminationState =
@@ -217,10 +96,64 @@ module Optimizer =
                 usedVariables = Set.union l.usedVariables r.usedVariables
             }
 
+    let rec rebuild (es : list<Expr>) =
+        match es with
+            | [] -> Expr.Unit
+            | l :: rest -> 
+                match l, rebuild rest with
+                    | Unit, r -> r
+                    | l, Unit -> l
+                    | l, r -> Expr.Sequential(l, r)
+
+    let onlySideEffects(e : Expr) =
+        let rec onlySideEffects (locals : Set<Var>) (e : Expr) : Expr =
+            match e with
+                | Call _ when e.Type = typeof<unit> ->
+                    e
+
+                | VarSet(v,_) when not (Set.contains v locals) ->
+                    e
+
+                | FieldSet _ ->
+                    e
+
+                | PropertySet _ ->
+                    e
+
+
+
+                | Let(v,e,b) ->
+                    let b = onlySideEffects locals b
+                    if b.GetFreeVars() |> Seq.exists (fun vi -> vi = v) then
+                        Expr.Let(v,e,b)
+                    else
+                        match onlySideEffects (Set.add v locals) e with
+                            | Unit -> b
+                            | e -> Expr.Sequential(e, b)
+
+
+                | ShapeCombination(o, args) ->
+                    args |> List.map (onlySideEffects locals) |> rebuild
+
+                | ShapeVar _
+                | ShapeLambda _ -> Expr.Unit
+
+        onlySideEffects Set.empty e
  
     let rec eliminateDeadCode (e : Expr) : State<EliminationState, Expr> =
         state {
             match e with
+
+
+//                | WriteOutput(name, idx, value) -> 
+//                    let! value = eliminateDeadCode value
+//                    let! idx = idx |> Option.mapS eliminateDeadCode
+//                    match idx with
+//                        | Some idx -> return Expr.WriteOutput(name, idx, value)
+//                        | None -> return Expr.WriteOutput(name, value)
+//        
+
+
 
                 | AddressOf e ->
                     let! e = eliminateDeadCode e
@@ -268,22 +201,13 @@ module Optimizer =
                     return Expr.FieldSet(t, f, value)
 
                 | ForInteger(v, first, step, last, body) ->
-                    let dependencies, _ = buildDependencies body |> State.run DependencyState.empty
                    
                     let! last = eliminateDeadCode last
                     let! step = eliminateDeadCode step
                     let! first = eliminateDeadCode first
-                   
-                    do! State.modify (fun s ->
-                            let newUsed = 
-                                Set.union dependencies.staticDeps s.usedVariables |> Set.map (fun v ->
-                                    match Map.tryFind v dependencies.dependencies with
-                                        | Some deps -> Set.add v deps
-                                        | None -> Set.singleton v
-                                ) |> Set.unionMany
-                            { s with usedVariables = newUsed }
-                        )
 
+
+                    let! _ = eliminateDeadCode body
                     let! body = eliminateDeadCode body
 
                     match body with
@@ -298,51 +222,69 @@ module Optimizer =
                     let! ifState, i = State.withLocalState (eliminateDeadCode i)
                     do! State.put (EliminationState.merge ifState elseState)
 
-                    let! condState, cond = State.withLocalState (eliminateDeadCode cond)
-
                     match i, e with
-                        | Unit, Unit when isPure cond -> 
-                            return Expr.Unit
+                        | Unit, Unit -> 
+                            let! cond = eliminateDeadCode (onlySideEffects cond)
+                            return cond
                         | _ ->
-                            do! State.put condState
+                            let! cond = eliminateDeadCode cond
                             return Expr.IfThenElse(cond, i, e)
 
                 | Lambda(v, b) ->
                     let! b = eliminateDeadCode b
                     return Expr.Lambda(v, b)
   
-                | LetRecursive _
-                | NewDelegate _ ->
-                    return failwith "[FShade] recursi
-                    ve let bindings not supported"
-  
+                | LetRecursive _ ->
+                    return failwith "recursive bindings not implemented"
+                    
                 | Let(v,e,b) ->
                     let! b = eliminateDeadCode b
-                    let! e = eliminateDeadCode e
                     let! vUsed = EliminationState.isUsed v
                     if vUsed then
+                        let! e = eliminateDeadCode e
                         return Expr.Let(v, e, b)
 
-                    elif hasSideEffect e then
-                        return Expr.Sequential(e, b)
-
                     else
-                        return b
+                        let! e = eliminateDeadCode (onlySideEffects e)
+                        match e with
+                            | Unit -> return b
+                            | _ -> return Expr.Sequential(e, b)
 
-                
-                | WriteOutput(name, idx, value) -> 
-                    let! value = eliminateDeadCode value
-                    let! idx = idx |> Option.mapS eliminateDeadCode
-                    match idx with
-                        | Some idx -> return Expr.WriteOutput(name, idx, value)
-                        | None -> return Expr.WriteOutput(name, value)
-        
-                | Var v ->
-                    do! EliminationState.useVar v
-                    return e
+                | NewArray(t, args) ->
+                    let! args = args |> List.rev |> List.mapS eliminateDeadCode |> State.map List.rev
+                    return Expr.NewArray(t, args)
 
-                | Value _ ->
-                    return e
+                | NewDelegate(t, vars, e) ->
+                    let! e = eliminateDeadCode e
+                    return Expr.NewDelegate(t, vars, e)
+  
+                | NewObject(ctor, args) ->
+                    let! args = args |> List.rev |> List.mapS eliminateDeadCode |> State.map List.rev
+                    return Expr.NewObject(ctor, args)
+
+                | NewRecord(t, args) ->
+                    let! args = args |> List.rev |> List.mapS eliminateDeadCode |> State.map List.rev
+                    return Expr.NewRecord(t, args)
+
+                | NewTuple(args) ->
+                    let! args = args |> List.rev |> List.mapS eliminateDeadCode |> State.map List.rev
+                    return Expr.NewTuple(args)
+
+                | NewUnionCase(ci, args) ->
+                    let! args = args |> List.rev |> List.mapS eliminateDeadCode |> State.map List.rev
+                    return Expr.NewUnionCase(ci, args)
+
+                | PropertyGet(None, pi, idx) ->
+                    let! idx = idx |> List.rev |> List.mapS eliminateDeadCode |> State.map List.rev
+                    return Expr.PropertyGet(pi, idx)
+
+                | PropertyGet(Some t, pi, idx) ->
+                    let! idx = idx |> List.rev |> List.mapS eliminateDeadCode |> State.map List.rev
+                    let! t = eliminateDeadCode t
+                    return Expr.PropertyGet(t, pi, idx)
+                    
+                | QuoteRaw _ | QuoteTyped _ -> 
+                    return failwith "not implemented"
 
                 | Sequential(l, r) ->
                     let! r = eliminateDeadCode r
@@ -351,6 +293,24 @@ module Optimizer =
                         | Unit, r   -> return r
                         | l, Unit   -> return l
                         | l, r      -> return Expr.Sequential(l, r)
+
+                | TryWith _ | TryFinally _ -> 
+                    return failwith "not implemented"
+
+                | TupleGet(t, i) ->
+                    let! t = eliminateDeadCode t
+                    return Expr.TupleGet(t, i)
+
+                | TypeTest(e, t) ->
+                    let! e = eliminateDeadCode e
+                    return Expr.TypeTest(e, t)
+
+                | UnionCaseTest(e, ci) ->
+                    let! e = eliminateDeadCode e
+                    return Expr.UnionCaseTest(e, ci)
+
+                | Value _ ->
+                    return e
 
                 | VarSet(v, e) ->
                     
@@ -362,13 +322,32 @@ module Optimizer =
                         //let! vUsed = EliminationState.isUsed v
                         return Expr.VarSet(v, e)
                     else
-                        if hasSideEffect e then
-                            return! eliminateDeadCode e
-                        else
-                            return Expr.Unit
+                        return! eliminateDeadCode (onlySideEffects e)
+
+                | Var v ->
+                    do! EliminationState.useVar v
+                    return e
+
+                | WhileLoop(guard, body) ->
+                    // TODO: fix
+
+                    return failwith ""
+//                    let! guardState, guard = State.withLocalState (eliminateDeadCode guard)
+//                    let! _ = eliminateDeadCode body
+//                    let! body = eliminateDeadCode body
+//
+//
+//                    match body with
+//                        | Unit when not (hasSideEffect guard) -> 
+//                            return Expr.Unit
+//                        | _ ->
+//                            do! State.put guardState
+//                            return Expr.WhileLoop(guard, body)
+
+                    
 
                 | _ ->
-                    return failwith ""
+                    return failwithf "[FShade] unexpected expression %A" e
         }
 
 

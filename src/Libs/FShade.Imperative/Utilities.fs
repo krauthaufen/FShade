@@ -160,9 +160,15 @@ module ReflectionPatterns =
 module ExprExtensions =
 
     module private Methods = 
+
+        let operators = getMethodInfo(<@ (+) @>).DeclaringType
+
         let getArray = getMethodInfo <@ Microsoft.FSharp.Core.LanguagePrimitives.IntrinsicFunctions.GetArray @>
         let setArray = getMethodInfo <@ Microsoft.FSharp.Core.LanguagePrimitives.IntrinsicFunctions.SetArray @>
         let unboxGeneric = getArray.DeclaringType.GetMethod "UnboxGeneric"
+
+        let opRangeStep = operators.GetMethod("op_RangeStep")
+            
 
     type Expr with
 
@@ -214,13 +220,12 @@ module ExprExtensions =
                     Expr.ForIntegerRangeLoop(v, first, last, body)
 
                 | _ ->
-                    // TODO: maybe bad
-                    let range = <@@ [(%%first : int) .. (%%step : int) .. (%%last : int)] @@>
-                    match range with
-                        | Call(None, Method("ToList",_), [s]) ->
-                            Expr.ForEach(v, s, body)
-                        | _ ->
-                            Expr.ForEach(v, range, body)
+                    let seq = Expr.Call(Methods.opRangeStep.MakeGenericMethod [| first.Type; step.Type |], [first;step;last])
+                    let inputSequence = Var("inputSequence", seq.Type)
+                    Expr.Let(
+                        inputSequence, seq, 
+                        Expr.ForEach(v, Expr.Var inputSequence, body)
+                    )
                             
 
         /// tries to evaluate the supplied expression and returns its value on success
