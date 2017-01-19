@@ -10,18 +10,18 @@ open FShade
 
 let sink a = ()
 
-type ExpressionEqualConstraint(desired : Expr) =
-    inherit Constraint()
+let exprComparer = 
+    { new System.Collections.Generic.IEqualityComparer<Expr> with
+        member x.GetHashCode(l : Expr) =
+            0
 
-    override x.ApplyTo<'a>(real : 'a) : ConstraintResult =
-        match real :> obj with
-            | :? Expr as real ->
-                failwith ""
+        member x.Equals(l : Expr, r : Expr) =
+            // TODO: implement
+            false
+    }
 
-            | _ ->
-                failwith ""
+let exprEqual (r : Expr) = EqualConstraint(r).Using exprComparer
 
-let exprEqual (r : Expr) = ExpressionEqualConstraint(r)
 
 [<Test>]
 let bla() =
