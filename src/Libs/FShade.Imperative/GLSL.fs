@@ -81,7 +81,8 @@ module GLSL =
                 | CType.CInt(false, (8 | 16 | 32 | 64))     -> "uint"
                 | CType.CFloat(16)                          -> "half"
                 | CType.CFloat(32 | 64)                     -> "float"
-
+                
+                | CType.CVector(CType.CInt(true, (8 | 16 | 32 | 64)), d)   -> "ivec" + string d
                 | CType.CVector(CType.CFloat(32 | 64), d)   -> "vec" + string d
                 | CType.CMatrix(CType.CFloat(32 | 64), r,c) -> "mat" + string c + "x" + string r
 
@@ -100,10 +101,17 @@ module GLSL =
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module CParameter =
         let glsl (p : CParameter) =
-            let t = CType.glsl p.ctype
             let m = CParameterModifier.glsl p.modifier
-            if m = "" then sprintf "%s %s" t p.name
-            else sprintf "%s %s %s" m t p.name
+            match p.ctype with
+                | CArray(et, l) ->
+                    let t = CType.glsl et
+                    if m = "" then sprintf "%s %s[%d]" t p.name l
+                    else sprintf "%s %s %s[%d]" m t p.name l
+
+                | pt ->
+                    let t = CType.glsl pt
+                    if m = "" then sprintf "%s %s" t p.name
+                    else sprintf "%s %s %s" m t p.name
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module CFunctionSignature =

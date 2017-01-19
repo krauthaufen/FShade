@@ -6,6 +6,7 @@ open System.Reflection
 open Microsoft.FSharp.Reflection
 open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Quotations.Patterns
+open Microsoft.FSharp.Quotations.DerivedPatterns
 
 open Aardvark.Base
 
@@ -89,6 +90,7 @@ module ReflectionPatterns =
         else
             None
 
+
     let (|EnumerableOf|_|) (t : Type) =
         if t.IsArray then
             Some (t.GetElementType())
@@ -168,9 +170,25 @@ module ExprExtensions =
         let unboxGeneric = getArray.DeclaringType.GetMethod "UnboxGeneric"
 
         let opRangeStep = operators.GetMethod("op_RangeStep")
-            
+        let ignore = getMethodInfo <@ ignore @>
 
     type Expr with
+
+        static member Ignore(e : Expr) =
+            if e.Type = typeof<unit> then 
+                e
+            else
+                Expr.Call(Methods.ignore.MakeGenericMethod [| e.Type |], [e])
+
+        static member Seq (es : list<Expr>) =
+            match es with
+                | [] -> Expr.Unit
+                | l :: rest -> 
+                    match l, Expr.Seq rest with
+                        | Unit, r -> r
+                        | l, Unit -> l
+                        | l, r -> Expr.Sequential(l, r)
+
 
         static member Unit =
             Expr.Value(())
@@ -318,6 +336,27 @@ module ExprExtensions =
     let (|ExprOf|) (e : Expr) =
         ExprOf(e.Type)
 
+    let (|Ignore|_|) (e : Expr) =
+        match e with
+            | Call(None, mi, [a]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = Methods.ignore ->
+                Some a
+            | _ ->
+                None
+
+    let (|GetArray|_|) (e : Expr) =
+        match e with
+            | Call(None, mi, [arr;idx]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = Methods.getArray ->
+                Some(arr, idx)
+            | _ ->
+                None
+
+    let (|SetArray|_|) (e : Expr) =
+        match e with
+            | Call(None, mi, [arr;idx;value]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = Methods.setArray ->
+                Some(arr, idx, value)
+            | _ ->
+                None
+
     /// detects FieldGet and PropertyGet expressions having no indexers
     let (|MemberFieldGet|_|) (e : Expr) =
         match e with
@@ -427,12 +466,15 @@ module ExprExtensions =
             | _ ->
                 None
 
+    
+
     /// reduces an expression
     let (|ReducibleExpression|_|) (e : Expr) =
         match e with
             | LetCopyOfStruct e     -> Some e
             | Pipe e                -> Some e
             | LambdaApp e           -> Some e
+            | Ignore e              -> Some e
 
             | _                     -> None
 
@@ -625,3 +667,13 @@ module private Helpers =
 
     let inline (|>>) (m : State<'s, 'a>) (f : 'a -> 'b) =
         m |> State.map f
+
+    module Array =
+        let mapS (f : 'a -> State<'s, 'b>) (m : 'a[]) : State<'s, 'b[]> =
+            { new State<'s, 'b[]>() with
+                override x.Run(s : byref<'s>) =
+                    let res = Array.zeroCreate m.Length
+                    for i in 0 .. m.Length - 1 do
+                        res.[i] <- f(m.[i]).Run(&s)
+                    res
+            }

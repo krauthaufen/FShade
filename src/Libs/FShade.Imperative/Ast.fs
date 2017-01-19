@@ -389,24 +389,51 @@ type CLExpr =
     | CLField of CType * CLExpr * string
     | CLItem of CType * CLExpr * CExpr
     | CLPtr of CType * CExpr
+    | CLVecSwizzle of CType * CLExpr * list<CVecComponent>
+    | CLMatrixElement of t : CType * m : CLExpr * r : int * c : int
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module CLExpr =
+    open Aardvark.Base.Monads.Option
+
     let rec ofExpr (e : CExpr) =
         match e with
             | CVar v -> CLVar v
             | CField(t, e, name) -> CLField(t, ofExpr e, name)
             | CItem(t, e, index) -> CLItem(t, ofExpr e, index)
             | CAddressOf(t, e) -> CLPtr(t, e)
+            | CVecSwizzle(t, e, c) -> CLVecSwizzle(t, ofExpr e, c)
+            | CMatrixElement(t, e, r, c) -> CLMatrixElement(t, ofExpr e, r, c)
             | _ -> failwithf "[FShade] cannot convert CExpr toCLExpr (%A)" e
             
     let rec ofExprSafe (e : CExpr) =
-        match e with
-            | CVar v ->  CLVar v |> Some
-            | CField(t, e, name) -> CLField(t, ofExpr e, name) |> Some
-            | CItem(t, e, index) -> CLItem(t, ofExpr e, index) |> Some
-            | CAddressOf(t, e) -> CLPtr(t, e) |> Some
-            | _ -> None
+        option {
+            match e with
+                | CVar v -> 
+                    return CLVar v
+
+                | CField(t, e, name) -> 
+                    let! e = ofExprSafe e
+                    return CLField(t, e, name)
+
+                | CItem(t, e, index) -> 
+                    let! e = ofExprSafe e
+                    return CLItem(t, e, index)
+
+                | CAddressOf(t, e) -> 
+                    return CLPtr(t, e)
+
+                | CVecSwizzle(t, e, c) ->
+                    let! e = ofExprSafe e
+                    return CLVecSwizzle(t, e, c)
+
+                | CMatrixElement(t, e, r, c) ->
+                    let! e = ofExprSafe e
+                    return CLMatrixElement(t, e, r, c)
+
+                | _ -> 
+                    return! None
+        }
 
     let rec toExpr (e : CLExpr) =
         match e with
@@ -414,6 +441,8 @@ module CLExpr =
             | CLField(t, e, name) -> CField(t, toExpr e, name)
             | CLItem(t, e, index) -> CItem(t, toExpr e, index)
             | CLPtr(t, e) -> CAddressOf(t, e)
+            | CLVecSwizzle(t, e, c) -> CVecSwizzle(t, toExpr e, c)
+            | CLMatrixElement(t, e, r, c) -> CMatrixElement(t, toExpr e, r, c)
 
 /// represents a c-style statement
 type CStatement =

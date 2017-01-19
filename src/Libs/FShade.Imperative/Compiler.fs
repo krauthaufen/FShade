@@ -37,6 +37,7 @@ module Compiler =
     type FunctionDefinition = 
         | ManagedFunction of name : string * args : list<Var> * body : Expr
         | CompiledFunction of signature : CFunctionSignature * body : CStatement
+        | ManagedFunctionWithSignature of signature : CFunctionSignature * body : Expr
 
         member x.Signature =
             match x with
@@ -45,6 +46,9 @@ module Compiler =
 
                 | ManagedFunction(name,args,body) ->
                     CFunctionSignature.ofFunction name args body.Type
+
+                | ManagedFunctionWithSignature(s,_) ->
+                    s
 
     type ConstantDefinition = { cName : string; cType : Type; cValue : Expr }
 
@@ -73,7 +77,7 @@ module Compiler =
     type CompilerState =
         {
             nameIndices         : Map<string, int>
-            variableNames       : Map<Var, string>
+            variables           : Map<Var, CVar>
             reservedNames       : Set<string>
 
             usedFunctions       : HashMap<obj, FunctionDefinition>
@@ -272,22 +276,22 @@ module Compiler =
                     | Some idx -> name + string idx
             )
 
-        let variableName (v : Var) =
-            State.custom (fun s ->
-                match Map.tryFind v s.variableNames with
-                    | Some name -> 
-                        s, name
-                    | None ->
-                        match Map.tryFind v.Name s.nameIndices with
-                            | Some index ->
-                                let name = v.Name + string index
-                                let state = { s with nameIndices = Map.add v.Name (index + 1) s.nameIndices; variableNames = Map.add v name s.variableNames }
-                                state, name
-                            | None ->
-                                let state = { s with nameIndices = Map.add v.Name 1 s.nameIndices; variableNames = Map.add v v.Name s.variableNames }
-                                state, v.Name
-
-            )
+//        let variableName (v : Var) =
+//            State.custom (fun s ->
+//                match Map.tryFind v s.variables with
+//                    | Some name -> 
+//                        s, name
+//                    | None ->
+//                        match Map.tryFind v.Name s.nameIndices with
+//                            | Some index ->
+//                                let name = v.Name + string index
+//                                let state = { s with nameIndices = Map.add v.Name (index + 1) s.nameIndices; variableNames = Map.add v name s.variableNames }
+//                                state, name
+//                            | None ->
+//                                let state = { s with nameIndices = Map.add v.Name 1 s.nameIndices; variableNames = Map.add v v.Name s.variableNames }
+//                                state, v.Name
+//
+//            )
 
         let reserveName (n : string) =
             State.modify (fun s ->
@@ -368,7 +372,7 @@ module Compiler =
     let emptyState (m : ModuleState) =
         {
             nameIndices         = Map.empty
-            variableNames       = Map.empty
+            variables           = Map.empty
             reservedNames       = Set.empty
             usedFunctions       = HashMap.empty
             usedConstants       = PSet.empty
@@ -389,11 +393,27 @@ module Compiler =
         
     /// converts a variable to a CVar using the cached name or by
     /// creating a fresh name for it (and caching it)
+    let toCVarOfType (v : Var) (t : CType) =
+        State.custom (fun s ->
+            match Map.tryFind v s.variables with
+                | Some v -> s, v
+                | None ->
+                    match Map.tryFind v.Name s.nameIndices with
+                        | Some index ->
+                            let name = v.Name + string index
+                            let res = { ctype = t; name = name }
+                            let state = { s with nameIndices = Map.add v.Name (index + 1) s.nameIndices; variables = Map.add v res s.variables }
+                            state, res
+                        | None ->
+                            let res = { ctype = t; name = v.Name }
+                            let state = { s with nameIndices = Map.add v.Name 1 s.nameIndices; variables = Map.add v res s.variables }
+                            state, res
+        )
+
     let toCVar (v : Var) =
         state {
-            let! ctype = toCType v.Type
-            let! name = CompilerState.variableName v
-            return { name = name; ctype = ctype }
+            let! t = toCType v.Type
+            return! toCVarOfType v t
         }
 
     /// converts an EntryParameter to a CEntryParameter 
@@ -462,45 +482,63 @@ module Compiler =
                     return! CompilerState.useConstant e e
                 else
                     let! globals = State.get |> State.map (fun s -> s.moduleState.globalParameters)
-                    let free = free |> PSet.toList
+                    let free = free |> PSet.toArray
  
                     let newVariables = HashSet()
 
                     let args = 
-                        free |> List.choose (fun f ->
+                        free |> Array.choose (fun f ->
                             match f with
                                 | CompilerState.Free.Variable v ->
                                     Some v
+
                                 | CompilerState.Free.Global(n, t, isMutable) ->
-                                    if Set.contains n globals then None
+                                    if Set.contains n globals then 
+                                        None
                                     else 
                                         let v = Var(n, t, isMutable)
                                         newVariables.Add v |> ignore
                                         Some v
                         )
 
-                    let! name = CompilerState.newName "helper"
-                    let definition = ManagedFunction(name, args, e)
-
-                    let! signature = 
-                        if List.length args = List.length free then CompilerState.useGlobalFunction (e :> obj) definition
-                        else CompilerState.useLocalFunction (e :> obj) definition
-
-                    let! args = 
-                        args |> List.mapS (fun v ->
+                    
+                    let! variables = 
+                        args |> Array.mapS (fun v ->
                             state {
-                                let! s = State.get
                                 if newVariables.Contains v then
-                                    do! State.put { s with variableNames = Map.add v v.Name s.variableNames }
                                     let! t = toCType v.Type
-                                    return CVar { ctype = t; name = v.Name }
+                                    let res = { ctype = t; name = v.Name }
+                                    do! State.modify (fun s -> { s with variables = Map.add v res s.variables })
+                                    return res
                                 else
-                                    let! v = toCVar v
-                                    return CVar v
+                                    let! res = toCVar v
+                                    return res
                             }
                         ) 
 
-                    return CCall(signature, List.toArray args)
+                    let! name = CompilerState.newName "helper"
+                    let! returnType = toCType e.Type
+                    let variables = variables
+
+                    let signature =
+                        {
+                            name = name
+                            returnType = returnType
+                            parameters = 
+                                Array.map2 
+                                    (fun (a : CVar) (v : Var) -> { name = a.name; ctype = a.ctype; modifier = (if v.IsMutable then CParameterModifier.ByRef else CParameterModifier.In) }) 
+                                    variables
+                                    args
+                        }
+
+                    let definition = ManagedFunctionWithSignature(signature, e)
+
+                    let! signature = 
+                        if args.Length = free.Length then CompilerState.useGlobalFunction (e :> obj) definition
+                        else CompilerState.useLocalFunction (e :> obj) definition
+
+
+                    return CCall(signature, variables |> Array.map CVar)
             }
 
         let rec zero (t : CType) =
@@ -520,6 +558,7 @@ module Compiler =
                 | CFloat _          -> CValue(t, CFractional 1.0)
                 | CVector(bt, d)    -> CNewVector(t, d, List.replicate d (one bt))
                 | _                 -> failwithf "[FShade] cannot create one-value for type %A" t
+
 
         let rec tryGetBuiltInMethod (mi : MethodInfo) (args : list<CExpr>) =
             let ct = CType.ofType mi.ReturnType
@@ -597,6 +636,7 @@ module Compiler =
                 | (MethodQuote <@ Vec.zw : V4d -> V2d @> _ | Method("get_ZW", [VectorOf _])), [v] -> CVecSwizzle(ct, v, CVecComponent.zw) |> Some
                 | (MethodQuote <@ Vec.xyz : V4d -> V3d @> _ | Method("get_XYZ", [VectorOf _])), [v] -> CVecSwizzle(ct, v, CVecComponent.xyz) |> Some
                 | (MethodQuote <@ Vec.yzw : V4d -> V3d @> _ | Method("get_YZW", [VectorOf _])), [v] -> CVecSwizzle(ct, v, CVecComponent.yzw) |> Some
+
 
                 // matrix creation
                 | Method("FromRows", _), rows -> CMatrixFromRows(ct, rows) |> Some
@@ -676,7 +716,7 @@ module Compiler =
                 | _ ->
                     None
 
-        let rec tryGetBuiltInField (fi : FieldInfo) (arg : CExpr) =
+        let tryGetBuiltInField (fi : FieldInfo) (arg : CExpr) =
             let ct = CType.ofType fi.FieldType
             match fi.DeclaringType, fi.Name with
                 | VectorOf _, "X" -> CVecSwizzle(ct, arg, [CVecComponent.X]) |> Some
@@ -702,6 +742,12 @@ module Compiler =
                 | MatrixOf _, "M33" -> CMatrixElement(ct, arg, 3, 3) |> Some
 
                 | _ -> None
+
+        let tryGetBuiltInStaticProperty (t : CType) (pi : PropertyInfo) =
+            match pi.Name with
+                | "Zero"    -> zero t |> Some
+                | "One"     -> one t |> Some
+                | _         -> None
 
     let rec toCExpr (e : Expr) =
         state {
@@ -758,6 +804,10 @@ module Compiler =
                                     let! e = asExternal e
                                     return e
 
+                | GetArray(arr, i) ->
+                    let! arr = toCExpr arr
+                    let! i = toCExpr i
+                    return CItem(ct, arr, i)
 
                 | NewTuple(fields) ->
                     let! ctor = e.Type |> Constructors.tuple |> CompilerState.useCtor e.Type
@@ -841,6 +891,9 @@ module Compiler =
                         | _ ->
                             return CField(ct, t, f.Name)
 
+                | PropertyGet(None, pi, []) ->
+                    return! Expr.Value(pi.GetValue(null), pi.PropertyType) |> toCExpr
+                    
                 | PropertyGet(None, pi, args) ->
                     return! Expr.Call(pi.GetMethod, args) |> toCExpr
 
@@ -949,64 +1002,81 @@ module Compiler =
                     return CRExpr.ofExpr res |> Some
         }
 
-    let rec toCStatement (last : bool) (e : Expr) =
+    let rec toCStatement (isLast : bool) (e : Expr) =
         state {
             match e with
                 | ReducibleExpression e ->
-                    return! toCStatement last e
+                    return! toCStatement isLast e
 
                 | Quotations.DerivedPatterns.Unit ->
                     return CNop
 
                 | ForInteger(v, first, step, last, b) ->
-                    let! v = toCVar v
-                    let! first = toCRExpr first
-                    let! step = toCExpr step
-                    let! last = toCExpr last
-                    let! body = toCStatement false b
+                    match step, last with
+                        | Trivial, Trivial -> 
+                            let! v = toCVar v
+                            let! cfirst = toCRExpr first
+                            let! cstep = toCExpr step
+                            let! clast = toCExpr last
+                            let! cbody = toCStatement false b
 
-                    let increment =
-                        match step with
-                            | CValue(_, CIntegral 1L)   -> CIncrement(false, CLVar v)   // i++
-                            | CValue(_, CIntegral -1L)  -> CDecrement(false, CLVar v)   // i--
-                            | CNeg(_,step)              -> CWrite(CLVar v, CExpr.CSub(v.ctype, CVar v, step))   // i = i - <step>
-                            | step                      -> CWrite(CLVar v, CExpr.CAdd(v.ctype, CVar v, step))   // i = i + <step>
+                            let increment =
+                                match cstep with
+                                    | CValue(_, CIntegral 1L)   -> CIncrement(false, CLVar v)   // i++
+                                    | CValue(_, CIntegral -1L)  -> CDecrement(false, CLVar v)   // i--
+                                    | CNeg(_,step)              -> CWrite(CLVar v, CExpr.CSub(v.ctype, CVar v, cstep))   // i = i - <step>
+                                    | step                      -> CWrite(CLVar v, CExpr.CAdd(v.ctype, CVar v, cstep))   // i = i + <step>
 
-                    let stepPositive =
-                        match step with
-                            | CValue(_, CIntegral v) -> 
-                                if v = 0L then failwithf "[FShade] infinite loop detected: %A" e
-                                Some (v > 0L)
-                            | _ ->
-                                None
+                            let stepPositive =
+                                match cstep with
+                                    | CValue(_, CIntegral v) -> 
+                                        if v = 0L then failwithf "[FShade] infinite loop detected: %A" e
+                                        Some (v > 0L)
+                                    | _ ->
+                                        None
 
-                    let condition =
-                        match stepPositive with
-                            | Some true ->
-                                match last with
-                                    // i <= last - 1 --> i < last
-                                    | CValue(ct, CIntegral value) -> CLess(CVar v, CValue(ct, CIntegral (value + 1L)))
-                                    | CSub(_, last, CValue(ct, CIntegral 1L)) -> CLess(CVar v, last)
-                                    | _ -> CLequal(CVar v, last)
+                            let condition =
+                                match stepPositive with
+                                    | Some true ->
+                                        match clast with
+                                            // i <= last - 1 --> i < last
+                                            | CValue(ct, CIntegral value) -> CLess(CVar v, CValue(ct, CIntegral (value + 1L)))
+                                            | CSub(_, last, CValue(ct, CIntegral 1L)) -> CLess(CVar v, last)
+                                            | _ -> CLequal(CVar v, clast)
 
-                            | Some false ->
-                                match last with
-                                    // i >= last + 1 --> i > last
-                                    | CAdd(_, last, CValue(ct, CIntegral 1L)) -> CGreater(CVar v, last)
-                                    | _ -> CGequal(CVar v, last)
+                                    | Some false ->
+                                        match clast with
+                                            // i >= last + 1 --> i > last
+                                            | CAdd(_, last, CValue(ct, CIntegral 1L)) -> CGreater(CVar v, last)
+                                            | _ -> CGequal(CVar v, clast)
                                 
-                            | None -> 
-                                // i <> last
-                                CNotEqual(CVar v, last)
+                                    | None -> 
+                                        // i <> last
+                                        CNotEqual(CVar v, clast)
 
 
-                    return 
-                        CFor(
-                            CDeclare(v, first),                 // int i = <first>
-                            condition,                          
-                            increment,
-                            body                              
-                        )
+                            return 
+                                CFor(
+                                    CDeclare(v, cfirst),                 // int i = <first>
+                                    condition,                          
+                                    increment,
+                                    cbody                              
+                                )
+                        | Trivial, last ->
+                            let vLast = Var("last", last.Type)
+                            return! toCStatement isLast (Expr.Let(vLast, last, Expr.ForInteger(v, first, step, Expr.Var vLast, b)))
+
+                        | step, Trivial -> 
+                            let vStep = Var("step", step.Type)
+                            return! toCStatement isLast (Expr.Let(vStep, step, Expr.ForInteger(v, first, Expr.Var vStep, last, b)))
+
+                        | step, last ->
+                            let vStep = Var("step", step.Type)
+                            let vLast = Var("last", last.Type)
+                            return! toCStatement isLast (Expr.Let(vStep, step, Expr.Let(vLast, last, Expr.ForInteger(v, first, Expr.Var vStep, Expr.Var vLast, b))))
+                            
+
+                            
 
 
                 | WriteOutput(name, index, value) ->
@@ -1029,14 +1099,27 @@ module Compiler =
                         | None ->
                             return failwithf "[FShade] cannot set value for ptr %A" e
 
+                | FieldSet(Some t, f, value) ->
+                    let! t = toCLExpr (Expr.FieldGet(t, f))
+                    match t with
+                        | Some t ->
+                            let! value = toCExpr value
+                            return CWrite(t, value)
+                        | None ->
+                            return failwithf "[FShade] cannot set field %A" e
+
                 | FieldSet(None, f, value) ->
                     return failwithf "[FShade] cannot set static field %A to value %A" f value
 
 
                 | Let(v, e, b) ->
-                    let! v = toCVar v
                     let! e = toCRExpr e
-                    let! body = toCStatement last b
+                    let! v = 
+                        match e with
+                            | Some e -> toCVarOfType v e.ctype
+                            | None -> toCVar v
+
+                    let! body = toCStatement isLast b
                     return CSequential [
                         CDeclare(v, e)
                         body
@@ -1051,7 +1134,7 @@ module Compiler =
 
                 | Sequential(l, r) ->
                     let! l = toCStatement false l
-                    let! r = toCStatement last r
+                    let! r = toCStatement isLast r
                     return CSequential [l;r]
 
                 | VarSet(v, value) ->
@@ -1069,7 +1152,7 @@ module Compiler =
                             let! a = toCExpr a
                             return CWrite(l, a)
                         | None ->
-                            return! Expr.Call(t, pi.SetMethod, i @ [a]) |> toCStatement last
+                            return! Expr.Call(t, pi.SetMethod, i @ [a]) |> toCStatement isLast
 
 
                 | WhileLoop(guard, body) ->
@@ -1079,21 +1162,21 @@ module Compiler =
 
                 | IfThenElse(c, i, e) ->
                     let! c = toCExpr c
-                    let! i = toCStatement last i
-                    let! e = toCStatement last e
+                    let! i = toCStatement isLast i
+                    let! e = toCStatement isLast e
                     return CIfThenElse(c, i, e)
 
                 | e ->
                     let! ce = toCRExpr e
                     match ce with
                         | Some (CRExpr e) ->
-                            if last && e.ctype <> CType.CVoid then
+                            if isLast && e.ctype <> CType.CVoid then
                                 return CReturnValue e
                             else
                                 return CDo e
                             
                         | Some (CRArray(t,_) as rhs) -> 
-                            if last then 
+                            if isLast then 
                                 let! name = CompilerState.newName "temp"
                                 let cVar = { name = name; ctype = t }
                                 return CSequential [
@@ -1104,7 +1187,7 @@ module Compiler =
                                 return CNop
 
                         | None ->
-                            if last then
+                            if isLast then
                                 let! name = CompilerState.newName "temp"
                                 let cVar = { name = name; ctype = CType.ofType e.Type }
                                 return CSequential [
@@ -1164,6 +1247,10 @@ module Compiler =
                 | CompiledFunction(signature, body) ->
                     return CFunctionDef(signature, body)
                     
+                | ManagedFunctionWithSignature(signature, body) ->
+                    let! body = toCStatement true body
+                    return CFunctionDef(signature, body)
+
         }
 
     let compileConstant (c : ConstantDefinition) =
