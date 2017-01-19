@@ -80,7 +80,7 @@ type IShaderBuilder =
 
 type IOParameter =
     {
-        paramSemantic       : string
+//        paramSemantic       : string
         paramType           : Type
         paramInterpolation  : InterpolationMode
     }

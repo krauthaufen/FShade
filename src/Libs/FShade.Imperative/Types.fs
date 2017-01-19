@@ -15,11 +15,10 @@ type MemoryType =
 
 type ShaderType = 
     | Vertex  = 0
-    | Geometry = 1 
-    | TessControl = 2
-    | TessEval = 3
+    | TessControl = 1
+    | TessEval = 2
+    | Geometry = 3 
     | Fragment = 4
-    | Compute = 5 
 
 [<RequireQualifiedAccess>]
 type OutputTopology = 

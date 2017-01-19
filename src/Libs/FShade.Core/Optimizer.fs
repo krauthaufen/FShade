@@ -27,54 +27,14 @@ module Optimizer =
                 | Some a -> a |> f |> State.map Some
                 | None -> State.value None
 
-
-//    let hasSideEffect (e : Expr) =
-//        // TODO: validate
-//        let rec hasSideEffect (locals : Set<Var>) (e : Expr) =
-//            match e with
-//                | Let(v, e, b) ->
-//                    hasSideEffect locals e || 
-//                    hasSideEffect (Set.add v locals) b
-//                  
-//                | LetRecursive(bindings, body) ->
-//                    bindings |> List.exists (snd >> hasSideEffect locals) ||
-//                    hasSideEffect (bindings |> List.map fst |> Set.ofList) body
-//                 
-//                | FieldSet _ -> true
-//                | PropertySet _ -> true   
-//                | VarSet(v,_) when not (Set.contains v locals) -> true
-//                | Call(_, mi, _) when mi.ReturnType = typeof<unit> -> true
-//
-//
-//                | ShapeCombination(_, args) -> args |> List.exists (hasSideEffect locals)
-//                | ShapeVar _ -> false
-//                | ShapeLambda _ -> false 
-//
-//        hasSideEffect Set.empty e
-//
-//    let hasExternalSideEffect (e : Expr) =
-//        // TODO: validate
-//        let rec hasSideEffect (locals : Set<Var>) (e : Expr) =
-//            match e with
-//                | Let(v, e, b) ->
-//                    hasSideEffect locals e || 
-//                    hasSideEffect (Set.add v locals) b
-//                  
-//                | LetRecursive(bindings, body) ->
-//                    bindings |> List.exists (snd >> hasSideEffect locals) ||
-//                    hasSideEffect (bindings |> List.map fst |> Set.ofList) body
-//                 
-////                | FieldSet _ -> true
-////                | PropertySet _ -> true   
-////                | VarSet(v,_) when not (Set.contains v locals) -> true
-//                | Call(_, mi, _) when mi.ReturnType = typeof<unit> -> true
-//
-//
-//                | ShapeCombination(_, args) -> args |> List.exists (hasSideEffect locals)
-//                | ShapeVar _ -> false
-//                | ShapeLambda _ -> false 
-//
-//        hasSideEffect Set.empty e
+    let rec (|LExpr|_|) (e : Expr) =
+        // TODO: complete?
+        match e with
+            | Var v -> Some v
+            | FieldGet(Some (LExpr v), fi) -> Some v
+            | PropertyGet(Some (LExpr v), _, _) -> Some v
+            | GetArray(LExpr a, i) -> Some a
+            | _ -> None
 
 
     type EliminationState =
@@ -105,86 +65,147 @@ module Optimizer =
                 else return! fix m
             }
 
-    let onlySideEffects(e : Expr) =
-        let rec onlySideEffects (locals : Set<Var>) (e : Expr) : Expr =
+
+    let rec withoutValueS (e : Expr) : State<EliminationState, Expr> =
+        state {
             match e with
-                | Ignore e ->
-                    onlySideEffects locals e
-
-                // static calls returning unit are side-effects
-                | Call(None, _, _) when e.Type = typeof<unit> ->
-                    e
-
-                // varsets on non-local variables are side-effects
-                | VarSet(v,_) when not (Set.contains v locals) ->
-                    e
-
-                // field-sets on non-local variables are side-effects
-                | FieldSet(Some (Var v), _,  _) when not (Set.contains v locals) ->
-                    e
-
-                // static field-sets are side-effects
-                | FieldSet(None, _, _) ->
-                    e
+                | ExprOf t when t = typeof<unit> ->
+                    return! eliminateDeadCodeS e
 
                     
-                // property-sets on non-local variables are side-effects
-                | PropertySet(Some (Var v), _, _, _) when not (Set.contains v locals) ->
-                    e
-                    
-                // static property-sets are side-effects
-                | PropertySet(None, _, _, _) ->
-                    e
-
-                | ForInteger(v, first, step, last, body) ->
-                    match onlySideEffects (Set.add v locals) body with
-                        | Unit -> Expr.Seq [onlySideEffects locals first; onlySideEffects locals step; onlySideEffects locals last]
-                        | body -> Expr.ForInteger(v, first, step, last, body)
-
-                | WhileLoop(guard, body) ->
-                    match onlySideEffects locals body with
-                        | Unit -> onlySideEffects locals guard
-                        | body -> Expr.WhileLoop(guard, body)
-
                 | IfThenElse(cond, i, e) ->
-                    match onlySideEffects locals i, onlySideEffects locals e with
-                        | Unit, Unit -> onlySideEffects locals cond
-                        | i, e-> Expr.IfThenElse(cond, i, e)
+                    let! elseState, e = State.withLocalState (withoutValueS e)
+                    let! ifState, i = State.withLocalState (withoutValueS i)
+                    do! State.put (EliminationState.merge ifState elseState)
+                    
+                    match i, e with
+                        | Unit, Unit -> 
+                            return! withoutValueS cond
+                        | _ ->
+                            let! cond = eliminateDeadCodeS cond
+                            return Expr.IfThenElse(cond, i, e)
 
-                | Lambda(v,b) ->
-                    Expr.Unit
+                | AddressOf e ->
+                    return! withoutValueS e
 
+                | AddressSet(e,v) ->
+                    let! v = withoutValueS v
+                    let! e = withoutValueS e
+                    return Expr.Seq [v; e]
+
+                | Application(l, a) ->
+                    let! a = eliminateDeadCodeS a
+                    let! l = eliminateDeadCodeS l
+                    return Expr.Application(l, a)
+
+                | Call(t, mi, args) ->
+                    let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+                    let! t = t |> Option.mapS withoutValueS
+
+                    match t with
+                        | Some t -> return Expr.Seq (t :: args)
+                        | None -> return Expr.Seq args            
+
+                | Coerce(e,t) ->
+                    return! withoutValueS e
+
+                | DefaultValue t ->
+                    return Expr.Unit
+
+                | FieldGet(None, _) -> 
+                    return Expr.Unit
+
+                | FieldGet(Some t, _) ->
+                    return! withoutValueS t
+
+                | Lambda(v, b) ->
+                    return Expr.Unit
+
+                | LetRecursive _ ->
+                    return failwith "recursive bindings not implemented"
+                    
                 | Let(v,e,b) ->
-                    let b = onlySideEffects locals b
-                    if b.GetFreeVars() |> Seq.exists (fun vi -> vi = v) then
-                        Expr.Let(v,e,b)
+                    let! b = withoutValueS b
+                    let! vUsed = EliminationState.isUsed v
+                    if vUsed then
+                        let! e = eliminateDeadCodeS e
+                        return Expr.Let(v, e, b)
+
                     else
-                        match onlySideEffects (Set.add v locals) e with
-                            | Unit -> b
-                            | e -> Expr.Sequential(e, b)
+                        let! e = withoutValueS e
+                        match e with
+                            | Unit -> return b
+                            | _ -> return Expr.Sequential(e, b)
+
+                | NewArray(t, args) ->
+                    let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+                    return Expr.Seq args
+
+                | NewDelegate(t, vars, e) ->
+                    return! withoutValueS e
+  
+                | NewObject(ctor, args) ->
+                    let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+                    return Expr.Seq args
+
+                | NewRecord(t, args) ->
+                    let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+                    return Expr.Seq args
+
+                | NewTuple(args) ->
+                    let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+                    return Expr.Seq args
+
+                | NewUnionCase(ci, args) ->
+                    let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+                    return Expr.Seq args
 
 
-                | ShapeCombination(o, args) ->
-                    args |> List.map (onlySideEffects locals) |> Expr.Seq
+                | PropertyGet(None, pi, idx) ->
+                    let! idx = idx |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+                    return Expr.Seq idx
 
-                | ShapeVar _
-                | ShapeLambda _ -> Expr.Unit
+                | PropertyGet(Some t, pi, idx) ->
+                    let! idx = idx |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+                    let! t = withoutValueS t
+                    return Expr.Seq (t :: idx)
+                    
+                | QuoteRaw _ | QuoteTyped _ -> 
+                    return failwith "not implemented"
 
-        onlySideEffects Set.empty e
- 
+                | Sequential(l, r) ->
+                    let! r = withoutValueS r
+                    let! l = withoutValueS l
+                    match l, r with
+                        | Unit, r   -> return r
+                        | l, Unit   -> return l
+                        | l, r      -> return Expr.Sequential(l, r)
 
-    // arr.[i].X <- 10
+                | TryWith _ | TryFinally _ -> 
+                    return failwith "not implemented"
 
-    let rec (|LExpr|_|) (e : Expr) =
-        // TODO: complete?
-        match e with
-            | Var v -> Some v
-            | FieldGet(Some (LExpr v), fi) -> Some v
-            | PropertyGet(Some (LExpr v), _, _) -> Some v
-            | GetArray(LExpr a, i) -> Some a
-            | _ -> None
+                | TupleGet(t, i) ->
+                    return! withoutValueS t
 
-    let rec eliminateDeadCodeS (e : Expr) : State<EliminationState, Expr> =
+                | TypeTest(e, t) ->
+                    return! withoutValueS e
+
+                | UnionCaseTest(e, ci) ->
+                    return! withoutValueS e
+
+                | Value _ ->
+                    return Expr.Unit
+
+                | Var v ->
+                    return Expr.Unit
+
+                | _ ->
+                    return failwith ""
+
+        
+        }
+
+    and eliminateDeadCodeS (e : Expr) : State<EliminationState, Expr> =
         state {
             match e with
 
@@ -195,32 +216,36 @@ module Optimizer =
                         let! e = eliminateDeadCodeS e
                         return Expr.VarSet(v, e)
                     else
-                        return! eliminateDeadCodeS (onlySideEffects e)
+                        return! withoutValueS e
 
                 | FieldSet(Some (LExpr v as target), fi, value) ->
-                    let e = ()
                     let! vUsed = EliminationState.isUsed v
                     if vUsed then
                         let! value = eliminateDeadCodeS value
                         let! target = eliminateDeadCodeS target
                         return Expr.FieldSet(target, fi, value)
                     else
-                        let! v = eliminateDeadCodeS (onlySideEffects value)
-                        let! t = eliminateDeadCodeS (onlySideEffects target)
+                        let! v = withoutValueS value
+                        let! t = withoutValueS target
                         return Expr.Seq [v;t]
 
                 | PropertySet(Some (LExpr v as target), pi, idx, value) ->
-                    let e = ()
                     let! vUsed = EliminationState.isUsed v
                     if vUsed then
                         let! value = eliminateDeadCodeS value
                         let! idx = idx |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
                         let! target = eliminateDeadCodeS target
                         return Expr.PropertySet(target, pi, value, idx)
-                    else
-                        let all = (target :: idx) @ [value]
-                        let effects = all |> List.map onlySideEffects |> Expr.Seq
-                        return! eliminateDeadCodeS effects
+                    else 
+                        let! value = withoutValueS value
+                        let! idx = idx |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+                        let! target = withoutValueS target
+
+                        return Expr.Seq [
+                            yield target
+                            yield! idx
+                            yield value
+                        ]
 
                 // global side effects
                 | FieldSet(None, f, value) ->
@@ -254,9 +279,8 @@ module Optimizer =
                     do! State.put (EliminationState.merge ifState elseState)
 
                     match i, e with
-                        | Unit, Unit -> 
-                            let! cond = eliminateDeadCodeS (onlySideEffects cond)
-                            return cond
+                        | Unit, Unit ->
+                            return! withoutValueS cond
                         | _ ->
                             let! cond = eliminateDeadCodeS cond
                             return Expr.IfThenElse(cond, i, e)
@@ -267,9 +291,9 @@ module Optimizer =
                             let! body = eliminateDeadCodeS body
                             match body with
                                 | Unit ->
-                                    let! last = eliminateDeadCodeS (onlySideEffects last)
-                                    let! step = eliminateDeadCodeS (onlySideEffects step)
-                                    let! first = eliminateDeadCodeS (onlySideEffects first)
+                                    let! last = withoutValueS last
+                                    let! step = withoutValueS step
+                                    let! first = withoutValueS first
                                     return Expr.Seq [first; step; last]
                                 | _ ->
                                     let! last = eliminateDeadCodeS last
@@ -300,7 +324,14 @@ module Optimizer =
                             let! body = eliminateDeadCodeS body
                             match body with
                                 | Unit -> 
-                                    return! eliminateDeadCodeS (onlySideEffects guard)
+                                    let! guardState, guard = State.withLocalState (withoutValueS guard)
+                                    match guard with
+                                        | Unit ->
+                                            do! State.put guardState
+                                            return Expr.Unit
+                                        | _ -> 
+                                            let! guard = eliminateDeadCodeS guard
+                                            return Expr.WhileLoop(guard, body)
                                 | _ ->
                                     let! guard = eliminateDeadCodeS guard
                                     return Expr.WhileLoop(guard, body)
@@ -310,8 +341,7 @@ module Optimizer =
 
 
                 | Ignore e ->
-                    let! e = eliminateDeadCodeS e
-                    return Expr.Ignore e
+                    return! withoutValueS e
 
                 | AddressOf e ->
                     let! e = eliminateDeadCodeS e
@@ -364,7 +394,7 @@ module Optimizer =
                         return Expr.Let(v, e, b)
 
                     else
-                        let! e = eliminateDeadCodeS (onlySideEffects e)
+                        let! e = withoutValueS e
                         match e with
                             | Unit -> return b
                             | _ -> return Expr.Sequential(e, b)
@@ -439,6 +469,13 @@ module Optimizer =
                 | _ ->
                     return failwithf "[FShade] unexpected expression %A" e
         }
+
+
+
+    let withoutValue (e : Expr) =
+        let run = withoutValueS e
+        let mutable state = EliminationState.empty
+        run.Run(&state)
 
     let eliminateDeadCode (e : Expr) =
         let run = eliminateDeadCodeS e

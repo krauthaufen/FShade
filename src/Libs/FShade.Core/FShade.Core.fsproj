@@ -67,8 +67,8 @@
     <Compile Include="Reflection.fs" />
     <Compile Include="Intrinsics.fs" />
     <Compile Include="Frontend.fs" />
-    <Compile Include="Shader.fs" />
     <Compile Include="Optimizer.fs" />
+    <Compile Include="Shader.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

@@ -3,6 +3,7 @@
 open System
 open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Quotations.Patterns
+open Microsoft.FSharp.Quotations.DerivedPatterns
 open Microsoft.FSharp.Quotations.ExprShape
 open Microsoft.FSharp.Reflection
 
@@ -13,9 +14,9 @@ open FShade.Imperative
 type Shader =
     {
         shaderType              : ShaderType
-        shaderInputs            : list<IOParameter>
-        shaderOutptus           : list<IOParameter>
-        shaderUniforms          : list<UniformParameter>
+        shaderInputs            : Map<string, IOParameter>
+        shaderOutputs           : Map<string, IOParameter>
+        shaderUniforms          : Map<string, UniformParameter>
         shaderInputTopology     : Option<InputTopology>
         shaderOutputTopology    : Option<OutputTopology>
         shaderBody              : Expr
@@ -32,29 +33,34 @@ module Shader =
             vertexType : Type
             inputs : Dictionary<string, IOParameter>
             outputs : Dictionary<string, IOParameter>
-            uniforms : HashSet<UniformParameter>
+            uniforms : Dictionary<string, UniformParameter>
             mutable builder : Expr
         }
 
-        member x.AddInput(p : IOParameter) =
-            match x.inputs.TryGetValue p.paramSemantic with
+        member x.AddInput(semantic : string, p : IOParameter) =
+            match x.inputs.TryGetValue semantic with
                 | (true, old) ->
                     if old.paramType = p.paramType then ()
-                    else failwithf "[FShade] conflicting input-types for %s (%s vs %s)" p.paramSemantic (getPrettyName old.paramType) (getPrettyName p.paramType)
+                    else failwithf "[FShade] conflicting input-types for %s (%s vs %s)" semantic (getPrettyName old.paramType) (getPrettyName p.paramType)
                 | _ ->
-                    x.inputs.[p.paramSemantic] <- p
+                    x.inputs.[semantic] <- p
 
 
-        member x.AddOutput(p : IOParameter) =
-            match x.outputs.TryGetValue p.paramSemantic with
+        member x.AddOutput(semantic : string, p : IOParameter) =
+            match x.outputs.TryGetValue semantic with
                 | (true, old) ->
                     if old.paramType = p.paramType then ()
-                    else failwithf "[FShade] conflicting outputs-types for %s (%s vs %s)" p.paramSemantic (getPrettyName old.paramType) (getPrettyName p.paramType)
+                    else failwithf "[FShade] conflicting outputs-types for %s (%s vs %s)" semantic (getPrettyName old.paramType) (getPrettyName p.paramType)
                 | _ ->
-                    x.outputs.[p.paramSemantic] <- p
+                    x.outputs.[semantic] <- p
             
-        member x.AddUniform(u : UniformParameter) =
-            x.uniforms.Add u |> ignore
+        member x.AddUniform( u : UniformParameter) =
+            match x.uniforms.TryGetValue u.uniformName with
+                | (true, old) ->
+                    if old.uniformType = u.uniformType then ()
+                    else failwithf "[FShade] conflicting uniform-types for %s (%s vs %s)" u.uniformName (getPrettyName old.uniformType) (getPrettyName u.uniformType)
+                | _ ->
+                    x.uniforms.[u.uniformName] <- u
 
     module private Preprocessor =
         open System.Reflection
@@ -66,10 +72,14 @@ module Shader =
             let (|VertexLoad|_|) (vertexType : Type) (e : Expr) =
                 match e with
                     | PropertyGet(Some e, p, []) when e.Type = vertexType ->
-                        let att = p.GetCustomAttributes<SemanticAttribute>(true) |> Seq.toList
-                        match att with
-                            | x::_ -> Some (e, x.Semantic)
-                            | _ -> Some (e, p.Name)
+                        let isRecordField = FSharpType.GetRecordFields(vertexType, true) |> Array.exists (fun pi -> pi = p)
+                        if isRecordField then
+                            let att = p.GetCustomAttributes<SemanticAttribute>(true) |> Seq.toList
+                            match att with
+                                | x::_ -> Some (e, x.Semantic, p)
+                                | _ -> Some (e, p.Name, p)
+                        else
+                            failwith "[FShade] cannot access properties on vertex-input-type"
                     | _ ->
                         None
 
@@ -85,36 +95,64 @@ module Shader =
                     | None ->
                         None
 
-        let rec private preprocessInternal (state : PreprocessorState) (vertexIndices : Map<Var, Expr>) (e : Expr) =
+        let private deconstructRecord (e : Expr) =
+            match e with
+                | NewRecord(t, args) -> 
+                    args
+
+                | e ->
+                    let fields = FSharpType.GetRecordFields(e.Type, true)
+                    fields |> Array.toList |> List.map (fun f -> Expr.PropertyGet(e, f))
+
+        let rec private writeOutput (state : PreprocessorState) (vertexIndices : Map<Var, Expr>) (vertex : Expr) =
+            let fields = FSharpType.GetRecordFields(vertex.Type, true) |> Array.toList
+            let values = deconstructRecord vertex |> List.map (preprocessInternal state vertexIndices)
+
+            List.zip fields values
+                |> List.collect (fun (f, v) ->
+                    let v = preprocessInternal state vertexIndices v
+                    let sem = f.Semantic
+                    match v with
+                        | NewFixedArray(len, et, args) ->
+                            state.AddOutput(sem, { paramType = v.Type; paramInterpolation = InterpolationMode.Default })
+                            args |> List.mapi (fun i a ->
+                                Expr.WriteOutput(sem, Expr.Value i, a)
+                            )
+                            
+                        | NewArray(et, args) ->
+                            let outputType = Peano.getArrayType (List.length args) et
+                            state.AddOutput(sem, { paramType = outputType; paramInterpolation = InterpolationMode.Default })
+                            args |> List.mapi (fun i a ->
+                                Expr.WriteOutput(sem, Expr.Value i, a)
+                            )
+                        | _ -> 
+                            state.AddOutput(sem, { paramType = v.Type; paramInterpolation = InterpolationMode.Default })
+                            [ Expr.WriteOutput(sem, v) ]
+                   )
+                |> Expr.Seq
+
+        and private preprocessInternal (state : PreprocessorState) (vertexIndices : Map<Var, Expr>) (e : Expr) =
             match e with
                 | BuilderCall(b, mi, [Lambda(v,body)]) when mi.Name = "Delay" ->
                     state.builder <- b
                     preprocessInternal state vertexIndices body
 
-                | BuilderCall(b, Method("For",_), [ExprOf(FixedArrayType(d,_)) as seq; Lambda(v,Let(vi,Var(vo),body))]) ->  
+                | BuilderCall(b, Method("For",_), [seq; Lambda(v,Let(vi,Var(vo),body))]) ->  
                     state.builder <- b   
                     let body = preprocessInternal state vertexIndices body
                     let seq = preprocessInternal state vertexIndices seq            
                     let result = Expr.ForEach(vi, seq, body)
                     result
 
-                | BuilderCall(b, Method("For",_), [Call(None, Method("op_Range",_), [s; e]); Lambda(v,Let(vi,Var(vo),body))]) ->
-                    state.builder <- b
-                    let body = preprocessInternal state vertexIndices body
-                    let s = preprocessInternal state vertexIndices s  
-                    let e = preprocessInternal state vertexIndices e
-                    Expr.ForIntegerRangeLoop(vi, s, e, body)
-
                 | BuilderCall(b, Method("Combine",_), [l;r]) ->
                     state.builder <- b
                     let l = preprocessInternal state vertexIndices l
                     let r = preprocessInternal state vertexIndices r
-                    Expr.Sequential(l,r)
+                    Expr.Seq [l; r]
 
                 | BuilderCall(b, Method("Zero",_), []) ->
                     state.builder <- b
-                    Expr.Value(())
-
+                    Expr.Unit
 
                 // for v in primitive do
                 | BuilderCall(b, Method("For",_) , [Coerce(primitive, t); Lambda(v,Let(vi,Var(vo),body))]) 
@@ -126,8 +164,7 @@ module Shader =
                     let index = Var("i", typeof<int>)
                     let vertexIndices = Map.add vi (Expr.Var index) vertexIndices
                     let body = preprocessInternal state vertexIndices body
-
-                    Expr.ForIntegerRangeLoop(index, Expr.Value(0), Expr.Value(count - 1),  body)
+                    Expr.ForIntegerRangeLoop(index, <@@ 0 @@>, <@@ count - 1 @@>,  body)
 
 
                 // let v = primitive.P0 || let v = primitive.VertexCount
@@ -150,7 +187,7 @@ module Shader =
                     match pi.PrimitiveIndex with
                         | Some index ->
                             let n = m.Semantic
-                            state.AddInput { paramSemantic = n; paramType = e.Type.MakeArrayType(); paramInterpolation = InterpolationMode.Default }
+                            state.AddInput(n, { paramType = e.Type.MakeArrayType(); paramInterpolation = InterpolationMode.Default })
                             Expr.ReadInput(e.Type, n, Expr.Value index)
                         | None ->
                             e
@@ -158,65 +195,47 @@ module Shader =
                 // primitive.[i].pos
                 | MemberFieldGet(PropertyGet(Some p, pi, [index]), m) when pi.Name = "Item" ->
                     let sem = m.Semantic
-                    state.AddInput { paramSemantic = sem; paramType = e.Type.MakeArrayType(); paramInterpolation = pi.Interpolation }
+                    state.AddInput(sem, { paramType = e.Type.MakeArrayType(); paramInterpolation = pi.Interpolation })
                     Expr.ReadInput(e.Type, sem, index)
 
-                | VertexLoad state.vertexType (ve, sem) ->
+                | VertexLoad state.vertexType (ve, sem, pi) ->
                     match ve with
                         | Value(null,_) -> 
-                            state.AddInput { paramSemantic = sem; paramType = e.Type; paramInterpolation = InterpolationMode.Default }
+                            state.AddInput(sem, { paramType = e.Type; paramInterpolation = InterpolationMode.Default })
                             Expr.ReadInput(e.Type, sem)
+
                         | Var v ->
                             match Map.tryFind v vertexIndices with
                                 | Some i -> 
-                                    state.AddInput { paramSemantic = sem; paramType = e.Type.MakeArrayType(); paramInterpolation = InterpolationMode.Default }
+                                    state.AddInput(sem, { paramType = e.Type.MakeArrayType(); paramInterpolation = InterpolationMode.Default })
                                     Expr.ReadInput(e.Type, sem, i)
                                 | _ -> 
-                                    failwithf "[FShade] accessing vertex input with unknown index"
+                                    Expr.PropertyGet(ve, pi)
+                                    //failwithf "[FShade] accessing vertex input with unknown index"
 
                         | e ->
-                            failwithf "[FShade] complex vertex expressions not supported: %A" ve
+                            Expr.PropertyGet(ve, pi)
+                            //failwithf "[FShade] complex vertex expressions not supported: %A" ve
 
-                // yield (let a = x+y in f(a))   ==>    yield f(x+y)
+                // yield (let a = x+y in f(a))   ==>    let a = x + y in yield f(a)
                 | BuilderCall(b, mi, [Let(v, e, inner)]) when mi.Name = "Yield" ->
                     state.builder <- b
-                    let inner = inner.Substitute (fun vi -> if vi = v then Some e else None)
-                    Expr.Call(b, mi, [inner]) |> preprocessInternal state vertexIndices
+                    Expr.Let(v, e, Expr.Call(b, mi, [inner])) |> preprocessInternal state vertexIndices
+
 
                 // yield { a = 1; b = x + y }
-                | BuilderCall(b, mi, [NewRecord(t, fields)]) when mi.Name = "Yield" ->
+                | BuilderCall(b, mi, [vertex]) when mi.Name = "Yield" && FSharpType.IsRecord vertex.Type ->
                     state.builder <- b
-                    let semantics = FSharpType.GetRecordFields(t, true) |> Seq.map (fun m -> m.Semantic) |> Seq.toList
-
-                    let stores =
-                        List.zip semantics fields 
-                            |> List.collect (fun (name, value) ->
-                                let value = preprocessInternal state vertexIndices value
-
-                                if value.Type.IsArray then
-                                    match value with
-                                        | NewArray(t, args) ->
-                                            state.AddOutput { paramSemantic = name; paramType = value.Type; paramInterpolation = InterpolationMode.Default }
-                                            //state.AddOutput(name, value.Type)
-                                            args |> List.mapi (fun i v -> Expr.WriteOutput(name, Expr.Value i, v))
-                                        | _ ->
-                                            Log.warn "[FShade] bad array output"
-                                            []
-
-
-                                else
-                                    state.AddOutput { paramSemantic = name; paramType = value.Type; paramInterpolation = InterpolationMode.Default }
-                                    [Expr.WriteOutput(name, value)]
-                            )
-
-                    let emit = Expr.Call(getMethodInfo <@ emitVertex @>, [])
-                    stores |> List.fold (fun a e -> Expr.Sequential(e, a)) emit
+                    Expr.Seq [
+                        writeOutput state vertexIndices vertex
+                        <@ emitVertex() @>
+                    ]
 
                 // yield V4d.IOOI
                 | BuilderCall(b, mi, [value]) when mi.Name = "Yield" ->
                     state.builder <- b
                     let value = preprocessInternal state vertexIndices value
-                    state.AddOutput { paramSemantic = Intrinsics.Position; paramType = typeof<V4d>; paramInterpolation = InterpolationMode.Default }
+                    state.AddOutput(Intrinsics.Position, { paramType = typeof<V4d>; paramInterpolation = InterpolationMode.Default })
                     let store = 
                         if value.Type = typeof<V4d> then 
                             Expr.WriteOutput(Intrinsics.Position, value)
@@ -230,42 +249,14 @@ module Shader =
                     
                     Expr.Sequential(store, Expr.Call(getMethodInfo <@ emitVertex @>, []))
 
-                // return (let a = x+y in f(a))   ==>    return f(x+y)
+                // return (let a = x+y in f(a))   ==>    let a = x + y in return f(a)
                 | BuilderCall(b, mi, [Let(v, e, inner)]) when mi.Name = "Return" ->
                     state.builder <- b
-                    let inner = inner.Substitute (fun vi -> if vi = v then Some e else None)
-                    Expr.Call(b, mi, [inner]) |> preprocessInternal state vertexIndices
+                    Expr.Let(v, e, Expr.Call(b, mi, [inner])) |> preprocessInternal state vertexIndices
 
-
-                | BuilderCall(b, mi, [NewRecord(t, fields)]) when mi.Name = "Return" ->
+                | BuilderCall(b, mi, [vertex]) when mi.Name = "Return" && FSharpType.IsRecord vertex.Type ->
                     state.builder <- b
-                    let semantics = FSharpType.GetRecordFields(t, true) |> Seq.map (fun m -> m.Semantic) |> Seq.toList
-
-                    let stores =
-                        List.zip semantics fields 
-                            |> List.collect (fun (name, value) ->
-                                let value = preprocessInternal state vertexIndices value
-
-
-                                if value.Type.IsArray then
-                                    match value with
-                                        | NewArray(t, args) ->
-                                            state.AddOutput { paramSemantic = name; paramType = value.Type.MakeArrayType(); paramInterpolation = InterpolationMode.Default }
-                                            args |> List.mapi (fun i v -> Expr.WriteOutput(name, Expr.Value i, v))
-                                        | _ ->
-                                            Log.warn "[FShade] bad array output"
-                                            []
-
-
-                                else
-                                    state.AddOutput { paramSemantic = name; paramType = value.Type; paramInterpolation = InterpolationMode.Default }
-                                    [Expr.WriteOutput(name, value)]
-                            )
-
-                    match stores with
-                        | [] -> Expr.Value(())
-                        | fst :: rest ->
-                            List.fold (fun e rest -> Expr.Sequential(e, rest)) fst rest
+                    writeOutput state vertexIndices vertex
 
                 // return V4d.IOOI
                 | BuilderCall(b, mi, [value]) when mi.Name = "Return" ->
@@ -275,7 +266,7 @@ module Shader =
                         if b.Type = typeof<FragmentBuilder> then Intrinsics.Color
                         else Intrinsics.Position
                         
-                    state.AddOutput { paramSemantic = sem; paramType = typeof<V4d>; paramInterpolation = InterpolationMode.Default }
+                    state.AddOutput(sem, { paramType = typeof<V4d>; paramInterpolation = InterpolationMode.Default })
                     if value.Type = typeof<V4d> then
                         Expr.WriteOutput(sem, value)
                     elif value.Type = typeof<V3d> then
@@ -299,6 +290,7 @@ module Shader =
 
                 | ShapeVar _ -> 
                     e
+
 
         /// preprocess removes all builder calls from the given expression, 
         /// replaces all input-accesses with Expr.Load and all writes with Expr.Store.
@@ -327,7 +319,7 @@ module Shader =
                     vertexType = vertexType
                     inputs = Dictionary()
                     outputs = Dictionary()
-                    uniforms = HashSet()
+                    uniforms = Dictionary()
                     builder = Expr.Value(())
                 }
 
@@ -336,15 +328,56 @@ module Shader =
 
             clean, state
 
+
+    
+
+
     let inline shaderType (s : Shader) = s.shaderType
     let inline uniforms (s : Shader) = s.shaderUniforms
     let inline inputs (s : Shader) = s.shaderInputs
-    let inline outputs (s : Shader) = s.shaderOutptus
+    let inline outputs (s : Shader) = s.shaderOutputs
     let inline body (s : Shader) = s.shaderBody
     let inline inputTopology (s : Shader) = s.shaderInputTopology
     let inline outputTopology (s : Shader) = s.shaderOutputTopology
+      
+    [<AutoOpen>]
+    module private Utilities =   
+        module Map =
+            let keys (m : Map<'a, 'b>) = m |> Map.toSeq |> Seq.map fst
+            let values (m : Map<'a, 'b>) = m |> Map.toSeq |> Seq.map snd
+
+        let usedInputs (e : Expr) =
+            let rec visit (used : HashSet<string>) (e : Expr) =
+                match e with
+                    | ReadInput(name, idx) ->
+                        idx |> Option.iter (visit used)
+                        used.Add name |> ignore
+
+                    | ShapeVar v ->
+                        ()
+
+                    | ShapeLambda(v,b) ->
+                        visit used b
+
+                    | ShapeCombination(o, args) ->
+                        for a in args do
+                            visit used a
+
+            let used = HashSet<string>()
+            visit used e
+            used
         
-        
+        let rec append (writes : list<Expr>) (e : Expr) =
+            match e with
+                | Let(v,e,b) -> Expr.Let(v, e, append writes b)
+                | Sequential(l, r) -> Expr.Sequential(l, append writes r)
+                | IfThenElse(c, i, e) -> Expr.IfThenElse(c, append writes i, append writes e)
+
+
+                | WriteOutput _ -> Expr.Seq (e :: writes)
+
+                | _ -> failwith ""
+
     let ofExpr (inputType : Type) (e : Expr) =
         let body, state = Preprocessor.preprocess inputType e
 
@@ -356,9 +389,9 @@ module Shader =
 
         { 
             shaderType              = builder.ShaderType
-            shaderInputs            = state.inputs.Values |> Seq.toList
-            shaderOutptus           = state.inputs.Values |> Seq.toList
-            shaderUniforms          = state.uniforms |> Seq.toList
+            shaderInputs            = state.inputs |> Dictionary.toMap
+            shaderOutputs           = state.outputs |> Dictionary.toMap
+            shaderUniforms          = state.uniforms |> Dictionary.toMap
             shaderInputTopology     = state.inputTopology
             shaderOutputTopology    = builder.OutputTopology
             shaderBody              = body
@@ -368,29 +401,116 @@ module Shader =
         let e = f Unchecked.defaultof<'a>
         ofExpr typeof<'a> e
 
+    let optimize (shader : Shader) =
+        let newBody = Optimizer.eliminateDeadCode shader.shaderBody
+        let used = usedInputs newBody
+
+        { shader with
+            shaderInputs = shader.shaderInputs |> Map.filter (fun n _ -> used.Contains n)
+            shaderUniforms = shader.shaderUniforms |> Map.filter (fun n _ -> used.Contains n)
+            shaderBody = newBody
+        }
+
+    let removeOutputs (semantics : Set<string>) (shader : Shader) =
+        let rec remove (semantics : Set<string>) (e : Expr) =
+            match e with
+                | WriteOutput(name, idx, value) ->
+                    if Set.contains name semantics then
+                        let value = Optimizer.withoutValue value
+                        match idx with
+                            | Some idx -> 
+                                let idx = Optimizer.withoutValue idx
+                                Expr.Seq [idx; value]
+                            | None ->
+                                value
+                    else
+                        e
+
+                | Sequential(l, r) ->
+                    let l = remove semantics l
+                    let r = remove semantics r
+                    match l, r with
+                        | Unit, r -> r
+                        | l, Unit -> l
+                        | l, r -> Expr.Sequential(l, r)
+
+                | ShapeVar v ->
+                    e
+
+                | ShapeLambda(v,b) ->
+                    Expr.Lambda(v, remove semantics b)
+
+                | ShapeCombination(o, args) ->
+                    RebuildShapeCombination(o, args |> List.map (remove semantics))
+
+        optimize 
+            { shader with
+                shaderOutputs           = shader.shaderOutputs |> Map.filter (fun n _ -> not (Set.contains n semantics))
+                shaderBody              = remove semantics shader.shaderBody
+            }
+
+    let addOutputs (outputs : Map<string, Type>) (shader : Shader) =
+        match shader.shaderType with
+            | ShaderType.Geometry | ShaderType.TessControl | ShaderType.TessEval -> 
+                failwithf "[FShade] pass-thru not implemented for %A" shader.shaderType
+
+            | _ ->
+                let newOutputs =  outputs |> Map.filter (fun sem _ -> not (Map.containsKey sem shader.shaderOutputs))
+                if Map.isEmpty newOutputs then
+                    shader
+                else
+                    let writes = newOutputs |> Map.toList |> List.map (fun (n,t) -> Expr.WriteOutput(n, Expr.ReadInput(t, n)))
+                    let newBody = shader.shaderBody |> append writes
+                    let added = newOutputs |> Map.map (fun n t -> { paramType = t; paramInterpolation = InterpolationMode.Default })
+
+                    { shader with
+                        shaderOutputs           = Map.union shader.shaderOutputs added
+                        shaderInputs            = Map.union shader.shaderInputs added
+                        shaderBody              = newBody
+                    }
+
+    let setOutputs (outputs : Map<string, Type>) (shader : Shader) =
+        let toRemove = shader.shaderOutputs |> Map.keys |> Seq.filter (fun n -> not (Map.containsKey n outputs)) |> Set.ofSeq
+        let toAdd = outputs |> Map.filter (fun n _ -> not (Map.containsKey n shader.shaderOutputs))
+
+        match Map.isEmpty toAdd, Set.isEmpty toRemove with
+            | true, true -> 
+                shader
+
+            | true, false -> 
+                shader |> removeOutputs toRemove
+
+            | false, true -> 
+                shader |> addOutputs toAdd
+
+            | false, false ->
+                shader 
+                    |> addOutputs toAdd
+                    |> removeOutputs toRemove
+
     let toEntryPoint (prev : Option<ShaderType>) (s : Shader) (next : Option<ShaderType>) =
         let inputs = 
-            s.shaderInputs |> List.map (fun i -> 
+            s.shaderInputs |> Map.toList |> List.map (fun (n,i) -> 
                 { 
-                    paramName = i.paramSemantic
-                    paramSemantic = i.paramSemantic
+                    paramName = n
+                    paramSemantic = n
                     paramType = i.paramType
                     paramDecorations = Set.ofList [ParameterDecoration.Interpolation i.paramInterpolation]
                 }
             )
 
         let outputs = 
-            s.shaderOutptus |> List.map (fun i -> 
+            s.shaderOutputs |> Map.toList |> List.map (fun (n, i) -> 
                 { 
-                    paramName = i.paramSemantic
-                    paramSemantic = i.paramSemantic
+                    paramName = n
+                    paramSemantic = n
                     paramType = i.paramType
                     paramDecorations = Set.empty
                 }
             )
 
         let uniforms =
-            s.shaderUniforms |> List.map (fun u ->
+            s.shaderUniforms |> Map.toList |> List.map (fun (n, u) ->
                 let uniformBuffer = 
                     match u.uniformValue with
                         | Attribute(scope, name) -> Some scope.FullName
@@ -417,6 +537,31 @@ module Shader =
                     s.shaderOutputTopology |> Option.map EntryDecoration.OutputTopology |> Option.toList
                 ]
         }
+
+
+
+    let passing (stage : ShaderType) (attributes : Map<string, IOParameter>) =
+        match stage with
+            | ShaderType.Vertex | ShaderType.Fragment ->
+                {
+                    shaderType              = stage
+                    shaderInputs            = attributes
+                    shaderOutputs           = attributes
+                    shaderUniforms          = Map.empty
+                    shaderInputTopology     = None
+                    shaderOutputTopology    = None
+                    shaderBody =
+                        attributes
+                            |> Map.toList
+                            |> List.map (fun (n, p) -> Expr.WriteOutput(n, Expr.ReadInput(p.paramType, n)))
+                            |> Expr.Seq
+            
+                }
+            | _ ->
+                failwith "[FShade] not implemented"
+    
+    let colorFragment = 
+        passing ShaderType.Fragment (Map.ofList [ Intrinsics.Color, { paramType = typeof<V4d>; paramInterpolation = InterpolationMode.Default }] )
 
 [<NoComparison>]
 type Effect = 
@@ -475,6 +620,23 @@ module Effect =
             | ShaderType.Fragment       -> { empty with fragment = Some shader }
             | _                         -> failwithf "[FShade] unknown shader-type %A" shader.shaderType
 
+    let ofShaders (shaders : list<Shader>) =
+        let addShader (shader : Shader) (e : Effect) =
+            let trySet (old : Option<Shader>) (n : Shader) =
+                match old with
+                    | None -> Some n
+                    | Some o -> failwithf "[FShade] duplicate shader for stage %A" o.shaderType
+
+            match shader.shaderType with
+                | ShaderType.Vertex         -> { e with vertex = trySet e.vertex shader }
+                | ShaderType.TessControl    -> { e with tessControl = trySet e.tessControl shader }
+                | ShaderType.TessEval       -> { e with tessEval = trySet e.tessEval shader }
+                | ShaderType.Geometry       -> { e with geometry = trySet e.geometry shader }
+                | ShaderType.Fragment       -> { e with fragment = trySet e.fragment shader }
+                | _                         -> failwithf "[FShade] unknown shader-type %A" shader.shaderType
+
+        shaders |> List.fold (fun e s -> addShader s e) empty
+
     let inline ofExpr (inputType : Type) (e : Expr) =
         Shader.ofExpr inputType e |> ofShader
 
@@ -494,4 +656,52 @@ module Effect =
 
         { entries = entries }
 
+    let map (f : Shader -> Shader) (e : Effect) =
+        {
+            vertex        = e.vertex        |> Option.map f
+            tessControl   = e.tessControl   |> Option.map f
+            tessEval      = e.tessEval      |> Option.map f
+            geometry      = e.geometry      |> Option.map f
+            fragment      = e.fragment      |> Option.map f
+        }
 
+    let setOutputs (wanted : Map<string, Type>) (e : Effect) =
+        let rec traverse (wanted : Map<string, Type>) (s : list<Shader>) =
+            match s with
+                | [] -> []
+
+                | s :: rest ->
+                    let newShader = Shader.setOutputs wanted s
+                    let wanted = newShader.shaderInputs |> Map.map (fun _ p -> p.paramType)
+                
+                    let newWanted =
+                        if s.shaderType = ShaderType.Fragment then 
+                            Map.add Intrinsics.Position typeof<V4d> wanted
+                        else 
+                            wanted
+
+                    newShader :: traverse newWanted rest
+
+        e.shaders 
+            |> List.rev
+            |> traverse wanted
+            |> ofShaders
+
+    let nextShader (t : ShaderType) (e : Effect) =
+        e.shaders 
+            |> List.tryFind (fun s -> s.shaderType > t)
+
+    let prevShader (t : ShaderType) (e : Effect) =
+        e.shaders 
+            |> List.rev
+            |> List.tryFind (fun s -> s.shaderType < t)
+
+    let link (effect : Effect) =
+        let next = effect |> nextShader ShaderType.Vertex
+        match next with
+            | Some next -> 
+                match effect.vertex with
+                    | None -> { effect with vertex = Some (Shader.passing ShaderType.Vertex next.shaderInputs) }
+                    | _ -> effect
+            | None ->
+                effect

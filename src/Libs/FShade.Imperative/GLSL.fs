@@ -33,7 +33,7 @@ module GLSL =
         {
             config          : Config
             stages          : ShaderStageDescription
-            parameters      : Map<string, ParameterKind>
+            inputs          : Set<string>
         }
  
   
@@ -42,27 +42,37 @@ module GLSL =
         let ofConfig (c : Config) =
             {
                 config = c
-                stages = { prev = None; self = ShaderType.Compute; next = None }
-                parameters = Map.empty
+                stages = { prev = None; self = ShaderType.Vertex; next = None }
+                inputs = Set.empty
             }
 
-        let parameterName (name : string) (s : State) =
+        let parameterName (kind : ParameterKind) (name : string) (s : State) =
             let c = s.config
-            if c.version > version120 && c.locations then
-                name
+            let kind =
+                match kind with
+                    | In -> 
+                        if Set.contains name s.inputs then In
+                        else Other
+                    | kind ->
+                        kind
+
+            if kind = Out && name = Intrinsics.Position && s.stages.next = Some ShaderType.Fragment then
+                "gl_Position"
+
+            elif c.version > version120 && c.locations then
+                match kind with
+                    | In  -> name
+                    | Out -> name + "Out"
+                    | Other -> name
             else
-                match Map.tryFind name s.parameters with
-                    | Some kind -> 
-                        match kind, s.stages with
-                            | In, { prev = None }                   -> name
-                            | In, { prev = Some _; self = s }       -> name + string s
+                match kind, s.stages with
+                    | In, { prev = None }                   -> name
+                    | In, { prev = Some _; self = s }       -> name + string s
 
-                            | Out, { next = Some n }                -> name + string n
-                            | Out, { next = None }                  -> name
-                            | Other, _                              -> name
+                    | Out, { next = Some n }                -> name + string n
+                    | Out, { next = None }                  -> name + "Out"
+                    | Other, _                              -> name
 
-                    | None -> 
-                        name
 
 
             
@@ -162,7 +172,7 @@ module GLSL =
                     sprintf "%s(%s)" f.name args
 
                 | CReadInput(_, name, idx) ->
-                    let name = c |> State.parameterName name
+                    let name = c |> State.parameterName In name
                     match idx with
                         | Some idx -> sprintf "%s[%s]" name (glsl idx)
                         | None -> name
@@ -250,7 +260,7 @@ module GLSL =
                                 | None -> sprintf "%s %s" (CType.glsl v.ctype) v.name
 
                 | CWriteOutput(name, idx, value) ->
-                    let name = c |> State.parameterName name
+                    let name = c |> State.parameterName Out name
                     match idx with
                         | Some idx -> sprintf "%s[%s] = %s" name (CExpr.glsl c idx) (CExpr.glsl c value)
                         | None -> sprintf "%s = %s" name (CExpr.glsl c value)
@@ -356,7 +366,7 @@ module GLSL =
                     | [] -> ""
                     | _ -> String.concat " " decorations + " "
 
-            let name = state |> State.parameterName p.cParamName
+            let name = state |> State.parameterName kind p.cParamName
 
             let prefix =
                 if c.version > version120 then
@@ -380,11 +390,7 @@ module GLSL =
                 { 
                     config = c
 
-                    parameters = 
-                        Map.ofList [
-                            yield! e.cInputs |> List.map (fun p -> p.cParamName, In)
-                            yield! e.cOutputs |> List.map (fun p -> p.cParamName, Out)
-                        ]
+                    inputs = e.cInputs |> List.map (fun p -> p.cParamName) |> Set.ofList
 
                     stages =
                         e.cDecorations 

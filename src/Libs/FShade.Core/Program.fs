@@ -27,8 +27,73 @@ type GLSLBackend private() =
     override x.TryGetIntrinsicCtor (c : ConstructorInfo) =
         None
 
+type Vertex =
+    {
+        [<Position>] p : V4d
+        [<Semantic("TexCoord")>] tc : V2d
+    }
+
+type Fragment =
+    {
+        [<Color>] color : V4d
+        [<Semantic("TexCoord")>] tc : V2d
+    }
+
+type UniformScope with
+    member x.Trafo : M44d= x?PerModel?Trafo
+
 [<EntryPoint>]
 let main args =
+
+    let vert (v : Vertex) =
+        vertex {
+            return {
+                p = uniform.Trafo * v.p
+                tc = v.tc
+            }
+        }
+
+    let frag (v : Vertex) =
+        fragment {
+            return {
+                color = V4d.IIII
+                tc = v.tc
+            }
+        }
+
+    let vert = Shader.ofFunction vert
+    let frag = Shader.ofFunction frag
+    
+    let effect = Effect.ofShaders [vert; frag]
+
+    { Effect.empty with fragment = Some Shader.colorFragment }
+        |> Effect.setOutputs (Map.ofList ["Colors", typeof<V4d>; "Bla", typeof<V2d>])
+        |> Effect.link
+        |> Effect.toModule
+        |> Linker.compileAndLink GLSLBackend.Instance
+        |> GLSL.CModule.glsl  { 
+            GLSL.Config.version = System.Version(4,1,0)
+            GLSL.Config.locations = false
+            GLSL.Config.perStageUniforms = true
+            GLSL.Config.uniformBuffers = true 
+        }
+        |> printfn "%s"
+
+    effect
+        |> Effect.setOutputs (Map.ofList [ "Colors", typeof<V4d> ])
+        |> Effect.toModule
+        |> Linker.compileAndLink GLSLBackend.Instance
+        |> GLSL.CModule.glsl  { 
+            GLSL.Config.version = System.Version(4,1,0)
+            GLSL.Config.locations = false
+            GLSL.Config.perStageUniforms = true
+            GLSL.Config.uniformBuffers = true 
+        }
+        |> printfn "%s"
+
+    System.Environment.Exit 0
+
+
     let optimized = 
         Optimizer.eliminateDeadCode 
             <@
@@ -60,7 +125,7 @@ let main args =
                 let mutable t = 0
                 let mutable s = 0
                 while (t <- t + 1; s < 10) do
-                    s <- s + 2
+                    s <- s + 1
                 sink(s,s)
 
                 // fun fact: do-while looks like:
@@ -73,11 +138,10 @@ let main args =
                 // array should remain
                 let mutable x = 0
                 let arr = [| V2i.Zero; V2i.Zero; V2i.Zero; V2i.Zero |]
-                for i in 0 .. 3 do
+                for i in 3 .. -1 .. 0 do
                     arr.[i].X <- i
-                    x <- x + arr.[i].Y
 
-                sink(x, x)
+                sink(arr, arr)
 
 
 
