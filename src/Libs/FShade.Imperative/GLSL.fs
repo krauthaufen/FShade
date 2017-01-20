@@ -31,6 +31,94 @@ module GLSL =
             inputs          : Set<string>
         }
  
+
+    let private builtInInputs =
+        Dictionary.ofList [
+            ShaderStage.Vertex, 
+                Map.ofList [
+                    Intrinsics.VertexId, "gl_VertexID"
+                    Intrinsics.InstanceId, "gl_InstanceID"
+                ]
+
+            ShaderStage.TessControl,
+                Map.ofList [
+                    Intrinsics.PointSize, "gl_PointSize"
+                    Intrinsics.ClipDistance, "gl_ClipDistance"
+                    Intrinsics.PatchVertices, "gl_PatchVertices"
+                    Intrinsics.PrimitiveId, "gl_PrimitiveID"
+                    Intrinsics.InvocationId, "gl_InvocationID"
+                ]
+
+            ShaderStage.TessEval,
+                Map.ofList [
+                    Intrinsics.PointSize, "gl_PointSize"
+                    Intrinsics.ClipDistance, "gl_ClipDistance"
+                    Intrinsics.TessCoord, "gl_TessCoord"
+                    Intrinsics.PatchVertices, "gl_PatchVertices"
+                    Intrinsics.PrimitiveId, "gl_PrimitiveID"
+                    Intrinsics.TessLevelInner, "gl_TessLevelInner"
+                    Intrinsics.TessLevelOuter, "gl_TessLevelOuter"
+                ]
+                
+            ShaderStage.Geometry,
+                Map.ofList [
+                    Intrinsics.PointSize, "gl_PointSize"
+                    Intrinsics.ClipDistance, "gl_ClipDistance"
+                    Intrinsics.PrimitiveId, "gl_PrimitiveID"
+                    Intrinsics.InvocationId, "gl_InvocationID"
+                ]
+
+            ShaderStage.Fragment,
+                Map.ofList [
+                    Intrinsics.FragCoord, "gl_FragCoord"
+                    Intrinsics.PointCoord, "gl_PointCoord"
+                    Intrinsics.FrontFacing, "gl_FronFacing"
+                    Intrinsics.SampleId, "gl_SampleID"
+                    Intrinsics.SamplePosition, "gl_SamplePosition"
+                    Intrinsics.SampleMask, "gl_SampleMask"
+                    Intrinsics.ClipDistance, "gl_ClipDistance"
+                    Intrinsics.PrimitiveId, "gl_PrimitiveID"
+                    Intrinsics.Layer, "gl_Layer"
+                    Intrinsics.ViewportIndex, "gl_ViewportIndex"
+                ]
+            ]
+
+    let private builtInOutputs =
+        Dictionary.ofList [
+            ShaderStage.Vertex,
+                Map.ofList [
+                    Intrinsics.PointSize, "gl_PointSize"
+                    Intrinsics.ClipDistance, "gl_ClipDistance"
+                ]
+
+            ShaderStage.TessControl,
+                Map.ofList [
+                    Intrinsics.TessLevelInner, "gl_TessLevelInner"
+                    Intrinsics.TessLevelOuter, "gl_TessLevelOuter"
+                ]
+
+            ShaderStage.TessEval,
+                Map.ofList [
+                    Intrinsics.PointSize, "gl_PointSize"
+                    Intrinsics.ClipDistance, "gl_ClipDistance"
+                ]
+
+            ShaderStage.Geometry,
+                Map.ofList [
+                    Intrinsics.PointSize, "gl_PointSize"
+                    Intrinsics.ClipDistance, "gl_ClipDistance"
+                    Intrinsics.Layer, "gl_Layer"
+                    Intrinsics.ViewportIndex, "gl_ViewportIndex"
+                ]
+
+            ShaderStage.Fragment,
+                Map.ofList [
+                    Intrinsics.Depth, "gl_FragDepth"
+                    Intrinsics.SampleMask, "gl_SampleMask"
+                ]
+
+        ]
+
   
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module State =
@@ -42,16 +130,8 @@ module GLSL =
             }
 
 
-        let private builtInInputs =
-            Dictionary.ofList [
-                ShaderStage.Vertex, 
-                    Map.ofList [
-                        Intrinsics.VertexId, "gl_VertexID"
-                        Intrinsics.InstanceId, "gl_InstanceID"
-                    ]
-            ]
 
-        let parameterName (kind : ParameterKind) (name : string) (s : State) =
+        let regularName (kind : ParameterKind) (name : string) (s : State) =
             let c = s.config
 
             if kind = ParameterKind.Output && name = Intrinsics.Position && s.stages.next = Some ShaderStage.Fragment then
@@ -74,6 +154,20 @@ module GLSL =
                     | _                                                 -> name
 
 
+        let parameterName (kind : ParameterKind) (name : string) (s : State) =
+            let c = s.config
+
+            match kind with
+                | ParameterKind.Input -> 
+                    match Map.tryFind name builtInInputs.[s.stages.self] with
+                        | Some s -> s
+                        | None -> regularName kind name s
+                | ParameterKind.Output -> 
+                    match Map.tryFind name builtInOutputs.[s.stages.self] with
+                        | Some s -> s
+                        | None -> regularName kind name s
+                | _ ->
+                    regularName kind name s
 
             
 
@@ -333,8 +427,7 @@ module GLSL =
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module CEntryParameter =
-
-        let glsl (state : State) (kind : ParameterKind) (index : int) (p : CEntryParameter) =
+        let private regularDefinition (state : State) (kind : ParameterKind) (index : int) (p : CEntryParameter) =
             let c = state.config
             let decorations =
                 p.cParamDecorations 
@@ -382,7 +475,25 @@ module GLSL =
                         | _ -> ""
                     
 
-            sprintf "%s%s%s %s;" decorations prefix (CType.glsl p.cParamType) name |> Some
+            sprintf "%s%s%s %s;" decorations prefix (CType.glsl p.cParamType) name
+
+        let glsl (state : State) (kind : ParameterKind) (index : int) (p : CEntryParameter) =
+            match kind with
+                | ParameterKind.Input -> 
+                    match Map.tryFind p.cParamName builtInInputs.[state.stages.self] with
+                        | Some s -> None
+                        | None -> regularDefinition state kind index p |> Some
+
+                | ParameterKind.Output -> 
+                    match state.stages.next, p.cParamName with
+                        | Some ShaderStage.Fragment, "Positions" -> None
+                        | _ -> 
+                            match Map.tryFind p.cParamName builtInOutputs.[state.stages.self] with
+                                | Some s -> None
+                                | None -> regularDefinition state kind index p |> Some
+                | _ ->
+                    regularDefinition state kind index p |> Some
+
     
         let many (state : State) (kind : ParameterKind) (l : list<CEntryParameter>) =
             let definitions, _ = 
