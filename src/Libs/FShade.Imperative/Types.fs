@@ -13,7 +13,7 @@ type MemoryType =
     | Global = 1
     | Local = 2
 
-type ShaderType = 
+type ShaderStage = 
     | Vertex  = 0
     | TessControl = 1
     | TessEval = 2

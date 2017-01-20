@@ -1,14 +1,21 @@
 ﻿module Optimizer
 
 open Microsoft.FSharp.Quotations
+open Microsoft.FSharp.Quotations.Patterns
+open Microsoft.FSharp.Quotations.DerivedPatterns
+open Microsoft.FSharp.Quotations.ExprShape
 
 open FsUnit
 open NUnit.Framework
 open NUnit.Framework.Constraints
 
+open Aardvark.Base
+open Aardvark.Base.Monads.State
+
 open FShade
 
 let sink a = ()
+
 
 let exprComparer = 
     { new System.Collections.Generic.IEqualityComparer<Expr> with
@@ -16,8 +23,7 @@ let exprComparer =
             0
 
         member x.Equals(l : Expr, r : Expr) =
-            // TODO: implement
-            false
+            l.ToString() = r.ToString()
     }
 
 let exprEqual (r : Expr) = EqualConstraint(r).Using exprComparer

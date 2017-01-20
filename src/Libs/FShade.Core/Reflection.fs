@@ -185,3 +185,12 @@ module BasicQuotationPatterns =
 
             | _ -> None
 
+
+    module Map =
+        let choose (f : 'k -> 'v -> Option<'r>) (m : Map<'k, 'v>) =
+            let mutable res = Map.empty
+            for (k,v) in Map.toSeq m do
+                match f k v with
+                    | Some v -> res <- Map.add k v res
+                    | _ -> ()
+            res

@@ -349,16 +349,17 @@ module Compiler =
                     let fb = free b
                     PSet.union fe (PSet.remove (Variable v) fb)
 
-                | ReadInput(name,idx) ->
+                | ReadInput(kind,name,idx) ->
                     match idx with
                         | Some idx -> free idx |> PSet.add (Global(name, e.Type, false))
                         | None -> PSet.ofList [ Global(name, e.Type, false) ]
 
-                | WriteOutput(name,idx,value) ->
-                    match idx with
-                        | Some idx -> PSet.union (free idx) (free value) |> PSet.add (Global(name, e.Type, true))
-                        | None -> (free value) |> PSet.add (Global(name, e.Type, true))
-                    
+                | WriteOutputs values ->
+                    let mutable res = PSet.empty
+                    for (name, value) in Map.toSeq values do
+                        res <- res |> PSet.union (free value) |> PSet.add (Global(name, value.Type, true))
+
+                    res
 
                 | ExprShape.ShapeCombination(o, args) ->
                     args |> List.fold (fun m e -> PSet.union m (free e)) PSet.empty
@@ -757,6 +758,7 @@ module Compiler =
                 | ReducibleExpression e ->
                     return! toCExpr e
 
+                | NewFixedArray _
                 | AddressSet _
                 | DefaultValue _
                 | FieldSet _
@@ -772,7 +774,7 @@ module Compiler =
                 | WhileLoop _ ->
                     return! asExternal e
 
-                | ReadInput(name, index) ->
+                | ReadInput(kind, name, index) ->
                     let! s = State.get
                     if Set.contains name s.moduleState.globalParameters then
                         do! State.put { s with usedGlobals = PSet.add name s.usedGlobals }
@@ -780,9 +782,9 @@ module Compiler =
                     match index with
                         | Some idx -> 
                             let! idx = toCExpr idx
-                            return CReadInput(ct, name, Some idx)
+                            return CReadInput(kind, ct, name, Some idx)
                         | _ ->
-                            return CReadInput(ct, name, None)
+                            return CReadInput(kind, ct, name, None)
 
 
                 | Var v ->
@@ -1077,17 +1079,28 @@ module Compiler =
                             
 
                             
+                | WriteOutputs values ->
+                    let! writes =
+                        values |> Map.toList |> List.mapS (fun (name, value) ->
+                            state {
+                                let! value = toCRExpr value |> State.map Option.get
+                                let v = CLExpr.CLVar { ctype = value.ctype; name = name }
+                                return CWriteOutput(name, value)
+                            }
+                        )
 
 
-                | WriteOutput(name, index, value) ->
-                    let! value = toCExpr value
-                    let v = CLExpr.CLVar { ctype = value.ctype; name = name }
-                    match index with
-                        | Some idx ->
-                            let! idx = toCExpr idx 
-                            return CWriteOutput(name, Some idx, value)
-                        | None ->
-                            return CWriteOutput(name, None, value)
+                    return CSequential writes
+
+//                | WriteOutput(name, index, value) ->
+//                    let! value = toCExpr value
+//                    let v = CLExpr.CLVar { ctype = value.ctype; name = name }
+//                    match index with
+//                        | Some idx ->
+//                            let! idx = toCExpr idx 
+//                            return CWriteOutput(name, Some idx, value)
+//                        | None ->
+//                            return CWriteOutput(name, None, value)
 
 
                 | AddressSet(a, v) ->

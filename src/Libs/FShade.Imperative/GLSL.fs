@@ -24,11 +24,6 @@ module GLSL =
 
     let version120 = Version(1,2,0)
 
-    type ParameterKind =
-        | In
-        | Out
-        | Other
-
     type State =
         {
             config          : Config
@@ -42,36 +37,41 @@ module GLSL =
         let ofConfig (c : Config) =
             {
                 config = c
-                stages = { prev = None; self = ShaderType.Vertex; next = None }
+                stages = { prev = None; self = ShaderStage.Vertex; next = None }
                 inputs = Set.empty
             }
 
+
+        let private builtInInputs =
+            Dictionary.ofList [
+                ShaderStage.Vertex, 
+                    Map.ofList [
+                        Intrinsics.VertexId, "gl_VertexID"
+                        Intrinsics.InstanceId, "gl_InstanceID"
+                    ]
+            ]
+
         let parameterName (kind : ParameterKind) (name : string) (s : State) =
             let c = s.config
-            let kind =
-                match kind with
-                    | In -> 
-                        if Set.contains name s.inputs then In
-                        else Other
-                    | kind ->
-                        kind
 
-            if kind = Out && name = Intrinsics.Position && s.stages.next = Some ShaderType.Fragment then
+            if kind = ParameterKind.Output && name = Intrinsics.Position && s.stages.next = Some ShaderStage.Fragment then
                 "gl_Position"
 
             elif c.version > version120 && c.locations then
                 match kind with
-                    | In  -> name
-                    | Out -> name + "Out"
-                    | Other -> name
+                    | ParameterKind.Input       -> name
+                    | ParameterKind.Output      -> name + "Out"
+                    | ParameterKind.Uniform     -> name
+                    | ParameterKind.Argument    -> name
+                    | kind                      -> failwithf "[GLSL] unknown parameter-kind %A for %s" kind name
             else
                 match kind, s.stages with
-                    | In, { prev = None }                   -> name
-                    | In, { prev = Some _; self = s }       -> name + string s
+                    | ParameterKind.Input, { prev = None }              -> name
+                    | ParameterKind.Input, { prev = Some _; self = s }  -> name + string s
 
-                    | Out, { next = Some n }                -> name + string n
-                    | Out, { next = None }                  -> name + "Out"
-                    | Other, _                              -> name
+                    | ParameterKind.Output, { next = Some n }           -> name + string n
+                    | ParameterKind.Output, { next = None }             -> name + "Out"
+                    | _                                                 -> name
 
 
 
@@ -171,8 +171,8 @@ module GLSL =
                     let args = args |> Seq.map glsl |> String.concat ", "
                     sprintf "%s(%s)" f.name args
 
-                | CReadInput(_, name, idx) ->
-                    let name = c |> State.parameterName In name
+                | CReadInput(kind,_, name, idx) ->
+                    let name = c |> State.parameterName kind name
                     match idx with
                         | Some idx -> sprintf "%s[%s]" name (glsl idx)
                         | None -> name
@@ -259,11 +259,14 @@ module GLSL =
                                 | Some r -> sprintf "%s %s = %s" (CType.glsl v.ctype) v.name (CRExpr.glsl c r)
                                 | None -> sprintf "%s %s" (CType.glsl v.ctype) v.name
 
-                | CWriteOutput(name, idx, value) ->
-                    let name = c |> State.parameterName Out name
-                    match idx with
-                        | Some idx -> sprintf "%s[%s] = %s" name (CExpr.glsl c idx) (CExpr.glsl c value)
-                        | None -> sprintf "%s = %s" name (CExpr.glsl c value)
+                | CWriteOutput(name, value) ->
+                    let name = c |> State.parameterName ParameterKind.Output name
+                    match value with
+                        | CRExpr.CRArray(_,values) ->
+                            values |> Seq.map (CExpr.glsl c) |> Seq.mapi (sprintf "%s[%d] = %s" name) |> String.concat ";\r\n"
+
+                        | CRExpr e -> 
+                            sprintf "%s = %s" name (CExpr.glsl c e)
                             
 
                 | CWrite(l, v) ->
@@ -330,7 +333,9 @@ module GLSL =
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module CEntryParameter =
-        let glsl (state : State) (c : Config) (kind : ParameterKind) (index : int) (p : CEntryParameter) =
+
+        let glsl (state : State) (kind : ParameterKind) (index : int) (p : CEntryParameter) =
+            let c = state.config
             let decorations =
                 p.cParamDecorations 
                 |> Set.toList
@@ -352,14 +357,10 @@ module GLSL =
 
             let decorations =
                 match kind with
-                    | Other -> 
-                        decorations
-
+                    | ParameterKind.Input | ParameterKind.Output when c.locations && c.version > version120 ->
+                        sprintf "layout(location = %d)" index :: decorations
                     | _ ->
-                        if c.locations && c.version > version120 then 
-                            sprintf "layout(location = %d)" index :: decorations
-                        else 
-                            decorations
+                        decorations
                 
             let decorations = 
                 match decorations with
@@ -371,18 +372,30 @@ module GLSL =
             let prefix =
                 if c.version > version120 then
                     match kind with
-                        | In -> "in "
-                        | Out -> "out "
-                        | Other -> ""
+                        | ParameterKind.Input -> "in "
+                        | ParameterKind.Output -> "out "
+                        | _ -> ""
                 else
                     match kind with
-                        | In -> "varying "
-                        | Out -> "varying "
-                        | Other -> ""
+                        | ParameterKind.Input -> "varying "
+                        | ParameterKind.Output -> "varying "
+                        | _ -> ""
                     
 
-            sprintf "%s%s%s %s;" decorations prefix (CType.glsl p.cParamType) name
+            sprintf "%s%s%s %s;" decorations prefix (CType.glsl p.cParamType) name |> Some
     
+        let many (state : State) (kind : ParameterKind) (l : list<CEntryParameter>) =
+            let definitions, _ = 
+                l |> List.fold (fun (r,i) p ->
+                    match glsl state kind i p with
+                        | Some str ->
+                            (r @ [str], i + 1)
+                        | None ->
+                            (r, i)
+                ) ([], 0) 
+            definitions
+                
+
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module CEntryDef =
         let glsl (c : Config) (e : CEntryDef) =
@@ -397,14 +410,14 @@ module GLSL =
                         |> List.tryPick (function EntryDecoration.Stages t -> Some t | _ -> None) 
                         |> Option.defaultValue {
                             prev = None
-                            self = ShaderType.Vertex
+                            self = ShaderStage.Vertex
                             next = None
                         }
                 }
 
-            let inputs = e.cInputs |> List.mapi (CEntryParameter.glsl state c In)
-            let outputs = e.cOutputs |> List.mapi (CEntryParameter.glsl state c Out)
-            let args = e.cArguments |> List.mapi (CEntryParameter.glsl state c Other) |> String.concat ", " 
+            let inputs = CEntryParameter.many state ParameterKind.Input e.cInputs
+            let outputs = CEntryParameter.many state ParameterKind.Output e.cOutputs
+            let args = CEntryParameter.many state ParameterKind.Argument e.cArguments |> String.concat ", " 
 
             String.concat "\r\n" [
                 yield! inputs

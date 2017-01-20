@@ -261,7 +261,6 @@ module CIntrinsic =
             arguments = Some args
         }
 
-
 /// represents a c-style expression
 type CExpr =
     | CVar of CVar
@@ -270,7 +269,7 @@ type CExpr =
     | CCallIntrinsic of t : CType * func : CIntrinsic * args : CExpr[]
     | CConditional of ctype : CType * cond : CExpr * ifTrue : CExpr * ifFalse : CExpr
 
-    | CReadInput of ctype : CType * name : string * index : Option<CExpr>
+    | CReadInput of kind : ParameterKind * ctype : CType * name : string * index : Option<CExpr>
 
     | CNeg of CType * CExpr
     | CNot of CType * CExpr
@@ -319,7 +318,7 @@ type CExpr =
             | CCall(f,_) -> f.returnType
             | CCallIntrinsic(t,_,_) -> t
             | CConditional(t,_,_,_) -> t
-            | CReadInput(t,_,_) -> t
+            | CReadInput(_,t,_,_) -> t
             | CNeg(t,_) -> t
             | CNot(t,_) -> t
             | CAdd(t,_,_) -> t
@@ -457,7 +456,7 @@ type CStatement =
     | CSequential of list<CStatement>
     | CReturn
 
-    | CWriteOutput of string * Option<CExpr> * CExpr
+    | CWriteOutput of string * CRExpr
 
     | CReturnValue of CExpr
     | CBreak

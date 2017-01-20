@@ -75,15 +75,30 @@ type PrimitiveIndexAttribute(index : int) =
     member x.Index = index
 
 type IShaderBuilder =
-    abstract member ShaderType : ShaderType
+    abstract member ShaderStage : ShaderStage
     abstract member OutputTopology : Option<OutputTopology>
 
-type IOParameter =
+type ParameterDescription =
     {
-//        paramSemantic       : string
         paramType           : Type
         paramInterpolation  : InterpolationMode
     }
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module ParameterDescription =
+
+    let inline paramInterpolation (p : ParameterDescription) = p.paramInterpolation
+    let inline paramType (p : ParameterDescription) = p.paramType
+
+    let ofType (t : Type) =
+        {
+            paramType = t
+            paramInterpolation = InterpolationMode.Default
+        }
+
+
+    
+
 
 type UniformValue =
     | Attribute of scope : UniformScope * name : string

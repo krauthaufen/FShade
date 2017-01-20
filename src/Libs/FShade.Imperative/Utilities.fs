@@ -303,6 +303,17 @@ module ExprExtensions =
 
                 | _ -> None
 
+    let (|Seq|_|) (e : Expr) =
+        let rec all (e : Expr) =
+            match e with
+                | Sequential(l,r) -> all l @ all r
+                | Unit -> []
+                | e -> [e]
+
+        match e with
+            | Sequential(l, r) -> all l @ all r |> Some
+            | _ -> None
+
     let (|NewFixedArray|_|) (e : Expr) =
         match e with
             | NewObject(ctor, [Coerce(NewArray(et, args),_)]) ->
@@ -677,3 +688,4 @@ module private Helpers =
                         res.[i] <- f(m.[i]).Run(&s)
                     res
             }
+

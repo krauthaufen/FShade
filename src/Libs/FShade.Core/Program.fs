@@ -31,6 +31,7 @@ type Vertex =
     {
         [<Position>] p : V4d
         [<Semantic("TexCoord")>] tc : V2d
+        [<ClipDistance>] clip : float[]
     }
 
 type Fragment =
@@ -50,6 +51,7 @@ let main args =
             return {
                 p = uniform.Trafo * v.p
                 tc = v.tc
+                clip = [| 0.0; 1.0; 2.0 |]
             }
         }
 
@@ -64,11 +66,10 @@ let main args =
     let vert = Shader.ofFunction vert
     let frag = Shader.ofFunction frag
     
-    let effect = Effect.ofShaders [vert; frag]
+    let effect = Effect.ofList [vert; frag]
 
-    { Effect.empty with fragment = Some Shader.colorFragment }
-        |> Effect.setOutputs (Map.ofList ["Colors", typeof<V4d>; "Bla", typeof<V2d>])
-        |> Effect.link
+    Effect.empty
+        |> Effect.link ShaderStage.Fragment (Map.ofList ["Colors", typeof<V4d>; "Bla", typeof<V2d>])
         |> Effect.toModule
         |> Linker.compileAndLink GLSLBackend.Instance
         |> GLSL.CModule.glsl  { 
@@ -80,7 +81,7 @@ let main args =
         |> printfn "%s"
 
     effect
-        |> Effect.setOutputs (Map.ofList [ "Colors", typeof<V4d> ])
+        |> Effect.link ShaderStage.Fragment (Map.ofList ["Colors", typeof<V4d>])
         |> Effect.toModule
         |> Linker.compileAndLink GLSLBackend.Instance
         |> GLSL.CModule.glsl  { 

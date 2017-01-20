@@ -180,7 +180,7 @@ module ShaderBuilders =
         member x.Quote() = ()
 
         interface IShaderBuilder with
-            member x.ShaderType = ShaderType.Vertex
+            member x.ShaderStage = ShaderStage.Vertex
             member x.OutputTopology = None
     type FragmentBuilder() =
         inherit BaseBuilder()
@@ -188,7 +188,7 @@ module ShaderBuilders =
         member x.Quote() = ()
 
         interface IShaderBuilder with
-            member x.ShaderType = ShaderType.Fragment
+            member x.ShaderStage = ShaderStage.Fragment
             member x.OutputTopology = None
 
     type GeometryBuilder(size : Option<int>, top : OutputTopology) =
@@ -217,7 +217,7 @@ module ShaderBuilders =
             Seq.empty
 
         interface IShaderBuilder with
-            member x.ShaderType = ShaderType.Geometry
+            member x.ShaderStage = ShaderStage.Geometry
             member x.OutputTopology = Some top
 
 
@@ -231,7 +231,7 @@ module ShaderBuilders =
             levels
 
         interface IShaderBuilder with
-            member x.ShaderType = ShaderType.TessControl
+            member x.ShaderStage = ShaderStage.TessControl
             member x.OutputTopology = None
 
     type TessEvalBuilder() =
@@ -241,7 +241,7 @@ module ShaderBuilders =
         member x.Delay f = f()
         member x.Return(v) = v
         interface IShaderBuilder with
-            member x.ShaderType = ShaderType.TessEval
+            member x.ShaderStage = ShaderStage.TessEval
             member x.OutputTopology = None
 
     let vertex = VertexBuilder()
