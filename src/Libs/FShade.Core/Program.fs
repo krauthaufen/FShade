@@ -34,9 +34,8 @@ type GLSLBackend private() =
 
 type Vertex =
     {
-        [<Position>] p : V4d
+        [<Position>] pos : V4d
         [<Semantic("TexCoord")>] tc : V2d
-        [<ClipDistance>] clip : float[]
     }
 
 type Fragment =
@@ -60,9 +59,8 @@ let effectTest() =
     let vert (v : Vertex) =
         vertex {
             return {
-                p = uniform.Trafo * v.p
+                pos = uniform.Trafo * v.pos
                 tc = v.tc
-                clip = [| 0.0; 1.0; 2.0 |]
             }
         }
 
@@ -193,6 +191,52 @@ module Crazyness =
 
         printfn "def1: %A" def1
         printfn "def2: %A" def2
+
+
+type Tessellation = Tessellation
+let tessellate (inner : float[]) (p : float[]) : Tessellation =
+    failwith ""
+
+type TessBuilder() =
+    inherit BaseBuilder()
+        member x.Bind(t : Tessellation, f : V3d -> 'a) : 'a =
+            failwith ""
+
+        member x.Return(v) = v
+
+        member x.Quote() = ()
+
+        interface IShaderBuilder with
+            member x.ShaderStage = ShaderStage.TessEval
+            member x.OutputTopology = None
+
+let tessellation = TessBuilder()
+
+
+let interpolate (v : V3d) (t : Primitive<'a>) : 'a =
+    failwith ""
+
+let test (quad : Patch4<Vertex>) =
+    tessellation {
+        let p0 = quad.P0
+        let p1 = quad.P1
+        let p2 = quad.P2
+        let p3 = quad.P3
+
+        let centroid = (p0.pos + p1.pos + p2.pos) / 3.0
+        let level = 1.0 / centroid.Z
+
+        let! coord = tessellate [| level |] [| level; level; level |]
+        
+        let vertex = interpolate coord quad
+
+        return {
+            vertex with
+                pos = vertex.pos + V4d(0,1,0, 0)
+        }
+
+
+    }
 
 
 
