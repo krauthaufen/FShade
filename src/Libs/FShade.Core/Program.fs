@@ -115,19 +115,12 @@ type Vertex2 =
     }
 
 let composeTest() =
-    let a (v : Point<Vertex1>) =
+    let a (tri : Triangle<Vertex1>) =
         triangle {
-            yield {
-                p1 = 1.0 * uniform.Trafo * v.Value.p1
-            }
-
-            yield {
-                p1 = 2.0 * uniform.Trafo * v.Value.p1
-            }
-
-            yield {
-                p1 = 3.0 * uniform.Trafo * v.Value.p1
-            }
+            for v in tri do
+                yield {
+                    p1 = 1.0 * uniform.Trafo * v.p1
+                }
         }
 
     let b (v : Vertex2) =
@@ -156,7 +149,7 @@ let composeTest() =
 
 
     Effect.compose [sa; sb]
-        |> Effect.link ShaderStage.Geometry (Map.ofList [Intrinsics.Position, typeof<V4d>; "Coord", typeof<V2d>; "Hugo", typeof<V2d>])
+        |> Effect.link ShaderStage.Geometry (Map.ofList [Intrinsics.Position, typeof<V4d>])
         |> Effect.toModule
         |> Linker.compileAndLink GLSLBackend.Instance
         |> GLSL.CModule.glsl  { 

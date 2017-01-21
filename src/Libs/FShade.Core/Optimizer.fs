@@ -351,6 +351,20 @@ module Optimizer =
                                 let! cond = eliminateDeadCodeS cond
                                 return Expr.IfThenElse(cond, i, e)
 
+                    | ForEach(v, seq, body) ->
+                        let iterate =
+                            state {
+                                let! body = eliminateDeadCodeS body
+                                match body with
+                                    | Unit ->
+                                        return! withoutValueS seq
+                                    | _ ->
+                                        let! seq = eliminateDeadCodeS seq
+                                        return Expr.ForEach(v, seq, body)
+                                    
+                            }
+                        return! EliminationState.fix iterate
+
                     | ForInteger(v, first, step, last, body) ->
                         let iterate =
                             state {
@@ -592,6 +606,233 @@ module Optimizer =
                         | Value(h,_), AllConstant t -> Some (h :: t)
                         | _ -> None
 
+
+        let functionTable (l : list<string * obj>) =
+            let table = Dictionary.empty
+
+            let rec getFunctionElements (t : Type) =
+                if t.Name.StartsWith "FSharpFunc" || t.BaseType.Name.StartsWith "FSharpFunc" then
+                    let a, r = FSharpType.GetFunctionElements t
+                    let args, ret = getFunctionElements r
+                    a :: args, ret
+                else
+                    [], t
+
+            for (name, f) in l do
+                let fType = f.GetType()
+                let invoke : MethodInfo = 
+                    fType.GetMethods(BindingFlags.Public ||| BindingFlags.Instance) 
+                        |> Array.filter (fun mi -> mi.Name = "Invoke") 
+                        |> Array.maxBy (fun mi -> mi.GetParameters().Length)
+
+                let parameters =
+                    invoke.GetParameters() |> Array.map (fun p -> p.ParameterType) |> Array.toList
+
+                let run (args : list<obj>) = invoke.Invoke(f, List.toArray args)
+
+                table.[(name, parameters)] <- run
+
+            table
+
+        let operators =
+            functionTable [
+                "op_Addition", ((+) : int8 -> int8 -> int8) :> obj
+                "op_Addition", ((+) : int16 -> int16 -> int16) :> obj
+                "op_Addition", ((+) : int32 -> int32 -> int32) :> obj
+                "op_Addition", ((+) : int64 -> int64 -> int64) :> obj
+                "op_Addition", ((+) : uint8 -> uint8 -> uint8) :> obj
+                "op_Addition", ((+) : uint16 -> uint16 -> uint16) :> obj
+                "op_Addition", ((+) : uint32 -> uint32 -> uint32) :> obj
+                "op_Addition", ((+) : uint64 -> uint64 -> uint64) :> obj
+                "op_Addition", ((+) : float32 -> float32 -> float32) :> obj
+                "op_Addition", ((+) : float -> float -> float) :> obj
+                "op_Addition", ((+) : decimal -> decimal -> decimal) :> obj
+
+                
+                "op_Subtraction", ((-) : int8 -> int8 -> int8) :> obj
+                "op_Subtraction", ((-) : int16 -> int16 -> int16) :> obj
+                "op_Subtraction", ((-) : int32 -> int32 -> int32) :> obj
+                "op_Subtraction", ((-) : int64 -> int64 -> int64) :> obj
+                "op_Subtraction", ((-) : uint8 -> uint8 -> uint8) :> obj
+                "op_Subtraction", ((-) : uint16 -> uint16 -> uint16) :> obj
+                "op_Subtraction", ((-) : uint32 -> uint32 -> uint32) :> obj
+                "op_Subtraction", ((-) : uint64 -> uint64 -> uint64) :> obj
+                "op_Subtraction", ((-) : float32 -> float32 -> float32) :> obj
+                "op_Subtraction", ((-) : float -> float -> float) :> obj
+                "op_Subtraction", ((-) : decimal -> decimal -> decimal) :> obj
+
+                
+                "op_Multiply", ((*) : int8 -> int8 -> int8) :> obj
+                "op_Multiply", ((*) : int16 -> int16 -> int16) :> obj
+                "op_Multiply", ((*) : int32 -> int32 -> int32) :> obj
+                "op_Multiply", ((*) : int64 -> int64 -> int64) :> obj
+                "op_Multiply", ((*) : uint8 -> uint8 -> uint8) :> obj
+                "op_Multiply", ((*) : uint16 -> uint16 -> uint16) :> obj
+                "op_Multiply", ((*) : uint32 -> uint32 -> uint32) :> obj
+                "op_Multiply", ((*) : uint64 -> uint64 -> uint64) :> obj
+                "op_Multiply", ((*) : float32 -> float32 -> float32) :> obj
+                "op_Multiply", ((*) : float -> float -> float) :> obj
+                "op_Multiply", ((*) : decimal -> decimal -> decimal) :> obj
+
+                
+                "op_Division", ((/) : int8 -> int8 -> int8) :> obj
+                "op_Division", ((/) : int16 -> int16 -> int16) :> obj
+                "op_Division", ((/) : int32 -> int32 -> int32) :> obj
+                "op_Division", ((/) : int64 -> int64 -> int64) :> obj
+                "op_Division", ((/) : uint8 -> uint8 -> uint8) :> obj
+                "op_Division", ((/) : uint16 -> uint16 -> uint16) :> obj
+                "op_Division", ((/) : uint32 -> uint32 -> uint32) :> obj
+                "op_Division", ((/) : uint64 -> uint64 -> uint64) :> obj
+                "op_Division", ((/) : float32 -> float32 -> float32) :> obj
+                "op_Division", ((/) : float -> float -> float) :> obj
+                "op_Division", ((/) : decimal -> decimal -> decimal) :> obj
+
+                
+                "op_Modulus", ((%) : int8 -> int8 -> int8) :> obj
+                "op_Modulus", ((%) : int16 -> int16 -> int16) :> obj
+                "op_Modulus", ((%) : int32 -> int32 -> int32) :> obj
+                "op_Modulus", ((%) : int64 -> int64 -> int64) :> obj
+                "op_Modulus", ((%) : uint8 -> uint8 -> uint8) :> obj
+                "op_Modulus", ((%) : uint16 -> uint16 -> uint16) :> obj
+                "op_Modulus", ((%) : uint32 -> uint32 -> uint32) :> obj
+                "op_Modulus", ((%) : uint64 -> uint64 -> uint64) :> obj
+                "op_Modulus", ((%) : float32 -> float32 -> float32) :> obj
+                "op_Modulus", ((%) : float -> float -> float) :> obj
+                "op_Modulus", ((%) : decimal -> decimal -> decimal) :> obj
+
+                
+                "op_BitwiseOr", ((|||) : int8 -> int8 -> int8) :> obj
+                "op_BitwiseOr", ((|||) : int16 -> int16 -> int16) :> obj
+                "op_BitwiseOr", ((|||) : int32 -> int32 -> int32) :> obj
+                "op_BitwiseOr", ((|||) : int64 -> int64 -> int64) :> obj
+                "op_BitwiseOr", ((|||) : uint8 -> uint8 -> uint8) :> obj
+                "op_BitwiseOr", ((|||) : uint16 -> uint16 -> uint16) :> obj
+                "op_BitwiseOr", ((|||) : uint32 -> uint32 -> uint32) :> obj
+                "op_BitwiseOr", ((|||) : uint64 -> uint64 -> uint64) :> obj
+
+                
+                "op_BitwiseAnd", ((&&&) : int8 -> int8 -> int8) :> obj
+                "op_BitwiseAnd", ((&&&) : int16 -> int16 -> int16) :> obj
+                "op_BitwiseAnd", ((&&&) : int32 -> int32 -> int32) :> obj
+                "op_BitwiseAnd", ((&&&) : int64 -> int64 -> int64) :> obj
+                "op_BitwiseAnd", ((&&&) : uint8 -> uint8 -> uint8) :> obj
+                "op_BitwiseAnd", ((&&&) : uint16 -> uint16 -> uint16) :> obj
+                "op_BitwiseAnd", ((&&&) : uint32 -> uint32 -> uint32) :> obj
+                "op_BitwiseAnd", ((&&&) : uint64 -> uint64 -> uint64) :> obj
+
+                
+                "op_ExclusiveOr", ((^^^) : int8 -> int8 -> int8) :> obj
+                "op_ExclusiveOr", ((^^^) : int16 -> int16 -> int16) :> obj
+                "op_ExclusiveOr", ((^^^) : int32 -> int32 -> int32) :> obj
+                "op_ExclusiveOr", ((^^^) : int64 -> int64 -> int64) :> obj
+                "op_ExclusiveOr", ((^^^) : uint8 -> uint8 -> uint8) :> obj
+                "op_ExclusiveOr", ((^^^) : uint16 -> uint16 -> uint16) :> obj
+                "op_ExclusiveOr", ((^^^) : uint32 -> uint32 -> uint32) :> obj
+                "op_ExclusiveOr", ((^^^) : uint64 -> uint64 -> uint64) :> obj
+
+                
+                "op_LessThan", ((<) : int8 -> int8 -> bool) :> obj
+                "op_LessThan", ((<) : int16 -> int16 -> bool) :> obj
+                "op_LessThan", ((<) : int32 -> int32 -> bool) :> obj
+                "op_LessThan", ((<) : int64 -> int64 -> bool) :> obj
+                "op_LessThan", ((<) : uint8 -> uint8 -> bool) :> obj
+                "op_LessThan", ((<) : uint16 -> uint16 -> bool) :> obj
+                "op_LessThan", ((<) : uint32 -> uint32 -> bool) :> obj
+                "op_LessThan", ((<) : uint64 -> uint64 -> bool) :> obj
+                "op_LessThan", ((<) : float32 -> float32 -> bool) :> obj
+                "op_LessThan", ((<) : float -> float -> bool) :> obj
+                "op_LessThan", ((<) : decimal -> decimal -> bool) :> obj
+
+                
+                "op_LessThanOrEqual", ((<=) : int8 -> int8 -> bool) :> obj
+                "op_LessThanOrEqual", ((<=) : int16 -> int16 -> bool) :> obj
+                "op_LessThanOrEqual", ((<=) : int32 -> int32 -> bool) :> obj
+                "op_LessThanOrEqual", ((<=) : int64 -> int64 -> bool) :> obj
+                "op_LessThanOrEqual", ((<=) : uint8 -> uint8 -> bool) :> obj
+                "op_LessThanOrEqual", ((<=) : uint16 -> uint16 -> bool) :> obj
+                "op_LessThanOrEqual", ((<=) : uint32 -> uint32 -> bool) :> obj
+                "op_LessThanOrEqual", ((<=) : uint64 -> uint64 -> bool) :> obj
+                "op_LessThanOrEqual", ((<=) : float32 -> float32 -> bool) :> obj
+                "op_LessThanOrEqual", ((<=) : float -> float -> bool) :> obj
+                "op_LessThanOrEqual", ((<=) : decimal -> decimal -> bool) :> obj
+
+                
+                "op_GreaterThan", ((>) : int8 -> int8 -> bool) :> obj
+                "op_GreaterThan", ((>) : int16 -> int16 -> bool) :> obj
+                "op_GreaterThan", ((>) : int32 -> int32 -> bool) :> obj
+                "op_GreaterThan", ((>) : int64 -> int64 -> bool) :> obj
+                "op_GreaterThan", ((>) : uint8 -> uint8 -> bool) :> obj
+                "op_GreaterThan", ((>) : uint16 -> uint16 -> bool) :> obj
+                "op_GreaterThan", ((>) : uint32 -> uint32 -> bool) :> obj
+                "op_GreaterThan", ((>) : uint64 -> uint64 -> bool) :> obj
+                "op_GreaterThan", ((>) : float32 -> float32 -> bool) :> obj
+                "op_GreaterThan", ((>) : float -> float -> bool) :> obj
+                "op_GreaterThan", ((>) : decimal -> decimal -> bool) :> obj
+
+                
+                "op_GreaterThanOrEqual", ((>=) : int8 -> int8 -> bool) :> obj
+                "op_GreaterThanOrEqual", ((>=) : int16 -> int16 -> bool) :> obj
+                "op_GreaterThanOrEqual", ((>=) : int32 -> int32 -> bool) :> obj
+                "op_GreaterThanOrEqual", ((>=) : int64 -> int64 -> bool) :> obj
+                "op_GreaterThanOrEqual", ((>=) : uint8 -> uint8 -> bool) :> obj
+                "op_GreaterThanOrEqual", ((>=) : uint16 -> uint16 -> bool) :> obj
+                "op_GreaterThanOrEqual", ((>=) : uint32 -> uint32 -> bool) :> obj
+                "op_GreaterThanOrEqual", ((>=) : uint64 -> uint64 -> bool) :> obj
+                "op_GreaterThanOrEqual", ((>=) : float32 -> float32 -> bool) :> obj
+                "op_GreaterThanOrEqual", ((>=) : float -> float -> bool) :> obj
+                "op_GreaterThanOrEqual", ((>=) : decimal -> decimal -> bool) :> obj
+
+                
+                "op_Equality", ((=) : int8 -> int8 -> bool) :> obj
+                "op_Equality", ((=) : int16 -> int16 -> bool) :> obj
+                "op_Equality", ((=) : int32 -> int32 -> bool) :> obj
+                "op_Equality", ((=) : int64 -> int64 -> bool) :> obj
+                "op_Equality", ((=) : uint8 -> uint8 -> bool) :> obj
+                "op_Equality", ((=) : uint16 -> uint16 -> bool) :> obj
+                "op_Equality", ((=) : uint32 -> uint32 -> bool) :> obj
+                "op_Equality", ((=) : uint64 -> uint64 -> bool) :> obj
+                "op_Equality", ((=) : float32 -> float32 -> bool) :> obj
+                "op_Equality", ((=) : float -> float -> bool) :> obj
+                "op_Equality", ((=) : decimal -> decimal -> bool) :> obj
+
+                
+                "op_Inequality", ((<>) : int8 -> int8 -> bool) :> obj
+                "op_Inequality", ((<>) : int16 -> int16 -> bool) :> obj
+                "op_Inequality", ((<>) : int32 -> int32 -> bool) :> obj
+                "op_Inequality", ((<>) : int64 -> int64 -> bool) :> obj
+                "op_Inequality", ((<>) : uint8 -> uint8 -> bool) :> obj
+                "op_Inequality", ((<>) : uint16 -> uint16 -> bool) :> obj
+                "op_Inequality", ((<>) : uint32 -> uint32 -> bool) :> obj
+                "op_Inequality", ((<>) : uint64 -> uint64 -> bool) :> obj
+                "op_Inequality", ((<>) : float32 -> float32 -> bool) :> obj
+                "op_Inequality", ((<>) : float -> float -> bool) :> obj
+                "op_Inequality", ((<>) : decimal -> decimal -> bool) :> obj
+
+
+            ]
+
+        let rec (|EqualityCondition|_|) (e : Expr) =
+            match e with
+                | Call(None, Method("op_Equality", _), ([Var v; Value(c, _)] | [Value(c, _); Var v])) ->
+                    Some (Map.ofList [v, c])
+
+                | AndAlso(EqualityCondition l, EqualityCondition r) ->
+                    Some (Map.union l r)
+
+                | _ ->
+                    None
+
+        let rec (|InequalityCondition|_|) (e : Expr) =
+            match e with
+                | Call(None, Method("op_Inequality", _), ([Var v; Value(c, _)] | [Value(c, _); Var v])) ->
+                    Some (Map.ofList [v, c])
+
+                | OrElse(InequalityCondition l, InequalityCondition r) ->
+                    Some (Map.union l r)
+
+                | _ ->
+                    None
+
         let rec evaluateConstantsS (e : Expr) =
             state {
                 match e with
@@ -614,6 +855,31 @@ module Optimizer =
                             | _ ->
                                 return Expr.Application(lambda, arg)
 
+                    | ForInteger(v, first, step, last, body) ->
+                        let! first = evaluateConstantsS first
+                        let! step = evaluateConstantsS step
+                        let! last = evaluateConstantsS last
+                        let! body = evaluateConstantsS body
+
+                        match first, step, last with
+                            | Int32 f, Int32 s, Int32 l ->
+                                if s > 0 && l < f then return Expr.Unit
+                                elif s < 0 && l > f then return Expr.Unit
+                                else return Expr.ForInteger(v, first, step, last, body)
+                            | _ ->
+
+                                match body with
+                                    | Value _ -> return Expr.Unit
+                                    | _ -> return Expr.ForInteger(v, first, step, last, body)
+                    
+                    | ForEach(v, s, b) ->
+                        let! s = evaluateConstantsS s
+                        let! b = evaluateConstantsS b
+                        match b with
+                            | Unit -> return Expr.Unit
+                            | _ -> return Expr.ForEach(v, s, b)
+
+       
                     | Call(None, mi, args) ->
                         let! needed = State.needsCall mi
                         let! args = args |> List.mapS evaluateConstantsS
@@ -622,8 +888,17 @@ module Optimizer =
                             return Expr.Call(mi, args)
                         else
                             match args with
-                                | AllConstant args ->
-                                    return Expr.Value(mi.Invoke(null, args |> List.toArray), e.Type)
+                                | AllConstant values ->
+                                    let key = mi.Name, args |> List.map (fun v -> v.Type)
+                                    match operators.TryGetValue key with
+                                        | (true, f) -> 
+                                            return Expr.Value(f values, e.Type)
+                                        | _ -> 
+                                            return
+                                                try Expr.Value(mi.Invoke(null, values |> List.toArray), e.Type)
+                                                with e -> 
+                                                    Log.warn "could not evaluate %A: %A" mi e
+                                                    Expr.Call(mi, args)
                                 | _ ->
                                     return Expr.Call(mi, args) 
 
@@ -636,8 +911,11 @@ module Optimizer =
                             return Expr.Call(t, mi, args)
                         else
                             match t, args with
-                                | Value(t,_), AllConstant args -> 
-                                    return Expr.Value(mi.Invoke(t, List.toArray args), e.Type)
+                                | Value(tv,_), AllConstant values -> 
+                                    try
+                                        return Expr.Value(mi.Invoke(tv, List.toArray values), e.Type)
+                                    with _ ->
+                                        return Expr.Call(t, mi, args)
                                 | _ ->
                                     return Expr.Call(t, mi, args)
 
@@ -671,28 +949,29 @@ module Optimizer =
                         let! value = evaluateConstantsS value
                         return Expr.FieldSet(t, f, value)
 
-                    | ForInteger(v, first, step, last, body) ->
-                        let! first = evaluateConstantsS first
-                        let! step = evaluateConstantsS step
-                        let! last = evaluateConstantsS last
-                        let! body = evaluateConstantsS body
-
-                        match first, step, last with
-                            | Int32 f, Int32 s, Int32 l ->
-                                if s > 0 && l < f then return Expr.Unit
-                                elif s < 0 && l > f then return Expr.Unit
-                                else return Expr.ForInteger(v, first, step, last, body)
-                            | _ ->
-
-                                match body with
-                                    | Value _ -> return Expr.Unit
-                                    | _ -> return Expr.ForInteger(v, first, step, last, body)
-
                     | IfThenElse(cond, i, e) ->
                         let! cond = evaluateConstantsS cond
                         match cond with
-                            | Bool true -> return! evaluateConstantsS i
-                            | Bool false -> return! evaluateConstantsS e
+                            | Bool true -> 
+                                return! evaluateConstantsS i
+
+                            | Bool false -> 
+                                return! evaluateConstantsS e
+
+                            | EqualityCondition values ->
+                                let! e = evaluateConstantsS e
+                                for (v, c) in Map.toSeq values do
+                                    do! State.setVar v c
+                                let! i = evaluateConstantsS i
+                                return Expr.IfThenElse(cond, i, e)
+
+                            | InequalityCondition values ->
+                                let! i = evaluateConstantsS i
+                                for (v, c) in Map.toSeq values do
+                                    do! State.setVar v c
+                                let! e = evaluateConstantsS e
+                                return Expr.IfThenElse(cond, i, e)
+
                             | _ ->
                                 let! i = evaluateConstantsS i
                                 let! e = evaluateConstantsS e

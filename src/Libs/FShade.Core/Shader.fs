@@ -121,13 +121,6 @@ module private Preprocessor =
                 state.builder <- b
                 preprocessInternal state vertexIndices body
 
-            | BuilderCall(b, Method("For",_), [seq; Lambda(v,Let(vi,Var(vo),body))]) ->  
-                state.builder <- b   
-                let body = preprocessInternal state vertexIndices body
-                let seq = preprocessInternal state vertexIndices seq            
-                let result = Expr.ForEach(vi, seq, body)
-                result
-
             | BuilderCall(b, Method("Combine",_), [l;r]) ->
                 state.builder <- b
                 let l = preprocessInternal state vertexIndices l
@@ -150,6 +143,12 @@ module private Preprocessor =
                 let body = preprocessInternal state vertexIndices body
                 Expr.ForIntegerRangeLoop(index, <@@ 0 @@>, <@@ count - 1 @@>,  body)
 
+            | BuilderCall(b, Method("For",_), [seq; Lambda(v,Let(vi,Var(vo),body))]) ->  
+                state.builder <- b   
+                let body = preprocessInternal state vertexIndices body
+                let seq = preprocessInternal state vertexIndices seq            
+                let result = Expr.ForEach(vi, seq, body)
+                result
 
             // let v = primitive.P0 || let v = primitive.VertexCount
             | Let(v, PropertyGet(Primitive p, pi, []), body) ->
@@ -388,7 +387,7 @@ type Shader =
         shaderOutputs           : Map<string, ParameterDescription>
         shaderUniforms          : Map<string, UniformParameter>
         shaderInputTopology     : Option<InputTopology>
-        shaderOutputTopology    : Option<OutputTopology>
+        shaderOutputTopology    : Option<OutputTopology * int>
         shaderBody              : Expr
     }
 
@@ -524,6 +523,8 @@ module Shader =
             | Some InputTopology.Point -> ShaderOutputValue(Expr.Value 0) |> Some
             | _ -> Map.tryFind Intrinsics.SourceVertexIndex values
 
+    let private emitVertexMeth = getMethodInfo <@ emitVertex @>
+
     let systemInputs (shader : Shader) =
         let builtIn = builtInInputs.[shader.shaderStage]
         shader.shaderInputs |> Map.choose (fun name p ->
@@ -566,35 +567,6 @@ module Shader =
     let inline inputTopology (s : Shader) = s.shaderInputTopology
     let inline outputTopology (s : Shader) = s.shaderOutputTopology
 
-    /// creates a shader using the given vertex-input-type and body
-    let ofExpr (vertexType : Type) (body : Expr) =
-        let body, state = Preprocessor.preprocessShader vertexType body
-
-        // figure out the used builder-type
-        let builder = 
-            match Expr.TryEval state.builder with
-                | Some (:? IShaderBuilder as v) -> v
-                | _ -> failwithf "[FShade] could not evaluate shader-builder %A" state.builder
-
-        { 
-            shaderStage             = builder.ShaderStage
-            shaderInputs            = state.inputs |> Dictionary.toMap
-            shaderOutputs           = state.outputs |> Dictionary.toMap
-            shaderUniforms          = state.uniforms |> Dictionary.toMap
-            shaderInputTopology     = state.inputTopology
-            shaderOutputTopology    = builder.OutputTopology
-            shaderBody              = body
-        }
-
-    /// creates a shader using the given function
-    let ofFunction (shaderFunction : 'a -> Expr<'b>) =
-        try
-            Unchecked.defaultof<'a>
-                |> shaderFunction
-                |> ofExpr typeof<'a>
-        with _ ->
-            failwithf "[FShade] shader functions may not access their vertex-input statically"
-
     /// optimizes the shader by
     ///    1) evaluating constant expressions
     ///    2) removing useless expressions/variables
@@ -612,11 +584,55 @@ module Shader =
 
         let inputs = Preprocessor.usedInputs newBody
 
+        let newOutputTopology =
+            match shader.shaderStage with
+                | ShaderStage.Geometry -> 
+                    let top, _ = Option.get shader.shaderOutputTopology
+                    let range = Expr.computeCallCount emitVertexMeth newBody
+                    let maxVertices =
+                        if range.Max = Int32.MaxValue then
+                            Log.warn "[FShade] could not determine max-vertex-count (using 32)"
+                            32
+                        else
+                            range.Max
+                    Some (top, range.Max)
+                | _ ->
+                    None
+
         { shader with
             shaderInputs = shader.shaderInputs |> Map.filter (fun n _ -> inputs.ContainsKey n)
             shaderUniforms = shader.shaderUniforms |> Map.filter (fun n _ -> inputs.ContainsKey n)
+            shaderOutputTopology = newOutputTopology
             shaderBody = newBody
         }
+
+    /// creates a shader using the given vertex-input-type and body
+    let ofExpr (vertexType : Type) (body : Expr) =
+        let body, state = Preprocessor.preprocessShader vertexType body
+
+        // figure out the used builder-type
+        let builder = 
+            match Expr.TryEval state.builder with
+                | Some (:? IShaderBuilder as v) -> v
+                | _ -> failwithf "[FShade] could not evaluate shader-builder %A" state.builder
+
+        optimize { 
+            shaderStage             = builder.ShaderStage
+            shaderInputs            = state.inputs |> Dictionary.toMap
+            shaderOutputs           = state.outputs |> Dictionary.toMap
+            shaderUniforms          = state.uniforms |> Dictionary.toMap
+            shaderInputTopology     = state.inputTopology
+            shaderOutputTopology    = builder.OutputTopology |> Option.map (fun t -> t, Int32.MaxValue)
+            shaderBody              = body
+        }
+
+    /// creates a shader using the given function
+    let ofFunction (shaderFunction : 'a -> Expr<'b>) =
+        let expression = 
+            try shaderFunction Unchecked.defaultof<'a>
+            with _ -> failwith "[FShade] shader functions may not access their vertex-input statically"
+        ofExpr typeof<'a> expression
+
 
     /// creates a new shader by modifying all output-writes.
     /// this can be used for adding/removing outputs for shaders

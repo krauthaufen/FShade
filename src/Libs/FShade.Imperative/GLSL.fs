@@ -536,7 +536,7 @@ module GLSL =
                 match state.stages.self with
                     | ShaderStage.Geometry -> 
                         let inputTopology = e.cDecorations |> List.tryPick (function EntryDecoration.InputTopology t -> Some t | _ -> None) |> Option.get
-                        let outputTopology = e.cDecorations |> List.tryPick (function EntryDecoration.OutputTopology t -> Some t | _ -> None) |> Option.get
+                        let outputTopology, vertexCount = e.cDecorations |> List.tryPick (function EntryDecoration.OutputTopology(t,cnt) -> Some(t, cnt) | _ -> None) |> Option.get
                         
                         let inputPrimitive =
                             match inputTopology with
@@ -555,7 +555,7 @@ module GLSL =
 
                         [
                             sprintf "layout(%s) in;" inputPrimitive
-                            sprintf "layout(%s, max_vertices = %d) out;" outputPrimitive 3
+                            sprintf "layout(%s, max_vertices = %d) out;" outputPrimitive vertexCount
                         ]
                     | _ ->
                         []

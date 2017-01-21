@@ -52,7 +52,7 @@ type ShaderStageDescription =
 type EntryDecoration =
     | Stages of ShaderStageDescription
     | InputTopology of InputTopology
-    | OutputTopology of OutputTopology
+    | OutputTopology of OutputTopology * int
 
 
 type EntryPoint =
@@ -258,6 +258,65 @@ module private Affected =
 
 [<AbstractClass; Sealed; Extension>]
 type ExpressionSubstitutionExtensions private() =
+    static let zero = Range1i(0,0)
+
+    static let (<+>) (l : Range1i) (r : Range1i) =
+        Range1i(l.Min + r.Min, l.Max + r.Max)
+
+    static let (<|>) (l : Range1i) (r : Range1i) =
+        Range1i(min l.Min r.Min, max l.Max r.Max)
+
+    static let (<*>) (l : Range1i) (r : int) =
+        Range1i(l.Min * r, l.Max * r)
+
+    static let rec numberOfCalls (mi : MethodInfo) (e : Expr) =
+        match e with
+            | Call(t, m, args) ->
+                if m = mi || (m.IsGenericMethod && m.GetGenericMethodDefinition() = mi) then
+                    Range1i(1,1)
+                else
+                    let args = 
+                        match t with
+                            | Some t -> (t :: args)
+                            | None -> args
+                    args |> List.fold (fun r e -> r <+> numberOfCalls mi e) zero
+
+            | Sequential(l, r) ->
+                numberOfCalls mi l <+> numberOfCalls mi r
+
+            | IfThenElse(cond, i, e) ->
+                numberOfCalls mi cond <+> (numberOfCalls mi i <|> numberOfCalls mi e)
+
+            | ForInteger(v, first, step, last, body) ->
+                let minimal = 
+                    numberOfCalls mi first <+>
+                    numberOfCalls mi step <+>
+                    numberOfCalls mi last
+
+                let inner = numberOfCalls mi body
+
+                match first, step, last with
+                    | Int32 first, Int32 step, Int32 last -> 
+                        let cnt = [first .. step .. last] |> List.length
+                        minimal <+> inner <*> cnt
+                    | _ ->
+                        if inner.Max = 0 then
+                            minimal
+                        else
+                            Range1i(minimal.Min, Int32.MaxValue)
+
+            | WhileLoop(guard, body) ->
+                let minimal = numberOfCalls mi guard
+                let inner = numberOfCalls mi body
+                if inner.Max = 0 && minimal.Max = 0 then
+                    Range1i(0,0)
+                else
+                    Range1i(0, Int32.MaxValue)
+
+            | ShapeVar v -> zero
+            | ShapeLambda(v, b) -> zero
+            | ShapeCombination(o, args) -> args |> List.fold (fun r e -> r <+> numberOfCalls mi e) zero
+
     static let rec substituteReads (substitute : ParameterKind -> Type -> string -> Option<Expr> -> Option<Expr>) (e : Expr) =
         match e with
             | ReadInput(kind, name, index) ->
@@ -297,6 +356,10 @@ type ExpressionSubstitutionExtensions private() =
     static member SubstituteWrites (e : Expr, substitute : Map<string, Expr> -> Option<Expr>) =
         substituteWrites substitute e
 
+    [<Extension>]
+    static member ComputeCallCount (e : Expr, mi : MethodInfo) =
+        numberOfCalls mi e
+
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Expr =
@@ -304,6 +367,7 @@ module Expr =
     let inline substituteReads (f : ParameterKind -> Type -> string -> Option<Expr> -> Option<Expr>) (e : Expr) = e.SubstituteReads f
     let inline substituteWrites (f : Map<string, Expr> -> Option<Expr>) (e : Expr) = e.SubstituteWrites f
     let getAffectedOutputsMap (e : Expr) = Affected.getAffectedOutputsMap e
+    let computeCallCount (mi : MethodInfo) (e : Expr) = e.ComputeCallCount(mi)
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module EntryPoint =
