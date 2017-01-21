@@ -43,56 +43,63 @@ type Fragment =
 type UniformScope with
     member x.Trafo : M44d= x?PerModel?Trafo
 
+[<ReflectedDefinition>]
+let test (a : Arr<4 N, int>) =
+    for i in 0 .. a.Length - 1 do
+        a.[i] <- i
+
+    a.Length
+
 [<EntryPoint>]
 let main args =
-
-    let vert (v : Vertex) =
-        vertex {
-            return {
-                p = uniform.Trafo * v.p
-                tc = v.tc
-                clip = [| 0.0; 1.0; 2.0 |]
-            }
-        }
-
-    let frag (v : Vertex) =
-        fragment {
-            return {
-                color = V4d.IIII
-                tc = v.tc
-            }
-        }
-
-    let vert = Shader.ofFunction vert
-    let frag = Shader.ofFunction frag
-    
-    let effect = Effect.ofList [vert; frag]
-
-    Effect.empty
-        |> Effect.link ShaderStage.Fragment (Map.ofList ["Colors", typeof<V4d>; "Bla", typeof<V2d>])
-        |> Effect.toModule
-        |> Linker.compileAndLink GLSLBackend.Instance
-        |> GLSL.CModule.glsl  { 
-            GLSL.Config.version = System.Version(4,1,0)
-            GLSL.Config.locations = false
-            GLSL.Config.perStageUniforms = true
-            GLSL.Config.uniformBuffers = true 
-        }
-        |> printfn "%s"
-
-    effect
-        |> Effect.link ShaderStage.Fragment (Map.ofList ["Colors", typeof<V4d>])
-        |> Effect.toModule
-        |> Linker.compileAndLink GLSLBackend.Instance
-        |> GLSL.CModule.glsl  { 
-            GLSL.Config.version = System.Version(4,1,0)
-            GLSL.Config.locations = false
-            GLSL.Config.perStageUniforms = true
-            GLSL.Config.uniformBuffers = true 
-        }
-        |> printfn "%s"
-
-    System.Environment.Exit 0
+//
+//    let vert (v : Vertex) =
+//        vertex {
+//            return {
+//                p = uniform.Trafo * v.p
+//                tc = v.tc
+//                clip = [| 0.0; 1.0; 2.0 |]
+//            }
+//        }
+//
+//    let frag (v : Vertex) =
+//        fragment {
+//            return {
+//                color = V4d.IIII
+//                tc = v.tc
+//            }
+//        }
+//
+//    let vert = Shader.ofFunction vert
+//    let frag = Shader.ofFunction frag
+//    
+//    let effect = Effect.ofList [vert; frag]
+//
+//    Effect.empty
+//        |> Effect.link ShaderStage.Fragment (Map.ofList ["Colors", typeof<V4d>; "Bla", typeof<V2d>])
+//        |> Effect.toModule
+//        |> Linker.compileAndLink GLSLBackend.Instance
+//        |> GLSL.CModule.glsl  { 
+//            GLSL.Config.version = System.Version(4,1,0)
+//            GLSL.Config.locations = false
+//            GLSL.Config.perStageUniforms = true
+//            GLSL.Config.uniformBuffers = true 
+//        }
+//        |> printfn "%s"
+//
+//    effect
+//        |> Effect.link ShaderStage.Fragment (Map.ofList ["Colors", typeof<V4d>])
+//        |> Effect.toModule
+//        |> Linker.compileAndLink GLSLBackend.Instance
+//        |> GLSL.CModule.glsl  { 
+//            GLSL.Config.version = System.Version(4,1,0)
+//            GLSL.Config.locations = false
+//            GLSL.Config.perStageUniforms = true
+//            GLSL.Config.uniformBuffers = true 
+//        }
+//        |> printfn "%s"
+//
+//    System.Environment.Exit 0
 
 
     let optimized = 
@@ -144,7 +151,9 @@ let main args =
 
                 sink(arr, arr)
 
-
+                let arr = Arr<4 N, int> [| 1;2;3;4 |]
+                let cnt = test arr
+                sink(arr, arr)
 
                 ()
             @>

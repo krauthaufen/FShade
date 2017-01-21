@@ -600,6 +600,9 @@ module Compiler =
                 | Method("get_Length", [VectorOf _]), [v] ->
                     CVecLength(ct, v) |> Some
 
+                | Method("get_Length", [ArrOf(l,_)]), [a] ->
+                    CValue(CType.CInt(true, 32), CIntegral (int64 l)) |> Some
+
                  // lengthSquared     
                 | MethodQuote <@ Vec.lengthSquared : V4d -> float @> _, [v]
                 | Method("get_LengthSquared", [VectorOf _]), [v] ->
@@ -1015,7 +1018,7 @@ module Compiler =
 
                 | ForInteger(v, first, step, last, b) ->
                     match step, last with
-                        | Trivial, Trivial -> 
+                        | Trivial, TrivialOp -> 
                             let! v = toCVar v
                             let! cfirst = toCRExpr first
                             let! cstep = toCExpr step
@@ -1068,7 +1071,7 @@ module Compiler =
                             let vLast = Var("last", last.Type)
                             return! toCStatement isLast (Expr.Let(vLast, last, Expr.ForInteger(v, first, step, Expr.Var vLast, b)))
 
-                        | step, Trivial -> 
+                        | step, TrivialOp -> 
                             let vStep = Var("step", step.Type)
                             return! toCStatement isLast (Expr.Let(vStep, step, Expr.ForInteger(v, first, Expr.Var vStep, last, b)))
 

@@ -124,6 +124,14 @@ module ReflectionPatterns =
         else
             None
 
+    let (|ArrayLengthProperty|_|) (pi : PropertyInfo) =
+        if pi.Name = "Length" then
+            match pi.DeclaringType with
+                | ArrOf _ | ArrayOf _ -> Some ()
+                | _ -> None
+        else
+            None
+
     let (|VectorValue|_|) (v : obj) =
         match v with
             | :? V2d as v -> Some (typeof<float>, [| v.X :> obj; v.Y :> obj|])
@@ -455,8 +463,30 @@ module ExprExtensions =
             | FieldGet(None, _)
             | PropertyGet(None, _, [])
             | TupleGet(Trivial, _)
-            | PropertyGet(Some Trivial, FSharpTypeProperty, [])
+            | PropertyGet(Some Trivial, (FSharpTypeProperty | ArrayLengthProperty), [])
             | FieldGet(Some Trivial, _) ->
+                Some ()
+            | _ ->
+                None
+
+    let (|OperatorMethod|_|) (mi : MethodInfo) =
+        if mi.Name.StartsWith "op_" then Some ()
+        else None
+
+
+
+    /// detects a trivial (low runtime) expression like (|Trivial|_|) but also allows for operator-calls
+    let rec (|TrivialOp|_|) (e : Expr) =
+        match e with
+            | Var _ 
+            | Value _
+            | FieldGet(None, _)
+            | PropertyGet(None, _, [])
+            | TupleGet(TrivialOp, _)
+            | PropertyGet(Some TrivialOp, (FSharpTypeProperty | ArrayLengthProperty), [])
+            | Call(None, OperatorMethod, [TrivialOp; TrivialOp])
+            | Call(None, OperatorMethod, [TrivialOp])
+            | FieldGet(Some TrivialOp, _) ->
                 Some ()
             | _ ->
                 None

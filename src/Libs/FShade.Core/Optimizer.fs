@@ -1,6 +1,8 @@
 ﻿namespace FShade
 
 open System
+open System.Reflection
+
 open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Quotations.Patterns
 open Microsoft.FSharp.Quotations.DerivedPatterns
@@ -36,15 +38,34 @@ module Optimizer =
             | GetArray(LExpr a, i) -> Some a
             | _ -> None
 
+    let rec (|MutableArgument|_|) (e : Expr) =
+        match e with
+            | Var v -> 
+                if v.IsMutable then
+                    Some v
+                else
+                    match v.Type with
+                        | ArrOf _ -> Some v
+                        | ArrayOf _ -> Some v
+                        | _ -> None
+
+            | AddressOf (MutableArgument v) -> Some v
+            | _ -> None
 
     type EliminationState =
         {
+            isGlobalSideEffect : MethodInfo -> bool
             usedVariables : Set<Var>
         }
 
+
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module EliminationState =
-        let empty = { usedVariables = Set.empty }
+        let empty = 
+            { 
+                isGlobalSideEffect = fun mi -> mi.ReturnType = typeof<unit> || mi.ReturnType = typeof<System.Void>
+                usedVariables = Set.empty
+            }
         let useVar (v : Var) = State.modify (fun s -> { s with usedVariables = Set.add v s.usedVariables })
         let remVar (v : Var) = State.modify (fun s -> { s with usedVariables = Set.remove v s.usedVariables })
         let isUsed (v : Var) = State.get |> State.map (fun s -> Set.contains v s.usedVariables)
@@ -53,6 +74,7 @@ module Optimizer =
 
         let merge (l : EliminationState) (r : EliminationState) =
             {
+                isGlobalSideEffect = l.isGlobalSideEffect
                 usedVariables = Set.union l.usedVariables r.usedVariables
             }
 
@@ -61,10 +83,24 @@ module Optimizer =
                 let! initial = State.get
                 let! res = m
                 let! final = State.get
-                if initial = final then return res
+                if initial.usedVariables = final.usedVariables then return res
                 else return! fix m
             }
 
+
+    let private callNeededS (t : Option<Expr>) (mi : MethodInfo) (args : list<Expr>) =
+        state {
+            let! state = State.get
+
+            if state.isGlobalSideEffect mi then
+                return true
+            else
+                let isNeeded =
+                    args |> List.exists (function MutableArgument v -> Set.contains v state.usedVariables | _ -> false) ||
+                    t |> Option.map (function MutableArgument v -> Set.contains v state.usedVariables | _ -> false) |> Option.defaultValue false
+
+                return isNeeded
+        }
 
     let rec withoutValueS (e : Expr) : State<EliminationState, Expr> =
         state {
@@ -99,12 +135,23 @@ module Optimizer =
                     return Expr.Application(l, a)
 
                 | Call(t, mi, args) ->
-                    let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
-                    let! t = t |> Option.mapS withoutValueS
+                    let! needed = callNeededS t mi args
 
-                    match t with
-                        | Some t -> return Expr.Seq (t :: args)
-                        | None -> return Expr.Seq args            
+                    if needed then
+                        let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
+                        let! t = t |> Option.mapS eliminateDeadCodeS
+
+                        match t with
+                            | Some t -> return Expr.Call(t, mi, args) |> Expr.Ignore
+                            | None -> return Expr.Call(mi, args) |> Expr.Ignore
+                    else
+                        let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+                        let! t = t |> Option.mapS withoutValueS
+
+                        match t with
+                            | Some t -> return Expr.Seq (t :: args)
+                            | None -> return Expr.Seq args            
+
 
                 | Coerce(e,t) ->
                     return! withoutValueS e
@@ -304,19 +351,6 @@ module Optimizer =
                         }
 
                     return! EliminationState.fix iterate
-//                    
-//                    let! last = eliminateDeadCodeS last
-//                    let! step = eliminateDeadCodeS step
-//                    let! first = eliminateDeadCodeS first
-//
-//                    let! body = EliminationState.fix (eliminateDeadCodeS body)
-//
-//                    match body with
-//                        | Unit -> 
-//                            return Expr.Unit
-//
-//                        | _ ->
-//                            return Expr.ForInteger(v, first, step, last, body)
 
                 | WhileLoop(guard, body) ->
                     let iterate =
@@ -358,12 +392,19 @@ module Optimizer =
                     return Expr.Application(l, a)
 
                 | Call(t, mi, args) ->
-                    let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
-                    let! t = t |> Option.mapS eliminateDeadCodeS
+                    let! needed = 
+                        if e.Type <> typeof<unit> then State.value true
+                        else callNeededS t mi args
 
-                    match t with
-                        | Some t -> return Expr.Call(t, mi, args)
-                        | None -> return Expr.Call(mi, args)
+                    if needed then
+                        let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
+                        let! t = t |> Option.mapS eliminateDeadCodeS
+
+                        match t with
+                            | Some t -> return Expr.Call(t, mi, args)
+                            | None -> return Expr.Call(mi, args)
+                    else
+                        return Expr.Unit
 
                 | Coerce(e,t) ->
                     let! e = eliminateDeadCodeS e
@@ -480,4 +521,14 @@ module Optimizer =
     let eliminateDeadCode (e : Expr) =
         let run = eliminateDeadCodeS e
         let mutable state = EliminationState.empty
+        run.Run(&state)
+
+    let withoutValue' (isSideEffect : MethodInfo -> bool) (e : Expr) =
+        let run = withoutValueS e
+        let mutable state = { EliminationState.empty with isGlobalSideEffect = isSideEffect }
+        run.Run(&state)
+
+    let eliminateDeadCode' (isSideEffect : MethodInfo -> bool)  (e : Expr) =
+        let run = eliminateDeadCodeS e
+        let mutable state = { EliminationState.empty with isGlobalSideEffect = isSideEffect }
         run.Run(&state)

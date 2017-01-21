@@ -1,6 +1,8 @@
 ﻿namespace FShade
 
 open System
+open System.Reflection
+
 open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Quotations.Patterns
 open Microsoft.FSharp.Quotations.DerivedPatterns
@@ -500,6 +502,29 @@ module Shader =
 
         ]
 
+    let private sideEffects =
+        Dictionary.ofList [
+            ShaderStage.Vertex, 
+                HashSet.empty
+
+            ShaderStage.TessControl, 
+                HashSet.empty
+
+            ShaderStage.TessEval, 
+                HashSet.empty
+
+            ShaderStage.Geometry, 
+                HashSet.ofList [
+                    getMethodInfo <@ emitVertex @>
+                    getMethodInfo <@ restartStrip @>
+                    getMethodInfo <@ endPrimitive @>
+                ]
+
+            ShaderStage.Fragment, 
+                HashSet.ofList [
+                    getMethodInfo <@ discard @>
+                ]
+        ]
 
     let systemInputs (shader : Shader) =
         let builtIn = builtInInputs.[shader.shaderStage]
@@ -518,7 +543,6 @@ module Shader =
                 | None ->
                     None
         )
-
 
     let systemOutputs (shader : Shader) =
         let builtIn = builtInOutputs.[shader.shaderStage]
@@ -582,7 +606,8 @@ module Shader =
     ///    3) inline copy variables
     ///    4) inline functions where possible
     let optimize (shader : Shader) =
-        let newBody = Optimizer.eliminateDeadCode shader.shaderBody
+        let sideEffects = sideEffects.[shader.shaderStage]
+        let newBody = Optimizer.eliminateDeadCode' sideEffects.Contains shader.shaderBody
         let inputs = Preprocessor.usedInputs newBody
 
         { shader with
