@@ -30,6 +30,10 @@ module Peano =
 module ReflectionPatterns =
     open Aardvark.Base.TypeInfo.Patterns
 
+
+    type Type with
+        member x.IsArr = x.IsGenericType && x.GetGenericTypeDefinition() = typedefof<Arr<_,_>>
+
      //extracts the (optional) top-most method call from an expression
     let rec tryGetMethodInfo (e : Expr) =
         match e with
@@ -620,6 +624,33 @@ module ExprExtensions =
             | _ -> None
 
 [<AutoOpen>]
+module StateExtensions =
+    open Aardvark.Base.Monads.State
+
+    module Array =
+        let mapS (f : 'a -> State<'s, 'b>) (m : 'a[]) : State<'s, 'b[]> =
+            { new State<'s, 'b[]>() with
+                override x.Run(s : byref<'s>) =
+                    let res = Array.zeroCreate m.Length
+                    for i in 0 .. m.Length - 1 do
+                        res.[i] <- f(m.[i]).Run(&s)
+                    res
+            }
+
+    module Map =
+        let mapS (f : 'a -> 'b -> State<'s, 'c>) (m : Map<'a, 'b>) : State<'s, Map<'a, 'c>> =
+            { new State<'s, Map<'a, 'c>>() with
+                override x.Run(s : byref<'s>) =
+                    let mutable res = Map.empty
+                    for (KeyValue(k,v)) in m do
+                        let v = (f k v).Run(&s)
+                        res <- Map.add k v res
+                    res
+            }
+
+
+
+[<AutoOpen>]
 module private Helpers = 
     open System.Text.RegularExpressions
     open Aardvark.Base.TypeInfo
@@ -708,14 +739,3 @@ module private Helpers =
 
     let inline (|>>) (m : State<'s, 'a>) (f : 'a -> 'b) =
         m |> State.map f
-
-    module Array =
-        let mapS (f : 'a -> State<'s, 'b>) (m : 'a[]) : State<'s, 'b[]> =
-            { new State<'s, 'b[]>() with
-                override x.Run(s : byref<'s>) =
-                    let res = Array.zeroCreate m.Length
-                    for i in 0 .. m.Length - 1 do
-                        res.[i] <- f(m.[i]).Run(&s)
-                    res
-            }
-

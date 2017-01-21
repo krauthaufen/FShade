@@ -345,6 +345,9 @@ module NewStuff =
             static member StoreMeth = store1
             static member StoreIndexedMeth = store2
 
+
+
+
         type Expr with
             static member Load(name : string, t : Type) = Expr.Call(IO.LoadMeth.MakeGenericMethod [|t|], [Expr.Value name])
             static member Load(name : string, index : Expr, t : Type) = Expr.Call(IO.LoadIndexedMeth.MakeGenericMethod [|t|], [Expr.Value name; index])

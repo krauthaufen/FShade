@@ -394,25 +394,6 @@ type Shader =
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Shader =
-    [<AutoOpen>]
-    module private Utilities =   
-        module Map =
-            let keys (m : Map<'a, 'b>) = m |> Map.toSeq |> Seq.map fst
-            let values (m : Map<'a, 'b>) = m |> Map.toSeq |> Seq.map snd
-            
-        let rec modifyWrites (f : Map<string, Expr> -> Map<string, Expr>) (e : Expr) =
-            match e with
-                | WriteOutputs values ->
-                    Expr.WriteOutputs (f values)
-
-                | ShapeCombination(o, args) ->
-                    RebuildShapeCombination(o, args |> List.map (modifyWrites f))
-
-                | ShapeLambda(v, b) -> 
-                    Expr.Lambda(v, modifyWrites f b)
-
-                | ShapeVar _ ->
-                    e
 
     let private builtInInputs =
         Dictionary.ofList [
@@ -492,6 +473,7 @@ module Shader =
                     Intrinsics.ClipDistance, typeof<float[]>
                     Intrinsics.Layer, typeof<int>
                     Intrinsics.ViewportIndex, typeof<int>
+                    Intrinsics.SourceVertexIndex, typeof<int>
                 ]
 
             ShaderStage.Fragment,
@@ -525,6 +507,22 @@ module Shader =
                     getMethodInfo <@ discard @>
                 ]
         ]
+
+    let private converter (inType : Type) (outType : Type) : Expr -> Expr =
+        if inType <> outType then
+            failwithf "[FShade] cannot convert value from %A to %A" inType outType
+        else
+            id
+        
+    let private tryGetSourceVertexIndex (shader : Shader) (values : Map<string, Expr>) =
+        match shader.shaderInputTopology with
+            | Some InputTopology.Point -> Expr.Value 0 |> Some
+            | _ -> Map.tryFind Intrinsics.SourceVertexIndex values
+
+    let private tryGetSourceVertexIndexValue (shader : Shader) (values : Map<string, ShaderOutputValue>) =
+        match shader.shaderInputTopology with
+            | Some InputTopology.Point -> ShaderOutputValue(Expr.Value 0) |> Some
+            | _ -> Map.tryFind Intrinsics.SourceVertexIndex values
 
     let systemInputs (shader : Shader) =
         let builtIn = builtInInputs.[shader.shaderStage]
@@ -567,7 +565,6 @@ module Shader =
     let inline body (s : Shader) = s.shaderBody
     let inline inputTopology (s : Shader) = s.shaderInputTopology
     let inline outputTopology (s : Shader) = s.shaderOutputTopology
-      
 
     /// creates a shader using the given vertex-input-type and body
     let ofExpr (vertexType : Type) (body : Expr) =
@@ -599,15 +596,20 @@ module Shader =
             failwithf "[FShade] shader functions may not access their vertex-input statically"
 
     /// optimizes the shader by
-    ///    1) removing unused variables
+    ///    1) evaluating constant expressions
+    ///    2) removing useless expressions/variables
+    ///    3) unrolling loops where annotated
     ///
     /// and might in the future:
-    ///    2) evaluate constant expressions
     ///    3) inline copy variables
     ///    4) inline functions where possible
     let optimize (shader : Shader) =
         let sideEffects = sideEffects.[shader.shaderStage]
-        let newBody = Optimizer.eliminateDeadCode' sideEffects.Contains shader.shaderBody
+        let newBody = 
+            shader.shaderBody
+                |> Optimizer.evaluateConstants' sideEffects.Contains
+                |> Optimizer.eliminateDeadCode' sideEffects.Contains
+
         let inputs = Preprocessor.usedInputs newBody
 
         { shader with
@@ -644,16 +646,14 @@ module Shader =
 
             value.Value
 
-        let newBody = 
-            shader.shaderBody |> modifyWrites (fun values ->
-                let newOutputs =
-                    values
-                        |> Map.map (fun n -> ShaderOutputValue.ofParameterDescription shader.shaderOutputs.[n])
-                        |> f
-                
-                
-
-                newOutputs |> Map.map addValue
+        let newBody =
+            shader.shaderBody.SubstituteWrites (fun values ->
+                values
+                    |> Map.map (fun n -> ShaderOutputValue.ofParameterDescription shader.shaderOutputs.[n])
+                    |> f
+                    |> Map.map addValue
+                    |> Expr.WriteOutputs
+                    |> Some
             )
 
         let newShader =
@@ -694,9 +694,31 @@ module Shader =
                                 if t = typeof<obj> then
                                     failwithf "[FShade] cannot add output %A with object type" n
                                     
-                                ShaderOutputValue(Expr.ReadInput(ParameterKind.Input, t, n))
+                                match shader.shaderStage with
+                                    | ShaderStage.Vertex | ShaderStage.Fragment ->
+                                        ShaderOutputValue(Expr.ReadInput(ParameterKind.Input, t, n))
+
+                                    | ShaderStage.Geometry ->
+                                        match tryGetSourceVertexIndexValue shader values with
+                                            | Some index -> 
+                                                ShaderOutputValue(Expr.ReadInput(ParameterKind.Input, t, n, index.Value))
+                                            | None -> 
+                                                failwithf "[FShade] cannot add output %A to GeometryShader since no SourceVertexIndex was available" n
+                                    
+                                    | _ ->
+                                        failwith "[FShade] passing for tessellation not implemented"
+                                                
                     )
             )
+
+    let removeOutputs (semantics : Set<string>) (shader : Shader) =
+        let desired = 
+            shader.shaderOutputs |> Map.choose (fun name p ->
+                if Set.contains name semantics then None
+                else Some p.paramType
+            )
+
+        withOutputs desired shader
 
     /// translates a shader to an EntryPoint which can be used for compiling
     /// the shader to a CAst
@@ -781,6 +803,15 @@ module Shader =
                 shader.shaderInputs
                     |> Map.map (fun _ p -> p.paramType)
                     |> Map.add Intrinsics.Position typeof<V4d>
+
+            | ShaderStage.Geometry ->
+                shader.shaderInputs
+                    |> Map.map (fun _ p ->
+                        match p.paramType with
+                            | ArrOf(_,t) | ArrayOf t -> t
+                            | t -> t
+                    )
+
             | _ ->
                 shader.shaderInputs
                     |> Map.map (fun _ p -> p.paramType)
@@ -794,162 +825,179 @@ module Shader =
             | _ ->
                 shader.shaderOutputs
                     |> Map.map (fun _ p -> p.paramType)
-               
+        
 
-//[<NoComparison>]
-//type Effect = 
-//    { 
-//        vertex        : Option<Shader>
-//        tessControl   : Option<Shader>
-//        tessEval      : Option<Shader>
-//        geometry      : Option<Shader>
-//        fragment      : Option<Shader>
-//    }
-//
-//    member x.hasVertex = Option.isSome x.vertex
-//    member x.hasTessControl = Option.isSome x.tessControl
-//    member x.hasTessEval = Option.isSome x.tessEval
-//    member x.hasGeometry = Option.isSome x.geometry
-//    member x.hasFragment = Option.isSome x.fragment
-//
-//    member x.shaders =
-//        List.concat [
-//            Option.toList x.vertex
-//            Option.toList x.tessControl
-//            Option.toList x.tessEval
-//            Option.toList x.geometry
-//            Option.toList x.fragment
-//        ]
-//
-//[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-//module Effect =
-//    let inline vertex (e : Effect) = e.vertex
-//    let inline tessControl (e : Effect) = e.tessControl
-//    let inline tessEval (e : Effect) = e.tessEval
-//    let inline geometry (e : Effect) = e.geometry
-//    let inline fragment (e : Effect) = e.fragment
-//    let inline hasVertex (e : Effect) = e.hasVertex
-//    let inline hasTessControl (e : Effect) = e.hasTessControl
-//    let inline hasTessEval (e : Effect) = e.hasTessEval
-//    let inline hasGeometry (e : Effect) = e.hasGeometry
-//    let inline hasFragment (e : Effect) = e.hasFragment
-//    let inline shaders (e : Effect) = e.shaders
-//
-//    let empty = { vertex = None; tessControl = None; tessEval = None; geometry = None; fragment = None }
-//
-//    let isEmpty (e : Effect) =
-//        Option.isNone e.vertex &&
-//        Option.isNone e.tessControl &&
-//        Option.isNone e.tessEval &&
-//        Option.isNone e.geometry &&
-//        Option.isNone e.fragment
-//
-//    let ofShader (shader : Shader) =
-//        match shader.shaderStage with
-//            | ShaderStage.Vertex         -> { empty with vertex = Some shader }
-//            | ShaderStage.TessControl    -> { empty with tessControl = Some shader }
-//            | ShaderStage.TessEval       -> { empty with tessEval = Some shader }
-//            | ShaderStage.Geometry       -> { empty with geometry = Some shader }
-//            | ShaderStage.Fragment       -> { empty with fragment = Some shader }
-//            | _                          -> failwithf "[FShade] unknown shader-stage %A" shader.shaderStage
-//
-//    let ofShaders (shaders : list<Shader>) =
-//        let addShader (shader : Shader) (e : Effect) =
-//            let trySet (old : Option<Shader>) (n : Shader) =
-//                match old with
-//                    | None -> Some n
-//                    | Some o -> failwithf "[FShade] duplicate shader for stage %A" o.shaderStage
-//
-//            match shader.shaderStage with
-//                | ShaderStage.Vertex         -> { e with vertex = trySet e.vertex shader }
-//                | ShaderStage.TessControl    -> { e with tessControl = trySet e.tessControl shader }
-//                | ShaderStage.TessEval       -> { e with tessEval = trySet e.tessEval shader }
-//                | ShaderStage.Geometry       -> { e with geometry = trySet e.geometry shader }
-//                | ShaderStage.Fragment       -> { e with fragment = trySet e.fragment shader }
-//                | _                          -> failwithf "[FShade] unknown shader-stage %A" shader.shaderStage
-//
-//        shaders |> List.fold (fun e s -> addShader s e) empty
-//
-//    let inline ofExpr (inputType : Type) (e : Expr) =
-//        Shader.ofExpr inputType e |> ofShader
-//
-//    let inline ofFunction (f : 'a -> Expr<'b>) =
-//        Shader.ofFunction f |> ofShader
-//
-//    let toModule (e : Effect) =
-//        let rec compileAll (prev : Option<ShaderStage>) (list : list<Shader>) =
-//            match list with
-//                | [] -> []
-//                | [last] -> [ Shader.toEntryPoint prev last None ]
-//                | current :: next :: rest ->
-//                    (Shader.toEntryPoint prev current (Some next.shaderStage)) ::
-//                    compileAll (Some current.shaderStage) (next :: rest)
-//
-//        let entries = compileAll None e.shaders
-//
-//        { entries = entries }
-//
-//    let map (f : Shader -> Shader) (e : Effect) =
-//        {
-//            vertex        = e.vertex        |> Option.map f
-//            tessControl   = e.tessControl   |> Option.map f
-//            tessEval      = e.tessEval      |> Option.map f
-//            geometry      = e.geometry      |> Option.map f
-//            fragment      = e.fragment      |> Option.map f
-//        }
-//
-//    let setOutputs (wanted : Map<string, Type>) (e : Effect) =
-//        let rec traverse (wanted : Map<string, Type>) (s : list<Shader>) =
-//            match s with
-//                | [] -> []
-//
-//                | s :: rest ->
-//                    let newShader = Shader.withOutputs wanted s
-//                    let wanted = newShader.shaderInputs |> Map.map (fun _ p -> p.paramType)
-//                
-//                    let newWanted =
-//                        if s.shaderStage = ShaderStage.Fragment then 
-//                            Map.add Intrinsics.Position typeof<V4d> wanted
-//                        else 
-//                            wanted
-//
-//                    newShader :: traverse newWanted rest
-//
-//        e.shaders 
-//            |> List.rev
-//            |> traverse wanted
-//            |> ofShaders
-//
-//    let nextShader (t : ShaderStage) (e : Effect) =
-//        e.shaders 
-//            |> List.tryFind (fun s -> s.shaderStage > t)
-//
-//    let prevShader (t : ShaderStage) (e : Effect) =
-//        e.shaders 
-//            |> List.rev
-//            |> List.tryFind (fun s -> s.shaderStage < t)
-//
-//    //let link2 (finalStage : ShaderStage) (finalResults : Map<string, Type>) (e : Effect) =
-//        
-//
-//    let link (effect : Effect) =
-//        let next = effect |> nextShader ShaderStage.Vertex
-//        match next with
-//            | Some next -> 
-//                match effect.vertex with
-//                    | None -> 
-//                        let needed = 
-//                            match next.shaderStage with
-//                                | ShaderStage.Fragment -> 
-//                                    Map.add 
-//                                        Intrinsics.Position 
-//                                        { paramType = typeof<V4d>; paramInterpolation = InterpolationMode.Default }
-//                                        next.shaderInputs 
-//                                | _ ->
-//                                    next.shaderInputs
-//
-//                        { effect with vertex = Some (Shader.passing ShaderStage.Vertex (failwith "")) }
-//                    | _ -> 
-//                        effect
-//            | None ->
-//                effect
+    module private Composition = 
+        let simple (l : Shader) (r : Shader) =
+            let needed  = Map.intersect l.shaderOutputs r.shaderInputs
+            let passed  = Map.difference l.shaderOutputs r.shaderOutputs
+
+            let lBody =
+                l.shaderBody.SubstituteWrites (fun values ->
+                    let variables =
+                        needed |> Map.map (fun name (lv, rv) -> 
+                            let variable = Var(name + "C", rv.paramType)
+                            let converter = converter lv.paramType rv.paramType
+                            variable, converter
+                        )
+
+                    let rBody =
+                        r.shaderBody
+                            |> Expr.substituteReads (fun kind t name idx ->
+                                match kind with
+                                    | ParameterKind.Input -> 
+                                        match Map.tryFind name variables with
+                                            | Some(v,_) -> Expr.Var v |> Some
+                                            | _ -> None
+                                    | _ ->
+                                        None
+                            )
+
+                    let rBody = 
+                        variables |> Map.fold (fun b name (var, convert) ->
+                            Expr.Let(var, convert (Map.find name values), b)
+                        ) rBody
+
+                    let passedValues =
+                        passed |> Map.map (fun name p ->
+                            Map.find name values
+                        )
+
+                    if Map.isEmpty passedValues then
+                        rBody |> Some
+                    else
+                        rBody
+                            |> Expr.substituteWrites (fun rValues ->
+                                Map.union passedValues rValues
+                                    |> Expr.WriteOutputs
+                                    |> Some
+                            )
+                            |> Some
+                )
+
+            optimize 
+                { l with
+                    shaderInputs = Map.union r.shaderInputs l.shaderInputs
+                    shaderOutputs = Map.union l.shaderOutputs r.shaderOutputs
+                    shaderUniforms = Map.union l.shaderUniforms r.shaderUniforms
+                    shaderBody = lBody
+                }
+
+        let gsvs (lShader : Shader) (rShader : Shader) =
+            let needed  = Map.intersect lShader.shaderOutputs rShader.shaderInputs
+            let passed  = Map.difference lShader.shaderOutputs rShader.shaderOutputs
+            let unknown = Map.difference rShader.shaderInputs lShader.shaderOutputs |> Map.keys |> Set.ofSeq
+            let mutable finalOutputsFromRight = rShader.shaderOutputs |> Map.keys |> Set.ofSeq
+            
+            let lBody =
+                lShader.shaderBody.SubstituteWrites (fun values ->
+                    let variables =
+                        needed |> Map.map (fun name (lv, rv) -> 
+                            let variable = Var(name + "C", rv.paramType)
+                            let converter = converter lv.paramType rv.paramType
+                            variable, converter
+                        )
+
+                    let vertexIndex = tryGetSourceVertexIndex lShader values
+
+                    let rShader =
+                        match tryGetSourceVertexIndex lShader values with
+                            | Some _ -> rShader
+                            | None when Set.isEmpty unknown -> rShader
+                            | None ->
+                                let invalidOutputs = 
+                                    let affected = Expr.getAffectedOutputsMap rShader.shaderBody
+                                    unknown 
+                                        |> Seq.map (fun u -> match Map.tryFind u affected with | Some a -> a | _ -> Set.empty) 
+                                        |> Set.unionMany
+
+                                finalOutputsFromRight <- Set.difference finalOutputsFromRight invalidOutputs
+
+                                rShader |> removeOutputs invalidOutputs
+                            
+                    let rBody = 
+                        rShader.shaderBody
+                            |> Expr.substituteReads (fun kind t name idx ->
+                                match kind with
+                                    | ParameterKind.Input -> 
+                                        match Map.tryFind name variables with
+                                            | Some(v,_) -> 
+                                                Expr.Var v |> Some
+                                            | None -> 
+                                                match vertexIndex with
+                                                    | Some vertexIndex -> 
+                                                        match idx with
+                                                            | None -> Some (Expr.ReadInput(kind, t, name, vertexIndex))
+                                                            | Some i -> failwithf "[FShade] vertex shader reading indexed input %A not supported" name
+                                                    | None ->
+                                                        failwithf "[FShade] internal error in gsvs"
+                                    | _ -> 
+                                        None
+                            )
+                             
+                    let rBody = 
+                        variables |> Map.fold (fun b name (var, convert) ->
+                            Expr.Let(var, convert (Map.find name values), b)
+                        ) rBody
+
+                    let passedValues =
+                        passed |> Map.map (fun name p ->
+                            Map.find name values
+                        )
+
+                    if Map.isEmpty passedValues then
+                        rBody |> Some
+                    else
+                        rBody
+                            |> Expr.substituteWrites (fun rValues ->
+                                Map.union passedValues rValues
+                                    |> Expr.WriteOutputs
+                                    |> Some
+                            )
+                            |> Some
+                )
+
+            let rInputs = 
+                rShader.shaderInputs |> Map.choose (fun name p ->
+                    if Set.contains name unknown then
+                        Some { p with paramType = p.paramType.MakeArrayType() }
+                    else
+                        None
+                )
+
+            let rOutputs =
+                rShader.shaderOutputs |> Map.filter (fun name p -> Set.contains name finalOutputsFromRight)
+
+            optimize 
+                { lShader with
+                    shaderInputs = Map.union rInputs lShader.shaderInputs
+                    shaderOutputs = Map.union lShader.shaderOutputs rOutputs
+                    shaderUniforms = Map.union lShader.shaderUniforms rShader.shaderUniforms
+                    shaderBody = lBody
+                }
+
+    let compose2 (l : Shader) (r : Shader) =
+        match l.shaderStage, r.shaderStage with
+
+            // simple case: both are vertex/fragment
+            | ShaderStage.Vertex, ShaderStage.Vertex
+            | ShaderStage.Fragment, ShaderStage.Fragment ->
+                Composition.simple l r
+
+            // harder case: left is geometry and right is vertex
+            | ShaderStage.Geometry, ShaderStage.Vertex ->
+                Composition.gsvs l r
+
+
+            | _ ->
+                failwithf "[FShade] cannot compose %AShader with %AShader" l.shaderStage r.shaderStage
+
+    let compose (l : #seq<Shader>) =
+        use e = l.GetEnumerator()
+        if e.MoveNext() then
+            let mutable res = e.Current
+            while e.MoveNext() do
+                res <- compose2 res e.Current
+            res
+        else
+            failwith "[FShade] cannot compose empty shader-sequence"      

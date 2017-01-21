@@ -63,6 +63,12 @@ module Intrinsics =
     [<Literal>] 
     let ViewportIndex = "ViewportIndex"
 
+
+    
+    [<Literal>] 
+    let SourceVertexIndex = "GeometrySourceVertexIndex"
+
+
 [<AutoOpen>]
 module InstrinsicAttributes =
     type PositionAttribute() = inherit SemanticAttribute(Intrinsics.Position)
@@ -87,6 +93,8 @@ module InstrinsicAttributes =
     type SampleMaskAttribute() = inherit SemanticAttribute(Intrinsics.SampleMask)
     type LayerAttribute() = inherit SemanticAttribute(Intrinsics.Layer)
     type ViewportIndexAttribute() = inherit SemanticAttribute(Intrinsics.ViewportIndex)
+
+    type SourceVertexIndexAttribute() = inherit SemanticAttribute(Intrinsics.SourceVertexIndex)
 
 type TessLevels = 
     { 

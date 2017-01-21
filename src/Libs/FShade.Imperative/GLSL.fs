@@ -271,6 +271,8 @@ module GLSL =
                         | Some idx -> sprintf "%s[%s]" name (glsl idx)
                         | None -> name
 
+                | CCallIntrinsic(_, { intrinsicName = "discard" }, _) ->
+                    "discard"
 
                 | CCallIntrinsic(_, f, args) ->
                     let args = args |> Seq.map glsl |> String.concat ", "
@@ -475,7 +477,11 @@ module GLSL =
                         | _ -> ""
                     
 
-            sprintf "%s%s%s %s;" decorations prefix (CType.glsl p.cParamType) name
+            match p.cParamType with
+                | CPointer(_, t) ->
+                    sprintf "%s%s%s %s[];" decorations prefix (CType.glsl t) name
+                | _ -> 
+                    sprintf "%s%s%s %s;" decorations prefix (CType.glsl p.cParamType) name
 
         let glsl (state : State) (kind : ParameterKind) (index : int) (p : CEntryParameter) =
             match kind with
@@ -526,11 +532,41 @@ module GLSL =
                         }
                 }
 
+            let prefix = 
+                match state.stages.self with
+                    | ShaderStage.Geometry -> 
+                        let inputTopology = e.cDecorations |> List.tryPick (function EntryDecoration.InputTopology t -> Some t | _ -> None) |> Option.get
+                        let outputTopology = e.cDecorations |> List.tryPick (function EntryDecoration.OutputTopology t -> Some t | _ -> None) |> Option.get
+                        
+                        let inputPrimitive =
+                            match inputTopology with
+                                | InputTopology.Point -> "points"
+                                | InputTopology.Line -> "lines"
+                                | InputTopology.LineAdjacency -> "lines_adjacency"
+                                | InputTopology.Triangle -> "triangles"
+                                | InputTopology.TriangleAdjacency -> "triangles_adjacency"
+                                | InputTopology.Patch _ -> failwith "[FShade] GeometryShaders cannot use patches"
+
+                        let outputPrimitive =
+                            match outputTopology with
+                                | OutputTopology.Points -> "points"
+                                | OutputTopology.LineStrip -> "line_strip"
+                                | OutputTopology.TriangleStrip -> "triangle_strip"
+
+                        [
+                            sprintf "layout(%s) in;" inputPrimitive
+                            sprintf "layout(%s, max_vertices = %d) out;" outputPrimitive 3
+                        ]
+                    | _ ->
+                        []
+
+
             let inputs = CEntryParameter.many state ParameterKind.Input e.cInputs
             let outputs = CEntryParameter.many state ParameterKind.Output e.cOutputs
             let args = CEntryParameter.many state ParameterKind.Argument e.cArguments |> String.concat ", " 
 
             String.concat "\r\n" [
+                yield! prefix
                 yield! inputs
                 yield! outputs
                 yield sprintf "%s %s(%s)\r\n{\r\n%s;\r\n}" (CType.glsl e.cReturnType) e.cEntryName args (e.cBody |> CStatement.glsl state |> String.indent)

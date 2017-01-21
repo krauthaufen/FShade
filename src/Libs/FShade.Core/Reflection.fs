@@ -194,3 +194,20 @@ module BasicQuotationPatterns =
                     | Some v -> res <- Map.add k v res
                     | _ -> ()
             res
+
+        let keys (m : Map<'a, 'b>) = m |> Map.toSeq |> Seq.map fst
+        let values (m : Map<'a, 'b>) = m |> Map.toSeq |> Seq.map snd
+
+        let intersect (l : Map<'a, 'b>) (r : Map<'a, 'c>) =
+            l |> choose (fun k lv ->
+                match Map.tryFind k r with
+                    | Some rv -> Some (lv, rv)
+                    | None -> None
+            )
+
+        let difference (l : Map<'a, 'b>) (r : Map<'a, 'c>) =
+            l |> choose (fun k lv ->
+                match Map.tryFind k r with
+                    | Some rv -> None
+                    | None -> Some lv
+            )

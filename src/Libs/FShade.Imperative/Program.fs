@@ -19,6 +19,11 @@ type GLSLBackend private() =
             | MethodQuote <@ sin @> _           -> CIntrinsic.simple "sin" |> Some
             | MethodQuote <@ cos @> _           -> CIntrinsic.simple "cos" |> Some
             | MethodQuote <@ clamp @> _         -> CIntrinsic.custom "clamp" [2;0;1] |> Some
+
+            | MethodQuote <@ discard @> _         -> CIntrinsic.simple "discard" |> Some
+            | MethodQuote <@ emitVertex @> _      -> CIntrinsic.simple "EmitVertex" |> Some
+            | MethodQuote <@ restartStrip @> _    -> CIntrinsic.simple "EndPrimitive" |> Some
+            | MethodQuote <@ endPrimitive @> _    -> CIntrinsic.simple "EndPrimitive" |> Some
             | _ -> None
     
     override x.TryGetIntrinsicCtor (c : ConstructorInfo) =

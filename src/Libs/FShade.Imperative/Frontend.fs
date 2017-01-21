@@ -1,11 +1,14 @@
 ﻿namespace FShade.Imperative
 
 open System
+open System.Reflection
 open System.Collections.Generic
+open System.Runtime.CompilerServices
 
 open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Quotations.Patterns
 open Microsoft.FSharp.Quotations.DerivedPatterns
+open Microsoft.FSharp.Quotations.ExprShape
 open Microsoft.FSharp.Reflection
 
 open Aardvark.Base
@@ -66,8 +69,7 @@ type EntryPoint =
 
 [<AutoOpen>]
 module ExpressionExtensions =
-    open System.Reflection
-
+    
 
     type private IO private() =
         static let allMethods = typeof<IO>.GetMethods(BindingFlags.NonPublic ||| BindingFlags.Static)
@@ -101,14 +103,8 @@ module ExpressionExtensions =
         static member WriteOutputs(values : array<string * obj>) : unit =
             failwith "[FShade] cannot write outputs in host-code"
 
-    let private noneCtor, someCtor = 
-        let t = typeof<Option<int>>
-        let cases = FSharpType.GetUnionCases(t, true)
-        let none = cases |> Array.find (fun c -> c.Name = "None")
-        let some = cases |> Array.find (fun c -> c.Name = "Some")
-        none, some
 
-
+  
     type Expr with
         static member ReadInput<'a>(kind : ParameterKind, name : string) : Expr<'a> =
             let mi = IO.ReadInputMeth.MakeGenericMethod [| typeof<'a> |]
@@ -176,6 +172,138 @@ module ExpressionExtensions =
                 Some (Map.ofList args)
             | _ -> 
                 None
+
+    type MethodInfo with
+        static member WriteOutputs = IO.WriteOutputsMeth
+        static member ReadInput = IO.ReadInputMeth
+        static member ReadInputIndexed = IO.ReadInputIndexedMeth
+
+
+module private Affected =
+    open Aardvark.Base.Monads.State
+    
+    type State = { dependencies : Map<Var, Set<string>>; affected : Map<string, Set<string>> }
+
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module State =
+        let add (v : Var) (deps : Set<string>) = 
+            State.modify (fun s -> 
+                match Map.tryFind v s.dependencies with
+                    | Some old -> { s with dependencies = Map.add v (Set.union old deps) s.dependencies }
+                    | None -> { s with dependencies = Map.add v deps s.dependencies }
+            )
+
+        let affects (o : string) (deps : Set<string>) = 
+            State.modify (fun s -> 
+                match Map.tryFind o s.affected with
+                    | Some old -> { s with affected = Map.add o (Set.union old deps) s.affected }
+                    | None -> { s with affected = Map.add o deps s.affected }
+            )
+
+        let dependencies (v : Var) =
+            State.get |> State.map (fun s -> 
+                match Map.tryFind v s.dependencies with
+                    | Some d -> d
+                    | _ -> Set.empty
+            )
+       
+    let rec usedInputsS (e : Expr) : State<State, Set<string>> =
+        state {
+            match e with
+                | ReadInput(ParameterKind.Input, name, idx) ->
+                    match idx with
+                        | Some idx -> 
+                            let! used = usedInputsS idx
+                            return Set.add name used
+                        | None ->
+                            return Set.singleton name
+
+                | WriteOutputs values ->
+                    let! values = 
+                        values |> Map.toList |> List.mapS (fun (name, v) ->
+                            state {
+                                let! vUsed = usedInputsS v
+                                do! State.affects name vUsed
+                                return vUsed
+                            }
+                        )   
+                    return Set.unionMany values
+
+                | VarSet(v, e) ->
+                    let! eUsed = usedInputsS e
+                    do! State.add v eUsed
+                    return eUsed
+                    
+                | Let(v, e, b) ->
+                    let! eUsed = usedInputsS e
+                    do! State.add v eUsed
+                    let! bUsed = usedInputsS b
+                    return Set.union eUsed bUsed
+
+                | ShapeVar v -> 
+                    return! State.dependencies v
+
+                | ShapeLambda(v, b) ->
+                    return! usedInputsS b
+
+                | ShapeCombination(o, args) ->
+                    let! args = args |> List.mapS usedInputsS
+                    return Set.unionMany args
+
+        }
+
+    let getAffectedOutputsMap (e : Expr) =
+        let s, _ = usedInputsS e |> State.run { dependencies = Map.empty; affected = Map.empty }
+        s.affected
+
+[<AbstractClass; Sealed; Extension>]
+type ExpressionSubstitutionExtensions private() =
+    static let rec substituteReads (substitute : ParameterKind -> Type -> string -> Option<Expr> -> Option<Expr>) (e : Expr) =
+        match e with
+            | ReadInput(kind, name, index) ->
+                let index = index |> Option.map (substituteReads substitute)
+                match substitute kind e.Type name index with
+                    | Some e -> e
+                    | None -> 
+                        match index with
+                            | Some index -> Expr.ReadInput(kind, e.Type, name, index)
+                            | None -> e
+
+            | ShapeLambda(v,b) -> Expr.Lambda(v, substituteReads substitute b)
+            | ShapeVar _ -> e
+            | ShapeCombination(o, args) ->
+                RebuildShapeCombination(o, args |> List.map (substituteReads substitute))
+
+    static let rec substituteWrites (substitute : Map<string, Expr> -> Option<Expr>) (e : Expr) =
+        match e with
+            | WriteOutputs values ->
+                match substitute values with
+                    | Some e -> e
+                    | None ->
+                        let newValues = values |> Map.map (fun _ -> substituteWrites substitute)
+                        Expr.WriteOutputs newValues
+
+            | ShapeLambda(v,b) -> Expr.Lambda(v, substituteWrites substitute b)
+            | ShapeVar _ -> e
+            | ShapeCombination(o, args) ->
+                RebuildShapeCombination(o, args |> List.map (substituteWrites substitute))
+ 
+        
+    [<Extension>]
+    static member SubstituteReads (e : Expr, substitute : ParameterKind -> Type -> string -> Option<Expr> -> Option<Expr>) =
+        substituteReads substitute e
+        
+    [<Extension>]
+    static member SubstituteWrites (e : Expr, substitute : Map<string, Expr> -> Option<Expr>) =
+        substituteWrites substitute e
+
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module Expr =
+    let inline substitute (f : Var -> Option<Expr>) (e : Expr) = e.Substitute f
+    let inline substituteReads (f : ParameterKind -> Type -> string -> Option<Expr> -> Option<Expr>) (e : Expr) = e.SubstituteReads f
+    let inline substituteWrites (f : Map<string, Expr> -> Option<Expr>) (e : Expr) = e.SubstituteWrites f
+    let getAffectedOutputsMap (e : Expr) = Affected.getAffectedOutputsMap e
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module EntryPoint =
