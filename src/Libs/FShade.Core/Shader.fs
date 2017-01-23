@@ -123,11 +123,6 @@ module PreprocessorNew =
 
         // TODO: validate that these work!!!
         type Expr with
-            static member Call(target : Expr, name : string, args : list<Expr>) =
-                let all = target.Type.GetMethods(BindingFlags.NonPublic ||| BindingFlags.Instance ||| BindingFlags.Public)
-
-
-
             static member BuilderYield(builder : Expr, value : Expr) =
                 let all = builder.Type.GetMethods(BindingFlags.NonPublic ||| BindingFlags.Instance ||| BindingFlags.Public)
 
