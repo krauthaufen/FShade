@@ -88,7 +88,7 @@ module ExpressionExtensions =
 
         static let readInput        = find "ReadInput" [| typeof<ParameterKind>; typeof<string> |]
         static let readInputIndex   = find "ReadInput" [| typeof<ParameterKind>; typeof<string>; typeof<int> |]
-        static let writeOutputs     = find "WriteOutputs" [| typeof<array<string * obj>> |]
+        static let writeOutputs     = find "WriteOutputs" [| typeof<array<string * int * obj>> |]
 
         static member internal ReadInputMeth = readInput
         static member internal ReadInputIndexedMeth = readInputIndex
@@ -100,7 +100,7 @@ module ExpressionExtensions =
         static member ReadInput<'a>(kind : ParameterKind, name : string, index : int) : 'a =
             failwith "[FShade] cannot read inputs in host-code"
 
-        static member WriteOutputs(values : array<string * obj>) : unit =
+        static member WriteOutputs(values : array<string * int * obj>) : unit =
             failwith "[FShade] cannot write outputs in host-code"
 
 
@@ -122,30 +122,31 @@ module ExpressionExtensions =
             let mi = ShaderIO.ReadInputIndexedMeth.MakeGenericMethod [| t |]
             Expr.Call(mi, [ Expr.Value(kind); Expr.Value(name); index ])
 
-        static member WriteOutputs(values : Map<string, Expr>) =
+        static member WriteOutputs(values : Map<string, Option<Expr> * Expr>) =
             let values =
                 values 
                     |> Map.toList
-                    |> List.map (fun (name, value) -> 
+                    |> List.map (fun (name, (index, value)) -> 
+                        let index = index |> Option.defaultValue (Expr.Value -1)
                         if value.Type = typeof<obj> then
-                            Expr.NewTuple [ Expr.Value name; value ]
+                            Expr.NewTuple [ Expr.Value name; index; value ]
                         else 
-                            Expr.NewTuple [ Expr.Value name; Expr.Coerce(value, typeof<obj>) ]
+                            Expr.NewTuple [ Expr.Value name; index; Expr.Coerce(value, typeof<obj>) ]
                     )
 
             Expr.Call(
                 ShaderIO.WriteOutputsMeth,
-                [ Expr.NewArray(typeof<string * obj>, values) ]
+                [ Expr.NewArray(typeof<string * int * obj>, values) ]
             )
 
-        static member WriteOutputs (outputs : list<string * Expr>) =
+        static member WriteOutputs (outputs : list<string * Option<Expr> * Expr>) =
             let mutable map = Map.empty
-            for (name, value) in outputs do
+            for (name, index, value) in outputs do
                 match Map.tryFind name map with
                     | Some old ->
                         failwithf "[FShade] conflicting output-writes for semantic %s (%A vs. %A)" name old value
                     | _ ->
-                        map <- Map.add name value map
+                        map <- Map.add name (index, value) map
 
             Expr.WriteOutputs map
 
@@ -166,8 +167,10 @@ module ExpressionExtensions =
                 let args =
                     args |> List.map (fun a ->
                         match a with
-                            | NewTuple [String name;Coerce(value, _) ] ->
-                                name, value
+                            | NewTuple [String name; index; Coerce(value, _) ] ->
+                                match index with
+                                    | Int32 -1 -> name, (None, value)
+                                    | _ -> name, (Some index, value)
                             | _ ->  
                                 failwithf "[FShade] ill-formed WriteOutputs argument: %A" a    
                     )
@@ -223,11 +226,17 @@ module private Affected =
 
                 | WriteOutputs values ->
                     let! values = 
-                        values |> Map.toList |> List.mapS (fun (name, v) ->
+                        values |> Map.toList |> List.mapS (fun (name, (index, value)) ->
                             state {
-                                let! vUsed = usedInputsS v
+                                let! vUsed = usedInputsS value
                                 do! State.affects name vUsed
-                                return vUsed
+                                match index with
+                                    | Some index -> 
+                                        let! iUsed = usedInputsS index
+                                        do! State.affects name iUsed
+                                        return Set.union iUsed vUsed
+                                    | _ ->
+                                        return vUsed
                             }
                         )   
                     return Set.unionMany values
@@ -336,13 +345,18 @@ type ExpressionSubstitutionExtensions private() =
             | ShapeCombination(o, args) ->
                 RebuildShapeCombination(o, args |> List.map (substituteReads substitute))
 
-    static let rec substituteWrites (substitute : Map<string, Expr> -> Option<Expr>) (e : Expr) =
+    static let rec substituteWrites (substitute : Map<string, Option<Expr> * Expr> -> Option<Expr>) (e : Expr) =
         match e with
             | WriteOutputs values ->
                 match substitute values with
                     | Some e -> e
                     | None ->
-                        let newValues = values |> Map.map (fun _ -> substituteWrites substitute)
+                        let newValues = 
+                            values |> Map.map (fun _ (index, value) -> 
+                                let value = substituteWrites substitute value
+                                let index = index |> Option.map (substituteWrites substitute)
+                                index, value
+                            )
                         Expr.WriteOutputs newValues
 
             | ShapeLambda(v,b) -> Expr.Lambda(v, substituteWrites substitute b)
@@ -356,7 +370,7 @@ type ExpressionSubstitutionExtensions private() =
         substituteReads substitute e
         
     [<Extension>]
-    static member SubstituteWrites (e : Expr, substitute : Map<string, Expr> -> Option<Expr>) =
+    static member SubstituteWrites (e : Expr, substitute : Map<string, Option<Expr> * Expr> -> Option<Expr>) =
         substituteWrites substitute e
 
     [<Extension>]
@@ -368,7 +382,7 @@ type ExpressionSubstitutionExtensions private() =
 module Expr =
     let inline substitute (f : Var -> Option<Expr>) (e : Expr) = e.Substitute f
     let inline substituteReads (f : ParameterKind -> Type -> string -> Option<Expr> -> Option<Expr>) (e : Expr) = e.SubstituteReads f
-    let inline substituteWrites (f : Map<string, Expr> -> Option<Expr>) (e : Expr) = e.SubstituteWrites f
+    let inline substituteWrites (f : Map<string, Option<Expr> * Expr> -> Option<Expr>) (e : Expr) = e.SubstituteWrites f
     let getAffectedOutputsMap (e : Expr) = Affected.getAffectedOutputsMap e
     let computeCallCount (mi : MethodInfo) (e : Expr) = e.ComputeCallCount(mi)
 

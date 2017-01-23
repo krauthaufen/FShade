@@ -335,9 +335,9 @@ module private Preprocessor =
 
                     return 
                         Expr.WriteOutputs [
-                            yield Intrinsics.TessLevelInner, Expr.NewArray(typeof<float>, inner)
-                            yield Intrinsics.TessLevelOuter, Expr.NewArray(typeof<float>, outer)
-                            yield! free |> List.map (fun v -> v.Name, Expr.Var v)
+                            yield Intrinsics.TessLevelInner, None, Expr.NewArray(typeof<float>, inner)
+                            yield Intrinsics.TessLevelOuter, None, Expr.NewArray(typeof<float>, outer)
+                            yield! free |> List.map (fun v -> v.Name, None, Expr.Var v)
                         ]
 
 
@@ -497,7 +497,7 @@ module private Preprocessor =
                     return Expr.Lambda(v, b)
         }
 
-    and getOutputValues (sem : string) (value : Expr) : Preprocess<list<string * Expr>> =
+    and getOutputValues (sem : string) (value : Expr) : Preprocess<list<string * Option<Expr> * Expr>> =
         state {
             if FSharpType.IsRecord(value.Type, true) then
                 let fields = FSharpType.GetRecordFields(value.Type, true) |> Array.toList
@@ -513,7 +513,7 @@ module private Preprocessor =
                                     do! State.writeOutput sem p
 
                                     let! real = preprocessS v
-                                    return sem, real
+                                    return sem, None, real
                                 }
                             )
                         | _ -> 
@@ -525,7 +525,7 @@ module private Preprocessor =
                                     do! State.writeOutput sem p
 
                                     let! real = preprocessS (Expr.PropertyGet(value, f))
-                                    return sem, real
+                                    return sem, None, real
                                 }
                             )
 
@@ -534,13 +534,13 @@ module private Preprocessor =
             elif value.Type = typeof<V3d> then
                 let! value = preprocessS value
                 do! State.writeOutput sem { paramType = typeof<V4d>; paramInterpolation = InterpolationMode.Default }
-                return [sem, <@@ V4d((%%value : V3d), 1.0) @@>]
+                return [sem, None, <@@ V4d((%%value : V3d), 1.0) @@>]
 
 
             elif value.Type = typeof<V4d> then
                 let! value = preprocessS value
                 do! State.writeOutput sem { paramType = typeof<V4d>; paramInterpolation = InterpolationMode.Default }
-                return [sem, value]
+                return [sem, None, value]
 
             else
                 return failwithf "[FShade] invalid vertex-type: %A" value.Type
@@ -561,6 +561,20 @@ module private Preprocessor =
                         | _ -> failwithf "[FShade] could not evaluate shader-builder %A" builder
                 | _ ->
                     failwithf "[FShade] could not evaluate shader-builder %A" state.builder
+        let body =
+            match builder.ShaderStage, state.shaders with
+                | ShaderStage.TessControl, _ :: _ ->
+                    let invocationId = Expr.ReadInput<int>(ParameterKind.Input, Intrinsics.InvocationId)
+                    Expr.Sequential(
+                        Expr.IfThenElse(
+                            <@ %invocationId = 0 @>,
+                            body,
+                            Expr.Unit
+                        ),
+                        Expr.WriteOutputs Map.empty
+                    )
+                | _ -> 
+                    body
 
         let shader = 
             { 
@@ -597,7 +611,7 @@ module private Preprocessor =
                 Map.empty
 
 
-type ShaderOutputValue(mode : InterpolationMode, value : Expr) =
+type ShaderOutputValue(mode : InterpolationMode, index : Option<Expr>, value : Expr) =
     let value, inputs, uniforms =
         let value, state = Preprocessor.preprocess value
 
@@ -623,12 +637,15 @@ type ShaderOutputValue(mode : InterpolationMode, value : Expr) =
         value, inputs, uniforms
 
     member x.Type = value.Type
+    member x.Index = index
     member x.Value = value
     member x.Interpolation = mode
     member x.UsedInputs = inputs
     member x.UsedUniforms = uniforms
 
-    new(value : Expr) = ShaderOutputValue(InterpolationMode.Default, value)
+    new(index : Option<Expr>, value : Expr) = ShaderOutputValue(InterpolationMode.Default, index, value)
+    new(value : Expr) = ShaderOutputValue(InterpolationMode.Default, None, value)
+    new(mode : InterpolationMode, value : Expr) = ShaderOutputValue(mode, None, value)
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module ShaderOutputValue =
@@ -639,7 +656,11 @@ module ShaderOutputValue =
     let inline usedUniforms (o : ShaderOutputValue) = o.UsedUniforms
 
     let toParameterDescription (o : ShaderOutputValue) =
-        { paramType = o.Type; paramInterpolation = o.Interpolation }
+        match o.Index with
+            | Some i -> 
+                { paramType = o.Type.MakeArrayType(); paramInterpolation = o.Interpolation }
+            | _ ->
+                { paramType = o.Type; paramInterpolation = o.Interpolation }
 
     let ofParameterDescription (p : ParameterDescription) (value : Expr) =
         match value with
@@ -771,10 +792,10 @@ module Shader =
         else
             id
         
-    let private tryGetSourceVertexIndex (shader : Shader) (values : Map<string, Expr>) =
+    let private tryGetSourceVertexIndex (shader : Shader) (values : Map<string, Option<Expr> * Expr>) =
         match shader.shaderInputTopology with
             | Some InputTopology.Point -> Expr.Value 0 |> Some
-            | _ -> Map.tryFind Intrinsics.SourceVertexIndex values
+            | _ -> Map.tryFind Intrinsics.SourceVertexIndex values |> Option.map snd
 
     let private tryGetSourceVertexIndexValue (shader : Shader) (values : Map<string, ShaderOutputValue>) =
         match shader.shaderInputTopology with
@@ -892,7 +913,7 @@ module Shader =
                         | Some i -> i
                         | None -> pd
 
-                newInputs <- Map.add name inputParameter newInputs
+                newInputs <- Map.add n inputParameter newInputs
 
             for (n, up) in Map.toSeq value.UsedUniforms do
                 let uniformParameter =
@@ -902,12 +923,12 @@ module Shader =
 
                 newUniforms <- Map.add n uniformParameter newUniforms
 
-            value.Value
+            value.Index, value.Value
 
         let newBody =
             shader.shaderBody.SubstituteWrites (fun values ->
                 values
-                    |> Map.map (fun n -> ShaderOutputValue.ofParameterDescription shader.shaderOutputs.[n])
+                    |> Map.map (fun n (index, value) -> ShaderOutputValue(shader.shaderOutputs.[n].paramInterpolation, index, value))
                     |> f
                     |> Map.map addValue
                     |> Expr.WriteOutputs
@@ -939,34 +960,70 @@ module Shader =
         if current = outputs then
             shader
         else
-            shader |> mapOutputs (fun values ->
-                outputs 
-                    |> Map.map (fun n t ->
-                        match Map.tryFind n values with
-                            | Some value ->
-                                if not (t.IsAssignableFrom value.Type) then
-                                    ShaderOutputValue(value.Interpolation, converter value.Type t value.Value)
-                                else
-                                    value
-                            | None ->
-                                if t = typeof<obj> then
-                                    failwithf "[FShade] cannot add output %A with object type" n
-                                    
-                                match shader.shaderStage with
-                                    | ShaderStage.Vertex | ShaderStage.Fragment ->
-                                        ShaderOutputValue(Expr.ReadInput(ParameterKind.Input, t, n))
+            
+            let mutable constantOutputs = Map.empty
+            if shader.shaderStage = ShaderStage.TessControl then
+                shader.shaderBody.SubstituteWrites(fun values ->
+                    if Map.containsKey Intrinsics.TessLevelInner values then
+                        constantOutputs <- values
+                    None
+                ) |> ignore
 
-                                    | ShaderStage.Geometry ->
-                                        match tryGetSourceVertexIndexValue shader values with
-                                            | Some index -> 
-                                                ShaderOutputValue(Expr.ReadInput(ParameterKind.Input, t, n, index.Value))
-                                            | None -> 
-                                                failwithf "[FShade] cannot add output %A to GeometryShader since no SourceVertexIndex was available" n
+
+            shader |> mapOutputs (fun values ->
+                if Map.containsKey Intrinsics.TessLevelInner values then
+                    values |> Map.filter (fun n _ -> Map.containsKey n outputs)
+
+                else
+                    Map.difference outputs constantOutputs
+                        |> Map.map (fun n t ->
+                            match Map.tryFind n values with
+                                | Some value ->
+                                    if not (t.IsAssignableFrom value.Type) then
+                                        ShaderOutputValue(value.Interpolation, converter value.Type t value.Value)
+                                    else
+                                        value
+                                | None ->
+                                    if t = typeof<obj> then
+                                        failwithf "[FShade] cannot add output %A with object type" n
                                     
-                                    | _ ->
-                                        failwith "[FShade] passing for tessellation not implemented"
+                                    match shader.shaderStage with
+                                        | ShaderStage.Vertex | ShaderStage.Fragment ->
+                                            ShaderOutputValue(Expr.ReadInput(ParameterKind.Input, t, n))
+
+                                        | ShaderStage.Geometry ->
+                                            match tryGetSourceVertexIndexValue shader values with
+                                                | Some index -> 
+                                                    ShaderOutputValue(Expr.ReadInput(ParameterKind.Input, t, n, index.Value))
+                                                | None -> 
+                                                    failwithf "[FShade] cannot add output %A to GeometryShader since no SourceVertexIndex was available" n
+                                    
+                                        | ShaderStage.TessControl ->
+                                            let invocationId = Expr.ReadInput<int>(ParameterKind.Input, Intrinsics.InvocationId).Raw
+                                            let t = 
+                                                match t with
+                                                    | ArrayOf t -> t
+                                                    | _ -> t
+                                            ShaderOutputValue(Some invocationId, Expr.ReadInput(ParameterKind.Input, t, n, invocationId))
+
+                                        | ShaderStage.TessEval ->
+                                            let coord = Expr.ReadInput<V3d>(ParameterKind.Input, Intrinsics.TessCoord)
+
+                                            Log.warn "is wrong"
+                                            ShaderOutputValue(Expr.ReadInput(ParameterKind.Input, t, n, Expr.Value -1))
+
+//
+//                                            match shader.shaderInputTopology.Value with
+//                                                | InputTopology.Patch 3 | InputTopology.Triangle ->
+//                                                    let value = <@@ fun a b c -> a * (%coord).X + b * (%coord).Y + c * (%coord).Z @@>
+//                                                    failwithf "[FShade] passing for tessellation not implemented: %A" value
+//                                                | _ ->
+//                                                    failwith "[FShade] passing for tessellation not implemented"
+
+                                        | _ ->
+                                            failwith "[FShade] passing for tessellation not implemented"
                                                 
-                    )
+                        )
             )
 
     let removeOutputs (semantics : Set<string>) (shader : Shader) =
@@ -1017,26 +1074,7 @@ module Shader =
         let prevStage = prev |> Option.map stage
         let nextStage = next |> Option.map stage
 
-        let tessControlDecoration =
-            match next with
-                | Some tev when tev.shaderStage = ShaderStage.TessEval ->
-                    let tevInputs = 
-                        tev.shaderInputs |> Map.toList |> List.choose (fun (n,i) ->
-                            if builtInInputs.[ShaderStage.TessEval].ContainsKey n || s.shaderOutputs.ContainsKey n then
-                                None
-                            else
-                                Some { 
-                                    paramName = n
-                                    paramSemantic = n
-                                    paramType = i.paramType
-                                    paramDecorations = Set.ofList [ParameterDecoration.Interpolation i.paramInterpolation]
-                                }
-                        )
-
-                    [ EntryDecoration.TessControlPassThru tevInputs ]
-                | _ ->
-                    []
-
+  
         {
             conditional = s.shaderStage |> string |> Some
             entryName   = "main"
@@ -1048,7 +1086,6 @@ module Shader =
             decorations = 
                 List.concat [
                     [ EntryDecoration.Stages { prev = prevStage; self = s.shaderStage; next = nextStage } ]
-                    tessControlDecoration
                     s.shaderInputTopology |> Option.map EntryDecoration.InputTopology |> Option.toList
                     s.shaderOutputTopology |> Option.map EntryDecoration.OutputTopology |> Option.toList
                 ]
@@ -1068,7 +1105,7 @@ module Shader =
                     shaderOutputTopology    = None
                     shaderBody =
                         attributes
-                            |> Map.map (fun n t -> Expr.ReadInput(ParameterKind.Input, t, n))
+                            |> Map.map (fun n t -> None, Expr.ReadInput(ParameterKind.Input, t, n))
                             |> Expr.WriteOutputs
             
                 }
@@ -1088,7 +1125,7 @@ module Shader =
                         |> Map.map (fun _ p -> p.paramType)
                         |> Map.add Intrinsics.Position typeof<V4d>
 
-                | ShaderStage.Geometry ->
+                | ShaderStage.Geometry | ShaderStage.TessControl ->
                     shader.shaderInputs
                         |> Map.map (fun _ p ->
                             match p.paramType with
@@ -1120,6 +1157,9 @@ module Shader =
 
             let lBody =
                 l.shaderBody.SubstituteWrites (fun values ->
+                    // cannot compose to TessControl Shader
+                    let values = values |> Map.map (fun _ (_,v) -> v)
+
                     let variables =
                         needed |> Map.map (fun name (lv, rv) -> 
                             let variable = Var(name + "C", rv.paramType)
@@ -1146,7 +1186,7 @@ module Shader =
 
                     let passedValues =
                         passed |> Map.map (fun name p ->
-                            Map.find name values
+                            None, Map.find name values
                         )
 
                     if Map.isEmpty passedValues then
@@ -1235,6 +1275,9 @@ module Shader =
                                         None
                             )
                              
+                    // cannot compose to TessControl Shader
+                    let values = values |> Map.map (fun _ (_,v) -> v)
+
                     let rBody = 
                         variables |> Map.fold (fun b name (var, convert) ->
                             Expr.Let(var, convert (Map.find name values), b)
@@ -1249,7 +1292,7 @@ module Shader =
                     else
                        
                         let passedValues = 
-                            passed |> Map.map (fun name p -> Map.find name values)
+                            passed |> Map.map (fun name p -> None, Map.find name values)
 
                         rBody
                             |> Expr.substituteWrites (fun rValues ->

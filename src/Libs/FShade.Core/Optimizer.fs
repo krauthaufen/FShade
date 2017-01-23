@@ -838,12 +838,16 @@ module Optimizer =
                 match e with
                     | WriteOutputs values ->
                         let! values = 
-                            values |> Map.mapS (fun _ v -> 
-                                match v with
-                                    | Coerce(v, t) ->
-                                        evaluateConstantsS v |> State.map (fun v -> Expr.Coerce(v, t))
-                                    | v ->
-                                        evaluateConstantsS v
+                            values |> Map.mapS (fun _ (i, v) -> 
+                                state {
+                                    let! v = 
+                                        match v with
+                                            | Coerce(v, t) -> evaluateConstantsS v |> State.map (fun v -> Expr.Coerce(v, t))
+                                            | v -> evaluateConstantsS v
+
+                                    let! i = i |> Option.mapS evaluateConstantsS
+                                    return i, v
+                                }
                                         
                             )
                         return Expr.WriteOutputs(values)

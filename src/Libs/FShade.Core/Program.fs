@@ -229,7 +229,7 @@ module TessDeconstruct =
             let p2 = quad.P2
             let p3 = quad.P3
 
-            let centroid = (p0.pos + p1.pos + p2.pos) / 3.0
+            let centroid = (p0.pos + p1.pos + p2.pos + p3.pos) / 4.0
             let level = 1.0 / centroid.Z
 
             let! coord = tessellateQuad (level, level) (level, level, level, level)
@@ -248,7 +248,7 @@ module TessDeconstruct =
         let e = Effect.ofFunction test
         //let (tcs, tcsState), (tev, tevState) = test Unchecked.defaultof<_> |> Preprocessor.removeTessEval typeof<Patch4<Vertex>>
 
-        e   |> Effect.link ShaderStage.TessEval (Map.ofList [Intrinsics.Position, typeof<V4d>])
+        e   |> Effect.link ShaderStage.Fragment (Map.ofList [Intrinsics.Color, typeof<V4d>])
             |> Effect.toModule
             |> Linker.compileAndLink GLSLBackend.Instance
             |> GLSL.CModule.glsl  { 
@@ -277,9 +277,9 @@ let expected() =
                 let level = 1.0 / centroid.Z
 
                 ShaderIO.WriteOutputs [|
-                    Intrinsics.TessLevelInner, [| level |] :> obj
-                    Intrinsics.TessLevelOuter, [| level; level; level |] :> obj
-                    "level", level :> obj
+                    Intrinsics.TessLevelInner, -1, [| level |] :> obj
+                    Intrinsics.TessLevelOuter, -1, [| level; level; level |] :> obj
+                    "level", -1, level :> obj
                 |]
 
 
@@ -310,8 +310,8 @@ let expected() =
 
 [<EntryPoint>]
 let main args =
-//    TessDeconstruct.run()
-//    System.Environment.Exit 0
+    TessDeconstruct.run()
+    System.Environment.Exit 0
 
     composeTest()
     System.Environment.Exit 0

@@ -570,55 +570,7 @@ module GLSL =
 
     
             let inputs,outputs, body  =
-                match state.stages.self with
-                    | ShaderStage.TessControl ->
-                        let passed = e.cDecorations |> List.pick (function EntryDecoration.TessControlPassThru t -> Some t | _ -> None) 
-                        
-                        let additional = 
-                            passed |> List.map (fun e -> 
-                                {
-                                    cParamType           = CType.ofType e.paramType
-                                    cParamName           = e.paramName
-                                    cParamSemantic       = e.paramName
-                                    cParamDecorations    = e.paramDecorations
-                                }
-                            )
-
-                        let union (l : list<CEntryParameter>) (r : list<CEntryParameter>) =
-                            let mutable lm = l |> List.map (fun p -> p.cParamSemantic, p) |> Map.ofList
-                            for r in r do
-                                match Map.tryFind r.cParamSemantic lm with
-                                    | Some _ -> ()
-                                    | None ->
-                                        lm <- Map.add r.cParamSemantic r lm
-
-                            lm |> Map.toList |> List.map snd
-
-                        let inputs = union e.cInputs additional
-                        let outputs = union e.cOutputs additional
-
-                        let tInt32 = CType.CInt(true, 32)
-                        let invocationId = CReadInput(ParameterKind.Input, tInt32, Intrinsics.InvocationId, None)
-
-                        let body =  
-                            CStatement.CSequential [
-
-                                yield
-                                    CStatement.CIfThenElse(
-                                        CExpr.CEqual(invocationId, CValue(tInt32, CIntegral 0L)),
-                                        e.cBody,
-                                        CNop
-                                    )
-
-                                for a in additional do
-                                    yield CWriteOutput(a.cParamSemantic, Some invocationId, CRExpr(CReadInput(ParameterKind.Input, a.cParamType, a.cParamSemantic, Some invocationId)))
-                                
-                            ]
-
-                        inputs, outputs, body
-
-                    | _ ->
-                        e.cInputs, e.cOutputs, e.cBody
+                e.cInputs, e.cOutputs, e.cBody
 
             let inputs = CEntryParameter.many state ParameterKind.Input inputs
             let outputs = CEntryParameter.many state ParameterKind.Output outputs

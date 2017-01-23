@@ -168,38 +168,16 @@ module Effect =
                     []
 
                 | current :: before ->
-                    if current.shaderStage = ShaderStage.TessControl then
+                    let desired =
+                        needed |> Map.union (Shader.systemOutputs current) |> Map.remove Intrinsics.SourceVertexIndex
 
-                        let newNeeded =
-                            Map.difference needed (Shader.outputs current) |> Map.map (fun _ t -> 
-                                match t with
-                                    | ArrayOf t -> t
-                                    | _ -> t
-                            )
-                        
-                        let newBefore = 
-                            linkShaders newNeeded before
+                    let newCurrent = 
+                        Shader.withOutputs desired current
 
-                        let desired =
-                            needed |> Map.union (Shader.systemOutputs current)
+                    let newBefore = 
+                        linkShaders (Shader.inputs newCurrent) before
 
-                        let newCurrent = 
-                            current |> Shader.mapOutputs (fun writes ->
-                                writes |> Map.filter (fun n _ -> desired.ContainsKey n)
-                            )
-
-                        newCurrent :: newBefore
-                    else
-                        let desired =
-                            needed |> Map.union (Shader.systemOutputs current) |> Map.remove Intrinsics.SourceVertexIndex
-
-                        let newCurrent = 
-                            Shader.withOutputs desired current
-
-                        let newBefore = 
-                            linkShaders (Shader.inputs newCurrent) before
-
-                        newCurrent :: newBefore
+                    newCurrent :: newBefore
                              
         effect 
             // add the final desired stage passing all desired

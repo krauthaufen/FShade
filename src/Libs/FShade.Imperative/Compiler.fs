@@ -356,7 +356,10 @@ module Compiler =
 
                 | WriteOutputs values ->
                     let mutable res = PSet.empty
-                    for (name, value) in Map.toSeq values do
+                    for (name, (index, value)) in Map.toSeq values do
+                        match index with
+                            | Some index -> res <- PSet.union res (free index)
+                            | _ -> ()
                         res <- res |> PSet.union (free value) |> PSet.add (Global(name, value.Type, true))
 
                     res
@@ -1084,11 +1087,15 @@ module Compiler =
                             
                 | WriteOutputs values ->
                     let! writes =
-                        values |> Map.toList |> List.mapS (fun (name, value) ->
+                        values |> Map.toList |> List.mapS (fun (name, (index, value)) ->
                             state {
+                                let! index = 
+                                    match index with
+                                        | Some index -> toCExpr index |> State.map Some
+                                        | _ -> State.value None
                                 let! value = toCRExpr value |> State.map Option.get
-                                let v = CLExpr.CLVar { ctype = value.ctype; name = name }
-                                return CWriteOutput(name, None, value)
+
+                                return CWriteOutput(name, index, value)
                             }
                         )
 
