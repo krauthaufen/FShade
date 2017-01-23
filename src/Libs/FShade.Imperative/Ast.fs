@@ -456,7 +456,7 @@ type CStatement =
     | CSequential of list<CStatement>
     | CReturn
 
-    | CWriteOutput of string * CRExpr
+    | CWriteOutput of string * Option<CExpr> * CRExpr
 
     | CReturnValue of CExpr
     | CBreak

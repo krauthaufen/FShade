@@ -1088,7 +1088,7 @@ module Compiler =
                             state {
                                 let! value = toCRExpr value |> State.map Option.get
                                 let v = CLExpr.CLVar { ctype = value.ctype; name = name }
-                                return CWriteOutput(name, value)
+                                return CWriteOutput(name, None, value)
                             }
                         )
 

@@ -114,10 +114,10 @@ module Effect =
         Effect (Map.ofList [shader.shaderStage, shader])
 
     let ofExpr (inputType : Type) (e : Expr) =
-        Shader.ofExpr inputType e |> ofShader
+        Shader.ofExpr inputType e |> ofList
 
     let ofFunction (shaderFunction : 'a -> Expr<'b>) =
-        Shader.ofFunction shaderFunction |> ofShader
+        Shader.ofFunction shaderFunction |> ofList
 
 
     let inline toMap (effect : Effect) = effect.Shaders
@@ -168,16 +168,38 @@ module Effect =
                     []
 
                 | current :: before ->
-                    let desired =
-                        needed |> Map.union (Shader.systemOutputs current)
+                    if current.shaderStage = ShaderStage.TessControl then
 
-                    let newCurrent = 
-                        Shader.withOutputs desired current
+                        let newNeeded =
+                            Map.difference needed (Shader.outputs current) |> Map.map (fun _ t -> 
+                                match t with
+                                    | ArrayOf t -> t
+                                    | _ -> t
+                            )
+                        
+                        let newBefore = 
+                            linkShaders newNeeded before
 
-                    let newBefore = 
-                        linkShaders (Shader.inputs newCurrent) before
+                        let desired =
+                            needed |> Map.union (Shader.systemOutputs current)
 
-                    newCurrent :: newBefore
+                        let newCurrent = 
+                            current |> Shader.mapOutputs (fun writes ->
+                                writes |> Map.filter (fun n _ -> desired.ContainsKey n)
+                            )
+
+                        newCurrent :: newBefore
+                    else
+                        let desired =
+                            needed |> Map.union (Shader.systemOutputs current) |> Map.remove Intrinsics.SourceVertexIndex
+
+                        let newCurrent = 
+                            Shader.withOutputs desired current
+
+                        let newBefore = 
+                            linkShaders (Shader.inputs newCurrent) before
+
+                        newCurrent :: newBefore
                              
         effect 
             // add the final desired stage passing all desired
@@ -196,7 +218,7 @@ module Effect =
             |> ofList
                         
     let toModule (effect : Effect) =
-        let rec entryPoints (lastStage : Option<ShaderStage>) (shaders : list<Shader>) =
+        let rec entryPoints (lastStage : Option<Shader>) (shaders : list<Shader>) =
             match shaders with
                 | [] -> 
                     []
@@ -205,8 +227,8 @@ module Effect =
                     [ Shader.toEntryPoint lastStage shader None ]
 
                 | shader :: next :: after ->
-                    let shaderEntry = Shader.toEntryPoint lastStage shader (Some next.shaderStage) 
-                    shaderEntry :: entryPoints (Some shader.shaderStage) (next :: after)
+                    let shaderEntry = Shader.toEntryPoint lastStage shader (Some next) 
+                    shaderEntry :: entryPoints (Some shader) (next :: after)
 
         { entries = entryPoints None (toList effect) }
 

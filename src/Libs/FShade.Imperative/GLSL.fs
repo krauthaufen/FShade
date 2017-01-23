@@ -137,13 +137,6 @@ module GLSL =
             if kind = ParameterKind.Output && name = Intrinsics.Position && s.stages.next = Some ShaderStage.Fragment then
                 "gl_Position"
 
-            elif c.version > version120 && c.locations then
-                match kind with
-                    | ParameterKind.Input       -> name
-                    | ParameterKind.Output      -> name + "Out"
-                    | ParameterKind.Uniform     -> name
-                    | ParameterKind.Argument    -> name
-                    | kind                      -> failwithf "[GLSL] unknown parameter-kind %A for %s" kind name
             else
                 match kind, s.stages with
                     | ParameterKind.Input, { prev = None }              -> name
@@ -162,10 +155,12 @@ module GLSL =
                     match Map.tryFind name builtInInputs.[s.stages.self] with
                         | Some s -> s
                         | None -> regularName kind name s
+
                 | ParameterKind.Output -> 
                     match Map.tryFind name builtInOutputs.[s.stages.self] with
                         | Some s -> s
                         | None -> regularName kind name s
+
                 | _ ->
                     regularName kind name s
 
@@ -355,8 +350,14 @@ module GLSL =
                                 | Some r -> sprintf "%s %s = %s" (CType.glsl v.ctype) v.name (CRExpr.glsl c r)
                                 | None -> sprintf "%s %s" (CType.glsl v.ctype) v.name
 
-                | CWriteOutput(name, value) ->
+                | CWriteOutput(name, index, value) ->
                     let name = c |> State.parameterName ParameterKind.Output name
+
+                    let name =
+                        match index with
+                            | Some idx -> sprintf "%s[%s]" name (CExpr.glsl c idx)
+                            | _ -> name
+
                     match value with
                         | CRExpr.CRArray(_,values) ->
                             values |> Seq.map (CExpr.glsl c) |> Seq.mapi (sprintf "%s[%d] = %s" name) |> String.concat ";\r\n"
@@ -392,6 +393,12 @@ module GLSL =
 
                 | CDoWhile(guard, body) ->
                     sprintf "do\r\n{\r\n%s\r\n}\r\nwhile(%s)" (body |> glsl c |> String.indent) (CExpr.glsl c guard)
+
+                | CIfThenElse(cond, i, CNop) ->
+                    sprintf "if(%s)\r\n{\r\n%s;\r\n}" (CExpr.glsl c cond) (i |> glsl c |> String.indent)
+
+                | CIfThenElse(cond, CNop, e) ->
+                    sprintf "if(!(%s))\r\n{\r\n%s;\r\n}" (CExpr.glsl c cond) (e |> glsl c |> String.indent)
 
                 | CIfThenElse(cond, i, e) ->
                     sprintf "if(%s)\r\n{\r\n%s;\r\n}\r\nelse\r\n{\r\n%s;\r\n}" (CExpr.glsl c cond) (i |> glsl c |> String.indent) (e |> glsl c |> String.indent)
@@ -561,15 +568,67 @@ module GLSL =
                         []
 
 
-            let inputs = CEntryParameter.many state ParameterKind.Input e.cInputs
-            let outputs = CEntryParameter.many state ParameterKind.Output e.cOutputs
+    
+            let inputs,outputs, body  =
+                match state.stages.self with
+                    | ShaderStage.TessControl ->
+                        let passed = e.cDecorations |> List.pick (function EntryDecoration.TessControlPassThru t -> Some t | _ -> None) 
+                        
+                        let additional = 
+                            passed |> List.map (fun e -> 
+                                {
+                                    cParamType           = CType.ofType e.paramType
+                                    cParamName           = e.paramName
+                                    cParamSemantic       = e.paramName
+                                    cParamDecorations    = e.paramDecorations
+                                }
+                            )
+
+                        let union (l : list<CEntryParameter>) (r : list<CEntryParameter>) =
+                            let mutable lm = l |> List.map (fun p -> p.cParamSemantic, p) |> Map.ofList
+                            for r in r do
+                                match Map.tryFind r.cParamSemantic lm with
+                                    | Some _ -> ()
+                                    | None ->
+                                        lm <- Map.add r.cParamSemantic r lm
+
+                            lm |> Map.toList |> List.map snd
+
+                        let inputs = union e.cInputs additional
+                        let outputs = union e.cOutputs additional
+
+                        let tInt32 = CType.CInt(true, 32)
+                        let invocationId = CReadInput(ParameterKind.Input, tInt32, Intrinsics.InvocationId, None)
+
+                        let body =  
+                            CStatement.CSequential [
+
+                                yield
+                                    CStatement.CIfThenElse(
+                                        CExpr.CEqual(invocationId, CValue(tInt32, CIntegral 0L)),
+                                        e.cBody,
+                                        CNop
+                                    )
+
+                                for a in additional do
+                                    yield CWriteOutput(a.cParamSemantic, Some invocationId, CRExpr(CReadInput(ParameterKind.Input, a.cParamType, a.cParamSemantic, Some invocationId)))
+                                
+                            ]
+
+                        inputs, outputs, body
+
+                    | _ ->
+                        e.cInputs, e.cOutputs, e.cBody
+
+            let inputs = CEntryParameter.many state ParameterKind.Input inputs
+            let outputs = CEntryParameter.many state ParameterKind.Output outputs
             let args = CEntryParameter.many state ParameterKind.Argument e.cArguments |> String.concat ", " 
 
             String.concat "\r\n" [
                 yield! prefix
                 yield! inputs
                 yield! outputs
-                yield sprintf "%s %s(%s)\r\n{\r\n%s;\r\n}" (CType.glsl e.cReturnType) e.cEntryName args (e.cBody |> CStatement.glsl state |> String.indent)
+                yield sprintf "%s %s(%s)\r\n{\r\n%s;\r\n}" (CType.glsl e.cReturnType) e.cEntryName args (body |> CStatement.glsl state |> String.indent)
             ]
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]

@@ -53,7 +53,7 @@ type EntryDecoration =
     | Stages of ShaderStageDescription
     | InputTopology of InputTopology
     | OutputTopology of OutputTopology * int
-
+    | TessControlPassThru of list<EntryParameter>
 
 type EntryPoint =
     {
@@ -127,7 +127,10 @@ module ExpressionExtensions =
                 values 
                     |> Map.toList
                     |> List.map (fun (name, value) -> 
-                        Expr.NewTuple [ Expr.Value name; Expr.Coerce(value, typeof<obj>) ]
+                        if value.Type = typeof<obj> then
+                            Expr.NewTuple [ Expr.Value name; value ]
+                        else 
+                            Expr.NewTuple [ Expr.Value name; Expr.Coerce(value, typeof<obj>) ]
                     )
 
             Expr.Call(

@@ -158,9 +158,14 @@ module Primitives =
     let inline ddy< ^a when ^a : (static member (-) : ^a -> ^a -> ^a) > (v : ^a) : ^a = failwith "_"
     let discard () : unit = failwith "_"
 
+    type TessCoord<'a> = class end
 
-    let getInnerTessLevel (i : int) : float = failwith ""
-    let getOuterTessLevel (i : int) : float = failwith ""
+    let tessellateTriangle (li : float) (l01 : float, l12 : float, l20 : float) : TessCoord<V3d> =
+        failwith ""
+        
+    let tessellateQuad (lx : float, ly : float) (l01 : float, l12 : float, l23 : float, l30 : float) : TessCoord<V2d> =
+        failwith ""
+
 
 [<AutoOpen>]
 module ShaderBuilders =

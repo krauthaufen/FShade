@@ -836,6 +836,20 @@ module Optimizer =
         let rec evaluateConstantsS (e : Expr) =
             state {
                 match e with
+                    | WriteOutputs values ->
+                        let! values = 
+                            values |> Map.mapS (fun _ v -> 
+                                match v with
+                                    | Coerce(v, t) ->
+                                        evaluateConstantsS v |> State.map (fun v -> Expr.Coerce(v, t))
+                                    | v ->
+                                        evaluateConstantsS v
+                                        
+                            )
+                        return Expr.WriteOutputs(values)
+
+
+
                     | AddressOf e ->
                         let! e = evaluateConstantsS e
                         return Expr.AddressOf(e)
