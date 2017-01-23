@@ -193,13 +193,17 @@ module Crazyness =
         printfn "def2: %A" def2
 
 
-type Tessellation = Tessellation
-let tessellate (inner : float[]) (p : float[]) : Tessellation =
+type TessCoord<'a> = private TessellationCoord of 'a
+
+let tessellate3 (li : float) (l01 : float, l12 : float, l20 : float) : TessCoord<V3d> =
+    failwith ""
+
+let tessellate4 (lx : float,ly : float) (l01 : float,l12 : float,l23 : float,l30 : float) : TessCoord<V2d> =
     failwith ""
 
 type TessBuilder() =
     inherit BaseBuilder()
-        member x.Bind(t : Tessellation, f : V3d -> 'a) : 'a =
+        member x.Bind(t : TessCoord<'c>, f : 'c -> 'a) : 'a =
             failwith ""
 
         member x.Return(v) = v
@@ -213,36 +217,89 @@ type TessBuilder() =
 let tessellation = TessBuilder()
 
 
-let interpolate (v : V3d) (t : Primitive<'a>) : 'a =
-    failwith ""
+let inline interpolate< ^a, ^c, ^p when ^p : (member Interpolate : ^c -> ^a)> (c : ^c) (p : ^p) : 'a =
+    (^p : (member Interpolate : ^c -> ^a) (p, c))
 
-let test (quad : Patch4<Vertex>) =
-    tessellation {
-        let p0 = quad.P0
-        let p1 = quad.P1
-        let p2 = quad.P2
-        let p3 = quad.P3
+module TessDeconstruct = 
+    open Microsoft.FSharp.Quotations.Patterns
+    open Microsoft.FSharp.Quotations.ExprShape
 
-        let centroid = (p0.pos + p1.pos + p2.pos) / 3.0
-        let level = 1.0 / centroid.Z
+    let test (quad : Patch4<Vertex>) =
+        tessellation {
+            let p0 = quad.P0
+            let p1 = quad.P1
+            let p2 = quad.P2
+            let p3 = quad.P3
 
-        let! coord = tessellate [| level |] [| level; level; level |]
+            let centroid = (p0.pos + p1.pos + p2.pos) / 3.0
+            let level = 1.0 / centroid.Z
         
-        let vertex = interpolate coord quad
+            let! coord = tessellate4 (level, level) (level, level, level, level)
+        
+            let px = coord.X * quad.P0.pos + (1.0 - coord.X) * quad.P1.pos
+            let py = coord.X * quad.P2.pos + (1.0 - coord.X) * quad.P3.pos
+            let p = coord.Y * px + (1.0 - coord.Y) * py
 
-        return {
-            vertex with
-                pos = vertex.pos + V4d(0,1,0, 0)
+            return {
+                pos = p
+                tc = coord
+            }
         }
 
+    let run() =
+        let (tcs, tcsState), (tev, tevState) = test Unchecked.defaultof<_> |> Preprocessor.removeTessEval typeof<Patch4<Vertex>>
 
-    }
+        printfn "%A" tev
+
+
+open FShade.Imperative
+let expected() =
+    let tcs = 
+        <@ fun () ->
+            let id = ShaderIO.ReadInput<int>(ParameterKind.Input, Intrinsics.InvocationId, 0)
+            if id = 0 then
+                let p0 = ShaderIO.ReadInput<V4d>(ParameterKind.Input, Intrinsics.Position, 0)
+                let p1 = ShaderIO.ReadInput<V4d>(ParameterKind.Input, Intrinsics.Position, 1)
+                let p2 = ShaderIO.ReadInput<V4d>(ParameterKind.Input, Intrinsics.Position, 2)
+                let p3 = ShaderIO.ReadInput<V4d>(ParameterKind.Input, Intrinsics.Position, 3)
+
+                
+                let centroid = (p0 + p1 + p2) / 3.0
+                let level = 1.0 / centroid.Z
+
+                ShaderIO.WriteOutputs [|
+                    Intrinsics.TessLevelInner, [| level |] :> obj
+                    Intrinsics.TessLevelOuter, [| level; level; level |] :> obj
+                    "level", level :> obj
+                |]
+
+//            ShaderIO.WriteOutputs [|
+//                Intrinsics.Position, ShaderIO.ReadInput<V4d>(ParameterKind.Input, Intrinsics.Position, id) :> obj
+//            |]
+
+            ()
+        @>
+    
+    let tev =
+        <@
+            let coord = ShaderIO.ReadInput<V3d>(ParameterKind.Input, Intrinsics.TessCoord)
+            
+            let level = ShaderIO.ReadInput<V3d>(ParameterKind.Input, "level")
+            let p0 = ShaderIO.ReadInput<V4d>(ParameterKind.Input, Intrinsics.Position, 0)
+            let p1 = ShaderIO.ReadInput<V4d>(ParameterKind.Input, Intrinsics.Position, 1)
+            let p2 = ShaderIO.ReadInput<V4d>(ParameterKind.Input, Intrinsics.Position, 2)
+            let p3 = ShaderIO.ReadInput<V4d>(ParameterKind.Input, Intrinsics.Position, 3)
+
+            ()
+        @> 
+
+    ()
 
 
 
 [<EntryPoint>]
 let main args =
-    composeTest()
+    TessDeconstruct.run()
     System.Environment.Exit 0
 
 //    effectTest()

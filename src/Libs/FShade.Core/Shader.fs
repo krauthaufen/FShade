@@ -16,9 +16,399 @@ open FShade.Imperative
 open System.Collections.Generic
 open Aardvark.Base.ReflectionHelpers
 
-type private PreprocessorState =
+
+module PreprocessorNew =
+    open System.Reflection
+    open System.Collections.Generic
+    open Aardvark.Base.ReflectionHelpers
+    open Aardvark.Base.Monads.State
+
+    [<AutoOpen>] 
+    module BuilderPatterns =    
+        
+        let (|BuilderCombine|_|) (e : Expr) =
+            match e with
+                | BuilderCall(b, Method("Combine",_), [l;r]) ->
+                    Some(b, l, r)
+                | _ ->
+                    None
+
+        let (|BuilderDelay|_|) (e : Expr) =
+            match e with
+                | BuilderCall(b, Method("Delay",_), [Lambda(v,body)]) when v.Type = typeof<unit> ->
+                    Some(b, body)
+                | _ ->
+                    None
+
+        let (|BuilderRun|_|) (e : Expr) =
+            match e with
+                | BuilderCall(b, Method("Run",_), [e]) ->
+                    Some(b, e)
+                | _ ->
+                    None
+            
+        let (|BuilderZero|_|) (e : Expr) =
+            match e with
+                | BuilderCall(b, Method("Zero",_), []) ->
+                    Some(b)
+                | _ ->
+                    None
+
+        let (|BuilderFor|_|) (e : Expr) =
+            match e with
+                | BuilderCall(b, Method("For",_) , [sequence; Lambda(v,body)]) ->
+                    match body with
+                        | Let(vi,Var(vo),body) when vo = v ->
+                            Some(b, vi, sequence, body)
+                        | _ ->
+                            Some(b, v, sequence, body)
+                            
+                | _ ->
+                    None
+
+        let (|BuilderWhile|_|) (e : Expr) =
+            match e with
+                | BuilderCall(b, Method("While",_), [guard; body]) ->
+                    Some(b, guard, body)
+                | _ ->
+                    None
+
+        let (|BuilderYield|_|) (e : Expr) =
+            match e with
+                | BuilderCall(b, Method("Yield",_), [v]) ->
+                    Some(b, v)
+                | _ ->
+                    None
+
+        let (|BuilderYieldFrom|_|) (e : Expr) =
+            match e with
+                | BuilderCall(b, Method("YieldFrom",_), [v]) ->
+                    Some(b, v)
+                | _ ->
+                    None
+            
+        let (|BuilderReturn|_|) (e : Expr) =
+            match e with
+                | BuilderCall(b, Method("Return",_), [v]) ->
+                    Some(b, v)
+                | _ ->
+                    None
+
+        let (|BuilderReturnFrom|_|) (e : Expr) =
+            match e with
+                | BuilderCall(b, Method("ReturnFrom",_), [v]) ->
+                    Some(b, v)
+                | _ ->
+                    None
+
+        let (|BuilderBind|_|) (e : Expr) =
+            match e with
+                | BuilderCall(b, Method("Bind",_), [e; Lambda(vv, c)]) ->
+                    match c with
+                        | Let(vi, Var ve, c) -> 
+                            Some(b, vi, e, c)
+                        | _ ->
+                            Some(b, vv, e, c)
+                | _ ->
+                    None
+        
+        let (|BuilderUsing|_|) (e : Expr) =
+            match e with
+                | BuilderCall(b, Method("Using",_), [e; Lambda(v,body)]) ->
+                    match body with
+                        | Let(vi, Var vo, body) when vo = v -> Some(b, vi, e, b)
+                        | _ -> Some(b, v, e, body)
+                | _ ->
+                    None
+
+        // TODO: validate that these work!!!
+        type Expr with
+            static member Call(target : Expr, name : string, args : list<Expr>) =
+                let all = target.Type.GetMethods(BindingFlags.NonPublic ||| BindingFlags.Instance ||| BindingFlags.Public)
+
+
+
+            static member BuilderYield(builder : Expr, value : Expr) =
+                let all = builder.Type.GetMethods(BindingFlags.NonPublic ||| BindingFlags.Instance ||| BindingFlags.Public)
+
+                let yieldMeth =
+                    all |> Array.pick (fun m -> 
+                        if m.Name = "Yield" then
+                            let parameters = m.GetParameters()
+                            if parameters.Length = 1 then
+                                let p = parameters.[0]
+                                if p.ParameterType.IsGenericParameter then
+                                    m.MakeGenericMethod [|value.Type|] |> Some
+                                elif p.ParameterType.IsAssignableFrom value.Type then
+                                    Some m
+                                else
+                                    None
+                            else
+                                None
+                        else
+                            None    
+                    )
+
+                Expr.Call(builder, yieldMeth, [value])
+
+            static member BuilderReturn(builder : Expr, value : Expr) =
+                let all = builder.Type.GetMethods(BindingFlags.NonPublic ||| BindingFlags.Instance ||| BindingFlags.Public)
+
+                let yieldMeth =
+                    all |> Array.pick (fun m -> 
+                        if m.Name = "Return" then
+                            let parameters = m.GetParameters()
+                            if parameters.Length = 1 then
+                                let p = parameters.[0]
+                                if p.ParameterType.IsGenericParameter then
+                                    m.MakeGenericMethod [|value.Type|] |> Some
+                                elif p.ParameterType.IsAssignableFrom value.Type then
+                                    Some m
+                                else
+                                    None
+                            else
+                                None
+                        else
+                            None    
+                    )
+
+                Expr.Call(builder, yieldMeth, [value])
+
+    [<AutoOpen>] 
+    module OtherPatterns =
+
+        let (|Primitive|_|) (e : Expr) =
+            let iface = e.Type.GetInterface("Primitive`1")
+            if isNull iface then
+                None
+            else
+                let countProp = e.Type.GetProperty("VertexCount", BindingFlags.Static ||| BindingFlags.NonPublic ||| BindingFlags.Public)
+                let vertices = countProp.GetValue(null) |> unbox<int>
+                match e with
+                    | Value _ | Var _ | PropertyGet(None, _, []) -> Some(e, vertices)
+                    | _ -> None
+
+        let (|PrimitiveVertexGet|_|) (e : Expr) =
+            match e with
+                | PropertyGet(Some (Primitive(p,_)), pi, []) ->
+                    match pi.PrimitiveIndex with
+                        | Some index -> Some(p, Expr.Value index)
+                        | _ -> failwithf "[FShade] cannot get primitive-property %A" pi
+
+                | PropertyGet(Some (Primitive(p,_)), pi, [index]) when pi.Name = "Item" ->
+                    Some (p, index)
+
+                | _ ->
+                    None
+
+        let (|InputRead|_|) (vertexType : Type) (e : Expr) =
+            match e with
+                | PropertyGet(Some vertex, field, []) when vertex.Type = vertexType ->
+                    let isRecordField = FSharpType.GetRecordFields(vertexType, true) |> Array.exists (fun pi -> pi = field)
+                    if isRecordField then 
+                        let parameter = { paramType = field.PropertyType; paramInterpolation = field.Interpolation }
+                        Some(e, field.Semantic, parameter)
+                    else
+                        None
+                | _ ->
+                    None
+
+    type State =
+        {
+            inputType   : Type
+            vertexType  : Type
+            builder     : Option<Expr>
+            inputs      : Map<string, ParameterDescription>
+            outputs     : Map<string, ParameterDescription>
+            uniforms    : Map<string, UniformParameter>
+            vertexIndex : Map<Var, Expr>
+        }
+        
+    type Preprocess<'a> = State<State, 'a>
+
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module State =
+        let inputType = State.get |> State.map (fun s -> s.inputType)
+        let vertexType = State.get |> State.map (fun s -> s.vertexType)
+        let builder = State.get |> State.map (fun s -> s.builder)
+
+        let readInput (name : string) (desc : ParameterDescription) = 
+            State.modify (fun s ->
+                { s with State.inputs = Map.add name desc s.inputs }
+            )
+
+        let readUniform (p : UniformParameter) = 
+            State.modify (fun s ->
+                { s with State.uniforms = Map.add p.uniformName p s.uniforms }
+            )
+
+        let writeOutput (name : string) (desc : ParameterDescription) = 
+            State.modify (fun s ->
+                { s with State.outputs = Map.add name desc s.outputs }
+            )
+
+        let setBuilder (b : Expr) =
+            State.modify (fun s ->
+                { s with State.builder = Some b }
+            )
+
+        let setVertexIndex (v : Var) (index : Expr) =
+            State.modify (fun s ->
+                { s with vertexIndex = Map.add v index s.vertexIndex }
+            )
+
+        let tryGetVertexIndex (v : Var) =
+            State.get |> State.map (fun s -> Map.tryFind v s.vertexIndex)
+
+    let rec preprocessS (e : Expr) =
+        state {
+            let! vertexType = State.vertexType
+
+            match e with
+                | BuilderRun(b, body)
+                | BuilderDelay(b, body) ->
+                    do! State.setBuilder b
+                    return! preprocessS body
+
+                | BuilderCombine(b, l, r) ->
+                    do! State.setBuilder b
+                    let! l = preprocessS l
+                    let! r = preprocessS r
+                    match l with
+                        | Unit -> return r
+                        | _ -> return Expr.Sequential(l, r)
+
+                | BuilderZero(b) ->
+                    do! State.setBuilder b
+                    return Expr.Unit
+
+                | BuilderUsing(b, var, value, body)
+                | BuilderBind(b, var, value, body) ->
+                    do! State.setBuilder b
+                    let! value = preprocessS value
+                    let! body = preprocessS body
+                    if var.Type <> typeof<unit> then
+                        return Expr.Let(var, value, body)
+                    else
+                        match value with
+                            | Unit -> return body
+                            | _ -> return Expr.Sequential(value, body)
+
+                | BuilderFor(b, var, RangeSequence(first, step, last), body) ->
+                    do! State.setBuilder b
+                    let! first = preprocessS first
+                    let! step = preprocessS step
+                    let! last = preprocessS last
+                    let! body = preprocessS body
+                    return Expr.ForInteger(var, first, step, last, body)
+                    
+                | BuilderFor(b, var, Coerce(Primitive(primitive, vertexCount), _), body) ->
+                    do! State.setBuilder b
+                    let iVar = Var(var.Name + "Index", typeof<int>)
+                    let prop = primitive.Type.GetProperty("Item", BindingFlags.Instance ||| BindingFlags.NonPublic ||| BindingFlags.Public)
+                    let replacement = Expr.PropertyGet(primitive, prop, [Expr.Var iVar])
+                    
+                    do! State.setVertexIndex var (Expr.Var iVar)
+                    let! body = preprocessS body
+
+                    return Expr.ForIntegerRangeLoop(iVar, Expr.Value 0, Expr.Value (vertexCount - 1), body)
+
+                | BuilderFor(b, var, sequence, body) ->
+                    do! State.setBuilder b
+                    let! sequence = preprocessS sequence
+                    let! body = preprocessS body
+                    return Expr.ForEach(var, sequence, body)
+
+                | BuilderWhile(b, guard, body) ->
+                    do! State.setBuilder b
+                    let! guard = preprocessS guard
+                    let! body = preprocessS body
+                    return Expr.WhileLoop(guard, body)
+                    
+
+                | Uniform u ->
+                    do! State.readUniform u
+                    return Expr.ReadInput(ParameterKind.Uniform, e.Type, u.uniformName)
+
+                // let p0 = tri.P0 in <body>
+                // store (p0 -> 0) and preprocess <body>
+                | Let(var, PrimitiveVertexGet(p, index), body) when var.Type = vertexType ->
+                    let! index = preprocessS index
+                    do! State.setVertexIndex var index
+                    return! preprocessS body
+
+                // tri.P0.pos -> ReadInput(pos, 0)
+                | InputRead vertexType (PrimitiveVertexGet(p, index), semantic, parameter) ->
+                    do! State.readInput semantic parameter
+                    return Expr.ReadInput(ParameterKind.Input, e.Type, semantic, index)
+
+                // real vertex-read needed
+                | PrimitiveVertexGet(p, index) ->
+                    let! index = preprocessS index
+                    let fields = FSharpType.GetRecordFields(e.Type, true) |> Array.toList
+
+                    let! args =
+                        fields |> List.mapS (fun f ->
+                            state {
+                                let interpolation = f.Interpolation
+                                let semantic = f.Semantic 
+                                let parameter = { paramType = f.PropertyType; paramInterpolation = interpolation }
+                                do! State.readInput semantic parameter
+                                return Expr.ReadInput(ParameterKind.Input, f.PropertyType, semantic, index)
+                            }
+                        )
+                        
+                    return Expr.NewRecord(e.Type, args)
+
+                // vertex.pos -> ReadInput(pos)
+                | InputRead vertexType (vertex, semantic, parameter) ->
+                    let! index =
+                        match vertex with
+                            | Var v -> State.tryGetVertexIndex v
+                            | Value _ -> State.value None
+                            | _ -> failwithf "[FShade] found non-primitive vertex-expression: %A" vertex
+
+                    do! State.readInput semantic parameter
+                    match index with
+                        | Some index -> 
+                            return Expr.ReadInput(ParameterKind.Input, parameter.paramType, semantic, index)
+                        | _ ->
+                            return Expr.ReadInput(ParameterKind.Input, parameter.paramType, semantic)
+                    
+                    
+                | BuilderYield(b, Let(var, value, body)) ->
+                    return! preprocessS (Expr.Let(var, value, Expr.BuilderYield(b, body)))       
+
+                | BuilderReturn(b, Let(var, value, body)) ->
+                    return! preprocessS (Expr.Let(var, value, Expr.BuilderReturn(b, body)))   
+                    
+                | BuilderYield(b, value) ->
+                    do! State.setBuilder b
+                    let! value = preprocessS value
+
+                    if FSharpType.IsRecord(value.Type, true) then
+                        return failwithf "[FShade] not implemented"
+
+                    elif value.Type = typeof<V3d> then
+                        return failwithf "[FShade] not implemented"
+
+                    elif value.Type = typeof<V4d> then
+                        return failwithf "[FShade] not implemented"
+
+                    else
+                        return failwithf "[FShade] invalid vertex-type: %A" value.Type
+                        
+
+
+                | _ ->
+                    return failwith ""
+        }
+
+
+type PreprocessorState =
     {
         inputTopology : Option<InputTopology>
+        inputType : Type
         vertexType : Type
         inputs : Dictionary<string, ParameterDescription>
         outputs : Dictionary<string, ParameterDescription>
@@ -51,7 +441,10 @@ type private PreprocessorState =
             | _ ->
                 x.uniforms.[u.uniformName] <- u
 
-module private Preprocessor =
+
+    
+
+module Preprocessor =
     open System.Reflection
     open System.Collections.Generic
     open Aardvark.Base.ReflectionHelpers
@@ -274,7 +667,6 @@ module private Preprocessor =
             | ShapeVar _ -> 
                 e
 
-
     /// preprocess removes all builder calls from the given expression, 
     /// replaces all input-accesses with Expr.Load and all writes with Expr.Store.
     /// additionaly the used builder 
@@ -299,6 +691,7 @@ module private Preprocessor =
         let state = 
             {
                 inputTopology = inputTopology
+                inputType = inputType
                 vertexType = vertexType
                 inputs = Dictionary()
                 outputs = Dictionary()
@@ -316,6 +709,7 @@ module private Preprocessor =
         let state = 
             {
                 inputTopology = None
+                inputType = typeof<obj>
                 vertexType = typeof<obj>
                 inputs = Dictionary()
                 outputs = Dictionary()
@@ -347,6 +741,321 @@ module private Preprocessor =
         visit inputs e
         inputs
         
+
+    let (|TessellateCall|_|) (e : Expr) =
+        match e with
+            | Call(None, Method("tessellate4",_), [lx; ly; l01; l12; l23; l30]) ->
+                Some (4, [lx; ly], [l01; l12; l23; l30])
+            | Call(None, Method("tessellate3",_), [li; l01; l12; l20]) ->
+                Some (3, [li], [l01; l12; l20])
+            | _ -> None
+        
+    [<AutoOpen>] 
+    module BuilderPatterns =    
+        
+        let (|BuilderCombine|_|) (e : Expr) =
+            match e with
+                | BuilderCall(b, Method("Combine",_), [l;r]) ->
+                    Some(b, l, r)
+                | _ ->
+                    None
+
+        let (|BuilderDelay|_|) (e : Expr) =
+            match e with
+                | BuilderCall(b, Method("Delay",_), [Lambda(v,body)]) when v.Type = typeof<unit> ->
+                    Some(b, body)
+                | _ ->
+                    None
+
+        let (|BuilderRun|_|) (e : Expr) =
+            match e with
+                | BuilderCall(b, Method("Run",_), [e]) ->
+                    Some(b, e)
+                | _ ->
+                    None
+            
+        let (|BuilderZero|_|) (e : Expr) =
+            match e with
+                | BuilderCall(b, Method("Zero",_), []) ->
+                    Some(b)
+                | _ ->
+                    None
+
+        let (|BuilderFor|_|) (e : Expr) =
+            match e with
+                | BuilderCall(b, Method("For",_) , [sequence; Lambda(v,body)]) ->
+                    match body with
+                        | Let(vi,Var(vo),body) when vo = v ->
+                            Some(b, vi, sequence, body)
+                        | _ ->
+                            Some(b, v, sequence, body)
+                            
+                | _ ->
+                    None
+
+        let (|BuilderYield|_|) (e : Expr) =
+            match e with
+                | BuilderCall(b, Method("Yield",_), [v]) ->
+                    Some(b, v)
+                | _ ->
+                    None
+
+        let (|BuilderYieldFrom|_|) (e : Expr) =
+            match e with
+                | BuilderCall(b, Method("YieldFrom",_), [v]) ->
+                    Some(b, v)
+                | _ ->
+                    None
+            
+        let (|BuilderReturn|_|) (e : Expr) =
+            match e with
+                | BuilderCall(b, Method("Return",_), [v]) ->
+                    Some(b, v)
+                | _ ->
+                    None
+
+        let (|BuilderReturnFrom|_|) (e : Expr) =
+            match e with
+                | BuilderCall(b, Method("ReturnFrom",_), [v]) ->
+                    Some(b, v)
+                | _ ->
+                    None
+
+        let (|BuilderBind|_|) (e : Expr) =
+            match e with
+                | BuilderCall(b, Method("Bind",_), [e; Lambda(vv, c)]) ->
+                    match c with
+                        | Let(vi, Var ve, c) -> 
+                            Some(b, vi, e, c)
+                        | _ ->
+                            Some(b, vv, e, c)
+                | _ ->
+                    None
+        
+        let (|BuilderUsing|_|) (e : Expr) =
+            match e with
+                | BuilderCall(b, Method("Using",_), [e; Lambda(v,body)]) ->
+                    match body with
+                        | Let(vi, Var vo, body) when vo = v -> Some(b, vi, e, b)
+                        | _ -> Some(b, v, e, body)
+                | _ ->
+                    None
+
+
+
+
+    let rec removeTessellation (state : PreprocessorState, vertexIndices : Map<Var, Expr>, res : byref<Expr * PreprocessorState>, e : Expr) =
+        match e with
+            | BuilderCall(b, mi, [Lambda(v,body)]) when mi.Name = "Delay" ->
+                state.builder <- b
+                removeTessellation(state, vertexIndices, &res, body)
+
+            | BuilderCall(b, Method("Combine",_), [l;r]) ->
+                state.builder <- b
+                let l = removeTessellation(state, vertexIndices, &res, l)
+                let r = removeTessellation(state, vertexIndices, &res, r)
+                Expr.Seq [l; r]
+
+            | BuilderCall(b, Method("Zero",_), []) ->
+                state.builder <- b
+                Expr.Unit
+
+            // for v in primitive do
+            | BuilderCall(b, Method("For",_) , [Coerce(primitive, t); Lambda(v,Let(vi,Var(vo),body))]) 
+                when b.Type = typeof<GeometryBuilder> || b.Type = typeof<TessControlBuilder> || b.Type = typeof<TessEvalBuilder> ->
+                state.builder <- b
+
+                let count = primitive.Type.GetProperty("VertexCount", BindingFlags.Static ||| BindingFlags.Public).GetValue(null) |> unbox<int>
+                
+                let index = Var("i", typeof<int>)
+                let vertexIndices = Map.add vi (Expr.Var index) vertexIndices
+                let body = removeTessellation(state, vertexIndices, &res, body)
+                Expr.ForIntegerRangeLoop(index, <@@ 0 @@>, <@@ count - 1 @@>,  body)
+
+            | BuilderCall(b, Method("For",_), [seq; Lambda(v,Let(vi,Var(vo),body))]) ->  
+                state.builder <- b   
+                let body = removeTessellation(state, vertexIndices, &res, body)
+                let seq = removeTessellation(state, vertexIndices, &res, seq)        
+                let result = Expr.ForEach(vi, seq, body)
+                result
+
+            // let v = primitive.P0 || let v = primitive.VertexCount
+            | Let(v, PropertyGet(Primitive p, pi, []), body) ->
+                match pi.PrimitiveIndex with
+                    | Some index -> 
+                        let i = Var(v.Name, typeof<int>)
+                        let vertexIndices = Map.add v (Expr.Var i) vertexIndices
+                        
+                        let body = removeTessellation(state, vertexIndices, &res, body)
+
+                        Expr.Let(i, Expr.Value(index), body)
+
+                    | _ ->               
+                        let body = removeTessellation(state, vertexIndices, &res, body)
+                        Expr.Let(v, Expr.PropertyGet(p, pi, []), body)
+
+            // primitive.P0.pos || primitive.VertexCount.Abs
+            | MemberFieldGet(PropertyGet(Primitive p, pi, []), m) ->
+                match pi.PrimitiveIndex with
+                    | Some index ->
+                        let n = m.Semantic
+                        state.AddInput(n, { paramType = e.Type.MakeArrayType(); paramInterpolation = InterpolationMode.Default })
+                        Expr.ReadInput(ParameterKind.Input, e.Type, n, Expr.Value index)
+                    | None ->
+                        e
+
+            // primitive.[i].pos
+            | MemberFieldGet(PropertyGet(Some p, pi, [index]), m) when pi.Name = "Item" ->
+                let sem = m.Semantic
+                state.AddInput(sem, { paramType = e.Type.MakeArrayType(); paramInterpolation = pi.Interpolation })
+                Expr.ReadInput(ParameterKind.Input, e.Type, sem, index)
+
+            | VertexLoad state.vertexType (ve, sem, pi) ->
+                match ve with
+                    | Value(null,_) -> 
+                        state.AddInput(sem, { paramType = e.Type; paramInterpolation = InterpolationMode.Default })
+                        Expr.ReadInput(ParameterKind.Input, e.Type, sem)
+
+                    | Var v ->
+                        match Map.tryFind v vertexIndices with
+                            | Some i -> 
+                                state.AddInput(sem, { paramType = e.Type.MakeArrayType(); paramInterpolation = InterpolationMode.Default })
+                                Expr.ReadInput(ParameterKind.Input, e.Type, sem, i)
+                            | _ -> 
+                                Expr.PropertyGet(ve, pi)
+                                //failwithf "[FShade] accessing vertex input with unknown index"
+
+                    | e ->
+                        Expr.PropertyGet(ve, pi)
+                        //failwithf "[FShade] complex vertex expressions not supported: %A" ve
+
+            // yield (let a = x+y in f(a))   ==>    let a = x + y in yield f(a)
+            | BuilderCall(b, mi, [Let(v, e, inner)]) when mi.Name = "Yield" ->
+                state.builder <- b
+                let e = Expr.Let(v, e, Expr.Call(b, mi, [inner]))
+                removeTessellation(state, vertexIndices, &res, e)
+
+
+            // yield { a = 1; b = x + y }
+            | BuilderCall(b, mi, [vertex]) when mi.Name = "Yield" && FSharpType.IsRecord vertex.Type ->
+                state.builder <- b
+                Expr.Seq [
+                    writeOutput state vertexIndices vertex
+                    <@ emitVertex() @>
+                ]
+
+            // yield V4d.IOOI
+            | BuilderCall(b, mi, [value]) when mi.Name = "Yield" ->
+                state.builder <- b
+                let value = removeTessellation(state, vertexIndices, &res, value)
+                state.AddOutput(Intrinsics.Position, { paramType = typeof<V4d>; paramInterpolation = InterpolationMode.Default })
+                let store = 
+                    if value.Type = typeof<V4d> then 
+                        Expr.WriteOutputs [Intrinsics.Position, value]
+
+                    elif value.Type = typeof<V3d> then 
+                        let ctor = typeof<V4d>.GetConstructor [|typeof<V3d>; typeof<float> |]
+                        Expr.WriteOutputs [Intrinsics.Position, Expr.NewObject(ctor, [value; Expr.Value 1.0])]
+
+                    else 
+                        failwithf "[FShade] cannot yield %A" value
+                    
+                Expr.Sequential(store, Expr.Call(getMethodInfo <@ emitVertex @>, []))
+
+            // return (let a = x+y in f(a))   ==>    let a = x + y in return f(a)
+            | BuilderCall(b, mi, [Let(v, e, inner)]) when mi.Name = "Return" ->
+                state.builder <- b
+                let e = Expr.Let(v, e, Expr.Call(b, mi, [inner]))
+                removeTessellation(state, vertexIndices, &res, e)
+
+            | BuilderCall(b, mi, [vertex]) when mi.Name = "Return" && FSharpType.IsRecord vertex.Type ->
+                state.builder <- b
+                writeOutput state vertexIndices vertex
+
+            | Uniform u ->
+                state.AddUniform u
+                Expr.ReadInput(ParameterKind.Uniform, u.uniformType, u.uniformName)
+                     
+            | BuilderCall(b, Method("Bind",_), [TessellateCall(dim, inner, outer); Lambda(vv, Let(vi, Var ve, c))]) when ve = vv ->
+//                match tessellateCall with
+//                    | Call(None, Method("tessellate",_), args) 
+                let tev =
+                    Expr.Let(vi, Expr.ReadInput(ParameterKind.Input, vi.Type, Intrinsics.TessCoord), c)
+
+                let needed = tev.GetFreeVars() |> Seq.toList
+
+                let all =
+                    Map.ofList [
+                        yield Intrinsics.TessLevelInner, Expr.NewArray(typeof<float>, inner)
+                        yield Intrinsics.TessLevelOuter, Expr.NewArray(typeof<float>, outer)
+                        for n in needed do
+                            yield n.Name, Expr.Var n
+                    ]
+
+                let rec wrapTev (n : list<Var>) (e : Expr) =
+                    match n with
+                        | [] -> e
+                        | h :: t ->
+                            Expr.Let(h, Expr.ReadInput(ParameterKind.Input, h.Type, h.Name), wrapTev t e)
+
+                let tev = wrapTev needed tev
+
+                let result = preprocessShader state.inputType tev
+                res <- result
+                Expr.WriteOutputs all
+
+
+            | Sequential(l, r) ->
+                let l = removeTessellation(state, vertexIndices, &res, l)
+                let r = removeTessellation(state, vertexIndices, &res, r)
+                Expr.Sequential(l, r)
+
+            | ShapeVar _ -> e
+            | ShapeLambda(v, b) ->
+                let b = removeTessellation(state, vertexIndices, &res, b)
+                Expr.Lambda(v, b)
+
+            | ShapeCombination(o, args) ->
+                let mutable foo = res
+                let args = args |> List.map (fun a -> removeTessellation(state, vertexIndices, &foo, a)) 
+                res <- foo
+                RebuildShapeCombination(o, args)
+
+    let removeTessEval (inputType : Type) (e : Expr) =
+
+        // figure out the vertex-type and the (optional) input-topology
+        let vertexType, inputTopology =
+            let p = inputType.GetInterface("Primitive`1")
+            if isNull p then inputType, None
+            else 
+                let vertexType = p.GetGenericArguments().[0]
+                let top = inputType.GetProperty("InputTopology", BindingFlags.Static ||| BindingFlags.NonPublic ||| BindingFlags.Public).GetValue(null) |> unbox<InputTopology>
+                vertexType, Some top
+
+        // the builder can be inlined (TODO: may be nested)
+        let input = 
+            match e with
+                | Application(Lambda(var, b), value) -> b.Substitute(fun vi -> if vi = var then Some value else None)
+                | e -> e
+
+        // run the real processing
+        let state = 
+            {
+                inputTopology = inputTopology
+                inputType = inputType
+                vertexType = vertexType
+                inputs = Dictionary()
+                outputs = Dictionary()
+                uniforms = Dictionary()
+                builder = Expr.Value(())
+            }
+
+        let mutable tev = Unchecked.defaultof<_>
+        let clean = removeTessellation(state, Map.empty, &tev, e)
+
+
+        (clean, state), tev
+
 
 
     

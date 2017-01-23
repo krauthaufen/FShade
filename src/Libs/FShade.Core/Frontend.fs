@@ -39,6 +39,7 @@ module Primitives =
 
         static member VertexCount = 2
         static member InputTopology = InputTopology.Line
+        member x.Interpolate(coord : float) : 'v = shaderOnlyAccess()
 
     type Triangle<'a> = Triangle of 'a * 'a * 'a with
         interface Primitive<'a>
@@ -57,6 +58,7 @@ module Primitives =
 
         static member VertexCount = 3
         static member InputTopology = InputTopology.Triangle
+        member x.Interpolate(coord : V3d) : 'v = shaderOnlyAccess()
 
     type LineAdjacency<'a> = Triangle of 'a * 'a * 'a * 'a with
         interface Primitive<'a>
@@ -123,6 +125,7 @@ module Primitives =
 
         static member VertexCount = 3
         static member InputTopology = InputTopology.Patch 3
+        member x.Interpolate(coord : V3d) : 'v = shaderOnlyAccess()
 
     type Patch4<'a> = Patch4 of 'a * 'a * 'a * 'a with
         interface Primitive<'a>
@@ -144,7 +147,7 @@ module Primitives =
 
         static member VertexCount = 4
         static member InputTopology = InputTopology.Patch 4
-
+        member x.Interpolate(coord : V2d) : 'v = shaderOnlyAccess()
 
     let emitVertex() = ()
 

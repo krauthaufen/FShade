@@ -71,8 +71,8 @@ type EntryPoint =
 module ExpressionExtensions =
     
 
-    type private IO private() =
-        static let allMethods = typeof<IO>.GetMethods(BindingFlags.NonPublic ||| BindingFlags.Static)
+    type ShaderIO private() =
+        static let allMethods = typeof<ShaderIO>.GetMethods(BindingFlags.Public ||| BindingFlags.NonPublic ||| BindingFlags.Static)
 
         static let find (name : string) (types : array<Type>) =
             allMethods |> Array.find (fun mi -> 
@@ -107,19 +107,19 @@ module ExpressionExtensions =
   
     type Expr with
         static member ReadInput<'a>(kind : ParameterKind, name : string) : Expr<'a> =
-            let mi = IO.ReadInputMeth.MakeGenericMethod [| typeof<'a> |]
+            let mi = ShaderIO.ReadInputMeth.MakeGenericMethod [| typeof<'a> |]
             Expr.Call(mi, [ Expr.Value(kind); Expr.Value(name) ]) |> Expr.Cast
 
         static member ReadInput<'a>(kind : ParameterKind, name : string, index : Expr) : Expr<'a> =
-            let mi = IO.ReadInputIndexedMeth.MakeGenericMethod [| typeof<'a> |]
+            let mi = ShaderIO.ReadInputIndexedMeth.MakeGenericMethod [| typeof<'a> |]
             Expr.Call(mi, [ Expr.Value(kind); Expr.Value(name); index ]) |> Expr.Cast
 
         static member ReadInput(kind : ParameterKind, t : Type, name : string) =
-            let mi = IO.ReadInputMeth.MakeGenericMethod [| t |]
+            let mi = ShaderIO.ReadInputMeth.MakeGenericMethod [| t |]
             Expr.Call(mi, [ Expr.Value(kind); Expr.Value(name) ])
 
         static member ReadInput(kind : ParameterKind, t : Type, name : string, index : Expr) =
-            let mi = IO.ReadInputIndexedMeth.MakeGenericMethod [| t |]
+            let mi = ShaderIO.ReadInputIndexedMeth.MakeGenericMethod [| t |]
             Expr.Call(mi, [ Expr.Value(kind); Expr.Value(name); index ])
 
         static member WriteOutputs(values : Map<string, Expr>) =
@@ -131,7 +131,7 @@ module ExpressionExtensions =
                     )
 
             Expr.Call(
-                IO.WriteOutputsMeth,
+                ShaderIO.WriteOutputsMeth,
                 [ Expr.NewArray(typeof<string * obj>, values) ]
             )
 
@@ -148,10 +148,10 @@ module ExpressionExtensions =
 
     let (|ReadInput|_|) (e : Expr) =
         match e with
-            | Call(None, mi, [ Value((:? ParameterKind as kind),_); Value((:? string as name),_) ]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = IO.ReadInputMeth ->
+            | Call(None, mi, [ Value((:? ParameterKind as kind),_); Value((:? string as name),_) ]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = ShaderIO.ReadInputMeth ->
                 Some(kind, name, None)
 
-            | Call(None, mi, [ Value((:? ParameterKind as kind),_); Value((:? string as name),_); index ]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = IO.ReadInputIndexedMeth ->
+            | Call(None, mi, [ Value((:? ParameterKind as kind),_); Value((:? string as name),_); index ]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = ShaderIO.ReadInputIndexedMeth ->
                 Some(kind, name, Some index)
 
             | _ ->
@@ -159,7 +159,7 @@ module ExpressionExtensions =
 
     let (|WriteOutputs|_|) (e : Expr) =
         match e with
-            | Call(none, mi, [NewArray(_,args)]) when mi = IO.WriteOutputsMeth ->
+            | Call(none, mi, [NewArray(_,args)]) when mi = ShaderIO.WriteOutputsMeth ->
                 let args =
                     args |> List.map (fun a ->
                         match a with
@@ -174,9 +174,9 @@ module ExpressionExtensions =
                 None
 
     type MethodInfo with
-        static member WriteOutputs = IO.WriteOutputsMeth
-        static member ReadInput = IO.ReadInputMeth
-        static member ReadInputIndexed = IO.ReadInputIndexedMeth
+        static member WriteOutputs = ShaderIO.WriteOutputsMeth
+        static member ReadInput = ShaderIO.ReadInputMeth
+        static member ReadInputIndexed = ShaderIO.ReadInputIndexedMeth
 
 
 module private Affected =
