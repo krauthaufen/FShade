@@ -804,6 +804,46 @@ module Shader =
 
     let private emitVertexMeth = getMethodInfo <@ emitVertex @>
 
+    let private interpolate3 (coord : Expr) (p0 : Expr) (p1 : Expr) (p2 : Expr) =
+        let coord : Expr<V3d> = Expr.Cast coord
+        if p0.Type = typeof<float> then
+            <@@ (%coord).X * (%%p0 : float) + (%coord).Y * (%%p1 : float) + (%coord).Z * (%%p2 : float)  @@>
+        elif p0.Type = typeof<V2d> then
+            <@@ (%coord).X * (%%p0 : V2d) + (%coord).Y * (%%p1 : V2d) + (%coord).Z * (%%p2 : V2d)  @@>
+        elif p0.Type = typeof<V3d> then
+            <@@ (%coord).X * (%%p0 : V3d) + (%coord).Y * (%%p1 : V3d) + (%coord).Z * (%%p2 : V3d)  @@>
+        elif p0.Type = typeof<V4d> then
+            <@@ (%coord).X * (%%p0 : V4d) + (%coord).Y * (%%p1 : V4d) + (%coord).Z * (%%p2 : V4d)  @@>
+        else
+            failwithf "[FShade] cannot interpolate %A" p0.Type
+
+    let private interpolate4 (coord : Expr) (p0 : Expr) (p1 : Expr) (p2 : Expr) (p3 : Expr) =
+        let coord : Expr<V3d> = Expr.Cast coord
+        
+        if p0.Type = typeof<float> then
+            <@@ 
+                (1.0 - (%coord).Y) * ((1.0 - (%coord).X) * (%%p0 : float) + (%coord).X * (%%p1 : float)) +
+                (%coord).Y * ((1.0 - (%coord).X) * (%%p2 : float) + (%coord).X * (%%p3 : float)) 
+            @@>
+        elif p0.Type = typeof<V2d> then
+            <@@ 
+                (1.0 - (%coord).Y) * ((1.0 - (%coord).X) * (%%p0 : V2d) + (%coord).X * (%%p1 : V2d)) +
+                (%coord).Y * ((1.0 - (%coord).X) * (%%p2 : V2d) + (%coord).X * (%%p3 : V2d)) 
+            @@>
+        elif p0.Type = typeof<V3d> then
+            <@@ 
+                (1.0 - (%coord).Y) * ((1.0 - (%coord).X) * (%%p0 : V3d) + (%coord).X * (%%p1 : V3d)) +
+                (%coord).Y * ((1.0 - (%coord).X) * (%%p2 : V3d) + (%coord).X * (%%p3 : V3d)) 
+            @@>
+        elif p0.Type = typeof<V4d> then
+            <@@ 
+                (1.0 - (%coord).Y) * ((1.0 - (%coord).X) * (%%p0 : V4d) + (%coord).X * (%%p1 : V4d)) +
+                (%coord).Y * ((1.0 - (%coord).X) * (%%p2 : V4d) + (%coord).X * (%%p3 : V4d)) 
+            @@>
+        else
+            failwithf "[FShade] cannot interpolate %A" p0.Type
+
+
     let systemInputs (shader : Shader) =
         let builtIn = builtInInputs.[shader.shaderStage]
         shader.shaderInputs |> Map.choose (fun name p ->
@@ -1007,18 +1047,23 @@ module Shader =
                                             ShaderOutputValue(Some invocationId, Expr.ReadInput(ParameterKind.Input, t, n, invocationId))
 
                                         | ShaderStage.TessEval ->
-                                            let coord = Expr.ReadInput<V3d>(ParameterKind.Input, Intrinsics.TessCoord)
+                                            match shader.shaderInputTopology.Value with
+                                                | InputTopology.Patch 3 | InputTopology.Triangle ->
+                                                    let coord = Expr.ReadInput<V3d>(ParameterKind.Input, Intrinsics.TessCoord)
+                                                    let p0 = Expr.ReadInput(ParameterKind.Input, t, n, Expr.Value 0)
+                                                    let p1 = Expr.ReadInput(ParameterKind.Input, t, n, Expr.Value 1)
+                                                    let p2 = Expr.ReadInput(ParameterKind.Input, t, n, Expr.Value 2)
+                                                    interpolate3 coord p0 p1 p2 |> ShaderOutputValue
 
-                                            Log.warn "is wrong"
-                                            ShaderOutputValue(Expr.ReadInput(ParameterKind.Input, t, n, Expr.Value -1))
-
-//
-//                                            match shader.shaderInputTopology.Value with
-//                                                | InputTopology.Patch 3 | InputTopology.Triangle ->
-//                                                    let value = <@@ fun a b c -> a * (%coord).X + b * (%coord).Y + c * (%coord).Z @@>
-//                                                    failwithf "[FShade] passing for tessellation not implemented: %A" value
-//                                                | _ ->
-//                                                    failwith "[FShade] passing for tessellation not implemented"
+                                                | InputTopology.Patch 4 ->
+                                                    let coord = Expr.ReadInput<V3d>(ParameterKind.Input, Intrinsics.TessCoord)
+                                                    let p0 = Expr.ReadInput(ParameterKind.Input, t, n, Expr.Value 0)
+                                                    let p1 = Expr.ReadInput(ParameterKind.Input, t, n, Expr.Value 1)
+                                                    let p2 = Expr.ReadInput(ParameterKind.Input, t, n, Expr.Value 2)
+                                                    let p3 = Expr.ReadInput(ParameterKind.Input, t, n, Expr.Value 3)
+                                                    interpolate4 coord p0 p1 p2 p3 |> ShaderOutputValue
+                                                | _ ->
+                                                    failwith "[FShade] cannot pass for n-ary tess-eval shader"
 
                                         | _ ->
                                             failwith "[FShade] passing for tessellation not implemented"
