@@ -152,6 +152,8 @@ module Primitives =
 
         interface Primitive<'a>
 
+        member x.InvocationId : int = failwith ""
+
         member x.Item
             with get (i : int) : 'a = shaderOnlyAccess()
             

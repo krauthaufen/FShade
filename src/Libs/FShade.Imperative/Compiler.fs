@@ -1106,9 +1106,15 @@ module Compiler =
                                     match index with
                                         | Some index -> toCExpr index |> State.map Some
                                         | _ -> State.value None
-                                let! value = toCRExpr value |> State.map Option.get
 
-                                return CWriteOutput(name, index, value)
+                                let! value = toCStatement true value
+                                let rec replaceReturn (s : CStatement) =
+                                    match s with
+                                        | CReturnValue v -> CWriteOutput(name, index, CRExpr v)
+                                        | CSequential l -> l |> List.map replaceReturn |> CSequential
+                                        | _ -> s
+
+                                return replaceReturn value
                             }
                         )
 

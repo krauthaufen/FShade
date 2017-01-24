@@ -644,12 +644,53 @@ module GLSL =
             let prefix = "    "
             lines |> Seq.map (fun l -> if l.Length > 0 then prefix + l else l) |> String.concat "\r\n"
 
+//    type CompilerConfiguration =
+//        {
+//            languageVersion : Version
+//            enabledExtensions : Set<string>
+//            createUniformBuffers : bool
+//            createGlobalUniforms : bool
+//            createBindings : bool
+//            createDescriptorSets : bool
+//            createInputLocations : bool
+//            expectRowMajorMatrices : bool
+//
+//            createPerStageUniforms : bool
+//
+//            flipHandedness : bool
+//            depthRange : Range1d
+//
+//            treatUniformsAsInputs : bool
+//
+//        }
+
     type Config =
         {
-            version             : Version
-            perStageUniforms    : bool
-            locations           : bool
-            uniformBuffers      : bool
+            version                 : Version
+            enabledExtensions       : Set<string>
+            createUniformBuffers    : bool
+            
+//            createBindings          : bool
+//            createDescriptorSets    : bool
+            createInputLocations    : bool
+            createPerStageUniforms  : bool
+            
+            reverseMatrixLogic      : bool
+            flipHandedness          : bool
+            depthRange              : Range1d
+        }
+
+    let glsl410 =
+        {
+            version                 = Version(4,1,0)
+            enabledExtensions       = Set.empty
+            createUniformBuffers    = true
+            createInputLocations    = true
+            createPerStageUniforms  = false
+            
+            reverseMatrixLogic      = false
+            flipHandedness          = false
+            depthRange              = Range1d(-1.0, 1.0)
         }
 
     let version120 = Version(1,2,0)
@@ -877,6 +918,7 @@ module GLSL =
 
         let rec glsl (c : State) (e : CExpr) =
             let glsl = glsl c
+            let reverse = c.config.reverseMatrixLogic
             match e with
                 | CVar v -> 
                     v.name
@@ -922,13 +964,18 @@ module GLSL =
                 | CDiv(_, l, r) -> sprintf "(%s / %s)" (glsl l) (glsl r)
                 | CMod(_, l, r) -> sprintf "(%s %% %s)" (glsl l) (glsl r)
 
-                | CTranspose(_,m) -> sprintf "transpose(%s)" (glsl m)
+                | CMulMatMat(_, l, r) when reverse -> sprintf "(%s * %s)" (glsl r) (glsl l)
+                | CMulMatVec(_, l, r) when reverse -> sprintf "(%s * %s)" (glsl r) (glsl l)
+                | CMatrixElement(_, m, r, c) when reverse -> sprintf "%s[%d][%d]" (glsl m) r c
+
                 | CMulMatMat(_, l, r) -> sprintf "(%s * %s)" (glsl l) (glsl r)
                 | CMulMatVec(_, l, r) -> sprintf "(%s * %s)" (glsl l) (glsl r)
+                | CMatrixElement(_, m, r, c) -> sprintf "%s[%d][%d]" (glsl m) c r
+
+                | CTranspose(_,m) -> sprintf "transpose(%s)" (glsl m)
                 | CDot(_, l, r) -> sprintf "dot(%s, %s)" (glsl l) (glsl r)
                 | CCross(_, l, r) -> sprintf "cross(%s, %s)" (glsl l) (glsl r)
                 | CVecSwizzle(_, v, s) -> sprintf "%s.%s" (glsl v) (swizzle s)
-                | CMatrixElement(_, m, r, c) -> sprintf "%s[%d][%d]" (glsl m) c r
                 | CNewVector(r, _, args) -> sprintf "%s(%s)" (CType.glsl r) (args |> List.map glsl |> String.concat ", ")
                 | CVecLength(_, v) -> sprintf "length(%s)" (glsl v)
 
@@ -1042,7 +1089,7 @@ module GLSL =
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module CUniform =
         let glsl (c : Config) (uniforms : list<CUniform>) =
-            if c.uniformBuffers then
+            if c.createUniformBuffers then
                 let buffers =
                     uniforms 
                         |> List.groupBy (fun u -> u.cUniformBuffer)
@@ -1093,7 +1140,7 @@ module GLSL =
 
             let decorations =
                 match kind with
-                    | ParameterKind.Input | ParameterKind.Output when c.locations && c.version > version120 ->
+                    | ParameterKind.Input | ParameterKind.Output when c.createInputLocations && c.version > version120 ->
                         sprintf "layout(location = %d)" index :: decorations
                     | _ ->
                         decorations
@@ -1279,7 +1326,7 @@ module GLSL =
                         | _ -> sprintf "const %s %s = %s;" (CType.glsl t) n (CRExpr.glsl (State.ofConfig c) init)
 
                 | CUniformDef us ->
-                    if c.perStageUniforms then
+                    if c.createPerStageUniforms then
                         CUniform.glsl c us
                     else
                         ""
@@ -1297,9 +1344,12 @@ module GLSL =
         let glsl (c : Config) (m : CModule) =
             let definitions =
                 List.concat [
+                    yield [sprintf "#version %d%d0" c.version.Major c.version.Minor ]
+                    yield c.enabledExtensions |> Seq.map (sprintf "#extension %s : enable;") |> Seq.toList
+
                     yield m.types |> List.map CTypeDef.glsl
 
-                    if not c.perStageUniforms then
+                    if not c.createPerStageUniforms then
                         let uniforms = m.uniforms
                         yield [ CUniform.glsl c uniforms ]
 
@@ -1309,3 +1359,74 @@ module GLSL =
             definitions |> String.concat "\r\n\r\n"
 
         
+    let compile (config : Config) (outputs : Map<string, Type>) (effect : Effect) =
+
+        let adjustDepthRange =
+            config.depthRange.Min <> -1.0 || config.depthRange.Max <> 1.0 || config.flipHandedness
+
+        let effect =
+            if adjustDepthRange then
+                let lastGeometryStage =
+                    effect 
+                        |> Effect.toSeq 
+                        |> Seq.filter (fun s -> s.shaderStage < ShaderStage.Fragment) 
+                        |> Seq.last
+                        |> Shader.mapOutputs (fun values ->
+                            values |> Map.map (fun name value ->
+                                if name = Intrinsics.Position then
+                                    let range = config.depthRange
+                                    let intermediate = Var("_pos", value.Type, true)
+                                    let ie = Expr.Var intermediate
+                                    let newZ =
+                                        if range.Min <> -1.0 || range.Max <> 1.0 then
+                                       
+                                            // newZ = a * z + b * w
+
+                                            // due to projective division:
+                                            // max = (a * w + b * w) / w
+                                            // min = (a * -w + b * w) / w
+
+                                            // therefore:
+                                            // (1) max = a + b
+                                            // (2) min = b - a
+
+                             
+                                            // (1) + (2) => max + min = 2 * b
+                                            // (1) - (2) => max - min = 2 * a
+
+                                            // so finally we get:
+                                            // a = (max - min) / 2
+                                            // b = (max + min) / 2
+
+
+                                            let a = range.Size / 2.0
+                                            let b = (range.Min + range.Max) / 2.0
+
+                                            if a = b then
+                                                <@@ a * ((%%ie : V4d).Z + (%%ie : V4d).W) @@>
+                                            else
+                                                <@@ a * (%%ie : V4d).Z + b * (%%ie : V4d).W @@>
+                                        else
+                                            <@@ (%%ie : V4d).Z @@>
+
+                                    let ie =
+                                        if config.flipHandedness then
+                                            <@@ V4d((%%ie : V4d).X, -(%%ie : V4d).Y, %%newZ, (%%ie : V4d).W)  @@>
+                                        else
+                                            ie
+
+                                    ShaderOutputValue(Expr.Let(intermediate, value.Value, ie))
+                                else
+                                    value
+                            )
+                        )
+            
+                effect |> Effect.add lastGeometryStage
+            else
+                effect
+
+        effect
+            |> Effect.link ShaderStage.Fragment outputs
+            |> Effect.toModule
+            |> Linker.compileAndLink backend
+            |> CModule.glsl config

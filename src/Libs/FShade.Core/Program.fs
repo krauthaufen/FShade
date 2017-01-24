@@ -57,27 +57,11 @@ let effectTest() =
     let effect = Effect.ofList (vert @ frag)
 
     Effect.empty
-        |> Effect.link ShaderStage.Fragment (Map.ofList ["Colors", typeof<V4d>; "Bla", typeof<V2d>])
-        |> Effect.toModule
-        |> Linker.compileAndLink GLSL.backend
-        |> GLSL.CModule.glsl  { 
-            GLSL.Config.version = System.Version(4,1,0)
-            GLSL.Config.locations = false
-            GLSL.Config.perStageUniforms = true
-            GLSL.Config.uniformBuffers = true 
-        }
+        |> GLSL.compile GLSL.glsl410 (Map.ofList ["Colors", typeof<V4d>; "Bla", typeof<V2d>])
         |> printfn "%s"
 
     effect
-        |> Effect.link ShaderStage.Fragment (Map.ofList ["Colors", typeof<V4d>])
-        |> Effect.toModule
-        |> Linker.compileAndLink GLSL.backend
-        |> GLSL.CModule.glsl  { 
-            GLSL.Config.version = System.Version(4,1,0)
-            GLSL.Config.locations = false
-            GLSL.Config.perStageUniforms = true
-            GLSL.Config.uniformBuffers = true 
-        }
+        |> GLSL.compile GLSL.glsl410 (Map.ofList ["Colors", typeof<V4d>; "Bla", typeof<V2d>])
         |> printfn "%s"
 
 type Vertex1 =
@@ -130,16 +114,8 @@ let composeTest() =
 
 
 
-    Effect.compose [sa; sb]
-        |> Effect.link ShaderStage.Fragment (Map.ofList [Intrinsics.Color, typeof<V4d>])
-        |> Effect.toModule
-        |> Linker.compileAndLink GLSL.backend
-        |> GLSL.CModule.glsl  { 
-            GLSL.Config.version = System.Version(4,1,0)
-            GLSL.Config.locations = true
-            GLSL.Config.perStageUniforms = false
-            GLSL.Config.uniformBuffers = true 
-        }
+    Effect.compose [sa; sb] 
+        |> GLSL.compile GLSL.glsl410 (Map.ofList [ Intrinsics.Color, typeof<V4d> ])
         |> printfn "%s"
 
 
@@ -185,6 +161,37 @@ module Crazyness =
 module TessDeconstruct = 
     open Microsoft.FSharp.Quotations.Patterns
     open Microsoft.FSharp.Quotations.ExprShape
+    
+    module Sketch = 
+        type Bla = Bla
+
+        let patchOut (v : 'a) = Bla
+        type TessControlBuilder() =
+            inherit BaseBuilder()
+
+            member x.Quote() = ()
+            member x.Delay f = f()
+            member x.Bind(levels : Bla, f : unit -> Bla) : unit =
+                ()
+
+            member x.Return(u : unit) = Bla
+
+            member x.Yield(v : 'a) = v
+
+            interface IShaderBuilder with
+                member x.ShaderStage = ShaderStage.TessControl
+                member x.OutputTopology = None
+
+        let tessControl = TessControlBuilder()
+    
+        let testTCS (quad : Patch<3 N, Vertex>) =
+            tessControl {
+                if quad.InvocationId = 0 then
+                    do! patchOut { pos = V4d.IIII; tc = V2d.II; vi = 0 }
+
+
+                yield quad.[quad.InvocationId]
+            }
 
     let test (quad : Patch<3 N, Vertex>) =
         tessellation {
@@ -216,15 +223,7 @@ module TessDeconstruct =
         
     let run() =
         Effect.compose [Effect.ofFunction test; Effect.ofFunction geometry]
-            |> Effect.link ShaderStage.Fragment (Map.ofList ["Bla", typeof<V4d>])
-            |> Effect.toModule
-            |> Linker.compileAndLink GLSL.backend
-            |> GLSL.CModule.glsl  { 
-                GLSL.Config.version = System.Version(4,1,0)
-                GLSL.Config.locations = false
-                GLSL.Config.perStageUniforms = true
-                GLSL.Config.uniformBuffers = true 
-            }
+            |> GLSL.compile GLSL.glsl410 (Map.ofList [ "Bla", typeof<V4d> ])
             |> printfn "%s"
 
 
@@ -363,12 +362,7 @@ let main args =
     let entry =
         entry
             |> Linker.compileAndLink GLSL.backend
-            |> GLSL.CModule.glsl  { 
-                GLSL.Config.version = System.Version(4,1,0)
-                GLSL.Config.locations = false
-                GLSL.Config.perStageUniforms = true
-                GLSL.Config.uniformBuffers = true 
-            }
+            |> GLSL.CModule.glsl GLSL.glsl410
 
     printfn "%s" entry
     0
