@@ -15,6 +15,27 @@ open Aardvark.Base.TypeInfo.Patterns
 
 open FShade
 
+type CIntrinsicType =
+    {
+        intrinsicTypeName   : string
+        tag                 : obj
+    }
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module CIntrinsicType =
+    let simple (name : string) =
+        {
+            intrinsicTypeName = name
+            tag = null
+        }
+
+    let tagged (tag : obj) =
+        {
+            intrinsicTypeName = null
+            tag = tag
+        }
+
+
 /// represents a pointer modifier (const, etc.)
 type CPointerModifier =
     | None      = 0x00
@@ -33,6 +54,7 @@ type CType =
     | CArray of elementType : CType * length : int
     | CPointer of modifier : CPointerModifier * elementType : CType
     | CStruct of name : string * fields : list<CType * string> * original : Option<Type>
+    | CIntrinsic of CIntrinsicType
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module CType =
@@ -250,15 +272,22 @@ module CIntrinsic =
     let simple (name : string) =
         {
             intrinsicName = name
-            tag = name :> obj
+            tag = null
             arguments = None
         }
 
     let custom (name : string) (args : list<int>)=
         {
             intrinsicName = name
-            tag = name :> obj
+            tag = null
             arguments = Some args
+        }
+
+    let tagged (tag : obj)=
+        {
+            intrinsicName = null
+            tag = tag
+            arguments = None
         }
 
 /// represents a c-style expression

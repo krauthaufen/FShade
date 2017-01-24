@@ -22,9 +22,11 @@ module Compiler =
     [<AllowNullLiteral; AbstractClass>]
     type Backend() =
         let intrinsicFunctions = System.Collections.Concurrent.ConcurrentDictionary<MethodBase, Option<CIntrinsic>>()
+        let intrinsicTypes = System.Collections.Concurrent.ConcurrentDictionary<Type, Option<CIntrinsicType>>()
 
         abstract member TryGetIntrinsicMethod : MethodInfo -> Option<CIntrinsic>
         abstract member TryGetIntrinsicCtor : ConstructorInfo -> Option<CIntrinsic>
+        abstract member TryGetIntrinsicType : Type -> Option<CIntrinsicType>
 
         member x.TryGetIntrinsic (m : MethodBase) =
             intrinsicFunctions.GetOrAdd(m, fun m ->
@@ -33,6 +35,12 @@ module Compiler =
                     | :? ConstructorInfo as ci -> x.TryGetIntrinsicCtor ci
                     | _ -> None
             )
+
+        member x.TryGetIntrinsic (t : Type) =
+            intrinsicTypes.GetOrAdd(t, fun t ->
+                x.TryGetIntrinsicType t
+            )
+
 
     type FunctionDefinition = 
         | ManagedFunction of name : string * args : list<Var> * body : Expr
@@ -386,13 +394,18 @@ module Compiler =
 
     let toCType (t : Type) =
         State.custom (fun s ->
-            let cType = CType.ofType t
+            match s.moduleState.backend.TryGetIntrinsic t with
+                | Some ci -> 
+                    s, CType.CIntrinsic ci
 
-            match cType with
-                | CStruct _ ->
-                    { s with moduleState = { s.moduleState with ModuleState.usedTypes = HashMap.add (t :> obj) cType s.moduleState.usedTypes } }, cType
-                | _ ->
-                    s, cType
+                | None -> 
+                    let cType = CType.ofType t
+
+                    match cType with
+                        | CStruct _ ->
+                            { s with moduleState = { s.moduleState with ModuleState.usedTypes = HashMap.add (t :> obj) cType s.moduleState.usedTypes } }, cType
+                        | _ ->
+                            s, cType
         )
         
     /// converts a variable to a CVar using the cached name or by

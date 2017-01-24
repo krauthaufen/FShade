@@ -52,7 +52,8 @@ type ShaderStageDescription =
 type EntryDecoration =
     | Stages of ShaderStageDescription
     | InputTopology of InputTopology
-    | OutputTopology of OutputTopology * int
+    | OutputTopology of OutputTopology
+    | OutputVertices of int
 
 type EntryPoint =
     {
@@ -322,8 +323,11 @@ type ExpressionSubstitutionExtensions private() =
                 else
                     Range1i(0, Int32.MaxValue)
 
+            | Let(v, e, b) ->
+                numberOfCalls mi e <+> numberOfCalls mi b
+
             | ShapeVar v -> zero
-            | ShapeLambda(v, b) -> zero
+            | ShapeLambda(v, b) -> numberOfCalls mi b
             | ShapeCombination(o, args) -> args |> List.fold (fun r e -> r <+> numberOfCalls mi e) zero
 
     static let rec substituteReads (substitute : ParameterKind -> Type -> string -> Option<Expr> -> Option<Expr>) (e : Expr) =

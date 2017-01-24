@@ -16,15 +16,32 @@ open FShade.Imperative
 open System.Collections.Generic
 open Aardvark.Base.ReflectionHelpers
 
+
+[<RequireQualifiedAccess>]
+type ShaderOutputVertices =
+    | Unknown
+    | Computed of int
+    | UserGiven of int
+
+/// Shader encapsulates all information about a specific shader.
 type Shader =
     {
-        shaderStage             : ShaderStage
-        shaderInputs            : Map<string, ParameterDescription>
-        shaderOutputs           : Map<string, ParameterDescription>
-        shaderUniforms          : Map<string, UniformParameter>
-        shaderInputTopology     : Option<InputTopology>
-        shaderOutputTopology    : Option<OutputTopology * int>
-        shaderBody              : Expr
+        /// the shader's stage
+        shaderStage : ShaderStage
+        /// the used inputs for the shader
+        shaderInputs : Map<string, ParameterDescription>
+        /// the provided outputs written by the shader
+        shaderOutputs : Map<string, ParameterDescription>
+        /// the used uniforms for the shader
+        shaderUniforms : Map<string, UniformParameter>
+        /// the optional input-topology for the shader
+        shaderInputTopology : Option<InputTopology>
+        /// the optional output-topology for the shader (including the maximal vertex-count)
+        shaderOutputTopology : Option<OutputTopology>
+        /// the optional maximal vertex-count for the shader
+        shaderOutputVertices : ShaderOutputVertices
+        /// the body for the shader
+        shaderBody : Expr
     }
 
 module private Preprocessor =
@@ -450,9 +467,12 @@ module private Preprocessor =
                             state {
                                 let interpolation = f.Interpolation
                                 let semantic = f.Semantic 
-                                let parameter = { paramType = f.PropertyType; paramInterpolation = interpolation }
-                                do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
-                                return Expr.ReadInput(ParameterKind.Input, f.PropertyType, semantic, index)
+                                if semantic = Intrinsics.SourceVertexIndex then
+                                    return index
+                                else
+                                    let parameter = { paramType = f.PropertyType; paramInterpolation = interpolation }
+                                    do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
+                                    return Expr.ReadInput(ParameterKind.Input, f.PropertyType, semantic, index)
                             }
                         )
                         
@@ -469,8 +489,11 @@ module private Preprocessor =
 
                     match index with
                         | Some index -> 
-                            do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
-                            return Expr.ReadInput(ParameterKind.Input, parameter.paramType, semantic, index)
+                            if semantic = Intrinsics.SourceVertexIndex then
+                                return index
+                            else
+                                do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
+                                return Expr.ReadInput(ParameterKind.Input, parameter.paramType, semantic, index)
                         | _ ->
                             do! State.readInput semantic parameter
                             return Expr.ReadInput(ParameterKind.Input, parameter.paramType, semantic)
@@ -600,6 +623,7 @@ module private Preprocessor =
                         | _ -> failwithf "[FShade] could not evaluate shader-builder %A" builder
                 | _ ->
                     failwithf "[FShade] could not evaluate shader-builder %A" state.builder
+
         let body =
             match builder.ShaderStage, state.shaders with
                 | ShaderStage.TessControl, _ :: _ ->
@@ -615,6 +639,15 @@ module private Preprocessor =
                 | _ -> 
                     body
 
+        let outputVertices =
+            match builder with
+                | :? GeometryBuilder as b -> 
+                    match b.Size with
+                        | Some s -> ShaderOutputVertices.UserGiven s
+                        | None -> ShaderOutputVertices.Unknown
+                | _ ->
+                    ShaderOutputVertices.Unknown
+
         let shader = 
             { 
                 shaderStage             = builder.ShaderStage
@@ -622,7 +655,8 @@ module private Preprocessor =
                 shaderOutputs           = state.outputs
                 shaderUniforms          = state.uniforms
                 shaderInputTopology     = state.inputTopology
-                shaderOutputTopology    = builder.OutputTopology |> Option.map (fun t -> t, Int32.MaxValue)
+                shaderOutputTopology    = builder.OutputTopology
+                shaderOutputVertices    = outputVertices
                 shaderBody              = body
             }
 
@@ -648,7 +682,6 @@ module private Preprocessor =
 
             | ShapeVar _ ->
                 Map.empty
-
 
 type ShaderOutputValue(mode : InterpolationMode, index : Option<Expr>, value : Expr) =
     let value, inputs, uniforms =
@@ -882,6 +915,13 @@ module Shader =
             failwithf "[FShade] cannot interpolate %A" p0.Type
 
 
+    let inline stage (s : Shader) = s.shaderStage
+    let inline uniforms (s : Shader) = s.shaderUniforms
+    let inline body (s : Shader) = s.shaderBody
+    let inline inputTopology (s : Shader) = s.shaderInputTopology
+    let inline outputTopology (s : Shader) = s.shaderOutputTopology
+
+
     let systemInputs (shader : Shader) =
         let builtIn = builtInInputs.[shader.shaderStage]
         shader.shaderInputs |> Map.choose (fun name p ->
@@ -918,12 +958,6 @@ module Shader =
                     None
         )
 
-    let inline stage (s : Shader) = s.shaderStage
-    let inline uniforms (s : Shader) = s.shaderUniforms
-    let inline body (s : Shader) = s.shaderBody
-    let inline inputTopology (s : Shader) = s.shaderInputTopology
-    let inline outputTopology (s : Shader) = s.shaderOutputTopology
-
     /// optimizes the shader by
     ///    1) evaluating constant expressions
     ///    2) removing useless expressions/variables
@@ -941,25 +975,28 @@ module Shader =
 
         let inputs = Preprocessor.usedInputs newBody
 
-        let newOutputTopology =
+        let newOutputVertices =
             match shader.shaderStage with
-                | ShaderStage.Geometry -> 
-                    let top, _ = Option.get shader.shaderOutputTopology
-                    let range = Expr.computeCallCount emitVertexMeth newBody
-                    let maxVertices =
-                        if range.Max = Int32.MaxValue then
-                            Log.warn "[FShade] could not determine max-vertex-count (using 32)"
-                            32
-                        else
-                            range.Max
-                    Some (top, range.Max)
+                | ShaderStage.Geometry ->
+                    match shader.shaderOutputVertices with
+                        | ShaderOutputVertices.Computed _ | ShaderOutputVertices.Unknown ->
+                            let range = Expr.computeCallCount emitVertexMeth newBody
+                            let maxVertices =
+                                if range.Max = Int32.MaxValue then
+                                    Log.warn "[FShade] could not determine max-vertex-count (using 32)"
+                                    32
+                                else
+                                    range.Max
+                            ShaderOutputVertices.Computed range.Max
+                        | ov ->
+                            ov
                 | _ ->
-                    None
+                    shader.shaderOutputVertices
 
         { shader with
             shaderInputs = shader.shaderInputs |> Map.filter (fun n _ -> inputs.ContainsKey n)
             shaderUniforms = shader.shaderUniforms |> Map.filter (fun n _ -> inputs.ContainsKey n)
-            shaderOutputTopology = newOutputTopology
+            shaderOutputVertices = newOutputVertices
             shaderBody = newBody
         }
 
@@ -1109,6 +1146,7 @@ module Shader =
                         )
             )
 
+    /// creates a new shader by removing all outputs given in semantics
     let removeOutputs (semantics : Set<string>) (shader : Shader) =
         let desired = 
             shader.shaderOutputs |> Map.choose (fun name p ->
@@ -1167,10 +1205,25 @@ module Shader =
             arguments   = []
             body        = s.shaderBody
             decorations = 
-                List.concat [
-                    [ EntryDecoration.Stages { prev = prevStage; self = s.shaderStage; next = nextStage } ]
-                    s.shaderInputTopology |> Option.map EntryDecoration.InputTopology |> Option.toList
-                    s.shaderOutputTopology |> Option.map EntryDecoration.OutputTopology |> Option.toList
+                [
+                    yield EntryDecoration.Stages { 
+                        prev = prevStage
+                        self = s.shaderStage
+                        next = nextStage 
+                    }
+
+                    match s.shaderInputTopology with
+                        | Some t -> yield EntryDecoration.InputTopology t
+                        | None -> ()
+
+                    match s.shaderOutputTopology with
+                        | Some t -> yield EntryDecoration.OutputTopology t
+                        | _ -> ()
+
+                    match s.shaderOutputVertices with
+                        | ShaderOutputVertices.Unknown -> ()
+                        | ShaderOutputVertices.Computed v | ShaderOutputVertices.UserGiven v ->
+                            yield EntryDecoration.OutputVertices v
                 ]
         }
 
@@ -1186,6 +1239,7 @@ module Shader =
                     shaderUniforms          = Map.empty
                     shaderInputTopology     = None
                     shaderOutputTopology    = None
+                    shaderOutputVertices    = ShaderOutputVertices.Unknown
                     shaderBody =
                         attributes
                             |> Map.map (fun n t -> None, Expr.ReadInput(ParameterKind.Input, t, n))
@@ -1199,6 +1253,7 @@ module Shader =
     let empty (stage : ShaderStage) = 
         passing Map.empty stage
 
+    /// gets the needed inputs for the given shader
     let inputs (shader : Shader) =
         let builtIn = builtInInputs.[shader.shaderStage]
         let inputs = 
@@ -1221,7 +1276,8 @@ module Shader =
                         |> Map.map (fun _ p -> p.paramType)
 
         Map.difference inputs builtIn    
-
+        
+    /// gets the provided outputs for the given shader
     let outputs (shader : Shader) =
         match shader.shaderStage with
             | ShaderStage.Fragment ->
@@ -1409,6 +1465,11 @@ module Shader =
                     shaderBody = lBody
                 }
 
+    /// composes two shaders respecting their stages.
+    ///     - implemented: { Vertex->Vertex; Geometry->Vertex; Fragment->Fragment }
+    ///     - future:           { Tessellation->Vertex; Geometry->Geometry }
+    ///     - impossible/hard:  { Tessellation->Tessellation; Geometry->Tessellation }
+    ///     - effect:           { Vertex->Tessellation; Vertex->Geometry; Vertex->Fragment; Tessellation->Geometry; Tessellation->Fragment; Geometry->Fragment }
     let compose2 (l : Shader) (r : Shader) =
         match l.shaderStage, r.shaderStage with
 
@@ -1425,6 +1486,8 @@ module Shader =
             | _ ->
                 failwithf "[FShade] cannot compose %AShader with %AShader" l.shaderStage r.shaderStage
 
+    /// composes many shaders respecting their stages.
+    /// NOTE: the sequence cannot be empty
     let compose (l : #seq<Shader>) =
         use e = l.GetEnumerator()
         if e.MoveNext() then

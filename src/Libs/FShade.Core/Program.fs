@@ -9,33 +9,11 @@ open System.Reflection
 
 let sink(a,b) = ()
 
-type GLSLBackend private() =
-    inherit Compiler.Backend()
-    static let instance = GLSLBackend() :> Compiler.Backend
-
-    static member Instance = instance
-
-    override x.TryGetIntrinsicMethod (c : MethodInfo) =
-        match c with
-            | MethodQuote <@ sink @> _          -> CIntrinsic.simple "sink" |> Some
-            | MethodQuote <@ sin @> _           -> CIntrinsic.simple "sin" |> Some
-            | MethodQuote <@ cos @> _           -> CIntrinsic.simple "cos" |> Some
-            | MethodQuote <@ clamp @> _         -> CIntrinsic.custom "clamp" [2;0;1] |> Some
-
-            | MethodQuote <@ discard @> _         -> CIntrinsic.simple "discard" |> Some
-            | MethodQuote <@ emitVertex @> _      -> CIntrinsic.simple "EmitVertex" |> Some
-            | MethodQuote <@ restartStrip @> _    -> CIntrinsic.simple "EndPrimitive" |> Some
-            | MethodQuote <@ endPrimitive @> _    -> CIntrinsic.simple "EndPrimitive" |> Some
-
-            | _ -> None
-    
-    override x.TryGetIntrinsicCtor (c : ConstructorInfo) =
-        None
-
 type Vertex =
     {
         [<Position>] pos : V4d
         [<Semantic("TexCoord")>] tc : V2d
+        [<SourceVertexIndex>] vi : int
     }
 
 type Fragment =
@@ -61,6 +39,7 @@ let effectTest() =
             return {
                 pos = uniform.Trafo * v.pos
                 tc = v.tc
+                vi = 0
             }
         }
 
@@ -80,7 +59,7 @@ let effectTest() =
     Effect.empty
         |> Effect.link ShaderStage.Fragment (Map.ofList ["Colors", typeof<V4d>; "Bla", typeof<V2d>])
         |> Effect.toModule
-        |> Linker.compileAndLink GLSLBackend.Instance
+        |> Linker.compileAndLink GLSL.backend
         |> GLSL.CModule.glsl  { 
             GLSL.Config.version = System.Version(4,1,0)
             GLSL.Config.locations = false
@@ -92,7 +71,7 @@ let effectTest() =
     effect
         |> Effect.link ShaderStage.Fragment (Map.ofList ["Colors", typeof<V4d>])
         |> Effect.toModule
-        |> Linker.compileAndLink GLSLBackend.Instance
+        |> Linker.compileAndLink GLSL.backend
         |> GLSL.CModule.glsl  { 
             GLSL.Config.version = System.Version(4,1,0)
             GLSL.Config.locations = false
@@ -154,7 +133,7 @@ let composeTest() =
     Effect.compose [sa; sb]
         |> Effect.link ShaderStage.Fragment (Map.ofList [Intrinsics.Color, typeof<V4d>])
         |> Effect.toModule
-        |> Linker.compileAndLink GLSLBackend.Instance
+        |> Linker.compileAndLink GLSL.backend
         |> GLSL.CModule.glsl  { 
             GLSL.Config.version = System.Version(4,1,0)
             GLSL.Config.locations = true
@@ -203,51 +182,43 @@ module Crazyness =
         printfn "def2: %A" def2
 
 
-type TessBuilder() =
-    inherit BaseBuilder()
-    member x.Bind(t : TessCoord<'c>, f : 'c -> 'a) : 'a =
-        failwith ""
-
-    member x.Return(v) = v
-
-    member x.Quote() = ()
-
-    interface IShaderBuilder with
-        member x.ShaderStage = ShaderStage.TessControl
-        member x.OutputTopology = None
-
-let tessellation = TessBuilder()
-
 module TessDeconstruct = 
     open Microsoft.FSharp.Quotations.Patterns
     open Microsoft.FSharp.Quotations.ExprShape
 
-    let test (quad : Triangle<Vertex>) =
+    let test (quad : Patch<3 N, Vertex>) =
         tessellation {
-            let p0 = quad.P0.pos
-            let p1 = quad.P1.pos
-            let p2 = quad.P2.pos
+            let p0 = quad.[0].pos
+            let p1 = quad.[1].pos
+            let p2 = quad.[2].pos
 
             let centroid = (p0 + p1 + p2) / 3.0
             let level = 1.0 / centroid.Z
 
             let! coord = tessellateTriangle (level) (level, level, level)
             
-            let p = coord.X * p0 + coord.Y * p1 + coord.Z * p2
+            let p = sinh coord.X * p0.Abs + coord.Y * p1 + coord.Z * p2
 
             return {
                 pos = p + V4d(0.0, level, 0.0, 0.0)
                 tc = coord.XY
+                vi = 0
             }
         }
 
+    let geometry (tri : Triangle<Vertex>) =
+        triangle {
+            let center = (tri.P0.pos + tri.P1.pos + tri.P2.pos) / 3.0
+            yield { tri.P0 with pos = center + (tri.P0.pos - center) * 1.5 }
+            yield { tri.P1 with pos = center + (tri.P1.pos - center) * 1.5 }
+            yield { tri.P2 with pos = center + (tri.P2.pos - center) * 1.5 }
+        }
+        
     let run() =
-        let e = Effect.ofFunction test
-        //let (tcs, tcsState), (tev, tevState) = test Unchecked.defaultof<_> |> Preprocessor.removeTessEval typeof<Patch4<Vertex>>
-
-        e   |> Effect.link ShaderStage.Fragment (Map.ofList [Intrinsics.Color, typeof<V4d>])
+        Effect.compose [Effect.ofFunction test; Effect.ofFunction geometry]
+            |> Effect.link ShaderStage.Fragment (Map.ofList ["Bla", typeof<V4d>])
             |> Effect.toModule
-            |> Linker.compileAndLink GLSLBackend.Instance
+            |> Linker.compileAndLink GLSL.backend
             |> GLSL.CModule.glsl  { 
                 GLSL.Config.version = System.Version(4,1,0)
                 GLSL.Config.locations = false
@@ -391,7 +362,7 @@ let main args =
 
     let entry =
         entry
-            |> Linker.compileAndLink GLSLBackend.Instance
+            |> Linker.compileAndLink GLSL.backend
             |> GLSL.CModule.glsl  { 
                 GLSL.Config.version = System.Version(4,1,0)
                 GLSL.Config.locations = false

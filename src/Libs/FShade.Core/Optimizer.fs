@@ -54,7 +54,6 @@ module Optimizer =
                 | AddressOf (MutableArgument v) -> Some v
                 | _ -> None
 
-
     module DeadCodeElimination = 
 
         type EliminationState =
@@ -1170,21 +1169,32 @@ module Optimizer =
             run.Run(&state)
             
 
-
+    /// creates a new expression only containing e's visible side-effects.
+    /// NOTE: all methods are assumed to be pure (except for the ones returning void/unit)
     let withoutValue (e : Expr) =
         DeadCodeElimination.withoutValue e
-
+        
+    /// creates a new expression by removing all unused variables/calls.
+    /// NOTE: all methods are assumed to be pure (except for the ones returning void/unit)
     let eliminateDeadCode (e : Expr) =
         DeadCodeElimination.eliminateDeadCode e
-
-    let withoutValue' (isSideEffect : MethodInfo -> bool) (e : Expr) =
-        DeadCodeElimination.withoutValue' isSideEffect e
-
-    let eliminateDeadCode' (isSideEffect : MethodInfo -> bool)  (e : Expr) =
-        DeadCodeElimination.eliminateDeadCode' isSideEffect e
-
+        
+    /// creates a new expression by evaluating all constant-subexpressions where possible.
+    /// NOTE: all methods are assumed to be pure (except for the ones returning void/unit)
     let evaluateConstants (e : Expr) =
         ConstantFolding.evaluateConstants e
-
+        
+    /// creates a new expression only containing e's visible side-effects.
+    /// NOTE: isSideEffect needs to determine whether a Method has non-local side-effects.
+    let withoutValue' (isSideEffect : MethodInfo -> bool) (e : Expr) =
+        DeadCodeElimination.withoutValue' isSideEffect e
+        
+    /// creates a new expression by removing all unused variables/calls.
+    /// NOTE: isSideEffect needs to determine whether a Method has non-local side-effects.
+    let eliminateDeadCode' (isSideEffect : MethodInfo -> bool)  (e : Expr) =
+        DeadCodeElimination.eliminateDeadCode' isSideEffect e
+        
+    /// creates a new expression by evaluating all constant-subexpressions where possible.
+    /// NOTE: isSideEffect needs to determine whether a Method has non-local side-effects.
     let evaluateConstants' (isSideEffect : MethodInfo -> bool)  (e : Expr) =
         ConstantFolding.evaluateConstants' isSideEffect e

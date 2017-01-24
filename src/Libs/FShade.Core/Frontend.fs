@@ -105,8 +105,6 @@ module Primitives =
         static member VertexCount = 6
         static member InputTopology = InputTopology.TriangleAdjacency
 
-
-
     type Patch3<'a> = Patch3 of 'a * 'a * 'a with
         interface Primitive<'a>
 
@@ -149,6 +147,18 @@ module Primitives =
         static member InputTopology = InputTopology.Patch 4
         member x.Interpolate(coord : V2d) : 'v = shaderOnlyAccess()
 
+    type Patch<'d, 'a when 'd :> INatural>() =
+        static let dim = Peano.getSize typeof<'d>
+
+        interface Primitive<'a>
+
+        member x.Item
+            with get (i : int) : 'a = shaderOnlyAccess()
+            
+        static member VertexCount = dim
+        static member InputTopology = InputTopology.Patch dim
+        
+
     let emitVertex() = ()
 
     let endPrimitive() = ()
@@ -190,6 +200,8 @@ module ShaderBuilders =
         interface IShaderBuilder with
             member x.ShaderStage = ShaderStage.Vertex
             member x.OutputTopology = None
+
+
     type FragmentBuilder() =
         inherit BaseBuilder()
         member x.Return(v) = v
@@ -229,30 +241,22 @@ module ShaderBuilders =
             member x.OutputTopology = Some top
 
 
-    
-    type TessControlBuilder() =
+    type TessBuilder() =
         inherit BaseBuilder()
+        member x.Bind(t : TessCoord<'c>, f : 'c -> 'a) : 'a =
+            failwith ""
+
+        member x.Return(v) = v
 
         member x.Quote() = ()
-        member x.Delay f = f()
-        member x.Return(levels : TessLevels) =
-            levels
 
         interface IShaderBuilder with
             member x.ShaderStage = ShaderStage.TessControl
             member x.OutputTopology = None
 
-    type TessEvalBuilder() =
-        inherit BaseBuilder()
-
-        member x.Quote() = ()
-        member x.Delay f = f()
-        member x.Return(v) = v
-        interface IShaderBuilder with
-            member x.ShaderStage = ShaderStage.TessEval
-            member x.OutputTopology = None
 
     let vertex = VertexBuilder()
+    let tessellation = TessBuilder()
     let fragment = FragmentBuilder()
 
     let triangle = GeometryBuilder(None, OutputTopology.TriangleStrip)
@@ -262,7 +266,3 @@ module ShaderBuilders =
     let _triangle<'d> = GeometryBuilder(Some typeSize<'d>, OutputTopology.TriangleStrip)
     let _line<'d> = GeometryBuilder(Some typeSize<'d>, OutputTopology.LineStrip)
     let _point<'d> = GeometryBuilder(Some typeSize<'d>, OutputTopology.Points)
-
-
-    let tessControl = TessControlBuilder()
-    let tessEval = TessEvalBuilder()
