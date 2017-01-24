@@ -471,10 +471,20 @@ module GLSL =
 
             let name = state |> State.parameterName kind p.cParamName
 
+            let isPatchOutput =
+                match state.stages.self with
+                    | ShaderStage.TessControl ->
+                        match p.cParamType with
+                            | CPointer _ -> false
+                            | _ -> true
+                    | _ ->
+                        false
+
             let prefix =
                 if c.version > version120 then
                     match kind with
                         | ParameterKind.Input -> "in "
+                        | ParameterKind.Output when isPatchOutput -> "patch out "
                         | ParameterKind.Output -> "out "
                         | _ -> ""
                 else
@@ -563,6 +573,37 @@ module GLSL =
                         [
                             sprintf "layout(%s) in;" inputPrimitive
                             sprintf "layout(%s, max_vertices = %d) out;" outputPrimitive vertexCount
+                        ]
+
+                    | ShaderStage.TessControl ->
+                        let inputTopology = e.cDecorations |> List.tryPick (function EntryDecoration.InputTopology t -> Some t | _ -> None) |> Option.get
+                        
+                        let vertices =
+                            match inputTopology with
+                                | InputTopology.Point -> 1
+                                | InputTopology.Line -> 2
+                                | InputTopology.LineAdjacency -> 4
+                                | InputTopology.Triangle -> 3
+                                | InputTopology.TriangleAdjacency -> 6
+                                | InputTopology.Patch n -> n
+                        
+                        [
+                            sprintf "layout(vertices = %d) out;" vertices
+                        ]
+
+                    | ShaderStage.TessEval ->
+                        let inputTopology = e.cDecorations |> List.tryPick (function EntryDecoration.InputTopology t -> Some t | _ -> None) |> Option.get
+                        
+                        let inputTop =
+                            match inputTopology with
+                                | InputTopology.Line -> "isolines"
+                                | InputTopology.Triangle -> "triangles"
+                                | InputTopology.Patch 3 -> "triangles"
+                                | InputTopology.Patch 4 -> "quads"
+                                | t -> failwithf "[FShade] TessEvalShader cannot have %A inputs" t
+
+                        [
+                            sprintf "layout(%s, equal_spacing, ccw) in;" inputTop
                         ]
                     | _ ->
                         []

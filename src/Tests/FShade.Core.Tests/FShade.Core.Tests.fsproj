@@ -169,6 +169,7 @@
     </When>
   </Choose>
   <ItemGroup>
+    <Compile Include="Utilities.fs" />
     <Compile Include="Optimizer.fs" />
     <Content Include="App.config" />
   </ItemGroup>

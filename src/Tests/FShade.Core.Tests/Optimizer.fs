@@ -14,30 +14,6 @@ open Aardvark.Base.Monads.State
 
 open FShade
 
-let keep a = ()
-
-let exprComparer = 
-    { new System.Collections.Generic.IEqualityComparer<Expr> with
-        member x.GetHashCode(l : Expr) =
-            0
-
-        member x.Equals(l : Expr, r : Expr) =
-            l.ToString() = r.ToString()
-    }
-
-let exprEqual (r : Expr) = EqualConstraint(r).Using exprComparer
-
-module Opt =
-    open System.Reflection
-
-    let private keepMeth = getMethodInfo <@ keep @>
-    let isSideEffect (mi : MethodInfo) =
-        mi.IsGenericMethod && mi.GetGenericMethodDefinition() = keepMeth
-
-    let run (expression : Expr) =
-        expression
-            |> Optimizer.evaluateConstants' isSideEffect
-            |> Optimizer.eliminateDeadCode' isSideEffect
 
 [<Test>]
 let ``[For] long dependency chain for used variable``() =
@@ -200,3 +176,77 @@ let ``[If] negative constant folding``() =
         @>
 
     input |> Opt.run  |> should exprEqual expected
+
+
+
+[<Test>] 
+let ``[This] mutable this preseved``() =
+    let ii : Expr<V2d> = 
+        Expr.Value(V2d(1.0, 1.0)) |> Expr.Cast
+
+    let input =
+        <@
+            let mutable a = %ii
+            let b = a.Dot(a)
+            keep a
+        @>
+
+    let expected =
+        <@
+            let mutable a = %ii
+            ignore(a.Dot(a))
+            keep a
+        @>
+
+    input |> Opt.run |> should exprEqual expected
+
+[<Test>] 
+let ``[This] immutable this removed``() =
+    let ii : Expr<V2d> = 
+        Expr.Value(V2d(1.0, 1.0)) |> Expr.Cast
+
+    let input =
+        <@
+            let a = %ii
+            let b = a.Dot(a)
+            keep a
+        @>
+
+    let expected =
+        <@
+            keep %ii
+        @>
+
+    input |> Opt.run |> should exprEqual expected
+
+
+[<Test>] 
+let ``[Let] immutable binding inlined``() =
+    let input =
+        <@
+            let a = 1
+            keep a
+        @>
+
+    let expected =
+        <@
+            keep 1
+        @>
+
+    input |> Opt.run |> should exprEqual expected
+
+[<Test>] 
+let ``[Let] mutable binding preserved``() =
+    let input =
+        <@
+            let mutable a = 1
+            keep a
+        @>
+
+    let expected =
+        <@
+            let mutable a = 1
+            keep a
+        @>
+
+    input |> Opt.run |> should exprEqual expected

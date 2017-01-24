@@ -53,7 +53,6 @@ type EntryDecoration =
     | Stages of ShaderStageDescription
     | InputTopology of InputTopology
     | OutputTopology of OutputTopology * int
-    | TessControlPassThru of list<EntryParameter>
 
 type EntryPoint =
     {
@@ -103,8 +102,6 @@ module ExpressionExtensions =
         static member WriteOutputs(values : array<string * int * obj>) : unit =
             failwith "[FShade] cannot write outputs in host-code"
 
-
-  
     type Expr with
         static member ReadInput<'a>(kind : ParameterKind, name : string) : Expr<'a> =
             let mi = ShaderIO.ReadInputMeth.MakeGenericMethod [| typeof<'a> |]

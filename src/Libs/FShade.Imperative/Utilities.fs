@@ -648,7 +648,28 @@ module StateExtensions =
                     res
             }
 
+    module List =
+        let rec choose2 (f : 'a -> Choice<'b, 'c>) (m : list<'a>) =
+            match m with
+                | [] -> [], []
+                | h :: t ->
+                    let l, r = choose2 f t
+                    match f h with
+                        | Choice1Of2 b -> (b :: l, r)
+                        | Choice2Of2 c -> (l, c :: r)
 
+
+        let rec choose2S (f : 'a -> State<'s, Choice<'b, 'c>>) (m : list<'a>) =
+            state {
+                match m with
+                    | [] -> return [], []
+                    | h :: t ->
+                        let! (l, r) = choose2S f t
+                        let! res = f h
+                        match res with
+                            | Choice1Of2 b -> return (b :: l, r)
+                            | Choice2Of2 c -> return (l, c :: r)
+            }
 
 [<AutoOpen>]
 module private Helpers = 

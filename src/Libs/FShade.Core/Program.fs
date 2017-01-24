@@ -222,25 +222,22 @@ module TessDeconstruct =
     open Microsoft.FSharp.Quotations.Patterns
     open Microsoft.FSharp.Quotations.ExprShape
 
-    let test (quad : Patch4<Vertex>) =
+    let test (quad : Triangle<Vertex>) =
         tessellation {
-            let p0 = quad.P0
-            let p1 = quad.P1
-            let p2 = quad.P2
-            let p3 = quad.P3
+            let p0 = quad.P0.pos
+            let p1 = quad.P1.pos
+            let p2 = quad.P2.pos
 
-            let centroid = (p0.pos + p1.pos + p2.pos + p3.pos) / 4.0
+            let centroid = (p0 + p1 + p2) / 3.0
             let level = 1.0 / centroid.Z
 
-            let! coord = tessellateQuad (level, level) (level, level, level, level)
+            let! coord = tessellateTriangle (level) (level, level, level)
             
-            let px = coord.X * quad.P0.pos + (1.0 - coord.X) * quad.P1.pos
-            let py = coord.X * quad.P2.pos + (1.0 - coord.X) * quad.P3.pos
-            let p = coord.Y * px + (1.0 - coord.Y) * py
+            let p = coord.X * p0 + coord.Y * p1 + coord.Z * p2
 
             return {
                 pos = p + V4d(0.0, level, 0.0, 0.0)
-                tc = coord
+                tc = coord.XY
             }
         }
 

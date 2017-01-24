@@ -169,7 +169,7 @@ module Effect =
 
                 | current :: before ->
                     let desired =
-                        needed |> Map.union (Shader.systemOutputs current) |> Map.remove Intrinsics.SourceVertexIndex
+                        needed |> Map.union (Shader.systemOutputs current)
 
                     let newCurrent = 
                         Shader.withOutputs desired current

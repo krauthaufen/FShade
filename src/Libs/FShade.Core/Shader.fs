@@ -180,6 +180,17 @@ module private Preprocessor =
                 | _ ->
                     None
 
+        let rec (|TrivialInput|_|) (e : Expr) =
+            match e with
+                | Value _
+                | TupleGet(TrivialInput, _)
+                | PropertyGet((None | Some TrivialInput), _, [])
+                | ReadInput(_,_,(None | Some TrivialInput))
+                | FieldGet((None | Some TrivialInput), _) ->
+                    Some ()
+                | _ ->
+                    None
+
     type State =
         {
             inputType       : Type
@@ -190,6 +201,7 @@ module private Preprocessor =
             outputs         : Map<string, ParameterDescription>
             uniforms        : Map<string, UniformParameter>
             vertexIndex     : Map<Var, Expr>
+            variableValues  : Map<Var, Expr>
             shaders         : list<Shader>
         }
         
@@ -209,6 +221,7 @@ module private Preprocessor =
                 outputs         = Map.empty
                 uniforms        = Map.empty
                 vertexIndex     = Map.empty
+                variableValues  = Map.empty
                 shaders         = []
             }
 
@@ -259,8 +272,16 @@ module private Preprocessor =
                 { s with vertexIndex = Map.add v index s.vertexIndex }
             )
 
+        let setVariableValue (v : Var) (value : Expr) =
+            State.modify (fun s ->
+                { s with variableValues = Map.add v value s.variableValues }
+            )
+            
+
+
         let tryGetVertexIndex (v : Var) =
             State.get |> State.map (fun s -> Map.tryFind v s.vertexIndex)
+
 
     let rec preprocessS (e : Expr) : Preprocess<Expr> =
         state {
@@ -311,19 +332,30 @@ module private Preprocessor =
                         else <@@ (%%c : V3d).XY @@>
 
                     let tev = Expr.Let(var, coord, tev)
-                    let free = tev.GetFreeVars() |> Set.ofSeq |> Set.toList
 
-                    for f in free do
-                        do! State.writeOutput f.Name { paramType = f.Type; paramInterpolation = InterpolationMode.Default }
+                    let! s = State.get
+                    let! bindings, free = 
+                        tev.GetFreeVars() 
+                            |> Seq.toList 
+                            |> List.choose2S (fun v ->
+                                state {
+                                    match Map.tryFind v s.variableValues with
+                                        | Some (ReadInput(ParameterKind.Input, name, Some TrivialInput) as e) ->
+                                            return Choice1Of2 (v, e)
+                                        | _ -> 
+                                            do! State.writeOutput v.Name { paramType = v.Type; paramInterpolation = InterpolationMode.Default }
+                                            return Choice2Of2(v, Expr.ReadInput(ParameterKind.Input, v.Type, v.Name))
+                                }
+                            )
 
-                    let rec wrap (free : list<Var>) (b : Expr) =
-                        match free with
+                    let rec wrap (bindings : list<Var * Expr>) (b : Expr) =
+                        match bindings with
                             | [] -> b
-                            | h :: rest ->
-                                Expr.Let(h, Expr.ReadInput(ParameterKind.Input, h.Type, h.Name), wrap rest b)
+                            | (h, he) :: rest ->
+                                Expr.Let(h, he, wrap rest b)
                         
-                    let! inputType = State.inputType
-                    let tev = wrap free tev |> toShaders inputType
+                    let inputType = s.inputType
+                    let tev = wrap (bindings @ free) tev |> toShaders inputType s.vertexIndex
                     match tev with
                         | [tev] ->
                             do! State.modify (fun s -> { s with shaders = [ { tev with shaderStage = ShaderStage.TessEval } ] })
@@ -337,7 +369,7 @@ module private Preprocessor =
                         Expr.WriteOutputs [
                             yield Intrinsics.TessLevelInner, None, Expr.NewArray(typeof<float>, inner)
                             yield Intrinsics.TessLevelOuter, None, Expr.NewArray(typeof<float>, outer)
-                            yield! free |> List.map (fun v -> v.Name, None, Expr.Var v)
+                            yield! free |> List.map (fun (v,_) -> v.Name, None, Expr.Var v)
                         ]
 
 
@@ -395,6 +427,13 @@ module private Preprocessor =
                     let! index = preprocessS index
                     do! State.setVertexIndex var index
                     return! preprocessS body
+
+
+                | Let(var, e, body) ->
+                    let! e = preprocessS e
+                    do! State.setVariableValue var e
+                    let! body = preprocessS body
+                    return Expr.Let(var, e, body)
 
                 // tri.P0.pos -> ReadInput(pos, 0)
                 | InputRead vertexType (PrimitiveVertexGet(p, index), semantic, parameter) ->
@@ -547,9 +586,9 @@ module private Preprocessor =
 
         }
 
-    and toShaders (inputType : Type) (e : Expr) =
+    and toShaders (inputType : Type) (vertexIndex : Map<Var, Expr>) (e : Expr) =
         let run = preprocessS e
-        let mutable state = State.ofInputType inputType
+        let mutable state = { State.ofInputType inputType with vertexIndex = vertexIndex }
         let body = run.Run(&state)
 
         // figure out the used builder-type
@@ -751,7 +790,6 @@ module Shader =
                     Intrinsics.ClipDistance, typeof<float[]>
                     Intrinsics.Layer, typeof<int>
                     Intrinsics.ViewportIndex, typeof<int>
-                    Intrinsics.SourceVertexIndex, typeof<int>
                 ]
 
             ShaderStage.Fragment,
@@ -926,7 +964,7 @@ module Shader =
         }
 
     let ofExpr (inputType : Type) (e : Expr) =
-        Preprocessor.toShaders inputType e |> List.map optimize
+        Preprocessor.toShaders inputType Map.empty e |> List.map optimize
 
     let ofFunction (shaderFunction : 'a -> Expr<'b>) =
         let expression = 
