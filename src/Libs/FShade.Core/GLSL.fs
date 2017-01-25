@@ -644,34 +644,14 @@ module GLSL =
             let prefix = "    "
             lines |> Seq.map (fun l -> if l.Length > 0 then prefix + l else l) |> String.concat "\r\n"
 
-//    type CompilerConfiguration =
-//        {
-//            languageVersion : Version
-//            enabledExtensions : Set<string>
-//            createUniformBuffers : bool
-//            createGlobalUniforms : bool
-//            createBindings : bool
-//            createDescriptorSets : bool
-//            createInputLocations : bool
-//            expectRowMajorMatrices : bool
-//
-//            createPerStageUniforms : bool
-//
-//            flipHandedness : bool
-//            depthRange : Range1d
-//
-//            treatUniformsAsInputs : bool
-//
-//        }
-
     type Config =
         {
             version                 : Version
             enabledExtensions       : Set<string>
             createUniformBuffers    : bool
             
-//            createBindings          : bool
-//            createDescriptorSets    : bool
+            createBindings          : bool
+            createDescriptorSets    : bool
             createInputLocations    : bool
             createPerStageUniforms  : bool
             
@@ -680,20 +660,57 @@ module GLSL =
             depthRange              : Range1d
         }
 
-    let glsl410 =
-        {
-            version                 = Version(4,1,0)
-            enabledExtensions       = Set.empty
-            createUniformBuffers    = true
-            createInputLocations    = true
-            createPerStageUniforms  = false
-            
-            reverseMatrixLogic      = false
-            flipHandedness          = false
-            depthRange              = Range1d(-1.0, 1.0)
-        }
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module Config =
+        let gl410 =
+            {
+                version                 = Version(4,1)
+                enabledExtensions       = Set.empty
+                createUniformBuffers    = true
+                createBindings          = false
+                createDescriptorSets    = false
 
-    let version120 = Version(1,2,0)
+                createInputLocations    = true
+                createPerStageUniforms  = false
+            
+                reverseMatrixLogic      = true
+                flipHandedness          = false
+                depthRange              = Range1d(-1.0, 1.0)
+            }
+
+        let gl120 =
+            {
+                version                 = Version(1,2)
+                enabledExtensions       = Set.empty
+                createUniformBuffers    = false
+                createBindings          = false
+                createDescriptorSets    = false
+
+                createInputLocations    = false
+                createPerStageUniforms  = false
+            
+                reverseMatrixLogic      = true
+                flipHandedness          = false
+                depthRange              = Range1d(-1.0, 1.0)
+            }
+
+        let vulkan =
+            {
+                version                 = Version(1,4,0)
+                enabledExtensions       = Set.ofList [ "GL_ARB_tessellation_shader"; "GL_ARB_separate_shader_objects"; "GL_ARB_shading_language_420pack" ]
+                createUniformBuffers    = true
+                createBindings          = true
+                createDescriptorSets    = true
+
+                createInputLocations    = true
+                createPerStageUniforms  = true
+            
+                reverseMatrixLogic      = true
+                flipHandedness          = true
+                depthRange              = Range1d(0.0, 1.0)
+            }
+
+    let private version120 = Version(1,2,0)
 
     type State =
         {
@@ -701,7 +718,8 @@ module GLSL =
             stages          : ShaderStageDescription
             inputs          : Set<string>
         }
- 
+
+        
 
     let private builtInInputs =
         Dictionary.ofList [
@@ -812,10 +830,15 @@ module GLSL =
         let regularName (kind : ParameterKind) (name : string) (s : State) =
             let c = s.config
 
+
             if kind = ParameterKind.Output && name = Intrinsics.Position && s.stages.next = Some ShaderStage.Fragment then
                 "gl_Position"
 
             else
+                let name =
+                    if name = Intrinsics.FragmentPosition then Intrinsics.Position
+                    else name
+
                 match kind, s.stages with
                     | ParameterKind.Input, { prev = None }              -> name
                     | ParameterKind.Input, { self = s }                 -> prefixes.[s] + name
@@ -904,7 +927,7 @@ module GLSL =
                 | CLiteral.CIntegral v -> string v
                 | CLiteral.CFractional v -> 
                     let str = v.ToString(System.Globalization.CultureInfo.InvariantCulture)
-                    if str.Contains "." then str
+                    if str.Contains "." || str.Contains "E" || str.Contains "e" then str
                     else str + ".0"
 
                 | CLiteral.CString v -> "\"" + v + "\""            
@@ -971,10 +994,12 @@ module GLSL =
                 | CDiv(_, l, r) -> sprintf "(%s / %s)" (glsl l) (glsl r)
                 | CMod(_, l, r) -> sprintf "(%s %% %s)" (glsl l) (glsl r)
 
+                // reversed matrix logics
                 | CMulMatMat(_, l, r) when reverse -> sprintf "(%s * %s)" (glsl r) (glsl l)
                 | CMulMatVec(_, l, r) when reverse -> sprintf "(%s * %s)" (glsl r) (glsl l)
                 | CMatrixElement(_, m, r, c) when reverse -> sprintf "%s[%d][%d]" (glsl m) r c
-
+                
+                // non-reversed matrix logics
                 | CMulMatMat(_, l, r) -> sprintf "(%s * %s)" (glsl l) (glsl r)
                 | CMulMatVec(_, l, r) -> sprintf "(%s * %s)" (glsl l) (glsl r)
                 | CMatrixElement(_, m, r, c) -> sprintf "%s[%d][%d]" (glsl m) c r
@@ -1094,25 +1119,75 @@ module GLSL =
                 | CSwitch _ -> string s
                
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-    module CUniform =
-        let glsl (c : Config) (uniforms : list<CUniform>) =
+    module CUniform = 
+        let private layout (set : int) (binding : int) =
+            if set >= 0 && binding >= 0 then
+                sprintf "layout(set = %d, binding = %d)\r\n" set binding
+            elif set >= 0 then
+                sprintf "layout(set = %d)\r\n" set
+            elif binding >= 0 then
+                sprintf "layout(binding = %d)\r\n" binding
+            else
+                ""
+                
+        let glsl (ds : ref<int>) (c : Config) (uniforms : list<CUniform>) =
             if c.createUniformBuffers then
                 let buffers =
                     uniforms 
                         |> List.groupBy (fun u -> u.cUniformBuffer)
 
-                let definitions = 
-                    buffers |> List.map (fun (name, fields) ->
-                        let fields = fields |> List.map (fun u -> sprintf "%s %s;" (CType.glsl u.cUniformType) u.cUniformName)
+                let mutable binding = -1
 
+                let newBinding() =
+                    if c.createDescriptorSets then
+                        if c.createBindings then
+                            let b = binding + 1
+                            binding <- b
+                            b
+                        else
+                            -1
+                    elif c.createBindings then
+                        let set = !ds + 1
+                        ds := set
+                        set
+                    else
+                        -1
+                        
+                let newSet() =
+                    if c.createDescriptorSets then
+                        let set = !ds + 1
+                        ds := set
+                        binding <- -1
+                        set
+                    else
+                        -1
+
+                let definitions = 
+                    let set = newSet()
+                    buffers |> List.map (fun (name, fields) ->
+                        let fields = 
+                            fields |> List.map (fun u -> 
+                                sprintf "%s %s;" (CType.glsl u.cUniformType) u.cUniformName
+                            )
+                                
                         match name with
                             | None ->
-                                fields |> List.map (sprintf "uniform %s") |> String.concat "\r\n"
-                            | Some n ->
+                                let definitions = 
+                                    fields |> List.map (fun f ->
+                                        let binding = newBinding()
+                                        let prefix = layout set binding
+                                        sprintf "%suniform %s" prefix f
+                                    )
+
+                                definitions |> String.concat "\r\n"
+                            
+                            | Some bufferName ->
+                                let binding = newBinding()
+
                                 let fields = fields |> String.concat "\r\n"
-                                sprintf "uniform %s\r\n{\r\n%s\r\n}" n (String.indent fields)
-
-
+                                let prefix = layout set binding
+                            
+                                sprintf "%suniform %s\r\n{\r\n%s\r\n}" prefix bufferName (String.indent fields)
                     )
 
                 String.concat "\r\n\r\n" definitions
@@ -1216,9 +1291,7 @@ module GLSL =
             let state =
                 { 
                     config = c
-
                     inputs = e.cInputs |> List.map (fun p -> p.cParamName) |> Set.ofList
-
                     stages =
                         e.cDecorations 
                         |> List.tryPick (function EntryDecoration.Stages t -> Some t | _ -> None) 
@@ -1307,10 +1380,10 @@ module GLSL =
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module CValueDef =
-        let rec glsl (c : Config) (d : CValueDef) =
+        let rec glsl (ds : ref<int>) (c : Config) (d : CValueDef) =
             match d with
                 | CConditionalDef(d, inner) ->
-                    let inner = inner |> List.map (glsl c) |> String.concat "\r\n"
+                    let inner = inner |> List.map (glsl ds c) |> String.concat "\r\n"
                     sprintf "\r\n#ifdef %s\r\n%s\r\n\r\n#endif\r\n" d inner
 
                 | CEntryDef e -> 
@@ -1326,7 +1399,7 @@ module GLSL =
 
                 | CUniformDef us ->
                     if c.createPerStageUniforms then
-                        CUniform.glsl c us
+                        CUniform.glsl ds c us
                     else
                         ""
 
@@ -1348,29 +1421,21 @@ module GLSL =
 
                     yield m.types |> List.map CTypeDef.glsl
 
+                    let ds = ref -1
                     if not c.createPerStageUniforms then
                         let uniforms = m.uniforms
-                        yield [ CUniform.glsl c uniforms ]
+                        yield [ CUniform.glsl ds c uniforms ]
 
-                    yield m.values |> List.map (CValueDef.glsl c)
+                    yield m.values |> List.map (CValueDef.glsl ds c)
                 ]
 
             definitions |> String.concat "\r\n\r\n"
 
         
     let compile (config : Config) (outputs : Map<string, Type>) (effect : Effect) =
-
-        let adjustDepthRange =
-            config.depthRange.Min <> -1.0 || config.depthRange.Max <> 1.0 || config.flipHandedness
-
-        let effect =
-            if adjustDepthRange then
-                effect |> Effect.withDepthRange config.flipHandedness config.depthRange
-            else
-                effect
-
         effect
             |> Effect.link ShaderStage.Fragment outputs
+            |> Effect.withDepthRange config.flipHandedness config.depthRange
             |> Effect.toModule
             |> Linker.compileAndLink backend
             |> CModule.glsl config

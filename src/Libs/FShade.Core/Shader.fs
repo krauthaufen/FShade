@@ -271,7 +271,9 @@ module private Preprocessor =
 
         let readUniform (p : UniformParameter) = 
             State.modify (fun s ->
-                { s with State.uniforms = Map.add p.uniformName p s.uniforms }
+                match Map.tryFind p.uniformName s.uniforms with
+                    | Some u -> s
+                    | None -> { s with State.uniforms = Map.add p.uniformName p s.uniforms }
             )
 
         let writeOutput (name : string) (desc : ParameterDescription) = 
@@ -692,7 +694,11 @@ module private Preprocessor =
                     ) Map.empty
 
                 let written =
-                    values |> Map.toSeq |> Seq.map (fun (name, (_,v)) -> (name, ParameterKind.Output), v.Type) |> Map.ofSeq
+                    values |> Map.toSeq |> Seq.map (fun (name, (i,v)) -> 
+                        match i with
+                            | Some _ -> (name, ParameterKind.Output), v.Type.MakeArrayType()
+                            | _ -> (name, ParameterKind.Output), v.Type
+                    ) |> Map.ofSeq
 
                 Map.union used written
 
@@ -704,7 +710,6 @@ module private Preprocessor =
 
             | ShapeVar _ ->
                 Map.empty
-        
 
     let rec usedInputs (e : Expr) =
         match e with
@@ -753,10 +758,6 @@ type ShaderOutputValue (mode : InterpolationMode, index : Option<Expr>, value : 
     member x.Interpolation = mode
     member x.UsedInputs = inputs
     member x.UsedUniforms = uniforms
-
-//    new(index : Option<Expr>, value : Expr) = ShaderOutputValue(InterpolationMode.Default, index, value)
-//    new(value : Expr) = ShaderOutputValue(InterpolationMode.Default, None, value)
-//    new(mode : InterpolationMode, value : Expr) = ShaderOutputValue(mode, None, value)
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module ShaderOutputValue =
@@ -1061,68 +1062,7 @@ module Shader =
             with _ -> failwith "[FShade] shader functions may not access their vertex-input statically"
         ofExpr typeof<'a> expression
 
-
-
-
-    /// creates a new shader by modifying all output-writes.
-    /// this can be used for adding/removing outputs for shaders
-    let mapOutputs (f : Map<string, ShaderOutputValue> -> Map<string, ShaderOutputValue>) (shader : Shader) =
-        let mutable newOutputs = Map.empty
-        let mutable newInputs = shader.shaderInputs
-        let mutable newUniforms = shader.shaderUniforms
-
-        let addValue (name : string) (value : ShaderOutputValue) =
-            newOutputs <- Map.add name (ShaderOutputValue.toParameterDescription value) newOutputs
-
-            for (n, pd) in Map.toSeq value.UsedInputs do
-                let inputParameter = 
-                    match Map.tryFind n newInputs with
-                        | Some i -> i
-                        | None -> pd
-
-                newInputs <- Map.add n inputParameter newInputs
-
-            for (n, up) in Map.toSeq value.UsedUniforms do
-                let uniformParameter =
-                    match Map.tryFind n newUniforms with
-                        | Some u -> u
-                        | None -> up
-
-                newUniforms <- Map.add n uniformParameter newUniforms
-
-            value.Index, value.Value
-
-        let newBody =
-            shader.shaderBody.SubstituteWrites (fun values ->
-                values
-                    |> Map.map (fun n (index, value) -> ShaderOutputValue(shader.shaderOutputs.[n].paramInterpolation, index, value))
-                    |> f
-                    |> Map.map addValue
-                    |> Expr.WriteOutputs
-                    |> Some
-            )
-
-        let newShader =
-            { shader with
-                shaderUniforms          = newUniforms
-                shaderInputs            = newInputs
-                shaderOutputs           = newOutputs
-                shaderBody              = newBody
-            }
-
-        let outputsRemoved = 
-            shader.shaderOutputs |> Map.keys |> Seq.exists (fun n -> not (Map.containsKey n newOutputs))
-
-        optimize newShader
-
-    let substituteWrites (f : Map<string, ShaderOutputValue> -> Option<Expr>) (shader : Shader) =
-        let newBody =
-            shader.shaderBody.SubstituteWrites (fun values ->
-                values
-                    |> Map.map (fun n (index, value) -> ShaderOutputValue(shader.shaderOutputs.[n].paramInterpolation, index, value))
-                    |> f
-            )
-
+    let withBody (newBody : Expr) (shader : Shader) =
         let newBody, state = newBody |> Preprocessor.preprocess
         let io = Preprocessor.computeIO newBody
 
@@ -1138,30 +1078,30 @@ module Shader =
 
         let newInputs =
             filterIO ParameterKind.Input (fun name t ->
-                match Map.tryFind name state.inputs with
+                match Map.tryFind name shader.shaderInputs with
                     | Some p -> p
                     | _ -> 
-                        match Map.tryFind name shader.shaderInputs with
+                        match Map.tryFind name state.inputs with
                             | Some p -> p
                             | None -> ParameterDescription.ofType t
             )
 
         let newOutputs =
             filterIO ParameterKind.Output (fun name t ->
-                match Map.tryFind name state.outputs with
+                match Map.tryFind name shader.shaderOutputs with
                     | Some p -> p
                     | _ -> 
-                        match Map.tryFind name shader.shaderOutputs with
+                        match Map.tryFind name state.outputs with
                             | Some p -> p
                             | None -> ParameterDescription.ofType t
             )
 
         let newUniforms =
             filterIO ParameterKind.Uniform (fun name t ->
-                match Map.tryFind name state.uniforms with
+                match Map.tryFind name shader.shaderUniforms with
                     | Some p -> p
-                    | _ -> 
-                        match Map.tryFind name shader.shaderUniforms with
+                    | None -> 
+                        match Map.tryFind name state.uniforms with
                             | Some p -> p
                             | None -> { uniformName = name; uniformType = t; uniformValue = UniformValue.Attribute(uniform, name) }
             )
@@ -1174,6 +1114,103 @@ module Shader =
                 shaderBody              = newBody
             }
 
+
+    /// creates a new shader by substituting output-writes with an epxression.
+    /// when None is returned the respective write-expression will remain untouched
+    let substituteWrites (f : Map<string, ShaderOutputValue> -> Option<Expr>) (shader : Shader) =
+        let newBody =
+            shader.shaderBody.SubstituteWrites (fun values ->
+                values
+                    |> Map.map (fun n (index, value) -> ShaderOutputValue(shader.shaderOutputs.[n].paramInterpolation, index, value))
+                    |> f
+            )
+
+        shader |> withBody newBody
+  
+    let substituteReads (f : ParameterKind -> Type -> string -> Option<Expr> -> Option<Expr>) (shader : Shader) =
+        let newBody =
+            shader.shaderBody.SubstituteReads (fun k t n i ->
+                f k t n i
+            )
+
+        shader |> withBody newBody
+
+    let uniformsToInputs (semantics : Set<string>) (shader : Shader) =
+        let needed = semantics |> Set.exists (fun n -> Map.containsKey n shader.shaderUniforms)
+        if needed then
+            shader |> substituteReads (fun kind inputType name index ->
+                match kind with
+                    | ParameterKind.Uniform when Set.contains name semantics ->
+                        match index with
+                            | Some index ->
+                                failwith "[FShade] encountered indexed uniform-read" 
+                            | None ->
+                                match shader.shaderStage with
+                                    | ShaderStage.Vertex | ShaderStage.Fragment ->
+                                        Expr.ReadInput(ParameterKind.Input, inputType, name) |> Some
+
+                                    | ShaderStage.Geometry | ShaderStage.TessControl | ShaderStage.TessEval ->
+                                        Log.warn "[FShade] potentially bad uniform->input conversion (using vertex 0)"
+                                        Expr.ReadInput(ParameterKind.Input, inputType, name, Expr.Value 0) |> Some
+
+                                    | stage ->
+                                        failwithf "[FShade] unknown ShaderStage %A" stage
+                    | _ ->
+                        None
+            )
+        else
+            shader
+
+    let inputsToUniforms (scopes : Map<string, UniformScope>) (shader : Shader) =
+        let newBody = shader.shaderBody
+
+        // replace all input-reads (on the given semantics) with uniform-reads
+        let newBody = 
+            if scopes |> Map.exists (fun n _ -> Map.containsKey n shader.shaderInputs) then
+                let semantics = scopes |> Map.keys |> Set.ofSeq
+                newBody |> Expr.substituteReads (fun kind inputType name index ->
+                    match kind with
+                        | ParameterKind.Input when Set.contains name semantics ->
+                            match index with
+                                | Some index -> 
+                                    let inputType = 
+                                        if inputType.IsArray then inputType.GetElementType()
+                                        else inputType
+
+                                    Expr.ReadInput(ParameterKind.Uniform, inputType, name) |> Some
+                                | None ->
+                                    Expr.ReadInput(ParameterKind.Uniform, inputType, name) |> Some
+                        | _ ->
+                            None
+                )
+            else
+                newBody
+
+        // remove all writes to the given semantics
+        let newBody =
+            if scopes |> Map.exists (fun n _ -> Map.containsKey n shader.shaderOutputs) then 
+                newBody |> Expr.substituteWrites (fun values ->
+                    Map.difference values scopes
+                        |> Expr.WriteOutputs
+                        |> Some
+                )
+            else
+                newBody
+
+        // if the body was untouched simply return the old shader
+        if newBody = shader.shaderBody then 
+            shader
+        else 
+            let newShader = withBody newBody shader
+            { newShader with
+                shaderUniforms = 
+                    newShader.shaderUniforms |> Map.map (fun name u ->
+                        match Map.tryFind name scopes with
+                            | Some scope -> { u with uniformValue = UniformValue.Attribute(scope, name) }
+                            | _ -> u
+                    )
+            }
+
     /// creates a new shader having exactly the the given outputs by:
     ///     1) removing the ones that are not needed
     ///     2) adding the ones that are not existing
@@ -1183,25 +1220,76 @@ module Shader =
     let withOutputs (outputs : Map<string, Type>) (shader : Shader) =
         let current = shader.shaderOutputs |> Map.map (fun n p -> p.paramType)
 
+        let allWrites (shader : Shader) =
+            let rec allWrites (e : Expr) =
+                match e with
+                    | WriteOutputs values       -> Seq.singleton values
+                    | ShapeLambda(_,b)          -> allWrites b
+                    | ShapeVar _                -> Seq.empty
+                    | ShapeCombination(_,args)  -> args |> Seq.collect allWrites
+
+            allWrites shader.shaderBody
+
         if current = outputs then
             shader
         else
-            
-            let mutable constantOutputs = Map.empty
-            if shader.shaderStage = ShaderStage.TessControl then
-                shader.shaderBody.SubstituteWrites(fun values ->
-                    if Map.containsKey Intrinsics.TessLevelInner values then
-                        constantOutputs <- values
-                    None
-                ) |> ignore
+            let patchOutputs =
+                if shader.shaderStage = ShaderStage.TessControl then
+                    shader.shaderOutputs |> Map.filter (fun name p ->
+                        p.paramInterpolation = InterpolationMode.PerPatch
+                    )
+                else
+                    Map.empty
 
+            shader |> substituteWrites (fun values ->
+                let isPatchOutput = 
+                    if shader.shaderStage = ShaderStage.TessControl then
+                        values |> Map.exists (fun _ v -> v.Interpolation = InterpolationMode.PerPatch)
+                    else
+                        false
 
-            shader |> mapOutputs (fun values ->
-                if Map.containsKey Intrinsics.TessLevelInner values then
-                    values |> Map.filter (fun n _ -> Map.containsKey n outputs)
+                if isPatchOutput then
+                    let newValues = 
+                        values |> Map.choose (fun n v ->
+                            match Map.tryFind n outputs with
+                                | Some t ->
+                                    if t = v.Type then Some v
+                                    else v |> ShaderOutputValue.withValue (converter v.Type t v.Value) |> Some
+                                | None ->
+                                    None
+                        ) 
+
+                    newValues |> Expr.WriteOutputs |> Some
 
                 else
-                    Map.difference outputs constantOutputs
+                    let outputs = Map.difference outputs patchOutputs
+
+                    let write = 
+                        if Map.containsKey Intrinsics.FragmentPosition outputs then
+                            fun (m : Map<string, ShaderOutputValue>) ->
+                                match Map.tryFind Intrinsics.Position m with
+                                    | Some value ->
+                                        match value.Value with
+                                            | Trivial -> 
+                                                Expr.WriteOutputs (Map.add Intrinsics.FragmentPosition value m)
+                                                    |> Some
+                                            | nonTrivial ->
+                                                let v = Var("position", nonTrivial.Type)
+                                                let ve = Expr.Var v
+                                                Expr.Let(v, value.Value,
+                                                    Expr.WriteOutputs(
+                                                        m |> Map.add Intrinsics.Position (value |> ShaderOutputValue.withValue ve)
+                                                          |> Map.add Intrinsics.FragmentPosition (value |> ShaderOutputValue.withValue ve)
+                                                    )
+                                                ) 
+                                                |> Some
+
+                                    | None ->
+                                        failwith "[FShade] positions not written before fragment shader"
+                        else
+                            Expr.WriteOutputs >> Some
+
+                    Map.difference outputs patchOutputs
                         |> Map.map (fun n t ->
                             match Map.tryFind n values with
                                 | Some value ->
@@ -1261,6 +1349,7 @@ module Shader =
                                             failwith "[FShade] passing for tessellation not implemented"
                                                 
                         )
+                        |> write
             )
 
     /// creates a new shader by removing all outputs given in semantics
@@ -1371,14 +1460,20 @@ module Shader =
         passing Map.empty stage
 
     /// gets the needed inputs for the given shader
-    let inputs (shader : Shader) =
+    let neededInputs (shader : Shader) =
         let builtIn = builtInInputs.[shader.shaderStage]
         let inputs = 
             match shader.shaderStage with
                 | ShaderStage.Fragment ->
-                    shader.shaderInputs
-                        |> Map.map (fun _ p -> p.paramType)
-                        |> Map.add Intrinsics.Position typeof<V4d>
+                    let inputs =
+                        shader.shaderInputs
+                            |> Map.map (fun _ p -> p.paramType)
+
+                    match Map.tryFind Intrinsics.Position inputs with
+                        | Some p ->
+                            inputs |> Map.add Intrinsics.FragmentPosition typeof<V4d>
+                        | None ->
+                            inputs |> Map.add Intrinsics.Position typeof<V4d>
 
                 | ShaderStage.Geometry | ShaderStage.TessControl ->
                     shader.shaderInputs

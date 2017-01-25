@@ -67,6 +67,9 @@ module Intrinsics =
     
     [<Literal>] 
     let SourceVertexIndex = "GeometrySourceVertexIndex"
+    
+    [<Literal>] 
+    let internal FragmentPosition = "__FragmentPositions__"
 
 
 [<AutoOpen>]

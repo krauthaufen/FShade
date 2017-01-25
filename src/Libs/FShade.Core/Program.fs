@@ -57,11 +57,11 @@ let effectTest() =
     let effect = Effect.ofList (vert @ frag)
 
     Effect.empty
-        |> GLSL.compile GLSL.glsl410 (Map.ofList ["Colors", typeof<V4d>; "Bla", typeof<V2d>])
+        |> GLSL.compile GLSL.Config.gl410 (Map.ofList ["Colors", typeof<V4d>; "Bla", typeof<V2d>])
         |> printfn "%s"
 
     effect
-        |> GLSL.compile GLSL.glsl410 (Map.ofList ["Colors", typeof<V4d>; "Bla", typeof<V2d>])
+        |> GLSL.compile GLSL.Config.gl410 (Map.ofList ["Colors", typeof<V4d>; "Bla", typeof<V2d>])
         |> printfn "%s"
 
 type Vertex1 =
@@ -115,7 +115,7 @@ let composeTest() =
 
 
     Effect.compose [sa; sb] 
-        |> GLSL.compile GLSL.glsl410 (Map.ofList [ Intrinsics.Color, typeof<V4d> ])
+        |> GLSL.compile GLSL.Config.gl410 (Map.ofList [ Intrinsics.Color, typeof<V4d> ])
         |> printfn "%s"
 
 
@@ -218,15 +218,32 @@ module TessDeconstruct =
 
     let geometry (tri : Triangle<Vertex>) =
         triangle {
+            let scale : float = uniform?SomeScope?Scale
+
             let center = (tri.P0.pos + tri.P1.pos + tri.P2.pos) / 3.0
-            yield { tri.P0 with pos = center + (tri.P0.pos - center) * 1.5 }
-            yield { tri.P1 with pos = center + (tri.P1.pos - center) * 1.5 }
-            yield { tri.P2 with pos = center + (tri.P2.pos - center) * 1.5 }
+
+            yield { tri.P0 with pos = center + (tri.P0.pos - center) * scale }
+            yield { tri.P1 with pos = center + (tri.P1.pos - center) * scale }
+            yield { tri.P2 with pos = center + (tri.P2.pos - center) * scale }
+        }
+       
+
+    let sam = 
+        sampler2d {
+            texture uniform?SomeTexture
+        }
+
+    let frag (v : Vertex) =
+        fragment {
+            let col : V4d = uniform?PerView?AdditionalColor
+            return v.pos + col + sam.Sample(v.tc)
         }
         
     let run() =
-        Effect.compose [Effect.ofFunction test; Effect.ofFunction geometry]
-            |> GLSL.compile GLSL.glsl410 (Map.ofList [ "Bla", typeof<V4d> ])
+        Effect.compose [Effect.ofFunction test; Effect.ofFunction geometry; Effect.ofFunction frag]
+//            |> Effect.inputsToUniforms (Map.ofList ["TexCoord", uniform?PreviouslyInput])
+//            |> Effect.uniformsToInputs (Set.ofList ["TexCoord"])
+            |> GLSL.compile GLSL.Config.gl410 (Map.ofList [ Intrinsics.Color, typeof<V4d> ])
             |> printfn "%s"
 
 
@@ -367,7 +384,7 @@ let main args =
     let entry =
         entry
             |> Linker.compileAndLink GLSL.backend
-            |> GLSL.CModule.glsl GLSL.glsl410
+            |> GLSL.CModule.glsl GLSL.Config.gl410
 
     printfn "%s" entry
     0
