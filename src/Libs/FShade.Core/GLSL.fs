@@ -1365,62 +1365,7 @@ module GLSL =
 
         let effect =
             if adjustDepthRange then
-                let lastGeometryStage =
-                    effect 
-                        |> Effect.toSeq 
-                        |> Seq.filter (fun s -> s.shaderStage < ShaderStage.Fragment) 
-                        |> Seq.last
-                        |> Shader.mapOutputs (fun values ->
-                            values |> Map.map (fun name value ->
-                                if name = Intrinsics.Position then
-                                    let range = config.depthRange
-                                    let intermediate = Var("_pos", value.Type, true)
-                                    let ie = Expr.Var intermediate
-                                    let newZ =
-                                        if range.Min <> -1.0 || range.Max <> 1.0 then
-                                       
-                                            // newZ = a * z + b * w
-
-                                            // due to projective division:
-                                            // max = (a * w + b * w) / w
-                                            // min = (a * -w + b * w) / w
-
-                                            // therefore:
-                                            // (1) max = a + b
-                                            // (2) min = b - a
-
-                             
-                                            // (1) + (2) => max + min = 2 * b
-                                            // (1) - (2) => max - min = 2 * a
-
-                                            // so finally we get:
-                                            // a = (max - min) / 2
-                                            // b = (max + min) / 2
-
-
-                                            let a = range.Size / 2.0
-                                            let b = (range.Min + range.Max) / 2.0
-
-                                            if a = b then
-                                                <@@ a * ((%%ie : V4d).Z + (%%ie : V4d).W) @@>
-                                            else
-                                                <@@ a * (%%ie : V4d).Z + b * (%%ie : V4d).W @@>
-                                        else
-                                            <@@ (%%ie : V4d).Z @@>
-
-                                    let ie =
-                                        if config.flipHandedness then
-                                            <@@ V4d((%%ie : V4d).X, -(%%ie : V4d).Y, %%newZ, (%%ie : V4d).W)  @@>
-                                        else
-                                            ie
-
-                                    value |> ShaderOutputValue.withValue (Expr.Let(intermediate, value.Value, ie))
-                                else
-                                    value
-                            )
-                        )
-            
-                effect |> Effect.add lastGeometryStage
+                effect |> Effect.withDepthRange config.flipHandedness config.depthRange
             else
                 effect
 

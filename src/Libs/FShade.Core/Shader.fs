@@ -676,6 +676,36 @@ module private Preprocessor =
         let e = preprocessS(e).Run(&state)
         e, state
 
+    let rec computeIO (e : Expr) =
+        match e with
+            | ReadInput(kind,n,idx) ->
+                match idx with
+                    | Some idx -> computeIO idx |> Map.add (n, kind) e.Type
+                    | None -> Map.ofList [(n, kind), e.Type]
+
+            | WriteOutputs values ->
+                let used = 
+                    values |> Map.fold (fun m _ (i,v) ->
+                        let v = computeIO v
+                        let i = i |> Option.map computeIO |> Option.defaultValue Map.empty
+                        Map.union m (Map.union i v)
+                    ) Map.empty
+
+                let written =
+                    values |> Map.toSeq |> Seq.map (fun (name, (_,v)) -> (name, ParameterKind.Output), v.Type) |> Map.ofSeq
+
+                Map.union used written
+
+            | ShapeCombination(o, args) ->
+                args |> List.fold (fun m e -> Map.union m (computeIO e)) Map.empty
+
+            | ShapeLambda(_,b) ->
+                computeIO b
+
+            | ShapeVar _ ->
+                Map.empty
+        
+
     let rec usedInputs (e : Expr) =
         match e with
             | ReadInput(kind,n,idx) ->
@@ -755,6 +785,14 @@ module ShaderOutputValue =
 
     let withValue (value : Expr) (o : ShaderOutputValue) =
         ShaderOutputValue(o.Interpolation, o.Index, value)  
+
+[<AutoOpen>]
+module ShaderOutputValueExtensions = 
+     type Expr with
+        static member WriteOutputs (values : Map<string, ShaderOutputValue>) =
+            values
+                |> Map.map (fun _ v -> v.Index, v.Value)
+                |> Expr.WriteOutputs
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Shader =
@@ -1076,6 +1114,65 @@ module Shader =
             shader.shaderOutputs |> Map.keys |> Seq.exists (fun n -> not (Map.containsKey n newOutputs))
 
         optimize newShader
+
+    let substituteWrites (f : Map<string, ShaderOutputValue> -> Option<Expr>) (shader : Shader) =
+        let newBody =
+            shader.shaderBody.SubstituteWrites (fun values ->
+                values
+                    |> Map.map (fun n (index, value) -> ShaderOutputValue(shader.shaderOutputs.[n].paramInterpolation, index, value))
+                    |> f
+            )
+
+        let newBody, state = newBody |> Preprocessor.preprocess
+        let io = Preprocessor.computeIO newBody
+
+        let filterIO (desiredKind : ParameterKind) (build : string -> Type -> 'a) =
+            io  |> Map.toSeq 
+                |> Seq.choose (fun ((name, kind), t) -> 
+                    if kind = desiredKind then 
+                        Some (name, build name t)
+                    else 
+                        None
+                )
+                |> Map.ofSeq
+
+        let newInputs =
+            filterIO ParameterKind.Input (fun name t ->
+                match Map.tryFind name state.inputs with
+                    | Some p -> p
+                    | _ -> 
+                        match Map.tryFind name shader.shaderInputs with
+                            | Some p -> p
+                            | None -> ParameterDescription.ofType t
+            )
+
+        let newOutputs =
+            filterIO ParameterKind.Output (fun name t ->
+                match Map.tryFind name state.outputs with
+                    | Some p -> p
+                    | _ -> 
+                        match Map.tryFind name shader.shaderOutputs with
+                            | Some p -> p
+                            | None -> ParameterDescription.ofType t
+            )
+
+        let newUniforms =
+            filterIO ParameterKind.Uniform (fun name t ->
+                match Map.tryFind name state.uniforms with
+                    | Some p -> p
+                    | _ -> 
+                        match Map.tryFind name shader.shaderUniforms with
+                            | Some p -> p
+                            | None -> { uniformName = name; uniformType = t; uniformValue = UniformValue.Attribute(uniform, name) }
+            )
+
+        optimize
+            { shader with
+                shaderUniforms          = newUniforms
+                shaderInputs            = newInputs
+                shaderOutputs           = newOutputs
+                shaderBody              = newBody
+            }
 
     /// creates a new shader having exactly the the given outputs by:
     ///     1) removing the ones that are not needed

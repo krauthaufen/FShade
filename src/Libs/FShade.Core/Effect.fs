@@ -52,6 +52,11 @@ type Effect internal(shaders : Map<ShaderStage, Shader>) =
                 |> Seq.fold Map.union Map.empty
         )
         
+    let lastPrimitive =
+        lazy (
+            shaders |> Map.values |> Seq.filter (fun s -> s.shaderStage < ShaderStage.Fragment) |> Seq.tryLast
+        )
+
     /// gets the optionally required InputTopology for the effect.
     /// returns None when the effect is agnostic
     member x.InputToplogy       = inputToplogy.Value
@@ -59,6 +64,8 @@ type Effect internal(shaders : Map<ShaderStage, Shader>) =
     member x.FirstShader        = first.Value
     /// gets the optional last Shader for the effect (in execution-order).
     member x.LastShader         = last.Value
+    /// gets the optional last Shader operating on primitives for the effect (in execution-order).
+    member x.LastPrimShader     = lastPrimitive.Value 
     /// gets the required inputs for the first Shader in the effect (in execution-order).
     member x.Inputs             = inputs.Value
     /// gets the provided outputs for the last Shader in the effect (in execution-order).
@@ -107,6 +114,9 @@ module Effect =
     
     /// gets the optional last Shader for the effect (in execution-order).
     let inline lastShader (effect : Effect) = effect.LastShader
+
+    /// gets the optional last Shader operating on primitives for the effect (in execution-order).
+    let inline lastPrimShader (effect : Effect) = effect.LastPrimShader
 
     /// gets the optional first ShaderStage for the effect (in execution-order).
     let inline firstStage (effect : Effect) = effect.FirstShader |> Option.map Shader.stage
@@ -267,6 +277,64 @@ module Effect =
                     shaderEntry :: entryPoints (Some shader) (next :: after)
 
         { entries = entryPoints None (toList effect) }
+
+    let withDepthRange (flipHandedness : bool) (range : Range1d) (effect : Effect) =
+        match lastPrimShader effect with
+            | Some shader ->
+                let newLastPrim = 
+                    shader |> Shader.substituteWrites (fun values ->
+                        match Map.tryFind Intrinsics.Position values with
+                            | Some pos ->
+                                let intermediate = Var("_pos", pos.Type, true)
+                                let ie = Expr.Var intermediate
+                                let newZ =
+                                    if range.Min <> -1.0 || range.Max <> 1.0 then
+                                        //   newZ = a * z + b * w
+                                        // due to projective division:
+                                        //   max = (a * w + b * w) / w
+                                        //   min = (a * -w + b * w) / w
+                                        // therefore:
+                                        //   (1) max = a + b
+                                        //   (2) min = b - a
+                                        //   (1) + (2) => max + min = 2 * b
+                                        //   (1) - (2) => max - min = 2 * a
+                                        // so finally we get:
+                                        //   a = (max - min) / 2
+                                        //   b = (max + min) / 2
+                                        let a = range.Size / 2.0
+                                        let b = (range.Min + range.Max) / 2.0
+                                        if a = b then <@@ a * ((%%ie : V4d).Z + (%%ie : V4d).W) @@>
+                                        else <@@ a * (%%ie : V4d).Z + b * (%%ie : V4d).W @@>
+                                    else  
+                                        <@@ (%%ie : V4d).Z @@>
+
+                                let ie =
+                                    if flipHandedness then
+                                        <@@ V4d((%%ie : V4d).X, -(%%ie : V4d).Y, %%newZ, (%%ie : V4d).W)  @@>
+                                    else
+                                        <@@ V4d((%%ie : V4d).X, (%%ie : V4d).Y, %%newZ, (%%ie : V4d).W)  @@>
+
+                                let newPos = pos |> ShaderOutputValue.withValue ie
+
+                                let newExpression =
+                                    Expr.Let(
+                                        intermediate, pos.Value,
+                                        Expr.WriteOutputs(
+                                            Map.add Intrinsics.Position newPos values
+                                        )
+                                    )
+
+                                Some newExpression
+                            | _ ->
+                                None
+                    )
+
+                effect |> add newLastPrim
+
+            | None -> 
+                failwith "[FShade] cannot adjust depth-range for effect without primitive shaders"
+
+
 
     /// composes two effects using sequential semantics for 'abstract' stages.
     /// these 'abstract' stages consist of the following 'real' stages:
