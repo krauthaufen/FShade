@@ -106,7 +106,7 @@
     <None Include="Core\CodeGen.fsx" />
     <Compile Include="Core\SpirVTypes.fs" />
     <Compile Include="Core\SpirV.fs" />
-    <Compile Include="Ast.fs" />
+    <Compile Include="Assembler.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
