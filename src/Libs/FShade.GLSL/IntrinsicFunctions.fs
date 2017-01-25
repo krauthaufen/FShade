@@ -451,8 +451,8 @@ module IntrinsicFunctions =
             CIntrinsic.simple "dFdx", [ generic <@ ddx : float -> _ @> ]
             CIntrinsic.simple "dFdy", [ generic <@ ddy : float -> _ @> ]
             CIntrinsic.tagged "discard", [ exactly <@ discard @> ]
-            CIntrinsic.tagged "EmitVertex", [ exactly <@ emitVertex @> ]
-            CIntrinsic.tagged "EndPrimitive", [ 
+            CIntrinsic.simple "EmitVertex", [ exactly <@ emitVertex @> ]
+            CIntrinsic.simple "EndPrimitive", [ 
                 exactly <@ restartStrip @>
                 exactly <@ endPrimitive @>
             ]

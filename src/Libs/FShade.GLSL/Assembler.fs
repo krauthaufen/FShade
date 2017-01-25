@@ -800,7 +800,7 @@ module Assembler =
                     yield! prefix
                     yield! inputs
                     yield! outputs
-                    yield sprintf "%s %s(%s)\r\n{\r\n%s;\r\n}" (assembleType e.cReturnType) e.cEntryName args (String.indent body)
+                    yield sprintf "%s %s(%s)\r\n{\r\n%s\r\n}" (assembleType e.cReturnType) e.cEntryName args (String.indent body)
                 ]
         }
 
@@ -818,7 +818,7 @@ module Assembler =
                 | CFunctionDef(signature, body) ->
                     let signature = assembleFunctionSignature signature
                     let! body = assembleStatementS false body
-                    return sprintf "%s\r\n{\r\n%s;\r\n}\r\n" signature (String.indent body)
+                    return sprintf "%s\r\n{\r\n%s\r\n}\r\n" signature (String.indent body)
 
                 | CConstant(t, n, init) ->
                     let! init = assembleRExprS init
