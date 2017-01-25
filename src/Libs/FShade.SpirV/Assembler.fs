@@ -19,6 +19,7 @@ type AssemblerState =
         variableIds     : HashMap<CVar, uint32>
         functionIds     : HashMap<CFunctionSignature, uint32>
         inputs          : HashMap<string, uint32>
+        outputs         : HashMap<string, uint32>
         uniforms        : HashMap<string, uint32>
         currentId       : uint32
         labelId         : uint32
@@ -69,6 +70,9 @@ module Assembler =
 
     let getInput (name : string) =
         State.get |> State.map (fun s -> HashMap.find name s.inputs)
+        
+    let getOutput (name : string) =
+        State.get |> State.map (fun s -> HashMap.find name s.outputs)
 
     let getUniform (name : string) =
         State.get |> State.map (fun s -> HashMap.find name s.uniforms)
@@ -726,4 +730,133 @@ module Assembler =
                     return failwith "not implemented"
 
                     
+        }
+
+    let setVarId (v : CVar) (id : uint32) =
+        State.modify (fun s ->
+            { s with AssemblerState.variableIds = HashMap.add v id s.variableIds  }
+        )
+
+    let rec assembleStatement (breakLabel : Option<uint32>) (contLabel : Option<uint32>) (s : CStatement) =
+        asm {
+            match s with
+                | CNop ->
+                    ()
+
+                | CDo e ->
+                    do! State.ignore (assembleExpr e)
+
+                | CDeclare(v, e) ->
+                    let! e = e |> Option.mapS assembleRExpr
+                    let! tid = assemblePtrType StorageClass.Private v.ctype
+                    let! vid = newId
+                    yield OpVariable(tid, vid, StorageClass.Private, e)
+                    do! setVarId v vid
+
+                | CWrite(l, v) ->
+                    let! l = assembleLExpr l
+                    let! v = assembleExpr v
+                    yield OpStore(l, v, None)
+
+                | CIncrement(pre, l) ->
+                    return! assembleStatement breakLabel contLabel (CWrite(l, CExpr.CAdd(l.ctype, CLExpr.toExpr l, CValue(l.ctype, CIntegral 1L))))
+
+                | CDecrement(pre, l) ->
+                    return! assembleStatement breakLabel contLabel (CWrite(l, CExpr.CSub(l.ctype, CLExpr.toExpr l, CValue(l.ctype, CIntegral 1L))))
+
+                | CSequential s ->
+                    for s in s do 
+                        do! assembleStatement breakLabel contLabel s
+
+                | CReturn ->
+                    yield OpReturn
+
+                | CReturnValue v ->
+                    let! vid = assembleExpr v
+                    yield OpReturnValue vid
+
+                | CBreak ->
+                    match breakLabel with
+                        | Some l -> yield OpBranch l
+                        | _ -> failwith "[SpirV] break outside loop encountered"
+
+                | CContinue ->
+                    match contLabel with
+                        | Some l -> yield OpBranch l
+                        | _ -> failwith "[SpirV] break outside loop encountered"
+
+                | CFor(init, cond, step, body) ->
+                    do! assembleStatement breakLabel contLabel init
+                    
+                    let! lCond = newLabel
+                    let! lStart = newLabel
+                    let! lEnd = newLabel
+
+                    yield OpLabel lCond
+                    let! cid = assembleExpr cond
+                    yield OpBranchConditional(cid, lStart, lEnd, [||])
+
+                    yield OpLabel(lStart)
+                    do! assembleStatement (Some lEnd) (Some lCond) body
+                    do! assembleStatement breakLabel contLabel step
+                    yield OpBranch(lCond)
+
+                    yield OpLabel(lEnd)
+
+                | CWhile(guard, body) ->
+                    
+                    let! lCond = newLabel
+                    let! lStart = newLabel
+                    let! lEnd = newLabel
+
+                    yield OpLabel lCond
+                    let! cid = assembleExpr guard
+                    yield OpBranchConditional(cid, lStart, lEnd, [||])
+
+                    yield OpLabel(lStart)
+                    do! assembleStatement (Some lEnd) (Some lCond) body
+                    yield OpBranch(lCond)
+
+                    yield OpLabel(lEnd)
+
+                | CDoWhile(guard, body) ->
+                    
+                    let! lCond = newLabel
+                    let! lStart = newLabel
+                    let! lEnd = newLabel
+                    yield OpLabel(lStart)
+                    do! assembleStatement (Some lEnd) (Some lCond) body
+                    yield OpLabel(lCond)
+                    let! v = assembleExpr guard
+                    yield OpBranchConditional(v, lStart, lEnd, [||])
+                    yield OpLabel(lEnd)
+
+                | CIfThenElse(cond, i, e) ->
+                    let! cond = assembleExpr cond
+                    let! lTrue = newLabel
+                    let! lFalse = newLabel
+                    let! lEnd = newLabel
+
+                    yield OpBranchConditional(cond, lTrue, lFalse, [||])
+                    yield OpLabel lTrue
+                    do! assembleStatement breakLabel contLabel i
+                    yield OpBranch lEnd
+                    yield OpLabel lFalse
+                    do! assembleStatement breakLabel contLabel e
+                    yield OpLabel lEnd
+
+                | CWriteOutput(name, index, value) ->
+                    let! output = getOutput name
+                    let! value = assembleRExpr value
+                    match index with
+                        | None -> 
+                            yield OpStore(output, value, None)
+                        | Some i ->
+                            failwith "[SpirV] indexed output not implemented"
+                            
+                            
+                | CSwitch _ ->
+                    failwith "[SpirV] switch not implemented"
+                    
+
         }

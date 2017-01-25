@@ -243,14 +243,16 @@ module TessDeconstruct =
 
         fragment {
             let col : V4d = uniform?PerView?AdditionalColor
-            return v.pos + col + sam.Sample(v.tc)
+            let s = V2d(sam.Size)
+            return v.pos + col + V4d(s.X, s.Y, 0.0, 0.0)
         }
         
     let run() =
         Effect.compose [Effect.ofFunction test; Effect.ofFunction geometry; Effect.ofFunction frag]
             |> Effect.link ShaderStage.Fragment (Map.ofList [ Intrinsics.Color, typeof<V4d> ])
+            //|> Effect.withDepthRange true (Range1d(0.0, 1.0))
             |> Effect.toModule
-            |> ModuleCompiler.compileGLSL glslVulkan
+            |> ModuleCompiler.compileGLSL glsl410
             |> printfn "%s"
 
 
