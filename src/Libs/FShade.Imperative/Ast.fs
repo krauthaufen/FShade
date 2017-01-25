@@ -420,6 +420,15 @@ type CLExpr =
     | CLVecSwizzle of CType * CLExpr * list<CVecComponent>
     | CLMatrixElement of t : CType * m : CLExpr * r : int * c : int
 
+    member x.ctype =
+        match x with
+            | CLVar v -> v.ctype
+            | CLField(t,_,_) -> t
+            | CLItem(t,_,_) -> t
+            | CLPtr(t,_) -> t
+            | CLVecSwizzle(t, _, _) -> t
+            | CLMatrixElement(t, _, _, _) -> t
+
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module CLExpr =
     open Aardvark.Base.Monads.Option

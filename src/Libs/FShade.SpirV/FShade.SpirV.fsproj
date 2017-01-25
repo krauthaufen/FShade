@@ -36,27 +36,6 @@
     <DocumentationFile>
     </DocumentationFile>
   </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="mscorlib" />
-    <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Numerics" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\FShade.Core\FShade.Core.fsproj">
-      <Name>FShade.Core</Name>
-      <Project>{0f39c812-b7fb-4210-9e83-19d85a1cd10d}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\FShade.Imperative\FShade.Imperative.fsproj">
-      <Name>FShade.Imperative</Name>
-      <Project>{1223c55b-5634-4764-b5bd-bf9ad95c073b}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-  </ItemGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
   </PropertyGroup>
@@ -121,4 +100,31 @@
       </ItemGroup>
     </When>
   </Choose>
+  <ItemGroup>
+    <None Include="Core\spirv.json" />
+    <None Include="Core\spirv-enums.json" />
+    <None Include="Core\CodeGen.fsx" />
+    <Compile Include="Core\SpirVTypes.fs" />
+    <Compile Include="Core\SpirV.fs" />
+    <Compile Include="Ast.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="mscorlib" />
+    <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Numerics" />
+    <ProjectReference Include="..\FShade.Core\FShade.Core.fsproj">
+      <Name>FShade.Core</Name>
+      <Project>{0f39c812-b7fb-4210-9e83-19d85a1cd10d}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\FShade.Imperative\FShade.Imperative.fsproj">
+      <Name>FShade.Imperative</Name>
+      <Project>{1223c55b-5634-4764-b5bd-bf9ad95c073b}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+  </ItemGroup>
 </Project>
