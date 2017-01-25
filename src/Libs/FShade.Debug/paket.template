@@ -1,9 +1,0 @@
-type project
-id FShade.Debug
-authors Georg Haaser
-description
-    F# embedded shaders
-files
-    ..\..\..\bin\Release\FShade.Debug.dll ==> lib\net45
-    ..\..\..\bin\Release\FShade.Debug.pdb ==> lib\net45
-    ..\..\..\bin\Release\FShade.Debug.xml ==> lib\net45
