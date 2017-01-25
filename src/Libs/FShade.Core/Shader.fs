@@ -624,20 +624,29 @@ module private Preprocessor =
                 | _ ->
                     failwithf "[FShade] could not evaluate shader-builder %A" state.builder
 
-        let body =
+        let body, outputs =
             match builder.ShaderStage, state.shaders with
                 | ShaderStage.TessControl, _ :: _ ->
-                    let invocationId = Expr.ReadInput<int>(ParameterKind.Input, Intrinsics.InvocationId)
-                    Expr.Sequential(
-                        Expr.IfThenElse(
-                            <@ %invocationId = 0 @>,
-                            body,
-                            Expr.Unit
-                        ),
-                        Expr.WriteOutputs Map.empty
-                    )
+                    let newBody =
+                        let invocationId = Expr.ReadInput<int>(ParameterKind.Input, Intrinsics.InvocationId)
+                        Expr.Sequential(
+                            Expr.IfThenElse(
+                                <@ %invocationId = 0 @>,
+                                body,
+                                Expr.Unit
+                            ),
+                            Expr.WriteOutputs Map.empty
+                        )
+
+                    let newOutputs =
+                        state.outputs |> Map.map (fun _ p -> 
+                            { p with paramInterpolation = InterpolationMode.PerPatch }
+                        )
+                        
+
+                    newBody, newOutputs
                 | _ -> 
-                    body
+                    body, state.outputs
 
         let outputVertices =
             match builder with
@@ -652,7 +661,7 @@ module private Preprocessor =
             { 
                 shaderStage             = builder.ShaderStage
                 shaderInputs            = state.inputs
-                shaderOutputs           = state.outputs
+                shaderOutputs           = outputs
                 shaderUniforms          = state.uniforms
                 shaderInputTopology     = state.inputTopology
                 shaderOutputTopology    = builder.OutputTopology
@@ -683,7 +692,7 @@ module private Preprocessor =
             | ShapeVar _ ->
                 Map.empty
 
-type ShaderOutputValue(mode : InterpolationMode, index : Option<Expr>, value : Expr) =
+type ShaderOutputValue (mode : InterpolationMode, index : Option<Expr>, value : Expr) =
     let value, inputs, uniforms =
         let value, state = Preprocessor.preprocess value
 
@@ -715,9 +724,9 @@ type ShaderOutputValue(mode : InterpolationMode, index : Option<Expr>, value : E
     member x.UsedInputs = inputs
     member x.UsedUniforms = uniforms
 
-    new(index : Option<Expr>, value : Expr) = ShaderOutputValue(InterpolationMode.Default, index, value)
-    new(value : Expr) = ShaderOutputValue(InterpolationMode.Default, None, value)
-    new(mode : InterpolationMode, value : Expr) = ShaderOutputValue(mode, None, value)
+//    new(index : Option<Expr>, value : Expr) = ShaderOutputValue(InterpolationMode.Default, index, value)
+//    new(value : Expr) = ShaderOutputValue(InterpolationMode.Default, None, value)
+//    new(mode : InterpolationMode, value : Expr) = ShaderOutputValue(mode, None, value)
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module ShaderOutputValue =
@@ -737,10 +746,15 @@ module ShaderOutputValue =
     let ofParameterDescription (p : ParameterDescription) (value : Expr) =
         match value with
             | Coerce(value,_) -> 
-                ShaderOutputValue(p.paramInterpolation, value)
+                ShaderOutputValue(p.paramInterpolation, None, value)
             | value ->
-                ShaderOutputValue(p.paramInterpolation, value)
-                
+                ShaderOutputValue(p.paramInterpolation, None, value)
+       
+    let ofValue (value : Expr) =
+        ShaderOutputValue(InterpolationMode.Default, None, value)
+
+    let withValue (value : Expr) (o : ShaderOutputValue) =
+        ShaderOutputValue(o.Interpolation, o.Index, value)  
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Shader =
@@ -870,8 +884,8 @@ module Shader =
 
     let private tryGetSourceVertexIndexValue (shader : Shader) (values : Map<string, ShaderOutputValue>) =
         match shader.shaderInputTopology with
-            | Some InputTopology.Point -> ShaderOutputValue(Expr.Value 0) |> Some
-            | _ -> Map.tryFind Intrinsics.SourceVertexIndex values
+            | Some InputTopology.Point -> Expr.Value 0 |> Some
+            | _ -> Map.tryFind Intrinsics.SourceVertexIndex values |> Option.map ShaderOutputValue.value
 
     let private emitVertexMeth = getMethodInfo <@ emitVertex @>
 
@@ -1095,7 +1109,7 @@ module Shader =
                             match Map.tryFind n values with
                                 | Some value ->
                                     if not (t.IsAssignableFrom value.Type) then
-                                        ShaderOutputValue(value.Interpolation, converter value.Type t value.Value)
+                                        value |> ShaderOutputValue.withValue (converter value.Type t value.Value)
                                     else
                                         value
                                 | None ->
@@ -1104,12 +1118,14 @@ module Shader =
                                     
                                     match shader.shaderStage with
                                         | ShaderStage.Vertex | ShaderStage.Fragment ->
-                                            ShaderOutputValue(Expr.ReadInput(ParameterKind.Input, t, n))
+                                            Expr.ReadInput(ParameterKind.Input, t, n)
+                                                |> ShaderOutputValue.ofValue
 
                                         | ShaderStage.Geometry ->
                                             match tryGetSourceVertexIndexValue shader values with
                                                 | Some index -> 
-                                                    ShaderOutputValue(Expr.ReadInput(ParameterKind.Input, t, n, index.Value))
+                                                    Expr.ReadInput(ParameterKind.Input, t, n, index)
+                                                        |> ShaderOutputValue.ofValue
                                                 | None -> 
                                                     failwithf "[FShade] cannot add output %A to GeometryShader since no SourceVertexIndex was available" n
                                     
@@ -1119,7 +1135,11 @@ module Shader =
                                                 match t with
                                                     | ArrayOf t -> t
                                                     | _ -> t
-                                            ShaderOutputValue(Some invocationId, Expr.ReadInput(ParameterKind.Input, t, n, invocationId))
+                                            ShaderOutputValue(
+                                                InterpolationMode.Default, 
+                                                Some invocationId, 
+                                                Expr.ReadInput(ParameterKind.Input, t, n, invocationId)
+                                            )
 
                                         | ShaderStage.TessEval ->
                                             match shader.shaderInputTopology.Value with
@@ -1128,7 +1148,7 @@ module Shader =
                                                     let p0 = Expr.ReadInput(ParameterKind.Input, t, n, Expr.Value 0)
                                                     let p1 = Expr.ReadInput(ParameterKind.Input, t, n, Expr.Value 1)
                                                     let p2 = Expr.ReadInput(ParameterKind.Input, t, n, Expr.Value 2)
-                                                    interpolate3 coord p0 p1 p2 |> ShaderOutputValue
+                                                    interpolate3 coord p0 p1 p2 |> ShaderOutputValue.ofValue
 
                                                 | InputTopology.Patch 4 ->
                                                     let coord = Expr.ReadInput<V3d>(ParameterKind.Input, Intrinsics.TessCoord)
@@ -1136,7 +1156,7 @@ module Shader =
                                                     let p1 = Expr.ReadInput(ParameterKind.Input, t, n, Expr.Value 1)
                                                     let p2 = Expr.ReadInput(ParameterKind.Input, t, n, Expr.Value 2)
                                                     let p3 = Expr.ReadInput(ParameterKind.Input, t, n, Expr.Value 3)
-                                                    interpolate4 coord p0 p1 p2 p3 |> ShaderOutputValue
+                                                    interpolate4 coord p0 p1 p2 p3 |> ShaderOutputValue.ofValue
                                                 | _ ->
                                                     failwith "[FShade] cannot pass for n-ary tess-eval shader"
 
@@ -1175,7 +1195,7 @@ module Shader =
                     paramName = n
                     paramSemantic = n
                     paramType = i.paramType
-                    paramDecorations = Set.empty
+                    paramDecorations = Set.ofList [ParameterDecoration.Interpolation i.paramInterpolation]
                 }
             )
 

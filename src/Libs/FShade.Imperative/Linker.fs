@@ -115,7 +115,7 @@ module Linker =
             let ofEntry (e : EntryPoint) =
                 state {
                     let! (s : GraphState) = State.get
-                    let! globals = build Unchecked.defaultof<_> e.uniforms Compiler.compileUniforms
+                    let! globals = build Unchecked.defaultof<_> (e,e.uniforms) (snd >> Compiler.compileUniforms)
 
                     let globalNames = e.uniforms |> List.map (fun u -> u.uniformName) |> Set.ofList
 
@@ -204,16 +204,22 @@ module Linker =
                             if current.Count > 0 then res.AddRange current
                             currentIfDef <- Some d
                             current.Clear()
-                            current.Add(n.Definition)
+                            match n.Definition with
+                                | CUniformDef [] -> ()
+                                | def -> current.Add def
 
                         | Some (Endif d) ->
-                            current.Add(n.Definition)
+                            match n.Definition with
+                                | CUniformDef [] -> ()
+                                | def -> current.Add def
                             currentIfDef <- None
                             res.Add (CConditionalDef(d, CSharpList.toList current))
                             current.Clear()
 
                         | None ->
-                            current.Add(n.Definition)
+                            match n.Definition with
+                                | CUniformDef [] -> ()
+                                | def -> current.Add def
                         
                 if current.Count > 0 then
                     match currentIfDef with   

@@ -7,6 +7,7 @@ type InterpolationMode =
     | Flat              = 3
     | Centroid          = 4
     | Sample            = 5
+    | PerPatch          = 6
 
 type MemoryType =
     | None = 0

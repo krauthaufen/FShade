@@ -800,7 +800,14 @@ module GLSL =
                 inputs = Set.empty
             }
 
-
+        let prefixes =
+            Dictionary.ofList [
+                ShaderStage.Vertex,         "vs_"
+                ShaderStage.TessControl,    "tc_"
+                ShaderStage.TessEval,       "te_"
+                ShaderStage.Geometry,       "gs_"
+                ShaderStage.Fragment,       "fs_"
+            ]
 
         let regularName (kind : ParameterKind) (name : string) (s : State) =
             let c = s.config
@@ -811,9 +818,9 @@ module GLSL =
             else
                 match kind, s.stages with
                     | ParameterKind.Input, { prev = None }              -> name
-                    | ParameterKind.Input, { prev = Some _; self = s }  -> name + string s
+                    | ParameterKind.Input, { self = s }                 -> prefixes.[s] + name
 
-                    | ParameterKind.Output, { next = Some n }           -> name + string n
+                    | ParameterKind.Output, { next = Some n }           -> prefixes.[n] + name
                     | ParameterKind.Output, { next = None }             -> name + "Out"
                     | _                                                 -> name
 
@@ -1132,6 +1139,7 @@ module GLSL =
                                 | InterpolationMode.NoPerspective -> Some "noperspective"
                                 | InterpolationMode.Perspective -> Some "perspective"
                                 | InterpolationMode.Sample -> Some "sample"
+                                | InterpolationMode.PerPatch -> Some "patch"
                                 | _ -> None
                         | ParameterDecoration.Memory _ ->
                             None
@@ -1152,20 +1160,11 @@ module GLSL =
 
             let name = state |> State.parameterName kind p.cParamName
 
-            let isPatchOutput =
-                match state.stages.self with
-                    | ShaderStage.TessControl ->
-                        match p.cParamType with
-                            | CPointer _ -> false
-                            | _ -> true
-                    | _ ->
-                        false
 
             let prefix =
                 if c.version > version120 then
                     match kind with
                         | ParameterKind.Input -> "in "
-                        | ParameterKind.Output when isPatchOutput -> "patch out "
                         | ParameterKind.Output -> "out "
                         | _ -> ""
                 else
@@ -1415,7 +1414,7 @@ module GLSL =
                                         else
                                             ie
 
-                                    ShaderOutputValue(Expr.Let(intermediate, value.Value, ie))
+                                    value |> ShaderOutputValue.withValue (Expr.Let(intermediate, value.Value, ie))
                                 else
                                     value
                             )

@@ -200,7 +200,10 @@ module TessDeconstruct =
             let p2 = quad.[2].pos
 
             let centroid = (p0 + p1 + p2) / 3.0
-            let level = 1.0 / centroid.Z
+            
+            let level = 
+                let a = 1.0 / centroid.Z
+                2.0 * a
 
             let! coord = tessellateTriangle (level) (level, level, level)
             
@@ -241,7 +244,9 @@ let expected() =
 
                 
                 let centroid = (p0 + p1 + p2) / 3.0
-                let level = 1.0 / centroid.Z
+                let level = 
+                    let a = 1.0 / centroid.Z
+                    2.0 * a
 
                 ShaderIO.WriteOutputs [|
                     Intrinsics.TessLevelInner, -1, [| level |] :> obj
