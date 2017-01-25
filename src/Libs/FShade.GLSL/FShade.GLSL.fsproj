@@ -6,7 +6,7 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>13af9c38-cca2-47c5-b4de-a7342f0d2961</ProjectGuid>
-    <OutputType>Library</OutputType>
+    <OutputType>Exe</OutputType>
     <RootNamespace>FShade.GLSL</RootNamespace>
     <AssemblyName>FShade.GLSL</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
@@ -44,6 +44,26 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FShade.Core\FShade.Core.fsproj">
+      <Name>FShade.Core</Name>
+      <Project>{0f39c812-b7fb-4210-9e83-19d85a1cd10d}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\FShade.Imperative\FShade.Imperative.fsproj">
+      <Name>FShade.Imperative</Name>
+      <Project>{1223c55b-5634-4764-b5bd-bf9ad95c073b}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Utilities.fs" />
+    <Compile Include="IntrinsicFunctions.fs" />
+    <Compile Include="IntrinsicParameters.fs" />
+    <Compile Include="Assembler.fs" />
+    <Compile Include="Extensions.fs" />
+    <Compile Include="Program.fs" />
   </ItemGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>

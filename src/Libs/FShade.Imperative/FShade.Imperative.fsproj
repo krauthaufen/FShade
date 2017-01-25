@@ -51,7 +51,7 @@
     <Compile Include="Frontend.fs" />
     <Compile Include="Ast.fs" />
     <Compile Include="Compiler.fs" />
-    <Compile Include="Linker.fs" />
+    <Compile Include="ModuleCompiler.fs" />
   </ItemGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>

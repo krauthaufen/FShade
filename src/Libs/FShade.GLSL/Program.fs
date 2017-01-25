@@ -57,11 +57,15 @@ let effectTest() =
     let effect = Effect.ofList (vert @ frag)
 
     Effect.empty
-        |> GLSL.compile GLSL.Config.gl410 (Map.ofList ["Colors", typeof<V4d>; "Bla", typeof<V2d>])
+        |> Effect.link ShaderStage.Fragment (Map.ofList ["Colors", typeof<V4d>; "Bla", typeof<V2d>])
+        |> Effect.toModule
+        |> ModuleCompiler.compileGlsl glsl410
         |> printfn "%s"
 
     effect
-        |> GLSL.compile GLSL.Config.gl410 (Map.ofList ["Colors", typeof<V4d>; "Bla", typeof<V2d>])
+        |> Effect.link ShaderStage.Fragment (Map.ofList ["Colors", typeof<V4d>; "Bla", typeof<V2d>])
+        |> Effect.toModule
+        |> ModuleCompiler.compileGlsl glsl410
         |> printfn "%s"
 
 type Vertex1 =
@@ -115,7 +119,9 @@ let composeTest() =
 
 
     Effect.compose [sa; sb] 
-        |> GLSL.compile GLSL.Config.gl410 (Map.ofList [ Intrinsics.Color, typeof<V4d> ])
+        |> Effect.link ShaderStage.Fragment (Map.ofList [ Intrinsics.Color, typeof<V4d> ])
+        |> Effect.toModule
+        |> ModuleCompiler.compileGlsl glsl410
         |> printfn "%s"
 
 
@@ -234,6 +240,7 @@ module TessDeconstruct =
         }
 
     let frag (v : Vertex) =
+
         fragment {
             let col : V4d = uniform?PerView?AdditionalColor
             return v.pos + col + sam.Sample(v.tc)
@@ -241,9 +248,9 @@ module TessDeconstruct =
         
     let run() =
         Effect.compose [Effect.ofFunction test; Effect.ofFunction geometry; Effect.ofFunction frag]
-//            |> Effect.inputsToUniforms (Map.ofList ["TexCoord", uniform?PreviouslyInput])
-//            |> Effect.uniformsToInputs (Set.ofList ["TexCoord"])
-            |> GLSL.compile GLSL.Config.gl410 (Map.ofList [ Intrinsics.Color, typeof<V4d> ])
+            |> Effect.link ShaderStage.Fragment (Map.ofList [ Intrinsics.Color, typeof<V4d> ])
+            |> Effect.toModule
+            |> ModuleCompiler.compileGlsl glslVulkan
             |> printfn "%s"
 
 
@@ -382,9 +389,7 @@ let main args =
 //        @>
 
     let entry =
-        entry
-            |> Linker.compileAndLink GLSL.backend
-            |> GLSL.CModule.glsl GLSL.Config.gl410
+        entry |> ModuleCompiler.compileGlsl glsl410
 
     printfn "%s" entry
     0

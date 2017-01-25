@@ -1,6 +1,8 @@
 ﻿namespace FShade
 
 open System
+open System.Runtime.CompilerServices
+
 open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Quotations.Patterns
 open Microsoft.FSharp.Quotations.DerivedPatterns
@@ -391,12 +393,6 @@ module Effect =
     /// composes many effects using the sequential semantics defined in compose2.
     let compose (effects : #seq<Effect>) =
         effects |> Seq.fold compose2 empty
-
-
-        
-            
-
-
 
 
 

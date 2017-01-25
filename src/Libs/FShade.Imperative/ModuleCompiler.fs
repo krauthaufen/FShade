@@ -3,6 +3,7 @@
 open System
 open System.Reflection
 open System.Collections.Generic
+open System.Runtime.CompilerServices
 
 open Microsoft.FSharp.Reflection
 open Microsoft.FSharp.Quotations
@@ -17,13 +18,15 @@ open FShade
 open FShade.Imperative
 
 
-
-module Linker =
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module ModuleCompiler =
     open Aardvark.Base.Monads.State
-    open SimpleOrder
+    open Compiler
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module ValueCompiler =
+        open SimpleOrder
+
         type GraphNode(definition : CValueDef, dependencies : pset<GraphNode>) =
             let mutable sortKey : Option<SortKey> = None
 
@@ -61,13 +64,13 @@ module Linker =
 
         type GraphState =
             {
-                moduleState     : Compiler.ModuleState
+                moduleState     : ModuleState
                 cache           : Dictionary<obj, GraphNode>
             }
 
         [<AutoOpen>]
         module private Helpers = 
-            let rec build (globals : GraphNode) (key : 'a) (compile : 'a -> State<Compiler.CompilerState, CValueDef>) : State<GraphState, GraphNode> =
+            let rec build (globals : GraphNode) (key : 'a) (compile : 'a -> State<CompilerState, CValueDef>) : State<GraphState, GraphNode> =
                 state {
                     let! (state : GraphState) = State.get
                     let cache : Dictionary<obj, GraphNode> = state.cache
@@ -76,7 +79,7 @@ module Linker =
                         | (true, v) -> 
                             return v
                         | _ ->
-                            let mutable s = Compiler.emptyState state.moduleState
+                            let mutable s = emptyState state.moduleState
                             let def = compile(key).Run(&s)
 
                             let localFunctions      = s.usedFunctions |> HashMap.toSeq |> Seq.map snd |> Seq.toList
@@ -105,26 +108,26 @@ module Linker =
 
                 }
 
-            and ofFunction (globals : GraphNode) (f : Compiler.FunctionDefinition) =
-                build globals f Compiler.compileFunction
+            and ofFunction (globals : GraphNode) (f : FunctionDefinition) =
+                build globals f compileFunctionS
 
-            and ofConstant (globals : GraphNode) (f : Compiler.ConstantDefinition) =
-                build globals f Compiler.compileConstant
+            and ofConstant (globals : GraphNode) (f : ConstantDefinition) =
+                build globals f compileConstantS
 
 
             let ofEntry (e : EntryPoint) =
                 state {
                     let! (s : GraphState) = State.get
-                    let! globals = build Unchecked.defaultof<_> (e,e.uniforms) (snd >> Compiler.compileUniforms)
+                    let! globals = build Unchecked.defaultof<_> (e,e.uniforms) (snd >> compileUniformsS)
 
                     let globalNames = e.uniforms |> List.map (fun u -> u.uniformName) |> Set.ofList
 
-                    do! State.modify (fun s -> { s with moduleState = { s.moduleState with Compiler.ModuleState.globalParameters = globalNames } })
-                    let! root = build globals e Compiler.compileEntry
+                    do! State.modify (fun s -> { s with moduleState = { s.moduleState with ModuleState.globalParameters = globalNames } })
+                    let! root = build globals e compileEntryS
 
                     let root = GraphNode(root.Definition, PSet.add globals root.Dependencies)
 
-                    do! State.modify (fun s -> { s with moduleState = { s.moduleState with Compiler.ModuleState.globalParameters = Set.empty } })
+                    do! State.modify (fun s -> { s with moduleState = { s.moduleState with ModuleState.globalParameters = Set.empty } })
 
                     return e, globals, root
                 }
@@ -230,7 +233,7 @@ module Linker =
 
                 CSharpList.toList res
 
-        let ofEntries (backend : Compiler.Backend) (l : list<EntryPoint>) =
+        let ofEntries (backend : Backend) (l : list<EntryPoint>) =
             let compile =
                 state {
                     let! nodes = l |> List.mapS ofEntry
@@ -257,6 +260,8 @@ module Linker =
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module TypeCompiler =
+        open SimpleOrder
+
         type TypeGraphNode(definition : CTypeDef, dependencies : pset<TypeGraphNode>) =
             let mutable sortKey : SortKey = Unchecked.defaultof<SortKey>
 
@@ -360,8 +365,7 @@ module Linker =
             
             compile.Run(&state) |> flatten
 
-
-    let compileAndLink (backend : Compiler.Backend) (m : Module) =
+    let compile (backend : Backend) (m : Module) =
         let values, types = ValueCompiler.ofEntries backend m.entries
         let types = TypeCompiler.ofTypes types
 
@@ -369,3 +373,11 @@ module Linker =
             CModule.types = types
             CModule.values = values
         }
+
+
+[<AbstractClass; Sealed; Extension>]
+type Compiler private() =
+
+    [<Extension>]
+    static member Compile(backend : Compiler.Backend, m : Module) =
+        ModuleCompiler.compile backend m

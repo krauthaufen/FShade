@@ -3,6 +3,7 @@
 open System
 open System.Reflection
 open System.Collections.Generic
+open System.Runtime.CompilerServices
 
 open Microsoft.FSharp.Reflection
 open Microsoft.FSharp.Quotations
@@ -16,6 +17,7 @@ open Aardvark.Base.TypeInfo.Patterns
 open FShade
 open FShade.Imperative
 
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Compiler =
     open Aardvark.Base.Monads.State
 
@@ -40,7 +42,6 @@ module Compiler =
             intrinsicTypes.GetOrAdd(t, fun t ->
                 x.TryGetIntrinsicType t
             )
-
 
     type FunctionDefinition = 
         | ManagedFunction of name : string * args : list<Var> * body : Expr
@@ -70,30 +71,7 @@ module Compiler =
                 | _ ->
                     failwithf "[FShade] cannot call function %A since it is not reflectable" mi
 
-    type ModuleState =
-        {
-            backend             : Backend
-            constantIndex       : int
-            usedTypes           : HashMap<obj, CType>
-
-            globalFunctions     : HashMap<obj, FunctionDefinition>
-            globalConstants     : HashMap<obj, ConstantDefinition>
-
-            globalParameters    : Set<string>
-        }
-
-    type CompilerState =
-        {
-            nameIndices         : Map<string, int>
-            variables           : Map<Var, CVar>
-            reservedNames       : Set<string>
-
-            usedFunctions       : HashMap<obj, FunctionDefinition>
-            usedConstants       : pset<ConstantDefinition>
-            usedGlobals         : pset<string>
-            moduleState         : ModuleState
-        }
-
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module Constructors =
         
         let cache = System.Collections.Concurrent.ConcurrentDictionary<Type, FunctionDefinition>()
@@ -264,201 +242,6 @@ module Compiler =
             )
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-    module CompilerState =
-        let newName (name : string) =
-            State.custom (fun s ->
-                match Map.tryFind name s.nameIndices with
-                    | Some index ->
-                        let state = { s with nameIndices = Map.add name (index + 1) s.nameIndices }
-                        let name = name + string index
-                        state, name
-                    | None ->
-                        let state = { s with nameIndices = Map.add name 1 s.nameIndices }
-                        state, name
-            )
-
-        let lastName (name : string) =
-            State.get |> State.map (fun s ->
-                match Map.tryFind name s.nameIndices with
-                    | None | Some 1 -> name
-                    | Some idx -> name + string idx
-            )
-
-//        let variableName (v : Var) =
-//            State.custom (fun s ->
-//                match Map.tryFind v s.variables with
-//                    | Some name -> 
-//                        s, name
-//                    | None ->
-//                        match Map.tryFind v.Name s.nameIndices with
-//                            | Some index ->
-//                                let name = v.Name + string index
-//                                let state = { s with nameIndices = Map.add v.Name (index + 1) s.nameIndices; variableNames = Map.add v name s.variableNames }
-//                                state, name
-//                            | None ->
-//                                let state = { s with nameIndices = Map.add v.Name 1 s.nameIndices; variableNames = Map.add v v.Name s.variableNames }
-//                                state, v.Name
-//
-//            )
-
-        let reserveName (n : string) =
-            State.modify (fun s ->
-                { s with reservedNames = Set.add n s.reservedNames; nameIndices = Map.add n 1 s.nameIndices }
-            )
-
-        let useLocalFunction (key : obj) (f : FunctionDefinition) =
-            State.custom (fun s ->
-                { s with usedFunctions = HashMap.add key f s.usedFunctions }, f.Signature
-            )
-
-        let useGlobalFunction (key : obj) (f : FunctionDefinition) =
-            State.custom (fun s ->
-                { s with moduleState = { s.moduleState with globalFunctions = HashMap.add key f s.moduleState.globalFunctions } }, f.Signature
-            )
-
-        let useCtor (key : obj) (f : FunctionDefinition) =
-            useGlobalFunction ((key, "ctor") :> obj) f
-
-        let useConstant (key : obj) (e : Expr) =
-            state {
-                let ct = CType.ofType e.Type
-                let! s = State.get
-                match HashMap.tryFind key s.moduleState.globalConstants with
-                    | None -> 
-                        let name = sprintf "_constant%d" s.moduleState.constantIndex
-                        let c = { cName = name; cType = e.Type; cValue = e }
-                        do! State.put { 
-                                s with 
-                                    moduleState = { s.moduleState with globalConstants = HashMap.add key c s.moduleState.globalConstants; constantIndex = s.moduleState.constantIndex + 1 } 
-                                    usedConstants = PSet.add c s.usedConstants
-                            }
-                    
-                        return CVar { name = name; ctype = ct }
-                    | Some c ->
-                        do! State.put { s with usedConstants = PSet.add c s.usedConstants }
-                        return CVar { name = c.cName; ctype = ct }
-
-            }
-
-        let tryGetIntrinsic (mi : MethodBase) =
-            State.get |> State.map (fun s ->
-                if isNull s.moduleState.backend then None
-                else s.moduleState.backend.TryGetIntrinsic mi
-            )
-
-        type Free =
-            | Variable of Var
-            | Global of name : string * t : Type * isMutable : bool
-
-        let rec free (e : Expr) : pset<Free> =
-            match e with
-                | Let(v,e,b) ->
-                    let fe = free e
-                    let fb = free b
-                    PSet.union fe (PSet.remove (Variable v) fb)
-
-                | ReadInput(kind,name,idx) ->
-                    match idx with
-                        | Some idx -> free idx |> PSet.add (Global(name, e.Type, false))
-                        | None -> PSet.ofList [ Global(name, e.Type, false) ]
-
-                | WriteOutputs values ->
-                    let mutable res = PSet.empty
-                    for (name, (index, value)) in Map.toSeq values do
-                        match index with
-                            | Some index -> res <- PSet.union res (free index)
-                            | _ -> ()
-                        res <- res |> PSet.union (free value) |> PSet.add (Global(name, value.Type, true))
-
-                    res
-
-                | ExprShape.ShapeCombination(o, args) ->
-                    args |> List.fold (fun m e -> PSet.union m (free e)) PSet.empty
-
-                | ExprShape.ShapeLambda(v, b) ->
-                    free b |> PSet.remove (Variable v)
-
-                | ExprShape.ShapeVar v ->
-                    PSet.ofList [ Variable v ]
-
-    let emptyState (m : ModuleState) =
-        {
-            nameIndices         = Map.empty
-            variables           = Map.empty
-            reservedNames       = Set.empty
-            usedFunctions       = HashMap.empty
-            usedConstants       = PSet.empty
-            usedGlobals         = PSet.empty
-            moduleState         = m
-        }
-
-    let toCType (t : Type) =
-        State.custom (fun s ->
-            match s.moduleState.backend.TryGetIntrinsic t with
-                | Some ci -> 
-                    s, CType.CIntrinsic ci
-
-                | None -> 
-                    let cType = CType.ofType t
-
-                    match cType with
-                        | CStruct _ ->
-                            { s with moduleState = { s.moduleState with ModuleState.usedTypes = HashMap.add (t :> obj) cType s.moduleState.usedTypes } }, cType
-                        | _ ->
-                            s, cType
-        )
-        
-    /// converts a variable to a CVar using the cached name or by
-    /// creating a fresh name for it (and caching it)
-    let toCVarOfType (v : Var) (t : CType) =
-        State.custom (fun s ->
-            match Map.tryFind v s.variables with
-                | Some v -> s, v
-                | None ->
-                    match Map.tryFind v.Name s.nameIndices with
-                        | Some index ->
-                            let name = v.Name + string index
-                            let res = { ctype = t; name = name }
-                            let state = { s with nameIndices = Map.add v.Name (index + 1) s.nameIndices; variables = Map.add v res s.variables }
-                            state, res
-                        | None ->
-                            let res = { ctype = t; name = v.Name }
-                            let state = { s with nameIndices = Map.add v.Name 1 s.nameIndices; variables = Map.add v res s.variables }
-                            state, res
-        )
-
-    let toCVar (v : Var) =
-        state {
-            let! t = toCType v.Type
-            return! toCVarOfType v t
-        }
-
-    /// converts an EntryParameter to a CEntryParameter 
-    /// NOTE that names are not treated here
-    let toCEntryParameter (p : EntryParameter) =
-        state {
-            let! ctype = toCType p.paramType
-            return {
-                cParamType           = ctype
-                cParamName           = p.paramName
-                cParamSemantic       = p.paramSemantic
-                cParamDecorations    = p.paramDecorations
-            }
-        }
-        
-    /// converts an Uniform to a CUniform
-    /// NOTE that names are not treated here
-    let toCUniform (v : Uniform) =
-        state {
-            let! ct = toCType v.uniformType
-            return {
-                cUniformType = ct
-                cUniformName = v.uniformName
-                cUniformBuffer = v.uniformBuffer
-            }
-        }
-
-    [<AutoOpen>]
     module Helpers = 
         let rec tryDeconstructValue (t : Type) (v : obj) =
             if FSharpType.IsTuple t then
@@ -492,72 +275,6 @@ module Compiler =
                     | _ ->
                         None
 
-        let rec asExternal (e : Expr) =
-            state {
-                let free = CompilerState.free e
-                if PSet.isEmpty free then
-                    return! CompilerState.useConstant e e
-                else
-                    let! globals = State.get |> State.map (fun s -> s.moduleState.globalParameters)
-                    let free = free |> PSet.toArray
- 
-                    let newVariables = HashSet()
-
-                    let args = 
-                        free |> Array.choose (fun f ->
-                            match f with
-                                | CompilerState.Free.Variable v ->
-                                    Some v
-
-                                | CompilerState.Free.Global(n, t, isMutable) ->
-                                    if Set.contains n globals then 
-                                        None
-                                    else 
-                                        let v = Var(n, t, isMutable)
-                                        newVariables.Add v |> ignore
-                                        Some v
-                        )
-
-                    
-                    let! variables = 
-                        args |> Array.mapS (fun v ->
-                            state {
-                                if newVariables.Contains v then
-                                    let! t = toCType v.Type
-                                    let res = { ctype = t; name = v.Name }
-                                    do! State.modify (fun s -> { s with variables = Map.add v res s.variables })
-                                    return res
-                                else
-                                    let! res = toCVar v
-                                    return res
-                            }
-                        ) 
-
-                    let! name = CompilerState.newName "helper"
-                    let! returnType = toCType e.Type
-                    let variables = variables
-
-                    let signature =
-                        {
-                            name = name
-                            returnType = returnType
-                            parameters = 
-                                Array.map2 
-                                    (fun (a : CVar) (v : Var) -> { name = a.name; ctype = a.ctype; modifier = (if v.IsMutable then CParameterModifier.ByRef else CParameterModifier.In) }) 
-                                    variables
-                                    args
-                        }
-
-                    let definition = ManagedFunctionWithSignature(signature, e)
-
-                    let! signature = 
-                        if args.Length = free.Length then CompilerState.useGlobalFunction (e :> obj) definition
-                        else CompilerState.useLocalFunction (e :> obj) definition
-
-
-                    return CCall(signature, variables |> Array.map CVar)
-            }
-
         let rec zero (t : CType) =
             match t with
                 | CVoid             -> CValue(t, CLiteral.Null)
@@ -575,7 +292,6 @@ module Compiler =
                 | CFloat _          -> CValue(t, CFractional 1.0)
                 | CVector(bt, d)    -> CNewVector(t, d, List.replicate d (one bt))
                 | _                 -> failwithf "[FShade] cannot create one-value for type %A" t
-
 
         let rec tryGetBuiltInMethod (mi : MethodInfo) (args : list<CExpr>) =
             let ct = CType.ofType mi.ReturnType
@@ -769,13 +485,300 @@ module Compiler =
                 | "One"     -> one t |> Some
                 | _         -> None
 
-    let rec toCExpr (e : Expr) =
+
+    type ModuleState =
+        {
+            backend             : Backend
+            constantIndex       : int
+            usedTypes           : HashMap<obj, CType>
+
+            globalFunctions     : HashMap<obj, FunctionDefinition>
+            globalConstants     : HashMap<obj, ConstantDefinition>
+
+            globalParameters    : Set<string>
+        }
+
+    type CompilerState =
+        {
+            nameIndices         : Map<string, int>
+            variables           : Map<Var, CVar>
+            reservedNames       : Set<string>
+
+            usedFunctions       : HashMap<obj, FunctionDefinition>
+            usedConstants       : pset<ConstantDefinition>
+            usedGlobals         : pset<string>
+            moduleState         : ModuleState
+        }
+
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module CompilerState =
+        let newName (name : string) =
+            State.custom (fun s ->
+                match Map.tryFind name s.nameIndices with
+                    | Some index ->
+                        let state = { s with nameIndices = Map.add name (index + 1) s.nameIndices }
+                        let name = name + string index
+                        state, name
+                    | None ->
+                        let state = { s with nameIndices = Map.add name 1 s.nameIndices }
+                        state, name
+            )
+
+        let lastName (name : string) =
+            State.get |> State.map (fun s ->
+                match Map.tryFind name s.nameIndices with
+                    | None | Some 1 -> name
+                    | Some idx -> name + string idx
+            )
+
+//        let variableName (v : Var) =
+//            State.custom (fun s ->
+//                match Map.tryFind v s.variables with
+//                    | Some name -> 
+//                        s, name
+//                    | None ->
+//                        match Map.tryFind v.Name s.nameIndices with
+//                            | Some index ->
+//                                let name = v.Name + string index
+//                                let state = { s with nameIndices = Map.add v.Name (index + 1) s.nameIndices; variableNames = Map.add v name s.variableNames }
+//                                state, name
+//                            | None ->
+//                                let state = { s with nameIndices = Map.add v.Name 1 s.nameIndices; variableNames = Map.add v v.Name s.variableNames }
+//                                state, v.Name
+//
+//            )
+
+        let reserveName (n : string) =
+            State.modify (fun s ->
+                { s with reservedNames = Set.add n s.reservedNames; nameIndices = Map.add n 1 s.nameIndices }
+            )
+
+        let useLocalFunction (key : obj) (f : FunctionDefinition) =
+            State.custom (fun s ->
+                { s with usedFunctions = HashMap.add key f s.usedFunctions }, f.Signature
+            )
+
+        let useGlobalFunction (key : obj) (f : FunctionDefinition) =
+            State.custom (fun s ->
+                { s with moduleState = { s.moduleState with globalFunctions = HashMap.add key f s.moduleState.globalFunctions } }, f.Signature
+            )
+
+        let useCtor (key : obj) (f : FunctionDefinition) =
+            useGlobalFunction ((key, "ctor") :> obj) f
+
+        let useConstant (key : obj) (e : Expr) =
+            state {
+                let ct = CType.ofType e.Type
+                let! s = State.get
+                match HashMap.tryFind key s.moduleState.globalConstants with
+                    | None -> 
+                        let name = sprintf "_constant%d" s.moduleState.constantIndex
+                        let c = { cName = name; cType = e.Type; cValue = e }
+                        do! State.put { 
+                                s with 
+                                    moduleState = { s.moduleState with globalConstants = HashMap.add key c s.moduleState.globalConstants; constantIndex = s.moduleState.constantIndex + 1 } 
+                                    usedConstants = PSet.add c s.usedConstants
+                            }
+                    
+                        return CVar { name = name; ctype = ct }
+                    | Some c ->
+                        do! State.put { s with usedConstants = PSet.add c s.usedConstants }
+                        return CVar { name = c.cName; ctype = ct }
+
+            }
+
+        let tryGetIntrinsic (mi : MethodBase) =
+            State.get |> State.map (fun s ->
+                if isNull s.moduleState.backend then None
+                else s.moduleState.backend.TryGetIntrinsic mi
+            )
+
+        type Free =
+            | Variable of Var
+            | Global of name : string * t : Type * isMutable : bool
+
+        let rec free (e : Expr) : pset<Free> =
+            match e with
+                | Let(v,e,b) ->
+                    let fe = free e
+                    let fb = free b
+                    PSet.union fe (PSet.remove (Variable v) fb)
+
+                | ReadInput(kind,name,idx) ->
+                    match idx with
+                        | Some idx -> free idx |> PSet.add (Global(name, e.Type, false))
+                        | None -> PSet.ofList [ Global(name, e.Type, false) ]
+
+                | WriteOutputs values ->
+                    let mutable res = PSet.empty
+                    for (name, (index, value)) in Map.toSeq values do
+                        match index with
+                            | Some index -> res <- PSet.union res (free index)
+                            | _ -> ()
+                        res <- res |> PSet.union (free value) |> PSet.add (Global(name, value.Type, true))
+
+                    res
+
+                | ExprShape.ShapeCombination(o, args) ->
+                    args |> List.fold (fun m e -> PSet.union m (free e)) PSet.empty
+
+                | ExprShape.ShapeLambda(v, b) ->
+                    free b |> PSet.remove (Variable v)
+
+                | ExprShape.ShapeVar v ->
+                    PSet.ofList [ Variable v ]
+
+    let emptyState (m : ModuleState) =
+        {
+            nameIndices         = Map.empty
+            variables           = Map.empty
+            reservedNames       = Set.empty
+            usedFunctions       = HashMap.empty
+            usedConstants       = PSet.empty
+            usedGlobals         = PSet.empty
+            moduleState         = m
+        }
+
+
+    let toCTypeS (t : Type) =
+        State.custom (fun s ->
+            match s.moduleState.backend.TryGetIntrinsic t with
+                | Some ci -> 
+                    s, CType.CIntrinsic ci
+
+                | None -> 
+                    let cType = CType.ofType t
+
+                    match cType with
+                        | CStruct _ ->
+                            { s with moduleState = { s.moduleState with ModuleState.usedTypes = HashMap.add (t :> obj) cType s.moduleState.usedTypes } }, cType
+                        | _ ->
+                            s, cType
+        )
+        
+    /// converts a variable to a CVar using the cached name or by
+    /// creating a fresh name for it (and caching it)
+    let toCVarOfTypeS (v : Var) (t : CType) =
+        State.custom (fun s ->
+            match Map.tryFind v s.variables with
+                | Some v -> s, v
+                | None ->
+                    match Map.tryFind v.Name s.nameIndices with
+                        | Some index ->
+                            let name = v.Name + string index
+                            let res = { ctype = t; name = name }
+                            let state = { s with nameIndices = Map.add v.Name (index + 1) s.nameIndices; variables = Map.add v res s.variables }
+                            state, res
+                        | None ->
+                            let res = { ctype = t; name = v.Name }
+                            let state = { s with nameIndices = Map.add v.Name 1 s.nameIndices; variables = Map.add v res s.variables }
+                            state, res
+        )
+
+    let toCVarS (v : Var) =
         state {
-            let! ct = toCType e.Type
+            let! t = toCTypeS v.Type
+            return! toCVarOfTypeS v t
+        }
+
+    /// converts an EntryParameter to a CEntryParameter 
+    /// NOTE that names are not treated here
+    let toCEntryParameterS (p : EntryParameter) =
+        state {
+            let! ctype = toCTypeS p.paramType
+            return {
+                cParamType           = ctype
+                cParamName           = p.paramName
+                cParamSemantic       = p.paramSemantic
+                cParamDecorations    = p.paramDecorations
+            }
+        }
+        
+    /// converts an Uniform to a CUniform
+    /// NOTE that names are not treated here
+    let toCUniformS (v : Uniform) =
+        state {
+            let! ct = toCTypeS v.uniformType
+            return {
+                cUniformType = ct
+                cUniformName = v.uniformName
+                cUniformBuffer = v.uniformBuffer
+            }
+        }
+
+    let rec asExternalS (e : Expr) =
+        state {
+            let free = CompilerState.free e
+            if PSet.isEmpty free then
+                return! CompilerState.useConstant e e
+            else
+                let! globals = State.get |> State.map (fun s -> s.moduleState.globalParameters)
+                let free = free |> PSet.toArray
+ 
+                let newVariables = HashSet()
+
+                let args = 
+                    free |> Array.choose (fun f ->
+                        match f with
+                            | CompilerState.Free.Variable v ->
+                                Some v
+
+                            | CompilerState.Free.Global(n, t, isMutable) ->
+                                if Set.contains n globals then 
+                                    None
+                                else 
+                                    let v = Var(n, t, isMutable)
+                                    newVariables.Add v |> ignore
+                                    Some v
+                    )
+
+                    
+                let! variables = 
+                    args |> Array.mapS (fun v ->
+                        state {
+                            if newVariables.Contains v then
+                                let! t = toCTypeS v.Type
+                                let res = { ctype = t; name = v.Name }
+                                do! State.modify (fun s -> { s with variables = Map.add v res s.variables })
+                                return res
+                            else
+                                let! res = toCVarS v
+                                return res
+                        }
+                    ) 
+
+                let! name = CompilerState.newName "helper"
+                let! returnType = toCTypeS e.Type
+                let variables = variables
+
+                let signature =
+                    {
+                        name = name
+                        returnType = returnType
+                        parameters = 
+                            Array.map2 
+                                (fun (a : CVar) (v : Var) -> { name = a.name; ctype = a.ctype; modifier = (if v.IsMutable then CParameterModifier.ByRef else CParameterModifier.In) }) 
+                                variables
+                                args
+                    }
+
+                let definition = ManagedFunctionWithSignature(signature, e)
+
+                let! signature = 
+                    if args.Length = free.Length then CompilerState.useGlobalFunction (e :> obj) definition
+                    else CompilerState.useLocalFunction (e :> obj) definition
+
+
+                return CCall(signature, variables |> Array.map CVar)
+        }
+
+    let rec toCExprS (e : Expr) =
+        state {
+            let! ct = toCTypeS e.Type
 
             match e with
                 | ReducibleExpression e ->
-                    return! toCExpr e
+                    return! toCExprS e
 
                 | NewFixedArray _
                 | AddressSet _
@@ -791,7 +794,7 @@ module Compiler =
                 | TryWith _
                 | VarSet _
                 | WhileLoop _ ->
-                    return! asExternal e
+                    return! asExternalS e
 
                 | ReadInput(kind, name, index) ->
                     let! s = State.get
@@ -800,55 +803,55 @@ module Compiler =
 
                     match index with
                         | Some idx -> 
-                            let! idx = toCExpr idx
+                            let! idx = toCExprS idx
                             return CReadInput(kind, ct, name, Some idx)
                         | _ ->
                             return CReadInput(kind, ct, name, None)
 
 
                 | Var v ->
-                    let! v = toCVar v
+                    let! v = toCVarS v
                     return CVar v
 
                 | Value(v, t) ->
-                    let! ct = toCType t
+                    let! ct = toCTypeS t
                     match CLiteral.tryCreate v with
                         | Some literal -> 
                             return CValue(ct, literal)
 
                         | None ->
-                            match tryDeconstructValue t v with
+                            match Helpers.tryDeconstructValue t v with
                                 | Some e -> 
-                                    return! toCExpr e
+                                    return! toCExprS e
 
                                 | _ -> 
-                                    let! e = asExternal e
+                                    let! e = asExternalS e
                                     return e
 
                 | GetArray(arr, i) ->
-                    let! arr = toCExpr arr
-                    let! i = toCExpr i
+                    let! arr = toCExprS arr
+                    let! i = toCExprS i
                     return CItem(ct, arr, i)
 
                 | NewTuple(fields) ->
                     let! ctor = e.Type |> Constructors.tuple |> CompilerState.useCtor e.Type
-                    let! fields = fields |> List.mapS toCExpr |>> List.toArray
+                    let! fields = fields |> List.mapS toCExprS |>> List.toArray
                     return CCall(ctor, fields)
 
                 | NewRecord(t, fields) ->
                     let! ctor = t |> Constructors.record |> CompilerState.useCtor t
-                    let! fields = fields |> List.mapS toCExpr |>> List.toArray
+                    let! fields = fields |> List.mapS toCExprS |>> List.toArray
                     return CCall(ctor, fields)
 
                 | NewUnionCase(ci, fields) ->
                     let ctors = ci.DeclaringType |> Constructors.union
                     let! ctor = ctors |> HashMap.find ci |> CompilerState.useGlobalFunction ci
-                    let! fields = fields |> List.mapS toCExpr |>> List.toArray
+                    let! fields = fields |> List.mapS toCExprS |>> List.toArray
                     return CCall(ctor, fields)
 
                 | NewObject(ctor, args) ->
-                    let! args = args  |> List.mapS toCExpr
-                    match tryGetBuiltInCtor ctor args with
+                    let! args = args  |> List.mapS toCExprS
+                    match Helpers.tryGetBuiltInCtor ctor args with
                         | Some b ->
                             return b
                         | None -> 
@@ -862,12 +865,12 @@ module Compiler =
 
 
                 | UnionCaseTest(e, ci) ->
-                    let! e = toCExpr e
+                    let! e = toCExprS e
                     let tInt32 = CInt(true, 32)
                     return CEqual(CField(tInt32, e, "tag"), CValue(tInt32, CLiteral.CIntegral(int64 ci.Tag)))
 
                 | TupleGet(t, i) ->
-                    let! t = toCExpr t
+                    let! t = toCExprS t
                     return CField(ct, t, sprintf "Item%d" i)
 
 
@@ -878,13 +881,13 @@ module Compiler =
                             return CCallIntrinsic(ct, i, [||])
                         | None -> 
                             // TODO: assumes that the function does not have side-effects
-                            return! Expr.Value(mi.Invoke(null, [||]), mi.ReturnType) |> toCExpr 
+                            return! Expr.Value(mi.Invoke(null, [||]), mi.ReturnType) |> toCExprS
 
                 | Call(None, mi, t :: args) | Call(Some t, mi, args) ->
                     let args = t :: args
-                    let! args = args |> List.mapS toCExpr
+                    let! args = args |> List.mapS toCExprS
 
-                    match tryGetBuiltInMethod mi args with
+                    match Helpers.tryGetBuiltInMethod mi args with
                         | Some e -> 
                             return e
                         | None ->
@@ -902,65 +905,65 @@ module Compiler =
 
 
                 | FieldGet(None, f) ->
-                    return! Expr.Value(f.GetValue(null), f.FieldType) |> toCExpr
+                    return! Expr.Value(f.GetValue(null), f.FieldType) |> toCExprS
                     
                 | FieldGet(Some t, f) ->
-                    let! t = toCExpr t
-                    match tryGetBuiltInField f t with
+                    let! t = toCExprS t
+                    match Helpers.tryGetBuiltInField f t with
                         | Some e ->
                             return e
                         | _ ->
                             return CField(ct, t, f.Name)
 
                 | PropertyGet(None, pi, []) ->
-                    return! Expr.Value(pi.GetValue(null), pi.PropertyType) |> toCExpr
+                    return! Expr.Value(pi.GetValue(null), pi.PropertyType) |> toCExprS
                     
                 | PropertyGet(None, pi, args) ->
-                    return! Expr.Call(pi.GetMethod, args) |> toCExpr
+                    return! Expr.Call(pi.GetMethod, args) |> toCExprS
 
                 | PropertyGet(Some t, pi, []) ->
                     if FSharpType.IsRecord(pi.DeclaringType, true) then
-                        let! t = toCExpr t
+                        let! t = toCExprS t
                         return CField(ct, t, pi.Name)
 
                     elif FSharpType.IsUnion(pi.DeclaringType.BaseType, true) then
                         let case = 
                             FSharpType.GetUnionCases(pi.DeclaringType.BaseType, true)
                                 |> Seq.find (fun ci -> ci.Name = pi.DeclaringType.Name)
-                        let! t = toCExpr t
+                        let! t = toCExprS t
                         return CField(ct, t, case.Name + "_" + pi.Name)
                         
                     else
-                        return! Expr.Call(t, pi.GetMethod, []) |> toCExpr
+                        return! Expr.Call(t, pi.GetMethod, []) |> toCExprS
                     
                 | PropertyGet(Some t, pi, args) ->
-                    return! Expr.Call(t, pi.GetMethod, args) |> toCExpr
+                    return! Expr.Call(t, pi.GetMethod, args) |> toCExprS
 
                 | Coerce(e, t) ->
-                    let! e = toCExpr e
+                    let! e = toCExprS e
                     return CConvert(ct, e)
 
                 | AndAlso(l, r) ->
-                    let! l = toCExpr l
-                    let! r = toCExpr r
+                    let! l = toCExprS l
+                    let! r = toCExprS r
                     return CAnd(l, r)
 
                 | OrElse(l, r) ->
-                    let! l = toCExpr l
-                    let! r = toCExpr r
+                    let! l = toCExprS l
+                    let! r = toCExprS r
                     return COr(l, r)
 
                 | IfThenElse(c, i, e) ->
-                    let! c = toCExpr c
-                    let! i = toCExpr i
-                    let! e = toCExpr e
+                    let! c = toCExprS c
+                    let! i = toCExprS i
+                    let! e = toCExprS e
                     return CConditional(ct, c, i, e)
 
 
 
 
                 | AddressOf e ->
-                    let! e = toCExpr e
+                    let! e = toCExprS e
                     return CAddressOf(CPointer(CPointerModifier.None, e.ctype), e)
 
 
@@ -981,24 +984,24 @@ module Compiler =
                     return failwithf "[FShade unexpected expression kind %A" e
         }
 
-    and toCLExpr (e : Expr) =
-        e |> toCExpr |> State.map CLExpr.ofExprSafe
+    and toCLExprS (e : Expr) =
+        e |> toCExprS |> State.map CLExpr.ofExprSafe
 
-    let rec toCRExpr (e : Expr) =
+    let rec toCRExprS (e : Expr) =
         state {
             match e with
                 | ReducibleExpression(e) ->
-                    return! toCRExpr e
+                    return! toCRExprS e
 
                 | NewFixedArray(cnt, et, args) ->
                     let ct = CType.ofType et
-                    let! args = args |> List.mapS toCExpr
+                    let! args = args |> List.mapS toCExprS
                     return CRArray(CArray(ct, cnt), args) |> Some
 
                 | NewArray(et, args) ->
                     let ct = CType.ofType et
                     let cnt = List.length args
-                    let! args = args |> List.mapS toCExpr
+                    let! args = args |> List.mapS toCExprS
                     return CRArray(CArray(ct, cnt), args) |> Some
 
 
@@ -1013,21 +1016,21 @@ module Compiler =
                     while e.MoveNext() do
                         values.Add(Expr.Value(e.Current, et))
                     
-                    return! Expr.NewFixedArray(et, CSharpList.toList values) |> toCRExpr
+                    return! Expr.NewFixedArray(et, CSharpList.toList values) |> toCRExprS
 
                 | DefaultValue t ->
                     return None
 
                 | _ ->
-                    let! res = e |> toCExpr
+                    let! res = e |> toCExprS
                     return CRExpr.ofExpr res |> Some
         }
 
-    let rec toCStatement (isLast : bool) (e : Expr) =
+    let rec toCStatementS (isLast : bool) (e : Expr) =
         state {
             match e with
                 | ReducibleExpression e ->
-                    return! toCStatement isLast e
+                    return! toCStatementS isLast e
 
                 | Quotations.DerivedPatterns.Unit ->
                     return CNop
@@ -1035,11 +1038,11 @@ module Compiler =
                 | ForInteger(v, first, step, last, b) ->
                     match step, last with
                         | Trivial, TrivialOp -> 
-                            let! v = toCVar v
-                            let! cfirst = toCRExpr first
-                            let! cstep = toCExpr step
-                            let! clast = toCExpr last
-                            let! cbody = toCStatement false b
+                            let! v = toCVarS v
+                            let! cfirst = toCRExprS first
+                            let! cstep = toCExprS step
+                            let! clast = toCExprS last
+                            let! cbody = toCStatementS false b
 
                             let increment =
                                 match cstep with
@@ -1085,16 +1088,16 @@ module Compiler =
                                 )
                         | Trivial, last ->
                             let vLast = Var("last", last.Type)
-                            return! toCStatement isLast (Expr.Let(vLast, last, Expr.ForInteger(v, first, step, Expr.Var vLast, b)))
+                            return! toCStatementS isLast (Expr.Let(vLast, last, Expr.ForInteger(v, first, step, Expr.Var vLast, b)))
 
                         | step, TrivialOp -> 
                             let vStep = Var("step", step.Type)
-                            return! toCStatement isLast (Expr.Let(vStep, step, Expr.ForInteger(v, first, Expr.Var vStep, last, b)))
+                            return! toCStatementS isLast (Expr.Let(vStep, step, Expr.ForInteger(v, first, Expr.Var vStep, last, b)))
 
                         | step, last ->
                             let vStep = Var("step", step.Type)
                             let vLast = Var("last", last.Type)
-                            return! toCStatement isLast (Expr.Let(vStep, step, Expr.Let(vLast, last, Expr.ForInteger(v, first, Expr.Var vStep, Expr.Var vLast, b))))
+                            return! toCStatementS isLast (Expr.Let(vStep, step, Expr.Let(vLast, last, Expr.ForInteger(v, first, Expr.Var vStep, Expr.Var vLast, b))))
                             
 
                             
@@ -1104,10 +1107,10 @@ module Compiler =
                             state {
                                 let! index = 
                                     match index with
-                                        | Some index -> toCExpr index |> State.map Some
+                                        | Some index -> toCExprS index |> State.map Some
                                         | _ -> State.value None
 
-                                let! value = toCStatement true value
+                                let! value = toCStatementS true value
                                 let rec replaceReturn (s : CStatement) =
                                     match s with
                                         | CReturnValue v -> CWriteOutput(name, index, CRExpr v)
@@ -1133,8 +1136,8 @@ module Compiler =
 
 
                 | AddressSet(a, v) ->
-                    let! a = toCLExpr a
-                    let! v = toCExpr v
+                    let! a = toCLExprS a
+                    let! v = toCExprS v
                     match a with
                         | Some a ->
                             return CWrite(a, v)
@@ -1142,10 +1145,10 @@ module Compiler =
                             return failwithf "[FShade] cannot set value for ptr %A" e
 
                 | FieldSet(Some t, f, value) ->
-                    let! t = toCLExpr (Expr.FieldGet(t, f))
+                    let! t = toCLExprS (Expr.FieldGet(t, f))
                     match t with
                         | Some t ->
-                            let! value = toCExpr value
+                            let! value = toCExprS value
                             return CWrite(t, value)
                         | None ->
                             return failwithf "[FShade] cannot set field %A" e
@@ -1155,13 +1158,13 @@ module Compiler =
 
 
                 | Let(v, e, b) ->
-                    let! e = toCRExpr e
+                    let! e = toCRExprS e
                     let! v = 
                         match e with
-                            | Some e -> toCVarOfType v e.ctype
-                            | None -> toCVar v
+                            | Some e -> toCVarOfTypeS v e.ctype
+                            | None -> toCVarS v
 
-                    let! body = toCStatement isLast b
+                    let! body = toCStatementS isLast b
                     return CSequential [
                         CDeclare(v, e)
                         body
@@ -1175,41 +1178,41 @@ module Compiler =
                     return failwithf "[FShade] cannot compile exception handlers %A" e
 
                 | Sequential(l, r) ->
-                    let! l = toCStatement false l
-                    let! r = toCStatement isLast r
+                    let! l = toCStatementS false l
+                    let! r = toCStatementS isLast r
                     return CSequential [l;r]
 
                 | VarSet(v, value) ->
-                    let! v = toCVar v
-                    let! value = toCExpr value
+                    let! v = toCVarS v
+                    let! value = toCExprS value
                     return CWrite(CLVar v, value)
 
                 | PropertySet(None, pi, i, a) ->
                     return failwithf "[FShade] cannot set static property %A" pi
 
                 | PropertySet(Some t, pi, i, a) ->
-                    let! lexpr = Expr.PropertyGet(t, pi, i) |> toCLExpr
+                    let! lexpr = Expr.PropertyGet(t, pi, i) |> toCLExprS
                     match lexpr with
                         | Some l ->
-                            let! a = toCExpr a
+                            let! a = toCExprS a
                             return CWrite(l, a)
                         | None ->
-                            return! Expr.Call(t, pi.SetMethod, i @ [a]) |> toCStatement isLast
+                            return! Expr.Call(t, pi.SetMethod, i @ [a]) |> toCStatementS isLast
 
 
                 | WhileLoop(guard, body) ->
-                    let! guard = toCExpr guard
-                    let! body = toCStatement false body
+                    let! guard = toCExprS guard
+                    let! body = toCStatementS false body
                     return CWhile(guard, body)
 
                 | IfThenElse(c, i, e) ->
-                    let! c = toCExpr c
-                    let! i = toCStatement isLast i
-                    let! e = toCStatement isLast e
+                    let! c = toCExprS c
+                    let! i = toCStatementS isLast i
+                    let! e = toCStatementS isLast e
                     return CIfThenElse(c, i, e)
 
                 | e ->
-                    let! ce = toCRExpr e
+                    let! ce = toCRExprS e
                     match ce with
                         | Some (CRExpr e) ->
                             if isLast && e.ctype <> CType.CVoid then
@@ -1242,14 +1245,13 @@ module Compiler =
 
         }
 
-
-    let compileUniforms (u : list<Uniform>) =
+    let compileUniformsS (u : list<Uniform>) =
         state {
-            let! us = u |> List.mapS toCUniform
+            let! us = u |> List.mapS toCUniformS
             return CUniformDef us
         }
 
-    let compileEntry (f : EntryPoint) =
+    let compileEntryS (f : EntryPoint) =
         state {
             // ensure that all inputs, outputs, arguments have their correct names
             for i in f.inputs do do! CompilerState.reserveName i.paramName
@@ -1257,14 +1259,14 @@ module Compiler =
             for a in f.arguments do do! CompilerState.reserveName a.paramName
             for u in f.uniforms do do! CompilerState.reserveName u.uniformName
             
-            let! inputs     = f.inputs |> List.mapS toCEntryParameter
-            let! outputs    = f.outputs |> List.mapS toCEntryParameter
-            let! args       = f.arguments |> List.mapS toCEntryParameter
+            let! inputs     = f.inputs |> List.mapS toCEntryParameterS
+            let! outputs    = f.outputs |> List.mapS toCEntryParameterS
+            let! args       = f.arguments |> List.mapS toCEntryParameterS
 
 
             // compile the body
-            let! body = toCStatement true f.body
-            let! ret = toCType f.body.Type
+            let! body = toCStatementS true f.body
+            let! ret = toCTypeS f.body.Type
 
             return
                 CEntryDef {
@@ -1278,30 +1280,31 @@ module Compiler =
                 }
         }
 
-    let compileFunction (f : FunctionDefinition) =
+    let compileFunctionS (f : FunctionDefinition) =
         state {
             match f with
                 | ManagedFunction(name, args, body) ->
                     let signature = f.Signature
-                    let! body = toCStatement true body
+                    let! body = toCStatementS true body
                     return CFunctionDef(signature, body)
 
                 | CompiledFunction(signature, body) ->
                     return CFunctionDef(signature, body)
                     
                 | ManagedFunctionWithSignature(signature, body) ->
-                    let! body = toCStatement true body
+                    let! body = toCStatementS true body
                     return CFunctionDef(signature, body)
 
         }
 
-    let compileConstant (c : ConstantDefinition) =
+    let compileConstantS (c : ConstantDefinition) =
         state {
-            let! ct = toCType c.cType
-            let! e = toCRExpr c.cValue
+            let! ct = toCTypeS c.cType
+            let! e = toCRExprS c.cValue
             match e with
                 | Some e ->
                     return CValueDef.CConstant(ct, c.cName, e)
                 | None ->
                     return failwithf "[FShade] constants must have a value %A" c
         }
+
