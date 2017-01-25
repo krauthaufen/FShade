@@ -59,13 +59,13 @@ let effectTest() =
     Effect.empty
         |> Effect.link ShaderStage.Fragment (Map.ofList ["Colors", typeof<V4d>; "Bla", typeof<V2d>])
         |> Effect.toModule
-        |> ModuleCompiler.compileGlsl glsl410
+        |> ModuleCompiler.compileGLSL glsl410
         |> printfn "%s"
 
     effect
         |> Effect.link ShaderStage.Fragment (Map.ofList ["Colors", typeof<V4d>; "Bla", typeof<V2d>])
         |> Effect.toModule
-        |> ModuleCompiler.compileGlsl glsl410
+        |> ModuleCompiler.compileGLSL glsl410
         |> printfn "%s"
 
 type Vertex1 =
@@ -121,7 +121,7 @@ let composeTest() =
     Effect.compose [sa; sb] 
         |> Effect.link ShaderStage.Fragment (Map.ofList [ Intrinsics.Color, typeof<V4d> ])
         |> Effect.toModule
-        |> ModuleCompiler.compileGlsl glsl410
+        |> ModuleCompiler.compileGLSL glsl410
         |> printfn "%s"
 
 
@@ -250,7 +250,7 @@ module TessDeconstruct =
         Effect.compose [Effect.ofFunction test; Effect.ofFunction geometry; Effect.ofFunction frag]
             |> Effect.link ShaderStage.Fragment (Map.ofList [ Intrinsics.Color, typeof<V4d> ])
             |> Effect.toModule
-            |> ModuleCompiler.compileGlsl glslVulkan
+            |> ModuleCompiler.compileGLSL glslVulkan
             |> printfn "%s"
 
 
@@ -389,7 +389,7 @@ let main args =
 //        @>
 
     let entry =
-        entry |> ModuleCompiler.compileGlsl glsl410
+        entry |> ModuleCompiler.compileGLSL glsl410
 
     printfn "%s" entry
     0

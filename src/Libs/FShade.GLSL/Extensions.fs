@@ -19,6 +19,18 @@ module Backends =
             reverseMatrixLogic      = true
         }
 
+    let glsl120 =
+        Backend.Create {
+            version                 = Version(1,2)
+            enabledExtensions       = Set.empty
+            createUniformBuffers    = false
+            createBindings          = false
+            createDescriptorSets    = false
+            createInputLocations    = false
+            createPerStageUniforms  = false
+            reverseMatrixLogic      = true
+        }
+
     let glslVulkan =
         Backend.Create {
             version                 = Version(1,4)
@@ -33,7 +45,16 @@ module Backends =
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module ModuleCompiler =
-        let compileGlsl (cfg : Backend) (module_ : Module) =
+        let compileGLSL (cfg : Backend) (module_ : Module) =
             module_ 
                 |> ModuleCompiler.compile cfg 
                 |> Assembler.assemble cfg
+                
+        let compileGLSL120 (module_ : Module) =
+            compileGLSL glsl120 module_
+
+        let compileGLSL410 (module_ : Module) =
+            compileGLSL glsl410 module_
+
+        let compileGLSLVulkan (module_ : Module) =
+            compileGLSL glslVulkan module_
