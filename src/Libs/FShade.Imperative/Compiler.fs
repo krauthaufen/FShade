@@ -774,7 +774,6 @@ module Compiler =
 
     let rec toCExprS (e : Expr) =
         state {
-            let! ct = toCTypeS e.Type
 
             match e with
                 | ReducibleExpression e ->
@@ -797,6 +796,7 @@ module Compiler =
                     return! asExternalS e
 
                 | ReadInput(kind, name, index) ->
+                    let! ct = toCTypeS e.Type
                     let! s = State.get
                     if Set.contains name s.moduleState.globalParameters then
                         do! State.put { s with usedGlobals = PSet.add name s.usedGlobals }
@@ -829,6 +829,7 @@ module Compiler =
                                     return e
 
                 | GetArray(arr, i) ->
+                    let! ct = toCTypeS e.Type
                     let! arr = toCExprS arr
                     let! i = toCExprS i
                     return CItem(ct, arr, i)
@@ -855,6 +856,7 @@ module Compiler =
                         | Some b ->
                             return b
                         | None -> 
+                            let! ct = toCTypeS e.Type
                             let! intrinsic = CompilerState.tryGetIntrinsic ctor
                             match intrinsic with
                                 | Some i -> 
@@ -870,6 +872,7 @@ module Compiler =
                     return CEqual(CField(tInt32, e, "tag"), CValue(tInt32, CLiteral.CIntegral(int64 ci.Tag)))
 
                 | TupleGet(t, i) ->
+                    let! ct = toCTypeS e.Type
                     let! t = toCExprS t
                     return CField(ct, t, sprintf "Item%d" i)
 
@@ -878,6 +881,7 @@ module Compiler =
                     let! intrinsic = CompilerState.tryGetIntrinsic mi
                     match intrinsic with
                         | Some i -> 
+                            let! ct = toCTypeS e.Type
                             return CCallIntrinsic(ct, i, [||])
                         | None -> 
                             // TODO: assumes that the function does not have side-effects
@@ -894,6 +898,7 @@ module Compiler =
                             let! intrinsic = CompilerState.tryGetIntrinsic mi
                             match intrinsic with
                                 | Some i ->
+                                    let! ct = toCTypeS e.Type
                                     let args = 
                                         match i.arguments with
                                             | Some order -> order |> List.map (fun i -> args.[i])
@@ -913,6 +918,7 @@ module Compiler =
                         | Some e ->
                             return e
                         | _ ->
+                            let! ct = toCTypeS e.Type
                             return CField(ct, t, f.Name)
 
                 | PropertyGet(None, pi, []) ->
@@ -923,10 +929,14 @@ module Compiler =
 
                 | PropertyGet(Some t, pi, []) ->
                     if FSharpType.IsRecord(pi.DeclaringType, true) then
+                        
+                        let! ct = toCTypeS e.Type
                         let! t = toCExprS t
                         return CField(ct, t, pi.Name)
 
                     elif FSharpType.IsUnion(pi.DeclaringType.BaseType, true) then
+                        
+                        let! ct = toCTypeS e.Type
                         let case = 
                             FSharpType.GetUnionCases(pi.DeclaringType.BaseType, true)
                                 |> Seq.find (fun ci -> ci.Name = pi.DeclaringType.Name)
@@ -940,8 +950,12 @@ module Compiler =
                     return! Expr.Call(t, pi.GetMethod, args) |> toCExprS
 
                 | Coerce(e, t) ->
-                    let! e = toCExprS e
-                    return CConvert(ct, e)
+                    let! ce = toCExprS e
+                    if t.IsAssignableFrom e.Type then
+                        return ce
+                    else
+                        let! ct = toCTypeS e.Type
+                        return CConvert(ct, ce)
 
                 | AndAlso(l, r) ->
                     let! l = toCExprS l
@@ -954,6 +968,7 @@ module Compiler =
                     return COr(l, r)
 
                 | IfThenElse(c, i, e) ->
+                    let! ct = toCTypeS e.Type
                     let! c = toCExprS c
                     let! i = toCExprS i
                     let! e = toCExprS e
