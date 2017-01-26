@@ -458,8 +458,15 @@ module Assembler =
                     return! assembleExprS e
 
                 | CRArray(t, args) ->
+                    let et =
+                        match t with
+                            | CArray(t,_) -> t
+                            | CPointer(_,t) -> t
+                            | _ -> t
+
+                    let ct = assembleType et
                     let! args = args |> List.mapS assembleExprS |> State.map (String.concat ", ")
-                    return sprintf "{ %s }" args
+                    return sprintf "%s[]( %s )" ct args
         }
 
     let rec assembleStatementS (singleLine : bool) (s : CStatement) =
@@ -631,7 +638,7 @@ module Assembler =
                                     let fields = fields |> String.concat "\r\n"
                                     let prefix = uniformLayout set binding
                             
-                                    return sprintf "%suniform %s\r\n{\r\n%s\r\n}" prefix bufferName (String.indent fields)
+                                    return sprintf "%suniform %s\r\n{\r\n%s\r\n};\r\n" prefix bufferName (String.indent fields)
                         }
                     )
                 
@@ -824,6 +831,7 @@ module Assembler =
                     let! init = assembleRExprS init
                     match t with
                         | CArray(t,l) -> return sprintf "const %s %s[%d] = %s;" (assembleType t) n l init
+                        | CPointer(_,t) -> return sprintf "const %s %s[] = %s;" (assembleType t) n init
                         | _ -> return sprintf "const %s %s = %s;" (assembleType t) n init
 
                 | CUniformDef us ->
