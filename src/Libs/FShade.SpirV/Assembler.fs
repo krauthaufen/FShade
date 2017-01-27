@@ -1342,6 +1342,8 @@ module Assembler2 =
                 uniformIds          = Map.empty
                 fieldIds            = HashMap.empty
                 reversedInstuctions = []
+                currentBinding      = 0u
+                currentSet          = 0u
             }
         assembleModuleS(m).Run(&state)
         {
