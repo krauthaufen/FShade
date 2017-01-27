@@ -62,6 +62,7 @@
   <ItemGroup>
     <Compile Include="Utilities.fs" />
     <Compile Include="Optimizer.fs" />
+    <Compile Include="Caching.fs" />
     <Content Include="App.config" />
   </ItemGroup>
   <ItemGroup>

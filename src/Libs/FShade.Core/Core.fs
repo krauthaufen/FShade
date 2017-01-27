@@ -3,6 +3,197 @@
 open System
 open Aardvark.Base
 
+type IFunctionSignature =
+    interface end
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module FunctionSignature =
+    open System.Reflection
+    open Aardvark.Base.IL
+
+    [<AutoOpen>]
+    module private Implementation = 
+        type ClosureArg =
+            | CArgument of int
+            | CField of FieldInfo
+            | CValue of obj
+
+        type Argument =
+            | Value of obj
+            | Argument of int
+
+        let rec (|CallClosure|_|) (il : list<Instruction>) =
+            match il with
+
+                | [ Call(mi); Ret ] 
+                | [ Tail; Call(mi); Ret ] ->
+                    Some([], mi)
+
+                | (Nop | Start) :: CallClosure(fields, meth) -> 
+                    Some(fields, meth)
+
+                | Ldarg 0 :: Ldfld f :: CallClosure(fields, meth) ->
+                    Some (CField f :: fields, meth)
+
+                | LdNull :: CallClosure(fields, meth) ->
+                    Some (CValue null :: fields, meth)
+
+                | Ldfld f :: CallClosure(fields, meth) when f.IsStatic ->
+                    let v = f.GetValue(null)
+                    Some (CValue v :: fields, meth)
+
+                | Call mi :: CallClosure(fields, meth) when mi.IsStatic ->
+                    if mi.GetParameters().Length = 0 then
+                        let v = mi.Invoke(null, [||])
+                        Some (CValue v :: fields, meth)
+                    else
+                        None
+
+
+                | Ldarg i :: CallClosure(fields, meth) ->
+                    Some (CArgument (i - 1) :: fields, meth)
+
+                | LdConst c :: CallClosure(fields, meth)  ->    
+                    let value = 
+                        match c with
+                            | Int8 v -> v :> obj
+                            | UInt8 v -> v :> obj
+                            | Int16 v -> v :> obj
+                            | UInt16 v -> v :> obj
+                            | Int32 v -> v :> obj
+                            | UInt32 v -> v :> obj
+                            | Int64 v -> v :> obj
+                            | UInt64 v -> v :> obj
+                            | Float64 v -> v :> obj
+                            | Float32 v -> v :> obj
+                            | NativeInt v -> v :> obj
+                            | UNativeInt v -> v :> obj
+                            | String v -> v :> obj
+                    
+                    Some (CValue value :: fields, meth)
+                    
+
+                | _ -> None
+
+        let rec extractCall (target : obj) (mi : MethodBase) (args : list<Argument>) =
+            if mi.IsStatic && mi.Name = "InvokeFast" then
+                match args with
+                    | Value t :: rest when not (isNull t) ->
+                        let targetType = t.GetType()
+
+                        let cnt = List.length rest
+
+                        let invoke =
+                            targetType.GetMethods()
+                                |> Seq.tryFind (fun mi -> mi.Name = "Invoke" && mi.GetParameters().Length = cnt)
+                                   
+                        match invoke with
+                            | Some mi -> extractCall t (mi :> MethodBase) rest
+                            | None -> (target, mi, args)
+
+
+
+                    | _ ->
+                        (target, mi, args)
+
+            elif mi.IsStatic then
+                (target, mi, args)
+                        
+            else
+                if isNull target then
+                    failwith "[FShade] target is null for non-static function"
+
+                let targetType = target.GetType()
+                let impl = 
+                    if targetType <> mi.DeclaringType then
+                        let parameters = mi.GetParameters()
+                        let args = parameters |> Array.map (fun p -> p.ParameterType)
+                        let flags = BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance
+                        let impl = targetType.GetMethod(mi.Name, flags, System.Type.DefaultBinder, args, null)
+
+                        if isNull impl then
+                            Log.warn "[FShade] could not get override for method %A in type %A" mi targetType
+                            null
+                        elif mi.IsGenericMethod then
+                            if not impl.IsGenericMethod then
+                                Log.warn "[FShade] could not get override for method %A in type %A" mi targetType
+                                null
+                            else
+                                impl.MakeGenericMethod(mi.GetGenericArguments()) :> MethodBase
+                        else
+                            impl :> MethodBase
+
+                    else
+                        mi
+
+                if isNull impl then
+                    (target, mi, args)
+                else
+                    let definition = Aardvark.Base.IL.Disassembler.disassemble impl
+                    match definition.Body with
+                        | CallClosure(argMap, meth) ->
+                            let args =
+                                argMap |> List.map (fun a ->
+                                    match a with
+                                        | CField f -> f.GetValue(target) |> Value
+                                        | CArgument i -> args.[i]
+                                        | CValue c -> Value c
+                                )
+                            if meth.IsStatic then
+                                extractCall null meth args
+                            else
+                                match args with
+                                    | Value t :: args -> 
+                                        extractCall t meth args
+                                    | _ ->
+                                        (target, impl, args)
+                        | _ ->
+                            (target, impl, args)
+
+        type Signature =
+            {
+                target : obj
+                mi : MethodBase
+                args : list<Argument>
+            }
+            with interface IFunctionSignature
+
+        type RandomFunctionSignature() =
+            let id = Guid.NewGuid()
+            interface IFunctionSignature
+
+            member x.Id = id
+
+            override x.GetHashCode() = id.GetHashCode()
+            override x.Equals o =
+                match o with
+                    | :? RandomFunctionSignature as o -> id = o.Id
+                    | _ -> false
+
+    let ofFunction (f : 'a -> 'b) =
+        try
+            let invoke = f.GetType().GetMethod("Invoke")
+            if isNull invoke then
+                failwithf "[FShade] could not get signature for function %A" f
+            let (target, mi, args) = extractCall f invoke [Argument 1]
+
+            let target =
+                if isNull target then
+                    target
+                else
+                    let targetType = target.GetType()
+                    let targetFields = targetType.GetFields(BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
+                    if targetFields.Length = 0 then
+                        null
+                    else
+                        target
+
+            { target = target; mi = mi; args = args } :> IFunctionSignature
+        with e ->
+            Log.warn "[FShade] could not get function signature for %A" f
+            Log.warn "[FShade] said: '%s'" e.Message
+            RandomFunctionSignature() :> IFunctionSignature
+
 
 type UniformScope(parent : Option<UniformScope>, name : string) = 
     static let mutable currentId = 0

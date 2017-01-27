@@ -42,6 +42,7 @@ type Shader =
         shaderOutputVertices : ShaderOutputVertices
         /// the body for the shader
         shaderBody : Expr
+
     }
 
 module private Preprocessor =
@@ -300,7 +301,6 @@ module private Preprocessor =
 
         let tryGetVertexIndex (v : Var) =
             State.get |> State.map (fun s -> Map.tryFind v s.vertexIndex)
-
 
     let rec preprocessS (e : Expr) : Preprocess<Expr> =
         state {
@@ -727,6 +727,8 @@ module private Preprocessor =
             | ShapeVar _ ->
                 Map.empty
 
+
+
 type ShaderOutputValue (mode : InterpolationMode, index : Option<Expr>, value : Expr) =
     let value, inputs, uniforms =
         let value, state = Preprocessor.preprocess value
@@ -973,7 +975,6 @@ module Shader =
     let inline body (s : Shader) = s.shaderBody
     let inline inputTopology (s : Shader) = s.shaderInputTopology
     let inline outputTopology (s : Shader) = s.shaderOutputTopology
-
 
     let systemInputs (shader : Shader) =
         let builtIn = builtInInputs.[shader.shaderStage]
@@ -1450,7 +1451,6 @@ module Shader =
                         attributes
                             |> Map.map (fun n t -> None, Expr.ReadInput(ParameterKind.Input, t, n))
                             |> Expr.WriteOutputs
-            
                 }
             | _ ->
                 failwith "[FShade] not implemented"

@@ -12,9 +12,10 @@ open Microsoft.FSharp.Reflection
 open Aardvark.Base
 open FShade.Imperative
 
+
 /// Effect encapsulates a set of shaders for the various ShaderStages defined by FShade.
-type Effect internal(shaders : Map<ShaderStage, Shader>) =
-        
+type Effect internal(id : string, shaders : Map<ShaderStage, Shader>) =
+    
     let inputToplogy =
         lazy (
             shaders |> Map.toSeq |> Seq.tryPick (fun (_,s) ->
@@ -59,6 +60,13 @@ type Effect internal(shaders : Map<ShaderStage, Shader>) =
             shaders |> Map.values |> Seq.filter (fun s -> s.shaderStage < ShaderStage.Fragment) |> Seq.tryLast
         )
 
+    static member internal NewId() =
+        Guid.NewGuid().ToByteArray() |> Convert.ToBase64String
+
+    member x.IsEmpty            = id = ""
+
+    /// gets a unique id for this effect
+    member x.Id                 = id
     /// gets the optionally required InputTopology for the effect.
     /// returns None when the effect is agnostic
     member x.InputToplogy       = inputToplogy.Value
@@ -87,10 +95,28 @@ type Effect internal(shaders : Map<ShaderStage, Shader>) =
     /// gets the optional FragmentShader for the effect.
     member x.FragmentShader     = shaders |> Map.tryFind ShaderStage.Fragment
 
+    new(m) = Effect(Effect.NewId(), m)
+
 /// the Effect module provides functions for accessing, creating and modifying effects.
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Effect =
-    let empty = Effect Map.empty
+    open System.Diagnostics
+    open System.Runtime.CompilerServices
+    open System.ComponentModel
+
+    let private effectCache = System.Collections.Concurrent.ConcurrentDictionary<IFunctionSignature, Effect>()
+    let private composeCache = System.Collections.Concurrent.ConcurrentDictionary<string, Effect>()
+
+    //[<EditorBrowsable(EditorBrowsableState.Never); CompilerGenerated; DebuggerNonUserCode; DebuggerBrowsable(DebuggerBrowsableState.Never)>]
+    [<CompilerMessage("clearCaches is considered harmful",4321,IsError=false,IsHidden=true)>]
+    let clearCaches() =
+        effectCache.Clear()
+        composeCache.Clear()
+
+    let empty = Effect("", Map.empty)
+    
+    /// gets a unique id for this effect
+    let inline id (effect : Effect) = effect.Id
 
     /// gets the optional VertexShader for the effect.
     let inline vertexShader (effect : Effect) = effect.VertexShader
@@ -173,7 +199,10 @@ module Effect =
 
     /// creates an effect from a shader-function
     let ofFunction (shaderFunction : 'a -> Expr<'b>) =
-        Shader.ofFunction shaderFunction |> ofList
+        let signature = FunctionSignature.ofFunction shaderFunction
+        effectCache.GetOrAdd(signature, fun _ ->
+            Shader.ofFunction shaderFunction |> ofList
+        )
 
     /// gets a Map<ShaderStage, Shader> for the effect containing all Shaders.
     let inline toMap (effect : Effect) = effect.Shaders
@@ -359,36 +388,45 @@ module Effect =
     /// effects are composed sequentially per 'abstract' stage. 
     /// e.g. r's VertexShader will be appended to l's GeometryShader (if present)
     let compose2 (l : Effect) (r : Effect) =
-        let geometryLeft = l |> toList |> List.filter (fun s -> s.shaderStage < ShaderStage.Fragment)
-        let geometryRight = r |> toList |> List.filter (fun s -> s.shaderStage < ShaderStage.Fragment)
+        if l.IsEmpty then r
+        elif r.IsEmpty then l
+        else
+            let resultId = l.Id + r.Id
+            composeCache.GetOrAdd(resultId, fun resultId ->
+                let geometryLeft = l |> toList |> List.filter (fun s -> s.shaderStage < ShaderStage.Fragment)
+                let geometryRight = r |> toList |> List.filter (fun s -> s.shaderStage < ShaderStage.Fragment)
 
-        let rec composeToLast (l : list<Shader>) (r : list<Shader>) =
-            match l with
-                | [] -> r
-                | [l] ->
-                    match r with
-                        | [] -> [l]
-                        | rh :: _ ->
-                            if l.shaderStage < rh.shaderStage then
-                                l :: r
-                            else
-                                let mutable res = l
-                                for r in r do res <- Shader.compose2 res r
-                                [ res ]
-                | h :: rest ->
-                    h :: composeToLast rest r
+                let rec composeToLast (l : list<Shader>) (r : list<Shader>) =
+                    match l with
+                        | [] -> r
+                        | [l] ->
+                            match r with
+                                | [] -> [l]
+                                | rh :: _ ->
+                                    if l.shaderStage < rh.shaderStage then
+                                        l :: r
+                                    else
+                                        let mutable res = l
+                                        for r in r do res <- Shader.compose2 res r
+                                        [ res ]
+                        | h :: rest ->
+                            h :: composeToLast rest r
 
-        let shaders = 
-            composeToLast geometryLeft geometryRight
+                let shaders = 
+                    composeToLast geometryLeft geometryRight
 
-        let shaders = 
-            match l.FragmentShader, r.FragmentShader with
-                | Some l, Some r -> (Shader.compose2 l r) :: shaders
-                | None, Some r -> r :: shaders
-                | Some l, None -> l :: shaders
-                | None, None -> shaders
-                        
-        ofList shaders
+                let shaders = 
+                    match l.FragmentShader, r.FragmentShader with
+                        | Some l, Some r -> (Shader.compose2 l r) :: shaders
+                        | None, Some r -> r :: shaders
+                        | Some l, None -> l :: shaders
+                        | None, None -> shaders
+        
+                let shaderMap =                 
+                    shaders |> Seq.map (fun s -> s.shaderStage, s) |> Map.ofSeq
+
+                Effect(resultId, shaderMap)
+            )
 
     /// composes many effects using the sequential semantics defined in compose2.
     let compose (effects : #seq<Effect>) =

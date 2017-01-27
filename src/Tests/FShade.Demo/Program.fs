@@ -239,15 +239,39 @@ module TessDeconstruct =
             texture uniform?SomeTexture
         }
 
-    let frag (v : Vertex) =
-
+    let frag (v : Vertex)  =
         fragment {
             let col : V4d = uniform?PerView?AdditionalColor
             let s = V2d(sam.Size)
             return v.pos + col + V4d(s.X, s.Y, 0.0, 0.0)
         }
-        
+
+
+    let signatureTest() =
+        let someFunction (a : V4d) (b : V4d) (c : V4d) = a + b * c
+        let test2 = someFunction V4d.IIII
+        let test3 = test2 V4d.IIII
+        let s0 = FunctionSignature.ofFunction test3
+        let s1 = FunctionSignature.ofFunction (fun a -> someFunction V4d.IIII V4d.IIII a)
+        printfn "equal: %A" (s0 = s1)
+
     let run() =
+//        signatureTest()
+//        System.Environment.Exit 0
+        let a0 = Effect.ofFunction test
+        let a1 = Effect.ofFunction geometry
+        let a2 = Effect.ofFunction frag
+        let b0 = Effect.ofFunction test
+        let b1 = Effect.ofFunction geometry
+        let b2 = Effect.ofFunction frag
+
+
+        let c0 = Effect.compose [ Effect.compose [a0; b1]; a2]
+        let c1 = Effect.compose [ b0; Effect.compose [a1; b2]]
+
+        printfn "equal: %A" (c0 = c1)
+
+
         Effect.compose [Effect.ofFunction test; Effect.ofFunction geometry; Effect.ofFunction frag]
             |> Effect.link ShaderStage.Fragment (Map.ofList [ Intrinsics.Color, typeof<V4d> ])
             //|> Effect.withDepthRange true (Range1d(0.0, 1.0))
