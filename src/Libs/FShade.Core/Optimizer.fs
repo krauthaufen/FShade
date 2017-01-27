@@ -635,6 +635,14 @@ module Optimizer =
 
         let operators =
             functionTable [
+                "op_UnaryNegation", ((~-) : int8 -> int8) :> obj
+                "op_UnaryNegation", ((~-) : int16 -> int16) :> obj
+                "op_UnaryNegation", ((~-) : int32 -> int32) :> obj
+                "op_UnaryNegation", ((~-) : int64 -> int64) :> obj
+                "op_UnaryNegation", ((~-) : float32 -> float32) :> obj
+                "op_UnaryNegation", ((~-) : float -> float) :> obj
+                "op_UnaryNegation", ((~-) : decimal -> decimal) :> obj
+
                 "op_Addition", ((+) : int8 -> int8 -> int8) :> obj
                 "op_Addition", ((+) : int16 -> int16 -> int16) :> obj
                 "op_Addition", ((+) : int32 -> int32 -> int32) :> obj
