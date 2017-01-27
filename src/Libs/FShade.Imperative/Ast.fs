@@ -382,6 +382,41 @@ type CExpr =
             | CField(t,_,_) -> t
             | CItem(t,_,_) -> t
 
+
+type internal Used() =
+    let types = HashSet<CType>()
+    let intrinsics = HashSet<CIntrinsic>()
+        
+    member x.Types = types
+    member x.Intrinsics = intrinsics
+
+    member x.AddType (t : CType) =
+        if types.Add t then
+            match t with
+                | CMatrix(e,r,c) -> 
+                    x.AddType(CVector(e, c))
+                    x.AddType(CVector(e, r))
+                    x.AddType e
+
+                | CArray(e,_) | CPointer(_,e) | CVector(e,_) -> 
+                    x.AddType e
+
+
+                | CStruct(_,fields,_) ->
+                    for (t,_) in fields do
+                        x.AddType t
+                | _ ->
+                    ()
+
+    member x.AddIntrinsic (i : CIntrinsic) =
+        intrinsics.Add i |> ignore
+
+    member x.AddInput (kind : ParameterKind, t : CType, name : string, indexed : bool) =
+        ()
+
+    member x.AddOutput (t : CType, name : string, indexed : bool) =
+        ()
+
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module CExpr =
 
@@ -392,7 +427,81 @@ module CExpr =
                 CValue(t, literal) |> Some
             | None ->
                 None
+
+    let rec internal visit (used : Used) (e : CExpr) =
+        match e with
+            | CVar v -> 
+                used.AddType v.ctype
+
+            | CValue(t,_) ->
+                used.AddType t
                 
+            | CCall(func, args) ->
+                used.AddType func.returnType
+                for a in args do
+                    visit used a
+
+            | CCallIntrinsic(t, func, args) ->
+                used.AddType t
+                used.AddIntrinsic func
+                for a in args do visit used a
+                
+            | CConditional(t, cond, i, e) ->
+                used.AddType t
+                visit used cond
+                visit used i
+                visit used e
+
+            | CReadInput(k,t,n,i) ->
+                used.AddType t
+                used.AddInput(k, t, n, Option.isSome i)
+                match i with
+                    | Some i -> visit used i
+                    | _ -> ()
+
+            | CNeg(t,e) | CNot(t,e) | CTranspose(t,e) | CVecLength(t,e) | CConvert(t,e) | CAddressOf(t,e) ->
+                used.AddType t
+                visit used e
+
+            | CAdd(t,l,r) | CSub(t,l,r) | CMul(t,l,r) | CDiv(t,l,r) | CMod(t,l,r)
+            | CMulMatMat(t,l,r) | CMulMatVec(t,l,r) | CDot(t,l,r) | CCross(t,l,r)
+            | CBitAnd(t,l,r) | CBitOr(t,l,r) | CBitXor(t,l,r) ->
+                used.AddType t
+                visit used l
+                visit used r
+
+            | CVecSwizzle(t,e,_) ->
+                used.AddType t
+                visit used e
+
+            | CMatrixElement(t, m, _, _) ->
+                used.AddType t
+                visit used m
+
+            | CNewVector(t,_,c) ->
+                used.AddType t
+                for c in c do visit used c
+
+            | CMatrixFromRows(t,r) | CMatrixFromCols(t,r) ->
+                used.AddType t
+                for r in r do visit used r
+
+
+            | CAnd(l,r) | COr(l,r)
+            | CLess(l,r) | CLequal(l,r) | CGreater(l,r) | CGequal(l,r) | CEqual(l,r) | CNotEqual(l,r) ->
+                used.AddType CType.CBool
+                visit used l
+                visit used r
+            
+            | CField(t, target,_ ) ->
+                used.AddType t
+                visit used target
+
+            | CItem(t, target, index) ->
+                used.AddType t
+                visit used target
+                visit used index
+
 /// represents a c-style rhs-expression
 type CRExpr =
     | CRExpr of CExpr
@@ -410,6 +519,14 @@ module CRExpr =
         match e with
             | CRExpr e -> e
             | CRArray _ -> failwithf "[FShade] cannot convert CRExpr to CExpr (%A)" e
+          
+    let rec internal visit (used : Used) (e : CRExpr) =
+        match e with
+            | CRArray(t,args) ->
+                used.AddType t
+                for a in args do CExpr.visit used a
+            | CRExpr e ->
+                CExpr.visit used e
             
 /// represents a c-style lhs-expression
 type CLExpr =
@@ -481,6 +598,35 @@ module CLExpr =
             | CLVecSwizzle(t, e, c) -> CVecSwizzle(t, toExpr e, c)
             | CLMatrixElement(t, e, r, c) -> CMatrixElement(t, toExpr e, r, c)
 
+    let rec internal visit (used : Used) (e : CLExpr) =
+        match e with
+            | CLVar v -> 
+                used.AddType v.ctype
+
+            | CLField(t,target,_) ->
+                used.AddType t
+                visit used target
+
+            | CLItem(t, target, index) ->
+                used.AddType t
+                visit used target
+                CExpr.visit used index
+
+            | CLPtr(t,e) ->
+                used.AddType t
+                CExpr.visit used e
+                
+            | CLVecSwizzle(t,e,_) ->
+                used.AddType t
+                visit used e
+
+            | CLMatrixElement(t,m,_,_) ->
+                used.AddType t
+                visit used m
+                
+
+
+
 /// represents a c-style statement
 type CStatement =
     | CNop
@@ -505,6 +651,61 @@ type CStatement =
     | CIfThenElse of cond : CExpr * ifTrue : CStatement * ifFalse : CStatement
     | CSwitch of value : CExpr * cases : array<CLiteral * CStatement>
 
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module CStatement =
+    
+    let rec internal visit (used : Used) (s : CStatement) =
+        match s with
+            | CNop | CReturn | CBreak | CContinue -> 
+                ()
+            | CDo e ->
+                CExpr.visit used e
+            | CDeclare(v,r) ->
+                used.AddType v.ctype
+                match r with
+                    | Some r -> CRExpr.visit used r
+                    | _ -> ()
+            | CWrite(l,r) ->
+                CLExpr.visit used l
+                CExpr.visit used r
+
+            | CIncrement(_,v) | CDecrement(_,v) ->
+                CLExpr.visit used v
+
+            | CSequential s ->
+                for s in s do visit used s
+
+            | CWriteOutput(name, index, value) ->
+                match index with
+                    | Some i -> CExpr.visit used i
+                    | _ -> ()
+                CRExpr.visit used value
+                used.AddOutput(value.ctype, name, Option.isSome index)
+
+
+            | CReturnValue v ->
+                CExpr.visit used v
+
+            | CFor(init, cond, step, body) ->
+                visit used init
+                CExpr.visit used cond
+                visit used step
+                visit used body
+
+            | CWhile(guard, body) | CDoWhile(guard, body) ->
+                CExpr.visit used guard
+                visit used body
+
+            | CIfThenElse(c,i,e) ->
+                CExpr.visit used c
+                visit used i
+                visit used e
+
+            | CSwitch(value, cases) ->
+                CExpr.visit used value
+                for (_,b) in cases do 
+                    visit used b
+
 
 type CEntryParameter =
     {
@@ -514,6 +715,10 @@ type CEntryParameter =
         cParamDecorations    : Set<ParameterDecoration>
     }
 
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module CEntryParameter =
+    let internal visit (used : Used) (e : CEntryParameter) =
+        used.AddType e.cParamType
 
 type CEntryDef =
     {
@@ -525,6 +730,15 @@ type CEntryDef =
         cBody        : CStatement
         cDecorations : list<EntryDecoration>
     }
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module CEntryDef =
+    let internal visit (used : Used) (e : CEntryDef) =
+        e.cInputs |> List.iter (CEntryParameter.visit used)
+        e.cOutputs |> List.iter (CEntryParameter.visit used)
+        e.cArguments |> List.iter (CEntryParameter.visit used)
+        used.AddType e.cReturnType
+        CStatement.visit used e.cBody
 
 
 type CUniform =
@@ -552,6 +766,9 @@ module CUniform =
 
         res |> CSharpList.toList
 
+    let internal visit (used : Used) (u : CUniform) =
+        used.AddType u.cUniformType
+
 type CValueDef =
     | CConstant of ctype : CType * name : string * init : CRExpr
     | CFunctionDef of signature : CFunctionSignature * body : CStatement
@@ -559,9 +776,38 @@ type CValueDef =
     | CConditionalDef of string * list<CValueDef>
     | CUniformDef of list<CUniform>
 
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module CValueDef =
+    let rec internal visit (used : Used) (d : CValueDef) =
+        match d with
+            | CConstant(t, _, e) ->
+                used.AddType t
+                CRExpr.visit used e
+            | CFunctionDef(s, b) ->
+                used.AddType s.returnType
+                for p in s.parameters do
+                    used.AddType p.ctype
+                CStatement.visit used b
+
+            | CEntryDef e ->
+                CEntryDef.visit used e
+
+            | CConditionalDef(_,d) ->
+                for d in d do visit used d
+
+            | CUniformDef d ->
+                for d in d do CUniform.visit used d
+
 type CTypeDef =
     | CStructDef of name : string * fields : list<CType * string>
 
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module CTypeDef =
+    let rec internal visit (used : Used) (d : CTypeDef) =
+        match d with
+            | CStructDef(name, fields) ->
+                for (t,_) in fields do
+                    used.AddType t 
 
 type CModule =
     {
@@ -581,4 +827,30 @@ type CModule =
                     []
 
         x.values |> List.collect allUniforms |> CUniform.mergeMany
+
+
+type UsageInfo =
+    {
+        usedTypes       : pset<CType>
+        usedntrinsics   : pset<CIntrinsic>
+    }
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module CModule =
+    let internal visit (used : Used) (m : CModule) =
+        for t in m.types do CTypeDef.visit used t
+        for v in m.values do CValueDef.visit used v
+
+    let usageInfo (m : CModule) =
+        let u = Used()
+        visit u m
+
+        {
+            usedTypes = PSet.ofSeq u.Types
+            usedntrinsics = PSet.ofSeq u.Intrinsics
+        }
+
+        
+
+
 

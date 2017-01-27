@@ -256,11 +256,19 @@ module TessDeconstruct =
         printfn "equal: %A" (s0 = s1)
 
     let run() =
-        Effect.compose [Effect.ofFunction test; Effect.ofFunction geometry; Effect.ofFunction frag]
-            |> Effect.link ShaderStage.Fragment (Map.ofList [ Intrinsics.Color, typeof<V4d> ])
-            //|> Effect.withDepthRange true (Range1d(0.0, 1.0))
-            |> Effect.toModule
-            |> ModuleCompiler.compileGLSL glsl410
+        let cModule = 
+            Effect.compose [Effect.ofFunction test; Effect.ofFunction geometry; Effect.ofFunction frag]
+                |> Effect.link ShaderStage.Fragment (Map.ofList [ Intrinsics.Color, typeof<V4d> ])
+                //|> Effect.withDepthRange true (Range1d(0.0, 1.0))
+                |> Effect.toModule
+                |> ModuleCompiler.compile glsl410
+
+        let usage = CModule.usageInfo cModule
+
+        printfn "%A" usage
+
+        cModule
+            |> GLSL.Assembler.assemble glsl410
             |> printfn "%s"
 
 
