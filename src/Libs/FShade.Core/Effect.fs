@@ -100,15 +100,10 @@ type Effect internal(id : string, shaders : Map<ShaderStage, Shader>) =
 /// the Effect module provides functions for accessing, creating and modifying effects.
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Effect =
-    open System.Diagnostics
-    open System.Runtime.CompilerServices
-    open System.ComponentModel
-
     let private effectCache = System.Collections.Concurrent.ConcurrentDictionary<IFunctionSignature, Effect>()
     let private composeCache = System.Collections.Concurrent.ConcurrentDictionary<string, Effect>()
 
-    //[<EditorBrowsable(EditorBrowsableState.Never); CompilerGenerated; DebuggerNonUserCode; DebuggerBrowsable(DebuggerBrowsableState.Never)>]
-    [<CompilerMessage("clearCaches is considered harmful",4321,IsError=false,IsHidden=true)>]
+    [<CompilerMessage("clearCaches is considered harmful", 4321, IsError=false, IsHidden=true)>]
     let clearCaches() =
         effectCache.Clear()
         composeCache.Clear()

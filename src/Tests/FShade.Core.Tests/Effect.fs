@@ -1,4 +1,4 @@
-﻿module Caching
+﻿module Effect
 
 open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Quotations.Patterns
