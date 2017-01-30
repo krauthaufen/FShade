@@ -177,11 +177,13 @@ module ExpressionExtensions =
             | _ -> 
                 None
 
+    let private unrollMeth = getMethodInfo <@ Preprocessor.unroll : unit -> unit @>
+
     type MethodInfo with
         static member WriteOutputs = ShaderIO.WriteOutputsMeth
         static member ReadInput = ShaderIO.ReadInputMeth
         static member ReadInputIndexed = ShaderIO.ReadInputIndexedMeth
-
+        static member Unroll = unrollMeth
 
 module private Affected =
     open Aardvark.Base.Monads.State

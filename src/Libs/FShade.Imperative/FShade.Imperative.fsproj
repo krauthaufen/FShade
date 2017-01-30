@@ -46,8 +46,8 @@
     <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Utilities.fs" />
     <Compile Include="Types.fs" />
+    <Compile Include="Utilities.fs" />
     <Compile Include="Frontend.fs" />
     <Compile Include="Ast.fs" />
     <Compile Include="Compiler.fs" />

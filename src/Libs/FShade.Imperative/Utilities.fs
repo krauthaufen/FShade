@@ -184,6 +184,9 @@ module ExprExtensions =
         let opRangeStep = operators.GetMethod("op_RangeStep")
         let ignore = getMethodInfo <@ ignore @>
 
+        let unroll = getMethodInfo <@ Preprocessor.unroll : unit -> unit @>
+
+
     type Expr with
 
         static member Ignore(e : Expr) =
@@ -621,6 +624,11 @@ module ExprExtensions =
 
                 Alternatives(c, e) |> Some
 
+            | _ -> None
+
+    let (|Unroll|_|) (e : Expr) =
+        match e with
+            | Call(None, mi, []) when mi = Methods.unroll -> Some ()
             | _ -> None
 
 [<AutoOpen>]

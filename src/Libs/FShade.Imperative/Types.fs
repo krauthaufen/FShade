@@ -1,5 +1,6 @@
 ﻿namespace FShade
 
+
 type InterpolationMode =
     | Default           = 0
     | Perspective       = 1
@@ -35,3 +36,7 @@ type InputTopology =
     | Triangle 
     | TriangleAdjacency 
     | Patch of int
+
+    
+type Preprocessor private() =
+    static member unroll() = ()

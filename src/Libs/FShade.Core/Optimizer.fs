@@ -91,12 +91,17 @@ module Optimizer =
                     else return! fix m
                 }
 
+        let private staticallyNeededCalls =
+            HashSet.ofList [
+                MethodInfo.WriteOutputs
+                MethodInfo.Unroll
+            ]
 
         let private callNeededS (t : Option<Expr>) (mi : MethodInfo) (args : list<Expr>) =
             state {
                 let! state = State.get
 
-                if state.isGlobalSideEffect mi || mi = MethodInfo.WriteOutputs then
+                if state.isGlobalSideEffect mi || staticallyNeededCalls.Contains mi then
                     return true
                 else
                     let needsMutableParameter (p : ParameterInfo) (v : Expr) =
@@ -584,6 +589,7 @@ module Optimizer =
                     (mi.IsGenericMethod && mi.GetGenericMethodDefinition() = MethodInfo.ReadInput) ||
                     (mi.IsGenericMethod && mi.GetGenericMethodDefinition() = MethodInfo.ReadInputIndexed) ||
                     (mi = MethodInfo.WriteOutputs) || 
+                    (mi = MethodInfo.Unroll) ||
                     (s.isGlobalSideEffect mi)
                 )
 

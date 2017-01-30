@@ -247,6 +247,20 @@ module TessDeconstruct =
         }
 
 
+    let loopUnroll (v : Vertex) =
+        fragment {
+            let mutable a = 0.0
+
+            Preprocessor.unroll()
+            for i in 0 .. 2 .. 4 do
+                a <- a + float i
+
+            if a < 10.0 then
+                discard()
+
+            return V4d(a, 0.0, 0.0, 1.0)
+        }
+
     let signatureTest() =
         let someFunction (a : V4d) (b : V4d) (c : V4d) = a + b * c
         let test2 = someFunction V4d.IIII
@@ -257,7 +271,7 @@ module TessDeconstruct =
 
     let run() =
         let cModule = 
-            Effect.compose [Effect.ofFunction test; Effect.ofFunction geometry; Effect.ofFunction frag]
+            Effect.compose [Effect.ofFunction loopUnroll]
                 |> Effect.link ShaderStage.Fragment (Map.ofList [ Intrinsics.Color, typeof<V4d> ])
                 //|> Effect.withDepthRange true (Range1d(0.0, 1.0))
                 |> Effect.toModule

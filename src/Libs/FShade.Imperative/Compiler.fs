@@ -1041,6 +1041,25 @@ module Compiler =
                     return CRExpr.ofExpr res |> Some
         }
 
+    let rec private (|Seq|_|) (e : Expr) =
+        match e with
+            | Sequential(Seq l, Seq r) ->
+                Some (l @ r)
+            | Sequential(l, Seq r) ->
+                Some (l :: r)
+            | Sequential(Seq l, r) ->
+                Some (l @ [r])
+            | _ ->
+                Some [e]
+
+    let rec private (|Cons|_|) (e : Expr) =
+        match e with
+            | Seq (l :: rest) ->
+                Some (l, rest)
+            | e ->
+                Some(e, [])
+
+
     let rec toCStatementS (isLast : bool) (e : Expr) =
         state {
             match e with
@@ -1049,6 +1068,39 @@ module Compiler =
 
                 | Quotations.DerivedPatterns.Unit ->
                     return CNop
+                    
+                | Sequential(Sequential(a,b), c) ->
+                    return! toCStatementS isLast (Expr.Sequential(a, Expr.Sequential(b, c)))
+
+                | Sequential(Unroll, Cons((ForInteger(v, first, step, last, b) as loop), rest)) ->
+                    let! rest = rest |> List.mapS (toCStatementS isLast)
+
+                    let! v = toCVarS v
+                    match Expr.TryEval first, Expr.TryEval step, Expr.TryEval last with
+                        | Some (:? int as first), Some (:? int as step), Some (:? int as last) ->
+                            let range = [ first .. step .. last ]
+                            let! b = toCStatementS false b
+                            return CSequential [
+                                yield CDeclare(v, None)
+                                for i in range do
+                                    yield CWrite(CLVar v, CExpr.CValue(CType.CInt(true, 32), CIntegral (int64 i)))
+                                    yield b
+                                yield! rest
+                            ]
+                        | _ ->
+                            Log.warn "cannot unroll loop 'for i in %A .. %A .. %A'" first step last
+                            let! loop = toCStatementS false loop
+                            return CSequential [
+                                yield loop
+                                yield! rest
+                            ]
+
+
+                | Unroll ->
+                    Log.warn "[FShade] orphaned unroll detected"
+                    return CNop
+
+
 
                 | ForInteger(v, first, step, last, b) ->
                     match step, last with
