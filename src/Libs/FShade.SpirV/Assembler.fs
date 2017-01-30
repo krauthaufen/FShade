@@ -7,975 +7,13 @@ open FShade
 open FShade.Imperative
 
 
-type ConcList<'a> =
-    | Empty
-    | Single of list<'a>
-    | Concat of ConcList<'a> * ConcList<'a>
+type SpirVIntrinsicType = { compileType : SpirV<uint32> }
 
-type AssemblerState =
-    {
-        reverseMatrix   : bool
-        typeIds         : HashMap<obj, uint32>
-        variableIds     : HashMap<CVar, uint32>
-        functionIds     : HashMap<CFunctionSignature, uint32>
-        inputs          : HashMap<string, uint32>
-        outputs         : HashMap<string, uint32>
-        uniforms        : HashMap<string, uint32>
-        currentId       : uint32
-        labelId         : uint32
-        extensions      : Map<string, uint32>
-        constants       : HashMap<CType * CLiteral, uint32>
-        instructions    : ConcList<Instruction>
-    }
-
-type Asm<'a> = State<AssemblerState, 'a>
-
-type AsmBuilder() =
-    inherit StateBuilder()
-    
-    member x.Yield(i : Instruction) =
-        State.modify (fun s ->
-            { s with AssemblerState.instructions = Concat(s.instructions, Single [i]) }
-        )
-
-    member x.Yield(i : list<Instruction>) =
-        State.modify (fun s ->
-            { s with AssemblerState.instructions = Concat(s.instructions, Single i) }
-        )
-
-    member x.Run(a : Asm<'a>) = a
-
+type SpirVIntrinsicFunction = { compileFunction : uint32 -> uint32[] -> SpirV<uint32> }
 
 module Assembler =
-    let asm = AsmBuilder()
-
     [<Literal>]
     let glsl410 = "GLSL.std.450"
-
-    let newId = 
-        State.custom (fun s ->
-            { s with currentId = s.currentId + 1u }, s.currentId
-        )
-
-    let newLabel = 
-        State.custom (fun s ->
-            { s with labelId = s.labelId + 1u }, s.labelId
-        )
-
-    let getVarId (v : CVar) =
-        State.get |> State.map (fun s -> HashMap.find v s.variableIds)
-        
-    let getFunctionId (v : CFunctionSignature) =
-        State.get |> State.map (fun s -> HashMap.find v s.functionIds)
-
-    let getInput (name : string) =
-        State.get |> State.map (fun s -> HashMap.find name s.inputs)
-        
-    let getOutput (name : string) =
-        State.get |> State.map (fun s -> HashMap.find name s.outputs)
-
-    let getUniform (name : string) =
-        State.get |> State.map (fun s -> HashMap.find name s.uniforms)
-
-    let reverseMatrix =
-        State.get |> State.map (fun s -> s.reverseMatrix)
-        
-    let import (ext : string) =
-        asm {
-            let! s = State.get
-            match Map.tryFind ext s.extensions with
-                | Some ext -> 
-                    return ext
-                | None ->
-                    let! id = newId
-                    yield OpExtInstImport(id, ext)
-                    do! State.modify (fun s -> { s with extensions = Map.add ext id s.extensions })
-                    return id
-        }
-
-    type private CacheTypeBuilder(t : obj) =
-        inherit StateBuilder()    
-
-        member x.Yield(i : Instruction) =
-            State.modify (fun s ->
-                { s with AssemblerState.instructions = Concat(s.instructions, Single [i]) }
-            )
-
-        member x.Yield(i : list<Instruction>) =
-            State.modify (fun s ->
-                { s with AssemblerState.instructions = Concat(s.instructions, Single i) }
-            )
-        member x.Run(m : Asm<uint32>) : Asm<uint32> =
-            State.custom (fun s ->
-                match HashMap.tryFind t s.typeIds with
-                    | Some tid -> 
-                        s, tid
-                    | None ->
-                        let mutable s = s
-                        let tid = m.Run(&s)
-                        s <- { s with typeIds = HashMap.add t tid s.typeIds }
-                        s, tid
-            )
-
-    let setLength (len : int) (v : byte[]) =
-        let arr = 
-            if v.Length < len then
-                Array.append v (Array.zeroCreate (len - v.Length))
-            elif v.Length > len then
-                Array.take len v
-            else
-                v
-        Array.init (arr.Length / 4) (fun i ->
-            BitConverter.ToUInt32(arr, 4 * i)
-        )
-
-    let rec private (|Floating|Signed|Unsigned|Other|) (t : CType) =
-        match t with
-            | CFloat _ -> Floating
-            | CInt(signed, _) ->
-                if signed then Signed
-                else Unsigned
-
-            | CMatrix(t, _, _) -> (|Floating|Signed|Unsigned|Other|) t
-            | CVector(t, _) -> (|Floating|Signed|Unsigned|Other|) t
-
-            | _ ->
-                Other
-
-    let private (|Scalar|_|) (t : CType) =
-        match t with
-            | CInt _ 
-            | CFloat _ ->
-                Some ()
-            | _ ->
-                None
-
-
-    let private cacheType (t : obj) =
-        CacheTypeBuilder(t)
-
-    let assembleBool (b : bool) =
-        if b then 1u
-        else 0u
-
-    let rec assembleSystemType (t : Type) =
-        cacheType t {
-            match t with
-                | ArrOf(len, et) ->
-                    let! et = assembleSystemType et
-                    let! id = newId 
-                    yield OpTypeArray(id, et, uint32 len)
-                    return id
-
-                | SamplerType(dim, isArray, isShadow, isMS, valueType) ->
-                    let! valueType = assembleSystemType valueType
-                    let! imgId = newId
-
-                    let dim = 
-                        match dim with
-                            | SamplerDimension.Sampler1d -> Dim.Dim1D
-                            | SamplerDimension.Sampler2d -> Dim.Dim2D
-                            | SamplerDimension.Sampler3d -> Dim.Dim3D
-                            | SamplerDimension.SamplerCube -> Dim.Cube
-                            | dim -> failwithf "[SpirV] invalid sampler dimension %A" dim
-
-                    yield OpTypeImage(imgId, valueType, dim, assembleBool isShadow, assembleBool isArray, assembleBool isMS, 1u, 0, None)
-
-                    let! tid = newId
-                    yield OpTypeSampledImage(tid, imgId)
-                    return tid
-                | _ ->
-                    let ct = CType.ofType t
-                    return! assembleType ct
-        }
-
-    and assembleType (t : CType) =
-        cacheType t {
-            match t with
-                | CType.CBool -> 
-                    let! tid = newId
-                    yield OpTypeBool tid
-                    return tid
-
-                | CType.CVoid ->
-                    let! tid = newId
-                    yield OpTypeVoid tid
-                    return tid
-
-                | CType.CInt(signed, width) ->
-                    let! tid = newId
-                    yield OpTypeInt(tid, uint32 width, (if signed then 1u else 0u))
-                    return tid
-
-                | CType.CFloat(width) ->
-                    let! tid = newId
-                    yield OpTypeFloat(tid, uint32 width)
-                    return tid
-
-                | CType.CVector(et, len) ->
-                    let! et = assembleType et
-                    let! tid = newId
-                    yield OpTypeVector(tid, et, uint32 len)
-                    return tid
-
-                | CType.CMatrix(et, rows, cols) ->
-                    let! et = assembleType (CType.CVector(et, rows))
-                    let! tid = newId
-                    yield OpTypeMatrix(tid, et, uint32 cols)
-                    return tid
-
-                | CType.CArray(et, len) ->
-                    let! et = assembleType et
-                    let! tid = newId
-                    yield OpTypeArray(tid, et, uint32 len)
-                    return tid
-
-                | CType.CPointer(m, et) ->
-                    let! et = assembleType et
-                    let! tid = newId
-                    yield OpTypeRuntimeArray(tid, et)
-                    return tid
-
-                | CType.CStruct(name, fields, _) ->
-                    let! fields =
-                        fields |> List.mapS (fun (t, n) ->
-                            asm {
-                                let! t = assembleType t
-                                return t, n
-                            }
-                        )
-                        
-                    let fields = fields |> List.toArray
-                    let! tid = newId
-                    yield OpTypeStruct(tid, fields |> Array.map fst)
-                    for i in 0 .. fields.Length - 1 do
-                        let (_,n) = fields.[i]
-                        yield OpMemberName(tid, uint32 i, n)
-
-                    yield OpDecorate(tid, Decoration.GLSLPacked, [||])
-                    yield OpName(tid, name)
-                    return tid
-
-
-                | CType.CIntrinsic i ->
-                    match i.tag with
-                        | :? Type as t ->
-                            return! assembleSystemType t
-                        | tag ->
-                            return failwithf "[SpirV] unexpected type-tag %A" tag
-                                
-
-
-        }
-
-    and assemblePtrType (clazz : StorageClass) (t : CType) =
-        cacheType (t, "ptr") {
-            let! tid = assembleType t
-            let! id = newId
-            yield OpTypePointer(id, clazz, tid)
-            return id
-        }
-
-    let assembleConstant (t : CType) (v : CLiteral) =
-        asm {
-            let! s = State.get
-            match HashMap.tryFind (t, v) s.constants with
-                | Some cid ->
-                    return cid
-                | None ->
-                    let! tid = assembleType t
-                    let! id = newId
-                    match v with
-                        | CIntegral v ->
-                            match t with    
-                                | CInt(_,8)     -> yield OpConstant(tid, id, [| uint32 (int8 v) |])
-                                | CInt(_,16)    -> yield OpConstant(tid, id, [| uint32 (int16 v) |])
-                                | CInt(_,32)    -> yield OpConstant(tid, id, [| uint32 v |])
-                                | CInt(_,64)    -> yield OpConstant(tid, id, v |> BitConverter.GetBytes |> setLength 8)
-                                | _             -> failwithf "[SpirV] invalid integral type %A" t
-
-                        | CFractional v ->
-                            let arr = v |> float32 |> BitConverter.GetBytes |> setLength 4
-                            yield OpConstant(tid, id, arr)
-
-                        | CBool v ->
-                            if v then yield OpConstantTrue(tid, id)
-                            else yield OpConstantFalse(tid, id)
-
-                        | Null ->
-                            yield OpConstantNull(tid, id)
-
-                        | CString str ->
-                            yield OpString(id, str)
-
-                    do! State.modify (fun s -> { s with constants = HashMap.add (t,v) id s.constants })
-                    return id
-
-        }
-
-    let assembleInt32 (v : int) =
-        assembleConstant (CType.CInt(true, 32)) (CIntegral (int64 v))
-
-    let rec assembleExpr (e : CExpr) =
-        asm {
-            match e with
-                | CVar v ->
-                    let! id = getVarId v
-                    return id
-
-                | CValue(t, v) ->
-                    return! assembleConstant t v
-
-                | CCall(func, args) ->
-                    let! ret = assembleType func.returnType
-                    let! fid = getFunctionId func
-                    let! args = args |> Array.mapS assembleExpr
-                    let! id = newId
-                    yield OpFunctionCall(ret, id, fid, args)
-                    return id
-
-                | CCallIntrinsic _ ->
-                    return failwith "not implemented"
-                    
-
-                | CConditional(t, cond, i, e) ->
-                    let! t = assembleType t
-                    let! cond = assembleExpr cond
-                    let! lTrue = newLabel
-                    let! lFalse = newLabel
-                    let! lEnd = newLabel
-                    yield OpBranchConditional(cond, lTrue, lFalse, [||])
-
-                    yield OpLabel(lTrue)
-                    let! tid = assembleExpr i
-                    yield OpBranch(lEnd)
-
-                    yield OpLabel(lFalse)
-                    let! fid = assembleExpr e
-
-                    let! id = newId
-                    yield OpLabel(lEnd)
-                    yield OpPhi(t, id, [| tid; lTrue; fid; lFalse |])
-                    return id
-
-                | CReadInput(ParameterKind.Input, t, name, index) ->
-                    let! t = assembleType t
-                    let! input = getInput name
-                    match index with
-                        | Some index ->
-                            let! index = assembleExpr index
-                            let! id = newId
-                            yield OpPtrAccessChain(t, id, input, index, [||])
-                            return id
-                        | None ->
-                            let! id = newId
-                            yield OpLoad(t, id, input, None)
-                            return id
-
-                | CReadInput(ParameterKind.Uniform, t, name, index) ->
-                    let! t = assembleType t
-                    let! input = getUniform name
-                    match index with
-                        | Some index ->
-                            let! index = assembleExpr index
-                            let! id = newId
-                            yield OpPtrAccessChain(t, id, input, index, [||])
-                            return id
-                        | None ->
-                            let! id = newId
-                            yield OpLoad(t, id, input, None)
-                            return id
-
-                | CReadInput(_, _, _, _) ->
-                    return failwithf "[SpirV] invalid input %A" e
-
-                | CNeg(t, v) ->
-                    let! tid = assembleType t
-                    let! v = assembleExpr v
-                    let! id = newId
-                    match t with
-                        | Floating ->
-                            yield OpFNegate(tid, id, v)
-                        | Signed -> 
-                            yield OpSNegate(tid, id, v)
-                        | _ ->
-                            failwithf "[SpirV] bad type in negation %A" t
-                    return id
-
-                | CNot(t, v) ->
-                    let! t = assembleType t
-                    let! v = assembleExpr v
-                    let! id = newId
-                    yield OpLogicalNot(t, id, v)
-                    return id
-
-
-                | CAdd(t, l, r) ->
-                    let! tid = assembleType t
-                    let! l = assembleExpr l
-                    let! r = assembleExpr r
-                    let! id = newId
-                    match t with
-                        | Floating -> yield OpFAdd(tid, id, l, r)
-                        | Signed | Unsigned -> yield OpIAdd(tid, id, l, r)
-                        | _ -> failwithf "[SpirV] bad type in addition %A" t
-                    return id
-
-                | CSub(t, l, r) ->
-                    let! tid = assembleType t
-                    let! l = assembleExpr l
-                    let! r = assembleExpr r
-                    let! id = newId
-                    match t with
-                        | Floating -> yield OpFSub(tid, id, l, r)
-                        | Signed | Unsigned -> yield OpISub(tid, id, l, r)
-                        | _ -> failwithf "[SpirV] bad type in subtraction %A" t
-                    return id
-
-                | CMul(t, l, r) ->
-                    let! tid = assembleType t
-                    let! lid = assembleExpr l
-                    let! rid = assembleExpr r
-                    let! id = newId
-
-                    match l.ctype, r.ctype with 
-                        | CVector _, Scalar -> yield OpVectorTimesScalar(tid, id, lid, rid)
-                        | CMatrix _, Scalar -> yield OpMatrixTimesScalar(tid, id, lid, rid)
-                        | Scalar, CVector _ -> yield OpVectorTimesScalar(tid, id, rid, lid)
-                        | Scalar, CMatrix _ -> yield OpMatrixTimesScalar(tid, id, rid, lid)
-                        | _ ->
-                            match t with
-                                | Floating -> yield OpFMul(tid, id, lid, rid)
-                                | Signed | Unsigned -> yield OpIMul(tid, id, lid, rid)
-                                | _ -> failwithf "[SpirV] bad type in multiplication %A" t
-                    return id
-
-                | CDiv(t, l, r) ->
-                    let! tid = assembleType t
-                    let! l = assembleExpr l
-                    let! r = assembleExpr r
-                    let! id = newId
-                    match t with
-                        | Floating -> yield OpFDiv(tid, id, l, r)
-                        | Signed -> yield OpSDiv(tid, id, l, r)
-                        | Unsigned -> yield OpUDiv(tid, id, l, r)
-                        | _ -> failwithf "[SpirV] bad type in division %A" t
-                    return id
-
-                | CMod(t, l, r) ->
-                    let! tid = assembleType t
-                    let! l = assembleExpr l
-                    let! r = assembleExpr r
-                    let! id = newId
-                    match t with
-                        | Floating -> yield OpFMod(tid, id, l, r)
-                        | Signed -> yield OpSMod(tid, id, l, r)
-                        | Unsigned -> yield OpUMod(tid, id, l, r)
-                        | _ -> failwithf "[SpirV] bad type in modulus %A" t
-                    return id
-
-                | CTranspose(t, v) ->
-                    let! t = assembleType t
-                    let! v = assembleExpr v
-                    let! id = newId
-                    yield OpTranspose(t, id, v)
-                    return id
-
-                | CMulMatMat(t, l, r) ->
-                    let! tid = assembleType t
-                    let! l = assembleExpr l
-                    let! r = assembleExpr r
-                    let! id = newId
-                    let! reverse = reverseMatrix
-                    if reverse then yield OpMatrixTimesMatrix(tid, id, r, l)
-                    else yield OpMatrixTimesMatrix(tid, id, l, r)
-                    return id
-
-                | CMulMatVec(t, l, r) ->
-                    let! tid = assembleType t
-                    let! l = assembleExpr l
-                    let! r = assembleExpr r
-                    let! id = newId
-                    let! reverse = reverseMatrix
-                    if reverse then yield OpVectorTimesMatrix(tid, id, r, l)
-                    else yield OpMatrixTimesVector(tid, id, l, r)
-                    return id
-                    
-                | CDot(t, l, r) ->
-                    let! tid = assembleType t
-                    let! l = assembleExpr l
-                    let! r = assembleExpr r
-                    let! id = newId
-                    yield OpDot(tid, id, l, r)
-                    return id
-                    
-                | CCross(t, l, r) ->
-                    let! tid = assembleType t
-                    let! glsl = import glsl410
-                    let! l = assembleExpr l
-                    let! r = assembleExpr r
-                    let! id = newId
-                    yield OpExtInst(tid, id, 1u, uint32 GLSLExtInstruction.GLSLstd450Cross, [| l; r |])
-                    return id
-
-                | CVecSwizzle(t, v, fields) ->
-                    let! tid = assembleType t
-                    let! v = assembleExpr v
-                    let! id = newId
-                    let comp = fields |> List.map uint32 |> List.toArray
-                    yield OpVectorShuffle(tid, id, v, v, comp)
-                    return id
-
-                | CNewVector(t, d, args) ->
-                    let! tid = assembleType t
-                    let! args = args |> List.mapS assembleExpr
-                    let! id = newId
-                    yield OpCompositeConstruct(tid, id, List.toArray args)
-                    return id
-
-                | CVecLength(t, v) ->
-                    let! tid = assembleType t
-                    let! v = assembleExpr v
-                    let! glsl = import glsl410
-                    let! id = newId
-                    yield OpExtInst(tid, id, 1u, uint32 GLSLExtInstruction.GLSLstd450Length, [| v |])
-                    return id
-
-                | CMatrixElement _ | CMatrixFromCols _ | CMatrixFromRows _ ->
-                    return failwith "not implemented"
-                    
-                | CConvert(t, e) ->
-                    let! tid = assembleType t
-                    let! eid = assembleExpr e
-                    let! id = newId
-                    match e.ctype, t with
-                        | Floating, Floating    -> yield OpFConvert(tid, id, eid)
-                        | Floating, Signed      -> yield OpConvertFToS(tid, id, eid)
-                        | Floating, Unsigned    -> yield OpConvertFToU(tid, id, eid)
-                        | Signed, Floating      -> yield OpConvertSToF(tid, id, eid)
-                        | Signed, Signed        -> yield OpSConvert(tid, id, eid)
-                        | Signed, Unsigned      -> yield OpSatConvertSToU(tid, id, eid)
-                        | Unsigned, Floating    -> yield OpConvertUToF(tid, id, eid)
-                        | Unsigned, Signed      -> yield OpSatConvertUToS(tid, id, eid)
-                        | Unsigned, Unsigned    -> yield OpUConvert(tid, id, eid)
-                        | s, t                  -> failwithf "[SpirV] unknown conversion from %A to %A" s t
-
-                    return id
-
-                | CLess(l, r) -> 
-                    let! tid = assembleType CType.CBool
-                    let! lid = assembleExpr l
-                    let! rid = assembleExpr r
-                    let! id = newId
-                    match l.ctype with
-                        | Floating -> yield OpFOrdLessThan(tid, id, lid, rid)
-                        | Signed -> yield OpSLessThan(tid, id, lid, rid)
-                        | Unsigned -> yield OpULessThan(tid, id, lid, rid)
-                        | t -> failwithf "[SpirV] cannot compare %A" t
-                    return id
-
-                | CLequal(l, r) -> 
-                    let! tid = assembleType CType.CBool
-                    let! lid = assembleExpr l
-                    let! rid = assembleExpr r
-                    let! id = newId
-                    match l.ctype with
-                        | Floating -> yield OpFOrdLessThanEqual(tid, id, lid, rid)
-                        | Signed -> yield OpSLessThanEqual(tid, id, lid, rid)
-                        | Unsigned -> yield OpULessThanEqual(tid, id, lid, rid)
-                        | t -> failwithf "[SpirV] cannot compare %A" t
-                    return id
-
-                | CGreater(l, r) -> 
-                    let! tid = assembleType CType.CBool
-                    let! lid = assembleExpr l
-                    let! rid = assembleExpr r
-                    let! id = newId
-                    match l.ctype with
-                        | Floating -> yield OpFOrdGreaterThan(tid, id, lid, rid)
-                        | Signed -> yield OpSGreaterThan(tid, id, lid, rid)
-                        | Unsigned -> yield OpUGreaterThan(tid, id, lid, rid)
-                        | t -> failwithf "[SpirV] cannot compare %A" t
-                    return id
-
-                | CGequal(l, r) -> 
-                    let! tid = assembleType CType.CBool
-                    let! lid = assembleExpr l
-                    let! rid = assembleExpr r
-                    let! id = newId
-                    match l.ctype with
-                        | Floating -> yield OpFOrdGreaterThanEqual(tid, id, lid, rid)
-                        | Signed -> yield OpSGreaterThanEqual(tid, id, lid, rid)
-                        | Unsigned -> yield OpUGreaterThanEqual(tid, id, lid, rid)
-                        | t -> failwithf "[SpirV] cannot compare %A" t
-                    return id
-
-                | CEqual(l, r) -> 
-                    let! tid = assembleType CType.CBool
-                    let! lid = assembleExpr l
-                    let! rid = assembleExpr r
-                    let! id = newId
-                    match l.ctype with
-                        | Floating -> yield OpFOrdEqual(tid, id, lid, rid)
-                        | Signed | Unsigned -> yield OpIEqual(tid, id, lid, rid)
-                        | t -> failwithf "[SpirV] cannot compare %A" t
-                    return id
-
-                | CNotEqual(l, r) -> 
-                    let! tid = assembleType CType.CBool
-                    let! lid = assembleExpr l
-                    let! rid = assembleExpr r
-                    let! id = newId
-                    match l.ctype with
-                        | Floating -> yield OpFOrdNotEqual(tid, id, lid, rid)
-                        | Signed | Unsigned -> yield OpINotEqual(tid, id, lid, rid)
-                        | t -> failwithf "[SpirV] cannot compare %A" t
-                    return id
-
-                | CAnd(l, r) ->
-                    return! assembleExpr (CConditional(CType.CBool, l, r, CValue(CType.CBool, CBool false)))
-
-                | COr(l, r) ->
-                    return! assembleExpr (CConditional(CType.CBool, l,  CValue(CType.CBool, CBool true), r))
-
-                | CBitAnd(t, l, r) ->
-                    let! tid = assembleType t
-                    let! lid = assembleExpr l
-                    let! rid = assembleExpr r
-                    let! id = newId
-                    yield OpBitwiseAnd(tid, id, lid, rid)
-                    return id
-
-                | CBitOr(t, l, r) ->
-                    let! tid = assembleType t
-                    let! lid = assembleExpr l
-                    let! rid = assembleExpr r
-                    let! id = newId
-                    yield OpBitwiseOr(tid, id, lid, rid)
-                    return id
-
-                | CBitXor(t, l, r) ->
-                    let! tid = assembleType t
-                    let! lid = assembleExpr l
-                    let! rid = assembleExpr r
-                    let! id = newId
-                    yield OpBitwiseXor(tid, id, lid, rid)
-                    return id
-
-                | CAddressOf _ ->
-                    return failwith "not implemented"
-
-                | CField(t, v, f) ->
-                    let! tid = assembleType t
-                    let! vid = assembleExpr v
-                    let! id = newId
-                    match v.ctype with
-                        | CStruct(_,fields,_) ->
-                            let index = fields |> List.findIndex (fun (_,n) -> n = f)
-                            yield OpCompositeExtract(tid, id, vid, [| uint32 index |])
-                        | _ ->
-                            failwithf "[SpirV] cannot access field %A" f
-                    return id
-
-                | CItem(t, v, i) ->
-                    let! tid = assembleType t
-                    let! v = assembleExpr v
-                    let! i = assembleExpr i
-                    let! id = newId
-                    yield OpInBoundsAccessChain(tid, id, v, [| i |])
-                    return id
-
-        }
-
-    let assembleRExpr (e : CRExpr) =
-        asm {
-            match e with
-                | CRExpr e -> return! assembleExpr e
-                | CRArray(t, args) ->
-                    let! tid = assembleType t
-                    let! args = args |> List.mapS assembleExpr
-                    let! id = newId
-                    yield OpCompositeConstruct(tid, id, List.toArray args)
-                    return id
-        }
-
-    let rec assembleLExpr (e : CLExpr) =
-        asm {
-            let! tid = assemblePtrType StorageClass.Private e.ctype
-            match e with
-                | CLVar v ->
-                    let! id = getVarId v
-                    return id
-
-                | CLField(t, l, f) ->
-                    let! lid = assembleLExpr l
-                    match l.ctype with
-                        | CStruct(_, fields, _) ->
-                            let index = fields |> List.findIndex (fun (_,n) -> f = n)
-                            let! index = assembleInt32 index
-                            let! id = newId
-                            yield OpInBoundsAccessChain(tid, id, lid, [|index|])
-                            return id
-                        | t ->
-                            return failwithf "[SpirV] accessing field on non-struct-type %A" t
-
-                | CLItem(t, l, i) ->
-                    let! lid = assembleLExpr l
-                    let! index = assembleExpr i
-                    let! id = newId
-                    yield OpInBoundsAccessChain(tid, id, lid, [|index|])
-                    return id
-                    
-                | CLPtr _ | CLVecSwizzle _ | CLMatrixElement _ ->
-                    return failwith "not implemented"
-
-                    
-        }
-
-    let setVarId (v : CVar) (id : uint32) =
-        State.modify (fun s ->
-            { s with AssemblerState.variableIds = HashMap.add v id s.variableIds  }
-        )
-
-    let rec assembleStatement (breakLabel : Option<uint32>) (contLabel : Option<uint32>) (s : CStatement) =
-        asm {
-            match s with
-                | CNop ->
-                    ()
-
-                | CDo e ->
-                    do! State.ignore (assembleExpr e)
-
-                | CDeclare(v, e) ->
-                    let! e = e |> Option.mapS assembleRExpr
-                    let! tid = assemblePtrType StorageClass.Private v.ctype
-                    let! vid = newId
-                    yield OpVariable(tid, vid, StorageClass.Private, e)
-                    do! setVarId v vid
-
-                | CWrite(l, v) ->
-                    let! l = assembleLExpr l
-                    let! v = assembleExpr v
-                    yield OpStore(l, v, None)
-
-                | CIncrement(pre, l) ->
-                    return! assembleStatement breakLabel contLabel (CWrite(l, CExpr.CAdd(l.ctype, CLExpr.toExpr l, CValue(l.ctype, CIntegral 1L))))
-
-                | CDecrement(pre, l) ->
-                    return! assembleStatement breakLabel contLabel (CWrite(l, CExpr.CSub(l.ctype, CLExpr.toExpr l, CValue(l.ctype, CIntegral 1L))))
-
-                | CSequential s ->
-                    for s in s do 
-                        do! assembleStatement breakLabel contLabel s
-
-                | CReturn ->
-                    yield OpReturn
-
-                | CReturnValue v ->
-                    let! vid = assembleExpr v
-                    yield OpReturnValue vid
-
-                | CBreak ->
-                    match breakLabel with
-                        | Some l -> yield OpBranch l
-                        | _ -> failwith "[SpirV] break outside loop encountered"
-
-                | CContinue ->
-                    match contLabel with
-                        | Some l -> yield OpBranch l
-                        | _ -> failwith "[SpirV] break outside loop encountered"
-
-                | CFor(init, cond, step, body) ->
-                    do! assembleStatement breakLabel contLabel init
-                    
-                    let! lCond = newLabel
-                    let! lStart = newLabel
-                    let! lEnd = newLabel
-
-                    yield OpLabel lCond
-                    let! cid = assembleExpr cond
-                    yield OpBranchConditional(cid, lStart, lEnd, [||])
-
-                    yield OpLabel(lStart)
-                    do! assembleStatement (Some lEnd) (Some lCond) body
-                    do! assembleStatement breakLabel contLabel step
-                    yield OpBranch(lCond)
-
-                    yield OpLabel(lEnd)
-
-                | CWhile(guard, body) ->
-                    
-                    let! lCond = newLabel
-                    let! lStart = newLabel
-                    let! lEnd = newLabel
-
-                    yield OpLabel lCond
-                    let! cid = assembleExpr guard
-                    yield OpBranchConditional(cid, lStart, lEnd, [||])
-
-                    yield OpLabel(lStart)
-                    do! assembleStatement (Some lEnd) (Some lCond) body
-                    yield OpBranch(lCond)
-
-                    yield OpLabel(lEnd)
-
-                | CDoWhile(guard, body) ->
-                    
-                    let! lCond = newLabel
-                    let! lStart = newLabel
-                    let! lEnd = newLabel
-                    yield OpLabel(lStart)
-                    do! assembleStatement (Some lEnd) (Some lCond) body
-                    yield OpLabel(lCond)
-                    let! v = assembleExpr guard
-                    yield OpBranchConditional(v, lStart, lEnd, [||])
-                    yield OpLabel(lEnd)
-
-                | CIfThenElse(cond, i, e) ->
-                    let! cond = assembleExpr cond
-                    let! lTrue = newLabel
-                    let! lFalse = newLabel
-                    let! lEnd = newLabel
-
-                    yield OpBranchConditional(cond, lTrue, lFalse, [||])
-                    yield OpLabel lTrue
-                    do! assembleStatement breakLabel contLabel i
-                    yield OpBranch lEnd
-                    yield OpLabel lFalse
-                    do! assembleStatement breakLabel contLabel e
-                    yield OpLabel lEnd
-
-                | CWriteOutput(name, index, value) ->
-                    let! output = getOutput name
-                    let! value = assembleRExpr value
-                    match index with
-                        | None -> 
-                            yield OpStore(output, value, None)
-                        | Some i ->
-                            failwith "[SpirV] indexed output not implemented"
-                            
-                            
-                | CSwitch _ ->
-                    failwith "[SpirV] switch not implemented"
-                    
-
-        }
-
-    let assembleEntryParameter (clazz : StorageClass) (p : CEntryParameter) =
-        asm {
-            let! t = assemblePtrType clazz p.cParamType
-            let! id = newId
-            yield OpVariable(t, id, clazz, None)
-
-
-
-        }
-
-    let assembleEntry (e : CEntryDef) =
-        asm {
-            
-            ()
-        }
-
-
-module Assembler2 =
-
-    type SpirVState =
-        {
-            currentId           : uint32
-            valueIds            : HashMap<obj, uint32>
-            uniformIds          : Map<string, uint32 * list<uint32>>
-            fieldIds            : HashMap<CType, HashMap<string, int>>
-            reversedInstuctions : list<Instruction>
-            currentBinding      : uint32
-            currentSet          : uint32
-        }
-
-    type SpirV<'a> = State<SpirVState, 'a>
-
-    type SpirVBuilder() =
-        inherit StateBuilder()
-
-        member x.Yield(i : Instruction) =
-            State.modify (fun s ->
-                { s with reversedInstuctions = i :: s.reversedInstuctions }
-            )
-
-        member x.Run(m : SpirV<'a>) : SpirV<'a> =
-            m
-
-    let spirv = SpirVBuilder()
-
-    module SpirV =
-        let tryGetId (a : 'a) : SpirV<Option<uint32>> =
-            State.get |> State.map (fun s -> HashMap.tryFind (a :> obj) s.valueIds)
-            
-        let setId (a : 'a) (id : uint32) : SpirV<unit> =
-            State.modify (fun s -> { s with valueIds = HashMap.add (a :> obj) id  s.valueIds })
-
-            
-        let setUniformId (name : string) (var : uint32) (fields : list<uint32>) : SpirV<unit> =
-            State.modify (fun s -> { s with uniformIds = Map.add name (var, fields) s.uniformIds })
-
-
-        type CachedSpirVBuilder(key : obj) =
-            inherit StateBuilder()
-
-            member x.Yield(i : Instruction) =
-                State.modify (fun s ->
-                    { s with reversedInstuctions = i :: s.reversedInstuctions }
-                )
-
-            member x.Run(m : SpirV<uint32>) : SpirV<uint32> =
-                state {
-                    let! v = tryGetId key 
-                    match v with
-                        | Some id -> 
-                            return id
-                        | None ->
-                            let! id = m
-                            do! setId key id
-                            return id
-                }
-
-        let cached (v : 'a) =
-            CachedSpirVBuilder(v :> obj)
-
-        let id = 
-            State.custom (fun s ->
-                let id = s.currentId
-                { s with currentId = id + 1u }, id
-            )
-
-        let setFieldId (t : CType) (name : string) (id : int) =
-            State.modify (fun s ->
-                match HashMap.tryFind t s.fieldIds with
-                    | Some ids ->
-                        { s with fieldIds = HashMap.add t (HashMap.add name id ids) s.fieldIds }
-                    | None ->
-                        { s with fieldIds = HashMap.add t (HashMap.ofList [name,id]) s.fieldIds }
-            )
-
-        let tryGetFieldId (t : CType) (name : string) =
-            State.get |> State.map (fun s ->
-                match HashMap.tryFind t s.fieldIds with
-                    | Some ids ->
-                        HashMap.tryFind name ids
-                    | None ->
-                        None
-            )
-
-        let newBinding : SpirV<uint32> =
-            State.custom (fun s ->
-                let c = s.currentBinding
-                { s with currentBinding = c + 1u }, c
-            )
-
-        let newSet : SpirV<uint32> =
-            State.custom (fun s ->
-                let c = s.currentSet
-                { s with currentSet = c + 1u; currentBinding = 0u }, c
-            )
 
     let rec assembleType (t : CType) =
         SpirV.cached t {
@@ -1059,39 +97,11 @@ module Assembler2 =
 
     and assembleIntrinsicType (t : CIntrinsicType) : SpirV<uint32> =
         spirv {
-            return failwith "not implemented"
-        }
-
-    let rec assembleExpr (s : CExpr) : SpirV<uint32> =
-        spirv {
-            return failwith "not implemented"
-        }
-
-    let rec assembleRExpr (s : CRExpr) : SpirV<uint32> =
-        spirv {
-            return failwith "not implemented"
-        }
-
-    let rec assembleLExpr (s : CRExpr) : SpirV<uint32> =
-        spirv {
-            return failwith "not implemented"
-        }
-   
-    let rec assembleStatement (s : CStatement) : SpirV<unit> =
-        spirv {
-            return failwith "not implemented"
-        }
-
-    let tryGetBuiltIn (kind : ParameterKind) (stage : ShaderStageDescription) (name : string) : Option<BuiltIn> =
-        failwith "not implemented"
-
-
-
-    let assembleFunctionType (args : array<uint32>) (ret : uint32) =
-        SpirV.cached ("fun", args, ret) {  
-            let! id = SpirV.id
-            yield OpTypeFunction(id, ret, args)
-            return id
+            match t.tag with
+                | :? SpirVIntrinsicType as t ->
+                    return! t.compileType
+                | _ ->
+                    return failwithf "[FShade] cannot compile type %A" t
         }
 
     let rec assembleLiteral (t : CType) (v : CLiteral) =
@@ -1127,6 +137,447 @@ module Assembler2 =
                 | _ ->
                     failwithf "[FShade] unsupported literal value %A : %A" v t
 
+            return id
+        }
+
+    [<AutoOpen>]
+    module Patterns = 
+        let rec (|Floating|Signed|Unsigned|Other|) (t : CType) =
+            match t with
+                | CFloat _ -> Floating
+                | CInt(signed, _) ->
+                    if signed then Signed
+                    else Unsigned
+
+                | CMatrix(t, _, _) -> (|Floating|Signed|Unsigned|Other|) t
+                | CVector(t, _) -> (|Floating|Signed|Unsigned|Other|) t
+
+                | _ ->
+                    Other
+
+        let (|Scalar|Vector|Matrix|NonNumeric|) (t : CType) =
+            match t with
+                | CInt _ 
+                | CFloat _ ->
+                    Scalar
+                | CVector(et,_) ->
+                    Vector et
+                | CMatrix(et, _, _) ->
+                    Matrix et
+                | _ ->
+                    NonNumeric
+
+    let private newVector (et : CType) (d : int) (vid : uint32) =
+        spirv {
+            let! vType = assembleType (CVector(et, d))
+            let! tid = SpirV.id
+            yield OpCompositeConstruct(vType, tid, Array.create d vid)
+            return tid
+        }
+
+    let rec assembleExpr (e : CExpr) : SpirV<uint32> =
+        spirv {
+            let! tid = assembleType e.ctype
+            match e with
+                | CVar v ->
+                    let! vid = SpirV.getId v.name
+                    let! id = SpirV.id
+                    yield OpLoad(tid, id, vid, None)
+                    return id
+
+                | CValue(t,v) -> 
+                    return! assembleLiteral t v
+
+                | CCall(f, args) ->
+                    let! fid = SpirV.getId f
+                    let! id = SpirV.id
+                    let! args = args |> Array.mapS assembleExpr
+                    yield OpFunctionCall(tid, id, fid, args)
+                    return id
+
+                | CCallIntrinsic(_,f,args) ->
+                    let! args = args |> Array.mapS assembleExpr
+                    match f.tag with
+                        | :? SpirVIntrinsicFunction as f ->
+                            return! f.compileFunction tid args
+                        | _ ->
+                            return failwith ""
+
+                | CConditional(_, cond, i, e) ->
+                    let! cond = assembleExpr cond
+
+                    let! lTrue = SpirV.id
+                    let! lFalse = SpirV.id
+                    let! lEnd = SpirV.id
+
+                    yield OpBranchConditional(cond, lTrue, lFalse, [||])
+                    yield OpLabel(lTrue)
+                    let! vTrue = assembleExpr i
+                    yield OpBranch(lEnd)
+                    yield OpLabel(lFalse)
+                    let! vFalse = assembleExpr e
+                    yield OpLabel(lEnd)
+
+                    let! id = SpirV.id
+                    yield OpPhi(tid, id, [| vTrue; lTrue; vFalse; lFalse |])
+                    return id
+
+                | CReadInput(kind, t, name, index) ->
+                    let! vid = SpirV.getId (kind, name)
+                    match index with
+                        | None ->
+                            let! id = SpirV.id
+                            yield OpLoad(tid, id, vid, None)
+                            return id
+                        | Some index ->
+                            let! index = assembleExpr index
+                            let clazz =
+                                if kind = ParameterKind.Input then StorageClass.Input
+                                else StorageClass.Uniform
+
+                            let! ptrType = assemblePtrType clazz (CPointer(CPointerModifier.None, t))
+                            let! ptr = SpirV.id
+                            yield OpAccessChain(ptrType, ptr, vid, [| index |])
+                            let! id = SpirV.id
+                            yield OpLoad(tid, id, ptr, None)
+                            return id
+
+                | CNeg(t,e) ->
+                    let! eid = assembleExpr e
+                    let! id = SpirV.id
+                    match t with
+                        | Signed -> yield OpSNegate(tid, id, eid)
+                        | Floating -> yield OpFNegate(tid, id, eid)
+                        | _ -> failwithf "[FShade] cannot negate %A" t
+
+                    return id
+
+                | CNot(t,e) ->
+                    let! eid = assembleExpr e
+                    let! id = SpirV.id
+                    yield OpLogicalNot(tid, id, eid)
+                    return id
+
+                | CAdd(t, l, r) ->
+                    let! lid = assembleExpr l
+                    let! rid = assembleExpr r
+                    let! id = SpirV.id
+                    match t with
+                        | Signed | Unsigned -> yield OpIAdd(tid, id, lid, rid)
+                        | Floating -> yield OpFAdd(tid, id, lid, rid)
+                        | _ -> failwithf "[FShade] cannot add %A" t
+                    return id
+
+                | CSub(t, l, r) ->
+                    let! lid = assembleExpr l
+                    let! rid = assembleExpr r
+                    let! id = SpirV.id
+                    match t with
+                        | Signed | Unsigned -> yield OpISub(tid, id, lid, rid)
+                        | Floating -> yield OpFSub(tid, id, lid, rid)
+                        | _ -> failwithf "[FShade] cannot add %A" t
+                    return id
+                    
+                | CMul(t, l, r) | CMulMatVec(t, l, r) | CMulMatMat(t, l, r) ->
+                    let! lid = assembleExpr l
+                    let! rid = assembleExpr r
+                    let! id = SpirV.id
+
+                    let reverse = true
+
+                    match l.ctype, r.ctype with
+                        | Scalar, Vector _          -> yield OpVectorTimesScalar(tid, id, rid, lid)
+                        | Vector _, Scalar          -> yield OpVectorTimesScalar(tid, id, lid, rid)
+                        | Scalar, Matrix _          -> yield OpMatrixTimesScalar(tid, id, rid, lid)
+                        | Matrix _, Scalar          -> yield OpMatrixTimesScalar(tid, id, lid, rid)
+                        | Floating, Floating        -> yield OpFMul(tid, id, lid, rid)
+
+                        | (Signed | Unsigned), (Signed | Unsigned) -> 
+                            yield OpIMul(tid, id, lid, rid)
+
+                        | Matrix _, Vector _ -> 
+                            if reverse then yield OpVectorTimesMatrix(tid, id, rid, lid)
+                            else yield OpMatrixTimesVector(tid, id, lid, rid)
+
+                        | Vector _, Matrix _ -> 
+                            if reverse then yield OpMatrixTimesVector(tid, id, rid, lid)
+                            else yield OpVectorTimesMatrix(tid, id, lid, rid)
+
+                        | Matrix _, Matrix _ -> 
+                            if reverse then yield OpMatrixTimesMatrix(tid, id, rid, lid)
+                            else yield OpMatrixTimesMatrix(tid, id, lid, rid)
+
+                        | l, r ->
+                            failwithf "[FShade] cannot multiply %A and %A" l r
+
+                    return id
+
+                | CDiv(t, l, r) ->
+                    let! lid = assembleExpr l
+                    let! rid = assembleExpr r
+                    let lType = l.ctype
+                    let rType = r.ctype
+                    match lType, rType with
+                        | CVector(et,d), Scalar ->
+                            let! vid = newVector rType d rid
+                            let! id = SpirV.id
+                            match et with
+                                | Floating -> yield OpFDiv(tid, id, lid, vid)
+                                | Signed -> yield OpSDiv(tid, id, lid, vid)
+                                | Unsigned -> yield OpUDiv(tid, id, lid, vid)
+                                | _ -> failwith ""
+
+                            return id
+
+                        | Scalar, CVector(et, d) ->
+                            let! vid = newVector lType d lid
+                            let! id = SpirV.id
+                            match et with
+                                | Floating -> yield OpFDiv(tid, id, vid, rid)
+                                | Signed -> yield OpSDiv(tid, id, vid, rid)
+                                | Unsigned -> yield OpUDiv(tid, id, vid, rid)
+                                | _ -> failwith ""
+
+                            return id
+                            
+                        | Signed, Signed ->
+                            let! id = SpirV.id
+                            yield OpSDiv(tid, id, lid, rid)
+                            return id
+
+                        | Unsigned, Unsigned ->
+                            let! id = SpirV.id
+                            yield OpUDiv(tid, id, lid, rid)
+                            return id
+
+                        | Floating, Floating ->
+                            let! id = SpirV.id
+                            yield OpFDiv(tid, id, lid, rid)
+                            return id
+
+                        | _ -> 
+                            return failwith "not implemented"
+
+                | CMod(t, l, r) ->
+                    let! l = assembleExpr l
+                    let! r = assembleExpr r
+                    let! id = SpirV.id
+                    match t with
+                        | Floating -> yield OpFMod(tid, id, l, r)
+                        | Signed -> yield OpSMod(tid, id, l, r)
+                        | Unsigned -> yield OpUMod(tid, id, l, r)
+                        | _ -> failwithf "[SpirV] bad type in modulus %A" t
+                    return id
+
+                | CTranspose(t, v) ->
+                    let! v = assembleExpr v
+                    let! id = SpirV.id
+                    yield OpTranspose(tid, id, v)
+                    return id
+
+                | CDot(t, l, r) ->
+                    let! l = assembleExpr l
+                    let! r = assembleExpr r
+                    let! id = SpirV.id
+                    yield OpDot(tid, id, l, r)
+                    return id
+                    
+                | CCross(t, l, r) ->
+                    let! glsl = SpirV.import glsl410
+                    let! l = assembleExpr l
+                    let! r = assembleExpr r
+                    let! id = SpirV.id
+                    yield OpExtInst(tid, id, 1u, uint32 GLSLExtInstruction.GLSLstd450Cross, [| l; r |])
+                    return id
+
+                | CVecSwizzle(t, v, fields) ->
+                    let! v = assembleExpr v
+                    let! id = SpirV.id
+                    let comp = fields |> List.map uint32 |> List.toArray
+                    yield OpVectorShuffle(tid, id, v, v, comp)
+                    return id
+
+                | CNewVector(t, d, args) ->
+                    let! args = args |> List.mapS assembleExpr
+                    let! id = SpirV.id
+                    yield OpCompositeConstruct(tid, id, List.toArray args)
+                    return id
+
+                | CVecLength(t, v) ->
+                    let! v = assembleExpr v
+                    let! glsl = SpirV.import glsl410
+                    let! id = SpirV.id
+                    yield OpExtInst(tid, id, 1u, uint32 GLSLExtInstruction.GLSLstd450Length, [| v |])
+                    return id
+
+                | CMatrixElement _ | CMatrixFromCols _ | CMatrixFromRows _ ->
+                    return failwith "not implemented"
+                    
+                | CConvert(t, e) ->
+                    let! eid = assembleExpr e
+                    let! id = SpirV.id
+                    match e.ctype, t with
+                        | Floating, Floating    -> yield OpFConvert(tid, id, eid)
+                        | Floating, Signed      -> yield OpConvertFToS(tid, id, eid)
+                        | Floating, Unsigned    -> yield OpConvertFToU(tid, id, eid)
+                        | Signed, Floating      -> yield OpConvertSToF(tid, id, eid)
+                        | Signed, Signed        -> yield OpSConvert(tid, id, eid)
+                        | Signed, Unsigned      -> yield OpSatConvertSToU(tid, id, eid)
+                        | Unsigned, Floating    -> yield OpConvertUToF(tid, id, eid)
+                        | Unsigned, Signed      -> yield OpSatConvertUToS(tid, id, eid)
+                        | Unsigned, Unsigned    -> yield OpUConvert(tid, id, eid)
+                        | s, t                  -> failwithf "[SpirV] unknown conversion from %A to %A" s t
+
+                    return id
+
+                | CLess(l, r) -> 
+                    let! lid = assembleExpr l
+                    let! rid = assembleExpr r
+                    let! id = SpirV.id
+                    match l.ctype with
+                        | Floating -> yield OpFOrdLessThan(tid, id, lid, rid)
+                        | Signed -> yield OpSLessThan(tid, id, lid, rid)
+                        | Unsigned -> yield OpULessThan(tid, id, lid, rid)
+                        | t -> failwithf "[SpirV] cannot compare %A" t
+                    return id
+
+                | CLequal(l, r) -> 
+                    let! lid = assembleExpr l
+                    let! rid = assembleExpr r
+                    let! id = SpirV.id
+                    match l.ctype with
+                        | Floating -> yield OpFOrdLessThanEqual(tid, id, lid, rid)
+                        | Signed -> yield OpSLessThanEqual(tid, id, lid, rid)
+                        | Unsigned -> yield OpULessThanEqual(tid, id, lid, rid)
+                        | t -> failwithf "[SpirV] cannot compare %A" t
+                    return id
+
+                | CGreater(l, r) -> 
+                    let! lid = assembleExpr l
+                    let! rid = assembleExpr r
+                    let! id = SpirV.id
+                    match l.ctype with
+                        | Floating -> yield OpFOrdGreaterThan(tid, id, lid, rid)
+                        | Signed -> yield OpSGreaterThan(tid, id, lid, rid)
+                        | Unsigned -> yield OpUGreaterThan(tid, id, lid, rid)
+                        | t -> failwithf "[SpirV] cannot compare %A" t
+                    return id
+
+                | CGequal(l, r) -> 
+                    let! lid = assembleExpr l
+                    let! rid = assembleExpr r
+                    let! id = SpirV.id
+                    match l.ctype with
+                        | Floating -> yield OpFOrdGreaterThanEqual(tid, id, lid, rid)
+                        | Signed -> yield OpSGreaterThanEqual(tid, id, lid, rid)
+                        | Unsigned -> yield OpUGreaterThanEqual(tid, id, lid, rid)
+                        | t -> failwithf "[SpirV] cannot compare %A" t
+                    return id
+
+                | CEqual(l, r) -> 
+                    let! lid = assembleExpr l
+                    let! rid = assembleExpr r
+                    let! id = SpirV.id
+                    match l.ctype with
+                        | Floating -> yield OpFOrdEqual(tid, id, lid, rid)
+                        | Signed | Unsigned -> yield OpIEqual(tid, id, lid, rid)
+                        | t -> failwithf "[SpirV] cannot compare %A" t
+                    return id
+
+                | CNotEqual(l, r) -> 
+                    let! lid = assembleExpr l
+                    let! rid = assembleExpr r
+                    let! id = SpirV.id
+                    match l.ctype with
+                        | Floating -> yield OpFOrdNotEqual(tid, id, lid, rid)
+                        | Signed | Unsigned -> yield OpINotEqual(tid, id, lid, rid)
+                        | t -> failwithf "[SpirV] cannot compare %A" t
+                    return id
+
+                | CAnd(l, r) ->
+                    return! assembleExpr (CConditional(CType.CBool, l, r, CValue(CType.CBool, CBool false)))
+
+                | COr(l, r) ->
+                    return! assembleExpr (CConditional(CType.CBool, l,  CValue(CType.CBool, CBool true), r))
+
+                | CBitAnd(t, l, r) ->
+                    let! lid = assembleExpr l
+                    let! rid = assembleExpr r
+                    let! id = SpirV.id
+                    yield OpBitwiseAnd(tid, id, lid, rid)
+                    return id
+
+                | CBitOr(t, l, r) ->
+                    let! lid = assembleExpr l
+                    let! rid = assembleExpr r
+                    let! id = SpirV.id
+                    yield OpBitwiseOr(tid, id, lid, rid)
+                    return id
+
+                | CBitXor(t, l, r) ->
+                    let! lid = assembleExpr l
+                    let! rid = assembleExpr r
+                    let! id = SpirV.id
+                    yield OpBitwiseXor(tid, id, lid, rid)
+                    return id
+
+                | CAddressOf _ ->
+                    return failwith "not implemented"
+
+                | CField(t, e, f) ->
+                    let! eid = assembleExpr e
+                    let! fid = SpirV.tryGetFieldId e.ctype f
+                    match fid with
+                        | Some fid ->
+                            let! id = SpirV.id
+                            //let! iid = assembleLiteral (CType.CInt(true, 32)) (CIntegral (int64 fid))
+                            yield OpCompositeExtract(tid, id, eid, [|uint32 fid|])
+                            return id
+                        | None ->
+                            return failwithf "could not get field-id for %s on %A" f e.ctype
+
+                | CItem(t, e, i) ->
+                    let! eid = assembleExpr e
+                    let! iid = assembleExpr i
+                    let! id = SpirV.id
+                    failwith "not implemented"
+                    return id
+
+        }
+
+    let rec assembleRExpr (e : CRExpr) : SpirV<uint32> =
+        spirv {
+            match e with
+                | CRExpr e -> 
+                    return! assembleExpr e
+
+                | CRArray(t, args) ->
+                    let! tid = assembleType t
+                    let! args = args |> List.mapS assembleExpr
+                    let! id = SpirV.id
+                    yield OpCompositeConstruct(tid, id, List.toArray args)
+                    return id
+        }
+
+    let rec assembleLExpr (s : CLExpr) : SpirV<uint32> =
+        spirv {
+            return failwith "not implemented"
+        }
+   
+    let rec assembleStatement (s : CStatement) : SpirV<unit> =
+        spirv {
+            return failwith "not implemented"
+        }
+
+    let tryGetBuiltIn (kind : ParameterKind) (stage : ShaderStageDescription) (name : string) : Option<BuiltIn> =
+        failwith "not implemented"
+
+
+
+    let assembleFunctionType (args : array<uint32>) (ret : uint32) =
+        SpirV.cached ("fun", args, ret) {  
+            let! id = SpirV.id
+            yield OpTypeFunction(id, ret, args)
             return id
         }
 
@@ -1344,6 +795,7 @@ module Assembler2 =
                 reversedInstuctions = []
                 currentBinding      = 0u
                 currentSet          = 0u
+                imports             = Map.empty
             }
         assembleModuleS(m).Run(&state)
         {
