@@ -1076,8 +1076,8 @@ module Compiler =
                     let! rest = rest |> List.mapS (toCStatementS isLast)
 
                     let! v = toCVarS v
-                    match Expr.TryEval first, Expr.TryEval step, Expr.TryEval last with
-                        | Some (:? int as first), Some (:? int as step), Some (:? int as last) ->
+                    match first, step, last with
+                        | DerivedPatterns.Int32 first, DerivedPatterns.Int32 step, DerivedPatterns.Int32 last ->
                             let range = [ first .. step .. last ]
                             let! b = toCStatementS false b
                             return CSequential [

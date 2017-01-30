@@ -246,13 +246,12 @@ module TessDeconstruct =
             return v.pos + col + V4d(s.X, s.Y, 0.0, 0.0)
         }
 
-
     let loopUnroll (v : Vertex) =
         fragment {
             let mutable a = 0.0
 
             Preprocessor.unroll()
-            for i in 0 .. 2 .. 4 do
+            for i in 0 .. 2 .. 6 do
                 a <- a + float i
 
             if a < 10.0 then
