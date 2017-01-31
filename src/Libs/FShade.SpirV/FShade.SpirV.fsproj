@@ -67,6 +67,7 @@
     <Compile Include="Core\SpirV.fs" />
     <Compile Include="Utilities.fs" />
     <Compile Include="Assembler.fs" />
+    <Compile Include="Extensions.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />

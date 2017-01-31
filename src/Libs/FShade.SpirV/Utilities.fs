@@ -48,6 +48,8 @@ module SpirV =
     let setUniformId (name : string) (var : uint32) (fields : list<uint32>) : SpirV<unit> =
         State.modify (fun s -> { s with uniformIds = Map.add name (var, fields) s.uniformIds })
 
+    let getUniformId (name : string) : SpirV<uint32 * list<uint32>> =
+        State.get |> State.map (fun s -> Map.find name s.uniformIds)
 
     type CachedSpirVBuilder(key : obj) =
         inherit StateBuilder()

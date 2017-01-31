@@ -1,6 +1,8 @@
 ﻿namespace FShade.SpirV
 
 open System
+open System.Reflection
+
 open Aardvark.Base
 open Aardvark.Base.Monads.State
 open FShade
@@ -119,7 +121,7 @@ module Assembler =
                     yield OpConstant(tid, id, [| uint32 (v >>> 32); uint32 v |])
 
                 | CFloat(32 | 64), CFractional v ->
-                    let value = v |> BitConverter.GetBytes
+                    let value = v |> float32 |> BitConverter.GetBytes
                     yield OpConstant(tid, id, [| BitConverter.ToUInt32(value, 0) |])
                     
                 | CFloat(16), CFractional v ->
@@ -222,6 +224,22 @@ module Assembler =
                     yield OpPhi(tid, id, [| vTrue; lTrue; vFalse; lFalse |])
                     return id
 
+                | CReadInput(ParameterKind.Uniform, t, name, None) ->
+                    let! vid, path = SpirV.getUniformId name
+                    match path with
+                        | [] -> 
+                            let! id = SpirV.id
+                            yield OpLoad(tid, id, vid, None)
+                            return id
+
+                        | p ->  
+                            let! ptrType = assemblePtrType StorageClass.Uniform t
+                            let! ptr = SpirV.id
+                            yield OpInBoundsAccessChain(ptrType, ptr, vid, List.toArray p)
+                            let! id = SpirV.id
+                            yield OpLoad(tid, id, ptr, None)
+                            return id
+                            
                 | CReadInput(kind, t, name, index) ->
                     let! vid = SpirV.getId (kind, name)
                     match index with
@@ -231,9 +249,7 @@ module Assembler =
                             return id
                         | Some index ->
                             let! index = assembleExpr index
-                            let clazz =
-                                if kind = ParameterKind.Input then StorageClass.Input
-                                else StorageClass.Uniform
+                            let clazz = StorageClass.Input
 
                             let! ptrType = assemblePtrType clazz (CPointer(CPointerModifier.None, t))
                             let! ptr = SpirV.id
@@ -559,19 +575,182 @@ module Assembler =
                     return id
         }
 
-    let rec assembleLExpr (s : CLExpr) : SpirV<uint32> =
+    let rec assembleLExpr (e : CLExpr) : SpirV<uint32> =
         spirv {
-            return failwith "not implemented"
+            let! tid = assemblePtrType StorageClass.Private e.ctype
+            match e with
+                | CLVar v ->
+                    return! SpirV.getId v.name
+
+                | CLExpr.CLField(_, e, f) ->
+                    let! eid = assembleLExpr e
+                    let! fid = SpirV.tryGetFieldId e.ctype f
+                    match fid with
+                        | Some fid ->
+                            let! fid = assembleLiteral (CType.CInt(true, 32)) (CIntegral (int64 fid))
+                            let! id = SpirV.id
+                            yield OpInBoundsAccessChain(tid, id, eid, [| fid |])
+                            return id
+                        | None ->
+                            return failwithf "[FShade] unknown field %A" f
+
+                | CLExpr.CLItem(_, e, i) ->
+                    let! eid = assembleLExpr e
+                    let! iid = assembleExpr i
+                    let! id = SpirV.id
+                    yield OpInBoundsAccessChain(tid, id, eid, [| iid |])
+                    return id
+
+                | _ ->
+                    return failwith "not implemented"
+                    
         }
    
-    let rec assembleStatement (s : CStatement) : SpirV<unit> =
+    let rec assembleStatement (lBreak : Option<uint32>) (lCont : Option<uint32>) (s : CStatement) : SpirV<unit> =
         spirv {
-            return failwith "not implemented"
+            match s with
+                | CNop ->
+                    ()
+
+                | CDo e ->
+                    let! id = assembleExpr e
+                    ()
+
+                | CDeclare(v, r) ->
+                    let! t = assemblePtrType StorageClass.Private v.ctype
+                    let! vid = SpirV.id
+
+                    match r with
+                        | Some r ->
+                            let! rid = assembleRExpr r
+                            yield OpVariable(t, vid, StorageClass.Private, Some rid)
+                        | None ->
+                            yield OpVariable(t, vid, StorageClass.Private, None)
+
+                    do! SpirV.setId v.name vid
+
+                | CWrite(l, v) ->
+                    let! lid = assembleLExpr l
+                    let! vid = assembleExpr v
+                    yield OpStore(lid, vid, None)
+
+                | CIncrement(_, v) ->
+                    let t = v.ctype
+                    let! tid = assembleType t
+                    let! v = assembleLExpr v
+                    let! c1 = assembleLiteral t (CIntegral 1L)
+                    let! id0 = SpirV.id
+                    let! id1 = SpirV.id
+                    yield OpLoad(tid, id0, v, None)
+                    yield OpIAdd(tid, id1, id0, c1)
+                    yield OpStore(v, id1, None)
+
+                | CDecrement(_, v) ->
+                    let t = v.ctype
+                    let! tid = assembleType t
+                    let! v = assembleLExpr v
+                    let! c1 = assembleLiteral t (CIntegral 1L)
+                    let! id0 = SpirV.id
+                    let! id1 = SpirV.id
+                    yield OpLoad(tid, id0, v, None)
+                    yield OpISub(tid, id1, id0, c1)
+                    yield OpStore(v, id1, None)
+
+                | CSequential ss ->
+                    for s in ss do 
+                        do! assembleStatement lBreak lCont s
+
+                | CReturnValue v ->
+                    let! v = assembleExpr v
+                    yield OpReturnValue v
+
+                | CReturn ->
+                    yield OpReturn
+
+                | CBreak ->
+                    match lBreak with
+                        | Some lBreak -> yield OpBranch lBreak
+                        | _ -> failwith "break outside loop"
+
+                | CContinue ->
+                    match lCont with
+                        | Some lCont -> yield OpBranch lCont
+                        | _ -> failwith "continue outside loop"
+
+                | CWriteOutput(name, index, value) ->
+                    let! vid = assembleRExpr value
+                    match index with
+                        | Some _ -> failwith "not implemented"
+                        | None ->
+                            let! id = SpirV.getId (ParameterKind.Output, name)
+                            yield OpStore(id, vid, None)
+
+                | CFor(init, cond, step, body) ->
+                    do! assembleStatement lBreak lCont init
+
+                    let! lStart = SpirV.id
+                    let! lBody = SpirV.id
+                    let! lEnd = SpirV.id
+                    let! lStep = SpirV.id
+
+                    yield OpLabel lStart
+                    let! c = assembleExpr cond
+                    yield OpBranchConditional(c, lBody, lEnd, [||])
+                    yield OpLabel lBody
+
+                    do! assembleStatement (Some lEnd) (Some lStep) body
+
+                    yield OpLabel lStep
+                    do! assembleStatement lBreak lCont step
+                    yield OpBranch lStart
+
+                    yield OpLabel lEnd
+
+                | CWhile(guard, body) ->
+                    let! lStart = SpirV.id
+                    let! lBody = SpirV.id
+                    let! lEnd = SpirV.id
+
+                    yield OpLabel lStart
+                    let! v = assembleExpr guard
+                    yield OpBranchConditional(v, lBody, lEnd, [||])
+                    yield OpLabel lBody
+                    do! assembleStatement (Some lEnd) (Some lStart) body
+                    yield OpBranch lStart
+                    yield OpLabel lEnd
+
+                | CDoWhile(guard, body) ->
+                    let! lStart = SpirV.id
+                    let! lEnd = SpirV.id
+
+                    yield OpLabel lStart
+                    do! assembleStatement (Some lEnd) (Some lStart) body
+                    let! v = assembleExpr guard
+                    yield OpBranchConditional(v, lStart, lEnd, [||])
+                    yield OpLabel lEnd
+                    
+                | CIfThenElse(guard, bTrue, bFalse) ->
+                    let! g = assembleExpr guard
+                    let! lTrue = SpirV.id
+                    let! lFalse = SpirV.id
+                    let! lEnd = SpirV.id
+
+                    yield OpBranchConditional(g, lTrue, lFalse, [||])
+                    yield OpLabel lTrue
+                    do! assembleStatement lBreak lCont bTrue
+                    yield OpBranch lEnd
+
+                    yield OpLabel lFalse
+                    do! assembleStatement lBreak lCont bFalse
+                    yield OpLabel lEnd
+
+                | CSwitch _ ->
+                    return failwith "not implemented"
         }
 
     let tryGetBuiltIn (kind : ParameterKind) (stage : ShaderStageDescription) (name : string) : Option<BuiltIn> =
-        failwith "not implemented"
-
+        Log.warn "not implemented"
+        None
 
 
     let assembleFunctionType (args : array<uint32>) (ret : uint32) =
@@ -687,7 +866,7 @@ module Assembler =
                 do! SpirV.setId (ParameterKind.Argument, name) id
 
 
-            do! assembleStatement e.cBody
+            do! assembleStatement None None e.cBody
 
             yield OpFunctionEnd
 
@@ -759,7 +938,7 @@ module Assembler =
                         do! SpirV.setId p.name id
 
 
-                    do! assembleStatement body
+                    do! assembleStatement None None body
 
                     yield OpFunctionEnd
                     do! SpirV.setId signature id
@@ -808,3 +987,20 @@ module Assembler =
         }
 
 
+
+
+
+type Backend private() =
+    inherit Compiler.Backend()
+    static let instance = Backend()
+
+    static member Instance = instance
+
+    override x.TryGetIntrinsicMethod (c : MethodInfo) =
+        None
+
+    override x.TryGetIntrinsicCtor (c : ConstructorInfo) =
+        None
+
+    override x.TryGetIntrinsicType (t : Type) =
+        None
