@@ -210,20 +210,22 @@ module Assembler =
 
             | _ -> failwithf "[GLSL] cannot assemble type %A" t 
 
+    let assembleDeclaration (t : CType) (name : string) =
+        match t with
+            | CArray(et, len) ->
+                sprintf "%s %s[%d]" (assembleType et) name len
+            | t ->
+                sprintf "%s %s" (assembleType t) name
+        
+
     let assembleParameter (p : CParameter) =
         let modifier =
             match p.modifier with
                 | CParameterModifier.In -> ""
                 | CParameterModifier.ByRef -> "inout "
 
-        match p.ctype with
-            | CArray(et, l) ->
-                let t = assembleType et
-                sprintf "%s%s %s[%d]" modifier t p.name l
-
-            | pt ->
-                let t = assembleType pt
-                sprintf "%s%s %s" modifier t p.name
+        let decl = assembleDeclaration p.ctype p.name
+        sprintf "%s%s" modifier decl
 
     let assembleFunctionSignature (s : CFunctionSignature) =
         let ret = s.returnType |> assembleType
@@ -485,18 +487,10 @@ module Assembler =
 
                 | CDeclare(v, r) ->
                     let! r = r |> Option.mapS assembleRExprS
-                    match v.ctype with
-                        | CArray(t, l) ->
-                            let t = assembleType t
-                            match r with
-                                | Some r -> return sprintf "%s %s[%d] = %s;" t v.name l r
-                                | None -> return sprintf "%s %s[%d];" t v.name l
-
-                        | t ->
-                            let t = assembleType t
-                            match r with
-                                | Some r -> return sprintf "%s %s = %s;" t v.name r
-                                | None -> return sprintf "%s %s;" t v.name
+                    let decl = assembleDeclaration v.ctype v.name
+                    match r with
+                        | Some r -> return sprintf "%s = %s;" decl r
+                        | None -> return sprintf "%s;" decl
 
                 | CWriteOutput(name, index, value) ->
                     let! name = parameterNameS ParameterKind.Output name
@@ -604,50 +598,47 @@ module Assembler =
         else
             ""
 
+
     let assembleUniformsS (uniforms : list<CUniform>) =
         state {
             let! config = AssemblerState.config
-            if config.createUniformBuffers then
-                let buffers =
-                    uniforms 
-                        |> List.groupBy (fun u -> u.cUniformBuffer)
+            let buffers =
+                uniforms 
+                    |> List.groupBy (fun u -> u.cUniformBuffer)
 
-                let! set = AssemblerState.newSet
-                let! definitions =
-                    buffers |> List.mapS (fun (name, fields) ->
-                        state {
-                            let fields = 
-                                fields |> List.map (fun u -> 
-                                    sprintf "%s %s;" (assembleType u.cUniformType) u.cUniformName
-                                )
-                            match name with
-                                | None ->
-                                    let! definitions = 
-                                        fields |> List.mapS (fun f ->
-                                            state {
-                                                let! binding = AssemblerState.newBinding
-                                                let prefix = uniformLayout set binding
-                                                return sprintf "%suniform %s" prefix f
-                                            }
-                                        )
-
-                                    return definitions |> String.concat "\r\n"
-                                | Some bufferName ->
-                                    let! binding = AssemblerState.newBinding
+            let! set = AssemblerState.newSet
+            let! definitions =
+                buffers |> List.mapS (fun (name, fields) ->
+                    state {
+                        let fields = 
+                            fields |> List.map (fun u -> 
+                                let decl = assembleDeclaration u.cUniformType u.cUniformName
+                                sprintf "%s;" decl    
+                            )
+                        match name with
+                            | Some bufferName when config.createUniformBuffers ->
+                                let! binding = AssemblerState.newBinding
                                     
-                                    let fields = fields |> String.concat "\r\n"
-                                    let prefix = uniformLayout set binding
+                                let fields = fields |> String.concat "\r\n"
+                                let prefix = uniformLayout set binding
                             
-                                    return sprintf "%suniform %s\r\n{\r\n%s\r\n};\r\n" prefix bufferName (String.indent fields)
-                        }
-                    )
+                                return sprintf "%suniform %s\r\n{\r\n%s\r\n};\r\n" prefix bufferName (String.indent fields)
+
+                            | _ ->
+                                let! definitions = 
+                                    fields |> List.mapS (fun f ->
+                                        state {
+                                            let! binding = AssemblerState.newBinding
+                                            let prefix = uniformLayout set binding
+                                            return sprintf "%suniform %s" prefix f
+                                        }
+                                    )
+
+                                return definitions |> String.concat "\r\n"
+                    }
+                )
                 
-                return String.concat "\r\n\r\n" definitions
-            else   
-                return 
-                    uniforms
-                        |> List.map (fun u -> sprintf "uniform %s %s;" (assembleType u.cUniformType) u.cUniformName)
-                        |> String.concat "\r\n"
+            return String.concat "\r\n\r\n" definitions
 
                 
         }
@@ -851,7 +842,7 @@ module Assembler =
         match d with
             | CStructDef(name, fields) ->
                 let fields = fields |> List.map (fun (t, n) -> sprintf "%s %s;" (assembleType t) n) |> String.concat "\r\n"
-                sprintf "struct %s\r\n{\r\n%s\r\n}" name (String.indent fields)
+                sprintf "struct %s\r\n{\r\n%s\r\n};" name (String.indent fields)
 
     let assemble (backend : Backend) (m : CModule) =
         let c = backend.Config
