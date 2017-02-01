@@ -677,12 +677,17 @@ module Assembler =
                                         | InterpolationMode.Sample -> Some "sample"
                                         | InterpolationMode.PerPatch -> Some "patch"
                                         | _ -> None
-                                | ParameterDecoration.Memory _ ->
+                                | ParameterDecoration.Memory _ | ParameterDecoration.Slot _ ->
                                     None
 
                         )
 
-                    let! location = AssemblerState.newLocation kind p.cParamType
+                    let slot = p.cParamDecorations |> Seq.tryPick (function ParameterDecoration.Slot s -> Some s | _ -> None)
+
+                    let! location = 
+                        match slot with
+                            | Some slot -> State.value slot
+                            | _ -> AssemblerState.newLocation kind p.cParamType
 
                     let decorations =
                         match kind with

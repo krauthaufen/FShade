@@ -97,6 +97,37 @@ type Effect internal(id : string, shaders : Map<ShaderStage, Shader>) =
 
     new(m) = Effect(Effect.NewId(), m)
 
+
+type EffectConfig =
+    {
+        depthRange          : Range1d
+        flipHandedness      : bool
+        lastStage           : ShaderStage
+        outputs             : Map<string, Type * int>
+    }
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module EffectConfig =
+    let empty =
+        {
+            depthRange      = Range1d(-1.0, 1.0)
+            flipHandedness  = false
+            lastStage       = ShaderStage.Fragment
+            outputs         = Map.empty
+        }
+      
+    let ofMap (m : Map<string, Type * int>) =
+        { empty with outputs = m }
+
+    let ofSeq (m : seq<string * Type * int>) =
+        m |> Seq.map (fun (n,t,i) -> n,(t,i)) |> Map.ofSeq |> ofMap
+
+    let ofList (m : list<string * Type * int>) =
+        ofSeq m
+
+    let ofArray (m : array<string * Type * int>) =
+        ofSeq m
+
 /// the Effect module provides functions for accessing, creating and modifying effects.
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Effect =
@@ -254,13 +285,14 @@ module Effect =
 
     /// creates a new effect which will contain exactly the outputs given by <outputs> at the specified
     /// stage.
-    let link (stage : ShaderStage) (outputs : Map<string, Type>) (effect : Effect) =
+    let private link (stage : ShaderStage) (outputs : Map<string, Type>) (effect : Effect) =
         let rec linkShaders (needed : Map<string, Type>) (l : list<Shader>) =
             match l with
                 | [] -> 
                     []
 
                 | current :: before ->
+                    
                     let desired =
                         needed |> Map.union (Shader.systemOutputs current)
 
@@ -272,6 +304,7 @@ module Effect =
 
                     newCurrent :: newBefore
                              
+
         effect 
             // add the final desired stage passing all desired
             // outputs (if not yet present)
@@ -288,28 +321,12 @@ module Effect =
             // and create the new effect                              
             |> ofList
           
-    /// creates a Module for the given effect which can be used for compilation.              
-    let toModule (effect : Effect) =
-        let rec entryPoints (lastStage : Option<Shader>) (shaders : list<Shader>) =
-            match shaders with
-                | [] -> 
-                    []
-
-                | [shader] -> 
-                    [ Shader.toEntryPoint lastStage shader None ]
-
-                | shader :: next :: after ->
-                    let shaderEntry = Shader.toEntryPoint lastStage shader (Some next) 
-                    shaderEntry :: entryPoints (Some shader) (next :: after)
-
-        { entries = entryPoints None (toList effect) }
-
     let map (f : Shader -> Shader) (effect : Effect) =
         effect.Shaders
             |> Map.map (fun _ -> f)
             |> ofMap
 
-    let withDepthRange (flipHandedness : bool) (range : Range1d) (effect : Effect) =
+    let private withDepthRange (flipHandedness : bool) (range : Range1d) (effect : Effect) =
         if flipHandedness || range.Min <> -1.0 || range.Max <> 1.0 then
             let convertValue (v : ShaderOutputValue) =
                 let ie = v.Value
@@ -369,6 +386,47 @@ module Effect =
                     failwith "[FShade] cannot adjust depth-range for effect without primitive shaders"
         else
             effect
+
+    /// creates a Module for the given effect which can be used for compilation.              
+    let toModule (config : EffectConfig) (effect : Effect) =
+        
+        let effect =
+            effect
+                |> link config.lastStage (Map.map (fun _ -> fst) config.outputs)
+                |> withDepthRange config.flipHandedness config.depthRange
+                
+
+        let rec entryPoints (lastStage : Option<Shader>) (shaders : list<Shader>) =
+            match shaders with
+                | [] -> 
+                    []
+
+                | [shader] -> 
+                    let entry = Shader.toEntryPoint lastStage shader None
+
+                    let mutable free = Set.ofList (entry.outputs |> List.mapi (fun i _ -> i))
+
+                    let outputs = 
+                        entry.outputs
+                            |> List.map (fun o -> 
+                                let slot = 
+                                    match Map.tryFind o.paramName config.outputs with
+                                        | Some(_,slot) -> slot
+                                        | None -> Seq.head free
+                                let o = { o with paramDecorations = Set.add (ParameterDecoration.Slot slot) o.paramDecorations }
+                                free <- Set.remove slot free
+                                (slot, o)
+                            )
+                            |> List.sortBy fst
+                            |> List.map snd
+                            
+                    [ { entry with outputs = outputs } ]
+
+                | shader :: next :: after ->
+                    let shaderEntry = Shader.toEntryPoint lastStage shader (Some next) 
+                    shaderEntry :: entryPoints (Some shader) (next :: after)
+
+        { entries = entryPoints None (toList effect) }
 
     let inputsToUniforms (scopes : Map<string, UniformScope>) (effect : Effect) =
         effect |> map (Shader.inputsToUniforms scopes)

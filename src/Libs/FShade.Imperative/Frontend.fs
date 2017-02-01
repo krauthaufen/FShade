@@ -19,6 +19,7 @@ type ParameterDecoration =
     | Interpolation of InterpolationMode
     | Memory of MemoryType
     | Const
+    | Slot of int
 
 type Uniform =
     {

@@ -56,15 +56,19 @@ let effectTest() =
     
     let effect = Effect.ofList (vert @ frag)
 
+    let config =
+        EffectConfig.ofList [
+            Intrinsics.Color, typeof<V4d>, 1
+            "Bla", typeof<V2d>, 0
+        ]
+
     Effect.empty
-        |> Effect.link ShaderStage.Fragment (Map.ofList ["Colors", typeof<V4d>; "Bla", typeof<V2d>])
-        |> Effect.toModule
+        |> Effect.toModule config
         |> ModuleCompiler.compileGLSL glsl410
         |> printfn "%s"
 
     effect
-        |> Effect.link ShaderStage.Fragment (Map.ofList ["Colors", typeof<V4d>; "Bla", typeof<V2d>])
-        |> Effect.toModule
+        |> Effect.toModule config
         |> ModuleCompiler.compileGLSL glsl410
         |> printfn "%s"
 
@@ -117,10 +121,12 @@ let composeTest() =
     let sc = Effect.ofFunction c
 
 
-
+    let config =
+        EffectConfig.ofList [
+            Intrinsics.Color, typeof<V4d>, 0
+        ]
     Effect.compose [sa; sb] 
-        |> Effect.link ShaderStage.Fragment (Map.ofList [ Intrinsics.Color, typeof<V4d> ])
-        |> Effect.toModule
+        |> Effect.toModule config
         |> ModuleCompiler.compileGLSL glsl410
         |> printfn "%s"
 
@@ -250,12 +256,10 @@ module TessDeconstruct =
         fragment {
             let mutable a = 0.0
 
-            Preprocessor.unroll()
+            //Preprocessor.unroll()
             for i in 0 .. 2 .. 6 do
                 a <- a + float i
 
-            if a < 10.0 then
-                discard()
 
             return V4d(a, 0.0, 0.0, 1.0)
         }
@@ -269,16 +273,28 @@ module TessDeconstruct =
         printfn "equal: %A" (s0 = s1)
 
     let run() =
+//
+//        let test =
+//            Effect.ofFunction loopUnroll
+//                |> Effect.toModule (Map.ofList ["Colors", 0])
+//                |> ModuleCompiler.compileSpirV
+//
+//        for i in test.instructions do
+//            printfn "%A" i
+//        System.Environment.Exit 0
+
+
+
+        let config =
+            EffectConfig.ofList [
+                Intrinsics.Color, typeof<V4d>, 0
+                "Blubb", typeof<float>, 2
+            ]
+
         let cModule = 
             Effect.compose [Effect.ofFunction loopUnroll]
-                |> Effect.link ShaderStage.Fragment (Map.ofList [ Intrinsics.Color, typeof<V4d> ])
-                //|> Effect.withDepthRange true (Range1d(0.0, 1.0))
-                |> Effect.toModule
+                |> Effect.toModule config
                 |> ModuleCompiler.compile glsl410
-
-        let usage = CModule.usageInfo cModule
-
-        printfn "%A" usage
 
         cModule
             |> GLSL.Assembler.assemble glsl410
