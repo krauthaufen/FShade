@@ -49,12 +49,12 @@ module internal MethodTable =
 [<AutoOpen>]
 module internal Operators =
     let exactly (e : Expr) =
+        MethodTable.getMethod e
+
+    let generic (e : Expr) =
         let mi = MethodTable.getMethod e
         if mi.IsGenericMethod then mi.GetGenericMethodDefinition()
         else mi
-
-    let generic (e : Expr) =
-        MethodTable.getMethod e
 
 module internal String =
     let private lineBreak = System.Text.RegularExpressions.Regex("\r\n")
