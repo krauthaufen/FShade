@@ -56,6 +56,11 @@ type CType =
     | CStruct of name : string * fields : list<CType * string> * original : Option<Type>
     | CIntrinsic of CIntrinsicType
 
+[<AllowNullLiteral>]
+type IBackend =
+    abstract member TryGetIntrinsic : Type -> Option<CIntrinsicType>
+
+
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module CType =
     let private primitiveTypes =
@@ -83,32 +88,40 @@ module CType =
         ]
 
     let private typeCache =
-        let dict = System.Collections.Concurrent.ConcurrentDictionary<Type, CType>()
+        let dict = System.Collections.Concurrent.ConcurrentDictionary<Option<IBackend> * Type, CType>()
         for (k,v) in Dictionary.toSeq primitiveTypes do
-            dict.[k] <- v
-        dict
+            dict.[(None, k)] <- v
+        
+        fun (b : IBackend) (t : Type) (f : IBackend -> Type -> CType) ->
+            match dict.TryGetValue((None, t)) with
+                | (true, res) -> res
+                | _ -> dict.GetOrAdd((Some b,t), fun _ -> f b t)
+
 
     /// creates a c representation for a given system type
-    let rec ofType (t : Type) : CType =
-        typeCache.GetOrAdd(t, fun t ->
-            match t with
-                | VectorOf(d, t)    -> CVector(ofType t, d)
-                | MatrixOf(s, t)    -> CMatrix(ofType t, s.Y, s.X)
-                | ArrOf(len, t)     -> CArray(ofType t, len)
-                | Ref t             -> ofType t
-                | t when t.IsArray  -> CType.CPointer(CPointerModifier.None, ofType (t.GetElementType()))
-                | t                 -> ofCustomType t
+    let rec ofType (b : IBackend) (t : Type) : CType =
+        typeCache b t (fun b t ->
+            match b.TryGetIntrinsic t with
+                | Some i -> CIntrinsic i
+                | None -> 
+                    match t with
+                        | VectorOf(d, t)    -> CVector(ofType b t, d)
+                        | MatrixOf(s, t)    -> CMatrix(ofType b t, s.Y, s.X)
+                        | ArrOf(len, t)     -> CArray(ofType b t, len)
+                        | Ref t             -> ofType b t
+                        | t when t.IsArray  -> CType.CPointer(CPointerModifier.None, ofType b (t.GetElementType()))
+                        | t                 -> ofCustomType b t
         )
 
     /// creates a struct representation for a given system type
-    and private ofCustomType (t : Type) =
+    and private ofCustomType (b : IBackend) (t : Type) =
         let name = typeName t
         if FSharpType.IsRecord(t, true) then
-            let fields = FSharpType.GetRecordFields(t, true) |> Array.toList |> List.map (fun pi -> ofType pi.PropertyType, pi.Name) 
+            let fields = FSharpType.GetRecordFields(t, true) |> Array.toList |> List.map (fun pi -> ofType b pi.PropertyType, pi.Name) 
             CStruct(name, fields, Some t)
             
         elif FSharpType.IsTuple t then
-            let fields = FSharpType.GetTupleElements(t) |> Array.toList |> List.mapi (fun i t -> ofType t, sprintf "Item%d" i)
+            let fields = FSharpType.GetTupleElements(t) |> Array.toList |> List.mapi (fun i t -> ofType b t, sprintf "Item%d" i)
             CStruct(name, fields, Some t)
 
         elif FSharpType.IsUnion(t, true) then
@@ -116,16 +129,16 @@ module CType =
                 FSharpType.GetUnionCases(t, true) |> Array.toList |> List.collect (fun ci ->
                     ci.GetFields() |> Array.toList |> List.map (fun fi ->
                         let name = ci.Name + "_" + fi.Name
-                        ofType fi.PropertyType, name
+                        ofType b fi.PropertyType, name
                     )
                 )
 
-            let tagField = (ofType typeof<int>, "tag")
+            let tagField = (CType.CInt(true, 32), "tag")
             CStruct(name, tagField :: caseFields, Some t)
             
         else
             let fields = t.GetFields(BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
-            let fields = fields |> Array.toList |> List.map (fun fi -> ofType fi.FieldType, fi.Name) 
+            let fields = fields |> Array.toList |> List.map (fun fi -> ofType b fi.FieldType, fi.Name) 
             CStruct(name, fields, Some t)
    
        
@@ -146,7 +159,7 @@ type CParameter =
 module CParameter =
 
     /// creates a CParameter for a given ParameterInfo
-    let ofParameterInfo (p : ParameterInfo) =
+    let ofParameterInfo (b : IBackend) (p : ParameterInfo) =
         let paramType, isByRef =
             if p.ParameterType.IsByRef then
                 p.ParameterType.GetElementType(), true
@@ -155,12 +168,12 @@ module CParameter =
 
         {
             name = p.Name
-            ctype = CType.ofType paramType
+            ctype = CType.ofType b paramType
             modifier = (if isByRef then CParameterModifier.ByRef else CParameterModifier.In)
         }
 
     /// creates a CParameter for a given Var
-    let ofVar (p : Var) =
+    let ofVar (b : IBackend) (p : Var) =
         let paramType, isByRef =
             if p.Type.IsByRef then
                 p.Type.GetElementType(), true
@@ -171,7 +184,7 @@ module CParameter =
 
         {
             name = p.Name
-            ctype = CType.ofType paramType
+            ctype = CType.ofType b paramType
             modifier = (if isByRef then CParameterModifier.ByRef else CParameterModifier.In)
         }
 
@@ -187,18 +200,18 @@ type CFunctionSignature =
 module CFunctionSignature =
 
     /// creates a CFunctionSignature for a given MethodInfo
-    let ofMethodInfo (mi : MethodInfo) =
+    let ofMethodInfo (b : IBackend) (mi : MethodInfo) =
         {
             name = methodName mi
-            returnType = CType.ofType mi.ReturnType
-            parameters = mi.GetParameters() |> Array.map CParameter.ofParameterInfo
+            returnType = CType.ofType b mi.ReturnType
+            parameters = mi.GetParameters() |> Array.map (CParameter.ofParameterInfo b)
         }
 
-    let ofFunction (name : string) (args : list<Var>) (ret : Type) =
+    let ofFunction (b : IBackend) (name : string) (args : list<Var>) (ret : Type) =
         {
             name = name
-            returnType = CType.ofType ret
-            parameters = args |> List.toArray |> Array.map CParameter.ofVar
+            returnType = CType.ofType b ret
+            parameters = args |> List.toArray |> Array.map (CParameter.ofVar b)
         }
         
 
@@ -420,8 +433,8 @@ type internal Used() =
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module CExpr =
 
-    let tryCreateValue (valueType : Type) (value : obj) =
-        let t = CType.ofType valueType
+    let tryCreateValue (b : IBackend) (valueType : Type) (value : obj) =
+        let t = CType.ofType b valueType
         match CLiteral.tryCreate value with
             | Some literal ->
                 CValue(t, literal) |> Some

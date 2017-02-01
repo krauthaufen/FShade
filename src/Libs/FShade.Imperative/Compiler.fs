@@ -30,6 +30,9 @@ module Compiler =
         abstract member TryGetIntrinsicCtor : ConstructorInfo -> Option<CIntrinsic>
         abstract member TryGetIntrinsicType : Type -> Option<CIntrinsicType>
 
+        interface IBackend with
+            member x.TryGetIntrinsic (t : Type) = x.TryGetIntrinsic t
+
         member x.TryGetIntrinsic (m : MethodBase) =
             intrinsicFunctions.GetOrAdd(m, fun m ->
                 match m with
@@ -48,13 +51,13 @@ module Compiler =
         | CompiledFunction of signature : CFunctionSignature * body : CStatement
         | ManagedFunctionWithSignature of signature : CFunctionSignature * body : Expr
 
-        member x.Signature =
+        member x.Signature (b : IBackend) =
             match x with
                 | CompiledFunction(s,_) -> 
                     s
 
                 | ManagedFunction(name,args,body) ->
-                    CFunctionSignature.ofFunction name args body.Type
+                    CFunctionSignature.ofFunction b name args body.Type
 
                 | ManagedFunctionWithSignature(s,_) ->
                     s
@@ -74,22 +77,22 @@ module Compiler =
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module Constructors =
         
-        let cache = System.Collections.Concurrent.ConcurrentDictionary<Type, FunctionDefinition>()
-        let unionCache = System.Collections.Concurrent.ConcurrentDictionary<Type, HashMap<UnionCaseInfo, FunctionDefinition>>()
-        let ctorCache = System.Collections.Concurrent.ConcurrentDictionary<ConstructorInfo, FunctionDefinition>()
+        let cache = System.Collections.Concurrent.ConcurrentDictionary<IBackend * Type, FunctionDefinition>()
+        let unionCache = System.Collections.Concurrent.ConcurrentDictionary<IBackend * Type, HashMap<UnionCaseInfo, FunctionDefinition>>()
+        let ctorCache = System.Collections.Concurrent.ConcurrentDictionary<IBackend * ConstructorInfo, FunctionDefinition>()
 
-        let tuple (t : Type) =
-            cache.GetOrAdd(t, fun t ->
+        let tuple (b : IBackend) (t : Type) =
+            cache.GetOrAdd((b,t), fun (b,t) ->
                 let cName = 
                     "new_" + typeName t
 
                 let cParameters = 
                     FSharpType.GetTupleElements t
-                        |> Array.map CType.ofType 
+                        |> Array.map (CType.ofType b)
                         |> Array.mapi (fun i ct -> { name = sprintf "item%d" i; ctype = ct; modifier = CParameterModifier.In })
 
                 let cType =
-                    CType.ofType t
+                    CType.ofType b t
             
                 let cSignature =
                     {
@@ -116,8 +119,8 @@ module Compiler =
                 CompiledFunction(cSignature, cDefinition)
             )
 
-        let record (t : Type) =
-            cache.GetOrAdd(t, fun t ->
+        let record (b : IBackend) (t : Type) =
+            cache.GetOrAdd((b,t), fun (b,t) ->
                 let cName = 
                     "new_" + typeName t
 
@@ -126,11 +129,11 @@ module Compiler =
 
                 let cParameters =
                     cFields |> Array.map (fun pi ->
-                        { name = pi.Name.ToLower(); ctype = CType.ofType pi.PropertyType; modifier = CParameterModifier.In }
+                        { name = pi.Name.ToLower(); ctype = CType.ofType b pi.PropertyType; modifier = CParameterModifier.In }
                     )   
                     
                 let cType =
-                    CType.ofType t
+                    CType.ofType b t
             
                 let cSignature =
                     {
@@ -157,9 +160,9 @@ module Compiler =
                 CompiledFunction(cSignature, cDefinition)
             )
 
-        let union (t : Type) =
-            unionCache.GetOrAdd(t, fun t ->
-                let cType = CType.ofType t
+        let union (b : IBackend) (t : Type) =
+            unionCache.GetOrAdd((b,t), fun (b,t) ->
+                let cType = CType.ofType b t
                 let cTypeName = typeName t
                 
                 FSharpType.GetUnionCases(t, true)
@@ -169,11 +172,11 @@ module Compiler =
 
                         let cParameters =
                             cFields |> Array.map (fun pi ->
-                                { name = pi.Name.ToLower(); ctype = CType.ofType pi.PropertyType; modifier = CParameterModifier.In }
+                                { name = pi.Name.ToLower(); ctype = CType.ofType b pi.PropertyType; modifier = CParameterModifier.In }
                             )  
 
                         let cType =
-                            CType.ofType t
+                            CType.ofType b t
             
                         let cSignature =
                             {
@@ -205,7 +208,7 @@ module Compiler =
                     |> HashMap.ofSeq
             )
 
-        let custom (ctor : ConstructorInfo) =
+        let custom (b : IBackend) (ctor : ConstructorInfo) =
             let baseType = ctor.DeclaringType.BaseType
             if baseType <> typeof<obj> && baseType <> typeof<ValueType> then
                 failwithf "[FShade] cannot compile constructor for OOP-style type inheriting from a different class"
@@ -230,7 +233,7 @@ module Compiler =
                     | _ ->
                         failwithf "[FShade] unexpected constructor definition %A" e
 
-            ctorCache.GetOrAdd(ctor, fun ctor ->
+            ctorCache.GetOrAdd((b,ctor), fun (b, ctor) ->
                 match Expr.TryGetReflectedDefinition ctor with
                     | Some e ->
                         let args, body = preprocessCtor e
@@ -293,8 +296,8 @@ module Compiler =
                 | CVector(bt, d)    -> CNewVector(t, d, List.replicate d (one bt))
                 | _                 -> failwithf "[FShade] cannot create one-value for type %A" t
 
-        let rec tryGetBuiltInMethod (mi : MethodInfo) (args : list<CExpr>) =
-            let ct = CType.ofType mi.ReturnType
+        let rec tryGetBuiltInMethod (b : IBackend) (mi : MethodInfo) (args : list<CExpr>) =
+            let ct = CType.ofType b mi.ReturnType
             match mi, args with
                 | Method("op_UnaryNegation", _), [l]        -> CExpr.CNeg(ct, l) |> Some
                 | MethodQuote <@ not @> _, [l]              -> CExpr.CNot(ct, l) |> Some
@@ -441,19 +444,19 @@ module Compiler =
                     CExpr.CItem(ct, arr, index) |> Some
 
 
-                | ConversionMethod(_,o), [arg]              -> CExpr.CConvert(CType.ofType o, arg) |> Some
+                | ConversionMethod(_,o), [arg]              -> CExpr.CConvert(CType.ofType b o, arg) |> Some
                 | _ -> None
 
-        let rec tryGetBuiltInCtor (ctor : ConstructorInfo) (args : list<CExpr>) =
+        let rec tryGetBuiltInCtor (b : IBackend) (ctor : ConstructorInfo) (args : list<CExpr>) =
             match ctor.DeclaringType with
                 | VectorOf(d, t) ->
-                    CNewVector(CType.ofType ctor.DeclaringType, d, args) |> Some
+                    CNewVector(CType.ofType b ctor.DeclaringType, d, args) |> Some
 
                 | _ ->
                     None
 
-        let tryGetBuiltInField (fi : FieldInfo) (arg : CExpr) =
-            let ct = CType.ofType fi.FieldType
+        let tryGetBuiltInField (b : IBackend) (fi : FieldInfo) (arg : CExpr) =
+            let ct = CType.ofType b fi.FieldType
             match fi.DeclaringType, fi.Name with
                 | VectorOf _, "X" -> CVecSwizzle(ct, arg, [CVecComponent.X]) |> Some
                 | VectorOf _, "Y" -> CVecSwizzle(ct, arg, [CVecComponent.Y]) |> Some
@@ -555,12 +558,12 @@ module Compiler =
 
         let useLocalFunction (key : obj) (f : FunctionDefinition) =
             State.custom (fun s ->
-                { s with usedFunctions = HashMap.add key f s.usedFunctions }, f.Signature
+                { s with usedFunctions = HashMap.add key f s.usedFunctions }, f.Signature s.moduleState.backend
             )
 
         let useGlobalFunction (key : obj) (f : FunctionDefinition) =
             State.custom (fun s ->
-                { s with moduleState = { s.moduleState with globalFunctions = HashMap.add key f s.moduleState.globalFunctions } }, f.Signature
+                { s with moduleState = { s.moduleState with globalFunctions = HashMap.add key f s.moduleState.globalFunctions } }, f.Signature s.moduleState.backend
             )
 
         let useCtor (key : obj) (f : FunctionDefinition) =
@@ -568,8 +571,8 @@ module Compiler =
 
         let useConstant (key : obj) (e : Expr) =
             state {
-                let ct = CType.ofType e.Type
                 let! s = State.get
+                let ct = CType.ofType s.moduleState.backend e.Type
                 match HashMap.tryFind key s.moduleState.globalConstants with
                     | None -> 
                         let name = sprintf "_constant%d" s.moduleState.constantIndex
@@ -640,20 +643,26 @@ module Compiler =
         }
 
 
-    let toCTypeS (t : Type) =
+    let rec toCTypeS (t : Type) =
         State.custom (fun s ->
-            match s.moduleState.backend.TryGetIntrinsic t with
-                | Some ci -> 
-                    s, CType.CIntrinsic ci
+            let cType = CType.ofType s.moduleState.backend t
 
-                | None -> 
-                    let cType = CType.ofType t
+            let mutable usedTypes = s.moduleState.usedTypes
+            let rec visit (t : CType) =
+                match t with
+                    | CVector(i,_) | CMatrix(i,_,_) | CArray(i,_) | CPointer(_,i) ->
+                        visit i
 
-                    match cType with
-                        | CStruct _ ->
-                            { s with moduleState = { s.moduleState with ModuleState.usedTypes = HashMap.add (t :> obj) cType s.moduleState.usedTypes } }, cType
-                        | _ ->
-                            s, cType
+                    | CStruct(_, fields, _) ->
+                        usedTypes <- HashMap.add (t :> obj) cType usedTypes
+                        for (f,_) in fields do
+                            visit f
+
+                    | _ -> ()
+
+            visit cType
+            
+            { s with moduleState = { s.moduleState with usedTypes = usedTypes } }, cType
         )
         
     /// converts a variable to a CVar using the cached name or by
@@ -835,24 +844,28 @@ module Compiler =
                     return CItem(ct, arr, i)
 
                 | NewTuple(fields) ->
-                    let! ctor = e.Type |> Constructors.tuple |> CompilerState.useCtor e.Type
+                    let! s = State.get
+                    let! ctor = e.Type |> Constructors.tuple s.moduleState.backend |> CompilerState.useCtor e.Type
                     let! fields = fields |> List.mapS toCExprS |>> List.toArray
                     return CCall(ctor, fields)
 
                 | NewRecord(t, fields) ->
-                    let! ctor = t |> Constructors.record |> CompilerState.useCtor t
+                    let! s = State.get
+                    let! ctor = t |> Constructors.record s.moduleState.backend |> CompilerState.useCtor t
                     let! fields = fields |> List.mapS toCExprS |>> List.toArray
                     return CCall(ctor, fields)
 
                 | NewUnionCase(ci, fields) ->
-                    let ctors = ci.DeclaringType |> Constructors.union
+                    let! s = State.get
+                    let ctors = ci.DeclaringType |> Constructors.union s.moduleState.backend
                     let! ctor = ctors |> HashMap.find ci |> CompilerState.useGlobalFunction ci
                     let! fields = fields |> List.mapS toCExprS |>> List.toArray
                     return CCall(ctor, fields)
 
                 | NewObject(ctor, args) ->
+                    let! s = State.get
                     let! args = args  |> List.mapS toCExprS
-                    match Helpers.tryGetBuiltInCtor ctor args with
+                    match Helpers.tryGetBuiltInCtor s.moduleState.backend ctor args with
                         | Some b ->
                             return b
                         | None -> 
@@ -862,7 +875,7 @@ module Compiler =
                                 | Some i -> 
                                     return CCallIntrinsic(ct, i, List.toArray args)
                                 | None -> 
-                                    let! ctor = ctor |> Constructors.custom |> CompilerState.useGlobalFunction ctor
+                                    let! ctor = ctor |> Constructors.custom s.moduleState.backend |> CompilerState.useGlobalFunction ctor
                                     return CCall(ctor, List.toArray args)
 
 
@@ -890,8 +903,8 @@ module Compiler =
                 | Call(None, mi, t :: args) | Call(Some t, mi, args) ->
                     let args = t :: args
                     let! args = args |> List.mapS toCExprS
-
-                    match Helpers.tryGetBuiltInMethod mi args with
+                    let! s = State.get
+                    match Helpers.tryGetBuiltInMethod s.moduleState.backend mi args with
                         | Some e -> 
                             return e
                         | None ->
@@ -914,7 +927,8 @@ module Compiler =
                     
                 | FieldGet(Some t, f) ->
                     let! t = toCExprS t
-                    match Helpers.tryGetBuiltInField f t with
+                    let! s = State.get
+                    match Helpers.tryGetBuiltInField s.moduleState.backend f t with
                         | Some e ->
                             return e
                         | _ ->
@@ -1009,12 +1023,12 @@ module Compiler =
                     return! toCRExprS e
 
                 | NewFixedArray(cnt, et, args) ->
-                    let ct = CType.ofType et
+                    let! ct = toCTypeS et
                     let! args = args |> List.mapS toCExprS
                     return CRArray(CArray(ct, cnt), args) |> Some
 
                 | NewArray(et, args) ->
-                    let ct = CType.ofType et
+                    let! ct = toCTypeS et
                     let cnt = List.length args
                     let! args = args |> List.mapS toCExprS
                     return CRArray(CArray(ct, cnt), args) |> Some
@@ -1024,7 +1038,7 @@ module Compiler =
                     return None
 
                 | Value(v, EnumerableOf et) ->
-                    let ct = CType.ofType et
+                    let! ct = toCTypeS et
                     let enumerable = v |> unbox<System.Collections.IEnumerable>
                     let values = System.Collections.Generic.List<Expr>()
                     let e = enumerable.GetEnumerator()
@@ -1301,7 +1315,8 @@ module Compiler =
                         | None ->
                             if isLast then
                                 let! name = CompilerState.newName "temp"
-                                let cVar = { name = name; ctype = CType.ofType e.Type }
+                                let! t = toCTypeS e.Type
+                                let cVar = { name = name; ctype = t }
                                 return CSequential [
                                     CDeclare(cVar, None)
                                     CReturnValue(CVar cVar)
@@ -1351,7 +1366,8 @@ module Compiler =
         state {
             match f with
                 | ManagedFunction(name, args, body) ->
-                    let signature = f.Signature
+                    let! s = State.get
+                    let signature = f.Signature s.moduleState.backend
                     let! body = toCStatementS true body
                     return CFunctionDef(signature, body)
 
