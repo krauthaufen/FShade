@@ -128,60 +128,67 @@ module BasicQuotationPatterns =
                         None
 
             | PropertyGet(Some scope, p, []) when scope.Type = typeof<UniformScope> ->
-                try
-                    match Expr.TryEval scope with
-                        | Some scope ->
-                            let result = p.GetValue(scope, [||])
-                            match result with
-                                | :? ISemanticValue as v ->
-                                    Some {
-                                        uniformName = v.Semantic
-                                        uniformType = v.GetType()
-                                        uniformValue = Attribute(v.Scope, v.Semantic)
-                                    }
-                                | _ ->
-                                    None
-                        | None ->
-                            None
-                with :? TargetInvocationException as ex ->
-                    match ex.InnerException with
-                        | :? SemanticException as s -> 
-                            Some {
-                                uniformName = s.Semantic
-                                uniformType = p.PropertyType
-                                uniformValue = Attribute(s.Scope, s.Semantic)
-                            }
-
-                        | _ -> 
-                            None
+                match Expr.TryEval scope with
+                    | Some scope ->
+                        let old = UniformStuff.Push()
+                        let result = p.GetValue(scope, [||])
+                        match result with
+                            | :? ISemanticValue as v ->
+                                Some {
+                                    uniformName = v.Semantic
+                                    uniformType = v.GetType()
+                                    uniformValue = Attribute(v.Scope, v.Semantic)
+                                }
+                            | _ ->
+                                match UniformStuff.Pop old with
+                                    | Some (scope, name) -> 
+                                        Some {
+                                            uniformName = name
+                                            uniformType = p.PropertyType
+                                            uniformValue = Attribute(scope, name)
+                                        }
+                                    | None -> 
+                                        None
+                    | None ->
+                        None
+//                with :? TargetInvocationException as ex ->
+//                    match ex.InnerException with
+//                        | :? SemanticException as s -> 
+//                            Some {
+//                                uniformName = s.Semantic
+//                                uniformType = p.PropertyType
+//                                uniformValue = Attribute(s.Scope, s.Semantic)
+//                            }
+//
+//                        | _ -> 
+//                            None
 
             | Call(None, m, [scope]) when scope.Type = typeof<UniformScope> ->
-                try
-                    match Expr.TryEval scope with
-                        | Some scope ->
-                            let result = m.Invoke(null, [| scope |])
-                            match result with
-                                | :? ISemanticValue as v ->
-                                    Some {
-                                        uniformName = v.Semantic
-                                        uniformType = v.GetType()
-                                        uniformValue = Attribute(v.Scope, v.Semantic)
-                                    }
-                                | _ ->
-                                    None
+                match Expr.TryEval scope with
+                    | Some scope ->
+                        let old = UniformStuff.Push()
+                        let result = m.Invoke(null, [| scope |])
+                        match result with
+                            | :? ISemanticValue as v ->
+                                Some {
+                                    uniformName = v.Semantic
+                                    uniformType = v.GetType()
+                                    uniformValue = Attribute(v.Scope, v.Semantic)
+                                }
+                            | _ ->
+                                match UniformStuff.Pop old with
+                                    | Some (scope, name) -> 
+                                        Some {
+                                            uniformName = name
+                                            uniformType = m.ReturnType
+                                            uniformValue = Attribute(scope, name)
+                                        }
+                                    | None -> 
+                                        None
 
-                        | None ->
-                            None
-                with :? TargetInvocationException as ex ->
-                    match ex.InnerException with
-                        | :? SemanticException as s -> 
-                            Some {
-                                uniformName = s.Semantic
-                                uniformType = m.ReturnType
-                                uniformValue = Attribute(s.Scope, s.Semantic)
-                            }
-                        | _ -> 
-                            None
+                    | None ->
+                        None
+
 
             | _ -> None
 

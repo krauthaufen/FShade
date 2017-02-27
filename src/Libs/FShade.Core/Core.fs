@@ -243,12 +243,6 @@ type UniformScope(parent : Option<UniformScope>, name : string) =
 type ISemanticValue =
     abstract member Semantic : string
     abstract member Scope : UniformScope
-     
-type SemanticException(scope : UniformScope, sem : string) =
-    inherit Exception(sem)
-    member x.Scope = scope
-    member x.Semantic = sem
-
 
 [<AttributeUsage(AttributeTargets.Property ||| AttributeTargets.Field)>]
 type SemanticAttribute(s : string) =
@@ -360,6 +354,25 @@ module UniformExtensions =
 
     let uniform = UniformScope(None, "Global")
 
+
+    type internal UniformStuff private() =
+
+        [<ThreadStatic; DefaultValue>]
+        static val mutable private current : Option<UniformScope * string>
+
+        static member Push() =
+            let old = UniformStuff.current
+            UniformStuff.current <- None
+            old
+
+        static member Pop(old : Option<_>) =
+            let c = UniformStuff.current
+            UniformStuff.current <- old
+            c
+
+        static member Set(scope : UniformScope, name : string) =
+            UniformStuff.current <- Some(scope, name)
+
     let (?) (s : UniformScope) (name : string) : 'a =
         let t = typeof<'a>
 
@@ -370,9 +383,11 @@ module UniformExtensions =
                 let result = creator.Invoke(null, [| name :> obj ; s :> obj |])
                 result |> unbox
             else
-                raise <| SemanticException(s, name)
+                UniformStuff.Set(s, name)
+                Unchecked.defaultof<'a>
                 
         elif t = typeof<UniformScope> then
             s.GetChildScope name |> unbox<'a>
         else
-            raise <| SemanticException(s, name)
+            UniformStuff.Set(s, name)
+            Unchecked.defaultof<'a>
