@@ -205,9 +205,9 @@ module TessDeconstruct =
                 yield quad.[quad.InvocationId]
             }
 
+
     [<GLSLIntrinsic("mix({0},{1},{2})")>]
-    let mix (a : V4d) (b : V4d) (t : float) : V4d =
-        failwith "asdsad"
+    let mix (a : 'a) (b : 'a) (t : float) = onlyInShaderCode<'a> "mix"
 
     let test (quad : Patch<3 N, Vertex>) =
         tessellation {
