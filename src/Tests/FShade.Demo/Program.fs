@@ -205,6 +205,10 @@ module TessDeconstruct =
                 yield quad.[quad.InvocationId]
             }
 
+    [<Intrinsic("mix({0},{1},{2})")>]
+    let mix (a : V4d) (b : V4d) (t : float) : V4d =
+        failwith "asdsad"
+
     let test (quad : Patch<3 N, Vertex>) =
         tessellation {
             let p0 = quad.[0].pos
@@ -219,7 +223,9 @@ module TessDeconstruct =
 
             let! coord = tessellateTriangle (level) (level, level, level)
             
-            let p = sinh coord.X * p0.Abs + coord.Y * p1 + coord.Z * p2
+            let test = sinh coord.X * p0.Abs + coord.Y * p1 + coord.Z * p2
+
+            let p = mix p0 test 0.5
 
             return {
                 pos = p + V4d(0.0, level, 0.0, 0.0)
@@ -272,6 +278,7 @@ module TessDeconstruct =
         let s1 = FunctionSignature.ofFunction (fun a -> someFunction V4d.IIII V4d.IIII a)
         printfn "equal: %A" (s0 = s1)
 
+
     let run() =
 //
 //        let test =
@@ -292,7 +299,7 @@ module TessDeconstruct =
             ]
 
         let cModule = 
-            Effect.compose [Effect.ofFunction loopUnroll]
+            Effect.compose [Effect.ofFunction test]
                 |> Effect.toModule config
                 |> ModuleCompiler.compile glsl410
 

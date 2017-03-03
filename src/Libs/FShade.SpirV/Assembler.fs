@@ -537,6 +537,20 @@ module Assembler =
                     yield OpBitwiseXor(tid, id, lid, rid)
                     return id
 
+                | CLeftShift(t, l, r) ->
+                    let! lid = assembleExpr l
+                    let! rid = assembleExpr r
+                    let! id = SpirV.id
+                    yield OpShiftLeftLogical(tid, id, lid, rid)
+                    return id
+
+                | CRightShift(t, l, r) ->
+                    let! lid = assembleExpr l
+                    let! rid = assembleExpr r
+                    let! id = SpirV.id
+                    yield OpShiftRightLogical(tid, id, lid, rid)
+                    return id
+
                 | CAddressOf _ ->
                     return failwith "not implemented"
 

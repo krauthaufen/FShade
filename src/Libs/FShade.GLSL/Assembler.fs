@@ -397,6 +397,16 @@ module Assembler =
                     let! l = assembleExprS l
                     let! r = assembleExprS r
                     return sprintf "(%s ^ %s)" l r
+                    
+                | CLeftShift(_, l, r) ->
+                    let! l = assembleExprS l
+                    let! r = assembleExprS r
+                    return sprintf "(%s << %s)" l r
+
+                | CRightShift(_, l, r) ->
+                    let! l = assembleExprS l
+                    let! r = assembleExprS r
+                    return sprintf "(%s >> %s)" l r
 
                 | CLess(l, r) ->
                     let! l = assembleExprS l

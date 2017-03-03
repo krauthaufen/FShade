@@ -50,6 +50,7 @@
     <Compile Include="Utilities.fs" />
     <Compile Include="Frontend.fs" />
     <Compile Include="Ast.fs" />
+    <Compile Include="Intrinsics.fs" />
     <Compile Include="Compiler.fs" />
     <Compile Include="ModuleCompiler.fs" />
   </ItemGroup>

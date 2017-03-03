@@ -307,6 +307,8 @@ module Compiler =
                 | Method("op_Division", _), [l;r]           -> CExpr.CDiv(ct, l, r) |> Some
                 | Method("op_Modulus", _), [l;r]            -> CExpr.CMod(ct, l, r) |> Some
 
+                | Method("op_LeftShift", _), [l;r]          -> CExpr.CLeftShift(ct, l, r) |> Some
+                | Method("op_RightShift", _), [l;r]         -> CExpr.CRightShift(ct, l, r) |> Some
             
                 | Method("op_Multiply", _), [l;r] ->
                     let lt = l.ctype
@@ -592,8 +594,11 @@ module Compiler =
 
         let tryGetIntrinsic (mi : MethodBase) =
             State.get |> State.map (fun s ->
-                if isNull s.moduleState.backend then None
-                else s.moduleState.backend.TryGetIntrinsic mi
+                if isNull s.moduleState.backend then mi.Intrinsic
+                else 
+                    match s.moduleState.backend.TryGetIntrinsic mi with
+                        | Some i -> Some i
+                        | None -> mi.Intrinsic
             )
 
         type Free =
