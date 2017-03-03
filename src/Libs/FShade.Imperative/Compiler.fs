@@ -594,11 +594,8 @@ module Compiler =
 
         let tryGetIntrinsic (mi : MethodBase) =
             State.get |> State.map (fun s ->
-                if isNull s.moduleState.backend then mi.Intrinsic
-                else 
-                    match s.moduleState.backend.TryGetIntrinsic mi with
-                        | Some i -> Some i
-                        | None -> mi.Intrinsic
+                if isNull s.moduleState.backend then None
+                else s.moduleState.backend.TryGetIntrinsic mi
             )
 
         type Free =

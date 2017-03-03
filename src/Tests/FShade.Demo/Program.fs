@@ -205,7 +205,7 @@ module TessDeconstruct =
                 yield quad.[quad.InvocationId]
             }
 
-    [<Intrinsic("mix({0},{1},{2})")>]
+    [<GLSLIntrinsic("mix({0},{1},{2})")>]
     let mix (a : V4d) (b : V4d) (t : float) : V4d =
         failwith "asdsad"
 

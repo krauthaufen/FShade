@@ -3,21 +3,28 @@
 open System
 open FShade.Imperative
 
-[<AttributeUsage(AttributeTargets.Property ||| AttributeTargets.Method, AllowMultiple = false)>]
-type IntrinsicAttribute(format : string) =
+[<AbstractClass>]
+[<AttributeUsage(AttributeTargets.Property ||| AttributeTargets.Method, AllowMultiple = true)>]
+type IntrinsicAttribute() =
     inherit Attribute()
-    member x.Format = format
+    abstract member Intrinsic : CIntrinsic
+
+
+type GLSLIntrinsicAttribute(format : string) =
+    inherit IntrinsicAttribute()
+
+    override x.Intrinsic =
+        {
+            intrinsicName = null
+            tag = format
+            arguments = None
+        }
 
 [<AutoOpen>]
 module ``Reflection Helpers`` =
     type System.Reflection.MethodBase with
-        member x.Intrinsic =
-            let att = x.GetCustomAttributes(typeof<IntrinsicAttribute>, true) |> Seq.map unbox<IntrinsicAttribute> |> Seq.toList
+        member x.Intrinsic<'a when 'a :> IntrinsicAttribute>() =
+            let att = x.GetCustomAttributes(typeof<'a>, true) |> Seq.map unbox<IntrinsicAttribute> |> Seq.toList
             match att with
-                | h :: _ ->
-                    Some {
-                        intrinsicName = null
-                        tag = h.Format
-                        arguments = None
-                    }
+                | h :: _ -> Some h.Intrinsic
                 | _ -> None

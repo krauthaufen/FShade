@@ -38,7 +38,7 @@ type Backend private(config : Config) =
         match c with
             | IntrinsicFunction f -> Some f
             | TextureLookup fmt -> Some (CIntrinsic.tagged fmt)
-            | _ -> None
+            | _ -> c.Intrinsic<GLSLIntrinsicAttribute>()
 
     override x.TryGetIntrinsicCtor (c : ConstructorInfo) =
         None
