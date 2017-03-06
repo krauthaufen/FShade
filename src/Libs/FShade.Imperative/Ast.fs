@@ -104,13 +104,16 @@ module CType =
             match b.TryGetIntrinsic t with
                 | Some i -> CIntrinsic i
                 | None -> 
-                    match t with
-                        | VectorOf(d, t)    -> CVector(ofType b t, d)
-                        | MatrixOf(s, t)    -> CMatrix(ofType b t, s.Y, s.X)
-                        | ArrOf(len, t)     -> CArray(ofType b t, len)
-                        | Ref t             -> ofType b t
-                        | t when t.IsArray  -> CType.CPointer(CPointerModifier.None, ofType b (t.GetElementType()))
-                        | t                 -> ofCustomType b t
+                    if t.IsEnum then 
+                        ofType b typeof<int>
+                    else
+                        match t with
+                            | VectorOf(d, t)    -> CVector(ofType b t, d)
+                            | MatrixOf(s, t)    -> CMatrix(ofType b t, s.Y, s.X)
+                            | ArrOf(len, t)     -> CArray(ofType b t, len)
+                            | Ref t             -> ofType b t
+                            | t when t.IsArray  -> CType.CPointer(CPointerModifier.None, ofType b (t.GetElementType()))
+                            | t                 -> ofCustomType b t
         )
 
     /// creates a struct representation for a given system type

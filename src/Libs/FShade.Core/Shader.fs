@@ -727,98 +727,98 @@ module private Preprocessor =
                     None
         )
 
-//    let rec computeIO (e : Expr) =
-//        match e with
-//            | ReadInput(kind,n,idx) ->
-//                match idx with
-//                    | Some idx -> computeIO idx |> Map.add (n, kind) e.Type
-//                    | None -> Map.ofList [(n, kind), e.Type]
-//
-//            | WriteOutputs values ->
-//                let used = 
-//                    values |> Map.fold (fun m _ (i,v) ->
-//                        let v = computeIO v
-//                        let i = i |> Option.map computeIO |> Option.defaultValue Map.empty
-//                        Map.union m (Map.union i v)
-//                    ) Map.empty
-//
-//                let written =
-//                    values |> Map.toSeq |> Seq.map (fun (name, (i,v)) -> 
-//                        match i with
-//                            | Some _ -> (name, ParameterKind.Output), v.Type.MakeArrayType()
-//                            | _ -> (name, ParameterKind.Output), v.Type
-//                    ) |> Map.ofSeq
-//
-//                Map.union used written
-//
-//            
-//            | Call(t,mi,args) ->
-//                let inner = 
-//                    match preprocessMethod mi with
-//                        | Some(e, _) -> computeIO e
-//                        | None -> Map.empty
-//
-//                Option.toList t @ args |> List.fold (fun s a -> Map.union s (computeIO a)) inner
-//
-//
-//            | ShapeCombination(o, args) ->
-//                args |> List.fold (fun m e -> Map.union m (computeIO e)) Map.empty
-//
-//            | ShapeLambda(_,b) ->
-//                computeIO b
-//
-//            | ShapeVar _ ->
-//                Map.empty
-//
-//    let rec usedInputs (e : Expr) =
-//        match e with
-//            | ReadInput(kind,n,idx) ->
-//                match idx with
-//                    | Some idx -> usedInputs idx |> Map.add n (kind, e.Type)
-//                    | None -> Map.ofList [n, (kind, e.Type)]
-//            
-//            | Call(t,mi,args) ->
-//                let inner = 
-//                    match preprocessMethod mi with
-//                        | Some(e, _) -> usedInputs e
-//                        | None -> Map.empty
-//
-//                Option.toList t @ args |> List.fold (fun s a -> Map.union s (usedInputs a)) inner
-//
-//
-//            | ShapeCombination(o, args) ->
-//                args |> List.fold (fun m e -> Map.union m (usedInputs e)) Map.empty
-//
-//            | ShapeLambda(_,b) ->
-//                usedInputs b
-//
-//            | ShapeVar _ ->
-//                Map.empty
-//
+    let rec computeIO (e : Expr) =
+        match e with
+            | ReadInput(kind,n,idx) ->
+                match idx with
+                    | Some idx -> computeIO idx |> Map.add (n, kind) e.Type
+                    | None -> Map.ofList [(n, kind), e.Type]
+
+            | WriteOutputs values ->
+                let used = 
+                    values |> Map.fold (fun m _ (i,v) ->
+                        let v = computeIO v
+                        let i = i |> Option.map computeIO |> Option.defaultValue Map.empty
+                        Map.union m (Map.union i v)
+                    ) Map.empty
+
+                let written =
+                    values |> Map.toSeq |> Seq.map (fun (name, (i,v)) -> 
+                        match i with
+                            | Some _ -> (name, ParameterKind.Output), v.Type.MakeArrayType()
+                            | _ -> (name, ParameterKind.Output), v.Type
+                    ) |> Map.ofSeq
+
+                Map.union used written
+
+            
+            | Call(t,mi,args) ->
+                let inner = 
+                    match preprocessMethod mi with
+                        | Some(e, _) -> computeIO e
+                        | None -> Map.empty
+
+                Option.toList t @ args |> List.fold (fun s a -> Map.union s (computeIO a)) inner
+
+
+            | ShapeCombination(o, args) ->
+                args |> List.fold (fun m e -> Map.union m (computeIO e)) Map.empty
+
+            | ShapeLambda(_,b) ->
+                computeIO b
+
+            | ShapeVar _ ->
+                Map.empty
+
+    let rec usedInputs (e : Expr) =
+        match e with
+            | ReadInput(kind,n,idx) ->
+                match idx with
+                    | Some idx -> usedInputs idx |> Map.add n (kind, e.Type)
+                    | None -> Map.ofList [n, (kind, e.Type)]
+            
+            | Call(t,mi,args) ->
+                let inner = 
+                    match preprocessMethod mi with
+                        | Some(e, _) -> usedInputs e
+                        | None -> Map.empty
+
+                Option.toList t @ args |> List.fold (fun s a -> Map.union s (usedInputs a)) inner
+
+
+            | ShapeCombination(o, args) ->
+                args |> List.fold (fun m e -> Map.union m (usedInputs e)) Map.empty
+
+            | ShapeLambda(_,b) ->
+                usedInputs b
+
+            | ShapeVar _ ->
+                Map.empty
+
 
 
 type ShaderOutputValue (mode : InterpolationMode, index : Option<Expr>, value : Expr) =
     let value, inputs, uniforms =
         let value, state = Preprocessor.preprocess value
-//
-//        let inputs, uniforms =
-//            value
-//                |> Preprocessor.usedInputs
-//                |> Map.partition (fun l (kind, t) -> kind = ParameterKind.Input)
 
-        let inputs = state.inputs
-//            inputs |> Map.map (fun name (_,t) ->
-//                match Map.tryFind name state.inputs with
-//                    | Some p -> p
-//                    | None -> { paramType = t; paramInterpolation = InterpolationMode.Default }
-//            )
+        let inputs, uniforms =
+            value
+                |> Preprocessor.usedInputs
+                |> Map.partition (fun l (kind, t) -> kind = ParameterKind.Input)
+
+        let inputs =
+            inputs |> Map.map (fun name (_,t) ->
+                match Map.tryFind name state.inputs with
+                    | Some p -> p
+                    | None -> { paramType = t; paramInterpolation = InterpolationMode.Default }
+            )
             
-        let uniforms = state.uniforms
-//            uniforms |> Map.map (fun name (_,t) ->
-//                match Map.tryFind name state.uniforms with
-//                    | Some p -> p
-//                    | None -> { uniformType = t; uniformName = name; uniformValue = UniformValue.Attribute(uniform, name) }
-//            )
+        let uniforms =
+            uniforms |> Map.map (fun name (_,t) ->
+                match Map.tryFind name state.uniforms with
+                    | Some p -> p
+                    | None -> { uniformType = t; uniformName = name; uniformValue = UniformValue.Attribute(uniform, name) }
+            )
 
         value, inputs, uniforms
 
@@ -1138,52 +1138,48 @@ module Shader =
 
     let withBody (newBody : Expr) (shader : Shader) =
         let newBody, state = newBody |> Preprocessor.preprocess
-        //let io = Preprocessor.computeIO newBody
+        let io = Preprocessor.computeIO newBody
 
-//        let filterIO (desiredKind : ParameterKind) (build : string -> Type -> 'a) =
-//            let io =
-//                if desiredKind = ParameterKind.Input then state.inputs
-//                elif desiredKind = ParameterKind.Uniform then state.uniforms
-//                else state.outputs
-//
-//            io  |> Map.toSeq 
-//                |> Seq.choose (fun ((name, kind), t) -> 
-//                    if kind = desiredKind then 
-//                        Some (name, build name t)
-//                    else 
-//                        None
-//                )
-//                |> Map.ofSeq
+        let filterIO (desiredKind : ParameterKind) (build : string -> Type -> 'a) =
 
-        let newInputs = state.inputs
-//            filterIO ParameterKind.Input (fun name t ->
-//                match Map.tryFind name shader.shaderInputs with
-//                    | Some p -> p
-//                    | _ -> 
-//                        match Map.tryFind name state.inputs with
-//                            | Some p -> p
-//                            | None -> ParameterDescription.ofType t
-//            )
+            io  |> Map.toSeq 
+                |> Seq.choose (fun ((name, kind), t) -> 
+                    if kind = desiredKind then 
+                        Some (name, build name t)
+                    else 
+                        None
+                )
+                |> Map.ofSeq
 
-        let newOutputs = state.outputs
-//            filterIO ParameterKind.Output (fun name t ->
-//                match Map.tryFind name shader.shaderOutputs with
-//                    | Some p -> p
-//                    | _ -> 
-//                        match Map.tryFind name state.outputs with
-//                            | Some p -> p
-//                            | None -> ParameterDescription.ofType t
-//            )
+        let newInputs = 
+            filterIO ParameterKind.Input (fun name t ->
+                match Map.tryFind name shader.shaderInputs with
+                    | Some p -> p
+                    | _ -> 
+                        match Map.tryFind name state.inputs with
+                            | Some p -> p
+                            | None -> ParameterDescription.ofType t
+            )
 
-        let newUniforms =state.uniforms
-//            filterIO ParameterKind.Uniform (fun name t ->
-//                match Map.tryFind name shader.shaderUniforms with
-//                    | Some p -> p
-//                    | None -> 
-//                        match Map.tryFind name state.uniforms with
-//                            | Some p -> p
-//                            | None -> { uniformName = name; uniformType = t; uniformValue = UniformValue.Attribute(uniform, name) }
-//            )
+        let newOutputs = 
+            filterIO ParameterKind.Output (fun name t ->
+                match Map.tryFind name shader.shaderOutputs with
+                    | Some p -> p
+                    | _ -> 
+                        match Map.tryFind name state.outputs with
+                            | Some p -> p
+                            | None -> ParameterDescription.ofType t
+            )
+
+        let newUniforms =
+            filterIO ParameterKind.Uniform (fun name t ->
+                match Map.tryFind name shader.shaderUniforms with
+                    | Some p -> p
+                    | None -> 
+                        match Map.tryFind name state.uniforms with
+                            | Some p -> p
+                            | None -> { uniformName = name; uniformType = t; uniformValue = UniformValue.Attribute(uniform, name) }
+            )
 
         optimize
             { shader with

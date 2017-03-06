@@ -36,12 +36,37 @@ module Bla =
         let a : float = uniform?A?B
         v * a
 
+let private texSampler =
+    sampler2d {
+        texture uniform?ColorTexture
+        filter Filter.Anisotropic
+        addressU WrapMode.Wrap
+        addressV WrapMode.Wrap
+    }
+
 let effectTest() =
+
+    
 
     let vert (v : Vertex) =
         vertex {
+
+            let color = int v.pos.Y
+
+            let color = 
+                let color =
+                    if color > 0 then
+                        let color = 4 * color
+                        color * 3
+
+                    else
+                        0
+
+                color * 7
+
+
             return {
-                pos = Bla.hugo (uniform.Trafo * v.pos)
+                pos = Bla.hugo (uniform.Trafo * v.pos) * float color
                 tc = v.tc
                 vi = 0
             }
@@ -50,7 +75,7 @@ let effectTest() =
     let frag (v : Vertex) =
         fragment {
             return {
-                color = V4d.IIII
+                color = texSampler.Sample(v.tc)
                 tc = v.tc
             }
         }

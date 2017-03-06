@@ -81,10 +81,14 @@ module ModuleCompiler =
                         | _ ->
                             let mutable s = emptyState state.moduleState
                             let def = compile(key).Run(&s)
+                            
+                            
+                            do! State.modify (fun gs -> { gs with moduleState = { gs.moduleState with ModuleState.globalNameIndices = s.moduleState.globalNameIndices } })
 
                             let localFunctions      = s.usedFunctions |> HashMap.toSeq |> Seq.map snd |> Seq.toList
                             let globalFunctions     = s.moduleState.globalFunctions |> HashMap.toSeq |> Seq.map snd |> Seq.toList
                             let globalConstants     = s.moduleState.globalConstants |> HashMap.toSeq |> Seq.map snd |> Seq.toList
+                            
 
                             let! localFunctions = localFunctions |> List.mapS (ofFunction globals)
                             let! globalFunctions = globalFunctions |> List.mapS (ofFunction globals)
@@ -251,6 +255,7 @@ module ModuleCompiler =
                             globalConstants     = HashMap.empty
                             globalParameters    = Set.empty
                             tryGetOverrideCode  = m.tryGetOverrideCode
+                            globalNameIndices   = Map.empty
                         }
                     cache = Dictionary() 
                 }

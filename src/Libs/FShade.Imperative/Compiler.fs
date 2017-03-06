@@ -497,6 +497,7 @@ module Compiler =
 
     type ModuleState =
         {
+            globalNameIndices   : Map<string, int>
             backend             : Backend
             constantIndex       : int
             usedTypes           : HashMap<obj, CType>
@@ -522,6 +523,25 @@ module Compiler =
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module CompilerState =
+
+        let newGlobalName (name : string) =
+            State.custom (fun s ->
+                let m = s.moduleState
+
+                let newM,res = 
+                    match Map.tryFind name m.globalNameIndices with
+                        | Some index ->
+                            let state = { m with globalNameIndices = Map.add name (index + 1) m.globalNameIndices }
+                            let name = name + string index
+                            state, name
+                        | None ->
+                            let state = { m with globalNameIndices = Map.add name 1 m.globalNameIndices }
+                            state, name
+
+                { s with moduleState = newM }, res
+            )
+
+
         let newName (name : string) =
             State.custom (fun s ->
                 match Map.tryFind name s.nameIndices with
@@ -748,6 +768,14 @@ module Compiler =
                                     Some v
                     )
 
+
+                let! parameters =
+                    args |> Array.mapS (fun v ->
+                        state {
+                            let! t = toCTypeS v.Type
+                            return { name = v.Name; ctype = t; modifier = (if v.IsMutable then CParameterModifier.ByRef else CParameterModifier.In) }
+                        }
+                    )   
                     
                 let! variables = 
                     args |> Array.mapS (fun v ->
@@ -763,7 +791,7 @@ module Compiler =
                         }
                     ) 
 
-                let! name = CompilerState.newName "helper"
+                let! name = CompilerState.newGlobalName "helper"
                 let! returnType = toCTypeS e.Type
                 let variables = variables
 
@@ -771,11 +799,11 @@ module Compiler =
                     {
                         name = name
                         returnType = returnType
-                        parameters = 
-                            Array.map2 
-                                (fun (a : CVar) (v : Var) -> { name = a.name; ctype = a.ctype; modifier = (if v.IsMutable then CParameterModifier.ByRef else CParameterModifier.In) }) 
-                                variables
-                                args
+                        parameters = parameters
+//                            Array.map2 
+//                                (fun (a : CVar) (v : Var) -> { name = a.name; ctype = a.ctype; modifier = (if v.IsMutable then CParameterModifier.ByRef else CParameterModifier.In) }) 
+//                                variables
+//                                args
                     }
 
                 let definition = ManagedFunctionWithSignature(signature, e)
@@ -1192,21 +1220,17 @@ module Compiler =
                             
                 | WriteOutputs values ->
                     let! writes =
-                        values |> Map.toList |> List.mapS (fun (name, (index, value)) ->
+                        values |> Map.toList |> List.chooseS (fun (name, (index, value)) ->
                             state {
                                 let! index = 
                                     match index with
                                         | Some index -> toCExprS index |> State.map Some
                                         | _ -> State.value None
 
-                                let! value = toCStatementS true value
-                                let rec replaceReturn (s : CStatement) =
-                                    match s with
-                                        | CReturnValue v -> CWriteOutput(name, index, CRExpr v)
-                                        | CSequential l -> l |> List.map replaceReturn |> CSequential
-                                        | _ -> s
-
-                                return replaceReturn value
+                                let! value = toCRExprS value
+                                match value with
+                                    | Some value -> return CWriteOutput(name, index, value) |> Some
+                                    | None -> return None
                             }
                         )
 
