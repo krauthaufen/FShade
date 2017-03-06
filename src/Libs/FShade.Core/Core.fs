@@ -98,57 +98,88 @@ module FunctionSignature =
 
             elif mi.IsStatic then
                 (target, mi, args)
+
                         
             else
                 if isNull target then
                     failwith "[FShade] target is null for non-static function"
 
-                let targetType = target.GetType()
-                let impl = 
-                    if targetType <> mi.DeclaringType then
-                        let parameters = mi.GetParameters()
-                        let args = parameters |> Array.map (fun p -> p.ParameterType)
-                        let flags = BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance
-                        let impl = targetType.GetMethod(mi.Name, flags, System.Type.DefaultBinder, args, null)
+                match target with
+                    | :? Delegate as d ->
+                        
+                        let impl = d.Method :> MethodBase
+                        let target = d.Target
+                        let definition = Aardvark.Base.IL.Disassembler.disassemble impl
+                        match definition.Body with
+                            | CallClosure(argMap, meth) ->
+                                let args =
+                                    argMap |> List.map (fun a ->
+                                        match a with
+                                            | CField f -> f.GetValue(target) |> Value
+                                            | CArgument i -> args.[i]
+                                            | CValue c -> Value c
+                                    )
+                                if meth.IsStatic then
+                                    extractCall null meth args
+                                else
+                                    match args with
+                                        | Value t :: args -> 
+                                            extractCall t meth args
+                                        | _ ->
+                                            (target, impl, args)
+                            | _ ->
+                                (target, impl, args)
+                    | _ ->
+
+                        let targetType = target.GetType()
+
+
+
+                        let impl = 
+                            if targetType <> mi.DeclaringType then
+                                let parameters = mi.GetParameters()
+                                let args = parameters |> Array.map (fun p -> p.ParameterType)
+                                let flags = BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance
+                                let impl = targetType.GetMethod(mi.Name, flags, System.Type.DefaultBinder, args, null)
+
+                                if isNull impl then
+                                    Log.warn "[FShade] could not get override for method %A in type %A" mi targetType
+                                    null
+                                elif mi.IsGenericMethod then
+                                    if not impl.IsGenericMethod then
+                                        Log.warn "[FShade] could not get override for method %A in type %A" mi targetType
+                                        null
+                                    else
+                                        impl.MakeGenericMethod(mi.GetGenericArguments()) :> MethodBase
+                                else
+                                    impl :> MethodBase
+
+                            else
+                                mi
 
                         if isNull impl then
-                            Log.warn "[FShade] could not get override for method %A in type %A" mi targetType
-                            null
-                        elif mi.IsGenericMethod then
-                            if not impl.IsGenericMethod then
-                                Log.warn "[FShade] could not get override for method %A in type %A" mi targetType
-                                null
-                            else
-                                impl.MakeGenericMethod(mi.GetGenericArguments()) :> MethodBase
+                            (target, mi, args)
                         else
-                            impl :> MethodBase
-
-                    else
-                        mi
-
-                if isNull impl then
-                    (target, mi, args)
-                else
-                    let definition = Aardvark.Base.IL.Disassembler.disassemble impl
-                    match definition.Body with
-                        | CallClosure(argMap, meth) ->
-                            let args =
-                                argMap |> List.map (fun a ->
-                                    match a with
-                                        | CField f -> f.GetValue(target) |> Value
-                                        | CArgument i -> args.[i]
-                                        | CValue c -> Value c
-                                )
-                            if meth.IsStatic then
-                                extractCall null meth args
-                            else
-                                match args with
-                                    | Value t :: args -> 
-                                        extractCall t meth args
-                                    | _ ->
-                                        (target, impl, args)
-                        | _ ->
-                            (target, impl, args)
+                            let definition = Aardvark.Base.IL.Disassembler.disassemble impl
+                            match definition.Body with
+                                | CallClosure(argMap, meth) ->
+                                    let args =
+                                        argMap |> List.map (fun a ->
+                                            match a with
+                                                | CField f -> f.GetValue(target) |> Value
+                                                | CArgument i -> args.[i]
+                                                | CValue c -> Value c
+                                        )
+                                    if meth.IsStatic then
+                                        extractCall null meth args
+                                    else
+                                        match args with
+                                            | Value t :: args -> 
+                                                extractCall t meth args
+                                            | _ ->
+                                                (target, impl, args)
+                                | _ ->
+                                    (target, impl, args)
 
         type Signature =
             {
