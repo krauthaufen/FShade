@@ -3,6 +3,16 @@
 open System
 open Aardvark.Base
 
+
+module internal HashMap =
+    let union (l : HashMap<'a, 'b>) (r : HashMap<'a, 'b>) =
+        let mutable res = l
+        for (k,v) in HashMap.toSeq r do
+            res <- HashMap.add k v res
+
+        res
+
+
 type IFunctionSignature =
     interface end
 

@@ -66,13 +66,17 @@ module Compiler =
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module FunctionDefinition =
-        let ofMethodBase (mi : MethodBase) =
+        let ofMethodBase (tryGetOverrideCode : MethodBase -> Option<Expr>) (mi : MethodBase) =
             let name = methodName mi
-            match Expr.TryGetReflectedDefinition mi with
+            match tryGetOverrideCode mi with
                 | Some (Lambdas(args, body)) ->
                     ManagedFunction(name, List.concat args, body)
                 | _ ->
-                    failwithf "[FShade] cannot call function %A since it is not reflectable" mi
+                    match Expr.TryGetReflectedDefinition mi with
+                        | Some (Lambdas(args, body)) ->
+                            ManagedFunction(name, List.concat args, body)
+                        | _ ->
+                            failwithf "[FShade] cannot call function %A since it is not reflectable" mi
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module Constructors =
@@ -501,6 +505,7 @@ module Compiler =
             globalConstants     : HashMap<obj, ConstantDefinition>
 
             globalParameters    : Set<string>
+            tryGetOverrideCode  : MethodBase -> Option<Expr>
         }
 
     type CompilerState =
@@ -920,7 +925,8 @@ module Compiler =
                                             | None -> args
                                     return CCallIntrinsic(ct, i, List.toArray args)
                                 | _ ->
-                                    let! def = mi |> FunctionDefinition.ofMethodBase |> CompilerState.useGlobalFunction mi
+                                    
+                                    let! def = mi |> FunctionDefinition.ofMethodBase s.moduleState.tryGetOverrideCode |> CompilerState.useGlobalFunction mi
                                     return CCall(def, List.toArray args)
 
 

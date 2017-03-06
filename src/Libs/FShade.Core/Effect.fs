@@ -426,7 +426,10 @@ module Effect =
                     let shaderEntry = Shader.toEntryPoint lastStage shader (Some next) 
                     shaderEntry :: entryPoints (Some shader) (next :: after)
 
-        { entries = entryPoints None (toList effect) }
+
+        let shaders = toList effect
+
+        { entries = entryPoints None shaders; tryGetOverrideCode = Shader.tryGetOverrideCode }
 
     let inputsToUniforms (scopes : Map<string, UniformScope>) (effect : Effect) =
         effect |> map (Shader.inputsToUniforms scopes)

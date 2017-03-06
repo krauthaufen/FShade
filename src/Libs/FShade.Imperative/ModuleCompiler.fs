@@ -233,10 +233,10 @@ module ModuleCompiler =
 
                 CSharpList.toList res
 
-        let ofEntries (backend : Backend) (l : list<EntryPoint>) =
+        let ofModule (backend : Backend) (m : Module) =
             let compile =
                 state {
-                    let! nodes = l |> List.mapS ofEntry
+                    let! nodes = m.entries |> List.mapS ofEntry
                     return nodes
                 }
 
@@ -250,6 +250,7 @@ module ModuleCompiler =
                             globalFunctions     = HashMap.empty
                             globalConstants     = HashMap.empty
                             globalParameters    = Set.empty
+                            tryGetOverrideCode  = m.tryGetOverrideCode
                         }
                     cache = Dictionary() 
                 }
@@ -366,7 +367,7 @@ module ModuleCompiler =
             compile.Run(&state) |> flatten
 
     let compile (backend : Backend) (m : Module) =
-        let values, types = ValueCompiler.ofEntries backend m.entries
+        let values, types = ValueCompiler.ofModule backend m
         let types = TypeCompiler.ofTypes types
 
         {

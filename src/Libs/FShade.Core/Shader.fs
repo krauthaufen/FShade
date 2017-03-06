@@ -45,7 +45,9 @@ type Shader =
 
     }
 
+
 module private Preprocessor =
+    
     open System.Reflection
     open System.Collections.Generic
     open Aardvark.Base.ReflectionHelpers
@@ -223,6 +225,9 @@ module private Preprocessor =
             shaders         : list<Shader>
         }
         
+    let shaderUtilityFunctions = System.Collections.Concurrent.ConcurrentDictionary<MethodBase, Option<Expr * State>>()
+
+
     type Preprocess<'a> = State<State, 'a>
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -325,6 +330,25 @@ module private Preprocessor =
                         | Some idx -> return Expr.ReadInput(kind, e.Type, name, idx)
                         | None -> return Expr.ReadInput(kind, e.Type, name)
 
+                | WriteOutputs(map) ->
+                    let! map = 
+                        map |> Map.mapS (fun name (idx, value) ->
+                            state {
+                                let! idx = idx |> Option.mapS preprocessS
+                                let! value = preprocessS value
+                                return idx, value
+                            }
+                        )
+                    for (name, (idx, value)) in Map.toSeq map do
+                        do! State.modify (fun s ->
+                                if Map.containsKey name s.outputs then 
+                                    s
+                                else 
+                                    { s with State.outputs = Map.add name { paramType = value.Type; paramInterpolation = InterpolationMode.Default } s.outputs }
+                            ) 
+
+
+                    return Expr.WriteOutputs(map)
 
                 | BuilderRun(b, body)
                 | BuilderDelay(b, body) ->
@@ -549,6 +573,22 @@ module private Preprocessor =
                     let! b = preprocessS b
                     return Expr.Let(v, e, b)
 
+                | Call(t, mi, args) ->
+                    match preprocessMethod mi with
+                        | Some(_, innerState) ->
+                            do! State.modify (fun s -> { s with uniforms = Map.union s.uniforms innerState.uniforms })
+                        | None ->
+                            ()
+
+                    let! args = args |> List.mapS preprocessS
+                    let! t = t |> Option.mapS preprocessS
+
+                    match t with
+                        | Some t -> return Expr.Call(t, mi, args)
+                        | None -> return Expr.Call(mi, args)
+                            
+
+
                 | ShapeCombination(o, args) ->
                     let! args = args |> List.mapS preprocessS
                     return RebuildShapeCombination(o, args)
@@ -673,86 +713,115 @@ module private Preprocessor =
 
         shader :: state.shaders
 
-    let preprocess (e : Expr) =
+    and preprocess (e : Expr) =
         let mutable state = State.empty
         let e = preprocessS(e).Run(&state)
         e, state
 
-    let rec computeIO (e : Expr) =
-        match e with
-            | ReadInput(kind,n,idx) ->
-                match idx with
-                    | Some idx -> computeIO idx |> Map.add (n, kind) e.Type
-                    | None -> Map.ofList [(n, kind), e.Type]
+    and preprocessMethod (mi : MethodBase) =    
+        shaderUtilityFunctions.GetOrAdd(mi, fun mi ->
+            match Expr.TryGetReflectedDefinition mi with
+                | Some expr ->
+                    preprocess(expr) |> Some
+                | None ->
+                    None
+        )
 
-            | WriteOutputs values ->
-                let used = 
-                    values |> Map.fold (fun m _ (i,v) ->
-                        let v = computeIO v
-                        let i = i |> Option.map computeIO |> Option.defaultValue Map.empty
-                        Map.union m (Map.union i v)
-                    ) Map.empty
-
-                let written =
-                    values |> Map.toSeq |> Seq.map (fun (name, (i,v)) -> 
-                        match i with
-                            | Some _ -> (name, ParameterKind.Output), v.Type.MakeArrayType()
-                            | _ -> (name, ParameterKind.Output), v.Type
-                    ) |> Map.ofSeq
-
-                Map.union used written
-
-            | ShapeCombination(o, args) ->
-                args |> List.fold (fun m e -> Map.union m (computeIO e)) Map.empty
-
-            | ShapeLambda(_,b) ->
-                computeIO b
-
-            | ShapeVar _ ->
-                Map.empty
-
-    let rec usedInputs (e : Expr) =
-        match e with
-            | ReadInput(kind,n,idx) ->
-                match idx with
-                    | Some idx -> usedInputs idx |> Map.add n (kind, e.Type)
-                    | None -> Map.ofList [n, (kind, e.Type)]
-
-            | ShapeCombination(o, args) ->
-                args |> List.fold (fun m e -> Map.union m (usedInputs e)) Map.empty
-
-            | ShapeLambda(_,b) ->
-                usedInputs b
-
-            | ShapeVar _ ->
-                Map.empty
-
+//    let rec computeIO (e : Expr) =
+//        match e with
+//            | ReadInput(kind,n,idx) ->
+//                match idx with
+//                    | Some idx -> computeIO idx |> Map.add (n, kind) e.Type
+//                    | None -> Map.ofList [(n, kind), e.Type]
+//
+//            | WriteOutputs values ->
+//                let used = 
+//                    values |> Map.fold (fun m _ (i,v) ->
+//                        let v = computeIO v
+//                        let i = i |> Option.map computeIO |> Option.defaultValue Map.empty
+//                        Map.union m (Map.union i v)
+//                    ) Map.empty
+//
+//                let written =
+//                    values |> Map.toSeq |> Seq.map (fun (name, (i,v)) -> 
+//                        match i with
+//                            | Some _ -> (name, ParameterKind.Output), v.Type.MakeArrayType()
+//                            | _ -> (name, ParameterKind.Output), v.Type
+//                    ) |> Map.ofSeq
+//
+//                Map.union used written
+//
+//            
+//            | Call(t,mi,args) ->
+//                let inner = 
+//                    match preprocessMethod mi with
+//                        | Some(e, _) -> computeIO e
+//                        | None -> Map.empty
+//
+//                Option.toList t @ args |> List.fold (fun s a -> Map.union s (computeIO a)) inner
+//
+//
+//            | ShapeCombination(o, args) ->
+//                args |> List.fold (fun m e -> Map.union m (computeIO e)) Map.empty
+//
+//            | ShapeLambda(_,b) ->
+//                computeIO b
+//
+//            | ShapeVar _ ->
+//                Map.empty
+//
+//    let rec usedInputs (e : Expr) =
+//        match e with
+//            | ReadInput(kind,n,idx) ->
+//                match idx with
+//                    | Some idx -> usedInputs idx |> Map.add n (kind, e.Type)
+//                    | None -> Map.ofList [n, (kind, e.Type)]
+//            
+//            | Call(t,mi,args) ->
+//                let inner = 
+//                    match preprocessMethod mi with
+//                        | Some(e, _) -> usedInputs e
+//                        | None -> Map.empty
+//
+//                Option.toList t @ args |> List.fold (fun s a -> Map.union s (usedInputs a)) inner
+//
+//
+//            | ShapeCombination(o, args) ->
+//                args |> List.fold (fun m e -> Map.union m (usedInputs e)) Map.empty
+//
+//            | ShapeLambda(_,b) ->
+//                usedInputs b
+//
+//            | ShapeVar _ ->
+//                Map.empty
+//
 
 
 type ShaderOutputValue (mode : InterpolationMode, index : Option<Expr>, value : Expr) =
     let value, inputs, uniforms =
         let value, state = Preprocessor.preprocess value
+//
+//        let inputs, uniforms =
+//            value
+//                |> Preprocessor.usedInputs
+//                |> Map.partition (fun l (kind, t) -> kind = ParameterKind.Input)
 
-        let inputs, uniforms =
-            value
-                |> Preprocessor.usedInputs 
-                |> Map.partition (fun l (kind, t) -> kind = ParameterKind.Input)
-
-        let inputs = 
-            inputs |> Map.map (fun name (_,t) ->
-                match Map.tryFind name state.inputs with
-                    | Some p -> p
-                    | None -> { paramType = t; paramInterpolation = InterpolationMode.Default }
-            )
+        let inputs = state.inputs
+//            inputs |> Map.map (fun name (_,t) ->
+//                match Map.tryFind name state.inputs with
+//                    | Some p -> p
+//                    | None -> { paramType = t; paramInterpolation = InterpolationMode.Default }
+//            )
             
-        let uniforms = 
-            uniforms |> Map.map (fun name (_,t) ->
-                match Map.tryFind name state.uniforms with
-                    | Some p -> p
-                    | None -> { uniformType = t; uniformName = name; uniformValue = UniformValue.Attribute(uniform, name) }
-            )
+        let uniforms = state.uniforms
+//            uniforms |> Map.map (fun name (_,t) ->
+//                match Map.tryFind name state.uniforms with
+//                    | Some p -> p
+//                    | None -> { uniformType = t; uniformName = name; uniformValue = UniformValue.Attribute(uniform, name) }
+//            )
 
         value, inputs, uniforms
+
 
     member x.Type = value.Type
     member x.Index = index
@@ -800,6 +869,11 @@ module ShaderOutputValueExtensions =
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Shader =
 
+    let tryGetOverrideCode (mi : MethodBase) =
+        match Preprocessor.preprocessMethod mi with
+            | Some (e,_) -> Some e
+            | None -> None
+             
     let private builtInInputs =
         Dictionary.ofList [
             ShaderStage.Vertex,
@@ -1022,12 +1096,11 @@ module Shader =
     ///    4) inline functions where possible
     let optimize (shader : Shader) =
         let sideEffects = sideEffects.[shader.shaderStage]
-        let newBody = 
+        let newBody, state = 
             shader.shaderBody
                 |> Optimizer.evaluateConstants' sideEffects.Contains
                 |> Optimizer.eliminateDeadCode' sideEffects.Contains
-
-        let inputs = Preprocessor.usedInputs newBody
+                |> Preprocessor.preprocess
 
         let newOutputVertices =
             match shader.shaderStage with
@@ -1048,8 +1121,8 @@ module Shader =
                     shader.shaderOutputVertices
 
         { shader with
-            shaderInputs = shader.shaderInputs |> Map.filter (fun n _ -> inputs.ContainsKey n)
-            shaderUniforms = shader.shaderUniforms |> Map.filter (fun n _ -> inputs.ContainsKey n)
+            shaderInputs = shader.shaderInputs |> Map.filter (fun n _ -> state.inputs.ContainsKey n)
+            shaderUniforms = shader.shaderUniforms |> Map.filter (fun n _ -> state.uniforms.ContainsKey n)
             shaderOutputVertices = newOutputVertices
             shaderBody = newBody
         }
@@ -1065,47 +1138,52 @@ module Shader =
 
     let withBody (newBody : Expr) (shader : Shader) =
         let newBody, state = newBody |> Preprocessor.preprocess
-        let io = Preprocessor.computeIO newBody
+        //let io = Preprocessor.computeIO newBody
 
-        let filterIO (desiredKind : ParameterKind) (build : string -> Type -> 'a) =
-            io  |> Map.toSeq 
-                |> Seq.choose (fun ((name, kind), t) -> 
-                    if kind = desiredKind then 
-                        Some (name, build name t)
-                    else 
-                        None
-                )
-                |> Map.ofSeq
+//        let filterIO (desiredKind : ParameterKind) (build : string -> Type -> 'a) =
+//            let io =
+//                if desiredKind = ParameterKind.Input then state.inputs
+//                elif desiredKind = ParameterKind.Uniform then state.uniforms
+//                else state.outputs
+//
+//            io  |> Map.toSeq 
+//                |> Seq.choose (fun ((name, kind), t) -> 
+//                    if kind = desiredKind then 
+//                        Some (name, build name t)
+//                    else 
+//                        None
+//                )
+//                |> Map.ofSeq
 
-        let newInputs =
-            filterIO ParameterKind.Input (fun name t ->
-                match Map.tryFind name shader.shaderInputs with
-                    | Some p -> p
-                    | _ -> 
-                        match Map.tryFind name state.inputs with
-                            | Some p -> p
-                            | None -> ParameterDescription.ofType t
-            )
+        let newInputs = state.inputs
+//            filterIO ParameterKind.Input (fun name t ->
+//                match Map.tryFind name shader.shaderInputs with
+//                    | Some p -> p
+//                    | _ -> 
+//                        match Map.tryFind name state.inputs with
+//                            | Some p -> p
+//                            | None -> ParameterDescription.ofType t
+//            )
 
-        let newOutputs =
-            filterIO ParameterKind.Output (fun name t ->
-                match Map.tryFind name shader.shaderOutputs with
-                    | Some p -> p
-                    | _ -> 
-                        match Map.tryFind name state.outputs with
-                            | Some p -> p
-                            | None -> ParameterDescription.ofType t
-            )
+        let newOutputs = state.outputs
+//            filterIO ParameterKind.Output (fun name t ->
+//                match Map.tryFind name shader.shaderOutputs with
+//                    | Some p -> p
+//                    | _ -> 
+//                        match Map.tryFind name state.outputs with
+//                            | Some p -> p
+//                            | None -> ParameterDescription.ofType t
+//            )
 
-        let newUniforms =
-            filterIO ParameterKind.Uniform (fun name t ->
-                match Map.tryFind name shader.shaderUniforms with
-                    | Some p -> p
-                    | None -> 
-                        match Map.tryFind name state.uniforms with
-                            | Some p -> p
-                            | None -> { uniformName = name; uniformType = t; uniformValue = UniformValue.Attribute(uniform, name) }
-            )
+        let newUniforms =state.uniforms
+//            filterIO ParameterKind.Uniform (fun name t ->
+//                match Map.tryFind name shader.shaderUniforms with
+//                    | Some p -> p
+//                    | None -> 
+//                        match Map.tryFind name state.uniforms with
+//                            | Some p -> p
+//                            | None -> { uniformName = name; uniformType = t; uniformValue = UniformValue.Attribute(uniform, name) }
+//            )
 
         optimize
             { shader with
@@ -1451,6 +1529,7 @@ module Shader =
                         attributes
                             |> Map.map (fun n t -> None, Expr.ReadInput(ParameterKind.Input, t, n))
                             |> Expr.WriteOutputs
+
                 }
             | _ ->
                 failwith "[FShade] not implemented"

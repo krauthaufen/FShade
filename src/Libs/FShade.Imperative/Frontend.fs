@@ -460,13 +460,13 @@ module EntryPoint =
         }
       
 
-type Module = { entries : list<EntryPoint> }
+type Module = { entries : list<EntryPoint>; tryGetOverrideCode : MethodBase -> Option<Expr> }
        
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Module =
 
     let ofLambda (name : string) (e : Expr) =
-        { entries = [EntryPoint.ofLambda name e] }
+        { entries = [EntryPoint.ofLambda name e]; tryGetOverrideCode = constF None }
 
     let ofLambdas (l : list<string * Expr>) =
-        { entries = l |> List.map (uncurry EntryPoint.ofLambda) }
+        { entries = l |> List.map (uncurry EntryPoint.ofLambda); tryGetOverrideCode = constF None }

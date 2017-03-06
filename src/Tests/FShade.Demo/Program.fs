@@ -32,12 +32,16 @@ module Bla =
             a.[i] <- i
         a.Length
 
+    let hugo (v : V4d) =
+        let a : float = uniform?A?B
+        v * a
+
 let effectTest() =
 
     let vert (v : Vertex) =
         vertex {
             return {
-                pos = uniform.Trafo * v.pos
+                pos = Bla.hugo (uniform.Trafo * v.pos)
                 tc = v.tc
                 vi = 0
             }
@@ -51,21 +55,16 @@ let effectTest() =
             }
         }
 
-    let vert = Shader.ofFunction vert
-    let frag = Shader.ofFunction frag
+    let vert = Effect.ofFunction vert
+    let frag = Effect.ofFunction frag
     
-    let effect = Effect.ofList (vert @ frag)
+    let effect = Effect.compose [vert;frag]
 
     let config =
         EffectConfig.ofList [
             Intrinsics.Color, typeof<V4d>, 1
             "Bla", typeof<V2d>, 0
         ]
-
-    Effect.empty
-        |> Effect.toModule config
-        |> ModuleCompiler.compileGLSL glsl410
-        |> printfn "%s"
 
     effect
         |> Effect.toModule config
@@ -206,8 +205,10 @@ module TessDeconstruct =
             }
 
 
-    [<GLSLIntrinsic("mix({0},{1},{2})")>]
-    let mix (a : 'a) (b : 'a) (t : float) = onlyInShaderCode<'a> "mix"
+    [<GLSLIntrinsic("mix({1},{2},{0})")>]
+    let inline lerp (t : float) (a : 'a) (b : 'a)  = 
+        onlyInShaderCode<'a> "mix"
+
 
     let test (quad : Patch<3 N, Vertex>) =
         tessellation {
@@ -225,7 +226,7 @@ module TessDeconstruct =
             
             let test = sinh coord.X * p0.Abs + coord.Y * p1 + coord.Z * p2
 
-            let p = mix p0 test 0.5
+            let p = lerp 0.5 p0 test
 
             return {
                 pos = p + V4d(0.0, level, 0.0, 0.0)
@@ -360,7 +361,7 @@ let expected() =
 
 [<EntryPoint>]
 let main args =
-    TessDeconstruct.run()
+    effectTest()
     System.Environment.Exit 0
 
     composeTest()
