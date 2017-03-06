@@ -44,26 +44,33 @@ let private texSampler =
         addressV WrapMode.Wrap
     }
 
+
+type MyEnum =
+    | A = 1
+    | B = 2
+
 let effectTest() =
 
     
 
     let vert (v : Vertex) =
         vertex {
-
+            let asd : MyEnum = uniform?ASD
             let color = int v.pos.Y
 
             let color = 
-                let color =
-                    if color > 0 then
-                        let color = 4 * color
-                        color * 3
+                if asd = MyEnum.A then
+                    let color =
+                        if color > 0 then
+                            let color = 4 * color
+                            color * 3
 
-                    else
-                        0
+                        else
+                            0
 
-                color * 7
-
+                    color * 7
+                else
+                    0
 
             return {
                 pos = Bla.hugo (uniform.Trafo * v.pos) * float color

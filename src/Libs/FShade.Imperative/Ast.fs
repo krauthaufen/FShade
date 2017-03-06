@@ -95,36 +95,38 @@ module CType =
         fun (b : IBackend) (t : Type) (f : IBackend -> Type -> CType) ->
             match dict.TryGetValue((None, t)) with
                 | (true, res) -> res
-                | _ -> dict.GetOrAdd((Some b,t), fun _ -> f b t)
+                | _ -> 
+                    dict.GetOrAdd((Some b,t), fun _ -> f b t)
 
 
-    /// creates a c representation for a given system type
-    let rec ofType (b : IBackend) (t : Type) : CType =
-        typeCache b t (fun b t ->
-            match b.TryGetIntrinsic t with
-                | Some i -> CIntrinsic i
-                | None -> 
-                    if t.IsEnum then 
-                        ofType b typeof<int>
-                    else
+    let rec private ofTypeInternal (seen : PersistentHashSet<Type>) (b : IBackend) (t : Type) =
+        if PersistentHashSet.contains t seen then
+            failwithf "[FShade] encountered recursive type %A" t
+        else
+            typeCache b t (fun b t ->
+                match b.TryGetIntrinsic t with
+                    | Some i -> CIntrinsic i
+                    | None -> 
+                        let seen = PersistentHashSet.add t seen 
                         match t with
-                            | VectorOf(d, t)    -> CVector(ofType b t, d)
-                            | MatrixOf(s, t)    -> CMatrix(ofType b t, s.Y, s.X)
-                            | ArrOf(len, t)     -> CArray(ofType b t, len)
-                            | Ref t             -> ofType b t
-                            | t when t.IsArray  -> CType.CPointer(CPointerModifier.None, ofType b (t.GetElementType()))
-                            | t                 -> ofCustomType b t
-        )
+                            | Enum              -> CInt(true, 32)
+                            | VectorOf(d, t)    -> CVector(ofTypeInternal seen b t, d)
+                            | MatrixOf(s, t)    -> CMatrix(ofTypeInternal seen b t, s.Y, s.X)
+                            | ArrOf(len, t)     -> CArray(ofTypeInternal seen b t, len)
+                            | Ref t             -> ofTypeInternal seen b t
+                            | t when t.IsArray  -> CType.CPointer(CPointerModifier.None, ofTypeInternal seen b (t.GetElementType()))
+                            | t                 -> ofCustomType seen b t
+            )
 
     /// creates a struct representation for a given system type
-    and private ofCustomType (b : IBackend) (t : Type) =
+    and private ofCustomType (seen : PersistentHashSet<Type>) (b : IBackend) (t : Type) =
         let name = typeName t
         if FSharpType.IsRecord(t, true) then
-            let fields = FSharpType.GetRecordFields(t, true) |> Array.toList |> List.map (fun pi -> ofType b pi.PropertyType, pi.Name) 
+            let fields = FSharpType.GetRecordFields(t, true) |> Array.toList |> List.map (fun pi -> ofTypeInternal seen b pi.PropertyType, pi.Name) 
             CStruct(name, fields, Some t)
             
         elif FSharpType.IsTuple t then
-            let fields = FSharpType.GetTupleElements(t) |> Array.toList |> List.mapi (fun i t -> ofType b t, sprintf "Item%d" i)
+            let fields = FSharpType.GetTupleElements(t) |> Array.toList |> List.mapi (fun i t -> ofTypeInternal seen b t, sprintf "Item%d" i)
             CStruct(name, fields, Some t)
 
         elif FSharpType.IsUnion(t, true) then
@@ -132,7 +134,7 @@ module CType =
                 FSharpType.GetUnionCases(t, true) |> Array.toList |> List.collect (fun ci ->
                     ci.GetFields() |> Array.toList |> List.map (fun fi ->
                         let name = ci.Name + "_" + fi.Name
-                        ofType b fi.PropertyType, name
+                        ofTypeInternal seen b fi.PropertyType, name
                     )
                 )
 
@@ -141,8 +143,13 @@ module CType =
             
         else
             let fields = t.GetFields(BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
-            let fields = fields |> Array.toList |> List.map (fun fi -> ofType b fi.FieldType, fi.Name) 
+            let fields = fields |> Array.toList |> List.map (fun fi -> ofTypeInternal seen b fi.FieldType, fi.Name) 
             CStruct(name, fields, Some t)
+ 
+    /// creates a c representation for a given system type
+    let ofType (b : IBackend) (t : Type) : CType =
+        ofTypeInternal PersistentHashSet.empty b t
+
    
        
 /// represents a function-parameter modifier

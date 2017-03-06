@@ -251,7 +251,10 @@ module Compiler =
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module Helpers = 
         let rec tryDeconstructValue (t : Type) (v : obj) =
-            if FSharpType.IsTuple t then
+            if t.IsEnum then
+                Expr.Value(unbox<int> v, t) |> Some
+
+            elif FSharpType.IsTuple t then
                 let elements = FSharpType.GetTupleElements t |> Array.toList
                 let arguments =
                     elements |> List.mapi (fun i t ->
