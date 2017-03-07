@@ -989,20 +989,6 @@ module Optimizer =
                             | Bool false -> 
                                 return! evaluateConstantsS e
 
-//                            | EqualityCondition values ->
-//                                let! e = evaluateConstantsS e
-//                                for (v, c) in Map.toSeq values do
-//                                    do! State.setVar v c
-//                                let! i = evaluateConstantsS i
-//                                return Expr.IfThenElse(cond, i, e)
-//
-//                            | InequalityCondition values ->
-//                                let! i = evaluateConstantsS i
-//                                for (v, c) in Map.toSeq values do
-//                                    do! State.setVar v c
-//                                let! e = evaluateConstantsS e
-//                                return Expr.IfThenElse(cond, i, e)
-
                             | _ ->
                                 let! i = evaluateConstantsS i
                                 let! e = evaluateConstantsS e

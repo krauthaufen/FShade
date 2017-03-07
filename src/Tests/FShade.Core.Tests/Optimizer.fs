@@ -121,64 +121,6 @@ let ``[While] counting and changing used/unused values``() =
 
 
 
-[<Test>]
-let ``[If] positive constant folding``() =
-    let input =
-        <@
-            let mutable a = 1000
-            if a = 0 then
-                // a is known to be 0 here
-                keep a
-                if a > 0 then 
-                    true
-                else
-                    false
-            else
-                false
-        @>
-
-    let expected =
-        <@
-            let mutable a = 1000
-            if a = 0 then
-                keep 0
-                false
-            else
-                false
-        @>
-
-    input |> Opt.run  |> should exprEqual expected
-
-[<Test>]
-let ``[If] negative constant folding``() =
-    let input =
-        <@
-            let mutable a = 1000
-            if a <> 0 then
-                true
-            else
-                // a is known to be 0 here
-                keep a
-                if a > 0 then 
-                    true
-                else
-                    false
-        @>
-
-    let expected =
-        <@
-            let mutable a = 1000
-            if a <> 0 then
-                true
-            else
-                keep 0
-                false
-        @>
-
-    input |> Opt.run  |> should exprEqual expected
-
-
-
 [<Test>] 
 let ``[This] mutable this preseved``() =
     let ii : Expr<V2d> = 

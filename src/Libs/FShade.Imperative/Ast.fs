@@ -99,15 +99,15 @@ module CType =
                     dict.GetOrAdd((Some b,t), fun _ -> f b t)
 
 
-    let rec private ofTypeInternal (seen : PersistentHashSet<Type>) (b : IBackend) (t : Type) =
-        if PersistentHashSet.contains t seen then
+    let rec private ofTypeInternal (seen : hset<Type>) (b : IBackend) (t : Type) =
+        if HSet.contains t seen then
             failwithf "[FShade] encountered recursive type %A" t
         else
             typeCache b t (fun b t ->
                 match b.TryGetIntrinsic t with
                     | Some i -> CIntrinsic i
                     | None -> 
-                        let seen = PersistentHashSet.add t seen 
+                        let seen = HSet.add t seen 
                         match t with
                             | Enum              -> CInt(true, 32)
                             | VectorOf(d, t)    -> CVector(ofTypeInternal seen b t, d)
@@ -119,7 +119,7 @@ module CType =
             )
 
     /// creates a struct representation for a given system type
-    and private ofCustomType (seen : PersistentHashSet<Type>) (b : IBackend) (t : Type) =
+    and private ofCustomType (seen : hset<Type>) (b : IBackend) (t : Type) =
         let name = typeName t
         if FSharpType.IsRecord(t, true) then
             let fields = FSharpType.GetRecordFields(t, true) |> Array.toList |> List.map (fun pi -> ofTypeInternal seen b pi.PropertyType, pi.Name) 
@@ -148,7 +148,7 @@ module CType =
  
     /// creates a c representation for a given system type
     let ofType (b : IBackend) (t : Type) : CType =
-        ofTypeInternal PersistentHashSet.empty b t
+        ofTypeInternal HSet.empty b t
 
    
        
@@ -860,8 +860,8 @@ type CModule =
 
 type UsageInfo =
     {
-        usedTypes       : pset<CType>
-        usedntrinsics   : pset<CIntrinsic>
+        usedTypes       : hset<CType>
+        usedntrinsics   : hset<CIntrinsic>
     }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -875,8 +875,8 @@ module CModule =
         visit u m
 
         {
-            usedTypes = PSet.ofSeq u.Types
-            usedntrinsics = PSet.ofSeq u.Intrinsics
+            usedTypes = HSet.ofSeq u.Types
+            usedntrinsics = HSet.ofSeq u.Intrinsics
         }
 
         

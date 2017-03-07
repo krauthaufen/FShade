@@ -982,9 +982,9 @@ module Assembler =
         let mutable state = 
             {
                 currentId           = 0u
-                valueIds            = HashMap.empty
+                valueIds            = HMap.empty
                 uniformIds          = Map.empty
-                fieldIds            = HashMap.empty
+                fieldIds            = HMap.empty
                 reversedInstuctions = []
                 currentBinding      = 0u
                 currentSet          = 0u
