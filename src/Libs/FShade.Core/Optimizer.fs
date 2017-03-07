@@ -824,27 +824,27 @@ module Optimizer =
 
             ]
 
-        let rec (|EqualityCondition|_|) (e : Expr) =
-            match e with
-                | Call(None, Method("op_Equality", _), ([Var v; Value(c, _)] | [Value(c, _); Var v])) ->
-                    Some (Map.ofList [v, c])
-
-                | AndAlso(EqualityCondition l, EqualityCondition r) ->
-                    Some (Map.union l r)
-
-                | _ ->
-                    None
-
-        let rec (|InequalityCondition|_|) (e : Expr) =
-            match e with
-                | Call(None, Method("op_Inequality", _), ([Var v; Value(c, _)] | [Value(c, _); Var v])) ->
-                    Some (Map.ofList [v, c])
-
-                | OrElse(InequalityCondition l, InequalityCondition r) ->
-                    Some (Map.union l r)
-
-                | _ ->
-                    None
+//        let rec (|EqualityCondition|_|) (e : Expr) =
+//            match e with
+//                | Call(None, Method("op_Equality", _), ([Var v; Value(c, _)] | [Value(c, _); Var v])) ->
+//                    Some (Map.ofList [v, c])
+//
+//                | AndAlso(EqualityCondition l, EqualityCondition r) ->
+//                    Some (Map.union l r)
+//
+//                | _ ->
+//                    None
+//
+//        let rec (|InequalityCondition|_|) (e : Expr) =
+//            match e with
+//                | Call(None, Method("op_Inequality", _), ([Var v; Value(c, _)] | [Value(c, _); Var v])) ->
+//                    Some (Map.ofList [v, c])
+//
+//                | OrElse(InequalityCondition l, InequalityCondition r) ->
+//                    Some (Map.union l r)
+//
+//                | _ ->
+//                    None
 
         let rec evaluateConstantsS (e : Expr) =
             state {
@@ -989,19 +989,19 @@ module Optimizer =
                             | Bool false -> 
                                 return! evaluateConstantsS e
 
-                            | EqualityCondition values ->
-                                let! e = evaluateConstantsS e
-                                for (v, c) in Map.toSeq values do
-                                    do! State.setVar v c
-                                let! i = evaluateConstantsS i
-                                return Expr.IfThenElse(cond, i, e)
-
-                            | InequalityCondition values ->
-                                let! i = evaluateConstantsS i
-                                for (v, c) in Map.toSeq values do
-                                    do! State.setVar v c
-                                let! e = evaluateConstantsS e
-                                return Expr.IfThenElse(cond, i, e)
+//                            | EqualityCondition values ->
+//                                let! e = evaluateConstantsS e
+//                                for (v, c) in Map.toSeq values do
+//                                    do! State.setVar v c
+//                                let! i = evaluateConstantsS i
+//                                return Expr.IfThenElse(cond, i, e)
+//
+//                            | InequalityCondition values ->
+//                                let! i = evaluateConstantsS i
+//                                for (v, c) in Map.toSeq values do
+//                                    do! State.setVar v c
+//                                let! e = evaluateConstantsS e
+//                                return Expr.IfThenElse(cond, i, e)
 
                             | _ ->
                                 let! i = evaluateConstantsS i
