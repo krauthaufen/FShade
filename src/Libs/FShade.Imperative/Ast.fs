@@ -667,6 +667,7 @@ type CStatement =
     | CDecrement of pre : bool * CLExpr
 
     | CSequential of list<CStatement>
+    | CIsolated of list<CStatement>
     | CReturn
 
     | CWriteOutput of string * Option<CExpr> * CRExpr
@@ -679,7 +680,6 @@ type CStatement =
     | CDoWhile of guard : CExpr * body : CStatement
     | CIfThenElse of cond : CExpr * ifTrue : CStatement * ifFalse : CStatement
     | CSwitch of value : CExpr * cases : array<CLiteral * CStatement>
-
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module CStatement =
     
@@ -701,7 +701,7 @@ module CStatement =
             | CIncrement(_,v) | CDecrement(_,v) ->
                 CLExpr.visit used v
 
-            | CSequential s ->
+            | CSequential s | CIsolated s ->
                 for s in s do visit used s
 
             | CWriteOutput(name, index, value) ->

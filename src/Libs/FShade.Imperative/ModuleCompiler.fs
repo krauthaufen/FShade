@@ -81,9 +81,7 @@ module ModuleCompiler =
                         | _ ->
                             let mutable s = emptyState state.moduleState
                             let def = compile(key).Run(&s)
-                            
-                            
-                            do! State.modify (fun gs -> { gs with moduleState = { gs.moduleState with ModuleState.globalNameIndices = s.moduleState.globalNameIndices } })
+                            do! State.modify (fun gs -> { gs with moduleState = { s.moduleState with globalFunctions = HashMap.empty; globalConstants = HashMap.empty } })
 
                             let localFunctions      = s.usedFunctions |> HashMap.toSeq |> Seq.map snd |> Seq.toList
                             let globalFunctions     = s.moduleState.globalFunctions |> HashMap.toSeq |> Seq.map snd |> Seq.toList
@@ -106,7 +104,9 @@ module ModuleCompiler =
                             let node = GraphNode(def, PSet.ofList dependencies)
                             cache.[key] <- node
 
-                            do! State.modify (fun gs -> { gs with moduleState = s.moduleState })
+                            do! State.modify (fun gs -> 
+                                { gs with moduleState = { gs.moduleState with globalFunctions = s.moduleState.globalFunctions; globalConstants = s.moduleState.globalConstants } }
+                            )
 
                             return node
 

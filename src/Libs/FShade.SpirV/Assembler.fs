@@ -670,7 +670,7 @@ module Assembler =
                     yield OpISub(tid, id1, id0, c1)
                     yield OpStore(v, id1, None)
 
-                | CSequential ss ->
+                | CSequential ss | CIsolated ss ->
                     for s in ss do 
                         do! assembleStatement lBreak lCont s
 

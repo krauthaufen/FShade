@@ -55,14 +55,24 @@ let effectTest() =
 
     let vert (v : Vertex) =
         vertex {
+            return {
+                pos = Bla.hugo (uniform.Trafo * v.pos) 
+                tc = v.tc
+                vi = 0
+            }
+        }
+
+    let frag (v : Vertex) =
+        fragment {
+        
             let asd : MyEnum = uniform?ASD
-            let color = int v.pos.Y
 
             let color = 
                 if asd = MyEnum.A then
+                    let x = int v.tc.X
                     let color =
-                        if color > 0 then
-                            let color = 4 * color
+                        if x > 0 then
+                            let color = 4 * x
                             color * 3
 
                         else
@@ -73,16 +83,7 @@ let effectTest() =
                     0
 
             return {
-                pos = Bla.hugo (uniform.Trafo * v.pos) * float color
-                tc = v.tc
-                vi = 0
-            }
-        }
-
-    let frag (v : Vertex) =
-        fragment {
-            return {
-                color = texSampler.Sample(v.tc)
+                color = texSampler.Sample(v.tc) * float color
                 tc = v.tc
             }
         }
@@ -295,9 +296,10 @@ module TessDeconstruct =
         fragment {
             let mutable a = 0.0
 
-            //Preprocessor.unroll()
+            Preprocessor.unroll()
             for i in 0 .. 2 .. 6 do
-                a <- a + float i
+                let x = 2 * i
+                a <- a + float x
 
 
             return V4d(a, 0.0, 0.0, 1.0)

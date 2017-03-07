@@ -322,10 +322,17 @@ module Assembler =
                     let! r = assembleExprS r
                     return sprintf "(%s / %s)" l r
 
-                | CMod(_, l, r) ->
-                    let! l = assembleExprS l
-                    let! r = assembleExprS r
-                    return sprintf "(%s %% %s)" l r
+                | CMod(t, l, r) ->
+                    match t with
+                        | CInt _ | CVector(CInt _, _) | CMatrix(CInt _, _, _) ->
+                            let! l = assembleExprS l
+                            let! r = assembleExprS r
+                            return sprintf "(%s %% %s)" l r
+                        | _ ->
+                            let! l = assembleExprS l
+                            let! r = assembleExprS r
+                            return sprintf "mod(%s, %s)" l r
+                            
 
                 | CMulMatMat(_, l, r) | CMulMatVec(_, l, r) ->
                     let! reverse = AssemblerState.reverseMatrixLogic
@@ -533,6 +540,11 @@ module Assembler =
                     let! v = assembleLExprS v
                     if pre then return sprintf "--%s;" v
                     else return sprintf "%s--;" v
+
+                | CIsolated statements ->
+                    let! statements = statements |> List.mapS (assembleStatementS false) 
+                    let inner = statements |> seq
+                    return sprintf "{\r\n%s\r\n}" (String.indent inner)
 
                 | CSequential statements ->
                     let! statements = statements |> List.mapS (assembleStatementS false) 

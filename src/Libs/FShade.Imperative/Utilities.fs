@@ -331,6 +331,12 @@ module ExprExtensions =
 
     let (|NewFixedArray|_|) (e : Expr) =
         match e with
+            | NewObject(ctor, []) ->
+                let targs = ctor.DeclaringType.GetGenericArguments()
+                let len = Peano.getSize (targs.[0])
+                let et = targs.[1]
+                Some(len, et, [])
+
             | NewObject(ctor, [Coerce(NewArray(et, args),_)]) ->
                 if ctor.DeclaringType.IsGenericType && ctor.DeclaringType.GetGenericTypeDefinition() = typedefof<Arr<_,_>> then
                     let len = Peano.getSize (ctor.DeclaringType.GetGenericArguments().[0])
@@ -721,20 +727,24 @@ module private Helpers =
                 "tup_" + elements
 
             else
-                let selfName = 
-                    if t.IsGenericType then
-                        let m = rx.Match t.Name
-                        let targs = t.GetGenericArguments()
-                        let targstr = targs |> Seq.map typeName |> String.concat "_"
-                        m.Groups.["name"].Value + string targs.Length + "_" + targstr
-                    else
-                        t.Name
+                if typeof<INatural>.IsAssignableFrom t then
+                    let value = Peano.getSize t
+                    sprintf "N%d" value
+                else
+                    let selfName = 
+                        if t.IsGenericType then
+                            let m = rx.Match t.Name
+                            let targs = t.GetGenericArguments()
+                            let targstr = targs |> Seq.map typeName |> String.concat "_"
+                            m.Groups.["name"].Value + string targs.Length + "_" + targstr
+                        else
+                            t.Name
 
-                if t.IsNested then 
-                    (typeName t.DeclaringType) + "_" + selfName
-                else 
-                    if isNull t.Namespace then selfName
-                    else t.Namespace.Replace('.', '_') + "_" + selfName
+                    if t.IsNested then 
+                        (typeName t.DeclaringType) + "_" + selfName
+                    else 
+                        if isNull t.Namespace then selfName
+                        else t.Namespace.Replace('.', '_') + "_" + selfName
         )
 
     let methodName (mi : MethodBase) =

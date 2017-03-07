@@ -303,6 +303,32 @@ module Compiler =
                 | CVector(bt, d)    -> CNewVector(t, d, List.replicate d (one bt))
                 | _                 -> failwithf "[FShade] cannot create one-value for type %A" t
 
+        module private Generators =         
+            let rec allSubsets (l : list<'a>) =
+                match l with
+                    | [] -> [[]]
+                    | h :: rest ->
+                        let rest = allSubsets rest
+
+                        [
+                            yield! rest
+                            for r in rest do
+                                for i in 0 .. List.length r do
+                                    let l, r = List.splitAt i r
+                                    yield l @ [h] @ r
+
+                        ]
+
+            let allSwizzles (len : int) (l : list<string>) =
+                l |> allSubsets 
+                    |> List.filter (fun c -> List.length c = len)
+                    |> List.map (fun c ->
+                        let m = "get_" + String.concat "" c
+                        let c = c |> List.map (sprintf "CVecComponent.%s") |> String.concat "; "
+                        sprintf "| Method(\"%s\", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [%s]) |> Some" m c
+                    )
+                    |> String.concat "\r\n"
+
         let rec tryGetBuiltInMethod (b : IBackend) (mi : MethodInfo) (args : list<CExpr>) =
             let ct = CType.ofType b mi.ReturnType
             match mi, args with
@@ -379,12 +405,51 @@ module Compiler =
                             None
 
                 // vector swizzles
-                | (MethodQuote <@ Vec.xy : V4d -> V2d @> _ | Method("get_XY", [VectorOf _])), [v] -> CVecSwizzle(ct, v, CVecComponent.xy) |> Some
-                | (MethodQuote <@ Vec.yz : V4d -> V2d @> _ | Method("get_YZ", [VectorOf _])), [v] -> CVecSwizzle(ct, v, CVecComponent.yz) |> Some
-                | (MethodQuote <@ Vec.zw : V4d -> V2d @> _ | Method("get_ZW", [VectorOf _])), [v] -> CVecSwizzle(ct, v, CVecComponent.zw) |> Some
-                | (MethodQuote <@ Vec.xyz : V4d -> V3d @> _ | Method("get_XYZ", [VectorOf _])), [v] -> CVecSwizzle(ct, v, CVecComponent.xyz) |> Some
-                | (MethodQuote <@ Vec.yzw : V4d -> V3d @> _ | Method("get_YZW", [VectorOf _])), [v] -> CVecSwizzle(ct, v, CVecComponent.yzw) |> Some
+                | (MethodQuote <@ Vec.xy : V4d -> V2d @> _ ), [v] -> CVecSwizzle(ct, v, CVecComponent.xy) |> Some
+                | (MethodQuote <@ Vec.yz : V4d -> V2d @> _), [v] -> CVecSwizzle(ct, v, CVecComponent.yz) |> Some
+                | (MethodQuote <@ Vec.zw : V4d -> V2d @> _), [v] -> CVecSwizzle(ct, v, CVecComponent.zw) |> Some
+                | (MethodQuote <@ Vec.xyz : V4d -> V3d @> _), [v] -> CVecSwizzle(ct, v, CVecComponent.xyz) |> Some
+                | (MethodQuote <@ Vec.yzw : V4d -> V3d @> _), [v] -> CVecSwizzle(ct, v, CVecComponent.yzw) |> Some
 
+
+                | Method("get_ZW", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Z; CVecComponent.W]) |> Some
+                | Method("get_WZ", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.W; CVecComponent.Z]) |> Some
+                | Method("get_YW", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Y; CVecComponent.W]) |> Some
+                | Method("get_WY", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.W; CVecComponent.Y]) |> Some
+                | Method("get_YZ", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Y; CVecComponent.Z]) |> Some
+                | Method("get_ZY", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Z; CVecComponent.Y]) |> Some
+                | Method("get_XW", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.X; CVecComponent.W]) |> Some
+                | Method("get_WX", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.W; CVecComponent.X]) |> Some
+                | Method("get_XZ", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.X; CVecComponent.Z]) |> Some
+                | Method("get_ZX", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Z; CVecComponent.X]) |> Some
+                | Method("get_XY", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.X; CVecComponent.Y]) |> Some
+                | Method("get_YX", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Y; CVecComponent.X]) |> Some
+
+
+                | Method("get_YZW", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Y; CVecComponent.Z; CVecComponent.W]) |> Some
+                | Method("get_ZYW", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Z; CVecComponent.Y; CVecComponent.W]) |> Some
+                | Method("get_ZWY", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Z; CVecComponent.W; CVecComponent.Y]) |> Some
+                | Method("get_YWZ", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Y; CVecComponent.W; CVecComponent.Z]) |> Some
+                | Method("get_WYZ", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.W; CVecComponent.Y; CVecComponent.Z]) |> Some
+                | Method("get_WZY", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.W; CVecComponent.Z; CVecComponent.Y]) |> Some
+                | Method("get_XZW", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.X; CVecComponent.Z; CVecComponent.W]) |> Some
+                | Method("get_ZXW", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Z; CVecComponent.X; CVecComponent.W]) |> Some
+                | Method("get_ZWX", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Z; CVecComponent.W; CVecComponent.X]) |> Some
+                | Method("get_XWZ", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.X; CVecComponent.W; CVecComponent.Z]) |> Some
+                | Method("get_WXZ", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.W; CVecComponent.X; CVecComponent.Z]) |> Some
+                | Method("get_WZX", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.W; CVecComponent.Z; CVecComponent.X]) |> Some
+                | Method("get_XYW", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.X; CVecComponent.Y; CVecComponent.W]) |> Some
+                | Method("get_YXW", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Y; CVecComponent.X; CVecComponent.W]) |> Some
+                | Method("get_YWX", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Y; CVecComponent.W; CVecComponent.X]) |> Some
+                | Method("get_XWY", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.X; CVecComponent.W; CVecComponent.Y]) |> Some
+                | Method("get_WXY", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.W; CVecComponent.X; CVecComponent.Y]) |> Some
+                | Method("get_WYX", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.W; CVecComponent.Y; CVecComponent.X]) |> Some
+                | Method("get_XYZ", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.X; CVecComponent.Y; CVecComponent.Z]) |> Some
+                | Method("get_YXZ", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Y; CVecComponent.X; CVecComponent.Z]) |> Some
+                | Method("get_YZX", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Y; CVecComponent.Z; CVecComponent.X]) |> Some
+                | Method("get_XZY", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.X; CVecComponent.Z; CVecComponent.Y]) |> Some
+                | Method("get_ZXY", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Z; CVecComponent.X; CVecComponent.Y]) |> Some
+                | Method("get_ZYX", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Z; CVecComponent.Y; CVecComponent.X]) |> Some
 
                 // matrix creation
                 | Method("FromRows", _), rows -> CMatrixFromRows(ct, rows) |> Some
@@ -628,7 +693,7 @@ module Compiler =
 
         type Free =
             | Variable of Var
-            | Global of name : string * t : Type * isMutable : bool
+            | Global of kind : ParameterKind * name : string * _type : Type * index : Option<Expr>
 
         let rec free (e : Expr) : pset<Free> =
             match e with
@@ -639,8 +704,8 @@ module Compiler =
 
                 | ReadInput(kind,name,idx) ->
                     match idx with
-                        | Some idx -> free idx |> PSet.add (Global(name, e.Type, false))
-                        | None -> PSet.ofList [ Global(name, e.Type, false) ]
+                        | Some idx -> free idx |> PSet.add (Global(kind, name, e.Type, Some idx))
+                        | None -> PSet.ofList [ Global(kind, name, e.Type, None) ]
 
                 | WriteOutputs values ->
                     let mutable res = PSet.empty
@@ -648,7 +713,7 @@ module Compiler =
                         match index with
                             | Some index -> res <- PSet.union res (free index)
                             | _ -> ()
-                        res <- res |> PSet.union (free value) |> PSet.add (Global(name, value.Type, true))
+                        res <- res |> PSet.union (free value) |> PSet.add (Global(ParameterKind.Output, name, value.Type, index))
 
                     res
 
@@ -756,70 +821,78 @@ module Compiler =
  
                 let newVariables = HashSet()
 
-                let args = 
+                let freeArgs = 
                     free |> Array.choose (fun f ->
                         match f with
                             | CompilerState.Free.Variable v ->
                                 Some v
 
-                            | CompilerState.Free.Global(n, t, isMutable) ->
-                                if Set.contains n globals then 
+                            | CompilerState.Free.Global(kind, n, t, idx) ->
+                                if kind = ParameterKind.Uniform && Set.contains n globals then 
                                     None
                                 else 
-                                    let v = Var(n, t, isMutable)
+                                    let v = Var(n, t, (kind = ParameterKind.Output))
                                     newVariables.Add v |> ignore
                                     Some v
                     )
 
 
                 let! parameters =
-                    args |> Array.mapS (fun v ->
+                    freeArgs |> Array.mapS (fun v ->
                         state {
                             let! t = toCTypeS v.Type
                             return { name = v.Name; ctype = t; modifier = (if v.IsMutable then CParameterModifier.ByRef else CParameterModifier.In) }
                         }
                     )   
                     
-                let! variables = 
-                    args |> Array.mapS (fun v ->
+                let! args = 
+                    free |> Array.mapS (fun f ->
                         state {
-                            if newVariables.Contains v then
-                                let! t = toCTypeS v.Type
-                                let res = { ctype = t; name = v.Name }
-                                do! State.modify (fun s -> { s with variables = Map.add v res s.variables })
-                                return res
-                            else
-                                let! res = toCVarS v
-                                return res
+                            match f with
+                                | CompilerState.Free.Variable v ->
+                                    let! v = toCVarS v
+                                    return Some (CVar v)
+
+                                | CompilerState.Free.Global(kind, n, t, idx) ->
+                                    if kind = ParameterKind.Uniform && Set.contains n globals then 
+                                        return None
+                                    else 
+                                        match kind with
+                                            | ParameterKind.Input | ParameterKind.Uniform ->
+                                                let expression = 
+                                                    match idx with
+                                                        | Some idx -> Expr.ReadInput(kind, t, n, idx)
+                                                        | None -> Expr.ReadInput(kind, t, n)
+                                                let! e = toCExprS expression
+                                                return Some e
+                                            | _ ->
+                                                return failwithf "[FShade] cannot use output %A as closure in function" n
                         }
                     ) 
 
+                let args = Array.choose id args
+
                 let! name = CompilerState.newGlobalName "helper"
                 let! returnType = toCTypeS e.Type
-                let variables = variables
 
                 let signature =
                     {
                         name = name
                         returnType = returnType
                         parameters = parameters
-//                            Array.map2 
-//                                (fun (a : CVar) (v : Var) -> { name = a.name; ctype = a.ctype; modifier = (if v.IsMutable then CParameterModifier.ByRef else CParameterModifier.In) }) 
-//                                variables
-//                                args
                     }
 
                 let definition = ManagedFunctionWithSignature(signature, e)
 
                 let! signature = 
-                    if args.Length = free.Length then CompilerState.useGlobalFunction (e :> obj) definition
+                    if freeArgs.Length = free.Length then CompilerState.useGlobalFunction (e :> obj) definition
                     else CompilerState.useLocalFunction (e :> obj) definition
 
 
-                return CCall(signature, variables |> Array.map CVar)
+                return CCall(signature, args)
         }
 
-    let rec toCExprS (e : Expr) =
+    and toCExprS (e : Expr) : State<_, CExpr> =
         state {
 
             match e with
@@ -1064,7 +1137,9 @@ module Compiler =
                 | NewFixedArray(cnt, et, args) ->
                     let! ct = toCTypeS et
                     let! args = args |> List.mapS toCExprS
-                    return CRArray(CArray(ct, cnt), args) |> Some
+                    match args with
+                        | [] -> return None
+                        | args -> return CRArray(CArray(ct, cnt), args) |> Some
 
                 | NewArray(et, args) ->
                     let! ct = toCTypeS et
@@ -1137,7 +1212,7 @@ module Compiler =
                                 yield CDeclare(v, None)
                                 for i in range do
                                     yield CWrite(CLVar v, CExpr.CValue(CType.CInt(true, 32), CIntegral (int64 i)))
-                                    yield b
+                                    yield CIsolated [b]
                                 yield! rest
                             ]
                         | _ ->
