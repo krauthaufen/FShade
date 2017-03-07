@@ -525,11 +525,23 @@ module private Preprocessor =
                             return Expr.ReadInput(ParameterKind.Input, parameter.paramType, semantic)
                     
                     
-                | BuilderYield(b, mi, Let(var, value, body)) ->
-                    return! preprocessS (Expr.Let(var, value, Expr.Call(b, mi, [body])))       
+                | BuilderYield(b, mi, Let(var, value, body)) | BuilderReturn(b, mi, Let(var, value, body)) ->
+                    let mutable used = 0
+                    let newBody =
+                        body.Substitute (fun vi -> 
+                            if vi = var then 
+                                used <- used + 1
+                                Some value 
+                            else 
+                                None
+                        )
 
-                | BuilderReturn(b, mi, Let(var, value, body)) ->
-                    return! preprocessS (Expr.Let(var, value, Expr.Call(b, mi, [body])))   
+                    let real = 
+                        if used <= 1 then Expr.Call(b, mi, [newBody])
+                        else Expr.Let(var, value, Expr.Call(b, mi, [body]))
+
+                    return! preprocessS real
+
                     
                 | BuilderYield(b, _, value) ->
                     do! State.setBuilder b
