@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8" ?>
-<ScintillaNET>
-    <Language name="fs">
-		<Indentation TabWidth="4" UseTabs="false"/>
-        <Lexer StreamCommentPrefix="(* " StreamCommentSuffix=" *)">
-            <Keywords List="0">abstract and as assert asr begin class default delegate do done downcast downto else end exception false finally for fun function if in inherit inline interface land lor lsl lsr lxor let #light match member mod module mutable namespace new null of open or override rec sig static struct then to true try type val when upcast while with</Keywords>
-        </Lexer>
-    </Language>
-</ScintillaNET>

@@ -4,5 +4,7 @@ authors Georg Haaser
 description
     F# embedded shaders
 dependencies
+    FShade.Imperative = CURRENTVERSION
     FShade.Core = CURRENTVERSION
-    FShade.Debug = CURRENTVERSION
+    FShade.GLSL = CURRENTVERSION
+    FShade.SpirV = CURRENTVERSION
