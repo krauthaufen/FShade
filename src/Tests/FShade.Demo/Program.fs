@@ -393,18 +393,22 @@ let expected() =
 
     ()
 
-[<LocalSize(X = 32)>]
+[<Literal>]
+let local = 32
+
+[<LocalSize(X = local)>]
 let computer (a : float[]) (b : float[]) (c : Image2d<Formats.r32f>) =
     compute {
-
-        let s = allocateShared<float> 32
+        let temp = allocateShared<float> local
 
         let id = getGlobalId()
         let i = id.X
 
         let l = getLocalIndex()
-        s.[l] <- c.[V2i(l,0)].X
-        b.[i] <- a.[i] * 3.0 + s.[l]
+        temp.[l] <- c.[V2i(l,0)].X
+        barrier()
+
+        b.[i] <- a.[i] * 3.0 + temp.[l]
 
     }
 

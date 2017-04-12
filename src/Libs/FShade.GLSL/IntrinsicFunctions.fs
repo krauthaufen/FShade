@@ -463,6 +463,7 @@ module IntrinsicFunctions =
             CIntrinsic.tagged "ivec3(gl_GlobalInvocationID)", [ exactly <@ getGlobalId @> ]
             CIntrinsic.tagged "int(gl_LocalInvocationIndex)", [ exactly <@ getLocalIndex @> ]
             CIntrinsic.tagged "ivec3(gl_WorkGroupSize)", [ exactly <@ getWorkGroupSize @> ]
+            CIntrinsic.tagged "barrier()", [ exactly <@ barrier @> ]
 
 
         ]

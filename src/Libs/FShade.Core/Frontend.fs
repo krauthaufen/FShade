@@ -176,7 +176,7 @@ module Primitives =
     let getLocalIndex() : int = failwith ""
     let getWorkGroupSize() : V3i = failwith ""
     let getWorkGroupCount() : V3i = failwith ""
-
+    let barrier() : unit = failwith ""
     let allocateShared<'a when 'a : unmanaged> (size : int) : 'a[] = failwith ""
 
     type LocalSizeAttribute() = 
