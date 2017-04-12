@@ -258,7 +258,18 @@ module ShaderBuilders =
             member x.ShaderStage = ShaderStage.TessControl
             member x.OutputTopology = None
 
+    type ComputeBuilder() =
+        inherit BaseBuilder()
 
+        member x.Quote() = ()
+        member x.Zero() = ()
+
+        interface IShaderBuilder with
+            member x.ShaderStage = ShaderStage.Compute
+            member x.OutputTopology = None
+
+
+    let compute = ComputeBuilder()
     let vertex = VertexBuilder()
     let tessellation = TessBuilder()
     let fragment = FragmentBuilder()
