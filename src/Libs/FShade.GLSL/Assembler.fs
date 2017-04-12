@@ -735,6 +735,9 @@ module Assembler =
                                 | ParameterDecoration.StorageBuffer ->
                                     Some ("layout(std430) buffer " + (p.cParamSemantic + "_ssb"))
 
+                                | ParameterDecoration.Shared -> 
+                                    Some "shared"
+
                                 | ParameterDecoration.Memory _ | ParameterDecoration.Slot _ ->
                                     None
 
@@ -780,6 +783,8 @@ module Assembler =
                     
 
                     match p.cParamType with
+                        | CArray(t,l) ->
+                            return sprintf "%s%s%s %s[%d];%s" decorations prefix (assembleType t) name l suffix |> Some
                         | CPointer(_, t) ->
                             return sprintf "%s%s%s %s[];%s" decorations prefix (assembleType t) name suffix |> Some
                         | _ -> 
@@ -865,8 +870,11 @@ module Assembler =
 
 
                     | ShaderStage.Compute ->
+                        let localSize = e.cDecorations |> List.tryPick (function EntryDecoration.LocalSize s when s.AllGreater 0 -> Some s | _ -> None) 
                         [
-                            "layout( local_size_variable ) in;" 
+                            match localSize with
+                                | Some s -> yield sprintf "layout (local_size_x = %d, local_size_y = %d, local_size_z = %d)" s.X s.Y s.Z
+                                | None -> yield "layout( local_size_variable ) in;" 
                         ]
 
                     | _ ->

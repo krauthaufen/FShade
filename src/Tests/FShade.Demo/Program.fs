@@ -393,38 +393,29 @@ let expected() =
 
     ()
 
+[<LocalSize(X = 32)>]
+let computer (a : float[]) (b : float[]) (c : Image2d<Formats.r32f>) =
+    compute {
 
-type ComputeBuilder() =
-    inherit BaseBuilder()
+        let s = allocateShared<float> 32
 
-    member x.Quote() = ()
-    member x.Zero() = ()
+        let id = getGlobalId()
+        let i = id.X
 
-    interface IShaderBuilder with
-        member x.ShaderStage = ShaderStage.Compute
-        member x.OutputTopology = None
+        let l = getLocalIndex()
+        s.[l] <- c.[V2i(l,0)].X
+        b.[i] <- a.[i] * 3.0 + s.[l]
 
-
-let compute = ComputeBuilder()
-
-let blubber (f : float) (a : float[]) (b : float[]) (c : Image2d<Formats.r32f>) =
-    compute { 
-        let i = getGlobalId().X
-        if i < a.Length then
-            b.[i] <- f * a.[i] + c.[V2i(i,0)].X
     }
 
 [<EntryPoint>]
 let main args =
 
 
-    let test = ComputeShader.ofFunction blubber
+    let test = ComputeShader.ofFunction computer
     let m = ComputeShader.toModule test
-
     let code = ModuleCompiler.compileGLSL410 m
-
     printfn "%s" code
-
     System.Environment.Exit 0
 
 

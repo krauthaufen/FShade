@@ -38,9 +38,11 @@ type ComputeImage =
 
 type ComputeShader =
     {
+        csLocalSize    : V3i
         csBuffers      : Map<string, ComputeBuffer>
         csImages       : Map<string, ComputeImage>
         csUniforms     : Map<string, UniformParameter>
+        csShared       : Map<string, Type * int>
         csBody         : Expr
     }
 
@@ -77,10 +79,10 @@ module ComputeShader =
                         | _ ->
                             None
 
-        let rec preprocessCompute (e : Expr) =
+        let rec preprocessCompute (sizes : Dictionary<string, int>) (e : Expr) =
             match e with
                 | GetArray(ValueWithName(v, t, name), i) ->
-                    let i = preprocessCompute i
+                    let i = preprocessCompute sizes i
                     match t with
                         | ArrOf(_,t) | ArrayOf t ->
                             Expr.ReadInput(ParameterKind.Input, t, name, i)
@@ -88,8 +90,8 @@ module ComputeShader =
                             e
 
                 | SetArray(ValueWithName(v, t, name), i, e) ->
-                    let i = preprocessCompute i
-                    let e = preprocessCompute e
+                    let i = preprocessCompute sizes i
+                    let e = preprocessCompute sizes e
                     Expr.WriteOutputsRaw([name, Some i, e])
 
                 | PropertyGet(Some (ValueWithName(v, t, name)), prop, []) when t.IsArray && (prop.Name = "Length" || prop.Name = "LongLength") ->
@@ -98,25 +100,43 @@ module ComputeShader =
                 | ValueWithName(v,t,name) ->
                     Expr.ReadInput(ParameterKind.Uniform, t, "cs_" + name)
 
+                | Let(v, Call(None, mi, [size]),b) when mi.Name = "allocateShared" ->
+                    match Expr.TryEval size with
+                        | Some (:? int as size) ->
+                            sizes.[v.Name] <- size
+
+                            let b = 
+                                let e = Expr.ValueWithName(null, v.Type, v.Name) //Expr.ReadInput(ParameterKind.Input, v.Type, v.Name)
+                                b.Substitute(fun vi ->
+                                    if vi = v then Some e
+                                    else None
+                                )
+
+                            preprocessCompute sizes b
+
+                        | _ ->
+                            failwith "[FShade] could not evaluate size for allocateShared"
 
                 | ShapeLambda(v, b) ->
-                    Expr.Lambda(v, preprocessCompute b)
+                    Expr.Lambda(v, preprocessCompute sizes b)
 
                 | ShapeVar(v) ->
                     e
 
                 | ShapeCombination(o, args) ->
-                    RebuildShapeCombination(o, List.map preprocessCompute args)
+                    RebuildShapeCombination(o, List.map (preprocessCompute sizes) args)
              
 
 
-    let ofExpr (body : Expr) =
-        let body = preprocessCompute body
+    let ofExpr (localSize : V3i) (body : Expr) =
+        let sizes = Dictionary()
+        let body = preprocessCompute sizes body
         let body, state = Preprocessor.preprocess body
 
         let mutable buffers = Map.empty
         let mutable images = Map.empty
         let mutable uniforms = Map.empty
+        let mutable shared = Map.empty
 
         let addImage (fmt : Type) (name : string) (t : Type) (dim : SamplerDimension) (isArray : bool) (isMS : bool) (contentType : Type) =
             match Map.tryFind name images with
@@ -141,15 +161,24 @@ module ComputeShader =
                 | None ->
                     buffers <- Map.add name { ComputeBuffer.contentType = arrayType.GetElementType(); ComputeBuffer.read = read; ComputeBuffer.write = write } buffers
             
+        let addShared (name : string) (arrayType : Type) (size : int) =
+            shared <- Map.add name (arrayType.GetElementType(), size) shared
+
         for (name, p) in Map.toSeq state.inputs do
-            match p.paramType with
-                | ImageType(fmt, dim, isArr, isMS, valueType) ->
-                    addImage fmt name p.paramType dim isArr isMS valueType
-                | t -> 
-                    addBuffer name t true false
+            match sizes.TryGetValue name with
+                | (true, s) ->
+                    addShared name p.paramType s
+                | _ -> 
+                    match p.paramType with
+                        | ImageType(fmt, dim, isArr, isMS, valueType) ->
+                            addImage fmt name p.paramType dim isArr isMS valueType
+                        | t -> 
+                            addBuffer name t true false
 
         for (name, p) in Map.toSeq state.outputs do
-            addBuffer name (p.paramType.MakeArrayType()) false true
+            match sizes.TryGetValue name with
+                | (true, s) -> addShared name (p.paramType.MakeArrayType()) s
+                | _ -> addBuffer name (p.paramType.MakeArrayType()) false true
 
         for (name, p) in Map.toSeq state.uniforms do
             let isArgument, name = 
@@ -170,16 +199,23 @@ module ComputeShader =
             
 
         {
+            csLocalSize    = localSize
             csBuffers      = buffers
             csImages       = images
             csUniforms     = uniforms
             csBody         = body
+            csShared       = shared
         }
 
-    let ofFunction (f : 'a) : ComputeShader =
+    let ofFunction (f : 'a -> 'b) : ComputeShader =
+        let signature = FunctionSignature.ofFunction f
+        let localSize = 
+            match FunctionSignature.tryGetAttribute<LocalSizeAttribute> signature with
+                | Some size -> V3i(size.X, size.Y, size.Z)
+                | _ -> V3i(-1,-1,-1)
         match tryExtractExpr f with
             | Some body ->
-                ofExpr body
+                ofExpr localSize body
             | _ ->
                 failwithf "[FShade] cannot create compute shader using function: %A" f
 
@@ -191,6 +227,16 @@ module ComputeShader =
                     paramSemantic = n
                     paramType = i.contentType.MakeArrayType()
                     paramDecorations = Set.ofList [ParameterDecoration.StorageBuffer]
+                }
+            )
+
+        let sharedArguments =
+            s.csShared |> Map.toList |> List.map (fun (n,(t,s)) ->
+                { 
+                    paramName = n
+                    paramSemantic = n
+                    paramType = Peano.getArrayType s t
+                    paramDecorations = Set.ofList [ParameterDecoration.Shared]
                 }
             )
 
@@ -207,6 +253,7 @@ module ComputeShader =
                     uniformDecorations = decorations
                 }
             )
+
 
         let uniforms =
             s.csUniforms |> Map.toList |> List.map (fun (n, u) ->
@@ -228,7 +275,7 @@ module ComputeShader =
             inputs      = []
             outputs     = []
             uniforms    = imageArguments @ uniforms
-            arguments   = bufferArguments
+            arguments   = bufferArguments @ sharedArguments
             body        = s.csBody
             decorations = 
                 [
@@ -237,6 +284,8 @@ module ComputeShader =
                         self = ShaderStage.Compute
                         next = None 
                     }
+
+                    EntryDecoration.LocalSize s.csLocalSize
                 ]
         }
 

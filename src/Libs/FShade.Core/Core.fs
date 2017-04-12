@@ -244,6 +244,14 @@ module FunctionSignature =
             Log.warn "[FShade] said: '%s'" e.Message
             RandomFunctionSignature() :> IFunctionSignature
 
+    let tryGetAttribute<'a when 'a :> System.Attribute>(signature : IFunctionSignature) =
+        match signature with
+            | :? Signature as s -> 
+                match s.mi.GetCustomAttributes(typeof<'a>) |> Seq.tryHead with
+                    | Some (:? 'a as a) -> Some a
+                    | _ -> None
+            | _ ->
+                None
 
 type UniformScope(parent : Option<UniformScope>, name : string) = 
     static let mutable currentId = 0

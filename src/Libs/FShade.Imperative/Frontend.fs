@@ -21,6 +21,7 @@ type ParameterDecoration =
     | Const
     | Slot of int
     | StorageBuffer
+    | Shared
     
 [<RequireQualifiedAccess>]
 type UniformDecoration =
@@ -61,6 +62,7 @@ type EntryDecoration =
     | InputTopology of InputTopology
     | OutputTopology of OutputTopology
     | OutputVertices of int
+    | LocalSize of V3i
 
 type EntryPoint =
     {

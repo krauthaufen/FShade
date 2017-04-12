@@ -516,7 +516,7 @@ module Compiler =
                 | Method("get_Item", [ArrOf(_,_); _]), [arr; index]
                 | Method("GetArray", _), [arr; index] -> 
                     CExpr.CItem(ct, arr, index) |> Some
-
+                    
 
                 | ConversionMethod(_,o), [arg]              -> CExpr.CConvert(CType.ofType b o, arg) |> Some
                 | _ -> None
@@ -1378,6 +1378,12 @@ module Compiler =
                     let! v = toCVarS v
                     let! value = toCExprS value
                     return CWrite(CLVar v, value)
+
+                | SetArray(arr, index, value) ->
+                    let! carr = toCLExprS arr
+                    let! ci = toCExprS index
+                    let! cvalue = toCExprS value
+                    return CWrite(CLExpr.CLItem(cvalue.ctype, carr.Value, ci), cvalue)
 
                 | PropertySet(None, pi, i, a) ->
                     return failwithf "[FShade] cannot set static property %A" pi

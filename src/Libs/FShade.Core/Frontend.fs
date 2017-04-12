@@ -171,6 +171,33 @@ module Primitives =
     let discard () : unit = failwith "_"
 
     let getGlobalId() : V3i = failwith "_"
+    let getWorkGroupId() : V3i = failwith ""
+    let getLocalId() : V3i = failwith ""
+    let getLocalIndex() : int = failwith ""
+    let getWorkGroupSize() : V3i = failwith ""
+    let getWorkGroupCount() : V3i = failwith ""
+
+    let allocateShared<'a when 'a : unmanaged> (size : int) : 'a[] = failwith ""
+
+    type LocalSizeAttribute() = 
+        inherit System.Attribute()
+
+        let mutable x = 1
+        let mutable y = 1
+        let mutable z = 1
+
+        member __.X
+            with get() = x
+            and set v = x <- v
+
+        member __.Y
+            with get () = y
+            and set v = y <- v
+
+        member __.Z
+            with get () = z
+            and set v = z <- v
+
 
     type TessCoord<'a> = class end
 
