@@ -21,6 +21,7 @@ type ShaderStage =
     | TessEval = 2
     | Geometry = 3 
     | Fragment = 4
+    | Compute = -1
 
 [<RequireQualifiedAccess>]
 type OutputTopology = 

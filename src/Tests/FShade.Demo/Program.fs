@@ -49,6 +49,8 @@ type MyEnum =
     | A = 1
     | B = 2
 
+
+
 let effectTest() =
 
     
@@ -392,9 +394,40 @@ let expected() =
     ()
 
 
+type ComputeBuilder() =
+    inherit BaseBuilder()
+
+    member x.Quote() = ()
+    member x.Zero() = ()
+
+    interface IShaderBuilder with
+        member x.ShaderStage = ShaderStage.Compute
+        member x.OutputTopology = None
+
+
+let compute = ComputeBuilder()
+
+let blubber (f : float) (a : float[]) (b : float[]) (c : Image2d<Formats.r32f>) =
+    compute { 
+        let i = getGlobalId().X
+        if i < a.Length then
+            b.[i] <- f * a.[i] + c.[V2i(i,0)].X
+    }
 
 [<EntryPoint>]
 let main args =
+
+
+    let test = ComputeShader.ofFunction blubber
+    let m = ComputeShader.toModule test
+
+    let code = ModuleCompiler.compileGLSL410 m
+
+    printfn "%s" code
+
+    System.Environment.Exit 0
+
+
     effectTest()
     System.Environment.Exit 0
 

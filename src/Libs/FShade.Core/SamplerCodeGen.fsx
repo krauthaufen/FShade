@@ -1,10 +1,14 @@
-﻿#r @"..\..\..\..\Bin\Debug\Aardvark.Base.dll"
-#r @"..\..\..\..\Bin\Debug\FShade.Imperative.dll"
-#r @"..\..\..\..\Bin\Debug\FShade.Core.dll"
+﻿#r @"..\..\..\Bin\Debug\Aardvark.Base.dll"
+#r @"..\..\..\Bin\Debug\Aardvark.Base.TypeProviders.dll"
+#r @"..\..\..\Bin\Debug\Aardvark.Base.FSharp.dll"
+#r @"..\..\..\Bin\Debug\FShade.Imperative.dll"
+#r @"..\..\..\Bin\Debug\FShade.Core.dll"
 
 open System
 open System.IO
 open FShade
+open Aardvark.Base
+open System.Runtime.CompilerServices
 
 
 let namespaceName = "FShade"
@@ -14,6 +18,17 @@ let dims = [ SamplerDimension.Sampler1d; SamplerDimension.Sampler2d; SamplerDime
 let arr = [ true; false ]
 let ms = [ true; false ]
 let shadow = [ true; false ]
+
+
+let allImageCombinations =
+    [
+        for t in types do
+            for d in dims do
+                let arr = if d = SamplerDimension.Sampler3d then [false] else arr
+                for a in arr do
+                    for m in ms do
+                        yield (t,d,a,m)
+    ]
 
 let allCombinations =
     [
@@ -27,6 +42,14 @@ let allCombinations =
                                 ()
                             else
                                 yield (t,d,a,m,s)
+    ]
+
+let formats =
+    [
+        "RGBA"
+        "RGB"
+        "RG"
+        "R"
     ]
 
 let mutable indent = ""
@@ -123,15 +146,6 @@ let run() =
         let coordType = floatVec coordComponents
         let projCoordType = floatVec (coordComponents + 1)
         let texelCoordType = intVec coordComponents
-//
-//        let coordType, projCoordType, texelCoordType =
-//            match d with
-//                | SamplerDimension.Sampler1d -> "float", "V2d", "int"
-//                | SamplerDimension.Sampler2d -> "V2d", "V3d", "V2i"
-//                | SamplerDimension.Sampler3d -> "V3d", "V4d", "V3i"
-//                | SamplerDimension.SamplerCube -> "V3d", "ERROR", "V3i"
-//                | _ -> failwith "unsupported sampler-kind"
-//
 
         let sizeType =
             match d with
@@ -321,9 +335,103 @@ let run() =
     stop ()
 
 
+    for (t,d,a,m) in allImageCombinations do
+        let prefix =
+            match t with
+                | SamplerType.Float -> ""
+                | SamplerType.Int -> "Int"
+                | _ -> ""
+
+        let dim =
+            match d with
+                | SamplerDimension.Sampler1d -> "1d"
+                | SamplerDimension.Sampler2d -> "2d"
+                | SamplerDimension.Sampler3d -> "3d"
+                | SamplerDimension.SamplerCube -> "Cube"
+                | _ -> "2d"
+
+        let ms = if m then "MS" else ""
+        let arr = if a then "Array" else ""
+
+
+        let name = sprintf "%sImage%s%s%s" prefix dim arr ms 
+
+        let returnType =
+            match t with
+                | SamplerType.Float -> "V4d"
+                | SamplerType.Int -> "V4i"
+                | _ -> failwith "unknown image baseType"
+
+        let coordComponents =
+            match d with
+                | SamplerDimension.Sampler1d -> 1
+                | SamplerDimension.Sampler2d -> 2
+                | SamplerDimension.Sampler3d -> 3
+                | SamplerDimension.SamplerCube -> 3
+                | _ -> failwith "unsupported image-kind"
+
+        let coordType = intVec coordComponents
+
+        let sizeType =
+            match d with
+                | SamplerDimension.Sampler1d -> "int"
+                | SamplerDimension.Sampler2d -> "V2i"
+                | SamplerDimension.Sampler3d -> "V3i"
+                | SamplerDimension.SamplerCube -> "V2i"
+                | _ -> failwith "unsupported sampler-kind"
+
+        let iface =
+            match t with
+                | SamplerType.Float -> "Formats.IFloatingFormat"
+                | SamplerType.Int -> "Formats.ISignedFormat"
+                | _ -> ""
+
+        start "type %s<'f when 'f :> %s>() =" name iface
+        
+        line "interface IImage"
+        
+        line  "static member FormatType = typeof<'f>"
+        line  "static member Dimension = SamplerDimension.Sampler%s" dim
+        line  "static member ValueType = typeof<%s>" returnType
+        line  "static member CoordType = typeof<%s>" coordType
+        line  "static member IsArray = %s" (if a then "true" else "false")
+        line  "static member IsMultisampled = %s" (if m then "true" else "false")
+        line  ""
+
+        line "member x.Size : %s = failwith \"\"" sizeType
+
+
+        let args =
+            [
+                yield "coord", coordType
+                if a then yield "slice", "int"
+                if m then yield "sample", "int"
+            ]
+
+        let itemArgs = args |> List.map (fun (n,t) -> sprintf "%s : %s" n t) |> String.concat ", "
+
+        start "member x.Item"
+        line "with get(%s) : %s = failwith \"\"" itemArgs returnType
+        line "and set(%s) (v : %s) : unit = failwith \"\"" itemArgs returnType
+        stop()
+
+        if t = SamplerType.Int then
+            line "member x.AtomicAdd(%s, data : int) : int = failwith \"\"" itemArgs
+            line "member x.AtomicMin(%s, data : int) : int = failwith \"\"" itemArgs
+            line "member x.AtomicMax(%s, data : int) : int = failwith \"\"" itemArgs
+            line "member x.AtomicAnd(%s, data : int) : int = failwith \"\"" itemArgs
+            line "member x.AtomicOr(%s, data : int) : int = failwith \"\"" itemArgs
+            line "member x.AtomicXor(%s, data : int) : int = failwith \"\"" itemArgs
+            line "member x.AtomicExchange(%s, data : int) : int = failwith \"\"" itemArgs
+            line "member x.AtomicCompareExchange(%s, cmp : int, data : int) : int = failwith \"\"" itemArgs
+
+
+        stop()
+        ()
+
 
     let str = builder.ToString()
-    let fileName = Path.Combine(__SOURCE_DIRECTORY__, "SamplerGenerated.fs")
+    let fileName = Path.Combine(__SOURCE_DIRECTORY__, "Samplers.fs")
     File.WriteAllText(fileName, str)
 
     ()

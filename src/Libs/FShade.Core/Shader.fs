@@ -1482,6 +1482,7 @@ module Shader =
                     uniformName = u.uniformName
                     uniformType = u.uniformType
                     uniformBuffer = uniformBuffer
+                    uniformDecorations = u.decorations
                 }
             )
 

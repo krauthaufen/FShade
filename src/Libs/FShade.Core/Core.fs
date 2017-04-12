@@ -22,7 +22,7 @@ module FunctionSignature =
     open Aardvark.Base.IL
 
     [<AutoOpen>]
-    module private Implementation = 
+    module Implementation = 
         type ClosureArg =
             | CArgument of int
             | CField of FieldInfo
@@ -213,10 +213,19 @@ module FunctionSignature =
 
     let ofFunction (f : 'a -> 'b) =
         try
-            let invoke = f.GetType().GetMethod("Invoke")
+
+            let invoke =
+                if typeof<'b>.Name.StartsWith "FSharpFunc" then
+                    let invokes = f.GetType().GetMethods() |> Array.filter (fun mi -> mi.Name = "Invoke")
+                    if invokes.Length = 0 then null
+                    else invokes |> Array.maxBy (fun mi -> mi.GetParameters().Length)
+                else
+                    f.GetType().GetMethod "Invoke"
+
             if isNull invoke then
                 failwithf "[FShade] could not get signature for function %A" f
-            let (target, mi, args) = extractCall f invoke [Argument 1]
+
+            let (target, mi, args) = extractCall f invoke (invoke.GetParameters() |> Array.toList |> List.mapi (fun i _ -> Argument (1 + i)))
 
             let target =
                 if isNull target then
@@ -323,7 +332,57 @@ module ParameterDescription =
         }
 
 
-    
+module Formats =
+    type IFormat = interface end 
+    type IFloatingFormat = inherit IFormat
+    type ISignedFormat = inherit IFormat
+    type IUnsignedFormat = inherit IFormat
+
+    type rgba32f() = interface IFloatingFormat
+    type rgba16f() = interface IFloatingFormat
+    type rg32f() = interface IFloatingFormat
+    type rg16f() = interface IFloatingFormat
+    type r11g11b10f() = interface IFloatingFormat
+    type r32f() = interface IFloatingFormat
+    type r16f() = interface IFloatingFormat
+
+    type rgba16() = interface IFloatingFormat
+    type rgb10a2() = interface IFloatingFormat
+    type rgba8() = interface IFloatingFormat
+    type rg16() = interface IFloatingFormat
+    type rg8() = interface IFloatingFormat
+    type r16() = interface IFloatingFormat
+    type r8() = interface IFloatingFormat
+
+    type rgba16_snorm() = interface IFloatingFormat
+    type rgba8_snorm() = interface IFloatingFormat
+    type rg16_snorm() = interface IFloatingFormat
+    type rg8_snorm() = interface IFloatingFormat
+    type r16_snorm() = interface IFloatingFormat
+    type r8_snorm() = interface IFloatingFormat
+
+    type rgba32ui() = interface IUnsignedFormat
+    type rgba16ui() = interface IUnsignedFormat
+    type rgb10a2ui() = interface IUnsignedFormat
+    type rgba8ui() = interface IUnsignedFormat
+    type rg32ui() = interface IUnsignedFormat
+    type rg16ui() = interface IUnsignedFormat
+    type rg8ui() = interface IUnsignedFormat
+    type r32ui() = interface IUnsignedFormat
+    type r16ui() = interface IUnsignedFormat
+    type r8ui() = interface IUnsignedFormat
+
+    type rgba32i() = interface ISignedFormat
+    type rgba16i() = interface ISignedFormat
+    type rgba8i() = interface ISignedFormat
+    type rg32i() = interface ISignedFormat
+    type rg16i() = interface ISignedFormat
+    type rg8i() = interface ISignedFormat
+    type r32i() = interface ISignedFormat
+    type r16i() = interface ISignedFormat
+    type r8i() = interface ISignedFormat
+
+
 
 
 type UniformValue =
@@ -338,9 +397,15 @@ type UniformParameter =
         uniformValue        : UniformValue
     }
 
+
+
+
 type ISampler =
     abstract member Texture : ISemanticValue
     abstract member State : SamplerState
+
+type IImage =
+    interface end
 
 type ShaderTextureHandle(semantic : string, scope : UniformScope) =
     static member CreateUniform(semantic : string, scope : UniformScope) = ShaderTextureHandle(semantic, scope)

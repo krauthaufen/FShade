@@ -807,6 +807,7 @@ module Compiler =
                 cUniformType = ct
                 cUniformName = v.uniformName
                 cUniformBuffer = v.uniformBuffer
+                cUniformDecorations = v.uniformDecorations
             }
         }
 

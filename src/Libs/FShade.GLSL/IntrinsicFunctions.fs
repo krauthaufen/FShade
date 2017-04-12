@@ -457,10 +457,30 @@ module IntrinsicFunctions =
                 exactly <@ endPrimitive @>
             ]
 
+            CIntrinsic.tagged "ivec3(gl_GlobalInvocationID)", [ exactly <@ getGlobalId @> ]
+
+
         ]
 
     let (|TextureLookup|_|) (mi : MethodInfo) =
         match mi with
+            | Method(name, ((ImageType(_, dim, isArray, isMS, valueType)::_) as args)) ->
+                
+                let plainArgs(skip : int) =
+                    args |> List.skip skip |> List.mapi (fun i _ -> sprintf "{%d}" (skip + i)) |> String.concat ", "
+                        
+                let argCount = List.length args - 1
+
+                let functionName = 
+                    match name with
+                        | "get_Size" -> "imageSize({0})"
+                        | "get_Item" when argCount = 1 -> sprintf "imageLoad(%s)" (plainArgs 0)
+                        | "set_Item" when argCount = 2 -> sprintf "imageStore(%s)" (plainArgs 0)
+                        | "get_Item" -> sprintf "imageLoad({0}, ivec%d(%s), 0)" argCount (plainArgs 1)
+                        | _ ->failwithf "unknown sampler function %A" name
+                        
+                Some functionName
+
             | Method(name, ((SamplerType(dim, isArray, isShadow, isMS, valueType)::_) as args)) ->
                 let coordComponents =
                     match dim with

@@ -170,6 +170,8 @@ module Primitives =
     let inline ddy< ^a when ^a : (static member (-) : ^a -> ^a -> ^a) > (v : ^a) : ^a = failwith "_"
     let discard () : unit = failwith "_"
 
+    let getGlobalId() : V3i = failwith "_"
+
     type TessCoord<'a> = class end
 
     let tessellateTriangle (li : float) (l01 : float, l12 : float, l20 : float) : TessCoord<V3d> =

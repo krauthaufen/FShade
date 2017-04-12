@@ -67,6 +67,32 @@ type Backend private(config : Config) =
 
                 CIntrinsicType.simple name |> Some
 
+            | ImageType(fmt, dim, arr, ms, valueType) ->
+                let dimStr =
+                    match dim with
+                        | SamplerDimension.Sampler1d -> "1D"
+                        | SamplerDimension.Sampler2d -> "2D"
+                        | SamplerDimension.Sampler3d -> "3D"
+                        | SamplerDimension.SamplerCube -> "Cube"
+                        | _ -> failwith "unsupported sampler dimension"
+
+                let msSuffix = if ms then "MS" else ""
+                let typePrefix = 
+                    match valueType.Name with
+                        | "V4i" -> "i"
+                        | _ -> ""
+
+                let fmt = fmt.Name
+
+
+                let name = 
+                    if arr then sprintf "%simage%s%sArray" typePrefix dimStr msSuffix
+                    else sprintf "%simage%s%s" typePrefix dimStr msSuffix 
+
+                CIntrinsicType.simple name |> Some
+                
+
+
             | _ ->
                 None
 
@@ -182,6 +208,8 @@ module Assembler =
                         else name
 
                     match kind, stages with
+                        | _, { self = ShaderStage.Compute }                 -> return name
+
                         | ParameterKind.Input, { prev = None }              -> return name
                         | ParameterKind.Input, { self = s }                 -> return prefixes.[s] + name
 
@@ -610,15 +638,27 @@ module Assembler =
 
         }
 
-    let private uniformLayout (set : int) (binding : int) =
-        if set >= 0 && binding >= 0 then
-            sprintf "layout(set = %d, binding = %d)\r\n" set binding
-        elif set >= 0 then
-            sprintf "layout(set = %d)\r\n" set
-        elif binding >= 0 then
-            sprintf "layout(binding = %d)\r\n" binding
-        else
-            ""
+    let private uniformLayout (decorations : list<UniformDecoration>) (set : int) (binding : int) =
+
+        let decorations =
+            decorations |> List.choose (fun d ->
+                match d with
+                    | UniformDecoration.Format t -> Some t.Name
+            )
+
+        let decorations =
+            if set >= 0 then (sprintf "set = %d" set) :: decorations
+            else decorations
+            
+        let decorations =
+            if binding >= 0 then (sprintf "binding = %d" binding) :: decorations
+            else decorations
+
+               
+        match decorations with
+            | [] -> ""
+            | d -> d |> String.concat ", " |> sprintf "layout(%s)\r\n" 
+
 
 
     let assembleUniformsS (uniforms : list<CUniform>) =
@@ -635,23 +675,24 @@ module Assembler =
                         let fields = 
                             fields |> List.map (fun u -> 
                                 let decl = assembleDeclaration u.cUniformType u.cUniformName
-                                sprintf "%s;" decl    
+                                let decl = sprintf "%s;" decl 
+                                decl, u.cUniformDecorations
                             )
                         match name with
                             | Some bufferName when config.createUniformBuffers ->
                                 let! binding = AssemblerState.newBinding
                                     
-                                let fields = fields |> String.concat "\r\n"
-                                let prefix = uniformLayout set binding
+                                let fields = fields |> List.map fst |> String.concat "\r\n"
+                                let prefix = uniformLayout [] set binding
                             
                                 return sprintf "%suniform %s\r\n{\r\n%s\r\n};\r\n" prefix bufferName (String.indent fields)
 
                             | _ ->
                                 let! definitions = 
-                                    fields |> List.mapS (fun f ->
+                                    fields |> List.mapS (fun (f, decorations) ->
                                         state {
                                             let! binding = AssemblerState.newBinding
-                                            let prefix = uniformLayout set binding
+                                            let prefix = uniformLayout decorations set binding
                                             return sprintf "%suniform %s" prefix f
                                         }
                                     )
@@ -690,10 +731,17 @@ module Assembler =
                                         | InterpolationMode.Sample -> Some "sample"
                                         | InterpolationMode.PerPatch -> Some "patch"
                                         | _ -> None
+
+                                | ParameterDecoration.StorageBuffer ->
+                                    Some ("layout(std430) buffer " + (p.cParamSemantic + "_ssb"))
+
                                 | ParameterDecoration.Memory _ | ParameterDecoration.Slot _ ->
                                     None
 
                         )
+
+
+                    let isBuffer = p.cParamDecorations |> Seq.exists (function ParameterDecoration.StorageBuffer -> true | _ -> false)
 
                     let slot = p.cParamDecorations |> Seq.tryPick (function ParameterDecoration.Slot s -> Some s | _ -> None)
 
@@ -716,24 +764,26 @@ module Assembler =
 
                     let! name = parameterNameS kind p.cParamName
 
-                    let prefix =
+                    let prefix, suffix =
                         if config.version > version120 then
                             match kind with
-                                | ParameterKind.Input -> "in "
-                                | ParameterKind.Output -> "out "
-                                | _ -> ""
+                                | ParameterKind.Input -> "in ", ""
+                                | ParameterKind.Output -> "out ", ""
+                                | _ -> 
+                                    if isBuffer then " { ", " };"
+                                    else "", ""
                         else
                             match kind with
-                                | ParameterKind.Input -> "varying "
-                                | ParameterKind.Output -> "varying "
-                                | _ -> ""
+                                | ParameterKind.Input -> "varying ", ""
+                                | ParameterKind.Output -> "varying ", ""
+                                | _ -> "", ""
                     
 
                     match p.cParamType with
                         | CPointer(_, t) ->
-                            return sprintf "%s%s%s %s[];" decorations prefix (assembleType t) name |> Some
+                            return sprintf "%s%s%s %s[];%s" decorations prefix (assembleType t) name suffix |> Some
                         | _ -> 
-                            return sprintf "%s%s%s %s;" decorations prefix (assembleType p.cParamType) name |> Some
+                            return sprintf "%s%s%s %s;%s" decorations prefix (assembleType p.cParamType) name suffix |> Some
         }
     
     let assembleEntryS (e : CEntryDef) =
@@ -812,12 +862,19 @@ module Assembler =
                         [
                             sprintf "layout(%s, equal_spacing, ccw) in;" inputTop
                         ]
+
+
+                    | ShaderStage.Compute ->
+                        [
+                            "layout( local_size_variable ) in;" 
+                        ]
+
                     | _ ->
                         []
 
             let! inputs = e.cInputs |> List.chooseS (assembleEntryParameterS ParameterKind.Input)
             let! outputs = e.cOutputs |> List.chooseS (assembleEntryParameterS ParameterKind.Output)
-            let! args = e.cArguments |> List.chooseS (assembleEntryParameterS ParameterKind.Argument) |> State.map (String.concat ", " )
+            let! args = e.cArguments |> List.chooseS (assembleEntryParameterS ParameterKind.Argument)
             let! body = assembleStatementS false e.cBody
 
             return 
@@ -825,7 +882,8 @@ module Assembler =
                     yield! prefix
                     yield! inputs
                     yield! outputs
-                    yield sprintf "%s %s(%s)\r\n{\r\n%s\r\n}" (assembleType e.cReturnType) e.cEntryName args (String.indent body)
+                    yield! args
+                    yield sprintf "%s %s()\r\n{\r\n%s\r\n}" (assembleType e.cReturnType) e.cEntryName (String.indent body)
                 ]
         }
 
@@ -867,6 +925,7 @@ module Assembler =
                 sprintf "struct %s\r\n{\r\n%s\r\n};" name (String.indent fields)
 
     let assemble (backend : Backend) (m : CModule) =
+
         let c = backend.Config
         let definitions =
             state {
@@ -882,7 +941,7 @@ module Assembler =
                 return 
                     List.concat [
                         [sprintf "#version %d%d0" c.version.Major c.version.Minor ]
-                        c.enabledExtensions |> Seq.map (sprintf "#extension %s : enable;") |> Seq.toList
+                        c.enabledExtensions |> Seq.map (sprintf "#extension %s : enable") |> Seq.toList
                         types
                         uniforms
                         values

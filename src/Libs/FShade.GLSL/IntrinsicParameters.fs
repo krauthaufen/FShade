@@ -61,7 +61,12 @@ module IntrinsicParameters =
                     Intrinsics.Layer, "gl_Layer"
                     Intrinsics.ViewportIndex, "gl_ViewportIndex"
                 ]
-            ]
+
+            ShaderStage.Compute, Map.empty
+        ]
+
+
+
 
     let builtInOutputs =
         Dictionary.ofList [
@@ -97,6 +102,9 @@ module IntrinsicParameters =
                     Intrinsics.SampleMask, "gl_SampleMask"
                 ]
 
+            
+            ShaderStage.Compute, Map.empty
+
         ]
 
     let prefixes =
@@ -106,4 +114,5 @@ module IntrinsicParameters =
             ShaderStage.TessEval,       "te_"
             ShaderStage.Geometry,       "gs_"
             ShaderStage.Fragment,       "fs_"
+            ShaderStage.Compute,        "cs_"
         ]  

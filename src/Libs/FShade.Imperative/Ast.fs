@@ -774,6 +774,7 @@ type CUniform =
     {
         cUniformType         : CType
         cUniformName         : string
+        cUniformDecorations  : list<UniformDecoration>
         cUniformBuffer       : Option<string>
     }
 
