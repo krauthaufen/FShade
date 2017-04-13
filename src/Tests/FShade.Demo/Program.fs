@@ -413,10 +413,11 @@ let computer (f : Expr<float -> float -> float>) (a : float[]) (b : float[]) (c 
     }
 
 
-[<LocalSize(X = 256)>]
+[<LocalSize(X = MaxLocalSize)>]
 let scan (add : Expr<'a -> 'a -> 'a>) (zero : Expr<'a>) (input : 'a[]) (output : 'a[]) =
     compute {
-        let temp = allocateShared<'a> 256
+        let elems = LocalSize.X
+        let temp = allocateShared<'a> LocalSize.X
 
         let gid = getGlobalId().X
         let lid = getLocalId().X
@@ -430,7 +431,7 @@ let scan (add : Expr<'a -> 'a -> 'a>) (zero : Expr<'a>) (input : 'a[]) (output :
 
         let mutable d = 2
         let mutable s = 1
-        while s < 256 do
+        while s < elems do
             if lid % d = 0 && lid >= s then
                 temp.[lid] <- (%add) temp.[lid] temp.[lid - s]
 
@@ -442,7 +443,7 @@ let scan (add : Expr<'a -> 'a -> 'a>) (zero : Expr<'a>) (input : 'a[]) (output :
         s <- s / 2
         d <- d / 2
         while s >= 1 do
-            if lid % d = 0 && lid + s < 256 then
+            if lid % d = 0 && lid + s < elems then
                 temp.[lid + s] <- (%add) temp.[lid + s] temp.[lid]
 
             barrier()
@@ -458,8 +459,8 @@ let scan (add : Expr<'a -> 'a -> 'a>) (zero : Expr<'a>) (input : 'a[]) (output :
 [<EntryPoint>]
 let main args =
 
-
-    let test = ComputeShader.ofFunction (scan <@ fun a b -> a + b @> <@ 0.0 @>)
+    let maxGroupSize = V3i(128, 1024, 1024)
+    let test = ComputeShader.ofFunction maxGroupSize (scan <@ fun a b -> a + b @> <@ 0.0 @>)
     let m = ComputeShader.toModule test
     let code = ModuleCompiler.compileGLSL410 m
     printfn "%s" code

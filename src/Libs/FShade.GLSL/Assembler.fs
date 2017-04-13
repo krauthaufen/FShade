@@ -873,7 +873,7 @@ module Assembler =
                         let localSize = e.cDecorations |> List.tryPick (function EntryDecoration.LocalSize s when s.AllGreater 0 -> Some s | _ -> None) 
                         [
                             match localSize with
-                                | Some s -> yield sprintf "layout (local_size_x = %d, local_size_y = %d, local_size_z = %d)" s.X s.Y s.Z
+                                | Some s -> yield sprintf "layout (local_size_x = %d, local_size_y = %d, local_size_z = %d) in;" s.X s.Y s.Z
                                 | None -> yield "layout( local_size_variable ) in;" 
                         ]
 

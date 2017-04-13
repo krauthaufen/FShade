@@ -179,6 +179,11 @@ module Primitives =
     let barrier() : unit = failwith ""
     let allocateShared<'a when 'a : unmanaged> (size : int) : 'a[] = failwith ""
 
+    [<Literal>]
+    let MaxLocalSize = 2147483647
+
+    let LocalSize = V3i(2147483647, 2147483647, 2147483647)
+
     type LocalSizeAttribute() = 
         inherit System.Attribute()
 

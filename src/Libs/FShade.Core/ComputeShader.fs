@@ -79,10 +79,10 @@ module ComputeShader =
                         | _ ->
                             None
 
-        let rec preprocessCompute (sizes : Dictionary<string, int>) (e : Expr) =
+        let rec preprocessCompute (localSize : V3i) (sizes : Dictionary<string, int>) (e : Expr) =
             match e with
                 | GetArray(ValueWithName(v, t, name), i) ->
-                    let i = preprocessCompute sizes i
+                    let i = preprocessCompute localSize sizes i
                     match t with
                         | ArrOf(_,t) | ArrayOf t ->
                             Expr.ReadInput(ParameterKind.Input, t, name, i)
@@ -90,8 +90,8 @@ module ComputeShader =
                             e
 
                 | SetArray(ValueWithName(v, t, name), i, e) ->
-                    let i = preprocessCompute sizes i
-                    let e = preprocessCompute sizes e
+                    let i = preprocessCompute localSize sizes i
+                    let e = preprocessCompute localSize sizes e
                     Expr.WriteOutputsRaw([name, Some i, e])
 
                 | PropertyGet(Some (ValueWithName(v, t, name)), prop, []) when t.IsArray && (prop.Name = "Length" || prop.Name = "LongLength") ->
@@ -100,7 +100,14 @@ module ComputeShader =
                 | ValueWithName(v,t,name) ->
                     Expr.ReadInput(ParameterKind.Uniform, t, "cs_" + name)
 
+                | PropertyGet(None, pi, []) when pi.Name = "LocalSize" ->
+                    Expr.Value(localSize)
+
+                | FieldGet(None, pi) when pi.Name = "LocalSize" ->
+                    Expr.Value(localSize)
+
                 | Let(v, Call(None, mi, [size]),b) when mi.Name = "allocateShared" ->
+                    let size = preprocessCompute localSize sizes size
                     match Expr.TryEval size with
                         | Some (:? int as size) ->
                             sizes.[v.Name] <- size
@@ -112,26 +119,57 @@ module ComputeShader =
                                     else None
                                 )
 
-                            preprocessCompute sizes b
+                            preprocessCompute localSize sizes b
 
                         | _ ->
                             failwith "[FShade] could not evaluate size for allocateShared"
 
                 | ShapeLambda(v, b) ->
-                    Expr.Lambda(v, preprocessCompute sizes b)
+                    Expr.Lambda(v, preprocessCompute localSize sizes b)
 
                 | ShapeVar(v) ->
                     e
 
                 | ShapeCombination(o, args) ->
-                    RebuildShapeCombination(o, List.map (preprocessCompute sizes) args)
-             
+                    RebuildShapeCombination(o, List.map (preprocessCompute localSize sizes) args)
+          
+        let rec liftAllocs (localSize : V3i) (sizes : Dictionary<string, int>) (e : Expr) =
+            match e with
+                | Let(v, Call(None, mi, [size]),b) when mi.Name = "allocateShared" ->
+                    let size = liftAllocs localSize sizes size
+                    match Expr.TryEval size with
+                        | Some (:? int as size) ->
+                            sizes.[v.Name] <- size
+
+                            let b = 
+                                let e = Expr.ValueWithName(null, v.Type, v.Name) //Expr.ReadInput(ParameterKind.Input, v.Type, v.Name)
+                                b.Substitute(fun vi ->
+                                    if vi = v then Some e
+                                    else None
+                                )
+
+                            liftAllocs localSize sizes b
+
+                        | _ ->
+                            failwith "[FShade] could not evaluate size for allocateShared"
+
+                | ShapeLambda(v, b) ->
+                    Expr.Lambda(v, preprocessCompute localSize sizes b)
+
+                | ShapeVar(v) ->
+                    e
+
+                | ShapeCombination(o, args) ->
+                    RebuildShapeCombination(o, List.map (preprocessCompute localSize sizes) args)
+                
 
 
     let ofExpr (localSize : V3i) (body : Expr) =
         let sizes = Dictionary()
-        let body = preprocessCompute sizes body
+        let body = preprocessCompute localSize sizes body
+        let body = Optimizer.ConstantFolding.evaluateConstants'' (fun m -> m.DeclaringType.FullName = "FShade.Primitives") body
         let body, state = Preprocessor.preprocess body
+
 
         let mutable buffers = Map.empty
         let mutable images = Map.empty
@@ -207,17 +245,30 @@ module ComputeShader =
             csShared       = shared
         }
 
-    let ofFunction (f : 'a -> 'b) : ComputeShader =
+    let private cache = System.Collections.Concurrent.ConcurrentDictionary<IFunctionSignature * V3i, ComputeShader>()
+
+    let ofFunction (maxLocalSize : V3i) (f : 'a -> 'b) : ComputeShader =
         let signature = FunctionSignature.ofFunction f
-        let localSize = 
-            match FunctionSignature.tryGetAttribute<LocalSizeAttribute> signature with
-                | Some size -> V3i(size.X, size.Y, size.Z)
-                | _ -> V3i(-1,-1,-1)
-        match tryExtractExpr f with
-            | Some body ->
-                ofExpr localSize body
-            | _ ->
-                failwithf "[FShade] cannot create compute shader using function: %A" f
+
+        cache.GetOrAdd((signature, maxLocalSize), fun (signature, maxLocalSize) ->
+            let localSize = 
+                match FunctionSignature.tryGetAttribute<LocalSizeAttribute> signature with
+                    | Some size -> V3i(size.X, size.Y, size.Z)
+                    | _ -> V3i(0, 0, 0)
+
+            let localSize =
+                V3i(
+                    (if localSize.X = MaxLocalSize then maxLocalSize.X else localSize.X),
+                    (if localSize.Y = MaxLocalSize then maxLocalSize.Y else localSize.Y),
+                    (if localSize.Z = MaxLocalSize then maxLocalSize.Z else localSize.Z)
+                )
+
+            match tryExtractExpr f with
+                | Some body ->
+                    ofExpr localSize body
+                | _ ->
+                    failwithf "[FShade] cannot create compute shader using function: %A" f
+        )
 
     let toEntryPoint (s : ComputeShader) =
         let bufferArguments = 
