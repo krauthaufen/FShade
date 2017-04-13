@@ -291,6 +291,9 @@ module ShaderBuilders =
         member x.Quote() = ()
         member x.Zero() = ()
 
+        member x.While(g : unit -> bool, body : unit) =
+            ()
+
         interface IShaderBuilder with
             member x.ShaderStage = ShaderStage.Compute
             member x.OutputTopology = None

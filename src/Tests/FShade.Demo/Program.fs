@@ -397,7 +397,7 @@ let expected() =
 let local = 32
 
 [<LocalSize(X = local)>]
-let computer (a : float[]) (b : float[]) (c : Image2d<Formats.r32f>) =
+let computer (f : Expr<float -> float -> float>) (a : float[]) (b : float[]) (c : Image2d<Formats.r32f>) =
     compute {
         let temp = allocateShared<float> local
 
@@ -408,7 +408,50 @@ let computer (a : float[]) (b : float[]) (c : Image2d<Formats.r32f>) =
         temp.[l] <- c.[V2i(l,0)].X
         barrier()
 
-        b.[i] <- a.[i] * 3.0 + temp.[l]
+        b.[i] <- (%f) a.[i] temp.[l]
+
+    }
+
+
+[<LocalSize(X = 256)>]
+let scan (add : Expr<'a -> 'a -> 'a>) (zero : Expr<'a>) (input : 'a[]) (output : 'a[]) =
+    compute {
+        let temp = allocateShared<'a> 256
+
+        let gid = getGlobalId().X
+        let lid = getLocalId().X
+
+        if gid < input.Length then
+            temp.[lid] <- input.[gid]
+        else
+            temp.[lid] <- %zero
+
+        barrier()
+
+        let mutable d = 2
+        let mutable s = 1
+        while s < 256 do
+            if lid % d = 0 && lid >= s then
+                temp.[lid] <- (%add) temp.[lid] temp.[lid - s]
+
+            barrier()
+            s <- s * 2
+            d <- d * 2
+
+
+        s <- s / 2
+        d <- d / 2
+        while s >= 1 do
+            if lid % d = 0 && lid + s < 256 then
+                temp.[lid + s] <- (%add) temp.[lid + s] temp.[lid]
+
+            barrier()
+            s <- s / 2
+            d <- d / 2
+
+        if gid < input.Length then
+            output.[gid] <- temp.[lid]
+
 
     }
 
@@ -416,7 +459,7 @@ let computer (a : float[]) (b : float[]) (c : Image2d<Formats.r32f>) =
 let main args =
 
 
-    let test = ComputeShader.ofFunction computer
+    let test = ComputeShader.ofFunction (scan <@ fun a b -> a + b @> <@ 0.0 @>)
     let m = ComputeShader.toModule test
     let code = ModuleCompiler.compileGLSL410 m
     printfn "%s" code

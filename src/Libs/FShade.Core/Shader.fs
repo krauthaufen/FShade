@@ -453,7 +453,7 @@ module private Preprocessor =
                     let! body = preprocessS body
                     return Expr.ForEach(var, sequence, body)
 
-                | BuilderWhile(b, guard, body) ->
+                | BuilderWhile(b, Lambda(unitVar, guard), body) ->
                     do! State.setBuilder b
                     let! guard = preprocessS guard
                     let! body = preprocessS body
