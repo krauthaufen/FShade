@@ -222,6 +222,9 @@ module ShaderBuilders =
         member x.For(a : seq<'a>, f : 'a -> unit) : unit =
             for i in a do f i
 
+        member x.While(guard : unit -> bool, b : unit) =
+            ()
+
         member x.Combine(l : unit, r : 'a) = r
 
         member x.Zero() = ()
@@ -295,9 +298,6 @@ module ShaderBuilders =
 
         member x.Quote() = ()
         member x.Zero() = ()
-
-        member x.While(g : unit -> bool, body : unit) =
-            ()
 
         interface IShaderBuilder with
             member x.ShaderStage = ShaderStage.Compute
