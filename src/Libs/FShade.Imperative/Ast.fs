@@ -794,6 +794,7 @@ module CUniform =
                         all.[u.cUniformName] <- u
                         res.Add u
 
+        res.QuickSort(fun l r -> compare l.cUniformName r.cUniformName)
         res |> CSharpList.toList
 
     let internal visit (used : Used) (u : CUniform) =
