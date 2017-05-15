@@ -504,18 +504,61 @@ module ExprExtensions =
             | _ ->
                 None
 
+
+    let rec (|SaturatedLambda|_|) (e : Expr) : Option<list<Var * Expr> * Expr> =
+        match e with
+            | Application(Lambda(v,b), a) ->
+                Some ([v,a], b)
+
+            | Application(SaturatedLambda(bindings, Lambda(v,body)), a) ->
+                Some ((v,a) :: bindings, body)
+
+            | _ ->
+                None
+
     /// detects direct applications of lambdas and replaces them with let
     /// bindings or inlines the expression if either the argument is trivial or it occurs
     /// only once in the lambda-body
-    let (|LambdaApp|_|) (e : Expr) =
+    let rec (|LambdaApp|_|) (e : Expr) =
         match e with
-            | Application(Lambda(v,b), arg) ->
-                let mutable cnt = 0
-                let nb = b.Substitute(fun vi -> if vi = v then cnt <- cnt + 1; Some arg else None)
-                
-                match arg with
-                    | Trivial | _ when cnt <= 1 -> nb |> Some
-                    | _ ->  Expr.Let(v, e, b) |> Some
+            | SaturatedLambda(bindings, body) ->
+                let mutable b = body
+
+                for (v,e) in bindings do
+                    let mutable cnt = 0
+                    let nb = b.Substitute(fun vi -> if vi = v then cnt <- cnt + 1; Some e else None)
+                    
+                    match e with
+                        | Trivial | _ when cnt <= 1 -> 
+                            b <- nb
+                        | _ ->
+                            b <- Expr.Let(v, e, b)
+                Some(b)
+                    
+
+//            | Application(Lambda(v,b), arg) ->
+//                let mutable cnt = 0
+//                let nb = b.Substitute(fun vi -> if vi = v then cnt <- cnt + 1; Some arg else None)
+//                
+//                match arg with
+//                    | Trivial | _ when cnt <= 1 -> 
+//                        match nb with 
+//                            | LambdaApp(nb) -> Some nb
+//                            | _ -> Some nb
+//                    | _ ->  
+//                        match b with
+//                            | LambdaApp(b) -> Expr.Let(v, arg, b) |> Some
+//                            | _ -> Expr.Let(v, arg, b) |> Some
+//
+//
+//            | Application(LambdaApp(Let(v,e,Lambda(vl,bl))), arg) ->
+//                let mutable cnt = 0
+//                let nb = bl.Substitute(fun vi -> if vi = vl then cnt <- cnt + 1; Some arg else None)
+//                
+//                match arg with
+//                    | Trivial | _ when cnt <= 1 -> Expr.Let(v,e,nb) |> Some
+//                    | _ ->  Expr.Let(v, e, Expr.Let(vl, arg, bl)) |> Some
+//                
 
             | _ ->
                 None

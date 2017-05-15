@@ -1754,3 +1754,535 @@ module SamplerBuilders =
     let intSamplerCube = IntSamplerCubeBuilder()
     
 
+type Image1dArrayMS<'f when 'f :> Formats.IFloatingFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.Sampler1d
+    static member ValueType = typeof<V4d>
+    static member CoordType = typeof<int>
+    static member IsArray = true
+    static member IsMultisampled = true
+    
+    member x.Size : int = failwith ""
+    member x.Item
+        with get(coord : int, slice : int, sample : int) : V4d = failwith ""
+        and set(coord : int, slice : int, sample : int) (v : V4d) : unit = failwith ""
+
+
+type Image1dArray<'f when 'f :> Formats.IFloatingFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.Sampler1d
+    static member ValueType = typeof<V4d>
+    static member CoordType = typeof<int>
+    static member IsArray = true
+    static member IsMultisampled = false
+    
+    member x.Size : int = failwith ""
+    member x.Item
+        with get(coord : int, slice : int) : V4d = failwith ""
+        and set(coord : int, slice : int) (v : V4d) : unit = failwith ""
+
+
+type Image1dMS<'f when 'f :> Formats.IFloatingFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.Sampler1d
+    static member ValueType = typeof<V4d>
+    static member CoordType = typeof<int>
+    static member IsArray = false
+    static member IsMultisampled = true
+    
+    member x.Size : int = failwith ""
+    member x.Item
+        with get(coord : int, sample : int) : V4d = failwith ""
+        and set(coord : int, sample : int) (v : V4d) : unit = failwith ""
+
+
+type Image1d<'f when 'f :> Formats.IFloatingFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.Sampler1d
+    static member ValueType = typeof<V4d>
+    static member CoordType = typeof<int>
+    static member IsArray = false
+    static member IsMultisampled = false
+    
+    member x.Size : int = failwith ""
+    member x.Item
+        with get(coord : int) : V4d = failwith ""
+        and set(coord : int) (v : V4d) : unit = failwith ""
+
+
+type Image2dArrayMS<'f when 'f :> Formats.IFloatingFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.Sampler2d
+    static member ValueType = typeof<V4d>
+    static member CoordType = typeof<V2i>
+    static member IsArray = true
+    static member IsMultisampled = true
+    
+    member x.Size : V2i = failwith ""
+    member x.Item
+        with get(coord : V2i, slice : int, sample : int) : V4d = failwith ""
+        and set(coord : V2i, slice : int, sample : int) (v : V4d) : unit = failwith ""
+
+
+type Image2dArray<'f when 'f :> Formats.IFloatingFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.Sampler2d
+    static member ValueType = typeof<V4d>
+    static member CoordType = typeof<V2i>
+    static member IsArray = true
+    static member IsMultisampled = false
+    
+    member x.Size : V2i = failwith ""
+    member x.Item
+        with get(coord : V2i, slice : int) : V4d = failwith ""
+        and set(coord : V2i, slice : int) (v : V4d) : unit = failwith ""
+
+
+type Image2dMS<'f when 'f :> Formats.IFloatingFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.Sampler2d
+    static member ValueType = typeof<V4d>
+    static member CoordType = typeof<V2i>
+    static member IsArray = false
+    static member IsMultisampled = true
+    
+    member x.Size : V2i = failwith ""
+    member x.Item
+        with get(coord : V2i, sample : int) : V4d = failwith ""
+        and set(coord : V2i, sample : int) (v : V4d) : unit = failwith ""
+
+
+type Image2d<'f when 'f :> Formats.IFloatingFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.Sampler2d
+    static member ValueType = typeof<V4d>
+    static member CoordType = typeof<V2i>
+    static member IsArray = false
+    static member IsMultisampled = false
+    
+    member x.Size : V2i = failwith ""
+    member x.Item
+        with get(coord : V2i) : V4d = failwith ""
+        and set(coord : V2i) (v : V4d) : unit = failwith ""
+
+
+type Image3dMS<'f when 'f :> Formats.IFloatingFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.Sampler3d
+    static member ValueType = typeof<V4d>
+    static member CoordType = typeof<V3i>
+    static member IsArray = false
+    static member IsMultisampled = true
+    
+    member x.Size : V3i = failwith ""
+    member x.Item
+        with get(coord : V3i, sample : int) : V4d = failwith ""
+        and set(coord : V3i, sample : int) (v : V4d) : unit = failwith ""
+
+
+type Image3d<'f when 'f :> Formats.IFloatingFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.Sampler3d
+    static member ValueType = typeof<V4d>
+    static member CoordType = typeof<V3i>
+    static member IsArray = false
+    static member IsMultisampled = false
+    
+    member x.Size : V3i = failwith ""
+    member x.Item
+        with get(coord : V3i) : V4d = failwith ""
+        and set(coord : V3i) (v : V4d) : unit = failwith ""
+
+
+type ImageCubeArrayMS<'f when 'f :> Formats.IFloatingFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.SamplerCube
+    static member ValueType = typeof<V4d>
+    static member CoordType = typeof<V3i>
+    static member IsArray = true
+    static member IsMultisampled = true
+    
+    member x.Size : V2i = failwith ""
+    member x.Item
+        with get(coord : V3i, slice : int, sample : int) : V4d = failwith ""
+        and set(coord : V3i, slice : int, sample : int) (v : V4d) : unit = failwith ""
+
+
+type ImageCubeArray<'f when 'f :> Formats.IFloatingFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.SamplerCube
+    static member ValueType = typeof<V4d>
+    static member CoordType = typeof<V3i>
+    static member IsArray = true
+    static member IsMultisampled = false
+    
+    member x.Size : V2i = failwith ""
+    member x.Item
+        with get(coord : V3i, slice : int) : V4d = failwith ""
+        and set(coord : V3i, slice : int) (v : V4d) : unit = failwith ""
+
+
+type ImageCubeMS<'f when 'f :> Formats.IFloatingFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.SamplerCube
+    static member ValueType = typeof<V4d>
+    static member CoordType = typeof<V3i>
+    static member IsArray = false
+    static member IsMultisampled = true
+    
+    member x.Size : V2i = failwith ""
+    member x.Item
+        with get(coord : V3i, sample : int) : V4d = failwith ""
+        and set(coord : V3i, sample : int) (v : V4d) : unit = failwith ""
+
+
+type ImageCube<'f when 'f :> Formats.IFloatingFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.SamplerCube
+    static member ValueType = typeof<V4d>
+    static member CoordType = typeof<V3i>
+    static member IsArray = false
+    static member IsMultisampled = false
+    
+    member x.Size : V2i = failwith ""
+    member x.Item
+        with get(coord : V3i) : V4d = failwith ""
+        and set(coord : V3i) (v : V4d) : unit = failwith ""
+
+
+type IntImage1dArrayMS<'f when 'f :> Formats.ISignedFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.Sampler1d
+    static member ValueType = typeof<V4i>
+    static member CoordType = typeof<int>
+    static member IsArray = true
+    static member IsMultisampled = true
+    
+    member x.Size : int = failwith ""
+    member x.Item
+        with get(coord : int, slice : int, sample : int) : V4i = failwith ""
+        and set(coord : int, slice : int, sample : int) (v : V4i) : unit = failwith ""
+
+    member x.AtomicAdd(coord : int, slice : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicMin(coord : int, slice : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicMax(coord : int, slice : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicAnd(coord : int, slice : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicOr(coord : int, slice : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicXor(coord : int, slice : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicExchange(coord : int, slice : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicCompareExchange(coord : int, slice : int, sample : int, cmp : int, data : int) : int = failwith ""
+
+type IntImage1dArray<'f when 'f :> Formats.ISignedFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.Sampler1d
+    static member ValueType = typeof<V4i>
+    static member CoordType = typeof<int>
+    static member IsArray = true
+    static member IsMultisampled = false
+    
+    member x.Size : int = failwith ""
+    member x.Item
+        with get(coord : int, slice : int) : V4i = failwith ""
+        and set(coord : int, slice : int) (v : V4i) : unit = failwith ""
+
+    member x.AtomicAdd(coord : int, slice : int, data : int) : int = failwith ""
+    member x.AtomicMin(coord : int, slice : int, data : int) : int = failwith ""
+    member x.AtomicMax(coord : int, slice : int, data : int) : int = failwith ""
+    member x.AtomicAnd(coord : int, slice : int, data : int) : int = failwith ""
+    member x.AtomicOr(coord : int, slice : int, data : int) : int = failwith ""
+    member x.AtomicXor(coord : int, slice : int, data : int) : int = failwith ""
+    member x.AtomicExchange(coord : int, slice : int, data : int) : int = failwith ""
+    member x.AtomicCompareExchange(coord : int, slice : int, cmp : int, data : int) : int = failwith ""
+
+type IntImage1dMS<'f when 'f :> Formats.ISignedFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.Sampler1d
+    static member ValueType = typeof<V4i>
+    static member CoordType = typeof<int>
+    static member IsArray = false
+    static member IsMultisampled = true
+    
+    member x.Size : int = failwith ""
+    member x.Item
+        with get(coord : int, sample : int) : V4i = failwith ""
+        and set(coord : int, sample : int) (v : V4i) : unit = failwith ""
+
+    member x.AtomicAdd(coord : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicMin(coord : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicMax(coord : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicAnd(coord : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicOr(coord : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicXor(coord : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicExchange(coord : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicCompareExchange(coord : int, sample : int, cmp : int, data : int) : int = failwith ""
+
+type IntImage1d<'f when 'f :> Formats.ISignedFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.Sampler1d
+    static member ValueType = typeof<V4i>
+    static member CoordType = typeof<int>
+    static member IsArray = false
+    static member IsMultisampled = false
+    
+    member x.Size : int = failwith ""
+    member x.Item
+        with get(coord : int) : V4i = failwith ""
+        and set(coord : int) (v : V4i) : unit = failwith ""
+
+    member x.AtomicAdd(coord : int, data : int) : int = failwith ""
+    member x.AtomicMin(coord : int, data : int) : int = failwith ""
+    member x.AtomicMax(coord : int, data : int) : int = failwith ""
+    member x.AtomicAnd(coord : int, data : int) : int = failwith ""
+    member x.AtomicOr(coord : int, data : int) : int = failwith ""
+    member x.AtomicXor(coord : int, data : int) : int = failwith ""
+    member x.AtomicExchange(coord : int, data : int) : int = failwith ""
+    member x.AtomicCompareExchange(coord : int, cmp : int, data : int) : int = failwith ""
+
+type IntImage2dArrayMS<'f when 'f :> Formats.ISignedFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.Sampler2d
+    static member ValueType = typeof<V4i>
+    static member CoordType = typeof<V2i>
+    static member IsArray = true
+    static member IsMultisampled = true
+    
+    member x.Size : V2i = failwith ""
+    member x.Item
+        with get(coord : V2i, slice : int, sample : int) : V4i = failwith ""
+        and set(coord : V2i, slice : int, sample : int) (v : V4i) : unit = failwith ""
+
+    member x.AtomicAdd(coord : V2i, slice : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicMin(coord : V2i, slice : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicMax(coord : V2i, slice : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicAnd(coord : V2i, slice : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicOr(coord : V2i, slice : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicXor(coord : V2i, slice : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicExchange(coord : V2i, slice : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicCompareExchange(coord : V2i, slice : int, sample : int, cmp : int, data : int) : int = failwith ""
+
+type IntImage2dArray<'f when 'f :> Formats.ISignedFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.Sampler2d
+    static member ValueType = typeof<V4i>
+    static member CoordType = typeof<V2i>
+    static member IsArray = true
+    static member IsMultisampled = false
+    
+    member x.Size : V2i = failwith ""
+    member x.Item
+        with get(coord : V2i, slice : int) : V4i = failwith ""
+        and set(coord : V2i, slice : int) (v : V4i) : unit = failwith ""
+
+    member x.AtomicAdd(coord : V2i, slice : int, data : int) : int = failwith ""
+    member x.AtomicMin(coord : V2i, slice : int, data : int) : int = failwith ""
+    member x.AtomicMax(coord : V2i, slice : int, data : int) : int = failwith ""
+    member x.AtomicAnd(coord : V2i, slice : int, data : int) : int = failwith ""
+    member x.AtomicOr(coord : V2i, slice : int, data : int) : int = failwith ""
+    member x.AtomicXor(coord : V2i, slice : int, data : int) : int = failwith ""
+    member x.AtomicExchange(coord : V2i, slice : int, data : int) : int = failwith ""
+    member x.AtomicCompareExchange(coord : V2i, slice : int, cmp : int, data : int) : int = failwith ""
+
+type IntImage2dMS<'f when 'f :> Formats.ISignedFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.Sampler2d
+    static member ValueType = typeof<V4i>
+    static member CoordType = typeof<V2i>
+    static member IsArray = false
+    static member IsMultisampled = true
+    
+    member x.Size : V2i = failwith ""
+    member x.Item
+        with get(coord : V2i, sample : int) : V4i = failwith ""
+        and set(coord : V2i, sample : int) (v : V4i) : unit = failwith ""
+
+    member x.AtomicAdd(coord : V2i, sample : int, data : int) : int = failwith ""
+    member x.AtomicMin(coord : V2i, sample : int, data : int) : int = failwith ""
+    member x.AtomicMax(coord : V2i, sample : int, data : int) : int = failwith ""
+    member x.AtomicAnd(coord : V2i, sample : int, data : int) : int = failwith ""
+    member x.AtomicOr(coord : V2i, sample : int, data : int) : int = failwith ""
+    member x.AtomicXor(coord : V2i, sample : int, data : int) : int = failwith ""
+    member x.AtomicExchange(coord : V2i, sample : int, data : int) : int = failwith ""
+    member x.AtomicCompareExchange(coord : V2i, sample : int, cmp : int, data : int) : int = failwith ""
+
+type IntImage2d<'f when 'f :> Formats.ISignedFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.Sampler2d
+    static member ValueType = typeof<V4i>
+    static member CoordType = typeof<V2i>
+    static member IsArray = false
+    static member IsMultisampled = false
+    
+    member x.Size : V2i = failwith ""
+    member x.Item
+        with get(coord : V2i) : V4i = failwith ""
+        and set(coord : V2i) (v : V4i) : unit = failwith ""
+
+    member x.AtomicAdd(coord : V2i, data : int) : int = failwith ""
+    member x.AtomicMin(coord : V2i, data : int) : int = failwith ""
+    member x.AtomicMax(coord : V2i, data : int) : int = failwith ""
+    member x.AtomicAnd(coord : V2i, data : int) : int = failwith ""
+    member x.AtomicOr(coord : V2i, data : int) : int = failwith ""
+    member x.AtomicXor(coord : V2i, data : int) : int = failwith ""
+    member x.AtomicExchange(coord : V2i, data : int) : int = failwith ""
+    member x.AtomicCompareExchange(coord : V2i, cmp : int, data : int) : int = failwith ""
+
+type IntImage3dMS<'f when 'f :> Formats.ISignedFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.Sampler3d
+    static member ValueType = typeof<V4i>
+    static member CoordType = typeof<V3i>
+    static member IsArray = false
+    static member IsMultisampled = true
+    
+    member x.Size : V3i = failwith ""
+    member x.Item
+        with get(coord : V3i, sample : int) : V4i = failwith ""
+        and set(coord : V3i, sample : int) (v : V4i) : unit = failwith ""
+
+    member x.AtomicAdd(coord : V3i, sample : int, data : int) : int = failwith ""
+    member x.AtomicMin(coord : V3i, sample : int, data : int) : int = failwith ""
+    member x.AtomicMax(coord : V3i, sample : int, data : int) : int = failwith ""
+    member x.AtomicAnd(coord : V3i, sample : int, data : int) : int = failwith ""
+    member x.AtomicOr(coord : V3i, sample : int, data : int) : int = failwith ""
+    member x.AtomicXor(coord : V3i, sample : int, data : int) : int = failwith ""
+    member x.AtomicExchange(coord : V3i, sample : int, data : int) : int = failwith ""
+    member x.AtomicCompareExchange(coord : V3i, sample : int, cmp : int, data : int) : int = failwith ""
+
+type IntImage3d<'f when 'f :> Formats.ISignedFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.Sampler3d
+    static member ValueType = typeof<V4i>
+    static member CoordType = typeof<V3i>
+    static member IsArray = false
+    static member IsMultisampled = false
+    
+    member x.Size : V3i = failwith ""
+    member x.Item
+        with get(coord : V3i) : V4i = failwith ""
+        and set(coord : V3i) (v : V4i) : unit = failwith ""
+
+    member x.AtomicAdd(coord : V3i, data : int) : int = failwith ""
+    member x.AtomicMin(coord : V3i, data : int) : int = failwith ""
+    member x.AtomicMax(coord : V3i, data : int) : int = failwith ""
+    member x.AtomicAnd(coord : V3i, data : int) : int = failwith ""
+    member x.AtomicOr(coord : V3i, data : int) : int = failwith ""
+    member x.AtomicXor(coord : V3i, data : int) : int = failwith ""
+    member x.AtomicExchange(coord : V3i, data : int) : int = failwith ""
+    member x.AtomicCompareExchange(coord : V3i, cmp : int, data : int) : int = failwith ""
+
+type IntImageCubeArrayMS<'f when 'f :> Formats.ISignedFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.SamplerCube
+    static member ValueType = typeof<V4i>
+    static member CoordType = typeof<V3i>
+    static member IsArray = true
+    static member IsMultisampled = true
+    
+    member x.Size : V2i = failwith ""
+    member x.Item
+        with get(coord : V3i, slice : int, sample : int) : V4i = failwith ""
+        and set(coord : V3i, slice : int, sample : int) (v : V4i) : unit = failwith ""
+
+    member x.AtomicAdd(coord : V3i, slice : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicMin(coord : V3i, slice : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicMax(coord : V3i, slice : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicAnd(coord : V3i, slice : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicOr(coord : V3i, slice : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicXor(coord : V3i, slice : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicExchange(coord : V3i, slice : int, sample : int, data : int) : int = failwith ""
+    member x.AtomicCompareExchange(coord : V3i, slice : int, sample : int, cmp : int, data : int) : int = failwith ""
+
+type IntImageCubeArray<'f when 'f :> Formats.ISignedFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.SamplerCube
+    static member ValueType = typeof<V4i>
+    static member CoordType = typeof<V3i>
+    static member IsArray = true
+    static member IsMultisampled = false
+    
+    member x.Size : V2i = failwith ""
+    member x.Item
+        with get(coord : V3i, slice : int) : V4i = failwith ""
+        and set(coord : V3i, slice : int) (v : V4i) : unit = failwith ""
+
+    member x.AtomicAdd(coord : V3i, slice : int, data : int) : int = failwith ""
+    member x.AtomicMin(coord : V3i, slice : int, data : int) : int = failwith ""
+    member x.AtomicMax(coord : V3i, slice : int, data : int) : int = failwith ""
+    member x.AtomicAnd(coord : V3i, slice : int, data : int) : int = failwith ""
+    member x.AtomicOr(coord : V3i, slice : int, data : int) : int = failwith ""
+    member x.AtomicXor(coord : V3i, slice : int, data : int) : int = failwith ""
+    member x.AtomicExchange(coord : V3i, slice : int, data : int) : int = failwith ""
+    member x.AtomicCompareExchange(coord : V3i, slice : int, cmp : int, data : int) : int = failwith ""
+
+type IntImageCubeMS<'f when 'f :> Formats.ISignedFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.SamplerCube
+    static member ValueType = typeof<V4i>
+    static member CoordType = typeof<V3i>
+    static member IsArray = false
+    static member IsMultisampled = true
+    
+    member x.Size : V2i = failwith ""
+    member x.Item
+        with get(coord : V3i, sample : int) : V4i = failwith ""
+        and set(coord : V3i, sample : int) (v : V4i) : unit = failwith ""
+
+    member x.AtomicAdd(coord : V3i, sample : int, data : int) : int = failwith ""
+    member x.AtomicMin(coord : V3i, sample : int, data : int) : int = failwith ""
+    member x.AtomicMax(coord : V3i, sample : int, data : int) : int = failwith ""
+    member x.AtomicAnd(coord : V3i, sample : int, data : int) : int = failwith ""
+    member x.AtomicOr(coord : V3i, sample : int, data : int) : int = failwith ""
+    member x.AtomicXor(coord : V3i, sample : int, data : int) : int = failwith ""
+    member x.AtomicExchange(coord : V3i, sample : int, data : int) : int = failwith ""
+    member x.AtomicCompareExchange(coord : V3i, sample : int, cmp : int, data : int) : int = failwith ""
+
+type IntImageCube<'f when 'f :> Formats.ISignedFormat>() =
+    interface IImage
+    static member FormatType = typeof<'f>
+    static member Dimension = SamplerDimension.SamplerCube
+    static member ValueType = typeof<V4i>
+    static member CoordType = typeof<V3i>
+    static member IsArray = false
+    static member IsMultisampled = false
+    
+    member x.Size : V2i = failwith ""
+    member x.Item
+        with get(coord : V3i) : V4i = failwith ""
+        and set(coord : V3i) (v : V4i) : unit = failwith ""
+
+    member x.AtomicAdd(coord : V3i, data : int) : int = failwith ""
+    member x.AtomicMin(coord : V3i, data : int) : int = failwith ""
+    member x.AtomicMax(coord : V3i, data : int) : int = failwith ""
+    member x.AtomicAnd(coord : V3i, data : int) : int = failwith ""
+    member x.AtomicOr(coord : V3i, data : int) : int = failwith ""
+    member x.AtomicXor(coord : V3i, data : int) : int = failwith ""
+    member x.AtomicExchange(coord : V3i, data : int) : int = failwith ""
+    member x.AtomicCompareExchange(coord : V3i, cmp : int, data : int) : int = failwith ""
+

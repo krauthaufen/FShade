@@ -45,16 +45,37 @@ module ReflectionPatterns =
     let (|SamplerType|_|) (t : Type) =
         if typeof<ISampler>.IsAssignableFrom(t) then
             let dim : SamplerDimension = getProp "Dimension" t
-            let valueType : Type = getProp "ValueType" t
-            let coordType : Type = getProp "CoordType" t
             let isArray : bool = getProp "IsArray" t
             let isShadow : bool = getProp "IsShadow" t
             let isMS : bool = getProp "IsMultisampled" t
+            let valueType : Type = getProp "ValueType" t
 
             SamplerType(dim, isArray, isShadow, isMS, valueType) |> Some
 
         else
             None
+
+    /// <summary>
+    /// determines whether a given type is an Image and returns its properties if successful.
+    /// The properties are given by ImageType(dim, isArray, isMS, valueType)
+    /// </summary>
+    let (|ImageType|_|) (t : Type) =
+        if typeof<IImage>.IsAssignableFrom(t) then
+            let dim : SamplerDimension = getProp "Dimension" t
+            let isArray : bool = getProp "IsArray" t
+            let isMS : bool = getProp "IsMultisampled" t
+            let valueType : Type = getProp "ValueType" t
+            let format : Type = getProp "FormatType" t
+            ImageType(format, dim, isArray, isMS, valueType) |> Some
+        else
+            None
+
+    type UniformParameter with
+        member x.decorations =
+            match x.uniformType with
+                | ImageType(fmt,_,_,_,_) -> [Imperative.UniformDecoration.Format fmt]
+                | _ -> []
+
 
 [<AutoOpen>]
 module BasicQuotationPatterns =

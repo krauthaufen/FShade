@@ -27,7 +27,7 @@ module ModuleCompiler =
     module ValueCompiler =
         open SimpleOrder
 
-        type GraphNode(definition : CValueDef, dependencies : pset<GraphNode>) =
+        type GraphNode(definition : CValueDef, dependencies : hset<GraphNode>) =
             let mutable sortKey : Option<SortKey> = None
 
             member x.Definition = definition
@@ -81,11 +81,11 @@ module ModuleCompiler =
                         | _ ->
                             let mutable s = emptyState state.moduleState
                             let def = compile(key).Run(&s)
-                            do! State.modify (fun gs -> { gs with moduleState = { s.moduleState with globalFunctions = HashMap.empty; globalConstants = HashMap.empty } })
+                            do! State.modify (fun gs -> { gs with moduleState = { s.moduleState with globalFunctions = HMap.empty; globalConstants = HMap.empty } })
 
-                            let localFunctions      = s.usedFunctions |> HashMap.toSeq |> Seq.map snd |> Seq.toList
-                            let globalFunctions     = s.moduleState.globalFunctions |> HashMap.toSeq |> Seq.map snd |> Seq.toList
-                            let globalConstants     = s.moduleState.globalConstants |> HashMap.toSeq |> Seq.map snd |> Seq.toList
+                            let localFunctions      = s.usedFunctions |> HMap.toSeq |> Seq.map snd |> Seq.toList
+                            let globalFunctions     = s.moduleState.globalFunctions |> HMap.toSeq |> Seq.map snd |> Seq.toList
+                            let globalConstants     = s.moduleState.globalConstants |> HMap.toSeq |> Seq.map snd |> Seq.toList
                             
 
                             let! localFunctions = localFunctions |> List.mapS (ofFunction globals)
@@ -94,14 +94,14 @@ module ModuleCompiler =
 
                             let dependencies = 
                                 List.concat [
-                                    (if PSet.isEmpty s.usedGlobals then [] else [globals])
+                                    (if HSet.isEmpty s.usedGlobals then [] else [globals])
                                     localFunctions
                                     globalFunctions
                                     constants
                                 ]
 
 
-                            let node = GraphNode(def, PSet.ofList dependencies)
+                            let node = GraphNode(def, HSet.ofList dependencies)
                             cache.[key] <- node
 
                             do! State.modify (fun gs -> 
@@ -129,7 +129,7 @@ module ModuleCompiler =
                     do! State.modify (fun s -> { s with moduleState = { s.moduleState with ModuleState.globalParameters = globalNames } })
                     let! root = build globals e compileEntryS
 
-                    let root = GraphNode(root.Definition, PSet.add globals root.Dependencies)
+                    let root = GraphNode(root.Definition, HSet.add globals root.Dependencies)
 
                     do! State.modify (fun s -> { s with moduleState = { s.moduleState with ModuleState.globalParameters = Set.empty } })
 
@@ -146,7 +146,7 @@ module ModuleCompiler =
                 let mutable lastRootDef = order.Root
 
                 let rec flattenDependencies (g : GraphNode) =
-                    let dependencies = PSet.toList g.Dependencies
+                    let dependencies = HSet.toList g.Dependencies
                     match dependencies with
                         | [] -> 
                             match g.SortKey with
@@ -250,9 +250,9 @@ module ModuleCompiler =
                         {
                             backend             = backend
                             constantIndex       = 0
-                            usedTypes           = HashMap.empty
-                            globalFunctions     = HashMap.empty
-                            globalConstants     = HashMap.empty
+                            usedTypes           = HMap.empty
+                            globalFunctions     = HMap.empty
+                            globalConstants     = HMap.empty
                             globalParameters    = Set.empty
                             tryGetOverrideCode  = m.tryGetOverrideCode
                             globalNameIndices   = Map.empty
@@ -261,14 +261,14 @@ module ModuleCompiler =
                 }
 
             let nodes = compile.Run(&state)
-            let usedTypes = state.moduleState.usedTypes |> HashMap.toSeq |> Seq.map snd |> Seq.toList
+            let usedTypes = state.moduleState.usedTypes |> HMap.toSeq |> Seq.map snd |> Seq.toList
             flatten nodes, usedTypes
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module TypeCompiler =
         open SimpleOrder
 
-        type TypeGraphNode(definition : CTypeDef, dependencies : pset<TypeGraphNode>) =
+        type TypeGraphNode(definition : CTypeDef, dependencies : hset<TypeGraphNode>) =
             let mutable sortKey : SortKey = Unchecked.defaultof<SortKey>
 
             member x.Definition = definition
@@ -291,7 +291,7 @@ module ModuleCompiler =
       
 
             member x.AssignOrder(o : Order) =
-                match PSet.toList dependencies with
+                match HSet.toList dependencies with
                     | [] -> 
                         sortKey <- o.After(o.Root)
 
@@ -311,16 +311,16 @@ module ModuleCompiler =
             let allDirectChildTypes (ctype : CType) =
                 match ctype with
                     | CStruct(_, fields, _) -> 
-                        fields |> List.map fst |> PSet.ofList
+                        fields |> List.map fst |> HSet.ofList
 
                     | CVector(t,_) 
                     | CMatrix(t, _, _) 
                     | CPointer(_, t) 
                     | CArray(t,_) ->
-                        PSet.ofList [t]
+                        HSet.ofList [t]
 
                     | _ ->
-                        PSet.empty
+                        HSet.empty
 
             let rec ofType (t : CType) =
                 state {
@@ -329,7 +329,7 @@ module ModuleCompiler =
                         | (true, n) ->
                             return n
                         | _ ->
-                            let! used = t |> allDirectChildTypes |> PSet.toList |> List.chooseS ofType |>> PSet.ofList
+                            let! used = t |> allDirectChildTypes |> HSet.toList |> List.chooseS ofType |>> HSet.ofList
 
                             match t with
                                 | CStruct(name, fields, _) ->

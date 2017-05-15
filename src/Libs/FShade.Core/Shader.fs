@@ -453,7 +453,7 @@ module private Preprocessor =
                     let! body = preprocessS body
                     return Expr.ForEach(var, sequence, body)
 
-                | BuilderWhile(b, guard, body) ->
+                | BuilderWhile(b, Lambda(unitVar, guard), body) ->
                     do! State.setBuilder b
                     let! guard = preprocessS guard
                     let! body = preprocessS body
@@ -977,24 +977,37 @@ module Shader =
     let private sideEffects =
         Dictionary.ofList [
             ShaderStage.Vertex, 
-                HashSet.empty
+                HashSet.ofList [
+                    getMethodInfo <@ barrier @>
+                ]
 
             ShaderStage.TessControl, 
-                HashSet.empty
+                HashSet.ofList [
+                    getMethodInfo <@ barrier @>
+                ]
 
             ShaderStage.TessEval, 
-                HashSet.empty
+                HashSet.ofList [
+                    getMethodInfo <@ barrier @>
+                ]
 
             ShaderStage.Geometry, 
                 HashSet.ofList [
                     getMethodInfo <@ emitVertex @>
                     getMethodInfo <@ restartStrip @>
                     getMethodInfo <@ endPrimitive @>
+                    getMethodInfo <@ barrier @>
                 ]
 
             ShaderStage.Fragment, 
                 HashSet.ofList [
                     getMethodInfo <@ discard @>
+                    getMethodInfo <@ barrier @>
+                ]
+
+            ShaderStage.Compute, 
+                HashSet.ofList [
+                    getMethodInfo <@ barrier @>
                 ]
         ]
 
@@ -1482,6 +1495,7 @@ module Shader =
                     uniformName = u.uniformName
                     uniformType = u.uniformType
                     uniformBuffer = uniformBuffer
+                    uniformDecorations = u.decorations
                 }
             )
 

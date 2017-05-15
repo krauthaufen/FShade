@@ -170,6 +170,40 @@ module Primitives =
     let inline ddy< ^a when ^a : (static member (-) : ^a -> ^a -> ^a) > (v : ^a) : ^a = failwith "_"
     let discard () : unit = failwith "_"
 
+    let getGlobalId() : V3i = failwith "_"
+    let getWorkGroupId() : V3i = failwith ""
+    let getLocalId() : V3i = failwith ""
+    let getLocalIndex() : int = failwith ""
+    let getWorkGroupSize() : V3i = failwith ""
+    let getWorkGroupCount() : V3i = failwith ""
+    let barrier() : unit = failwith ""
+    let allocateShared<'a when 'a : unmanaged> (size : int) : 'a[] = failwith ""
+
+    [<Literal>]
+    let MaxLocalSize = 2147483647
+
+    let LocalSize = V3i(2147483647, 2147483647, 2147483647)
+
+    type LocalSizeAttribute() = 
+        inherit System.Attribute()
+
+        let mutable x = 1
+        let mutable y = 1
+        let mutable z = 1
+
+        member __.X
+            with get() = x
+            and set v = x <- v
+
+        member __.Y
+            with get () = y
+            and set v = y <- v
+
+        member __.Z
+            with get () = z
+            and set v = z <- v
+
+
     type TessCoord<'a> = class end
 
     let tessellateTriangle (li : float) (l01 : float, l12 : float, l20 : float) : TessCoord<V3d> =
@@ -187,6 +221,9 @@ module ShaderBuilders =
 
         member x.For(a : seq<'a>, f : 'a -> unit) : unit =
             for i in a do f i
+
+        member x.While(guard : unit -> bool, b : unit) =
+            ()
 
         member x.Combine(l : unit, r : 'a) = r
 
@@ -256,7 +293,18 @@ module ShaderBuilders =
             member x.ShaderStage = ShaderStage.TessControl
             member x.OutputTopology = None
 
+    type ComputeBuilder() =
+        inherit BaseBuilder()
 
+        member x.Quote() = ()
+        member x.Zero() = ()
+
+        interface IShaderBuilder with
+            member x.ShaderStage = ShaderStage.Compute
+            member x.OutputTopology = None
+
+
+    let compute = ComputeBuilder()
     let vertex = VertexBuilder()
     let tessellation = TessBuilder()
     let fragment = FragmentBuilder()

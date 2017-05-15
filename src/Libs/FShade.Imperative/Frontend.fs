@@ -20,11 +20,18 @@ type ParameterDecoration =
     | Memory of MemoryType
     | Const
     | Slot of int
+    | StorageBuffer
+    | Shared
+    
+[<RequireQualifiedAccess>]
+type UniformDecoration =
+    | Format of System.Type
 
 type Uniform =
     {
         uniformType         : Type
         uniformName         : string
+        uniformDecorations  : list<UniformDecoration>
         uniformBuffer       : Option<string>
     }
 
@@ -55,6 +62,7 @@ type EntryDecoration =
     | InputTopology of InputTopology
     | OutputTopology of OutputTopology
     | OutputVertices of int
+    | LocalSize of V3i
 
 type EntryPoint =
     {
@@ -120,12 +128,11 @@ module ExpressionExtensions =
         static member ReadInput(kind : ParameterKind, t : Type, name : string, index : Expr) =
             let mi = ShaderIO.ReadInputIndexedMeth.MakeGenericMethod [| t |]
             Expr.Call(mi, [ Expr.Value(kind); Expr.Value(name); index ])
-
-        static member WriteOutputs(values : Map<string, Option<Expr> * Expr>) =
+            
+        static member WriteOutputsRaw(values : list<string * Option<Expr> * Expr>) =
             let values =
                 values 
-                    |> Map.toList
-                    |> List.map (fun (name, (index, value)) -> 
+                    |> List.map (fun (name, index, value) -> 
                         let index = index |> Option.defaultValue (Expr.Value -1)
                         if value.Type = typeof<obj> then
                             Expr.NewTuple [ Expr.Value name; index; value ]
@@ -137,6 +144,9 @@ module ExpressionExtensions =
                 ShaderIO.WriteOutputsMeth,
                 [ Expr.NewArray(typeof<string * int * obj>, values) ]
             )
+
+        static member WriteOutputs(values : Map<string, Option<Expr> * Expr>) =
+            Expr.WriteOutputsRaw(Map.toList values |> List.map (fun (a,(b,c)) -> a,b,c))
 
         static member WriteOutputs (outputs : list<string * Option<Expr> * Expr>) =
             let mutable map = Map.empty
@@ -159,8 +169,8 @@ module ExpressionExtensions =
 
             | _ ->
                 None
-
-    let (|WriteOutputs|_|) (e : Expr) =
+                
+    let (|WriteOutputsRaw|_|) (e : Expr) =
         match e with
             | Call(none, mi, [NewArray(_,args)]) when mi = ShaderIO.WriteOutputsMeth ->
                 let args =
@@ -168,13 +178,21 @@ module ExpressionExtensions =
                         match a with
                             | NewTuple [String name; index; Coerce(value, _) ] ->
                                 match index with
-                                    | Int32 -1 -> name, (None, value)
-                                    | _ -> name, (Some index, value)
+                                    | Int32 -1 -> name, None, value
+                                    | _ -> name, (Some index), value
                             | _ ->  
                                 failwithf "[FShade] ill-formed WriteOutputs argument: %A" a    
                     )
 
-                Some (Map.ofList args)
+                Some args
+            | _ -> 
+                None
+
+    let (|WriteOutputs|_|) (e : Expr) =
+        match e with
+            | WriteOutputsRaw(args) ->
+                let args = args |> List.map (fun (a,b,c) -> a, (b,c)) |> Map.ofList
+                Some args
             | _ -> 
                 None
 

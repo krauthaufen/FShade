@@ -45,7 +45,21 @@ module Backends =
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module ModuleCompiler =
+
+        let private containsCompute (m : Module) =
+            m.entries |> List.exists (fun e -> e.decorations |> List.exists (function EntryDecoration.Stages { self = ShaderStage.Compute } -> true | _ -> false))
+
         let compileGLSL (cfg : Backend) (module_ : Module) =
+            let cfg =
+                if containsCompute module_ then
+                    Backend.Create {
+                        cfg.Config with
+                            version                 = Version(4,4,0)
+                            enabledExtensions       = Set.add "GL_ARB_compute_variable_group_size" cfg.Config.enabledExtensions
+                    }
+                else
+                    cfg
+
             module_ 
                 |> ModuleCompiler.compile cfg 
                 |> Assembler.assemble cfg

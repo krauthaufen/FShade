@@ -82,7 +82,7 @@ module Compiler =
     module Constructors =
         
         let cache = System.Collections.Concurrent.ConcurrentDictionary<IBackend * Type, FunctionDefinition>()
-        let unionCache = System.Collections.Concurrent.ConcurrentDictionary<IBackend * Type, HashMap<UnionCaseInfo, FunctionDefinition>>()
+        let unionCache = System.Collections.Concurrent.ConcurrentDictionary<IBackend * Type, hmap<UnionCaseInfo, FunctionDefinition>>()
         let ctorCache = System.Collections.Concurrent.ConcurrentDictionary<IBackend * ConstructorInfo, FunctionDefinition>()
 
         let tuple (b : IBackend) (t : Type) =
@@ -209,7 +209,7 @@ module Compiler =
                         let cDefinition = CompiledFunction(cSignature, cBody)
                         (ci, cDefinition)
                     )
-                    |> HashMap.ofSeq
+                    |> HMap.ofSeq
             )
 
         let custom (b : IBackend) (ctor : ConstructorInfo) =
@@ -516,7 +516,7 @@ module Compiler =
                 | Method("get_Item", [ArrOf(_,_); _]), [arr; index]
                 | Method("GetArray", _), [arr; index] -> 
                     CExpr.CItem(ct, arr, index) |> Some
-
+                    
 
                 | ConversionMethod(_,o), [arg]              -> CExpr.CConvert(CType.ofType b o, arg) |> Some
                 | _ -> None
@@ -568,10 +568,10 @@ module Compiler =
             globalNameIndices   : Map<string, int>
             backend             : Backend
             constantIndex       : int
-            usedTypes           : HashMap<obj, CType>
+            usedTypes           : hmap<obj, CType>
 
-            globalFunctions     : HashMap<obj, FunctionDefinition>
-            globalConstants     : HashMap<obj, ConstantDefinition>
+            globalFunctions     : hmap<obj, FunctionDefinition>
+            globalConstants     : hmap<obj, ConstantDefinition>
 
             globalParameters    : Set<string>
             tryGetOverrideCode  : MethodBase -> Option<Expr>
@@ -583,9 +583,9 @@ module Compiler =
             variables           : Map<Var, CVar>
             reservedNames       : Set<string>
 
-            usedFunctions       : HashMap<obj, FunctionDefinition>
-            usedConstants       : pset<ConstantDefinition>
-            usedGlobals         : pset<string>
+            usedFunctions       : hmap<obj, FunctionDefinition>
+            usedConstants       : hset<ConstantDefinition>
+            usedGlobals         : hset<string>
             moduleState         : ModuleState
         }
 
@@ -653,12 +653,12 @@ module Compiler =
 
         let useLocalFunction (key : obj) (f : FunctionDefinition) =
             State.custom (fun s ->
-                { s with usedFunctions = HashMap.add key f s.usedFunctions }, f.Signature s.moduleState.backend
+                { s with usedFunctions = HMap.add key f s.usedFunctions }, f.Signature s.moduleState.backend
             )
 
         let useGlobalFunction (key : obj) (f : FunctionDefinition) =
             State.custom (fun s ->
-                { s with moduleState = { s.moduleState with globalFunctions = HashMap.add key f s.moduleState.globalFunctions } }, f.Signature s.moduleState.backend
+                { s with moduleState = { s.moduleState with globalFunctions = HMap.add key f s.moduleState.globalFunctions } }, f.Signature s.moduleState.backend
             )
 
         let useCtor (key : obj) (f : FunctionDefinition) =
@@ -668,19 +668,19 @@ module Compiler =
             state {
                 let! s = State.get
                 let ct = CType.ofType s.moduleState.backend e.Type
-                match HashMap.tryFind key s.moduleState.globalConstants with
+                match HMap.tryFind key s.moduleState.globalConstants with
                     | None -> 
                         let name = sprintf "_constant%d" s.moduleState.constantIndex
                         let c = { cName = name; cType = e.Type; cValue = e }
                         do! State.put { 
                                 s with 
-                                    moduleState = { s.moduleState with globalConstants = HashMap.add key c s.moduleState.globalConstants; constantIndex = s.moduleState.constantIndex + 1 } 
-                                    usedConstants = PSet.add c s.usedConstants
+                                    moduleState = { s.moduleState with globalConstants = HMap.add key c s.moduleState.globalConstants; constantIndex = s.moduleState.constantIndex + 1 } 
+                                    usedConstants = HSet.add c s.usedConstants
                             }
                     
                         return CVar { name = name; ctype = ct }
                     | Some c ->
-                        do! State.put { s with usedConstants = PSet.add c s.usedConstants }
+                        do! State.put { s with usedConstants = HSet.add c s.usedConstants }
                         return CVar { name = c.cName; ctype = ct }
 
             }
@@ -695,45 +695,45 @@ module Compiler =
             | Variable of Var
             | Global of kind : ParameterKind * name : string * _type : Type * index : Option<Expr>
 
-        let rec free (e : Expr) : pset<Free> =
+        let rec free (e : Expr) : hset<Free> =
             match e with
                 | Let(v,e,b) ->
                     let fe = free e
                     let fb = free b
-                    PSet.union fe (PSet.remove (Variable v) fb)
+                    HSet.union fe (HSet.remove (Variable v) fb)
 
                 | ReadInput(kind,name,idx) ->
                     match idx with
-                        | Some idx -> free idx |> PSet.add (Global(kind, name, e.Type, Some idx))
-                        | None -> PSet.ofList [ Global(kind, name, e.Type, None) ]
+                        | Some idx -> free idx |> HSet.add (Global(kind, name, e.Type, Some idx))
+                        | None -> HSet.ofList [ Global(kind, name, e.Type, None) ]
 
                 | WriteOutputs values ->
-                    let mutable res = PSet.empty
+                    let mutable res = HSet.empty
                     for (name, (index, value)) in Map.toSeq values do
                         match index with
-                            | Some index -> res <- PSet.union res (free index)
+                            | Some index -> res <- HSet.union res (free index)
                             | _ -> ()
-                        res <- res |> PSet.union (free value) |> PSet.add (Global(ParameterKind.Output, name, value.Type, index))
+                        res <- res |> HSet.union (free value) |> HSet.add (Global(ParameterKind.Output, name, value.Type, index))
 
                     res
 
                 | ExprShape.ShapeCombination(o, args) ->
-                    args |> List.fold (fun m e -> PSet.union m (free e)) PSet.empty
+                    args |> List.fold (fun m e -> HSet.union m (free e)) HSet.empty
 
                 | ExprShape.ShapeLambda(v, b) ->
-                    free b |> PSet.remove (Variable v)
+                    free b |> HSet.remove (Variable v)
 
                 | ExprShape.ShapeVar v ->
-                    PSet.ofList [ Variable v ]
+                    HSet.ofList [ Variable v ]
 
     let emptyState (m : ModuleState) =
         {
             nameIndices         = Map.empty
             variables           = Map.empty
             reservedNames       = Set.empty
-            usedFunctions       = HashMap.empty
-            usedConstants       = PSet.empty
-            usedGlobals         = PSet.empty
+            usedFunctions       = HMap.empty
+            usedConstants       = HSet.empty
+            usedGlobals         = HSet.empty
             moduleState         = m
         }
 
@@ -749,7 +749,7 @@ module Compiler =
                         visit i
 
                     | CStruct(_, fields, _) ->
-                        usedTypes <- HashMap.add (t :> obj) cType usedTypes
+                        usedTypes <- HMap.add (t :> obj) cType usedTypes
                         for (f,_) in fields do
                             visit f
 
@@ -807,17 +807,18 @@ module Compiler =
                 cUniformType = ct
                 cUniformName = v.uniformName
                 cUniformBuffer = v.uniformBuffer
+                cUniformDecorations = v.uniformDecorations
             }
         }
 
     let rec asExternalS (e : Expr) =
         state {
             let free = CompilerState.free e
-            if PSet.isEmpty free then
+            if HSet.isEmpty free then
                 return! CompilerState.useConstant e e
             else
                 let! globals = State.get |> State.map (fun s -> s.moduleState.globalParameters)
-                let free = free |> PSet.toArray
+                let free = free |> HSet.toArray
  
                 let newVariables = HashSet()
 
@@ -919,7 +920,7 @@ module Compiler =
                     let! ct = toCTypeS e.Type
                     let! s = State.get
                     if Set.contains name s.moduleState.globalParameters then
-                        do! State.put { s with usedGlobals = PSet.add name s.usedGlobals }
+                        do! State.put { s with usedGlobals = HSet.add name s.usedGlobals }
 
                     match index with
                         | Some idx -> 
@@ -969,7 +970,7 @@ module Compiler =
                 | NewUnionCase(ci, fields) ->
                     let! s = State.get
                     let ctors = ci.DeclaringType |> Constructors.union s.moduleState.backend
-                    let! ctor = ctors |> HashMap.find ci |> CompilerState.useGlobalFunction ci
+                    let! ctor = ctors |> HMap.find ci |> CompilerState.useGlobalFunction ci
                     let! fields = fields |> List.mapS toCExprS |>> List.toArray
                     return CCall(ctor, fields)
 
@@ -1377,6 +1378,12 @@ module Compiler =
                     let! v = toCVarS v
                     let! value = toCExprS value
                     return CWrite(CLVar v, value)
+
+                | SetArray(arr, index, value) ->
+                    let! carr = toCLExprS arr
+                    let! ci = toCExprS index
+                    let! cvalue = toCExprS value
+                    return CWrite(CLExpr.CLItem(cvalue.ctype, carr.Value, ci), cvalue)
 
                 | PropertySet(None, pi, i, a) ->
                     return failwithf "[FShade] cannot set static property %A" pi

@@ -49,6 +49,8 @@ type MyEnum =
     | A = 1
     | B = 2
 
+
+
 let effectTest() =
 
     
@@ -391,10 +393,80 @@ let expected() =
 
     ()
 
+[<Literal>]
+let local = 32
 
+[<LocalSize(X = local)>]
+let computer (f : Expr<float -> float -> float>) (a : float[]) (b : float[]) (c : Image2d<Formats.r32f>) =
+    compute {
+        let temp = allocateShared<float> local
+
+        let id = getGlobalId()
+        let i = id.X
+
+        let l = getLocalIndex()
+        temp.[l] <- c.[V2i(l,0)].X
+        barrier()
+
+        b.[i] <- (%f) a.[i] temp.[l]
+
+    }
+
+
+[<LocalSize(X = MaxLocalSize)>]
+let scan (add : Expr<'a -> 'a -> 'a>) (zero : Expr<'a>) (input : 'a[]) (output : 'a[]) =
+    compute {
+        let elems = LocalSize.X
+        let temp = allocateShared<'a> LocalSize.X
+
+        let gid = getGlobalId().X
+        let lid = getLocalId().X
+
+        if gid < input.Length then
+            temp.[lid] <- input.[gid]
+        else
+            temp.[lid] <- %zero
+
+        barrier()
+
+        let mutable d = 2
+        let mutable s = 1
+        while s < elems do
+            if lid % d = 0 && lid >= s then
+                temp.[lid] <- (%add) temp.[lid] temp.[lid - s]
+
+            barrier()
+            s <- s * 2
+            d <- d * 2
+
+
+        s <- s / 2
+        d <- d / 2
+        while s >= 1 do
+            if lid % d = 0 && lid + s < elems then
+                temp.[lid + s] <- (%add) temp.[lid + s] temp.[lid]
+
+            barrier()
+            s <- s / 2
+            d <- d / 2
+
+        if gid < input.Length then
+            output.[gid] <- temp.[lid]
+
+
+    }
 
 [<EntryPoint>]
 let main args =
+
+    let maxGroupSize = V3i(128, 1024, 1024)
+    let test = ComputeShader.ofFunction maxGroupSize (scan <@ fun a b -> a + b @> <@ 0.0 @>)
+    let m = ComputeShader.toModule test
+    let code = ModuleCompiler.compileGLSL410 m
+    printfn "%s" code
+    System.Environment.Exit 0
+
+
     effectTest()
     System.Environment.Exit 0
 

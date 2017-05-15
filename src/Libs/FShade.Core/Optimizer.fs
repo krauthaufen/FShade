@@ -573,7 +573,7 @@ module Optimizer =
         type State = 
             {
                 variableValues : Map<Var, obj>
-                isGlobalSideEffect : MethodInfo -> bool
+                isGlobalSideEffect : MemberInfo -> bool
             }
 
         [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -581,7 +581,10 @@ module Optimizer =
             let empty = 
                 { 
                     variableValues = Map.empty
-                    isGlobalSideEffect = fun mi -> mi.ReturnType = typeof<unit> || mi.ReturnType = typeof<System.Void>
+                    isGlobalSideEffect = fun mi -> 
+                        match mi with
+                            | :? MethodInfo as mi -> mi.ReturnType = typeof<unit> || mi.ReturnType = typeof<System.Void>
+                            | _ -> false
                 }
 
             let needsCall (mi : MethodInfo) : State<State, bool> =
@@ -590,7 +593,17 @@ module Optimizer =
                     (mi.IsGenericMethod && mi.GetGenericMethodDefinition() = MethodInfo.ReadInputIndexed) ||
                     (mi = MethodInfo.WriteOutputs) || 
                     (mi = MethodInfo.Unroll) ||
-                    (s.isGlobalSideEffect mi)
+                    (s.isGlobalSideEffect (mi :> MemberInfo))
+                )
+
+            let needsField (f : FieldInfo) : State<State, bool> =
+                State.get |> State.map (fun s ->
+                    s.isGlobalSideEffect (f :> MemberInfo)
+                )
+
+            let needsProperty (p : PropertyInfo) : State<State, bool> =
+                State.get |> State.map (fun s ->
+                    s.isGlobalSideEffect (p :> MemberInfo)
                 )
 
             let setVar (v : Var) (value : obj) =
@@ -963,12 +976,15 @@ module Optimizer =
                             return Expr.Value(null, t)
 
                     | FieldGet(None, f) ->
-                        return Expr.Value(f.GetValue null, e.Type)
+                        let! n = State.needsField f
+                        if n then return e
+                        else return Expr.Value(f.GetValue null, e.Type)
 
                     | FieldGet(Some t, f) ->
                         let! t = evaluateConstantsS t
+                        let! n = State.needsField f
                         match t with
-                            | Value(t,_) ->  return Expr.Value(f.GetValue t, e.Type)
+                            | Value(t,_) when not n && not (isNull t) ->  return Expr.Value(f.GetValue t, e.Type)
                             | _ -> return Expr.FieldGet(t, f)
 
                     | FieldSet(None, f, value) ->
@@ -988,20 +1004,6 @@ module Optimizer =
 
                             | Bool false -> 
                                 return! evaluateConstantsS e
-
-//                            | EqualityCondition values ->
-//                                let! e = evaluateConstantsS e
-//                                for (v, c) in Map.toSeq values do
-//                                    do! State.setVar v c
-//                                let! i = evaluateConstantsS i
-//                                return Expr.IfThenElse(cond, i, e)
-//
-//                            | InequalityCondition values ->
-//                                let! i = evaluateConstantsS i
-//                                for (v, c) in Map.toSeq values do
-//                                    do! State.setVar v c
-//                                let! e = evaluateConstantsS e
-//                                return Expr.IfThenElse(cond, i, e)
 
                             | _ ->
                                 let! i = evaluateConstantsS i
@@ -1076,8 +1078,9 @@ module Optimizer =
                         
                     | PropertyGet(None, pi, indices) ->
                         let! indices = indices |> List.mapS evaluateConstantsS
+                        let! n = State.needsProperty pi
                         match indices with
-                            | AllConstant indices ->
+                            | AllConstant indices when not n ->
                                 return Expr.Value(pi.GetValue(null, List.toArray indices), e.Type)
                             | _ ->
                                 return Expr.PropertyGet(pi, indices)
@@ -1085,8 +1088,9 @@ module Optimizer =
                     | PropertyGet(Some t, pi, indices) ->
                         let! t = evaluateConstantsS t
                         let! indices = indices |> List.mapS evaluateConstantsS
+                        let! n = State.needsProperty pi
                         match t, indices with
-                            | Value(t,_), AllConstant indices ->
+                            | Value(t,_), AllConstant indices when not n && not (isNull t)->
                                 return Expr.Value(pi.GetValue(t, List.toArray indices), e.Type)
                             | _ ->
                                 return Expr.PropertyGet(t, pi, indices)
@@ -1178,6 +1182,17 @@ module Optimizer =
             run.Run(&state)
 
         let evaluateConstants' (isSideEffect : MethodInfo -> bool) (e : Expr) =
+            let run = evaluateConstantsS e
+
+            let isSideEffect (m : MemberInfo) =
+                match m with    
+                    | :? MethodInfo as mi -> isSideEffect mi
+                    | _ -> false
+
+            let mutable state = { State.empty with isGlobalSideEffect = isSideEffect }
+            run.Run(&state)
+
+        let evaluateConstants'' (isSideEffect : MemberInfo -> bool) (e : Expr) =
             let run = evaluateConstantsS e
             let mutable state = { State.empty with isGlobalSideEffect = isSideEffect }
             run.Run(&state)
