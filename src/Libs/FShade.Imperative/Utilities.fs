@@ -458,13 +458,16 @@ module ExprExtensions =
     /// code less readable and more complicated
     let (|LetCopyOfStruct|_|) (e : Expr) =
         match e with
-            | Let(v, e, b) when v.IsMutable && v.Type.IsValueType && v.Name = "copyOfStruct" ->
-                // TODO: find a better way for detecting this
-                let mutable count = 0
-                let newBody = b.Substitute(fun vi -> if v = vi then count <- count + 1; Some e else None) 
-                if count = 0 then Some b
-                elif count = 1 then Some newBody
-                else None
+            | Let(v, e, b) when v.Name = "copyOfStruct" ->
+                if v.Type.IsValueType then
+                    // TODO: find a better way for detecting this
+                    let mutable count = 0
+                    let newBody = b.Substitute(fun vi -> if v = vi then count <- count + 1; Some e else None) 
+                    if count = 0 then Some b
+                    elif count = 1 then Some newBody
+                    else None
+                else
+                    None
             | _ ->
                 None
 

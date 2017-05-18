@@ -101,10 +101,11 @@ let effectTest() =
             "Bla", typeof<V2d>, 0
         ]
 
-    effect
-        |> Effect.toModule config
-        |> ModuleCompiler.compileGLSL glsl410
-        |> printfn "%s"
+    let glsl = 
+        effect
+            |> Effect.toModule config
+            |> ModuleCompiler.compileGLSL glsl410
+    printfn "%s" glsl.code
 
 type Vertex1 =
     {
@@ -159,10 +160,13 @@ let composeTest() =
         EffectConfig.ofList [
             Intrinsics.Color, typeof<V4d>, 0
         ]
-    Effect.compose [sa; sb] 
-        |> Effect.toModule config
-        |> ModuleCompiler.compileGLSL glsl410
-        |> printfn "%s"
+
+    let glsl = 
+        Effect.compose [sa; sb] 
+            |> Effect.toModule config
+            |> ModuleCompiler.compileGLSL glsl410
+
+    printfn "%s" glsl.code
 
 
 
@@ -340,9 +344,12 @@ module TessDeconstruct =
                 |> Effect.toModule config
                 |> ModuleCompiler.compile glsl410
 
-        cModule
-            |> GLSL.Assembler.assemble glsl410
-            |> printfn "%s"
+        let glsl = 
+            cModule
+                |> GLSL.Assembler.assemble glsl410
+
+        printfn "%A" glsl.builtIns
+        printfn "%s" glsl.code
 
 
 
@@ -458,12 +465,14 @@ let scan (add : Expr<'a -> 'a -> 'a>) (zero : Expr<'a>) (input : 'a[]) (output :
 
 [<EntryPoint>]
 let main args =
+    TessDeconstruct.run()
+    System.Environment.Exit 0
 
     let maxGroupSize = V3i(128, 1024, 1024)
     let test = ComputeShader.ofFunction maxGroupSize (scan <@ fun a b -> a + b @> <@ 0.0 @>)
     let m = ComputeShader.toModule test
-    let code = ModuleCompiler.compileGLSL410 m
-    printfn "%s" code
+    let glsl = ModuleCompiler.compileGLSL410 m
+    printfn "%s" glsl.code
     System.Environment.Exit 0
 
 
@@ -552,6 +561,6 @@ let main args =
     let entry =
         entry |> ModuleCompiler.compileGLSL glsl410
 
-    printfn "%s" entry
+    printfn "%s" entry.code
     0
 

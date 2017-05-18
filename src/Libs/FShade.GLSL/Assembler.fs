@@ -23,6 +23,12 @@ type Config =
         reverseMatrixLogic      : bool
     }
 
+type GLSLShader =
+    {
+        code        : string
+        builtIns    : Map<ShaderStage, Map<ParameterKind, Set<string>>>
+    }
+
 type Backend private(config : Config) =
     inherit Compiler.Backend()
     static let table = System.Collections.Concurrent.ConcurrentDictionary<Config, Backend>()
@@ -104,6 +110,8 @@ type AssemblerState =
         currentBinding          : int
         currentInputLocation    : int
         currentOutputLocation   : int
+        builtIn                 : Map<ShaderStage, Map<ParameterKind, Set<string>>>
+
     }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -116,6 +124,7 @@ module AssemblerState =
             currentBinding = -1
             currentInputLocation = 0
             currentOutputLocation = 0
+            builtIn = Map.empty
         }
 
 
@@ -124,6 +133,23 @@ module AssemblerState =
     let prevStage = State.get |> State.map (fun s -> s.stages.prev)
     let nextStage = State.get |> State.map (fun s -> s.stages.next)
     
+    let useBuiltIn (kind : ParameterKind) (name : string) =
+        State.modify (fun s ->
+            let stage =s.stages.self
+
+            let old = 
+                match Map.tryFind stage s.builtIn with
+                    | Some b -> b
+                    | None -> Map.empty
+            
+            let oldSet =
+                match Map.tryFind kind old with
+                    | Some s -> s
+                    | None -> Set.empty
+
+            { s with builtIn = Map.add stage (Map.add kind (Set.add name oldSet) old) s.builtIn }
+        )
+
     let tryGetParameterName (kind : ParameterKind) (name : string) =
         state {
             let! stages = stages
@@ -710,8 +736,12 @@ module Assembler =
         state {
             let! stages = AssemblerState.stages
             let! builtIn = AssemblerState.tryGetParameterName kind p.cParamSemantic
+
+
+
             match builtIn with
-                | Some _ -> 
+                | Some name -> 
+                    do! AssemblerState.useBuiltIn kind name
                     return None
 
                 | None ->
@@ -956,4 +986,8 @@ module Assembler =
                     ]
             }
         let mutable state = AssemblerState.ofConfig c
-        definitions.Run(&state) |> String.concat "\r\n\r\n"
+        let code = definitions.Run(&state) |> String.concat "\r\n\r\n"
+        {
+            code        = code
+            builtIns    = state.builtIn
+        }
