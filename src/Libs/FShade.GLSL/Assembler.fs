@@ -120,8 +120,8 @@ module AssemblerState =
         {
             config = c
             stages = { prev = None; self = ShaderStage.Vertex; next = None }
-            currentDescriptorSet = -1
-            currentBinding = -1
+            currentDescriptorSet = 0
+            currentBinding = 0
             currentInputLocation = 0
             currentOutputLocation = 0
             builtIn = Map.empty
@@ -183,7 +183,7 @@ module AssemblerState =
             let c = s.config
             if c.createDescriptorSets then
                 let set = s.currentDescriptorSet
-                { s with currentDescriptorSet = set + 1; currentBinding = -1 }, set
+                { s with currentDescriptorSet = set + 1; currentBinding = 0 }, set
             else
                 s, -1
         )
@@ -671,13 +671,13 @@ module Assembler =
                 match d with
                     | UniformDecoration.Format t -> Some t.Name
             )
-
-        let decorations =
-            if set >= 0 then (sprintf "set = %d" set) :: decorations
-            else decorations
             
         let decorations =
             if binding >= 0 then (sprintf "binding = %d" binding) :: decorations
+            else decorations
+
+        let decorations =
+            if set >= 0 then (sprintf "set = %d" set) :: decorations
             else decorations
 
                
