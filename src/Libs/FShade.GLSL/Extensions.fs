@@ -10,7 +10,7 @@ module Backends =
     let glsl410 =
         Backend.Create {
             version                 = Version(4,1)
-            enabledExtensions       = Set.empty
+            enabledExtensions       = Set.ofList [ ]
             createUniformBuffers    = true
             createBindings          = false
             createDescriptorSets    = false

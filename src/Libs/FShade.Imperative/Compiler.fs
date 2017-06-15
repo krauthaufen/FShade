@@ -1229,7 +1229,32 @@ module Compiler =
                     Log.warn "[FShade] orphaned unroll detected"
                     return CNop
 
+                | ForEach(v, seq, body) ->
+                    let! e = asExternalS seq
 
+                    match e.ctype with
+                        | CArray(et, len) ->
+                            let! i = toCVarS (Var("i", typeof<int>, true))
+                            let! v = toCVarS v
+                            let! cbody = toCStatementS false body
+
+                            let tint32 = CType.CInt(true, 32)
+                            let condition = CLess(CVar i, CValue(tint32, CIntegral (int64 len)))
+                            let increment = CIncrement(false, CLVar i)
+                            return
+                                CFor(
+                                    CDeclare(i, Some (CRExpr(CValue(tint32, CIntegral 0L)))), 
+                                    condition,                          
+                                    increment,
+                                    CSequential [
+                                        CDeclare(v, Some (CRExpr(CItem(v.ctype, e, CVar i))))
+                                        cbody
+                                    ]                             
+                                )
+
+
+                        | _ -> 
+                            return failwith "foreach not implemented"
 
                 | ForInteger(v, first, step, last, b) ->
                     match step, last with

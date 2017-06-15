@@ -450,6 +450,10 @@ module IntrinsicFunctions =
 
             CIntrinsic.simple "dFdx", [ generic <@ ddx : float -> _ @> ]
             CIntrinsic.simple "dFdy", [ generic <@ ddy : float -> _ @> ]
+            CIntrinsic.simple "dFdxFine", [ generic <@ ddxFine : float -> _ @> ]
+            CIntrinsic.simple "dFdyFine", [ generic <@ ddyFine : float -> _ @> ]
+            CIntrinsic.simple "dFdxCoarse", [ generic <@ ddxCoarse : float -> _ @> ]
+            CIntrinsic.simple "dFdyCoarse", [ generic <@ ddyCoarse : float -> _ @> ]
             CIntrinsic.tagged "discard", [ exactly <@ discard @> ]
             CIntrinsic.simple "EmitVertex", [ exactly <@ emitVertex @> ]
             CIntrinsic.simple "EndPrimitive", [ 
