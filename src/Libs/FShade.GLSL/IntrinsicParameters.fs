@@ -55,7 +55,7 @@ module IntrinsicParameters =
                     Intrinsics.FrontFacing, "gl_FronFacing"
                     Intrinsics.SampleId, "gl_SampleID"
                     Intrinsics.SamplePosition, "gl_SamplePosition"
-                    Intrinsics.SampleMask, "gl_SampleMask"
+                    Intrinsics.SampleMask, "gl_SampleMaskIn"
                     Intrinsics.ClipDistance, "gl_ClipDistance"
                     Intrinsics.PrimitiveId, "gl_PrimitiveID"
                     Intrinsics.Layer, "gl_Layer"

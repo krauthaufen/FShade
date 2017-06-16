@@ -969,7 +969,7 @@ module Shader =
             ShaderStage.Fragment,
                 Map.ofList [
                     Intrinsics.Depth, typeof<float>
-                    Intrinsics.SampleMask, typeof<float[]>
+                    Intrinsics.SampleMask, typeof<int[]>
                 ]
 
         ]
