@@ -52,7 +52,7 @@ module IntrinsicParameters =
                 Map.ofList [
                     Intrinsics.FragCoord, "gl_FragCoord"
                     Intrinsics.PointCoord, "gl_PointCoord"
-                    Intrinsics.FrontFacing, "gl_FronFacing"
+                    Intrinsics.FrontFacing, "gl_FrontFacing"
                     Intrinsics.SampleId, "gl_SampleID"
                     Intrinsics.SamplePosition, "gl_SamplePosition"
                     Intrinsics.SampleMask, "gl_SampleMask"
