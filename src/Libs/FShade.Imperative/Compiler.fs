@@ -196,7 +196,7 @@ module Compiler =
                                 |> Array.toList
                                 |> List.mapi (fun i (f, p) -> 
                                     let v = { name = p.name; ctype = p.ctype }
-                                    CWrite(CLField(p.ctype, CLVar res, f.Name), CExpr.CVar v)
+                                    CWrite(CLField(p.ctype, CLVar res, ci.Name + "_" + f.Name), CExpr.CVar v)
                                 )
                             let tInt32 = CType.CInt(true, 32)
                             CSequential [
