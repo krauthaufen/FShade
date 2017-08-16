@@ -244,7 +244,7 @@ module TessDeconstruct =
             }
 
 
-    [<GLSLIntrinsic("mix({1},{2},{0})")>]
+    [<GLSLIntrinsic("mix({1},{2},{0})", "hugo")>]
     let inline lerp (t : float) (a : 'a) (b : 'a)  = 
         onlyInShaderCode<'a> "mix"
 

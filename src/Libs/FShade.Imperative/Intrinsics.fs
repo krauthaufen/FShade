@@ -10,7 +10,7 @@ type IntrinsicAttribute() =
     abstract member Intrinsic : CIntrinsic
 
 
-type GLSLIntrinsicAttribute(format : string) =
+type GLSLIntrinsicAttribute private(format : string, requiredExtensions : Set<string>) =
     inherit IntrinsicAttribute()
 
     override x.Intrinsic =
@@ -18,7 +18,11 @@ type GLSLIntrinsicAttribute(format : string) =
             intrinsicName = null
             tag = format
             arguments = None
+            additional = requiredExtensions
         }
+
+    new(format : string) = GLSLIntrinsicAttribute(format, Set.empty)
+    new(format : string, [<ParamArray>] requiredExtensions : string[]) = GLSLIntrinsicAttribute(format, Set.ofArray requiredExtensions)
 
 [<AutoOpen>]
 module ``Reflection Helpers`` =

@@ -288,6 +288,7 @@ type CIntrinsic =
         intrinsicName   : string
         tag             : obj
         arguments       : Option<list<int>>
+        additional      : obj
     }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -297,6 +298,7 @@ module CIntrinsic =
             intrinsicName = name
             tag = null
             arguments = None
+            additional = null
         }
 
     let custom (name : string) (args : list<int>)=
@@ -304,6 +306,7 @@ module CIntrinsic =
             intrinsicName = name
             tag = null
             arguments = Some args
+            additional = null
         }
 
     let tagged (tag : obj)=
@@ -311,6 +314,7 @@ module CIntrinsic =
             intrinsicName = null
             tag = tag
             arguments = None
+            additional = null
         }
 
 /// represents a c-style expression

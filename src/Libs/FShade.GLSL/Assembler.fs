@@ -15,9 +15,10 @@ type Config =
         version                 : Version
         enabledExtensions       : Set<string>
         createUniformBuffers    : bool
-            
+
         createBindings          : bool
         createDescriptorSets    : bool
+        stepDescriptorSets      : bool
         createInputLocations    : bool
         createPerStageUniforms  : bool
         reverseMatrixLogic      : bool
@@ -111,7 +112,7 @@ type AssemblerState =
         currentInputLocation    : int
         currentOutputLocation   : int
         builtIn                 : Map<ShaderStage, Map<ParameterKind, Set<string>>>
-
+        requiredExtensions      : Set<string>
     }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -125,6 +126,7 @@ module AssemblerState =
             currentInputLocation = 0
             currentOutputLocation = 0
             builtIn = Map.empty
+            requiredExtensions = Set.empty
         }
 
 
@@ -183,7 +185,11 @@ module AssemblerState =
             let c = s.config
             if c.createDescriptorSets then
                 let set = s.currentDescriptorSet
-                { s with currentDescriptorSet = set + 1; currentBinding = 0 }, set
+                if c.stepDescriptorSets then
+                    { s with currentDescriptorSet = set + 1; currentBinding = 0 }, set
+                else
+                    s, set
+                    
             else
                 s, -1
         )
@@ -330,6 +336,12 @@ module Assembler =
                             return name
 
                 | CCallIntrinsic(_, func, args) ->
+
+                    match func.additional with
+                        | null -> ()
+                        | :? Set<string> as exts -> do! State.modify (fun s -> { s with requiredExtensions = Set.union s.requiredExtensions exts})
+                        | _ -> ()
+
                     match func.tag with
                         | null ->
                             let! args = args |> assembleExprsS ", "
@@ -975,11 +987,13 @@ module Assembler =
 
                 let! values = m.values |> List.mapS assembleValueDefS
 
+                let! s = State.get
+                let extensions = Set.union c.enabledExtensions s.requiredExtensions
 
                 return 
                     List.concat [
                         [sprintf "#version %d%d0" c.version.Major c.version.Minor ]
-                        c.enabledExtensions |> Seq.map (sprintf "#extension %s : enable") |> Seq.toList
+                        extensions |> Seq.map (sprintf "#extension %s : enable") |> Seq.toList
                         types
                         uniforms
                         values
