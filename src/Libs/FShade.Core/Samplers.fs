@@ -91,6 +91,9 @@ type Sampler1dArrayShadow(tex : ISemanticValue, state : SamplerState) =
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : float, slice : int, cmp : float, dTdx : float, dTdy : float) : float = failwith ""
     
+    /// query lod levels
+    member x.QueryLod(coord : float) : V2d = failwith ""
+    
     /// non-sampled texture read
     member x.Read(coord : int, lod : int) : float = failwith ""
     
@@ -133,6 +136,9 @@ type Sampler1dArray(tex : ISemanticValue, state : SamplerState) =
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : float, slice : int, dTdx : float, dTdy : float) : V4d = failwith ""
+    
+    /// query lod levels
+    member x.QueryLod(coord : float) : V2d = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : int, lod : int) : V4d = failwith ""
@@ -233,6 +239,9 @@ type Sampler1dShadow(tex : ISemanticValue, state : SamplerState) =
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : float, cmp : float, dTdx : float, dTdy : float) : float = failwith ""
     
+    /// query lod levels
+    member x.QueryLod(coord : float) : V2d = failwith ""
+    
     /// non-sampled texture read
     member x.Read(coord : int, lod : int) : float = failwith ""
     
@@ -281,6 +290,9 @@ type Sampler1d(tex : ISemanticValue, state : SamplerState) =
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : float, dTdx : float, dTdy : float) : V4d = failwith ""
+    
+    /// query lod levels
+    member x.QueryLod(coord : float) : V2d = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : int, lod : int) : V4d = failwith ""
@@ -378,6 +390,9 @@ type Sampler2dArrayShadow(tex : ISemanticValue, state : SamplerState) =
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V2d, slice : int, cmp : float, dTdx : V2d, dTdy : V2d) : float = failwith ""
     
+    /// query lod levels
+    member x.QueryLod(coord : V2d) : V2d = failwith ""
+    
     /// gathers one component for the neighbouring 4 texels
     member x.Gather(coord : V2d, slice : int, comp : int) : V4d = failwith ""
     
@@ -426,6 +441,9 @@ type Sampler2dArray(tex : ISemanticValue, state : SamplerState) =
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V2d, slice : int, dTdx : V2d, dTdy : V2d) : V4d = failwith ""
+    
+    /// query lod levels
+    member x.QueryLod(coord : V2d) : V2d = failwith ""
     
     /// gathers one component for the neighbouring 4 texels
     member x.Gather(coord : V2d, slice : int, comp : int) : V4d = failwith ""
@@ -532,6 +550,9 @@ type Sampler2dShadow(tex : ISemanticValue, state : SamplerState) =
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V2d, cmp : float, dTdx : V2d, dTdy : V2d) : float = failwith ""
     
+    /// query lod levels
+    member x.QueryLod(coord : V2d) : V2d = failwith ""
+    
     /// gathers one component for the neighbouring 4 texels
     member x.Gather(coord : V2d, comp : int) : V4d = failwith ""
     
@@ -586,6 +607,9 @@ type Sampler2d(tex : ISemanticValue, state : SamplerState) =
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V2d, dTdx : V2d, dTdy : V2d) : V4d = failwith ""
+    
+    /// query lod levels
+    member x.QueryLod(coord : V2d) : V2d = failwith ""
     
     /// gathers one component for the neighbouring 4 texels
     member x.Gather(coord : V2d, comp : int) : V4d = failwith ""
@@ -698,6 +722,9 @@ type Sampler3dShadow(tex : ISemanticValue, state : SamplerState) =
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V3d, cmp : float, dTdx : V3d, dTdy : V3d) : float = failwith ""
     
+    /// query lod levels
+    member x.QueryLod(coord : V3d) : V2d = failwith ""
+    
     /// non-sampled texture read
     member x.Read(coord : V3i, lod : int) : float = failwith ""
     
@@ -746,6 +773,9 @@ type Sampler3d(tex : ISemanticValue, state : SamplerState) =
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V3d, dTdx : V3d, dTdy : V3d) : V4d = failwith ""
+    
+    /// query lod levels
+    member x.QueryLod(coord : V3d) : V2d = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : V3i, lod : int) : V4d = failwith ""
@@ -828,6 +858,9 @@ type SamplerCubeArrayShadow(tex : ISemanticValue, state : SamplerState) =
     /// regular sampled texture-lookup with lod-bias
     member x.Sample(coord : V3d, slice : int, cmp : float, lodBias : float) : float = failwith ""
     
+    /// query lod levels
+    member x.QueryLod(coord : V3d) : V2d = failwith ""
+    
 
 type SamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -858,6 +891,9 @@ type SamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
     
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : V3d, slice : int, level : float) : V4d = failwith ""
+    
+    /// query lod levels
+    member x.QueryLod(coord : V3d) : V2d = failwith ""
     
 
 type SamplerCubeShadowMS(tex : ISemanticValue, state : SamplerState) =
@@ -934,6 +970,9 @@ type SamplerCubeShadow(tex : ISemanticValue, state : SamplerState) =
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : V3d, cmp : float, level : float) : float = failwith ""
     
+    /// query lod levels
+    member x.QueryLod(coord : V3d) : V2d = failwith ""
+    
 
 type SamplerCube(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -964,6 +1003,9 @@ type SamplerCube(tex : ISemanticValue, state : SamplerState) =
     
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : V3d, level : float) : V4d = failwith ""
+    
+    /// query lod levels
+    member x.QueryLod(coord : V3d) : V2d = failwith ""
     
 
 type IntSampler1dArrayMS(tex : ISemanticValue, state : SamplerState) =
@@ -1029,6 +1071,9 @@ type IntSampler1dArray(tex : ISemanticValue, state : SamplerState) =
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : float, slice : int, dTdx : float, dTdy : float) : V4i = failwith ""
+    
+    /// query lod levels
+    member x.QueryLod(coord : float) : V2d = failwith ""
     
     /// non-sampled texture read
     member x.Read(coord : int, lod : int) : V4i = failwith ""
@@ -1104,6 +1149,9 @@ type IntSampler1d(tex : ISemanticValue, state : SamplerState) =
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : float, dTdx : float, dTdy : float) : V4i = failwith ""
     
+    /// query lod levels
+    member x.QueryLod(coord : float) : V2d = failwith ""
+    
     /// non-sampled texture read
     member x.Read(coord : int, lod : int) : V4i = failwith ""
     
@@ -1174,6 +1222,9 @@ type IntSampler2dArray(tex : ISemanticValue, state : SamplerState) =
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V2d, slice : int, dTdx : V2d, dTdy : V2d) : V4i = failwith ""
+    
+    /// query lod levels
+    member x.QueryLod(coord : V2d) : V2d = failwith ""
     
     /// gathers one component for the neighbouring 4 texels
     member x.Gather(coord : V2d, slice : int, comp : int) : V4i = failwith ""
@@ -1254,6 +1305,9 @@ type IntSampler2d(tex : ISemanticValue, state : SamplerState) =
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V2d, dTdx : V2d, dTdy : V2d) : V4i = failwith ""
+    
+    /// query lod levels
+    member x.QueryLod(coord : V2d) : V2d = failwith ""
     
     /// gathers one component for the neighbouring 4 texels
     member x.Gather(coord : V2d, comp : int) : V4i = failwith ""
@@ -1341,6 +1395,9 @@ type IntSampler3d(tex : ISemanticValue, state : SamplerState) =
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V3d, dTdx : V3d, dTdy : V3d) : V4i = failwith ""
     
+    /// query lod levels
+    member x.QueryLod(coord : V3d) : V2d = failwith ""
+    
     /// non-sampled texture read
     member x.Read(coord : V3i, lod : int) : V4i = failwith ""
     
@@ -1403,6 +1460,9 @@ type IntSamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : V3d, slice : int, level : float) : V4i = failwith ""
     
+    /// query lod levels
+    member x.QueryLod(coord : V3d) : V2d = failwith ""
+    
 
 type IntSamplerCubeMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -1455,6 +1515,9 @@ type IntSamplerCube(tex : ISemanticValue, state : SamplerState) =
     
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : V3d, level : float) : V4i = failwith ""
+    
+    /// query lod levels
+    member x.QueryLod(coord : V3d) : V2d = failwith ""
     
 
 [<AutoOpen>]

@@ -235,6 +235,14 @@ let run() =
                 (["coord", coordType] @ additionalArgs @ ["dTdx", coordType; "dTdy", coordType])
                 returnType
 
+        if not m then
+            samplerFunction
+                "query lod levels"
+                SampleVariants.None
+                "QueryLod"
+                ["coord", coordType]
+                "V2d"
+
 
         if d = SamplerDimension.Sampler2d && not m then
             let additionalArgs = 

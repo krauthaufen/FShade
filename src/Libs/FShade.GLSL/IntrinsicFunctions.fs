@@ -500,7 +500,6 @@ module IntrinsicFunctions =
                         | SamplerDimension.SamplerCube -> 3
                         | _ -> failwithf "unknown sampler dimension: %A" dim
 
-
                 let sampleArgs() = 
                     let consumedArgs, sampleArgs =
                         match isArray, isShadow with
@@ -545,35 +544,35 @@ module IntrinsicFunctions =
 
                 let argCount = List.length args - 1
 
-                let functionName = 
-                    match name with
-                        | "get_Size" -> 
-                            if isMS then "textureSize({0})"
-                            else "textureSize({0}, 0)"
+                match name with
+                    | "get_Size" -> 
+                        if isMS then Some "textureSize({0})"
+                        else Some "textureSize({0}, 0)"
 
-                        | "get_MipMapLevels" -> 
-                            if isMS then "1"
-                            else "textureQueryLevels({0})"
+                    | "get_MipMapLevels" -> 
+                        if isMS then Some "1"
+                        else Some "textureQueryLevels({0})"
 
-                        | "GetSize" -> 
-                            if isMS then "textureSize({0})"
-                            else "textureSize({0}, {1})"
+                    | "GetSize" -> 
+                        if isMS then Some "textureSize({0})"
+                        else Some "textureSize({0}, {1})"
 
 
-                        | "Sample" -> sprintf "texture(%s)" (sampleArgs())
-                        | "SampleOffset" -> sprintf "textureOffset(%s)" (sampleArgs())
-                        | "SampleProj" -> sprintf "textureProj(%s)" (projArgs())
-                        | "SampleLevel" -> sprintf "textureLod(%s)" (sampleArgs())
-                        | "SampleGrad" -> sprintf "textureGrad(%s)" (sampleArgs())
-                        | "Gather" -> sprintf "textureGather(%s)" (plainArgs 0)
-                        | "GatherOffset" -> sprintf "textureGatherOffset(%s)" (plainArgs 0)
-                        | "Read" -> sprintf "texelFetch(%s)" (plainArgs 0)
+                    | "Sample" -> sprintf "texture(%s)" (sampleArgs()) |> Some
+                    | "SampleOffset" -> sprintf "textureOffset(%s)" (sampleArgs()) |> Some
+                    | "SampleProj" -> sprintf "textureProj(%s)" (projArgs()) |> Some
+                    | "SampleLevel" -> sprintf "textureLod(%s)" (sampleArgs()) |> Some
+                    | "SampleGrad" -> sprintf "textureGrad(%s)" (sampleArgs()) |> Some
+                    | "Gather" -> sprintf "textureGather(%s)" (plainArgs 0) |> Some
+                    | "GatherOffset" -> sprintf "textureGatherOffset(%s)" (plainArgs 0) |> Some
+                    | "Read" -> sprintf "texelFetch(%s)" (plainArgs 0) |> Some
 
-                        | "get_Item" when argCount = 1 -> sprintf "texelFetch(%s, 0)" (plainArgs 0)
-                        | "get_Item" -> sprintf "texelFetch({0}, ivec%d(%s), 0)" argCount (plainArgs 1)
-                        | name -> failwithf "unknown sampler function %A" name
+                    | "get_Item" when argCount = 1 -> sprintf "texelFetch(%s, 0)" (plainArgs 0) |> Some
+                    | "get_Item" -> sprintf "texelFetch({0}, ivec%d(%s), 0)" argCount (plainArgs 1) |> Some
 
-                Some functionName
+                    | "QueryLod" -> sprintf "textureQueryLod(%s)" (plainArgs 0) |> Some
+
+                    | name -> None
             | _ ->
                 None
 
