@@ -568,7 +568,7 @@ module IntrinsicFunctions =
                     | "Read" -> sprintf "texelFetch(%s)" (plainArgs 0) |> Some
 
                     | "get_Item" when argCount = 1 -> sprintf "texelFetch(%s, 0)" (plainArgs 0) |> Some
-                    | "get_Item" -> sprintf "texelFetch({0}, ivec%d(%s), 0)" argCount (plainArgs 1) |> Some
+                    | "get_Item" -> sprintf "texelFetch(%s)" (plainArgs 0) |> Some
 
                     | "QueryLod" -> sprintf "textureQueryLod(%s)" (plainArgs 0) |> Some
 
