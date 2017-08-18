@@ -300,6 +300,9 @@ type Sampler1d(tex : ISemanticValue, state : SamplerState) =
     member x.Item
         with get (coord : int) : V4d = failwith ""
     
+    member x.Item
+        with get(coord : int, level : int) : V4d = failwith ""
+
 
 type Sampler2dArrayShadowMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -624,8 +627,8 @@ type Sampler2d(tex : ISemanticValue, state : SamplerState) =
         with get (coord : V2i) : V4d = failwith ""
     
     member x.Item
-        with get (cx : int, cy : int) : V4d = failwith ""
-    
+        with get(coord : V2i, level : int) : V4d = failwith ""
+
 
 type Sampler3dShadowMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -784,8 +787,8 @@ type Sampler3d(tex : ISemanticValue, state : SamplerState) =
         with get (coord : V3i) : V4d = failwith ""
     
     member x.Item
-        with get (cx : int, cy : int, cz : int) : V4d = failwith ""
-    
+        with get(coord : V3i, level : int) : V4d = failwith ""
+
 
 type SamplerCubeArrayShadowMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -1158,6 +1161,9 @@ type IntSampler1d(tex : ISemanticValue, state : SamplerState) =
     member x.Item
         with get (coord : int) : V4i = failwith ""
     
+    member x.Item
+        with get(coord : int, level : int) : V4i = failwith ""
+
 
 type IntSampler2dArrayMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -1322,8 +1328,8 @@ type IntSampler2d(tex : ISemanticValue, state : SamplerState) =
         with get (coord : V2i) : V4i = failwith ""
     
     member x.Item
-        with get (cx : int, cy : int) : V4i = failwith ""
-    
+        with get(coord : V2i, level : int) : V4i = failwith ""
+
 
 type IntSampler3dMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -1405,8 +1411,8 @@ type IntSampler3d(tex : ISemanticValue, state : SamplerState) =
         with get (coord : V3i) : V4i = failwith ""
     
     member x.Item
-        with get (cx : int, cy : int, cz : int) : V4i = failwith ""
-    
+        with get(coord : V3i, level : int) : V4i = failwith ""
+
 
 type IntSamplerCubeArrayMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
