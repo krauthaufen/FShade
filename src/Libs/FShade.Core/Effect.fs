@@ -14,7 +14,7 @@ open FShade.Imperative
 
 
 /// Effect encapsulates a set of shaders for the various ShaderStages defined by FShade.
-type Effect internal(id : string, shaders : Map<ShaderStage, Shader>) =
+type Effect internal(id : string, shaders : Map<ShaderStage, Shader>, composedOf : list<Effect>) =
     
     let inputToplogy =
         lazy (
@@ -67,6 +67,10 @@ type Effect internal(id : string, shaders : Map<ShaderStage, Shader>) =
 
     /// gets a unique id for this effect
     member x.Id                 = id
+
+    /// returns the effect of which the current one was composed (empty if leaf)
+    member x.ComposedOf = composedOf
+
     /// gets the optionally required InputTopology for the effect.
     /// returns None when the effect is agnostic
     member x.InputToplogy       = inputToplogy.Value
@@ -95,7 +99,8 @@ type Effect internal(id : string, shaders : Map<ShaderStage, Shader>) =
     /// gets the optional FragmentShader for the effect.
     member x.FragmentShader     = shaders |> Map.tryFind ShaderStage.Fragment
 
-    new(m) = Effect(Effect.NewId(), m)
+    new(m, o) = Effect(Effect.NewId(), m, o)
+    new(m) = Effect(Effect.NewId(), m, [])
 
 
 type EffectConfig =
@@ -139,7 +144,7 @@ module Effect =
         effectCache.Clear()
         composeCache.Clear()
 
-    let empty = Effect("", Map.empty)
+    let empty = Effect("", Map.empty, [])
     
     /// gets a unique id for this effect
     let inline id (effect : Effect) = effect.Id
@@ -206,7 +211,8 @@ module Effect =
                     map <- Map.add shader.shaderStage shader map
 
         Effect map
-            
+           
+
     /// creates an effect from a list of shaders
     let inline ofList (shaders : list<Shader>) = 
         ofSeq shaders
@@ -265,6 +271,18 @@ module Effect =
     let remove (stage : ShaderStage) (effect : Effect) =
         Effect (Map.remove stage effect.Shaders)
         
+    /// returns all DebugRanges used by the effect's shaders
+    let rec debugRanges (effect : Effect) =
+        match effect.ComposedOf with
+            | [] -> 
+                effect.Shaders 
+                    |> Map.values 
+                    |> Seq.choose (fun shader -> shader.shaderDebugRange)
+                    |> Seq.distinct
+                    |> Seq.toList
+            | effects ->
+                effects |> List.collect debugRanges
+
     /// creates a new effect by applying the given update-function to
     /// the respective (optional) shader for the given stage.
     /// When update returns Some it will be added/replaced and None will cause the shader to get removed.
@@ -481,7 +499,7 @@ module Effect =
                 let shaderMap =                 
                     shaders |> Seq.map (fun s -> s.shaderStage, s) |> Map.ofSeq
 
-                Effect(resultId, shaderMap)
+                Effect(resultId, shaderMap, [l;r])
             )
 
     /// composes many effects using the sequential semantics defined in compose2.

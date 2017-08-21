@@ -42,7 +42,8 @@ type Shader =
         shaderOutputVertices : ShaderOutputVertices
         /// the body for the shader
         shaderBody : Expr
-
+        /// the shader's source info (if any)
+        shaderDebugRange : Option<DebugRange>
     }
 
 
@@ -721,6 +722,7 @@ module private Preprocessor =
                 shaderOutputTopology    = builder.OutputTopology
                 shaderOutputVertices    = outputVertices
                 shaderBody              = body
+                shaderDebugRange        = None
             }
 
         shader :: state.shaders
@@ -1153,12 +1155,16 @@ module Shader =
         }
 
     let ofExpr (inputType : Type) (e : Expr) =
-        Preprocessor.toShaders inputType Map.empty e |> List.map optimize
+        let debugRange = e.CustomAttributes |> List.tryPick (function DebugRange r -> Some r | _ -> None)
+        Preprocessor.toShaders inputType Map.empty e 
+            |> List.map optimize
+            |> List.map (fun shader -> { shader with shaderDebugRange = debugRange })
 
     let ofFunction (shaderFunction : 'a -> Expr<'b>) =
         let expression = 
             try shaderFunction Unchecked.defaultof<'a>
             with _ -> failwith "[FShade] shader functions may not access their vertex-input statically"
+
         ofExpr typeof<'a> expression
 
     let withBody (newBody : Expr) (shader : Shader) =
@@ -1551,7 +1557,7 @@ module Shader =
                         attributes
                             |> Map.map (fun n t -> None, Expr.ReadInput(ParameterKind.Input, t, n))
                             |> Expr.WriteOutputs
-
+                    shaderDebugRange = None
                 }
             | _ ->
                 failwith "[FShade] not implemented"
@@ -1659,6 +1665,7 @@ module Shader =
                     shaderOutputs = Map.union l.shaderOutputs r.shaderOutputs
                     shaderUniforms = Map.union l.shaderUniforms r.shaderUniforms
                     shaderBody = lBody
+                    shaderDebugRange = None
                 }
 
         let gsvs (lShader : Shader) (rShader : Shader) =
@@ -1776,6 +1783,7 @@ module Shader =
                     shaderOutputs = Map.union lShader.shaderOutputs rOutputs
                     shaderUniforms = Map.union lShader.shaderUniforms rShader.shaderUniforms
                     shaderBody = lBody
+                    shaderDebugRange = None
                 }
 
     /// composes two shaders respecting their stages.

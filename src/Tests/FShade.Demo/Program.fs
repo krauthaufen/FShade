@@ -339,8 +339,13 @@ module TessDeconstruct =
                 "Blubb", typeof<float>, 2
             ]
 
+        let effect =
+            Effect.compose [Effect.ofFunction test; Effect.ofFunction frag]
+
+        Effect.debugRanges effect |> printfn "ranges: %A"
+
         let cModule = 
-            Effect.compose [Effect.ofFunction test]
+            effect
                 |> Effect.toModule config
                 |> ModuleCompiler.compile glsl410
 

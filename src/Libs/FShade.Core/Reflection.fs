@@ -76,6 +76,15 @@ module ReflectionPatterns =
                 | ImageType(fmt,_,_,_,_) -> [Imperative.UniformDecoration.Format fmt]
                 | _ -> []
 
+type DebugRange =
+    {
+        file : string
+        startLine : int
+        startCol : int
+        endLine : int
+        endCol : int
+    }
+
 
 [<AutoOpen>]
 module BasicQuotationPatterns =
@@ -211,6 +220,14 @@ module BasicQuotationPatterns =
                         None
 
 
+            | _ -> None
+
+
+
+    let (|DebugRange|_|) (e : Expr) =
+        match e with
+            | NewTuple([String "DebugRange"; NewTuple [String file; Int32 startLine; Int32 startCol; Int32 endLine; Int32 endCol]]) -> 
+                Some { file = file; startLine = startLine; startCol = startCol; endLine = endLine; endCol = endCol }
             | _ -> None
 
 
