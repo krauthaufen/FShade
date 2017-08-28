@@ -743,6 +743,29 @@ module Printer =
 
             line "        | %s -> \"%s\"" pattern i.name
 
+
+        line ""
+        line "    let operands (i : Instruction) = "
+        line "        match i with"
+        for i in instructions do
+            let pattern =
+                match i.operands with
+                    | [] -> i.name
+                    | operands -> 
+                        let args = operands |> List.map fst |> String.concat ", "
+                        sprintf "%s(%s)" i.name args
+
+            let values = 
+                match i.operands with
+                    | [] -> []
+                    | (_, Simple Kind.IdResultType) :: (_, Simple Kind.IdResult) :: rest -> rest
+                    | (_, Simple Kind.IdResultType) :: rest -> rest
+                    | ops -> ops
+
+            line "        | %s -> [| %s |]" pattern (values |> List.map (fst >> sprintf "%s :> obj") |> String.concat "; ")
+
+
+
     let printSpec (s : Spec) =
         builder <- StringBuilder()
 //        line "#I @\"E:\\Development\\fshade\\bin\\Debug\""

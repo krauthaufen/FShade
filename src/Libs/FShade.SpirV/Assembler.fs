@@ -32,29 +32,29 @@ module Assembler =
                 
                 | CType.CInt(s,w) ->
                     let! id = SpirV.id
-                    yield OpTypeInt(id, uint32 w, (if s then 1u else 0u))
+                    yield OpTypeInt(id, w, (if s then 1 else 0))
                     return id
 
                 | CType.CFloat(32 | 64) ->
                     let! id = SpirV.id
-                    yield OpTypeFloat(id, 32u)
+                    yield OpTypeFloat(id, 32)
                     return id
 
                 | CType.CFloat(w) ->
                     let! id = SpirV.id
-                    yield OpTypeFloat(id, uint32 w)
+                    yield OpTypeFloat(id, w)
                     return id
 
                 | CType.CVector(e,d) ->
                     let! e = assembleType e
                     let! id = SpirV.id
-                    yield OpTypeVector(id, e, uint32 d)
+                    yield OpTypeVector(id, e, d)
                     return id
 
                 | CType.CMatrix(e,r,c) ->
                     let! ev = assembleType (CVector(e, r))
                     let! id = SpirV.id
-                    yield OpTypeMatrix(id, ev, uint32 c)
+                    yield OpTypeMatrix(id, ev, c)
                     return id
                     
                 | CType.CArray(e,l) ->
@@ -79,7 +79,7 @@ module Assembler =
                     yield OpName(id, name)
                     for i in 0 .. fields.Length - 1 do
                         let (_,n) = fields.[i]
-                        yield OpMemberName(id, uint32 i, n)
+                        yield OpMemberName(id, i, n)
                         do! SpirV.setFieldId t n i
 
                     return id
@@ -112,22 +112,22 @@ module Assembler =
             let! id = SpirV.id
             match t, v with
                 | CInt(_, 8), CIntegral v ->
-                    yield OpConstant(tid, id, [| uint32 (int8 v) |])
+                    yield OpConstant(tid, id, [| int (int8 v) |])
                 | CInt(_, 16), CIntegral v ->
-                    yield OpConstant(tid, id, [| uint32 (int16 v) |])
+                    yield OpConstant(tid, id, [| int (int16 v) |])
                 | CInt(_, 32), CIntegral v ->
-                    yield OpConstant(tid, id, [| uint32 (int32 v) |])
+                    yield OpConstant(tid, id, [| int (int32 v) |])
                 | CInt(_, 64), CIntegral v ->
-                    yield OpConstant(tid, id, [| uint32 (v >>> 32); uint32 v |])
+                    yield OpConstant(tid, id, [| int (v >>> 32); int v |])
 
                 | CFloat(32 | 64), CFractional v ->
                     let value = v |> float32 |> BitConverter.GetBytes
-                    yield OpConstant(tid, id, [| BitConverter.ToUInt32(value, 0) |])
+                    yield OpConstant(tid, id, [| BitConverter.ToInt32(value, 0) |])
                     
                 | CFloat(16), CFractional v ->
                     let mutable value = float16()
                     value.Float32 <- float32 v
-                    yield OpConstant(tid, id, [| uint32 value.UInt16 |])
+                    yield OpConstant(tid, id, [| int value.UInt16 |])
 
                 | _, CBool v ->
                     if v then yield OpConstantTrue(tid, id)
@@ -221,7 +221,7 @@ module Assembler =
                     yield OpLabel(lEnd)
 
                     let! id = SpirV.id
-                    yield OpPhi(tid, id, [| vTrue; lTrue; vFalse; lFalse |])
+                    yield OpPhi(tid, id, [| PairIdRefIdRef(vTrue, lTrue); PairIdRefIdRef(vFalse, lFalse) |])
                     return id
 
                 | CReadInput(ParameterKind.Uniform, t, name, None) ->
@@ -403,13 +403,13 @@ module Assembler =
                     let! l = assembleExpr l
                     let! r = assembleExpr r
                     let! id = SpirV.id
-                    yield OpExtInst(tid, id, 1u, uint32 GLSLExtInstruction.GLSLstd450Cross, [| l; r |])
+                    yield OpExtInst(tid, id, 1u, int GLSLExtInstruction.GLSLstd450Cross, [| l; r |])
                     return id
 
                 | CVecSwizzle(t, v, fields) ->
                     let! v = assembleExpr v
                     let! id = SpirV.id
-                    let comp = fields |> List.map uint32 |> List.toArray
+                    let comp = fields |> List.map int |> List.toArray
                     yield OpVectorShuffle(tid, id, v, v, comp)
                     return id
 
@@ -423,7 +423,7 @@ module Assembler =
                     let! v = assembleExpr v
                     let! glsl = SpirV.import glsl410
                     let! id = SpirV.id
-                    yield OpExtInst(tid, id, 1u, uint32 GLSLExtInstruction.GLSLstd450Length, [| v |])
+                    yield OpExtInst(tid, id, 1u, int GLSLExtInstruction.GLSLstd450Length, [| v |])
                     return id
 
                 | CMatrixElement _ | CMatrixFromCols _ | CMatrixFromRows _ ->
@@ -561,7 +561,7 @@ module Assembler =
                         | Some fid ->
                             let! id = SpirV.id
                             //let! iid = assembleLiteral (CType.CInt(true, 32)) (CIntegral (int64 fid))
-                            yield OpCompositeExtract(tid, id, eid, [|uint32 fid|])
+                            yield OpCompositeExtract(tid, id, eid, [|int fid|])
                             return id
                         | None ->
                             return failwithf "could not get field-id for %s on %A" f e.ctype
@@ -837,9 +837,9 @@ module Assembler =
                 yield OpName(id, i.cParamName)
                 match tryGetBuiltIn ParameterKind.Input stages i.cParamName with
                     | Some b ->
-                        yield OpDecorate(id, Decoration.BuiltIn, [| uint32 b |])
+                        yield OpDecorate(id, Decoration.BuiltIn, [| int b |])
                     | None ->   
-                        yield OpDecorate(id, Decoration.Location, [| uint32 inputLocation |])
+                        yield OpDecorate(id, Decoration.Location, [| inputLocation |])
                         inc &inputLocation
 
                 do! SpirV.setId (ParameterKind.Input, i.cParamName) id
@@ -852,9 +852,9 @@ module Assembler =
                 yield OpName(id, i.cParamName)
                 match tryGetBuiltIn ParameterKind.Output stages i.cParamName with
                     | Some b ->
-                        yield OpDecorate(id, Decoration.BuiltIn, [| uint32 b |])
+                        yield OpDecorate(id, Decoration.BuiltIn, [| int b |])
                     | None ->   
-                        yield OpDecorate(id, Decoration.Location, [| uint32 outputLocation |])
+                        yield OpDecorate(id, Decoration.Location, [| outputLocation |])
                         inc &outputLocation
 
                 do! SpirV.setId (ParameterKind.Output, i.cParamName) id
@@ -913,8 +913,8 @@ module Assembler =
 
                                 let! id = SpirV.id
                                 yield OpVariable(tid, id, StorageClass.Uniform, None)
-                                yield OpDecorate(id, Decoration.DescriptorSet, [| set |])
-                                yield OpDecorate(id, Decoration.Binding, [| binding |])
+                                yield OpDecorate(id, Decoration.DescriptorSet, [| int set |])
+                                yield OpDecorate(id, Decoration.Binding, [| int binding |])
 
                                 let fields = List.toArray fields
                                 for i in 0 .. fields.Length do
@@ -930,8 +930,8 @@ module Assembler =
                                     let! binding = SpirV.newBinding
                                     let! id = SpirV.id
                                     yield OpVariable(tid, id, StorageClass.Uniform, None)
-                                    yield OpDecorate(id, Decoration.DescriptorSet, [| set |])
-                                    yield OpDecorate(id, Decoration.Binding, [| binding |])
+                                    yield OpDecorate(id, Decoration.DescriptorSet, [| int set |])
+                                    yield OpDecorate(id, Decoration.Binding, [| int binding |])
                                     do! SpirV.setUniformId f.cUniformName id []
         
                 | CValueDef.CConditionalDef(cond, inner) ->
@@ -993,7 +993,7 @@ module Assembler =
         assembleModuleS(m).Run(&state)
         {
             magic = 0x07230203u
-            version = 0x00010000u
+            version = Version(1,0)
             generatorMagic = (0xFADEu <<< 16) ||| 1u
             bound = state.currentId
             reserved = 0u

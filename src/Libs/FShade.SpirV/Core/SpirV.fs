@@ -1,4 +1,4 @@
-namespace FShade.SpirV
+namespace FShade.SpirV.Old
 open System
 
 type SourceLanguage =

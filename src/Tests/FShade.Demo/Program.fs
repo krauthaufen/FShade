@@ -470,7 +470,7 @@ let scan (add : Expr<'a -> 'a -> 'a>) (zero : Expr<'a>) (input : 'a[]) (output :
 
 module TestSpv = 
     open System.IO
-    open FShade.SpirV.New
+    open FShade.SpirV
 
     let run() =
         let data = File.ReadAllBytes @"C:\VulkanSDK\1.0.51.0\Bin32\cube-frag.spv"
@@ -478,6 +478,8 @@ module TestSpv =
         let dasm = Module.ofByteArray data
         let asm = Module.toByteArray dasm
         
+        Module.print dasm
+
         if data <> asm then
             Log.error "asm(dis(data)) <> data"
         else
