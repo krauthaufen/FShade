@@ -886,7 +886,7 @@ type Instruction =
     | OpGenericPtrMemSemantics of op0 : IdResultType * op1 : IdResult * pointer : IdRef
     | OpInBoundsPtrAccessChain of op0 : IdResultType * op1 : IdResult * _base : IdRef * element : IdRef * indexes : array<IdRef>
     | OpDecorate of target : IdRef * op1 : Decoration * parameters : array<int>
-    | OpMemberDecorate of structureType : IdRef * _member : int * op2 : Decoration
+    | OpMemberDecorate of structureType : IdRef * _member : int * decoration : Decoration * values : array<int>
     | OpDecorationGroup of op0 : IdResult
     | OpGroupDecorate of decorationGroup : IdRef * targets : array<IdRef>
     | OpGroupMemberDecorate of decorationGroup : IdRef * targets : array<PairIdRefLiteralInteger>
@@ -1597,12 +1597,14 @@ module Instruction =
                 writer.Write(target)
                 writer.Write(op1)
                 writer.WriteArray(parameters)
-            | OpMemberDecorate(structureType, _member, op2) ->
-                // size: 4, opcode: 72
-                writer.Write(0x40048u)
+            | OpMemberDecorate(structureType, _member, decoration, values) ->
+                // opcode: 72
+                let _size = 4 + (values.Length * 1)
+                writer.Write(((uint32 _size &&& 0xFFFFu) <<< 16) ||| 72u)
                 writer.Write(structureType)
                 writer.Write(_member)
-                writer.Write(op2)
+                writer.Write(decoration)
+                writer.WriteArray(values)
             | OpDecorationGroup(op0) ->
                 // size: 2, opcode: 73
                 writer.Write(0x20049u)
@@ -3857,8 +3859,9 @@ module Instruction =
                 | 72 -> // OpMemberDecorate
                     let! structureType = reader.ReadIdRef(remaining)
                     let! _member = reader.ReadLiteralInteger(remaining)
-                    let! op2 = reader.ReadDecoration(remaining)
-                    if !remaining = 0 then return (OpMemberDecorate(structureType, _member, op2))
+                    let! decoration = reader.ReadDecoration(remaining)
+                    let values = reader.ReadArray(reader.ReadLiteralInteger, remaining)
+                    if !remaining = 0 then return (OpMemberDecorate(structureType, _member, decoration, values))
                     else return! None
                 | 73 -> // OpDecorationGroup
                     let! op0 = reader.ReadIdResult(remaining)
@@ -6495,35 +6498,35 @@ module Instruction =
         | OpSourceExtension(extension) -> [| extension :> obj |]
         | OpName(target, name) -> [| target :> obj; name :> obj |]
         | OpMemberName(_type, _member, name) -> [| _type :> obj; _member :> obj; name :> obj |]
-        | OpString(op0, string) -> [| op0 :> obj; string :> obj |]
+        | OpString(op0, string) -> [| string :> obj |]
         | OpLine(file, line, column) -> [| file :> obj; line :> obj; column :> obj |]
         | OpExtension(name) -> [| name :> obj |]
-        | OpExtInstImport(op0, name) -> [| op0 :> obj; name :> obj |]
+        | OpExtInstImport(op0, name) -> [| name :> obj |]
         | OpExtInst(op0, op1, set, instruction, operandOperand) -> [| set :> obj; instruction :> obj; operandOperand :> obj |]
         | OpMemoryModel(op0, op1) -> [| op0 :> obj; op1 :> obj |]
         | OpEntryPoint(op0, entryPoint, name, _interface) -> [| op0 :> obj; entryPoint :> obj; name :> obj; _interface :> obj |]
         | OpExecutionMode(entryPoint, mode) -> [| entryPoint :> obj; mode :> obj |]
         | OpCapability(capability) -> [| capability :> obj |]
-        | OpTypeVoid(op0) -> [| op0 :> obj |]
-        | OpTypeBool(op0) -> [| op0 :> obj |]
-        | OpTypeInt(op0, width, signedness) -> [| op0 :> obj; width :> obj; signedness :> obj |]
-        | OpTypeFloat(op0, width) -> [| op0 :> obj; width :> obj |]
-        | OpTypeVector(op0, componentType, componentCount) -> [| op0 :> obj; componentType :> obj; componentCount :> obj |]
-        | OpTypeMatrix(op0, columnType, columnCount) -> [| op0 :> obj; columnType :> obj; columnCount :> obj |]
-        | OpTypeImage(op0, sampledType, op2, depth, arrayed, mS, sampled, op7, op8) -> [| op0 :> obj; sampledType :> obj; op2 :> obj; depth :> obj; arrayed :> obj; mS :> obj; sampled :> obj; op7 :> obj; op8 :> obj |]
-        | OpTypeSampler(op0) -> [| op0 :> obj |]
-        | OpTypeSampledImage(op0, imageType) -> [| op0 :> obj; imageType :> obj |]
-        | OpTypeArray(op0, elementType, length) -> [| op0 :> obj; elementType :> obj; length :> obj |]
-        | OpTypeRuntimeArray(op0, elementType) -> [| op0 :> obj; elementType :> obj |]
-        | OpTypeStruct(op0, membertypemembertype) -> [| op0 :> obj; membertypemembertype :> obj |]
-        | OpTypeOpaque(op0, thenameoftheopaquetype) -> [| op0 :> obj; thenameoftheopaquetype :> obj |]
-        | OpTypePointer(op0, op1, _type) -> [| op0 :> obj; op1 :> obj; _type :> obj |]
-        | OpTypeFunction(op0, returnType, parameterTypeParameterType) -> [| op0 :> obj; returnType :> obj; parameterTypeParameterType :> obj |]
-        | OpTypeEvent(op0) -> [| op0 :> obj |]
-        | OpTypeDeviceEvent(op0) -> [| op0 :> obj |]
-        | OpTypeReserveId(op0) -> [| op0 :> obj |]
-        | OpTypeQueue(op0) -> [| op0 :> obj |]
-        | OpTypePipe(op0, qualifier) -> [| op0 :> obj; qualifier :> obj |]
+        | OpTypeVoid(op0) -> [|  |]
+        | OpTypeBool(op0) -> [|  |]
+        | OpTypeInt(op0, width, signedness) -> [| width :> obj; signedness :> obj |]
+        | OpTypeFloat(op0, width) -> [| width :> obj |]
+        | OpTypeVector(op0, componentType, componentCount) -> [| componentType :> obj; componentCount :> obj |]
+        | OpTypeMatrix(op0, columnType, columnCount) -> [| columnType :> obj; columnCount :> obj |]
+        | OpTypeImage(op0, sampledType, op2, depth, arrayed, mS, sampled, op7, op8) -> [| sampledType :> obj; op2 :> obj; depth :> obj; arrayed :> obj; mS :> obj; sampled :> obj; op7 :> obj; op8 :> obj |]
+        | OpTypeSampler(op0) -> [|  |]
+        | OpTypeSampledImage(op0, imageType) -> [| imageType :> obj |]
+        | OpTypeArray(op0, elementType, length) -> [| elementType :> obj; length :> obj |]
+        | OpTypeRuntimeArray(op0, elementType) -> [| elementType :> obj |]
+        | OpTypeStruct(op0, membertypemembertype) -> [| membertypemembertype :> obj |]
+        | OpTypeOpaque(op0, thenameoftheopaquetype) -> [| thenameoftheopaquetype :> obj |]
+        | OpTypePointer(op0, op1, _type) -> [| op1 :> obj; _type :> obj |]
+        | OpTypeFunction(op0, returnType, parameterTypeParameterType) -> [| returnType :> obj; parameterTypeParameterType :> obj |]
+        | OpTypeEvent(op0) -> [|  |]
+        | OpTypeDeviceEvent(op0) -> [|  |]
+        | OpTypeReserveId(op0) -> [|  |]
+        | OpTypeQueue(op0) -> [|  |]
+        | OpTypePipe(op0, qualifier) -> [| qualifier :> obj |]
         | OpTypeForwardPointer(pointerType, op1) -> [| pointerType :> obj; op1 :> obj |]
         | OpConstantTrue(op0, op1) -> [|  |]
         | OpConstantFalse(op0, op1) -> [|  |]
@@ -6553,8 +6556,8 @@ module Instruction =
         | OpGenericPtrMemSemantics(op0, op1, pointer) -> [| pointer :> obj |]
         | OpInBoundsPtrAccessChain(op0, op1, _base, element, indexes) -> [| _base :> obj; element :> obj; indexes :> obj |]
         | OpDecorate(target, op1, parameters) -> [| target :> obj; op1 :> obj; parameters :> obj |]
-        | OpMemberDecorate(structureType, _member, op2) -> [| structureType :> obj; _member :> obj; op2 :> obj |]
-        | OpDecorationGroup(op0) -> [| op0 :> obj |]
+        | OpMemberDecorate(structureType, _member, decoration, values) -> [| structureType :> obj; _member :> obj; decoration :> obj; values :> obj |]
+        | OpDecorationGroup(op0) -> [|  |]
         | OpGroupDecorate(decorationGroup, targets) -> [| decorationGroup :> obj; targets :> obj |]
         | OpGroupMemberDecorate(decorationGroup, targets) -> [| decorationGroup :> obj; targets :> obj |]
         | OpVectorExtractDynamic(op0, op1, vector, index) -> [| vector :> obj; index :> obj |]
@@ -6714,7 +6717,7 @@ module Instruction =
         | OpPhi(op0, op1, variableParent) -> [| variableParent :> obj |]
         | OpLoopMerge(mergeBlock, continueTarget, op2) -> [| mergeBlock :> obj; continueTarget :> obj; op2 :> obj |]
         | OpSelectionMerge(mergeBlock, op1) -> [| mergeBlock :> obj; op1 :> obj |]
-        | OpLabel(op0) -> [| op0 :> obj |]
+        | OpLabel(op0) -> [|  |]
         | OpBranch(targetLabel) -> [| targetLabel :> obj |]
         | OpBranchConditional(condition, trueLabel, falseLabel, branchweights) -> [| condition :> obj; trueLabel :> obj; falseLabel :> obj; branchweights :> obj |]
         | OpSwitch(selector, _default, target) -> [| selector :> obj; _default :> obj; target :> obj |]
@@ -6783,12 +6786,12 @@ module Instruction =
         | OpAtomicFlagClear(pointer, scope, semantics) -> [| pointer :> obj; scope :> obj; semantics :> obj |]
         | OpImageSparseRead(op0, op1, image, coordinate, op4) -> [| image :> obj; coordinate :> obj; op4 :> obj |]
         | OpSizeOf(op0, op1, pointer) -> [| pointer :> obj |]
-        | OpTypePipeStorage(op0) -> [| op0 :> obj |]
+        | OpTypePipeStorage(op0) -> [|  |]
         | OpConstantPipeStorage(op0, op1, packetSize, packetAlignment, capacity) -> [| packetSize :> obj; packetAlignment :> obj; capacity :> obj |]
         | OpCreatePipeFromPipeStorage(op0, op1, pipeStorage) -> [| pipeStorage :> obj |]
         | OpGetKernelLocalSizeForSubgroupCount(op0, op1, subgroupCount, invoke, param, paramSize, paramAlign) -> [| subgroupCount :> obj; invoke :> obj; param :> obj; paramSize :> obj; paramAlign :> obj |]
         | OpGetKernelMaxNumSubgroups(op0, op1, invoke, param, paramSize, paramAlign) -> [| invoke :> obj; param :> obj; paramSize :> obj; paramAlign :> obj |]
-        | OpTypeNamedBarrier(op0) -> [| op0 :> obj |]
+        | OpTypeNamedBarrier(op0) -> [|  |]
         | OpNamedBarrierInitialize(op0, op1, subgroupCount) -> [| subgroupCount :> obj |]
         | OpMemoryNamedBarrier(namedBarrier, memory, semantics) -> [| namedBarrier :> obj; memory :> obj; semantics :> obj |]
         | OpModuleProcessed(_process) -> [| _process :> obj |]

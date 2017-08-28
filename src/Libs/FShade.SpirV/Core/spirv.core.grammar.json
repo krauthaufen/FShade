@@ -614,7 +614,8 @@
       "operands" : [
         { "kind" : "IdRef",          "name" : "'Structure Type'" },
         { "kind" : "LiteralInteger", "name" : "'Member'" },
-        { "kind" : "Decoration" }
+        { "kind" : "Decoration", "name":  "'Decoration'" },
+        { "kind" : "LiteralInteger", "name" :  "'Values'", "quantifier" :  "*" }
       ]
     },
     {

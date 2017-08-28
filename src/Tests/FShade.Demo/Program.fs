@@ -473,7 +473,7 @@ module TestSpv =
     open FShade.SpirV
 
     let run() =
-        let data = File.ReadAllBytes @"C:\VulkanSDK\1.0.51.0\Bin32\cube-frag.spv"
+        let data = File.ReadAllBytes @"C:\VulkanSDK\1.0.51.0\Bin32\cube-vert.spv"
 
         let dasm = Module.ofByteArray data
         let asm = Module.toByteArray dasm
