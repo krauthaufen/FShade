@@ -468,9 +468,36 @@ let scan (add : Expr<'a -> 'a -> 'a>) (zero : Expr<'a>) (input : 'a[]) (output :
 
     }
 
+module TestSpv = 
+    open System.IO
+    open FShade.SpirV.New
+
+    let run() =
+        let data = File.ReadAllBytes @"C:\VulkanSDK\1.0.51.0\Bin32\cube-frag.spv"
+
+        let dasm = Module.ofByteArray data
+        let asm = Module.toByteArray dasm
+        
+        if data <> asm then
+            Log.error "asm(dis(data)) <> data"
+        else
+            Log.line "asm(dis(data)) = data"
+
+        let redasm = Module.ofByteArray asm
+        if redasm <> dasm then
+            Log.error "dis(asm(m)) <> m"
+        else
+            Log.line "dis(asm(m)) = m"
+
+
+
+
+
 [<EntryPoint>]
 let main args =
-    TessDeconstruct.run()
+    let res = TestSpv.run()
+
+    //TessDeconstruct.run()
     System.Environment.Exit 0
 
     let maxGroupSize = V3i(128, 1024, 1024)

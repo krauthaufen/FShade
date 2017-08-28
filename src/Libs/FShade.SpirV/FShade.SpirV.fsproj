@@ -63,8 +63,11 @@
     <None Include="Core\spirv.json" />
     <None Include="Core\spirv-enums.json" />
     <None Include="Core\CodeGen.fsx" />
+    <None Include="Core\NewCodeGen.fsx" />
     <Compile Include="Core\SpirVTypes.fs" />
     <Compile Include="Core\SpirV.fs" />
+    <Compile Include="Core\SpirVInstructions.fs" />
+    <Compile Include="Core\Module.fs" />
     <Compile Include="Utilities.fs" />
     <Compile Include="Assembler.fs" />
     <Compile Include="Extensions.fs" />

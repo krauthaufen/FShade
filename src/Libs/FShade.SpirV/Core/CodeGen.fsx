@@ -1,5 +1,5 @@
-﻿#I @"..\..\..\Packages\Newtonsoft.Json\lib\net45"
-#r "Newtonsoft.Json.dll"
+﻿#I @"..\..\..\..\Packages\Newtonsoft.Json\lib\net45"
+#r @"Newtonsoft.Json.dll"
 #r "System.Xml.dll"
 #r "System.Xml.Linq.dll"
 
@@ -10,6 +10,7 @@ open Newtonsoft
 open Newtonsoft.Json
 open Newtonsoft.Json.Linq
 open Newtonsoft.Json.Serialization
+
 
 let file = Path.Combine(__SOURCE_DIRECTORY__, "spirv.json")
 let enumFile = Path.Combine(__SOURCE_DIRECTORY__, "spirv-enums.json")
