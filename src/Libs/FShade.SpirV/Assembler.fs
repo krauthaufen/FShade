@@ -13,9 +13,663 @@ type SpirVIntrinsicType = { compileType : SpirV<uint32> }
 
 type SpirVIntrinsicFunction = { compileFunction : uint32 -> uint32[] -> SpirV<uint32> }
 
-module Assembler =
+[<AutoOpen>]
+module private IntrinsicFunctions =
+
     [<Literal>]
     let glsl410 = "GLSL.std.450"
+
+    module CIntrinsic = 
+    
+        let instr0 (code : Instruction) = 
+            CIntrinsic.tagged
+                { compileFunction = fun t args ->
+                    spirv {
+                        yield code
+                        return 0u
+                    }
+                }
+        let instr1 (code : IdResultType * IdResult * IdRef -> Instruction) = 
+            CIntrinsic.tagged
+                { compileFunction = fun t args ->
+                    spirv {
+                        let! id = SpirV.id
+                        yield code(t, id, args.[0])
+                        return id
+                    }
+                }
+        let instr1O (code : IdResultType * IdResult * IdRef * Option<'a> -> Instruction) = 
+            CIntrinsic.tagged
+                { compileFunction = fun t args ->
+                    spirv {
+                        let! id = SpirV.id
+                        yield code(t, id, args.[0], None)
+                        return id
+                    }
+                }
+
+        let instr2 (code : IdResultType * IdResult * IdRef * IdRef -> Instruction) = 
+            CIntrinsic.tagged
+                { compileFunction = fun t args ->
+                    spirv {
+                        let! id = SpirV.id
+                        yield code(t, id, args.[0], args.[1])
+                        return id
+                    }
+                }
+        let instr2O (code : IdResultType * IdResult * IdRef * IdRef * Option<'a> -> Instruction) = 
+            CIntrinsic.tagged
+                { compileFunction = fun t args ->
+                    spirv {
+                        let! id = SpirV.id
+                        yield code(t, id, args.[0], args.[1], None)
+                        return id
+                    }
+                }
+                
+
+        let instr3 (code : IdResultType * IdResult * IdRef * IdRef * IdRef -> Instruction) = 
+            CIntrinsic.tagged
+                { compileFunction = fun t args ->
+                    spirv {
+                        let! id = SpirV.id
+                        yield code(t, id, args.[0], args.[1], args.[2])
+                        return id
+                    }
+                }
+        let instr3O (code : IdResultType * IdResult * IdRef * IdRef * IdRef * Option<'a> -> Instruction) = 
+            CIntrinsic.tagged
+                { compileFunction = fun t args ->
+                    spirv {
+                        let! id = SpirV.id
+                        yield code(t, id, args.[0], args.[1], args.[2], None)
+                        return id
+                    }
+                }
+
+        let simple (code : GLSLExtInstruction) = 
+            CIntrinsic.tagged
+                { compileFunction = fun t args ->
+                    spirv {
+                        let! ext = SpirV.import glsl410
+                        let! id = SpirV.id
+                        yield Instruction.OpExtInst(t, id, ext, int code, args)
+                        return id
+                    }
+                }
+        let custom (code : GLSLExtInstruction) (perm : list<int>) = 
+            CIntrinsic.tagged
+                { compileFunction = fun t args ->
+                    spirv {
+                        let! ext = SpirV.import glsl410
+                        let! id = SpirV.id
+                        yield Instruction.OpExtInst(t, id, ext, int code, perm |> List.map (fun i -> args.[i]) |> List.toArray)
+                        return id
+                    }
+                }
+            
+    let (|InstrinsicFunction|_|) : MethodInfo -> Option<CIntrinsic> =
+        MethodTable.ofList [
+            // ==========================================================================
+            // TRIGONOMETRIC
+            // ==========================================================================
+
+            // sin
+            CIntrinsic.simple GLSLExtInstruction.Sin, [
+                exactly <@ Math.Sin @>
+                exactly <@ Fun.Sin : float -> float @>
+                exactly <@ Fun.Sin : float32 -> float32 @>
+                generic <@ sin @> 
+            ]
+
+            // cos
+            CIntrinsic.simple GLSLExtInstruction.Cos, [
+                exactly <@ Math.Cos @>
+                exactly <@ Fun.Cos : float -> float @>
+                exactly <@ Fun.Cos : float32 -> float32 @>
+                generic <@ cos @> 
+            ]
+
+            // tan
+            CIntrinsic.simple GLSLExtInstruction.Tan, [
+                exactly <@ Math.Tan @>
+                exactly <@ Fun.Tan : float -> float @>
+                exactly <@ Fun.Tan : float32 -> float32 @>
+                generic <@ tan @> 
+            ]
+
+            // asin
+            CIntrinsic.simple GLSLExtInstruction.Asin, [
+                exactly <@ Math.Asin @>
+                exactly <@ Fun.Asin : float -> float @>
+                exactly <@ Fun.Asin : float32 -> float32 @>
+                generic <@ asin @> 
+            ]
+
+            // acos
+            CIntrinsic.simple GLSLExtInstruction.Acos, [
+                exactly <@ Math.Acos @>
+                exactly <@ Fun.Acos : float -> float @>
+                exactly <@ Fun.Acos : float32 -> float32 @>
+                generic <@ acos @> 
+            ]
+
+            // atan
+            CIntrinsic.simple GLSLExtInstruction.Atan, [
+                exactly <@ Math.Atan @>
+                exactly <@ Fun.Atan : float -> float @>
+                exactly <@ Fun.Atan : float32 -> float32 @>
+                generic <@ atan @> 
+            ]
+
+            // atan2
+            CIntrinsic.simple GLSLExtInstruction.Atan2, [
+                exactly <@ Math.Atan2 @>
+                exactly <@ Fun.Atan2 : float * float -> float @>
+                exactly <@ Fun.Atan2 : float32 * float32 -> float32 @>
+                generic <@ atan2 @> 
+            ]
+
+            // sinh
+            CIntrinsic.simple GLSLExtInstruction.Sinh, [
+                exactly <@ Math.Sinh @>
+                exactly <@ Fun.Sinh : float -> float @>
+                exactly <@ Fun.Sinh : float32 -> float32 @>
+                generic <@ sinh @> 
+            ]
+
+            // cosh
+            CIntrinsic.simple GLSLExtInstruction.Cosh, [
+                exactly <@ Math.Cosh @>
+                exactly <@ Fun.Cosh : float -> float @>
+                exactly <@ Fun.Cosh : float32 -> float32 @>
+                generic <@ cosh @> 
+            ]
+
+            // tanh
+            CIntrinsic.simple GLSLExtInstruction.Tanh, [
+                exactly <@ Math.Tanh @>
+                exactly <@ Fun.Tanh : float -> float @>
+                exactly <@ Fun.Tanh : float32 -> float32 @>
+                generic <@ tanh @> 
+            ]
+
+            // asinh
+            CIntrinsic.simple GLSLExtInstruction.Asinh, [
+                exactly <@ Fun.Asinh : float -> float @>
+                exactly <@ Fun.Asinh : float32 -> float32 @>
+            ]
+
+            // acosh
+            CIntrinsic.simple GLSLExtInstruction.Acosh, [
+                exactly <@ Fun.Acosh : float -> float @>
+                exactly <@ Fun.Acosh : float32 -> float32 @>
+            ]
+
+            // atanh
+            CIntrinsic.simple GLSLExtInstruction.Atanh, [
+                exactly <@ Fun.Atanh : float -> float @>
+                exactly <@ Fun.Atanh : float32 -> float32 @>
+            ]
+
+            // ==========================================================================
+            // EXPONENTIAL
+            // ==========================================================================
+
+            // pow
+            CIntrinsic.simple GLSLExtInstruction.Pow, [
+                exactly <@ Fun.Pow : float * float -> float @>
+                exactly <@ Fun.Pow : float32 * float32 -> float32 @>
+                exactly <@ Math.Pow @>
+                generic <@ ( ** ) : float -> float -> float @>
+                generic <@ pow : float -> float -> float @>
+                generic <@ pown @>
+            ]
+
+            // exp
+            CIntrinsic.simple GLSLExtInstruction.Exp, [
+                exactly <@ Math.Exp @> 
+                exactly <@ Fun.Exp : float32 -> float32 @>
+                exactly <@ Fun.Exp : float -> float @>
+                generic <@ exp @>
+            ]
+
+            // log
+            CIntrinsic.simple GLSLExtInstruction.Log, [
+                exactly <@ Math.Log @> 
+                exactly <@ Fun.Log : float32 -> float @>
+                exactly <@ Fun.Log : float -> float @>
+                generic <@ log @>
+            ]
+
+            // log2
+            CIntrinsic.simple GLSLExtInstruction.Log2, [
+                exactly <@ Fun.Log2 : float32 -> float @>
+                exactly <@ Fun.Log2 : float -> float @>
+            ]
+
+            // sqrt
+            CIntrinsic.simple GLSLExtInstruction.Sqrt, [
+                exactly <@ Math.Sqrt @>
+                exactly <@ Fun.Sqrt : float32 -> float32 @>
+                exactly <@ Fun.Sqrt : float -> float @>
+                generic <@ sqrt @>
+            ]
+
+
+            // ==========================================================================
+            // COMMON
+            // ==========================================================================
+            
+            // abs
+            CIntrinsic.simple GLSLExtInstruction.SAbs, [
+                exactly <@ Math.Abs : int8 -> _ @>
+                exactly <@ Math.Abs : int16 -> _ @>
+                exactly <@ Math.Abs : int32 -> _ @>
+                exactly <@ Math.Abs : int64 -> _ @>
+
+                exactly <@ Fun.Abs : int8 -> _ @>
+                exactly <@ Fun.Abs : int16 -> _ @>
+                exactly <@ Fun.Abs : int32 -> _ @>
+                exactly <@ Fun.Abs : int64 -> _ @>
+                
+                exactly <@ fun (v : int8) -> v.Abs() @>
+                exactly <@ fun (v : int16) -> v.Abs() @>
+                exactly <@ fun (v : int32) -> v.Abs() @>
+                exactly <@ fun (v : int64) -> v.Abs() @>
+
+                exactly <@ fun (v : V2i) -> v.Abs @>
+                exactly <@ fun (v : V3i) -> v.Abs @>
+                exactly <@ fun (v : V4i) -> v.Abs @>
+                exactly <@ fun (v : V2l) -> v.Abs @>
+                exactly <@ fun (v : V3l) -> v.Abs @>
+                exactly <@ fun (v : V4l) -> v.Abs @>
+                
+                exactly <@ abs : int8 -> int8 @>
+                exactly <@ abs : int16 -> int16 @>
+                exactly <@ abs : int32 -> int32 @>
+                exactly <@ abs : int64 -> int64 @>
+
+            ]
+
+            // fabs
+            CIntrinsic.simple GLSLExtInstruction.FAbs, [
+                exactly <@ Math.Abs : float32 -> _ @>
+                exactly <@ Math.Abs : float -> _ @>
+                exactly <@ Math.Abs : decimal -> _ @>
+
+                exactly <@ Fun.Abs : float32 -> _ @>
+                exactly <@ Fun.Abs : float -> _ @>
+                exactly <@ Fun.Abs : decimal -> _ @>
+
+                exactly <@ fun (v : float32) -> v.Abs() @>
+                exactly <@ fun (v : float) -> v.Abs() @>
+                exactly <@ fun (v : decimal) -> v.Abs() @>
+
+                exactly <@ fun (v : V2f) -> v.Abs @>
+                exactly <@ fun (v : V3f) -> v.Abs @>
+                exactly <@ fun (v : V4f) -> v.Abs @>
+                exactly <@ fun (v : V2d) -> v.Abs @>
+                exactly <@ fun (v : V3d) -> v.Abs @>
+                exactly <@ fun (v : V4d) -> v.Abs @>
+
+                exactly <@ abs : float32 -> float32 @>
+                exactly <@ abs : float -> float @>
+            ]
+
+            // sign
+            CIntrinsic.simple GLSLExtInstruction.SSign, [
+                exactly <@ Math.Sign : int8 -> _ @>
+                exactly <@ Math.Sign : int16 -> _ @>
+                exactly <@ Math.Sign : int32 -> _ @>
+                exactly <@ Math.Sign : int64 -> _ @>
+
+                exactly <@ Fun.Sign : int8 -> _ @>
+                exactly <@ Fun.Sign : int16 -> _ @>
+                exactly <@ Fun.Sign : int32 -> _ @>
+                exactly <@ Fun.Sign : int64 -> _ @>
+                
+                exactly <@ fun (v : int8) -> v.Sign() @>
+                exactly <@ fun (v : int16) -> v.Sign() @>
+                exactly <@ fun (v : int32) -> v.Sign() @>
+                exactly <@ fun (v : int64) -> v.Sign() @>
+
+                exactly <@ sign : int8 -> int @>
+                exactly <@ sign : int16 -> int @>
+                exactly <@ sign : int32 -> int @>
+                exactly <@ sign : int64 -> int @>
+            ]
+
+            // sign
+            CIntrinsic.simple GLSLExtInstruction.FSign, [
+                exactly <@ Math.Sign : float32 -> _ @>
+                exactly <@ Math.Sign : float -> _ @>
+                exactly <@ Math.Sign : decimal -> _ @>
+
+                exactly <@ Fun.Sign : float32 -> _ @>
+                exactly <@ Fun.Sign : float -> _ @>
+                exactly <@ Fun.Sign : decimal -> _ @>
+
+                exactly <@ fun (v : float32) -> v.Sign() @>
+                exactly <@ fun (v : float) -> v.Sign() @>
+                exactly <@ fun (v : decimal) -> v.Sign() @>
+
+                exactly <@ sign : float32 -> int @>
+                exactly <@ sign : float -> int @>
+            ]
+            
+            // floor
+            CIntrinsic.simple GLSLExtInstruction.Floor, [
+                exactly <@ Math.Floor : float -> _ @>
+                exactly <@ Math.Floor : decimal -> _ @>
+                exactly <@ Fun.Floor : float -> _ @>
+                exactly <@ Fun.Floor : float32 -> _ @>
+                generic <@ floor @>
+            ]
+            
+            // trunc
+            CIntrinsic.simple GLSLExtInstruction.Trunc, [
+                exactly <@ Math.Truncate : float -> _ @>
+                exactly <@ Math.Truncate : decimal -> _ @>
+                generic <@ truncate @>
+            ]
+
+            // round
+            CIntrinsic.simple GLSLExtInstruction.Round, [
+                exactly <@ Math.Round : float -> _ @>
+                exactly <@ Math.Round : decimal -> _ @>
+                exactly <@ Fun.Round : float -> _ @>
+                exactly <@ Fun.Round : float32 -> _ @>
+                generic <@ round @>
+            ]
+
+            // ceil
+            CIntrinsic.simple GLSLExtInstruction.Ceil, [
+                exactly <@ Math.Ceiling : float -> _ @>
+                exactly <@ Math.Ceiling : decimal -> _ @>
+                exactly <@ Fun.Ceiling : float -> _ @>
+                exactly <@ Fun.Ceiling : float32 -> _ @>
+                generic <@ ceil @>
+            ]
+
+            // fract
+            CIntrinsic.simple GLSLExtInstruction.Fract, [
+                exactly <@ Fun.Frac : float -> _ @>
+                exactly <@ Fun.Frac : float32 -> _ @>
+                exactly <@ Fun.Frac : decimal -> _ @>
+            ]
+
+            // min(int)
+            CIntrinsic.simple GLSLExtInstruction.SMin, [
+                exactly <@ Math.Min : int8 * int8 -> _ @>
+                exactly <@ Math.Min : int16 * int16 -> _ @>
+                exactly <@ Math.Min : int32 * int32 -> _ @>
+                exactly <@ Math.Min : int64 * int64 -> _ @>
+                
+                exactly <@ Fun.Min : int8 * int8 -> _ @>
+                exactly <@ Fun.Min : int16 * int16 -> _ @>
+                exactly <@ Fun.Min : int32 * int32 -> _ @>
+                exactly <@ Fun.Min : int64 * int64 -> _ @>
+                
+                exactly <@ V2i.Min @>
+                exactly <@ V3i.Min @>
+                exactly <@ V4i.Min @>
+                exactly <@ V2l.Min @>
+                exactly <@ V3l.Min @>
+                exactly <@ V4l.Min @>
+
+                
+                exactly <@ min : int8 -> int8 -> int8 @>
+                exactly <@ min : int16 -> int16 -> int16 @>
+                exactly <@ min : int32 -> int32 -> int32 @>
+            ]
+
+            // min(uint)
+            CIntrinsic.simple GLSLExtInstruction.UMin, [
+                exactly <@ Math.Min : uint8 * uint8 -> _ @>
+                exactly <@ Math.Min : uint16 * uint16 -> _ @>
+                exactly <@ Math.Min : uint32 * uint32 -> _ @>
+                exactly <@ Math.Min : uint64 * uint64 -> _ @>
+
+                exactly <@ Fun.Min : uint8 * uint8 -> _ @>
+                exactly <@ Fun.Min : uint16 * uint16 -> _ @>
+                exactly <@ Fun.Min : uint32 * uint32 -> _ @>
+                exactly <@ Fun.Min : uint64 * uint64 -> _ @>
+
+                
+                exactly <@ min : uint8 -> uint8 -> uint8 @>
+                exactly <@ min : uint16 -> uint16 -> uint16 @>
+                exactly <@ min : uint32 -> uint32 -> uint32 @>
+            ]
+
+            // min(float)
+            CIntrinsic.simple GLSLExtInstruction.FMin, [
+                exactly <@ Math.Min : float32 * float32 -> _ @>
+                exactly <@ Math.Min : float * float -> _ @>
+                exactly <@ Math.Min : decimal * decimal -> _ @>
+
+                exactly <@ Fun.Min : float32 * float32 -> _ @>
+                exactly <@ Fun.Min : float * float -> _ @>
+
+                exactly <@ V2f.Min @>
+                exactly <@ V3f.Min @>
+                exactly <@ V4f.Min @>
+                exactly <@ V2d.Min @>
+                exactly <@ V3d.Min @>
+                exactly <@ V4d.Min @>
+
+                exactly <@ min : float32 -> float32 -> float32 @> 
+                exactly <@ min : float -> float -> float @> 
+            ]
+
+
+
+
+            // max(int)
+            CIntrinsic.simple GLSLExtInstruction.SMax, [
+                exactly <@ Math.Max : int8 * int8 -> _ @>
+                exactly <@ Math.Max : int16 * int16 -> _ @>
+                exactly <@ Math.Max : int32 * int32 -> _ @>
+                exactly <@ Math.Max : int64 * int64 -> _ @>
+                
+                exactly <@ Fun.Max : int8 * int8 -> _ @>
+                exactly <@ Fun.Max : int16 * int16 -> _ @>
+                exactly <@ Fun.Max : int32 * int32 -> _ @>
+                exactly <@ Fun.Max : int64 * int64 -> _ @>
+                
+                exactly <@ V2i.Max @>
+                exactly <@ V3i.Max @>
+                exactly <@ V4i.Max @>
+                exactly <@ V2l.Max @>
+                exactly <@ V3l.Max @>
+                exactly <@ V4l.Max @>
+
+                
+                exactly <@ max : int8 -> int8 -> int8 @>
+                exactly <@ max : int16 -> int16 -> int16 @>
+                exactly <@ max : int32 -> int32 -> int32 @>
+            ]
+
+            // max(uint)
+            CIntrinsic.simple GLSLExtInstruction.UMax, [
+                exactly <@ Math.Max : uint8 * uint8 -> _ @>
+                exactly <@ Math.Max : uint16 * uint16 -> _ @>
+                exactly <@ Math.Max : uint32 * uint32 -> _ @>
+                exactly <@ Math.Max : uint64 * uint64 -> _ @>
+
+                exactly <@ Fun.Max : uint8 * uint8 -> _ @>
+                exactly <@ Fun.Max : uint16 * uint16 -> _ @>
+                exactly <@ Fun.Max : uint32 * uint32 -> _ @>
+                exactly <@ Fun.Max : uint64 * uint64 -> _ @>
+
+                
+                exactly <@ max : uint8 -> uint8 -> uint8 @>
+                exactly <@ max : uint16 -> uint16 -> uint16 @>
+                exactly <@ max : uint32 -> uint32 -> uint32 @>
+            ]
+
+            // max(float)
+            CIntrinsic.simple GLSLExtInstruction.FMin, [
+                exactly <@ Math.Max : float32 * float32 -> _ @>
+                exactly <@ Math.Max : float * float -> _ @>
+                exactly <@ Math.Max : decimal * decimal -> _ @>
+
+                exactly <@ Fun.Max : float32 * float32 -> _ @>
+                exactly <@ Fun.Max : float * float -> _ @>
+
+                exactly <@ V2f.Max @>
+                exactly <@ V3f.Max @>
+                exactly <@ V4f.Max @>
+                exactly <@ V2d.Max @>
+                exactly <@ V3d.Max @>
+                exactly <@ V4d.Max @>
+
+                exactly <@ max : float32 -> float32 -> float32 @> 
+                exactly <@ max : float -> float -> float @> 
+            ]
+            
+            // clamp(int)
+            CIntrinsic.custom GLSLExtInstruction.SClamp [2; 0; 1], [
+                exactly <@ clamp : int8 -> _ -> _ @>
+                exactly <@ clamp : int16 -> _ -> _ @>
+                exactly <@ clamp : int32 -> _ -> _ @>
+                exactly <@ clamp : int64 -> _ -> _ @>
+            ]
+
+            // clamp(uint)
+            CIntrinsic.custom GLSLExtInstruction.UClamp [2; 0; 1], [
+                exactly <@ clamp : uint8 -> _ -> _ @>
+                exactly <@ clamp : uint16 -> _ -> _ @>
+                exactly <@ clamp : uint32 -> _ -> _ @>
+                exactly <@ clamp : uint64 -> _ -> _ @>
+            ]
+
+            // clamp(float)
+            CIntrinsic.custom GLSLExtInstruction.FClamp [2; 0; 1], [
+                exactly <@ clamp : float32 -> _ -> _ @>
+                exactly <@ clamp : float -> _ -> _ @>
+            ]
+
+            // mix
+            CIntrinsic.simple GLSLExtInstruction.FMix, [
+                exactly <@ Fun.Lerp : float32 * float32 * float32 -> _ @>
+                exactly <@ Fun.Lerp : float * float * float -> _ @>
+            ]
+            
+            
+            // ==========================================================================
+            // GEOMETRIC
+            // ==========================================================================
+            
+            // distance
+            CIntrinsic.simple GLSLExtInstruction.Distance, [
+                exactly <@ V2i.Distance : _ * _ -> _ @>
+                exactly <@ V3i.Distance : _ * _ -> _ @>
+                exactly <@ V4i.Distance : _ * _ -> _ @>
+                exactly <@ V2l.Distance : _ * _ -> _ @>
+                exactly <@ V3l.Distance : _ * _ -> _ @>
+                exactly <@ V4l.Distance : _ * _ -> _ @>
+                exactly <@ V2f.Distance : _ * _ -> _ @>
+                exactly <@ V3f.Distance : _ * _ -> _ @>
+                exactly <@ V4f.Distance : _ * _ -> _ @>
+                exactly <@ V2d.Distance : _ * _ -> _ @>
+                exactly <@ V3d.Distance : _ * _ -> _ @>
+                exactly <@ V4d.Distance : _ * _ -> _ @>
+            ]
+
+            // normalize
+            CIntrinsic.simple GLSLExtInstruction.Normalize, [
+                exactly <@ fun (v : V2f) -> v.Normalized @>
+                exactly <@ fun (v : V3f) -> v.Normalized @>
+                exactly <@ fun (v : V4f) -> v.Normalized @>
+                exactly <@ fun (v : V2d) -> v.Normalized @>
+                exactly <@ fun (v : V3d) -> v.Normalized @>
+                exactly <@ fun (v : V4d) -> v.Normalized @>
+                generic <@ Vec.normalize : V3d -> V3d @>
+            ]
+
+            // reflect
+            CIntrinsic.simple GLSLExtInstruction.Reflect, [
+                exactly <@ Vec.reflect : V3d -> V3d -> V3d @> 
+            ]
+
+            // refract
+            CIntrinsic.simple GLSLExtInstruction.Refract, [
+                exactly <@ Vec.refract : V3d -> V3d -> float -> V3d @> 
+            ]
+            
+            // ==========================================================================
+            // MATRIX
+            // ==========================================================================
+
+            // transpose
+            CIntrinsic.instr1 Instruction.OpTranspose, [
+                exactly <@ fun (v : M22f) -> v.Transposed @>
+                exactly <@ fun (v : M33f) -> v.Transposed @>
+                exactly <@ fun (v : M44f) -> v.Transposed @>
+                exactly <@ fun (v : M22d) -> v.Transposed @>
+                exactly <@ fun (v : M33d) -> v.Transposed @>
+                exactly <@ fun (v : M44d) -> v.Transposed @>
+                generic <@ Mat.transpose : M22d -> M22d @>
+            ]
+
+            // det
+            CIntrinsic.simple GLSLExtInstruction.Determinant, [
+                exactly <@ fun (v : M22f) -> v.Determinant @>
+                exactly <@ fun (v : M33f) -> v.Determinant @>
+                exactly <@ fun (v : M44f) -> v.Determinant @>
+                exactly <@ fun (v : M22d) -> v.Determinant @>
+                exactly <@ fun (v : M33d) -> v.Determinant @>
+                exactly <@ fun (v : M44d) -> v.Determinant @>
+                generic <@ Mat.det : M22d -> float @>
+            ]
+
+            // inverse
+            CIntrinsic.simple GLSLExtInstruction.MatrixInverse, [
+                exactly <@ fun (v : M22f) -> v.Inverse @>
+                exactly <@ fun (v : M33f) -> v.Inverse @>
+                exactly <@ fun (v : M44f) -> v.Inverse @>
+                exactly <@ fun (v : M22d) -> v.Inverse @>
+                exactly <@ fun (v : M33d) -> v.Inverse @>
+                exactly <@ fun (v : M44d) -> v.Inverse @>
+                generic <@ Mat.inverse : M22d -> M22d @>
+            ]
+            
+
+            // ==========================================================================
+            // GLOBAL
+            // ==========================================================================
+            CIntrinsic.instr1 Instruction.OpDPdx, [ generic <@ ddx : float -> _ @> ]
+            CIntrinsic.instr1 Instruction.OpDPdy, [ generic <@ ddy : float -> _ @> ]
+            CIntrinsic.instr1 Instruction.OpDPdxFine, [ generic <@ ddxFine : float -> _ @> ]
+            CIntrinsic.instr1 Instruction.OpDPdyFine, [ generic <@ ddyFine : float -> _ @> ]
+            CIntrinsic.instr1 Instruction.OpDPdxCoarse, [ generic <@ ddxCoarse : float -> _ @> ]
+            CIntrinsic.instr1 Instruction.OpDPdyCoarse, [ generic <@ ddyCoarse : float -> _ @> ]
+            CIntrinsic.instr0 Instruction.OpKill, [ exactly <@ discard @> ]
+            CIntrinsic.instr0 Instruction.OpEmitVertex, [ exactly <@ emitVertex @> ]
+            CIntrinsic.instr0 Instruction.OpEndPrimitive, [ 
+                exactly <@ restartStrip @>
+                exactly <@ endPrimitive @>
+            ]
+
+            // compute stuff
+//            CIntrinsic.tagged "ivec3(gl_NumWorkGroups)", [ exactly <@ getWorkGroupCount @> ]
+//            CIntrinsic.tagged "ivec3(gl_WorkGroupID)", [ exactly <@ getWorkGroupId @> ]
+//            CIntrinsic.tagged "ivec3(gl_LocalInvocationID)", [ exactly <@ getLocalId @> ]
+//            CIntrinsic.tagged "ivec3(gl_GlobalInvocationID)", [ exactly <@ getGlobalId @> ]
+//            CIntrinsic.tagged "int(gl_LocalInvocationIndex)", [ exactly <@ getLocalIndex @> ]
+//            CIntrinsic.tagged "ivec3(gl_WorkGroupSize)", [ exactly <@ getWorkGroupSize @> ]
+//            CIntrinsic.tagged "barrier()", [ exactly <@ barrier @> ]
+
+        ]
+
+    let (|TextureLookup|_|) (mi : MethodInfo) : Option<CIntrinsic> =
+        None
+   
+
+
+
+module Assembler =
 
     let rec assembleType (t : CType) =
         SpirV.cached t {
@@ -403,7 +1057,7 @@ module Assembler =
                     let! l = assembleExpr l
                     let! r = assembleExpr r
                     let! id = SpirV.id
-                    yield OpExtInst(tid, id, 1u, int GLSLExtInstruction.GLSLstd450Cross, [| l; r |])
+                    yield OpExtInst(tid, id, 1u, int GLSLExtInstruction.Cross, [| l; r |])
                     return id
 
                 | CVecSwizzle(t, v, fields) ->
@@ -423,7 +1077,7 @@ module Assembler =
                     let! v = assembleExpr v
                     let! glsl = SpirV.import glsl410
                     let! id = SpirV.id
-                    yield OpExtInst(tid, id, 1u, int GLSLExtInstruction.GLSLstd450Length, [| v |])
+                    yield OpExtInst(tid, id, 1u, int GLSLExtInstruction.Length, [| v |])
                     return id
 
                 | CMatrixElement _ | CMatrixFromCols _ | CMatrixFromRows _ ->
@@ -1003,7 +1657,6 @@ module Assembler =
 
 
 
-
 type Backend private() =
     inherit Compiler.Backend()
     static let instance = Backend()
@@ -1011,7 +1664,10 @@ type Backend private() =
     static member Instance = instance
 
     override x.TryGetIntrinsicMethod (c : MethodInfo) =
-        None
+        match c with
+            | InstrinsicFunction ci -> Some ci
+            | TextureLookup ci -> Some ci
+            | _ -> None
 
     override x.TryGetIntrinsicCtor (c : ConstructorInfo) =
         None

@@ -243,11 +243,14 @@ module TessDeconstruct =
                 yield quad.[quad.InvocationId]
             }
 
-
-    [<GLSLIntrinsic("mix({1},{2},{0})", "hugo")>]
-    let inline lerp (t : float) (a : 'a) (b : 'a)  = 
-        onlyInShaderCode<'a> "mix"
-
+//
+//    [<GLSLIntrinsic("mix({1},{2},{0})", "hugo")>]
+//    let inline lerp (t : float) (a : 'a) (b : 'a)  = 
+//        onlyInShaderCode<'a> "mix"
+//
+    [<ReflectedDefinition>]
+    let lerp (t : float) (a : V4d) (b : V4d) =
+        (1.0 - t) * a + t * b
 
     let test (quad : Patch<3 N, Vertex>) =
         tessellation {
@@ -321,18 +324,6 @@ module TessDeconstruct =
 
 
     let run() =
-//
-//        let test =
-//            Effect.ofFunction loopUnroll
-//                |> Effect.toModule (Map.ofList ["Colors", 0])
-//                |> ModuleCompiler.compileSpirV
-//
-//        for i in test.instructions do
-//            printfn "%A" i
-//        System.Environment.Exit 0
-
-
-
         let config =
             EffectConfig.ofList [
                 Intrinsics.Color, typeof<V4d>, 0
@@ -341,6 +332,14 @@ module TessDeconstruct =
 
         let effect =
             Effect.compose [Effect.ofFunction test; Effect.ofFunction frag]
+
+        let test =
+            effect
+                |> Effect.toModule config
+                |> ModuleCompiler.compileSpirV
+
+        FShade.SpirV.Module.print test
+        System.Environment.Exit 0
 
         Effect.debugRanges effect |> printfn "ranges: %A"
 
@@ -497,9 +496,9 @@ module TestSpv =
 
 [<EntryPoint>]
 let main args =
-    let res = TestSpv.run()
+    //let res = TestSpv.run()
 
-    //TessDeconstruct.run()
+    TessDeconstruct.run()
     System.Environment.Exit 0
 
     let maxGroupSize = V3i(128, 1024, 1024)
