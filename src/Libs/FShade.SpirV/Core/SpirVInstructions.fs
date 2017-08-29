@@ -900,13 +900,13 @@ type Instruction =
     | OpTranspose of op0 : IdResultType * op1 : IdResult * matrix : IdRef
     | OpSampledImage of op0 : IdResultType * op1 : IdResult * image : IdRef * sampler : IdRef
     | OpImageSampleImplicitLod of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * op4 : Option<ImageOperands> * parameters : array<IdRef>
-    | OpImageSampleExplicitLod of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * op4 : ImageOperands
+    | OpImageSampleExplicitLod of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * op4 : ImageOperands * parameters : array<IdRef>
     | OpImageSampleDrefImplicitLod of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * dref : IdRef * op5 : Option<ImageOperands> * parameters : array<IdRef>
-    | OpImageSampleDrefExplicitLod of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * dref : IdRef * op5 : ImageOperands
+    | OpImageSampleDrefExplicitLod of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * dref : IdRef * op5 : ImageOperands * parameters : array<IdRef>
     | OpImageSampleProjImplicitLod of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * op4 : Option<ImageOperands> * parameters : array<IdRef>
-    | OpImageSampleProjExplicitLod of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * op4 : ImageOperands
+    | OpImageSampleProjExplicitLod of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * op4 : ImageOperands * parameters : array<IdRef>
     | OpImageSampleProjDrefImplicitLod of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * dref : IdRef * op5 : Option<ImageOperands> * parameters : array<IdRef>
-    | OpImageSampleProjDrefExplicitLod of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * dref : IdRef * op5 : ImageOperands
+    | OpImageSampleProjDrefExplicitLod of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * dref : IdRef * op5 : ImageOperands * parameters : array<IdRef>
     | OpImageFetch of op0 : IdResultType * op1 : IdResult * image : IdRef * coordinate : IdRef * op4 : Option<ImageOperands> * parameters : array<IdRef>
     | OpImageGather of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * _component : IdRef * op5 : Option<ImageOperands> * parameters : array<IdRef>
     | OpImageDrefGather of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * dref : IdRef * op5 : Option<ImageOperands> * parameters : array<IdRef>
@@ -1100,13 +1100,13 @@ type Instruction =
     | OpGetDefaultQueue of op0 : IdResultType * op1 : IdResult
     | OpBuildNDRange of op0 : IdResultType * op1 : IdResult * globalWorkSize : IdRef * localWorkSize : IdRef * globalWorkOffset : IdRef
     | OpImageSparseSampleImplicitLod of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * op4 : Option<ImageOperands> * parameters : array<IdRef>
-    | OpImageSparseSampleExplicitLod of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * op4 : ImageOperands
+    | OpImageSparseSampleExplicitLod of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * op4 : ImageOperands * parameters : array<IdRef>
     | OpImageSparseSampleDrefImplicitLod of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * dref : IdRef * op5 : Option<ImageOperands> * parameters : array<IdRef>
-    | OpImageSparseSampleDrefExplicitLod of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * dref : IdRef * op5 : ImageOperands
+    | OpImageSparseSampleDrefExplicitLod of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * dref : IdRef * op5 : ImageOperands * parameters : array<IdRef>
     | OpImageSparseSampleProjImplicitLod of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * op4 : Option<ImageOperands> * parameters : array<IdRef>
-    | OpImageSparseSampleProjExplicitLod of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * op4 : ImageOperands
+    | OpImageSparseSampleProjExplicitLod of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * op4 : ImageOperands * parameters : array<IdRef>
     | OpImageSparseSampleProjDrefImplicitLod of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * dref : IdRef * op5 : Option<ImageOperands> * parameters : array<IdRef>
-    | OpImageSparseSampleProjDrefExplicitLod of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * dref : IdRef * op5 : ImageOperands
+    | OpImageSparseSampleProjDrefExplicitLod of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * dref : IdRef * op5 : ImageOperands * parameters : array<IdRef>
     | OpImageSparseFetch of op0 : IdResultType * op1 : IdResult * image : IdRef * coordinate : IdRef * op4 : Option<ImageOperands> * parameters : array<IdRef>
     | OpImageSparseGather of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * _component : IdRef * op5 : Option<ImageOperands> * parameters : array<IdRef>
     | OpImageSparseDrefGather of op0 : IdResultType * op1 : IdResult * sampledImage : IdRef * coordinate : IdRef * dref : IdRef * op5 : Option<ImageOperands> * parameters : array<IdRef>
@@ -1698,14 +1698,16 @@ module Instruction =
                 writer.Write(coordinate)
                 writer.Write(op4)
                 writer.WriteArray(parameters)
-            | OpImageSampleExplicitLod(op0, op1, sampledImage, coordinate, op4) ->
-                // size: 6, opcode: 88
-                writer.Write(0x60058u)
+            | OpImageSampleExplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) ->
+                // opcode: 88
+                let _size = 6 + (parameters.Length * 1)
+                writer.Write(((uint32 _size &&& 0xFFFFu) <<< 16) ||| 88u)
                 writer.Write(op0)
                 writer.Write(op1)
                 writer.Write(sampledImage)
                 writer.Write(coordinate)
                 writer.Write(op4)
+                writer.WriteArray(parameters)
             | OpImageSampleDrefImplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) ->
                 // opcode: 89
                 let _size = 6 + (if Option.isSome op5 then 1 else 0) + (parameters.Length * 1)
@@ -1717,15 +1719,17 @@ module Instruction =
                 writer.Write(dref)
                 writer.Write(op5)
                 writer.WriteArray(parameters)
-            | OpImageSampleDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5) ->
-                // size: 7, opcode: 90
-                writer.Write(0x7005Au)
+            | OpImageSampleDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) ->
+                // opcode: 90
+                let _size = 7 + (parameters.Length * 1)
+                writer.Write(((uint32 _size &&& 0xFFFFu) <<< 16) ||| 90u)
                 writer.Write(op0)
                 writer.Write(op1)
                 writer.Write(sampledImage)
                 writer.Write(coordinate)
                 writer.Write(dref)
                 writer.Write(op5)
+                writer.WriteArray(parameters)
             | OpImageSampleProjImplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) ->
                 // opcode: 91
                 let _size = 5 + (if Option.isSome op4 then 1 else 0) + (parameters.Length * 1)
@@ -1736,14 +1740,16 @@ module Instruction =
                 writer.Write(coordinate)
                 writer.Write(op4)
                 writer.WriteArray(parameters)
-            | OpImageSampleProjExplicitLod(op0, op1, sampledImage, coordinate, op4) ->
-                // size: 6, opcode: 92
-                writer.Write(0x6005Cu)
+            | OpImageSampleProjExplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) ->
+                // opcode: 92
+                let _size = 6 + (parameters.Length * 1)
+                writer.Write(((uint32 _size &&& 0xFFFFu) <<< 16) ||| 92u)
                 writer.Write(op0)
                 writer.Write(op1)
                 writer.Write(sampledImage)
                 writer.Write(coordinate)
                 writer.Write(op4)
+                writer.WriteArray(parameters)
             | OpImageSampleProjDrefImplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) ->
                 // opcode: 93
                 let _size = 6 + (if Option.isSome op5 then 1 else 0) + (parameters.Length * 1)
@@ -1755,15 +1761,17 @@ module Instruction =
                 writer.Write(dref)
                 writer.Write(op5)
                 writer.WriteArray(parameters)
-            | OpImageSampleProjDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5) ->
-                // size: 7, opcode: 94
-                writer.Write(0x7005Eu)
+            | OpImageSampleProjDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) ->
+                // opcode: 94
+                let _size = 7 + (parameters.Length * 1)
+                writer.Write(((uint32 _size &&& 0xFFFFu) <<< 16) ||| 94u)
                 writer.Write(op0)
                 writer.Write(op1)
                 writer.Write(sampledImage)
                 writer.Write(coordinate)
                 writer.Write(dref)
                 writer.Write(op5)
+                writer.WriteArray(parameters)
             | OpImageFetch(op0, op1, image, coordinate, op4, parameters) ->
                 // opcode: 95
                 let _size = 5 + (if Option.isSome op4 then 1 else 0) + (parameters.Length * 1)
@@ -3129,14 +3137,16 @@ module Instruction =
                 writer.Write(coordinate)
                 writer.Write(op4)
                 writer.WriteArray(parameters)
-            | OpImageSparseSampleExplicitLod(op0, op1, sampledImage, coordinate, op4) ->
-                // size: 6, opcode: 306
-                writer.Write(0x60132u)
+            | OpImageSparseSampleExplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) ->
+                // opcode: 306
+                let _size = 6 + (parameters.Length * 1)
+                writer.Write(((uint32 _size &&& 0xFFFFu) <<< 16) ||| 306u)
                 writer.Write(op0)
                 writer.Write(op1)
                 writer.Write(sampledImage)
                 writer.Write(coordinate)
                 writer.Write(op4)
+                writer.WriteArray(parameters)
             | OpImageSparseSampleDrefImplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) ->
                 // opcode: 307
                 let _size = 6 + (if Option.isSome op5 then 1 else 0) + (parameters.Length * 1)
@@ -3148,15 +3158,17 @@ module Instruction =
                 writer.Write(dref)
                 writer.Write(op5)
                 writer.WriteArray(parameters)
-            | OpImageSparseSampleDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5) ->
-                // size: 7, opcode: 308
-                writer.Write(0x70134u)
+            | OpImageSparseSampleDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) ->
+                // opcode: 308
+                let _size = 7 + (parameters.Length * 1)
+                writer.Write(((uint32 _size &&& 0xFFFFu) <<< 16) ||| 308u)
                 writer.Write(op0)
                 writer.Write(op1)
                 writer.Write(sampledImage)
                 writer.Write(coordinate)
                 writer.Write(dref)
                 writer.Write(op5)
+                writer.WriteArray(parameters)
             | OpImageSparseSampleProjImplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) ->
                 // opcode: 309
                 let _size = 5 + (if Option.isSome op4 then 1 else 0) + (parameters.Length * 1)
@@ -3167,14 +3179,16 @@ module Instruction =
                 writer.Write(coordinate)
                 writer.Write(op4)
                 writer.WriteArray(parameters)
-            | OpImageSparseSampleProjExplicitLod(op0, op1, sampledImage, coordinate, op4) ->
-                // size: 6, opcode: 310
-                writer.Write(0x60136u)
+            | OpImageSparseSampleProjExplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) ->
+                // opcode: 310
+                let _size = 6 + (parameters.Length * 1)
+                writer.Write(((uint32 _size &&& 0xFFFFu) <<< 16) ||| 310u)
                 writer.Write(op0)
                 writer.Write(op1)
                 writer.Write(sampledImage)
                 writer.Write(coordinate)
                 writer.Write(op4)
+                writer.WriteArray(parameters)
             | OpImageSparseSampleProjDrefImplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) ->
                 // opcode: 311
                 let _size = 6 + (if Option.isSome op5 then 1 else 0) + (parameters.Length * 1)
@@ -3186,15 +3200,17 @@ module Instruction =
                 writer.Write(dref)
                 writer.Write(op5)
                 writer.WriteArray(parameters)
-            | OpImageSparseSampleProjDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5) ->
-                // size: 7, opcode: 312
-                writer.Write(0x70138u)
+            | OpImageSparseSampleProjDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) ->
+                // opcode: 312
+                let _size = 7 + (parameters.Length * 1)
+                writer.Write(((uint32 _size &&& 0xFFFFu) <<< 16) ||| 312u)
                 writer.Write(op0)
                 writer.Write(op1)
                 writer.Write(sampledImage)
                 writer.Write(coordinate)
                 writer.Write(dref)
                 writer.Write(op5)
+                writer.WriteArray(parameters)
             | OpImageSparseFetch(op0, op1, image, coordinate, op4, parameters) ->
                 // opcode: 313
                 let _size = 5 + (if Option.isSome op4 then 1 else 0) + (parameters.Length * 1)
@@ -3972,7 +3988,8 @@ module Instruction =
                     let! sampledImage = reader.ReadIdRef(remaining)
                     let! coordinate = reader.ReadIdRef(remaining)
                     let! op4 = reader.ReadImageOperands(remaining)
-                    if !remaining = 0 then return (OpImageSampleExplicitLod(op0, op1, sampledImage, coordinate, op4))
+                    let parameters = reader.ReadArray(reader.ReadIdRef, remaining)
+                    if !remaining = 0 then return (OpImageSampleExplicitLod(op0, op1, sampledImage, coordinate, op4, parameters))
                     else return! None
                 | 89 -> // OpImageSampleDrefImplicitLod
                     let! op0 = reader.ReadIdResultType(remaining)
@@ -3991,7 +4008,8 @@ module Instruction =
                     let! coordinate = reader.ReadIdRef(remaining)
                     let! dref = reader.ReadIdRef(remaining)
                     let! op5 = reader.ReadImageOperands(remaining)
-                    if !remaining = 0 then return (OpImageSampleDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5))
+                    let parameters = reader.ReadArray(reader.ReadIdRef, remaining)
+                    if !remaining = 0 then return (OpImageSampleDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters))
                     else return! None
                 | 91 -> // OpImageSampleProjImplicitLod
                     let! op0 = reader.ReadIdResultType(remaining)
@@ -4008,7 +4026,8 @@ module Instruction =
                     let! sampledImage = reader.ReadIdRef(remaining)
                     let! coordinate = reader.ReadIdRef(remaining)
                     let! op4 = reader.ReadImageOperands(remaining)
-                    if !remaining = 0 then return (OpImageSampleProjExplicitLod(op0, op1, sampledImage, coordinate, op4))
+                    let parameters = reader.ReadArray(reader.ReadIdRef, remaining)
+                    if !remaining = 0 then return (OpImageSampleProjExplicitLod(op0, op1, sampledImage, coordinate, op4, parameters))
                     else return! None
                 | 93 -> // OpImageSampleProjDrefImplicitLod
                     let! op0 = reader.ReadIdResultType(remaining)
@@ -4027,7 +4046,8 @@ module Instruction =
                     let! coordinate = reader.ReadIdRef(remaining)
                     let! dref = reader.ReadIdRef(remaining)
                     let! op5 = reader.ReadImageOperands(remaining)
-                    if !remaining = 0 then return (OpImageSampleProjDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5))
+                    let parameters = reader.ReadArray(reader.ReadIdRef, remaining)
+                    if !remaining = 0 then return (OpImageSampleProjDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters))
                     else return! None
                 | 95 -> // OpImageFetch
                     let! op0 = reader.ReadIdResultType(remaining)
@@ -5390,7 +5410,8 @@ module Instruction =
                     let! sampledImage = reader.ReadIdRef(remaining)
                     let! coordinate = reader.ReadIdRef(remaining)
                     let! op4 = reader.ReadImageOperands(remaining)
-                    if !remaining = 0 then return (OpImageSparseSampleExplicitLod(op0, op1, sampledImage, coordinate, op4))
+                    let parameters = reader.ReadArray(reader.ReadIdRef, remaining)
+                    if !remaining = 0 then return (OpImageSparseSampleExplicitLod(op0, op1, sampledImage, coordinate, op4, parameters))
                     else return! None
                 | 307 -> // OpImageSparseSampleDrefImplicitLod
                     let! op0 = reader.ReadIdResultType(remaining)
@@ -5409,7 +5430,8 @@ module Instruction =
                     let! coordinate = reader.ReadIdRef(remaining)
                     let! dref = reader.ReadIdRef(remaining)
                     let! op5 = reader.ReadImageOperands(remaining)
-                    if !remaining = 0 then return (OpImageSparseSampleDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5))
+                    let parameters = reader.ReadArray(reader.ReadIdRef, remaining)
+                    if !remaining = 0 then return (OpImageSparseSampleDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters))
                     else return! None
                 | 309 -> // OpImageSparseSampleProjImplicitLod
                     let! op0 = reader.ReadIdResultType(remaining)
@@ -5426,7 +5448,8 @@ module Instruction =
                     let! sampledImage = reader.ReadIdRef(remaining)
                     let! coordinate = reader.ReadIdRef(remaining)
                     let! op4 = reader.ReadImageOperands(remaining)
-                    if !remaining = 0 then return (OpImageSparseSampleProjExplicitLod(op0, op1, sampledImage, coordinate, op4))
+                    let parameters = reader.ReadArray(reader.ReadIdRef, remaining)
+                    if !remaining = 0 then return (OpImageSparseSampleProjExplicitLod(op0, op1, sampledImage, coordinate, op4, parameters))
                     else return! None
                 | 311 -> // OpImageSparseSampleProjDrefImplicitLod
                     let! op0 = reader.ReadIdResultType(remaining)
@@ -5445,7 +5468,8 @@ module Instruction =
                     let! coordinate = reader.ReadIdRef(remaining)
                     let! dref = reader.ReadIdRef(remaining)
                     let! op5 = reader.ReadImageOperands(remaining)
-                    if !remaining = 0 then return (OpImageSparseSampleProjDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5))
+                    let parameters = reader.ReadArray(reader.ReadIdRef, remaining)
+                    if !remaining = 0 then return (OpImageSparseSampleProjDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters))
                     else return! None
                 | 313 -> // OpImageSparseFetch
                     let! op0 = reader.ReadIdResultType(remaining)
@@ -5725,13 +5749,13 @@ module Instruction =
         | OpTranspose(op0, op1, matrix) -> Some op0
         | OpSampledImage(op0, op1, image, sampler) -> Some op0
         | OpImageSampleImplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) -> Some op0
-        | OpImageSampleExplicitLod(op0, op1, sampledImage, coordinate, op4) -> Some op0
+        | OpImageSampleExplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) -> Some op0
         | OpImageSampleDrefImplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> Some op0
-        | OpImageSampleDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5) -> Some op0
+        | OpImageSampleDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> Some op0
         | OpImageSampleProjImplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) -> Some op0
-        | OpImageSampleProjExplicitLod(op0, op1, sampledImage, coordinate, op4) -> Some op0
+        | OpImageSampleProjExplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) -> Some op0
         | OpImageSampleProjDrefImplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> Some op0
-        | OpImageSampleProjDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5) -> Some op0
+        | OpImageSampleProjDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> Some op0
         | OpImageFetch(op0, op1, image, coordinate, op4, parameters) -> Some op0
         | OpImageGather(op0, op1, sampledImage, coordinate, _component, op5, parameters) -> Some op0
         | OpImageDrefGather(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> Some op0
@@ -5896,13 +5920,13 @@ module Instruction =
         | OpGetDefaultQueue(op0, op1) -> Some op0
         | OpBuildNDRange(op0, op1, globalWorkSize, localWorkSize, globalWorkOffset) -> Some op0
         | OpImageSparseSampleImplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) -> Some op0
-        | OpImageSparseSampleExplicitLod(op0, op1, sampledImage, coordinate, op4) -> Some op0
+        | OpImageSparseSampleExplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) -> Some op0
         | OpImageSparseSampleDrefImplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> Some op0
-        | OpImageSparseSampleDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5) -> Some op0
+        | OpImageSparseSampleDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> Some op0
         | OpImageSparseSampleProjImplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) -> Some op0
-        | OpImageSparseSampleProjExplicitLod(op0, op1, sampledImage, coordinate, op4) -> Some op0
+        | OpImageSparseSampleProjExplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) -> Some op0
         | OpImageSparseSampleProjDrefImplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> Some op0
-        | OpImageSparseSampleProjDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5) -> Some op0
+        | OpImageSparseSampleProjDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> Some op0
         | OpImageSparseFetch(op0, op1, image, coordinate, op4, parameters) -> Some op0
         | OpImageSparseGather(op0, op1, sampledImage, coordinate, _component, op5, parameters) -> Some op0
         | OpImageSparseDrefGather(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> Some op0
@@ -5991,13 +6015,13 @@ module Instruction =
         | OpTranspose(op0, op1, matrix) -> Some op1
         | OpSampledImage(op0, op1, image, sampler) -> Some op1
         | OpImageSampleImplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) -> Some op1
-        | OpImageSampleExplicitLod(op0, op1, sampledImage, coordinate, op4) -> Some op1
+        | OpImageSampleExplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) -> Some op1
         | OpImageSampleDrefImplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> Some op1
-        | OpImageSampleDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5) -> Some op1
+        | OpImageSampleDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> Some op1
         | OpImageSampleProjImplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) -> Some op1
-        | OpImageSampleProjExplicitLod(op0, op1, sampledImage, coordinate, op4) -> Some op1
+        | OpImageSampleProjExplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) -> Some op1
         | OpImageSampleProjDrefImplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> Some op1
-        | OpImageSampleProjDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5) -> Some op1
+        | OpImageSampleProjDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> Some op1
         | OpImageFetch(op0, op1, image, coordinate, op4, parameters) -> Some op1
         | OpImageGather(op0, op1, sampledImage, coordinate, _component, op5, parameters) -> Some op1
         | OpImageDrefGather(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> Some op1
@@ -6163,13 +6187,13 @@ module Instruction =
         | OpGetDefaultQueue(op0, op1) -> Some op1
         | OpBuildNDRange(op0, op1, globalWorkSize, localWorkSize, globalWorkOffset) -> Some op1
         | OpImageSparseSampleImplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) -> Some op1
-        | OpImageSparseSampleExplicitLod(op0, op1, sampledImage, coordinate, op4) -> Some op1
+        | OpImageSparseSampleExplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) -> Some op1
         | OpImageSparseSampleDrefImplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> Some op1
-        | OpImageSparseSampleDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5) -> Some op1
+        | OpImageSparseSampleDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> Some op1
         | OpImageSparseSampleProjImplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) -> Some op1
-        | OpImageSparseSampleProjExplicitLod(op0, op1, sampledImage, coordinate, op4) -> Some op1
+        | OpImageSparseSampleProjExplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) -> Some op1
         | OpImageSparseSampleProjDrefImplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> Some op1
-        | OpImageSparseSampleProjDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5) -> Some op1
+        | OpImageSparseSampleProjDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> Some op1
         | OpImageSparseFetch(op0, op1, image, coordinate, op4, parameters) -> Some op1
         | OpImageSparseGather(op0, op1, sampledImage, coordinate, _component, op5, parameters) -> Some op1
         | OpImageSparseDrefGather(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> Some op1
@@ -6604,13 +6628,13 @@ module Instruction =
         | OpTranspose(op0, op1, matrix) -> [| matrix :> obj |]
         | OpSampledImage(op0, op1, image, sampler) -> [| image :> obj; sampler :> obj |]
         | OpImageSampleImplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) -> [| sampledImage :> obj; coordinate :> obj; op4 :> obj; parameters :> obj |]
-        | OpImageSampleExplicitLod(op0, op1, sampledImage, coordinate, op4) -> [| sampledImage :> obj; coordinate :> obj; op4 :> obj |]
+        | OpImageSampleExplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) -> [| sampledImage :> obj; coordinate :> obj; op4 :> obj; parameters :> obj |]
         | OpImageSampleDrefImplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> [| sampledImage :> obj; coordinate :> obj; dref :> obj; op5 :> obj; parameters :> obj |]
-        | OpImageSampleDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5) -> [| sampledImage :> obj; coordinate :> obj; dref :> obj; op5 :> obj |]
+        | OpImageSampleDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> [| sampledImage :> obj; coordinate :> obj; dref :> obj; op5 :> obj; parameters :> obj |]
         | OpImageSampleProjImplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) -> [| sampledImage :> obj; coordinate :> obj; op4 :> obj; parameters :> obj |]
-        | OpImageSampleProjExplicitLod(op0, op1, sampledImage, coordinate, op4) -> [| sampledImage :> obj; coordinate :> obj; op4 :> obj |]
+        | OpImageSampleProjExplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) -> [| sampledImage :> obj; coordinate :> obj; op4 :> obj; parameters :> obj |]
         | OpImageSampleProjDrefImplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> [| sampledImage :> obj; coordinate :> obj; dref :> obj; op5 :> obj; parameters :> obj |]
-        | OpImageSampleProjDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5) -> [| sampledImage :> obj; coordinate :> obj; dref :> obj; op5 :> obj |]
+        | OpImageSampleProjDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> [| sampledImage :> obj; coordinate :> obj; dref :> obj; op5 :> obj; parameters :> obj |]
         | OpImageFetch(op0, op1, image, coordinate, op4, parameters) -> [| image :> obj; coordinate :> obj; op4 :> obj; parameters :> obj |]
         | OpImageGather(op0, op1, sampledImage, coordinate, _component, op5, parameters) -> [| sampledImage :> obj; coordinate :> obj; _component :> obj; op5 :> obj; parameters :> obj |]
         | OpImageDrefGather(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> [| sampledImage :> obj; coordinate :> obj; dref :> obj; op5 :> obj; parameters :> obj |]
@@ -6804,13 +6828,13 @@ module Instruction =
         | OpGetDefaultQueue(op0, op1) -> [|  |]
         | OpBuildNDRange(op0, op1, globalWorkSize, localWorkSize, globalWorkOffset) -> [| globalWorkSize :> obj; localWorkSize :> obj; globalWorkOffset :> obj |]
         | OpImageSparseSampleImplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) -> [| sampledImage :> obj; coordinate :> obj; op4 :> obj; parameters :> obj |]
-        | OpImageSparseSampleExplicitLod(op0, op1, sampledImage, coordinate, op4) -> [| sampledImage :> obj; coordinate :> obj; op4 :> obj |]
+        | OpImageSparseSampleExplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) -> [| sampledImage :> obj; coordinate :> obj; op4 :> obj; parameters :> obj |]
         | OpImageSparseSampleDrefImplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> [| sampledImage :> obj; coordinate :> obj; dref :> obj; op5 :> obj; parameters :> obj |]
-        | OpImageSparseSampleDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5) -> [| sampledImage :> obj; coordinate :> obj; dref :> obj; op5 :> obj |]
+        | OpImageSparseSampleDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> [| sampledImage :> obj; coordinate :> obj; dref :> obj; op5 :> obj; parameters :> obj |]
         | OpImageSparseSampleProjImplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) -> [| sampledImage :> obj; coordinate :> obj; op4 :> obj; parameters :> obj |]
-        | OpImageSparseSampleProjExplicitLod(op0, op1, sampledImage, coordinate, op4) -> [| sampledImage :> obj; coordinate :> obj; op4 :> obj |]
+        | OpImageSparseSampleProjExplicitLod(op0, op1, sampledImage, coordinate, op4, parameters) -> [| sampledImage :> obj; coordinate :> obj; op4 :> obj; parameters :> obj |]
         | OpImageSparseSampleProjDrefImplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> [| sampledImage :> obj; coordinate :> obj; dref :> obj; op5 :> obj; parameters :> obj |]
-        | OpImageSparseSampleProjDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5) -> [| sampledImage :> obj; coordinate :> obj; dref :> obj; op5 :> obj |]
+        | OpImageSparseSampleProjDrefExplicitLod(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> [| sampledImage :> obj; coordinate :> obj; dref :> obj; op5 :> obj; parameters :> obj |]
         | OpImageSparseFetch(op0, op1, image, coordinate, op4, parameters) -> [| image :> obj; coordinate :> obj; op4 :> obj; parameters :> obj |]
         | OpImageSparseGather(op0, op1, sampledImage, coordinate, _component, op5, parameters) -> [| sampledImage :> obj; coordinate :> obj; _component :> obj; op5 :> obj; parameters :> obj |]
         | OpImageSparseDrefGather(op0, op1, sampledImage, coordinate, dref, op5, parameters) -> [| sampledImage :> obj; coordinate :> obj; dref :> obj; op5 :> obj; parameters :> obj |]

@@ -259,7 +259,7 @@ module Parser =
                 let operands =
                     operands |> List.collect (fun (n,t) ->
                         match t with
-                            | Option Kind.ImageOperands ->
+                            | Option Kind.ImageOperands | Simple Kind.ImageOperands ->
                                 [(n,t); ("parameters", Array Kind.IdRef)]
                             | _ ->
                                 [(n,t)]

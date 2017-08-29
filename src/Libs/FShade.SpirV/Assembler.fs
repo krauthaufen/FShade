@@ -20,7 +20,12 @@ module private IntrinsicFunctions =
     let glsl410 = "GLSL.std.450"
 
     module CIntrinsic = 
-    
+        let create (create : IdResultType -> IdRef[] -> SpirV<uint32>) =
+            CIntrinsic.tagged { compileFunction = create }
+
+        let ofFunction (create : IdResultType -> IdRef[] -> SpirV<uint32>) =
+            CIntrinsic.tagged { compileFunction = create } |> Some
+
         let instr0 (code : Instruction) = 
             CIntrinsic.tagged
                 { compileFunction = fun t args ->
@@ -38,15 +43,6 @@ module private IntrinsicFunctions =
                         return id
                     }
                 }
-        let instr1O (code : IdResultType * IdResult * IdRef * Option<'a> -> Instruction) = 
-            CIntrinsic.tagged
-                { compileFunction = fun t args ->
-                    spirv {
-                        let! id = SpirV.id
-                        yield code(t, id, args.[0], None)
-                        return id
-                    }
-                }
 
         let instr2 (code : IdResultType * IdResult * IdRef * IdRef -> Instruction) = 
             CIntrinsic.tagged
@@ -54,15 +50,6 @@ module private IntrinsicFunctions =
                     spirv {
                         let! id = SpirV.id
                         yield code(t, id, args.[0], args.[1])
-                        return id
-                    }
-                }
-        let instr2O (code : IdResultType * IdResult * IdRef * IdRef * Option<'a> -> Instruction) = 
-            CIntrinsic.tagged
-                { compileFunction = fun t args ->
-                    spirv {
-                        let! id = SpirV.id
-                        yield code(t, id, args.[0], args.[1], None)
                         return id
                     }
                 }
@@ -74,15 +61,6 @@ module private IntrinsicFunctions =
                     spirv {
                         let! id = SpirV.id
                         yield code(t, id, args.[0], args.[1], args.[2])
-                        return id
-                    }
-                }
-        let instr3O (code : IdResultType * IdResult * IdRef * IdRef * IdRef * Option<'a> -> Instruction) = 
-            CIntrinsic.tagged
-                { compileFunction = fun t args ->
-                    spirv {
-                        let! id = SpirV.id
-                        yield code(t, id, args.[0], args.[1], args.[2], None)
                         return id
                     }
                 }
@@ -662,10 +640,6 @@ module private IntrinsicFunctions =
 //            CIntrinsic.tagged "barrier()", [ exactly <@ barrier @> ]
 
         ]
-
-    let (|TextureLookup|_|) (mi : MethodInfo) : Option<CIntrinsic> =
-        None
-   
 
 
 
@@ -1653,6 +1627,312 @@ module Assembler =
             reserved = 0u
             instructions = state.reversedInstuctions |> List.rev
         }
+
+
+[<AutoOpen>]
+module private TextureFunctions =
+    open Aardvark.Base.TypeInfo.Patterns
+
+    let (|TextureLookup|_|) (mi : MethodInfo) : Option<CIntrinsic> =
+        match mi with
+            | Method(name, ((ImageType(_, dim, isArray, isMS, valueType)::args))) ->
+                Log.warn "image functions not implemented"
+                None    
+
+            | Method(name, ((SamplerType(dim, isArray, isShadow, isMS, valueType)::args))) ->
+                let argCount = List.length args
+
+                let coordDim =
+                    match dim with
+                        | SamplerDimension.Sampler1d -> 1
+                        | SamplerDimension.Sampler2d -> 2
+                        | SamplerDimension.Sampler3d -> 3
+                        | SamplerDimension.SamplerCube -> 3
+                        | _ -> failwithf "unknown sampler dimension %A" dim
+
+                let (|Coord|_|) =
+                    if coordDim = 1 then fun (t : Type) -> Some t
+                    else 
+                        fun (t : Type) ->
+                            match t with
+                                | VectorOf(d, t) when d = coordDim -> Some t
+                                | _ -> None
+
+                let (|CoordProj|_|) (t : Type) =
+                    match t with
+                        | VectorOf(d, t) when d = coordDim + 1 -> Some t
+                        | _ -> None
+
+                match name, args with
+                    // Size
+                    | "get_Size", [] -> 
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! id = SpirV.id
+                                yield OpImageQuerySize(tid, id, args.[0])
+                                return id
+                            }
+                            
+                    // GetSize(level)
+                    | "GetSize", [ Int32 ] ->
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! id = SpirV.id
+                                yield OpImageQuerySizeLod(tid, id, args.[0], args.[1])
+                                return id
+                            }
+                        
+                    // Read(coord)
+                    | "get_Item", [ Coord Int32 ] ->
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! id = SpirV.id
+                                yield OpImageRead(tid, id, args.[0], args.[1], None, [||])
+                                return id
+                            }
+                            
+                    // Read(coord, level)
+                    | ("get_Item" | "Read"), [ Coord Int32; Int32 ] ->
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! id = SpirV.id
+                                yield OpImageRead(tid, id, args.[0], args.[1], Some ImageOperands.Lod, [| args.[2] |])
+                                return id
+                            }
+                        
+                    // Read(coord, slice, level)
+                    | ("get_Item" | "Read"), [ Coord Int32; Int32; Int32 ] ->
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! cid = SpirV.id
+                                let! realCoordType = Assembler.assembleType (CVector(CInt(true, 32), coordDim + 1))
+                                yield OpCompositeConstruct(realCoordType, cid, [| args.[1]; args.[2] |])
+
+                                let! id = SpirV.id
+                                yield OpImageRead(tid, id, args.[0], cid, Some ImageOperands.Lod, [| args.[3] |])
+                                return id
+                            }
+                        
+                    // MipMapLevels
+                    | "get_MipMapLevels", [] ->
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! id = SpirV.id
+                                yield OpImageQueryLevels(tid, id, args.[0])
+                                return id
+                            }
+                        
+                    
+                    // Sample(coord)
+                    | "Sample", [ Coord Float64 ] ->
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! id = SpirV.id
+                                yield OpImageSampleImplicitLod(tid, id, args.[0], args.[1], None, [||])
+                                return id
+                            }
+                        
+                    // Sample(coord, bias)
+                    | "Sample", [ Coord Float64; Float64 ] ->
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! id = SpirV.id
+                                yield OpImageSampleImplicitLod(tid, id, args.[0], args.[1], Some ImageOperands.Bias, [| args.[2] |])
+                                return id
+                            }
+
+                    // Sample(coord, slice)
+                    | "Sample", [ Coord Float64; Int32 ] ->
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! cid = SpirV.id
+                                let! realCoordType = Assembler.assembleType (CVector(CFloat 64, coordDim + 1))
+                                yield OpCompositeConstruct(realCoordType, cid, [| args.[1]; args.[2] |])
+
+                                let! id = SpirV.id
+                                yield OpImageSampleImplicitLod(tid, id, args.[0], cid, None, [||])
+                                return id
+                            }
+                            
+                    // Sample(coord, slice, bias)
+                    | "Sample", [ Coord Float64; Int32; Float64 ] ->
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! cid = SpirV.id
+                                let! realCoordType = Assembler.assembleType (CVector(CFloat 64, coordDim + 1))
+                                yield OpCompositeConstruct(realCoordType, cid, [| args.[1]; args.[2] |])
+
+                                let! id = SpirV.id
+                                yield OpImageSampleImplicitLod(tid, id, args.[0], cid, Some ImageOperands.Bias, [| args.[3] |])
+                                return id
+                            }
+
+                    // SampleOffset(coord, offset)
+                    | "SampleOffset", [ Coord Float64; Coord Int32 ] ->
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! id = SpirV.id
+                                yield OpImageSampleImplicitLod(tid, id, args.[0], args.[1], Some ImageOperands.Offset, [| args.[2] |])
+                                return id
+                            }
+                            
+                    // SampleOffset(coord, offset, bias)
+                    | "SampleOffset", [ Coord Float64; Coord Int32; Float64 ] ->
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! id = SpirV.id
+                                yield OpImageSampleImplicitLod(tid, id, args.[0], args.[1], Some (ImageOperands.Bias ||| ImageOperands.Offset), [| args.[3]; args.[2] |])
+                                return id
+                            }
+                        
+                    // SampleOffset(coord, slice, offset)
+                    | "SampleOffset", [ Coord Float64; Int32; Coord Int32 ] ->
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! cid = SpirV.id
+                                let! realCoordType = Assembler.assembleType (CVector(CFloat 64, coordDim + 1))
+                                yield OpCompositeConstruct(realCoordType, cid, [| args.[1]; args.[2] |])
+
+                                let! id = SpirV.id
+                                yield OpImageSampleImplicitLod(tid, id, args.[0], cid, Some ImageOperands.Offset, [| args.[3] |])
+                                return id
+                            }
+
+                    // SampleOffset(coord, slice, offset, bias)
+                    | "SampleOffset", [ Coord Float64; Int32; Coord Int32; Float64 ] ->
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! cid = SpirV.id
+                                let! realCoordType = Assembler.assembleType (CVector(CFloat 64, coordDim + 1))
+                                yield OpCompositeConstruct(realCoordType, cid, [| args.[1]; args.[2] |])
+
+                                let! id = SpirV.id
+                                yield OpImageSampleImplicitLod(tid, id, args.[0], cid, Some (ImageOperands.Bias ||| ImageOperands.Offset), [| args.[4]; args.[3] |])
+                                return id
+                            }
+                           
+                    // SampleProj(coord) 
+                    | "SampleProj", [ CoordProj Float64 ] ->
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! id = SpirV.id
+                                yield OpImageSampleProjImplicitLod(tid, id, args.[0], args.[1], None, [||])
+                                return id
+                            }
+                        
+                    // SampleProj(coord, bias) 
+                    | "SampleProj", [ CoordProj Float64; Float64 ] ->
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! id = SpirV.id
+                                yield OpImageSampleProjImplicitLod(tid, id, args.[0], args.[1], Some ImageOperands.Bias, [| args.[2] |])
+                                return id
+                            }
+
+                    // SampleLevel(coord, level)
+                    | "SampleLevel", [ Coord Float64; Float64 ] ->
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! id = SpirV.id
+                                yield OpImageSampleExplicitLod(tid, id, args.[0], args.[1], ImageOperands.Lod, [| args.[2] |])
+                                return id
+                            }
+
+                    // SampleLevel(coord, slice, level)
+                    | "SampleLevel", [ Coord Float64; Int32; Float64 ] ->
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! cid = SpirV.id
+                                let! realCoordType = Assembler.assembleType (CVector(CFloat 64, coordDim + 1))
+                                yield OpCompositeConstruct(realCoordType, cid, [| args.[1]; args.[2] |])
+
+                                let! id = SpirV.id
+                                yield OpImageSampleExplicitLod(tid, id, args.[0], cid, ImageOperands.Lod, [| args.[3] |])
+                                return id
+                            }
+
+                    // SampleGrad(coord, dx, dy)
+                    | "SampleGrad", [ Coord Float64; Coord Float64; Coord Float64 ] ->
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! id = SpirV.id
+                                yield OpImageSampleExplicitLod(tid, id, args.[0], args.[1], ImageOperands.Grad, [| args.[2]; args.[3] |])
+                                return id
+                            }
+
+                    // SampleGrad(coord, slice, dx, dy)
+                    | "SampleGrad", [ Coord Float64; Int32; Coord Float64; Coord Float64 ] ->
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! cid = SpirV.id
+                                let! realCoordType = Assembler.assembleType (CVector(CFloat 64, coordDim + 1))
+                                yield OpCompositeConstruct(realCoordType, cid, [| args.[1]; args.[2] |])
+
+                                let! id = SpirV.id
+                                yield OpImageSampleExplicitLod(tid, id, args.[0], cid, ImageOperands.Grad, [| args.[3]; args.[4] |])
+                                return id
+                            }
+
+                    // QueryLod(coord)
+                    | "QueryLod", [ Coord Float64 ] ->
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! id = SpirV.id
+                                yield OpImageQueryLod(tid, id, args.[0], args.[1])
+                                return id
+                            }
+
+                    // Gather(coord, comp)
+                    | "Gather", [ Coord Float64; Int32 ] ->
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! id = SpirV.id
+                                yield OpImageGather(tid, id, args.[0], args.[1], args.[2], None, [||])
+                                return id
+                            }
+
+                    // Gather(coord, slice, comp)
+                    | "Gather", [ Coord Float64; Int32; Int32 ] ->
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! cid = SpirV.id
+                                let! realCoordType = Assembler.assembleType (CVector(CFloat 64, coordDim + 1))
+                                yield OpCompositeConstruct(realCoordType, cid, [| args.[1]; args.[2] |])
+
+                                let! id = SpirV.id
+                                yield OpImageGather(tid, id, args.[0], cid, args.[3], None, [||])
+                                return id
+                            }
+                            
+                    // GatherOffset(coord, offset, comp)
+                    | "GatherOffset", [ Coord Float64; Coord Int32; Int32] ->
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! id = SpirV.id
+                                yield OpImageGather(tid, id, args.[0], args.[1], args.[3], Some ImageOperands.Offset, [| args.[2] |])
+                                return id
+                            }  
+
+                    // GatherOffset(coord, slice, offset, comp)
+                    | "GatherOffset", [ Coord Float64; Int32; Coord Int32; Int32] ->
+                        CIntrinsic.ofFunction <| fun tid args ->
+                            spirv {
+                                let! cid = SpirV.id
+                                let! realCoordType = Assembler.assembleType (CVector(CFloat 64, coordDim + 1))
+                                yield OpCompositeConstruct(realCoordType, cid, [| args.[1]; args.[2] |])
+
+                                let! id = SpirV.id
+                                yield OpImageGather(tid, id, args.[0], cid, args.[4], Some ImageOperands.Offset, [| args.[3] |])
+                                return id
+                            }
+                        
+
+                    | _ ->
+                        None
+
+            | _ ->
+                None
+   
 
 
 
