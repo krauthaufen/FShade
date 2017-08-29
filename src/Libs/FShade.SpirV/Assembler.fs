@@ -1322,7 +1322,15 @@ module Assembler =
                 | CWriteOutput(name, index, value) ->
                     let! vid = assembleRExpr value
                     match index with
-                        | Some _ -> failwith "not implemented"
+                        | Some index -> 
+                            let! id = SpirV.getId (ParameterKind.Output, name)
+
+                            let! indexId = assembleExpr index
+                            let! vt = assemblePtrType StorageClass.Output value.ctype
+                            let! ptrId = SpirV.id
+                            yield OpPtrAccessChain(vt, ptrId, vt, indexId , [||])
+
+                            yield OpStore(ptrId, vid, None)
                         | None ->
                             let! id = SpirV.getId (ParameterKind.Output, name)
                             yield OpStore(id, vid, None)
@@ -1545,7 +1553,7 @@ module Assembler =
                                 yield OpDecorate(id, Decoration.Binding, [| int binding |])
 
                                 let fields = List.toArray fields
-                                for i in 0 .. fields.Length do
+                                for i in 0 .. fields.Length - 1 do
                                     let u = fields.[i]
                                     do! SpirV.setUniformId u.cUniformName id [uint32 i]
 
@@ -1936,10 +1944,24 @@ module private TextureFunctions =
 
 
 
+open Aardvark.Base.TypeInfo.Patterns
 
 type Backend private() =
     inherit Compiler.Backend()
     static let instance = Backend()
+
+    static let rec compileSimpleType (t : Type) =
+        match t with
+            | VectorOf(d,et) -> 
+                let et = compileSimpleType et
+                CVector(et, d)
+
+            | Float32 | Float64 -> CFloat(32)
+            | Int32 -> CInt(true, 32)
+
+
+            | _ ->
+                failwith "unexpected sampled type"
 
     static member Instance = instance
 
@@ -1953,4 +1975,32 @@ type Backend private() =
         None
 
     override x.TryGetIntrinsicType (t : Type) =
-        None
+        match t with
+            | ImageType(fmt, dim, arr, ms, valueType) -> 
+                failwith ""
+
+            | SamplerType(dim, arr, shadow, ms, valueType) -> 
+                let valueType = compileSimpleType valueType
+                let compile = 
+                    SpirV.cached t {
+                        let! st = Assembler.assembleType valueType
+
+                        let dim =
+                            match dim with
+                                | SamplerDimension.Sampler1d -> Dim.Dim1D
+                                | SamplerDimension.Sampler2d -> Dim.Dim2D
+                                | SamplerDimension.Sampler3d -> Dim.Dim3D
+                                | SamplerDimension.SamplerCube -> Dim.Cube
+                                | _ -> failwithf "unknown texture dimension: %A" dim
+
+                        let! iid = SpirV.id
+                        yield OpTypeImage(iid, st, dim, (if shadow then 1 else 0), (if arr then 1 else 0), (if ms then 1 else 0), 1, ImageFormat.Unknown, None)
+
+                        let! sid = SpirV.id
+                        yield OpTypeSampledImage(sid, iid)
+
+                        return sid
+                    }
+                CIntrinsicType.tagged { compileType = compile } |> Some
+            | _ ->
+                None

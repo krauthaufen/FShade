@@ -331,7 +331,7 @@ module TessDeconstruct =
             ]
 
         let effect =
-            Effect.compose [Effect.ofFunction test; Effect.ofFunction frag]
+            Effect.compose [Effect.ofFunction frag]
 
         let test =
             effect
