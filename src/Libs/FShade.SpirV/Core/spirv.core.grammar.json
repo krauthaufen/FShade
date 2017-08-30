@@ -148,7 +148,8 @@
       "opcode" : 16,
       "operands" : [
         { "kind" : "IdRef",         "name" : "'Entry Point'" },
-        { "kind" : "ExecutionMode", "name" : "'Mode'" }
+        { "kind" : "ExecutionMode", "name" : "'Mode'" },
+        { "kind" : "LiteralInteger", "name" :  "'Parameters'", "quantifier": "*" }
       ]
     },
     {

@@ -835,7 +835,7 @@ type Instruction =
     | OpExtInst of op0 : IdResultType * op1 : IdResult * set : IdRef * instruction : LiteralExtInstInteger * operandOperand : array<IdRef>
     | OpMemoryModel of op0 : AddressingModel * op1 : MemoryModel
     | OpEntryPoint of op0 : ExecutionModel * entryPoint : IdRef * name : string * _interface : array<IdRef>
-    | OpExecutionMode of entryPoint : IdRef * mode : ExecutionMode
+    | OpExecutionMode of entryPoint : IdRef * mode : ExecutionMode * parameters : array<int>
     | OpCapability of capability : Capability
     | OpTypeVoid of op0 : IdResult
     | OpTypeBool of op0 : IdResult
@@ -1283,11 +1283,13 @@ module Instruction =
                 writer.Write(entryPoint)
                 writer.WriteString(name)
                 writer.WriteArray(_interface)
-            | OpExecutionMode(entryPoint, mode) ->
-                // size: 3, opcode: 16
-                writer.Write(0x30010u)
+            | OpExecutionMode(entryPoint, mode, parameters) ->
+                // opcode: 16
+                let _size = 3 + (parameters.Length * 1)
+                writer.Write(((uint32 _size &&& 0xFFFFu) <<< 16) ||| 16u)
                 writer.Write(entryPoint)
                 writer.Write(mode)
+                writer.WriteArray(parameters)
             | OpCapability(capability) ->
                 // size: 2, opcode: 17
                 writer.Write(0x20011u)
@@ -3597,7 +3599,8 @@ module Instruction =
                 | 16 -> // OpExecutionMode
                     let! entryPoint = reader.ReadIdRef(remaining)
                     let! mode = reader.ReadExecutionMode(remaining)
-                    if !remaining = 0 then return (OpExecutionMode(entryPoint, mode))
+                    let parameters = reader.ReadArray(reader.ReadLiteralInteger, remaining)
+                    if !remaining = 0 then return (OpExecutionMode(entryPoint, mode, parameters))
                     else return! None
                 | 17 -> // OpCapability
                     let! capability = reader.ReadCapability(remaining)
@@ -6563,7 +6566,7 @@ module Instruction =
         | OpExtInst(op0, op1, set, instruction, operandOperand) -> [| set :> obj; instruction :> obj; operandOperand :> obj |]
         | OpMemoryModel(op0, op1) -> [| op0 :> obj; op1 :> obj |]
         | OpEntryPoint(op0, entryPoint, name, _interface) -> [| op0 :> obj; entryPoint :> obj; name :> obj; _interface :> obj |]
-        | OpExecutionMode(entryPoint, mode) -> [| entryPoint :> obj; mode :> obj |]
+        | OpExecutionMode(entryPoint, mode, parameters) -> [| entryPoint :> obj; mode :> obj; parameters :> obj |]
         | OpCapability(capability) -> [| capability :> obj |]
         | OpTypeVoid(op0) -> [| op0 :> obj |]
         | OpTypeBool(op0) -> [| op0 :> obj |]
