@@ -156,6 +156,7 @@ module CType =
 type CParameterModifier =
     | In
     | ByRef
+    | Out
 
 /// represents a parameter for a function
 type CParameter =

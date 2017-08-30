@@ -133,7 +133,7 @@ module Compiler =
 
                 let cParameters =
                     cFields |> Array.map (fun pi ->
-                        { name = pi.Name.ToLower(); ctype = CType.ofType b pi.PropertyType; modifier = CParameterModifier.In }
+                        { name = pi.Name; ctype = CType.ofType b pi.PropertyType; modifier = CParameterModifier.In }
                     )   
                     
                 let cType =
@@ -176,7 +176,7 @@ module Compiler =
 
                         let cParameters =
                             cFields |> Array.map (fun pi ->
-                                { name = pi.Name.ToLower(); ctype = CType.ofType b pi.PropertyType; modifier = CParameterModifier.In }
+                                { name = pi.Name; ctype = CType.ofType b pi.PropertyType; modifier = CParameterModifier.In }
                             )  
 
                         let cType =

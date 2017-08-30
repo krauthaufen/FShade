@@ -291,11 +291,16 @@ module TessDeconstruct =
             texture uniform?SomeTexture
         }
 
+    type noperspective = { uniform : int; gl_VertexID : int }
+
     let frag (v : Vertex)  =
         fragment {
+            let sampler = { uniform = int v.vi; gl_VertexID = v.vi - 100 }
+
+            let gl_VertexID = sampler.gl_VertexID
             let col : V4d = uniform?PerView?AdditionalColor
-            let s = V2d(sam.Size)
-            return v.pos + col + V4d(s.X, s.Y, 0.0, 0.0)
+            let vec4 = V2d(sam.Size) * float sampler.uniform
+            return v.pos + col + V4d(vec4.X, vec4.Y + float gl_VertexID, 0.0, 0.0)
         }
 
     let loopUnroll (v : Vertex) =

@@ -228,11 +228,50 @@ module AssemblerState =
 module Assembler =
     let version120 = Version(1,2)
 
+    [<Struct>]
+    type Identifier(str : string) = 
+        member x.Name = str
+
+    open System.Text.RegularExpressions
+
+    let reservedNames =
+        let str = 
+            String.concat "|" [
+                "precision|highp|mediump|lowp"
+                "break|case|continue|default|discard|do|else|for|if|return|switch|while"
+                "void|bool|int|uint|float|double|vec[2|3|4]|dvec[2|3|4]|bvec[2|3|4]|ivec[2|3|4]|uvec[2|3|4]|mat[2|3|4]"
+                "mat2x2|mat2x3|mat2x4|mat3x2|mat3x3|mat3x4|mat4x2|mat4x3|mat4x4|dmat2|dmat3|dmat4|dmat2x2|dmat2x3|dmat2x4|dmat3x2|dmat3x3|dmat3x4|dmat4x2|dmat4x3|dmat4x4"
+                "sampler[1|2|3]D|image[1|2|3]D|samplerCube|imageCube|sampler2DRect|image2DRect|sampler[1|2]DArray|image[1|2]DArray|samplerBuffer|imageBuffer|sampler2DMS|image2DMS|sampler2DMSArray|image2DMSArray|samplerCubeArray|imageCubeArray|sampler[1|2]DShadow|sampler2DRectShadow|sampler[1|2]DArrayShadow|samplerCubeShadow|samplerCubeArrayShadow|isampler[1|2|3]D|iimage[1|2|3]D|isamplerCube|iimageCube|isampler2DRect|iimage2DRect|isampler[1|2]DArray|iimage[1|2]DArray|isamplerBuffer|iimageBuffer|isampler2DMS|iimage2DMS|isampler2DMSArray|iimage2DMSArray|isamplerCubeArray|iimageCubeArray|atomic_uint|usampler[1|2|3]D|uimage[1|2|3]D|usamplerCube|uimageCube|usampler2DRect|uimage2DRect|usampler[1|2]DArray|uimage[1|2]DArray|usamplerBuffer|uimageBuffer|usampler2DMS|uimage2DMS|usampler2DMSArray|uimage2DMSArray|usamplerCubeArray|uimageCubeArray|struct"
+                "layout|attribute|centroid|sampler|patch|const|flat|in|inout|invariant|noperspective|out|smooth|uniform|varying|buffer|shared|coherent|readonly|writeonly"
+                "abs|acos|all|any|asin|atan|ceil|clamp|cos|cross|degrees|dFdx|dFdy|distance|dot|equal|exp|exp2|faceforward|floor|fract|ftransform|fwidth|greaterThan|greaterThanEqual|inversesqrt|length|lessThan|lessThanEqual|log|log2|matrixCompMult|max|min|mix|mod|noise[1-4]|normalize|not|notEqual|outerProduct|pow|radians|reflect|refract|shadow1D|shadow1DLod|shadow1DProj|shadow1DProjLod|shadow2D|shadow2DLod|shadow2DProj|shadow2DProjLod|sign|sin|smoothstep|sqrt|step|tan|texture1D|texture1DLod|texture1DProj|texture1DProjLod|texture2D|texture2DLod|texture2DProj|texture2DProjLod|texture3D|texture3DLod|texture3DProj|texture3DProjLod|textureCube|textureCubeLod|transpose"
+                "(gl_.*)"
+            ]
+        Regex("^(" + str + ")$")
+
+
+    let checkName (name : string) =
+        if name.Contains "__" then
+            failwithf "[GLSL] %A is not a GLSL compatible name" name
+
+        if reservedNames.IsMatch name then
+            failwithf "[GLSL] %A is not a GLSL compatible name" name
+            
+        Identifier(name)
+
+    let glslName (name : string) =
+        let name = name.Replace("__", "_")
+        if reservedNames.IsMatch name then
+            Identifier("_" + name)
+        else
+            Identifier(name)
+
     let parameterNameS (kind : ParameterKind) (name : string) =
         state {
             let! builtIn = AssemblerState.tryGetParameterName kind name
             match builtIn with
-                | Some name -> return name
+                | Some name -> 
+                    return Identifier(name)
+
                 | None ->
                     let! stages = AssemblerState.stages
                     let name =
@@ -240,42 +279,46 @@ module Assembler =
                         else name
 
                     match kind, stages with
-                        | _, { self = ShaderStage.Compute }                 -> return name
+                        | _, { self = ShaderStage.Compute }                 -> return checkName name
 
-                        | ParameterKind.Input, { prev = None }              -> return name
-                        | ParameterKind.Input, { self = s }                 -> return prefixes.[s] + name
+                        | ParameterKind.Input, { prev = None }              -> return checkName name
 
-                        | ParameterKind.Output, { next = Some n }           -> return prefixes.[n] + name
-                        | ParameterKind.Output, { next = None }             -> return name + "Out"
-                        | _                                                 -> return name
+                        | ParameterKind.Input, { self = s }                 -> return prefixes.[s] + name |> glslName
+                        | ParameterKind.Output, { next = Some n }           -> return prefixes.[n] + name |> glslName
+                        | ParameterKind.Output, { next = None }             -> 
+                            let name = name + "Out"
+                            return checkName name
+
+                        | _                                                 -> 
+                            return checkName name
         }
 
     let rec assembleType (t : CType) =
         match t with
-            | CType.CBool                               -> "bool"
-            | CType.CVoid                               -> "void"
-            | CType.CInt(true, (8 | 16 | 32 | 64))      -> "int"
-            | CType.CInt(false, (8 | 16 | 32 | 64))     -> "uint"
-            | CType.CFloat(16)                          -> "half"
-            | CType.CFloat(32 | 64)                     -> "float"
+            | CType.CBool                               -> "bool"  |> Identifier
+            | CType.CVoid                               -> "void"  |> Identifier
+            | CType.CInt(true, (8 | 16 | 32 | 64))      -> "int"   |> Identifier
+            | CType.CInt(false, (8 | 16 | 32 | 64))     -> "uint"  |> Identifier
+            | CType.CFloat(16)                          -> "half"  |> Identifier
+            | CType.CFloat(32 | 64)                     -> "float" |> Identifier
                 
-            | CType.CVector(CType.CInt(true, (8 | 16 | 32 | 64)), d)   -> "ivec" + string d
-            | CType.CVector(CType.CFloat(32 | 64), d)   -> "vec" + string d
-            | CType.CMatrix(CType.CFloat(32 | 64), r,c) -> "mat" + string c + "x" + string r
+            | CType.CVector(CType.CInt(true, (8 | 16 | 32 | 64)), d)   -> "ivec" + string d |> Identifier
+            | CType.CVector(CType.CFloat(32 | 64), d)   -> "vec" + string d |> Identifier
+            | CType.CMatrix(CType.CFloat(32 | 64), r,c) -> "mat" + string c + "x" + string r |> Identifier
 
-            | CType.CArray(t, l)                        -> assembleType t + "[" + string l + "]"
-            | CType.CStruct(n,_,_)                      -> n
+            | CType.CArray(t, l)                        -> assembleType(t).Name + "[" + string l + "]" |> Identifier
+            | CType.CStruct(n,_,_)                      -> glslName n
 
-            | CType.CIntrinsic it                       -> it.intrinsicTypeName
+            | CType.CIntrinsic it                       -> it.intrinsicTypeName |> Identifier
 
             | _ -> failwithf "[GLSL] cannot assemble type %A" t 
 
-    let assembleDeclaration (t : CType) (name : string) =
+    let assembleDeclaration (t : CType) (name : Identifier) =
         match t with
             | CArray(et, len) ->
-                sprintf "%s %s[%d]" (assembleType et) name len
+                sprintf "%s %s[%d]" (assembleType et).Name name.Name len
             | t ->
-                sprintf "%s %s" (assembleType t) name
+                sprintf "%s %s" (assembleType t).Name name.Name
         
 
     let assembleParameter (p : CParameter) =
@@ -283,14 +326,16 @@ module Assembler =
             match p.modifier with
                 | CParameterModifier.In -> ""
                 | CParameterModifier.ByRef -> "inout "
+                | CParameterModifier.Out -> "out "
 
-        let decl = assembleDeclaration p.ctype p.name
+        let decl = assembleDeclaration p.ctype (glslName p.name)
         sprintf "%s%s" modifier decl
 
     let assembleFunctionSignature (s : CFunctionSignature) =
         let ret = s.returnType |> assembleType
         let args = s.parameters |> Seq.map assembleParameter |> String.concat ", "
-        sprintf "%s %s(%s)" ret s.name args
+        let name = glslName s.name
+        sprintf "%s %s(%s)" ret.Name name.Name args
 
     let assembleLiteral (l : CLiteral) =
         match l with
@@ -317,23 +362,25 @@ module Assembler =
             
             match e with
                 | CVar v ->
-                    return v.name
+                    let name = glslName v.name
+                    return name.Name
 
                 | CValue(_, v) ->
                     return assembleLiteral v
 
                 | CCall(func, args) ->
+                    let name = glslName func.name
                     let! args = args |> assembleExprsS ", "
-                    return sprintf "%s(%s)" func.name args
+                    return sprintf "%s(%s)" name.Name args
 
                 | CReadInput(kind, _, name, index) ->
                     let! name = parameterNameS kind name
                     match index with
                         | Some index ->
                             let! index = assembleExprS index
-                            return sprintf "%s[%s]" name index
+                            return sprintf "%s[%s]" name.Name index
                         | None ->
-                            return name
+                            return name.Name
 
                 | CCallIntrinsic(_, func, args) ->
 
@@ -435,7 +482,7 @@ module Assembler =
                 | CNewVector(r, _, args) ->
                     let! args = assembleExprsS ", " args
                     let t = assembleType r
-                    return sprintf "%s(%s)" t args
+                    return sprintf "%s(%s)" t.Name args
 
                 | CVecLength(_, v) ->
                     let! v = assembleExprS v
@@ -444,7 +491,7 @@ module Assembler =
                 | CConvert(t, v) ->
                     let t = assembleType t
                     let! v = assembleExprS v
-                    return sprintf "%s(%s)" t v
+                    return sprintf "%s(%s)" t.Name v
 
                 | CAnd(l, r) ->
                     let! l = assembleExprS l
@@ -517,7 +564,8 @@ module Assembler =
 
                 | CField(_, v, f) ->
                     let! v = assembleExprS v
-                    return sprintf "%s.%s" v f
+                    let f = glslName f
+                    return sprintf "%s.%s" v f.Name
 
                 | CItem(_, v, i) ->
                     let! v = assembleExprS v
@@ -551,7 +599,7 @@ module Assembler =
 
                     let ct = assembleType et
                     let! args = args |> List.mapS assembleExprS |> State.map (String.concat ", ")
-                    return sprintf "%s[]( %s )" ct args
+                    return sprintf "%s[]( %s )" ct.Name args
         }
 
     let rec assembleStatementS (singleLine : bool) (s : CStatement) =
@@ -569,8 +617,9 @@ module Assembler =
                     return sprintf "%s;" e
 
                 | CDeclare(v, r) ->
+                    let name = glslName v.name
                     let! r = r |> Option.mapS assembleRExprS
-                    let decl = assembleDeclaration v.ctype v.name
+                    let decl = assembleDeclaration v.ctype name
                     match r with
                         | Some r -> return sprintf "%s = %s;" decl r
                         | None -> return sprintf "%s;" decl
@@ -581,8 +630,8 @@ module Assembler =
 
                     let name =
                         match index with
-                            | Some index -> sprintf "%s[%s]" name index
-                            | None -> name
+                            | Some index -> sprintf "%s[%s]" name.Name index
+                            | None -> name.Name
 
                     match value with
                         | CRArray(t, args) ->
@@ -712,18 +761,19 @@ module Assembler =
                     state {
                         let fields = 
                             fields |> List.map (fun u -> 
-                                let decl = assembleDeclaration u.cUniformType u.cUniformName
+                                let decl = assembleDeclaration u.cUniformType (checkName u.cUniformName)
                                 let decl = sprintf "%s;" decl 
                                 decl, u.cUniformDecorations
                             )
                         match name with
                             | Some bufferName when config.createUniformBuffers ->
+                                let bufferName = checkName bufferName
                                 let! binding = AssemblerState.newBinding
                                     
                                 let fields = fields |> List.map fst |> String.concat "\r\n"
                                 let prefix = uniformLayout [] set binding
                             
-                                return sprintf "%suniform %s\r\n{\r\n%s\r\n};\r\n" prefix bufferName (String.indent fields)
+                                return sprintf "%suniform %s\r\n{\r\n%s\r\n};\r\n" prefix bufferName.Name (String.indent fields)
 
                             | _ ->
                                 let! definitions = 
@@ -826,11 +876,11 @@ module Assembler =
 
                     match p.cParamType with
                         | CArray(t,l) ->
-                            return sprintf "%s%s%s %s[%d];%s" decorations prefix (assembleType t) name l suffix |> Some
+                            return sprintf "%s%s%s %s[%d];%s" decorations prefix (assembleType t).Name name.Name l suffix |> Some
                         | CPointer(_, t) ->
-                            return sprintf "%s%s%s %s[];%s" decorations prefix (assembleType t) name suffix |> Some
+                            return sprintf "%s%s%s %s[];%s" decorations prefix (assembleType t).Name name.Name suffix |> Some
                         | _ -> 
-                            return sprintf "%s%s%s %s;%s" decorations prefix (assembleType p.cParamType) name suffix |> Some
+                            return sprintf "%s%s%s %s;%s" decorations prefix (assembleType p.cParamType).Name name.Name suffix |> Some
         }
     
     let assembleEntryS (e : CEntryDef) =
@@ -927,13 +977,15 @@ module Assembler =
             let! args = e.cArguments |> List.chooseS (assembleEntryParameterS ParameterKind.Argument)
             let! body = assembleStatementS false e.cBody
 
+            let entryName = checkName e.cEntryName
+
             return 
                 String.concat "\r\n" [
                     yield! prefix
                     yield! inputs
                     yield! outputs
                     yield! args
-                    yield sprintf "%s %s()\r\n{\r\n%s\r\n}" (assembleType e.cReturnType) e.cEntryName (String.indent body)
+                    yield sprintf "%s %s()\r\n{\r\n%s\r\n}" (assembleType e.cReturnType).Name entryName.Name (String.indent body)
                 ]
         }
 
@@ -955,10 +1007,11 @@ module Assembler =
 
                 | CConstant(t, n, init) ->
                     let! init = assembleRExprS init
+                    let n = glslName n
                     match t with
-                        | CArray(t,l) -> return sprintf "const %s %s[%d] = %s;" (assembleType t) n l init
-                        | CPointer(_,t) -> return sprintf "const %s %s[] = %s;" (assembleType t) n init
-                        | _ -> return sprintf "const %s %s = %s;" (assembleType t) n init
+                        | CArray(t,l) -> return sprintf "const %s %s[%d] = %s;" (assembleType t).Name n.Name l init
+                        | CPointer(_,t) -> return sprintf "const %s %s[] = %s;" (assembleType t).Name n.Name init
+                        | _ -> return sprintf "const %s %s = %s;" (assembleType t).Name n.Name init
 
                 | CUniformDef us ->
                     let! config = AssemblerState.config
@@ -971,8 +1024,8 @@ module Assembler =
     let assembleTypeDef (d : CTypeDef) =
         match d with
             | CStructDef(name, fields) ->
-                let fields = fields |> List.map (fun (t, n) -> sprintf "%s %s;" (assembleType t) n) |> String.concat "\r\n"
-                sprintf "struct %s\r\n{\r\n%s\r\n};" name (String.indent fields)
+                let fields = fields |> List.map (fun (t, n) -> sprintf "%s %s;" (assembleType t).Name (glslName n).Name) |> String.concat "\r\n"
+                sprintf "struct %s\r\n{\r\n%s\r\n};" (glslName name).Name (String.indent fields)
 
     let assemble (backend : Backend) (m : CModule) =
 
