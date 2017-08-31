@@ -293,14 +293,17 @@ module TessDeconstruct =
 
     type noperspective = { uniform : int; gl_VertexID : int }
 
-    let frag (v : Vertex)  =
-        fragment {
-            let sampler = { uniform = int v.vi; gl_VertexID = v.vi - 100 }
+    type BadVertex = 
+        {
+            [<Semantic("Hugo")>]
+            hugo : V4d
+        }
 
-            let gl_VertexID = sampler.gl_VertexID
+    let frag (v : BadVertex)  =
+        fragment {
             let col : V4d = uniform?PerView?AdditionalColor
-            let vec4 = V2d(sam.Size) * float sampler.uniform
-            return v.pos + col + V4d(vec4.X, vec4.Y + float gl_VertexID, 0.0, 0.0)
+            let vec4 = V2d(sam.Size) 
+            return v.hugo + col + V4d(vec4.X, vec4.Y, 0.0, 0.0)
         }
 
     let loopUnroll (v : Vertex) =
@@ -345,7 +348,7 @@ module TessDeconstruct =
             ]
 
         let effect =
-            Effect.compose [Effect.ofFunction test; Effect.ofFunction frag]
+            Effect.compose [Effect.ofFunction geometry; Effect.ofFunction frag]
 
         Effect.debugRanges effect |> printfn "ranges: %A"
 

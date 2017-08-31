@@ -481,8 +481,13 @@ module private Preprocessor =
 
                 // tri.P0.pos -> ReadInput(pos, 0)
                 | InputRead vertexType (PrimitiveVertexGet(p, index), semantic, parameter) ->
-                    do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
-                    return Expr.ReadInput(ParameterKind.Input, e.Type, semantic, index)
+                    if semantic = Intrinsics.SourceVertexIndex then
+                        let! index = preprocessS index
+                        return index
+                    else
+                        let! index = preprocessS index
+                        do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
+                        return Expr.ReadInput(ParameterKind.Input, e.Type, semantic, index)
 
                 // real vertex-read needed
                 | PrimitiveVertexGet(p, index) ->
