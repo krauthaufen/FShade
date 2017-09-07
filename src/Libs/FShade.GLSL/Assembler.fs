@@ -808,30 +808,53 @@ module Assembler =
 
                 | None ->
                     let! config = AssemblerState.config
-                    let decorations =
+
+                    let! set = 
+                        if config.createDescriptorSets then AssemblerState.newSet
+                        else State.value -1
+
+                    let! decorations =
                         p.cParamDecorations 
                         |> Set.toList
-                        |> List.choose (fun d ->
-                            match d with
-                                | ParameterDecoration.Const -> Some "const"
-                                | ParameterDecoration.Interpolation m ->
-                                    match m with
-                                        | InterpolationMode.Centroid -> Some "centroid"
-                                        | InterpolationMode.Flat -> Some "flat"
-                                        | InterpolationMode.NoPerspective -> Some "noperspective"
-                                        | InterpolationMode.Perspective -> Some "perspective"
-                                        | InterpolationMode.Sample -> Some "sample"
-                                        | InterpolationMode.PerPatch -> Some "patch"
-                                        | _ -> None
+                        |> List.chooseS (fun d ->
+                            state {
+                                match d with
+                                    | ParameterDecoration.Const -> return Some "const"
+                                    | ParameterDecoration.Interpolation m ->
+                                        match m with
+                                            | InterpolationMode.Centroid -> return Some "centroid"
+                                            | InterpolationMode.Flat -> return Some "flat"
+                                            | InterpolationMode.NoPerspective -> return Some "noperspective"
+                                            | InterpolationMode.Perspective -> return Some "perspective"
+                                            | InterpolationMode.Sample -> return Some "sample"
+                                            | InterpolationMode.PerPatch -> return Some "patch"
+                                            | _ -> return None
 
-                                | ParameterDecoration.StorageBuffer ->
-                                    Some ("layout(std430) buffer " + (p.cParamSemantic + "_ssb"))
+                                    | ParameterDecoration.StorageBuffer ->
+                                        let! binding =
+                                            if config.createBindings then AssemblerState.newBinding
+                                            else State.value -1
 
-                                | ParameterDecoration.Shared -> 
-                                    Some "shared"
+                                        let args = []
 
-                                | ParameterDecoration.Memory _ | ParameterDecoration.Slot _ ->
-                                    None
+                                        let args =
+                                            if set >= 0 then sprintf "set=%d" set :: args
+                                            else args
+
+                                        let args =
+                                            if binding >= 0 then sprintf "binding=%d" binding :: args
+                                            else args
+
+                                        let args = "std430" :: args |> String.concat ","
+
+                                        return Some (sprintf "layout(%s) buffer " args + (p.cParamSemantic + "_ssb"))
+
+                                    | ParameterDecoration.Shared -> 
+                                        return Some "shared"
+
+                                    | ParameterDecoration.Memory _ | ParameterDecoration.Slot _ ->
+                                        return None
+                            }
 
                         )
 
@@ -1046,7 +1069,7 @@ module Assembler =
                 return 
                     List.concat [
                         [sprintf "#version %d%d0" c.version.Major c.version.Minor ]
-                        extensions |> Seq.map (sprintf "#extension %s : enable") |> Seq.toList
+                        [ extensions |> Seq.map (sprintf "#extension %s : enable") |> Seq.toList |> String.concat "\r\n" ]
                         types
                         uniforms
                         values

@@ -174,6 +174,62 @@ module Primitives =
     let inline ddyCoarse< ^a when ^a : (static member (-) : ^a -> ^a -> ^a) > (v : ^a) : ^a = failwith "_"
     let discard () : unit = failwith "_"
 
+    [<ReflectedDefinition>]
+    let packUnorm2x16 (v : V2d) : uint32 =
+        let h = (clamp 0.0 1.0 v.X) * 65535.0 |> round |> uint32
+        let l = (clamp 0.0 1.0 v.Y) * 65535.0 |> round |> uint32
+        (h <<< 16) ||| l
+
+    [<ReflectedDefinition>]
+    let packSnorm2x16 (v : V2d) : uint32 = 
+        let h = (clamp 0.0 1.0 (0.5 * v.X + 0.5)) * 65535.0 |> round |> uint32
+        let l = (clamp 0.0 1.0 (0.5 * v.Y + 0.5)) * 65535.0 |> round |> uint32
+        (h <<< 16) ||| l
+
+    [<ReflectedDefinition>]
+    let packUnorm4x8 (v : V4d) : uint32 =
+        let r = (clamp 0.0 1.0 v.X) * 255.0 |> round |> uint32
+        let g = (clamp 0.0 1.0 v.Y) * 255.0 |> round |> uint32
+        let b = (clamp 0.0 1.0 v.Z) * 255.0 |> round |> uint32
+        let a = (clamp 0.0 1.0 v.W) * 255.0 |> round |> uint32
+        (r <<< 24) ||| (g <<< 16) ||| (b <<< 8) ||| a
+        
+    [<ReflectedDefinition>]
+    let packSnorm4x8 (v : V4d) : uint32 = 
+        let r = (clamp 0.0 1.0 (0.5 * v.X + 0.5)) * 255.0 |> round |> uint32
+        let g = (clamp 0.0 1.0 (0.5 * v.Y + 0.5)) * 255.0 |> round |> uint32
+        let b = (clamp 0.0 1.0 (0.5 * v.Z + 0.5)) * 255.0 |> round |> uint32
+        let a = (clamp 0.0 1.0 (0.5 * v.W + 0.5)) * 255.0 |> round |> uint32
+        (r <<< 24) ||| (g <<< 16) ||| (b <<< 8) ||| a
+        
+    [<ReflectedDefinition>]
+    let unpackUnorm2x16 (v : uint32) : V2d =
+        let x = float (v >>> 16) / 65535.0
+        let y = float (v &&& 0xFFFFu) / 65535.0
+        V2d(x,y)
+        
+    [<ReflectedDefinition>]
+    let unpackSnorm2x16 (v : uint32) : V2d = 
+        let x = float (v >>> 16) / 65535.0
+        let y = float (v &&& 0xFFFFu) / 65535.0
+        V2d(2.0 * x - 1.0, 2.0 * y - 1.0)
+        
+    [<ReflectedDefinition>]
+    let unpackUnorm4x8 (v : uint32) : V4d = 
+        let x = float (v >>> 24) / 255.0
+        let y = float ((v >>> 16) &&& 0xFFu) / 255.0
+        let z = float ((v >>> 8) &&& 0xFFu) / 255.0
+        let w = float (v &&& 0xFFu) / 255.0
+        V4d(x,y,z,w)
+        
+    [<ReflectedDefinition>]
+    let unpackSnorm4x8 (v : uint32) : V4d = 
+        let x = float (v >>> 24) / 255.0
+        let y = float ((v >>> 16) &&& 0xFFu) / 255.0
+        let z = float ((v >>> 8) &&& 0xFFu) / 255.0
+        let w = float (v &&& 0xFFu) / 255.0
+        V4d(2.0 * x - 1.0, 2.0 * y - 1.0, 2.0 * z - 1.0, 2.0 * w - 1.0)
+
     let getGlobalId() : V3i = failwith "_"
     let getWorkGroupId() : V3i = failwith ""
     let getLocalId() : V3i = failwith ""

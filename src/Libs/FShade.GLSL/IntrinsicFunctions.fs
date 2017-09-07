@@ -448,6 +448,16 @@ module IntrinsicFunctions =
             // GLOBAL
             // ==========================================================================
 
+            CIntrinsic.simple "packUnorm2x16", [ exactly <@ packUnorm2x16 @> ]
+            CIntrinsic.simple "packSnorm2x16", [ exactly <@ packSnorm2x16 @> ]
+            CIntrinsic.simple "packUnorm4x8", [ exactly <@ packUnorm4x8 @> ]
+            CIntrinsic.simple "packSnorm4x8", [ exactly <@ packSnorm4x8 @> ]
+
+            CIntrinsic.simple "unpackUnorm2x16", [ exactly <@ unpackUnorm2x16 @> ]
+            CIntrinsic.simple "unpackSnorm2x16", [ exactly <@ unpackSnorm2x16 @> ]
+            CIntrinsic.simple "unpackUnorm4x8", [ exactly <@ unpackUnorm4x8 @> ]
+            CIntrinsic.simple "unpackSnorm4x8", [ exactly <@ unpackSnorm4x8 @> ]
+
             CIntrinsic.simple "dFdx", [ generic <@ ddx : float -> _ @> ]
             CIntrinsic.simple "dFdy", [ generic <@ ddy : float -> _ @> ]
             CIntrinsic.simple "dFdxFine", [ generic <@ ddxFine : float -> _ @> ]

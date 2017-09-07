@@ -38,12 +38,14 @@ type ComputeImage =
 
 type ComputeShader =
     {
-        csLocalSize    : V3i
-        csBuffers      : Map<string, ComputeBuffer>
-        csImages       : Map<string, ComputeImage>
-        csUniforms     : Map<string, UniformParameter>
-        csShared       : Map<string, Type * int>
-        csBody         : Expr
+        csLocalSize     : V3i
+        csBuffers       : Map<string, ComputeBuffer>
+        csImages        : Map<string, ComputeImage>
+        csSamplerStates : Map<string * int, SamplerState>
+        csTextureNames  : Map<string * int, string>
+        csUniforms      : Map<string, UniformParameter>
+        csShared        : Map<string, Type * int>
+        csBody          : Expr
     }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -164,17 +166,19 @@ module ComputeShader =
                 
 
 
-    let ofExpr (localSize : V3i) (body : Expr) =
+    let ofExpr (localSize : V3i) (body0 : Expr) =
         let sizes = Dictionary()
-        let body = preprocessCompute localSize sizes body
-        let body = Optimizer.ConstantFolding.evaluateConstants'' (fun m -> m.DeclaringType.FullName = "FShade.Primitives") body
-        let body, state = Preprocessor.preprocess body
+        let body1 = preprocessCompute localSize sizes body0
+        let body2, state = Preprocessor.preprocess body1
+        let body3 = Optimizer.ConstantFolding.evaluateConstants'' (fun m -> m.DeclaringType.FullName = "FShade.Primitives") body2
 
 
         let mutable buffers = Map.empty
         let mutable images = Map.empty
         let mutable uniforms = Map.empty
         let mutable shared = Map.empty
+        let mutable samplerStates = Map.empty
+        let mutable textureNames = Map.empty
 
         let addImage (fmt : Type) (name : string) (t : Type) (dim : SamplerDimension) (isArray : bool) (isMS : bool) (contentType : Type) =
             match Map.tryFind name images with
@@ -202,6 +206,19 @@ module ComputeShader =
         let addShared (name : string) (arrayType : Type) (size : int) =
             shared <- Map.add name (arrayType.GetElementType(), size) shared
 
+        let setSamplerState (name : string) (index : int) (state : SamplerState) =
+            match Map.tryFind (name, index) samplerStates with
+                | Some _ -> ()
+                | None ->
+                    samplerStates <- Map.add (name, index) state samplerStates
+                    
+        let setTextureName (name : string) (index : int) (textureName : string) =
+            match Map.tryFind (name, index) textureNames with
+                | Some _ -> ()
+                | None ->
+                    textureNames <- Map.add (name, index) textureName textureNames
+
+
         for (name, p) in Map.toSeq state.inputs do
             match sizes.TryGetValue name with
                 | (true, s) ->
@@ -218,6 +235,8 @@ module ComputeShader =
                 | (true, s) -> addShared name (p.paramType.MakeArrayType()) s
                 | _ -> addBuffer name (p.paramType.MakeArrayType()) false true
 
+
+
         for (name, p) in Map.toSeq state.uniforms do
             let isArgument, name = 
                 if name.StartsWith "cs_" then true, name
@@ -226,23 +245,43 @@ module ComputeShader =
             match p.uniformType with
                 | ImageType(fmt, dim, isArr, isMS, valueType) ->
                     addImage fmt name p.uniformType dim isArr isMS valueType
+
+                | SamplerType(dim, isArray, isShadow, isMS, valueType) ->
+                    match p.uniformValue with
+                        | UniformValue.Sampler(texName, state) ->
+                            setSamplerState name 0 state
+                            setTextureName name 0 texName
+
+                        | UniformValue.SamplerArray arr ->
+                            for i in 0 .. arr.Length - 1 do
+                                let (texName, state) = arr.[i]
+                                setSamplerState name i state
+                                setTextureName name i texName
+
+                        | _ ->
+                            ()
+
+                    uniforms <- Map.add name p uniforms
+
                 | _ ->
                     if isArgument then
                         uniforms <- Map.add name { p with uniformValue = UniformValue.Attribute(uniform?Arguments, name) } uniforms
-
                     else
                         uniforms <- Map.add name p uniforms
             
             ()
             
+        
 
         {
-            csLocalSize    = localSize
-            csBuffers      = buffers
-            csImages       = images
-            csUniforms     = uniforms
-            csBody         = body
-            csShared       = shared
+            csLocalSize     = localSize
+            csBuffers       = buffers
+            csImages        = images
+            csSamplerStates = samplerStates
+            csTextureNames  = textureNames
+            csUniforms      = uniforms
+            csBody          = body3
+            csShared        = shared
         }
 
     let private cache = System.Collections.Concurrent.ConcurrentDictionary<IFunctionSignature * V3i, ComputeShader>()

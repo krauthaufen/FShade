@@ -476,15 +476,36 @@ let scan (add : Expr<'a -> 'a -> 'a>) (zero : Expr<'a>) (input : 'a[]) (output :
 
     }
 
+
+let image =
+    sampler2d {
+        texture uniform?Bla
+        addressU WrapMode.Wrap
+        addressV WrapMode.Wrap
+        filter Filter.MinMagMipLinear
+    }
+
+[<LocalSize(X = 8)>]
+let code (v : int) (a : int[]) (b : int[]) =
+    compute {
+        let id = getGlobalId().X
+
+        let value = image.SampleLevel(V2d(float id / 1024.0, 0.0), 0.0)
+
+        let f : int = uniform?Factor
+        a.[id] <- v * f * (int (value.X * 255.0)) * (a.[id] + b.[id])
+
+    }
+
 [<EntryPoint>]
 let main args =
-    TessDeconstruct.run()
-    System.Environment.Exit 0
+//    TessDeconstruct.run()
+//    System.Environment.Exit 0
 
     let maxGroupSize = V3i(128, 1024, 1024)
-    let test = ComputeShader.ofFunction maxGroupSize (scan <@ fun a b -> a + b @> <@ 0.0 @>)
+    let test = ComputeShader.ofFunction maxGroupSize code
     let m = ComputeShader.toModule test
-    let glsl = ModuleCompiler.compileGLSL410 m
+    let glsl = ModuleCompiler.compileGLSLVulkan m
     printfn "%s" glsl.code
     System.Environment.Exit 0
 
