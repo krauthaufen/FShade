@@ -58,7 +58,6 @@ module Backends =
                     Backend.Create {
                         cfg.Config with
                             version                 = Version(4,4,0)
-                            enabledExtensions       = Set.add "GL_ARB_compute_variable_group_size" cfg.Config.enabledExtensions
                     }
                 else
                     cfg
