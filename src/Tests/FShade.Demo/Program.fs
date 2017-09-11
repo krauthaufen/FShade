@@ -49,6 +49,27 @@ type MyEnum =
     | A = 1
     | B = 2
 
+open System.Reflection
+let md5 = System.Security.Cryptography.MD5.Create()
+
+let methodHash (mi : MethodBase) =
+    let data = mi.GetMethodBody().GetILAsByteArray()
+    md5.ComputeHash(data) |> System.Convert.ToBase64String
+
+
+type Test() =
+    let b = 10
+    member x.B : int = b
+
+    static member F(this : Test, a : int) =
+        this.B + this.B * a
+
+    member x.G(a : int) =
+        x.B + x.B * a
+
+let hash1 = methodHash (typeof<Test>.GetMethod "F")
+let hash2 = methodHash (typeof<Test>.GetMethod "G")
+
 
 
 let effectTest() =
@@ -319,14 +340,55 @@ module TessDeconstruct =
             return V4d(a, 0.0, 0.0, 1.0)
         }
 
-    let signatureTest() =
+    let manyArgs (a : int) (b : float) (c : byte) (d : int64) (e : uint64) (f : string) (g : obj) =
+        float a + b + float c + float d
+
+    let someFunction (a : V4d) (b : V4d) (c : V4d) = a + b * c
+    
+    let testLocalLambdaNoClosure() =
         let someFunction (a : V4d) (b : V4d) (c : V4d) = a + b * c
         let test2 = someFunction V4d.IIII
         let test3 = test2 V4d.IIII
         let s0 = FunctionSignature.ofFunction test3
         let s1 = FunctionSignature.ofFunction (fun a -> someFunction V4d.IIII V4d.IIII a)
-        printfn "equal: %A" (s0 = s1)
+        s0 = s1
 
+    let testLocalLambdaNoClosure7() =
+        let manyArgs (a : int) (b : float) (c : byte) (d : int64) (e : uint64) (f : string) (g : obj) =
+            float a + b + float c + float d
+            
+        let test2 = manyArgs 1 2.0 3uy
+        let test3 = test2 4L 5UL "6"
+        let s0 = FunctionSignature.ofFunction test3
+        let s1 = FunctionSignature.ofFunction (fun a -> manyArgs 1 2.0 3uy 4L 5UL "6" a)
+        s0 = s1
+
+
+    let testStatic3Args() =
+        let test2 = someFunction V4d.IIII
+        let test3 = test2 V4d.IIII
+        let s0 = FunctionSignature.ofFunction test3
+        let s1 = FunctionSignature.ofFunction (fun a -> someFunction V4d.IIII V4d.IIII a)
+        s0 = s1
+
+    let testStatic7Args() =
+        let test2 = manyArgs 1 2.0 3uy
+        let test3 = test2 4L 5UL "6"
+        let s0 = FunctionSignature.ofFunction test3
+        let s1 = FunctionSignature.ofFunction (fun a -> manyArgs 1 2.0 3uy 4L 5UL "6" a)
+        s0 = s1
+
+
+
+    let signatureTest() =
+        printfn "local3:  %A" (testLocalLambdaNoClosure())
+        printfn "static3: %A" (testStatic3Args())
+        printfn "local7:  %A" (testLocalLambdaNoClosure7())
+        printfn "static7: %A" (testStatic7Args())
+
+        System.Environment.Exit 0
+        let s = FunctionSignature.ofFunction manyArgs
+        printfn "%A" s
 
     let run() =
 //
@@ -499,6 +561,7 @@ let code (v : int) (a : int[]) (b : int[]) =
 
 [<EntryPoint>]
 let main args =
+    TessDeconstruct.signatureTest()
 //    TessDeconstruct.run()
 //    System.Environment.Exit 0
 
