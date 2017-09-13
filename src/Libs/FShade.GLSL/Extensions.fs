@@ -35,7 +35,7 @@ module Backends =
 
     let glslVulkan =
         Backend.Create {
-            version                 = Version(1,4)
+            version                 = Version(4,5)
             enabledExtensions       = Set.ofList [ "GL_ARB_tessellation_shader"; "GL_ARB_separate_shader_objects"; "GL_ARB_shading_language_420pack" ]
             createUniformBuffers    = true
             createBindings          = true
@@ -57,7 +57,7 @@ module Backends =
                 if containsCompute module_ then
                     Backend.Create {
                         cfg.Config with
-                            version                 = Version(4,4,0)
+                            version                 = max (Version(4,4,0)) cfg.Config.version
                     }
                 else
                     cfg

@@ -36,6 +36,7 @@ NUGET
       System.Collections.Immutable (>= 1.2)
   remote: https://api.nuget.org/v3/index.json
     FSharp.Core (4.0.0.1)
+    FsPickler (3.3)
     Microsoft.NETCore.Platforms (2.0)
     NETStandard.Library (2.0)
       Microsoft.NETCore.Platforms (>= 1.1)
@@ -44,15 +45,9 @@ NUGET
       NETStandard.Library (>= 1.6.1)
     System.Reactive.Core (3.0)
       System.Reactive.Interfaces (>= 3.0)
-      System.Reactive.Interfaces (>= 3.0)
-      System.Reactive.Interfaces (>= 3.0)
     System.Reactive.Interfaces (3.0)
     System.Reactive.Linq (3.0)
       System.Reactive.Core (>= 3.0)
-      System.Reactive.Core (>= 3.0)
-      System.Reactive.Core (>= 3.0)
-      System.Reactive.Interfaces (>= 3.0)
-      System.Reactive.Interfaces (>= 3.0)
       System.Reactive.Interfaces (>= 3.0)
     System.Runtime.InteropServices.RuntimeInformation (4.3)
 

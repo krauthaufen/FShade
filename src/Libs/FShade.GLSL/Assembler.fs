@@ -297,8 +297,12 @@ module Assembler =
         match t with
             | CType.CBool                               -> "bool"  |> Identifier
             | CType.CVoid                               -> "void"  |> Identifier
-            | CType.CInt(true, (8 | 16 | 32 | 64))      -> "int"   |> Identifier
-            | CType.CInt(false, (8 | 16 | 32 | 64))     -> "uint"  |> Identifier
+            | CType.CInt(true, (8 | 16 | 32))           -> "int"   |> Identifier
+            | CType.CInt(false, (8 | 16 | 32))          -> "uint"  |> Identifier
+
+            | CType.CInt(true, 64)                      -> "int64_t" |> Identifier
+            | CType.CInt(false, 64)                     -> "uint64_t" |> Identifier
+
             | CType.CFloat(16)                          -> "half"  |> Identifier
             | CType.CFloat(32 | 64)                     -> "float" |> Identifier
                 
