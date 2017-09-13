@@ -122,3 +122,53 @@ module SpirV =
                     do! State.put { s with imports = Map.add name id s.imports; reversedInstuctions = OpExtInstImport(id, name) :: s.reversedInstuctions }
                     return id
         }
+
+open System.Reflection
+open System.Collections.Generic
+open Microsoft.FSharp.Quotations
+open Microsoft.FSharp.Quotations.Patterns
+open Microsoft.FSharp.Quotations.ExprShape
+
+module internal MethodTable =
+    let rec tryGetMethod (e : Expr) =
+        match e with
+            | Call(_,mi,_) -> Some mi
+            | PropertyGet(_,pi,_) -> Some pi.GetMethod
+
+            | ShapeVar _ -> None
+            | ShapeLambda(_,b) -> tryGetMethod b
+            | ShapeCombination(_,args) -> args |> List.tryPick tryGetMethod
+
+    let getMethod (e : Expr) =
+        e |> tryGetMethod |> Option.get
+
+    let ofList (list : list<'a * list<MethodInfo>>) =
+        let store = Dictionary<MethodInfo, 'a>()
+
+        for (value, mis) in list do
+            for mi in mis do
+                store.[mi] <- value
+            
+        fun (mi : MethodInfo) ->
+            match store.TryGetValue mi with
+                | (true, v) -> 
+                    Some v
+
+                | _ ->
+                    if mi.IsGenericMethod then
+                        match store.TryGetValue (mi.GetGenericMethodDefinition()) with
+                            | (true, v) -> Some v
+                            | _ -> None
+                    else
+                        None
+
+
+[<AutoOpen>]
+module internal Operators =
+    let exactly (e : Expr) =
+        MethodTable.getMethod e
+
+    let generic (e : Expr) =
+        let mi = MethodTable.getMethod e
+        if mi.IsGenericMethod then mi.GetGenericMethodDefinition()
+        else mi
