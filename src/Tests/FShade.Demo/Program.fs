@@ -478,19 +478,24 @@ let expected() =
 [<Literal>]
 let local = 32
 
+[<ReflectedDefinition>]
+let left (v : float) =
+    let lid = getLocalIndex()
+    let temp = allocateShared<float> local
+    temp.[lid] <- v * uniform?Sepp
+    barrier()
+
+    if lid = 0 then 0.0
+    else temp.[lid - 1]
+
 [<LocalSize(X = local)>]
 let computer (f : Expr<float -> float -> float>) (a : float[]) (b : float[]) (c : Image2d<Formats.r32f>) =
     compute {
-        let temp = allocateShared<float> local
-
         let id = getGlobalId()
         let i = id.X
 
-        let l = getLocalIndex()
-        temp.[l] <- c.[V2i(l,0)].X
-        barrier()
-
-        b.[i] <- (%f) a.[i] temp.[l]
+        let sepp = left (a.[i])
+        b.[i] <- (%f) a.[i] (float sepp)
 
     }
 
@@ -561,12 +566,12 @@ let code (v : int) (a : int[]) (b : int[]) =
 
 [<EntryPoint>]
 let main args =
-    TessDeconstruct.signatureTest()
+    //TessDeconstruct.signatureTest()
 //    TessDeconstruct.run()
 //    System.Environment.Exit 0
 
     let maxGroupSize = V3i(128, 1024, 1024)
-    let test = ComputeShader.ofFunction maxGroupSize code
+    let test = ComputeShader.ofFunction maxGroupSize (computer <@ (+) @>)
     let m = ComputeShader.toModule test
     let glsl = ModuleCompiler.compileGLSLVulkan m
     printfn "%s" glsl.code

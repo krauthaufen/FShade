@@ -1237,7 +1237,7 @@ module Assembler =
                             return failwithf "[FShade] unknown field %A" f
 
                 | CLExpr.CLItem(_, e, i) ->
-                    let! eid = assembleLExpr e
+                    let! eid = assembleExpr e
                     let! iid = assembleExpr i
                     let! id = SpirV.id
                     yield OpInBoundsAccessChain(tid, id, eid, [| iid |])

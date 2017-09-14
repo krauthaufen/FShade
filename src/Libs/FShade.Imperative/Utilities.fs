@@ -26,6 +26,15 @@ module Peano =
     let getSize (t : Type) =
         Aardvark.Base.Peano.getSize t
 
+
+    let getItem (e : Expr) (index : Expr) =
+        let prop = e.Type.GetProperty("Item")
+        Expr.PropertyGet(e, prop, [index])
+
+    let setItem (e : Expr) (index : Expr) (value : Expr) =
+        let prop = e.Type.GetProperty("Item")
+        Expr.PropertySet(e, prop, value, [index])
+
 [<AutoOpen>]
 module ReflectionPatterns =
     open Aardvark.Base.TypeInfo.Patterns
@@ -379,6 +388,8 @@ module ExprExtensions =
         match e with
             | Call(None, mi, [arr;idx]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = Methods.getArray ->
                 Some(arr, idx)
+            | PropertyGet(Some arr, prop, [idx]) when prop.Name = "Item" && arr.Type.IsGenericType && arr.Type.GetGenericTypeDefinition() = typedefof<Arr<_,_>> ->
+                Some(arr, idx)
             | _ ->
                 None
 
@@ -386,6 +397,10 @@ module ExprExtensions =
         match e with
             | Call(None, mi, [arr;idx;value]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = Methods.setArray ->
                 Some(arr, idx, value)
+
+            | PropertySet(Some arr, prop, [idx], value) when prop.Name = "Item" && arr.Type.IsGenericType && arr.Type.GetGenericTypeDefinition() = typedefof<Arr<_,_>> ->
+                Some(arr, idx, value)
+
             | _ ->
                 None
 

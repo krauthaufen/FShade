@@ -566,7 +566,7 @@ module CRExpr =
 type CLExpr =
     | CLVar of CVar
     | CLField of CType * CLExpr * string
-    | CLItem of CType * CLExpr * CExpr
+    | CLItem of CType * CExpr * CExpr
     | CLPtr of CType * CExpr
     | CLVecSwizzle of CType * CLExpr * list<CVecComponent>
     | CLMatrixElement of t : CType * m : CLExpr * r : int * c : int
@@ -588,7 +588,7 @@ module CLExpr =
         match e with
             | CVar v -> CLVar v
             | CField(t, e, name) -> CLField(t, ofExpr e, name)
-            | CItem(t, e, index) -> CLItem(t, ofExpr e, index)
+            | CItem(t, e, index) -> CLItem(t, e, index)
             | CAddressOf(t, e) -> CLPtr(t, e)
             | CVecSwizzle(t, e, c) -> CLVecSwizzle(t, ofExpr e, c)
             | CMatrixElement(t, e, r, c) -> CLMatrixElement(t, ofExpr e, r, c)
@@ -605,7 +605,6 @@ module CLExpr =
                     return CLField(t, e, name)
 
                 | CItem(t, e, index) -> 
-                    let! e = ofExprSafe e
                     return CLItem(t, e, index)
 
                 | CAddressOf(t, e) -> 
@@ -619,6 +618,7 @@ module CLExpr =
                     let! e = ofExprSafe e
                     return CLMatrixElement(t, e, r, c)
 
+
                 | _ -> 
                     return! None
         }
@@ -627,7 +627,7 @@ module CLExpr =
         match e with
             | CLVar v -> CVar v
             | CLField(t, e, name) -> CField(t, toExpr e, name)
-            | CLItem(t, e, index) -> CItem(t, toExpr e, index)
+            | CLItem(t, e, index) -> CItem(t, e, index)
             | CLPtr(t, e) -> CAddressOf(t, e)
             | CLVecSwizzle(t, e, c) -> CVecSwizzle(t, toExpr e, c)
             | CLMatrixElement(t, e, r, c) -> CMatrixElement(t, toExpr e, r, c)
@@ -643,7 +643,7 @@ module CLExpr =
 
             | CLItem(t, target, index) ->
                 used.AddType t
-                visit used target
+                CExpr.visit used target
                 CExpr.visit used index
 
             | CLPtr(t,e) ->

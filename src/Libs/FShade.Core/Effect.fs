@@ -447,7 +447,7 @@ module Effect =
 
         let shaders = toList effect
 
-        { entries = entryPoints None shaders; tryGetOverrideCode = Shader.tryGetOverrideCode }
+        { entries = entryPoints None shaders; tryGetOverrideCode = Shader.tryGetOverrideCode V3i.Zero }
 
     let inputsToUniforms (scopes : Map<string, UniformScope>) (effect : Effect) =
         effect |> map (Shader.inputsToUniforms scopes)

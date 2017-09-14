@@ -1404,11 +1404,17 @@ module Compiler =
                     let! value = toCExprS value
                     return CWrite(CLVar v, value)
 
+                
+
+//                | SetArray(ReadInput(kind, name, None), index, value) ->
+//                    return! toCStatementS isLast (Expr.WriteOutputs [name, Some index, value])
+//                    //return failwith ""
+
                 | SetArray(arr, index, value) ->
-                    let! carr = toCLExprS arr
+                    let! carr = toCExprS arr
                     let! ci = toCExprS index
                     let! cvalue = toCExprS value
-                    return CWrite(CLExpr.CLItem(cvalue.ctype, carr.Value, ci), cvalue)
+                    return CWrite(CLExpr.CLItem(cvalue.ctype, carr, ci), cvalue)
 
                 | PropertySet(None, pi, i, a) ->
                     return failwithf "[FShade] cannot set static property %A" pi

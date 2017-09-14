@@ -108,18 +108,46 @@ module ComputeShader =
                 | FieldGet(None, pi) when pi.Name = "LocalSize" ->
                     Expr.Value(localSize)
 
+                | Call(None, mi, [size]) when mi.Name = "allocateShared" ->
+                    failwith "[FShade] non-static call to allocateShared"
+
                 | Let(v, Call(None, mi, [size]),b) when mi.Name = "allocateShared" ->
                     let size = preprocessCompute localSize sizes size
                     match Expr.TryEval size with
                         | Some (:? int as size) ->
-                            sizes.[v.Name] <- size
+                            //sizes.[v.Name] <- size
 
-                            let b = 
-                                let e = Expr.ValueWithName(null, v.Type, v.Name) //Expr.ReadInput(ParameterKind.Input, v.Type, v.Name)
-                                b.Substitute(fun vi ->
-                                    if vi = v then Some e
-                                    else None
-                                )
+                            let et = mi.ReturnType.GetElementType()
+                            let t = Peano.getArrayType size et
+
+                            let rep = Expr.ReadInput(ParameterKind.Uniform, t, v.Name)
+                            let rec substitute (e : Expr) =
+                                match e with
+
+                                    | GetArray(Var vv, index) when vv = v ->
+                                        Peano.getItem rep index
+                                        //Expr.ReadInput(ParameterKind.Argument, et, v.Name, index)
+
+                                    | SetArray(Var vv, index, value) when vv = v ->
+                                        Peano.setItem rep index value
+                                        //Expr.WriteOutputs [v.Name, Some index, value]
+                                        //failwith ""
+
+                                    
+
+                                    | ShapeCombination(o, args) -> RebuildShapeCombination(o, List.map substitute args)
+                                    | ShapeLambda(v,b) -> Expr.Lambda(v, substitute b)
+                                    | ShapeVar vv -> 
+                                        if vv = v then failwith "[FShade] cannot use shared memory as value"
+                                        Expr.Var vv
+
+
+                            let b = substitute b
+//                                let e = Expr.ReadInput(ParameterKind.Argument, v.Type, v.Name)
+//                                b.Substitute(fun vi ->
+//                                    if vi = v then Some e
+//                                    else None
+//                                )
 
                             preprocessCompute localSize sizes b
 
@@ -135,48 +163,17 @@ module ComputeShader =
                 | ShapeCombination(o, args) ->
                     RebuildShapeCombination(o, List.map (preprocessCompute localSize sizes) args)
           
-        let rec liftAllocs (localSize : V3i) (sizes : Dictionary<string, int>) (e : Expr) =
-            match e with
-                | Let(v, Call(None, mi, [size]),b) when mi.Name = "allocateShared" ->
-                    let size = liftAllocs localSize sizes size
-                    match Expr.TryEval size with
-                        | Some (:? int as size) ->
-                            sizes.[v.Name] <- size
 
-                            let b = 
-                                let e = Expr.ValueWithName(null, v.Type, v.Name) //Expr.ReadInput(ParameterKind.Input, v.Type, v.Name)
-                                b.Substitute(fun vi ->
-                                    if vi = v then Some e
-                                    else None
-                                )
-
-                            liftAllocs localSize sizes b
-
-                        | _ ->
-                            failwith "[FShade] could not evaluate size for allocateShared"
-
-                | ShapeLambda(v, b) ->
-                    Expr.Lambda(v, preprocessCompute localSize sizes b)
-
-                | ShapeVar(v) ->
-                    e
-
-                | ShapeCombination(o, args) ->
-                    RebuildShapeCombination(o, List.map (preprocessCompute localSize sizes) args)
-                
 
 
     let ofExpr (localSize : V3i) (body0 : Expr) =
-        let sizes = Dictionary()
-        let body1 = preprocessCompute localSize sizes body0
-        let body2, state = Preprocessor.preprocess body1
-        let body3 = Optimizer.ConstantFolding.evaluateConstants'' (fun m -> m.DeclaringType.FullName = "FShade.Primitives") body2
+        let body1, state = Preprocessor.preprocess localSize body0
+        let body2 = Optimizer.ConstantFolding.evaluateConstants'' (fun m -> m.DeclaringType.FullName = "FShade.Primitives") body1
 
 
         let mutable buffers = Map.empty
         let mutable images = Map.empty
         let mutable uniforms = Map.empty
-        let mutable shared = Map.empty
         let mutable samplerStates = Map.empty
         let mutable textureNames = Map.empty
 
@@ -203,9 +200,6 @@ module ComputeShader =
                 | None ->
                     buffers <- Map.add name { ComputeBuffer.contentType = arrayType.GetElementType(); ComputeBuffer.read = read; ComputeBuffer.write = write } buffers
             
-        let addShared (name : string) (arrayType : Type) (size : int) =
-            shared <- Map.add name (arrayType.GetElementType(), size) shared
-
         let setSamplerState (name : string) (index : int) (state : SamplerState) =
             match Map.tryFind (name, index) samplerStates with
                 | Some _ -> ()
@@ -220,20 +214,14 @@ module ComputeShader =
 
 
         for (name, p) in Map.toSeq state.inputs do
-            match sizes.TryGetValue name with
-                | (true, s) ->
-                    addShared name p.paramType s
-                | _ -> 
-                    match p.paramType with
-                        | ImageType(fmt, dim, isArr, isMS, valueType) ->
-                            addImage fmt name p.paramType dim isArr isMS valueType
-                        | t -> 
-                            addBuffer name t true false
+            match p.paramType with
+                | ImageType(fmt, dim, isArr, isMS, valueType) ->
+                    addImage fmt name p.paramType dim isArr isMS valueType
+                | t -> 
+                    addBuffer name t true false
 
         for (name, p) in Map.toSeq state.outputs do
-            match sizes.TryGetValue name with
-                | (true, s) -> addShared name (p.paramType.MakeArrayType()) s
-                | _ -> addBuffer name (p.paramType.MakeArrayType()) false true
+            addBuffer name (p.paramType.MakeArrayType()) false true
 
 
 
@@ -280,8 +268,8 @@ module ComputeShader =
             csSamplerStates = samplerStates
             csTextureNames  = textureNames
             csUniforms      = uniforms
-            csBody          = body3
-            csShared        = shared
+            csBody          = body2
+            csShared        = Map.empty
         }
 
     let private cache = System.Collections.Concurrent.ConcurrentDictionary<IFunctionSignature * V3i, ComputeShader>()
@@ -382,5 +370,5 @@ module ComputeShader =
     let toModule (shader : ComputeShader) : Module =
         {
             entries = [ toEntryPoint shader ]
-            tryGetOverrideCode = Shader.tryGetOverrideCode
+            tryGetOverrideCode = Shader.tryGetOverrideCode shader.csLocalSize
         }

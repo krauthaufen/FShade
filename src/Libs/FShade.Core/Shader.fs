@@ -224,9 +224,10 @@ module private Preprocessor =
             vertexIndex     : Map<Var, Expr>
             variableValues  : Map<Var, Expr>
             shaders         : list<Shader>
+            localSize       : V3i
         }
         
-    let shaderUtilityFunctions = System.Collections.Concurrent.ConcurrentDictionary<MethodBase, Option<Expr * State>>()
+    let shaderUtilityFunctions = System.Collections.Concurrent.ConcurrentDictionary<V3i * MethodBase, Option<Expr * State>>()
 
 
     type Preprocess<'a> = State<State, 'a>
@@ -247,6 +248,7 @@ module private Preprocessor =
                 vertexIndex     = Map.empty
                 variableValues  = Map.empty
                 shaders         = []
+                localSize       = V3i.Zero
             }
 
         let ofInputType (t : Type) =
@@ -308,13 +310,106 @@ module private Preprocessor =
         let tryGetVertexIndex (v : Var) =
             State.get |> State.map (fun s -> Map.tryFind v s.vertexIndex)
 
-    let rec preprocessS (e : Expr) : Preprocess<Expr> =
+    let rec preprocessComputeS (e : Expr) : Preprocess<Expr> =
+        state {
+            match e with
+                | GetArray(ValueWithName(v, t, name), i) ->
+                    let! i = preprocessComputeS i
+                    match t with
+                        | ArrOf(_,t) | ArrayOf t ->
+                            return Expr.ReadInput(ParameterKind.Input, t, name, i)
+                        | _ ->
+                            return e
+
+                | SetArray(ValueWithName(v, t, name), i, e) ->
+                    let! i = preprocessComputeS i
+                    let! e = preprocessComputeS e
+                    return Expr.WriteOutputsRaw([name, Some i, e])
+
+                | PropertyGet(Some (ValueWithName(v, t, name)), prop, []) when t.IsArray && (prop.Name = "Length" || prop.Name = "LongLength") ->
+                    return Expr.ReadInput(ParameterKind.Uniform, typeof<int>, "cs_" + name + "_length")
+                    
+                | ValueWithName(v,t,name) ->
+                    return Expr.ReadInput(ParameterKind.Uniform, t, "cs_" + name)
+
+                | PropertyGet(None, pi, []) when pi.Name = "LocalSize" ->
+                    let! s = State.get
+                    return Expr.Value(s.localSize)
+
+                | FieldGet(None, pi) when pi.Name = "LocalSize" ->
+                    let! s = State.get
+                    return Expr.Value(s.localSize)
+
+                | Call(None, mi, [size]) when mi.Name = "allocateShared" ->
+                    return failwith "[FShade] non-static call to allocateShared"
+
+                | Let(v, Call(None, mi, [size]),b) when mi.Name = "allocateShared" ->
+                    let! size = preprocessComputeS size
+                    match Expr.TryEval size with
+                        | Some (:? int as size) ->
+                            let et = mi.ReturnType.GetElementType()
+                            let t = Peano.getArrayType size et
+
+
+                            let name = sprintf "%s_%sx%d" v.Name et.PrettyName size
+
+                            let rep = Expr.ReadInput(ParameterKind.Uniform, t, name)
+                            let rec substitute (e : Expr) =
+                                match e with
+
+                                    | GetArray(Var vv, index) when vv = v ->
+                                        Peano.getItem rep index
+                                        //Expr.ReadInput(ParameterKind.Argument, et, v.Name, index)
+
+                                    | SetArray(Var vv, index, value) when vv = v ->
+                                        Peano.setItem rep index value
+                                        //Expr.WriteOutputs [v.Name, Some index, value]
+                                        //failwith ""
+
+                                    
+
+                                    | ShapeCombination(o, args) -> RebuildShapeCombination(o, List.map substitute args)
+                                    | ShapeLambda(v,b) -> Expr.Lambda(v, substitute b)
+                                    | ShapeVar vv -> 
+                                        if vv = v then failwith "[FShade] cannot use shared memory as value"
+                                        Expr.Var vv
+
+
+                        //    {
+                        //        uniformName         : string
+                        //        uniformType         : Type
+                        //        uniformValue        : UniformValue
+                        //    }
+
+
+                            let b = substitute b
+                            do! State.readUniform { uniformName = name; uniformType = t; uniformValue = UniformValue.Attribute(uniform?SharedMemory, name) }
+
+                            return! preprocessComputeS b
+
+                        | _ ->
+                            return failwith "[FShade] could not evaluate size for allocateShared"
+
+                | ShapeLambda(v, b) ->
+                    let! b = preprocessComputeS b
+                    return Expr.Lambda(v, b)
+
+                | ShapeVar(v) ->
+                    return e
+
+                | ShapeCombination(o, args) ->
+                    let! args = args |> List.mapS preprocessComputeS
+                    return RebuildShapeCombination(o, args)
+          
+        }
+
+    let rec preprocessNormalS (e : Expr) : Preprocess<Expr> =
         state {
             let! vertexType = State.vertexType
 
             match e with
                 | ReadInput(kind, name, idx) ->
-                    let! idx = idx |> Option.mapS preprocessS
+                    let! idx = idx |> Option.mapS preprocessNormalS
 
                     let paramType =
                         match idx with
@@ -335,8 +430,8 @@ module private Preprocessor =
                     let! map = 
                         map |> Map.mapS (fun name (idx, value) ->
                             state {
-                                let! idx = idx |> Option.mapS preprocessS
-                                let! value = preprocessS value
+                                let! idx = idx |> Option.mapS preprocessNormalS
+                                let! value = preprocessNormalS value
                                 return idx, value
                             }
                         )
@@ -354,12 +449,12 @@ module private Preprocessor =
                 | BuilderRun(b, body)
                 | BuilderDelay(b, body) ->
                     do! State.setBuilder b
-                    return! preprocessS body
+                    return! preprocessNormalS body
 
                 | BuilderCombine(b, l, r) ->
                     do! State.setBuilder b
-                    let! l = preprocessS l
-                    let! r = preprocessS r
+                    let! l = preprocessNormalS l
+                    let! r = preprocessNormalS r
                     return Expr.Seq [l;r]
 
                 | BuilderZero(b) ->
@@ -420,8 +515,8 @@ module private Preprocessor =
                 | BuilderUsing(b, var, value, body)
                 | BuilderBind(b, var, value, body) ->
                     do! State.setBuilder b
-                    let! value = preprocessS value
-                    let! body = preprocessS body
+                    let! value = preprocessNormalS value
+                    let! body = preprocessNormalS body
                     if var.Type <> typeof<unit> then
                         return Expr.Let(var, value, body)
                     else
@@ -431,10 +526,10 @@ module private Preprocessor =
 
                 | BuilderFor(b, var, RangeSequence(first, step, last), body) ->
                     do! State.setBuilder b
-                    let! first = preprocessS first
-                    let! step = preprocessS step
-                    let! last = preprocessS last
-                    let! body = preprocessS body
+                    let! first = preprocessNormalS first
+                    let! step = preprocessNormalS step
+                    let! last = preprocessNormalS last
+                    let! body = preprocessNormalS body
                     return Expr.ForInteger(var, first, step, last, body)
                     
                 | BuilderFor(b, var, Coerce(Primitive(primitive, vertexCount), _), body) ->
@@ -444,20 +539,20 @@ module private Preprocessor =
                     let replacement = Expr.PropertyGet(primitive, prop, [Expr.Var iVar])
                     
                     do! State.setVertexIndex var (Expr.Var iVar)
-                    let! body = preprocessS body
+                    let! body = preprocessNormalS body
 
                     return Expr.ForIntegerRangeLoop(iVar, Expr.Value 0, Expr.Value (vertexCount - 1), body)
 
                 | BuilderFor(b, var, sequence, body) ->
                     do! State.setBuilder b
-                    let! sequence = preprocessS sequence
-                    let! body = preprocessS body
+                    let! sequence = preprocessNormalS sequence
+                    let! body = preprocessNormalS body
                     return Expr.ForEach(var, sequence, body)
 
                 | BuilderWhile(b, Lambda(unitVar, guard), body) ->
                     do! State.setBuilder b
-                    let! guard = preprocessS guard
-                    let! body = preprocessS body
+                    let! guard = preprocessNormalS guard
+                    let! body = preprocessNormalS body
                     return Expr.WhileLoop(guard, body)
                     
 
@@ -468,30 +563,30 @@ module private Preprocessor =
                 // let p0 = tri.P0 in <body>
                 // store (p0 -> 0) and preprocess <body>
                 | Let(var, PrimitiveVertexGet(p, index), body) when var.Type = vertexType ->
-                    let! index = preprocessS index
+                    let! index = preprocessNormalS index
                     do! State.setVertexIndex var index
-                    return! preprocessS body
+                    return! preprocessNormalS body
 
 
                 | Let(var, e, body) ->
-                    let! e = preprocessS e
+                    let! e = preprocessNormalS e
                     do! State.setVariableValue var e
-                    let! body = preprocessS body
+                    let! body = preprocessNormalS body
                     return Expr.Let(var, e, body)
 
                 // tri.P0.pos -> ReadInput(pos, 0)
                 | InputRead vertexType (PrimitiveVertexGet(p, index), semantic, parameter) ->
                     if semantic = Intrinsics.SourceVertexIndex then
-                        let! index = preprocessS index
+                        let! index = preprocessNormalS index
                         return index
                     else
-                        let! index = preprocessS index
+                        let! index = preprocessNormalS index
                         do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
                         return Expr.ReadInput(ParameterKind.Input, e.Type, semantic, index)
 
                 // real vertex-read needed
                 | PrimitiveVertexGet(p, index) ->
-                    let! index = preprocessS index
+                    let! index = preprocessNormalS index
                     let fields = FSharpType.GetRecordFields(e.Type, true) |> Array.toList
 
                     let! args =
@@ -546,12 +641,12 @@ module private Preprocessor =
                         if used <= 1 then Expr.Call(b, mi, [newBody])
                         else Expr.Let(var, value, Expr.Call(b, mi, [body]))
 
-                    return! preprocessS real
+                    return! preprocessNormalS real
 
                     
                 | BuilderYield(b, _, value) ->
                     do! State.setBuilder b
-                    let! value = preprocessS value
+                    let! value = preprocessNormalS value
                     let defaultSem = 
                         if b.Type = typeof<FragmentBuilder> then Intrinsics.Color
                         else Intrinsics.Position
@@ -566,7 +661,7 @@ module private Preprocessor =
 
                 | BuilderReturn(b, _, value) ->
                     do! State.setBuilder b
-                    let! value = preprocessS value
+                    let! value = preprocessNormalS value
                     let defaultSem = 
                         if b.Type = typeof<FragmentBuilder> then Intrinsics.Color
                         else Intrinsics.Position
@@ -576,30 +671,31 @@ module private Preprocessor =
                     return Expr.WriteOutputs values
 
                 | Sequential(l, r) ->
-                    let! l = preprocessS l
-                    let! r = preprocessS r
+                    let! l = preprocessNormalS l
+                    let! r = preprocessNormalS r
                     return Expr.Seq [l;r]
                     
                 | IfThenElse(cond, i, e) ->
-                    let! cond = preprocessS cond
-                    let! i = preprocessS i
-                    let! e = preprocessS e
+                    let! cond = preprocessNormalS cond
+                    let! i = preprocessNormalS i
+                    let! e = preprocessNormalS e
                     return Expr.IfThenElse(cond, i, e)
 
                 | Let(v, e, b) ->
-                    let! e = preprocessS e
-                    let! b = preprocessS b
+                    let! e = preprocessNormalS e
+                    let! b = preprocessNormalS b
                     return Expr.Let(v, e, b)
 
                 | Call(t, mi, args) ->
-                    match preprocessMethod mi with
+                    let! s = State.get
+                    match preprocessMethod s.localSize mi with
                         | Some(_, innerState) ->
                             do! State.modify (fun s -> { s with uniforms = Map.union s.uniforms innerState.uniforms })
                         | None ->
                             ()
 
-                    let! args = args |> List.mapS preprocessS
-                    let! t = t |> Option.mapS preprocessS
+                    let! args = args |> List.mapS preprocessNormalS
+                    let! t = t |> Option.mapS preprocessNormalS
 
                     match t with
                         | Some t -> return Expr.Call(t, mi, args)
@@ -608,15 +704,22 @@ module private Preprocessor =
 
 
                 | ShapeCombination(o, args) ->
-                    let! args = args |> List.mapS preprocessS
+                    let! args = args |> List.mapS preprocessNormalS
                     return RebuildShapeCombination(o, args)
 
                 | ShapeVar _ ->
                     return e
 
                 | ShapeLambda(v, b) ->
-                    let! b = preprocessS b
+                    let! b = preprocessNormalS b
                     return Expr.Lambda(v, b)
+        }
+
+    and preprocessS (e : Expr) =
+        state {
+            let! e0 = preprocessComputeS e
+            let! e1 = preprocessNormalS e0
+            return e1
         }
 
     and getOutputValues (sem : string) (value : Expr) : Preprocess<list<string * Option<Expr> * Expr>> =
@@ -732,32 +835,32 @@ module private Preprocessor =
 
         shader :: state.shaders
 
-    and preprocess (e : Expr) =
-        let mutable state = State.empty
+    and preprocess (localSize : V3i) (e : Expr) =
+        let mutable state = { State.empty with localSize = localSize }
         let e = preprocessS(e).Run(&state)
         e, state
 
-    and preprocessMethod (mi : MethodBase) =    
-        shaderUtilityFunctions.GetOrAdd(mi, fun mi ->
+    and preprocessMethod (localSize : V3i) (mi : MethodBase) =    
+        shaderUtilityFunctions.GetOrAdd((localSize, mi), fun (localSize, mi) ->
             match Expr.TryGetReflectedDefinition mi with
                 | Some expr ->
-                    preprocess(expr) |> Some
+                    preprocess localSize expr |> Some
                 | None ->
                     None
         )
 
-    let rec computeIO (e : Expr) =
+    let rec computeIO (localSize : V3i) (e : Expr) =
         match e with
             | ReadInput(kind,n,idx) ->
                 match idx with
-                    | Some idx -> computeIO idx |> Map.add (n, kind) e.Type
+                    | Some idx -> computeIO localSize idx |> Map.add (n, kind) e.Type
                     | None -> Map.ofList [(n, kind), e.Type]
 
             | WriteOutputs values ->
                 let used = 
                     values |> Map.fold (fun m _ (i,v) ->
-                        let v = computeIO v
-                        let i = i |> Option.map computeIO |> Option.defaultValue Map.empty
+                        let v = computeIO localSize v
+                        let i = i |> Option.map (computeIO localSize) |> Option.defaultValue Map.empty
                         Map.union m (Map.union i v)
                     ) Map.empty
 
@@ -773,43 +876,43 @@ module private Preprocessor =
             
             | Call(t,mi,args) ->
                 let inner = 
-                    match preprocessMethod mi with
-                        | Some(e, _) -> computeIO e
+                    match preprocessMethod localSize mi with
+                        | Some(e, _) -> computeIO localSize e
                         | None -> Map.empty
 
-                Option.toList t @ args |> List.fold (fun s a -> Map.union s (computeIO a)) inner
+                Option.toList t @ args |> List.fold (fun s a -> Map.union s (computeIO localSize a)) inner
 
 
             | ShapeCombination(o, args) ->
-                args |> List.fold (fun m e -> Map.union m (computeIO e)) Map.empty
+                args |> List.fold (fun m e -> Map.union m (computeIO localSize e)) Map.empty
 
             | ShapeLambda(_,b) ->
-                computeIO b
+                computeIO localSize b
 
             | ShapeVar _ ->
                 Map.empty
 
-    let rec usedInputs (e : Expr) =
+    let rec usedInputs (localSize : V3i) (e : Expr) =
         match e with
             | ReadInput(kind,n,idx) ->
                 match idx with
-                    | Some idx -> usedInputs idx |> Map.add n (kind, e.Type)
+                    | Some idx -> usedInputs localSize idx |> Map.add n (kind, e.Type)
                     | None -> Map.ofList [n, (kind, e.Type)]
             
             | Call(t,mi,args) ->
                 let inner = 
-                    match preprocessMethod mi with
-                        | Some(e, _) -> usedInputs e
+                    match preprocessMethod localSize mi with
+                        | Some(e, _) -> usedInputs localSize e
                         | None -> Map.empty
 
-                Option.toList t @ args |> List.fold (fun s a -> Map.union s (usedInputs a)) inner
+                Option.toList t @ args |> List.fold (fun s a -> Map.union s (usedInputs localSize a)) inner
 
 
             | ShapeCombination(o, args) ->
-                args |> List.fold (fun m e -> Map.union m (usedInputs e)) Map.empty
+                args |> List.fold (fun m e -> Map.union m (usedInputs localSize e)) Map.empty
 
             | ShapeLambda(_,b) ->
-                usedInputs b
+                usedInputs localSize b
 
             | ShapeVar _ ->
                 Map.empty
@@ -818,11 +921,11 @@ module private Preprocessor =
 
 type ShaderOutputValue (mode : InterpolationMode, index : Option<Expr>, value : Expr) =
     let value, inputs, uniforms =
-        let value, state = Preprocessor.preprocess value
+        let value, state = Preprocessor.preprocess V3i.Zero value
 
         let inputs, uniforms =
             value
-                |> Preprocessor.usedInputs
+                |> Preprocessor.usedInputs V3i.Zero
                 |> Map.partition (fun l (kind, t) -> kind = ParameterKind.Input)
 
         let inputs =
@@ -888,8 +991,8 @@ module ShaderOutputValueExtensions =
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Shader =
 
-    let tryGetOverrideCode (mi : MethodBase) =
-        match Preprocessor.preprocessMethod mi with
+    let tryGetOverrideCode (localSize : V3i) (mi : MethodBase) =
+        match Preprocessor.preprocessMethod localSize mi with
             | Some (e,_) -> Some e
             | None -> None
              
@@ -1132,7 +1235,7 @@ module Shader =
             shader.shaderBody
                 |> Optimizer.evaluateConstants' sideEffects.Contains
                 |> Optimizer.eliminateDeadCode' sideEffects.Contains
-                |> Preprocessor.preprocess
+                |> Preprocessor.preprocess V3i.Zero
 
         let newOutputVertices =
             match shader.shaderStage with
@@ -1173,8 +1276,8 @@ module Shader =
         ofExpr typeof<'a> expression
 
     let withBody (newBody : Expr) (shader : Shader) =
-        let newBody, state = newBody |> Preprocessor.preprocess
-        let io = Preprocessor.computeIO newBody
+        let newBody, state = newBody |> Preprocessor.preprocess V3i.Zero
+        let io = Preprocessor.computeIO V3i.Zero newBody
 
         let filterIO (desiredKind : ParameterKind) (build : string -> Type -> 'a) =
 
