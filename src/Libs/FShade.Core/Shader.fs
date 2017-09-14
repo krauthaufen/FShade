@@ -358,13 +358,13 @@ module private Preprocessor =
                                 match e with
 
                                     | GetArray(Var vv, index) when vv = v ->
+                                        let index = substitute index
                                         Peano.getItem rep index
-                                        //Expr.ReadInput(ParameterKind.Argument, et, v.Name, index)
 
                                     | SetArray(Var vv, index, value) when vv = v ->
+                                        let index = substitute index
+                                        let value = substitute value
                                         Peano.setItem rep index value
-                                        //Expr.WriteOutputs [v.Name, Some index, value]
-                                        //failwith ""
 
                                     
 
@@ -717,7 +717,11 @@ module private Preprocessor =
 
     and preprocessS (e : Expr) =
         state {
-            let! e0 = preprocessComputeS e
+            let! s = State.get
+            let! e0 = 
+                if s.localSize <> V3i.Zero then preprocessComputeS e
+                else State.value e
+
             let! e1 = preprocessNormalS e0
             return e1
         }

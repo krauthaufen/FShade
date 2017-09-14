@@ -481,21 +481,63 @@ let local = 32
 [<ReflectedDefinition>]
 let left (v : float) =
     let lid = getLocalIndex()
-    let temp = allocateShared<float> local
-    temp.[lid] <- v * uniform?Sepp
+    let temp = allocateShared<float> LocalSize.X
+    temp.[lid] <- v
     barrier()
 
     if lid = 0 then 0.0
     else temp.[lid - 1]
 
-[<LocalSize(X = local)>]
+[<ReflectedDefinition>]
+let scan1 (v : float) =
+    let scanSize = getWorkGroupSize().X
+    let lid = getLocalIndex()
+    let temp = allocateShared<float> LocalSize.X
+    temp.[lid] <- v
+    barrier()
+
+    let mutable s = 1
+    let mutable d = 2
+    while d <= scanSize do
+        if lid % d = 0 && lid >= s then
+            temp.[lid] <- temp.[lid - s] + temp.[lid]
+
+        barrier()
+        s <- s <<< 1
+        d <- d <<< 1
+
+    d <- d >>> 1
+    s <- s >>> 1
+    while s >= 1 do
+        if lid % d = 0 && lid + s < scanSize then
+            temp.[lid + s] <- temp.[lid] + temp.[lid + s]
+                    
+        barrier()
+        s <- s >>> 1
+        d <- d >>> 1
+              
+    let left =
+        if lid > 0 then temp.[lid - 1]
+        else 0.0
+        
+    let right = 
+        temp.[scanSize - 1] - temp.[lid]      
+
+    (left, right)
+
+[<LocalSize(X = 32)>]
 let computer (f : Expr<float -> float -> float>) (a : float[]) (b : float[]) (c : Image2d<Formats.r32f>) =
     compute {
         let id = getGlobalId()
         let i = id.X
 
-        let sepp = left (a.[i])
-        b.[i] <- (%f) a.[i] (float sepp)
+        let sad : float[] = allocateShared 1
+
+        let hugo = a.[i] * 7.0 + 2.0
+        sad.[0] <- hugo
+
+        let (l,r) = scan1 hugo
+        b.[i] <- (%f) a.[i] (float l)
 
     }
 

@@ -770,6 +770,10 @@ module Assembler =
                                 decl, u.cUniformDecorations
                             )
                         match name with
+                            | Some "SharedMemory" ->
+                                let fields = fields |> List.map (fun (d,_) -> sprintf "shared %s" d) |> String.concat "\r\n"
+                                return fields
+                                
                             | Some bufferName when config.createUniformBuffers ->
                                 let bufferName = checkName bufferName
                                 let! binding = AssemblerState.newBinding
