@@ -345,8 +345,13 @@ type CExpr =
     | CVecSwizzle of CType * CExpr * list<CVecComponent>
     | CMatrixElement of t : CType * m : CExpr * r : int * c : int
     | CNewVector of t : CType * d : int * components : list<CExpr>
+
+    | CNewMatrix of t : CType * elements : list<CExpr>
     | CMatrixFromRows of t : CType * rows : list<CExpr>
     | CMatrixFromCols of t : CType * cols : list<CExpr>
+    | CMatrixRow of t : CType * mat : CExpr * row : int
+    | CMatrixCol of t : CType * mat : CExpr * col : int
+
     | CVecLength of t : CType * v : CExpr
 
     | CConvert of CType * CExpr
@@ -406,8 +411,13 @@ type CExpr =
             | CVecSwizzle(t,_,_) -> t
             | CMatrixElement(t,_,_,_) -> t
             | CNewVector(t,_,_) -> t
+
+            | CNewMatrix(t,_) -> t
             | CMatrixFromRows(t,_) -> t
             | CMatrixFromCols(t,_) -> t
+            | CMatrixRow(t,_,_) -> t
+            | CMatrixCol(t,_,_) -> t
+
             | CVecLength(t,_) -> t
 
 
@@ -516,10 +526,18 @@ module CExpr =
                 used.AddType t
                 for c in c do visit used c
 
+            | CNewMatrix(t,c) ->
+                used.AddType t
+                for c in c do visit used c
+                
+
             | CMatrixFromRows(t,r) | CMatrixFromCols(t,r) ->
                 used.AddType t
                 for r in r do visit used r
 
+            | CMatrixRow(t,m,_) | CMatrixCol(t,m,_) ->
+                used.AddType t
+                visit used m
 
             | CAnd(l,r) | COr(l,r)
             | CLess(l,r) | CLequal(l,r) | CGreater(l,r) | CGequal(l,r) | CEqual(l,r) | CNotEqual(l,r) ->

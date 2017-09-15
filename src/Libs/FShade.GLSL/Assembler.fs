@@ -576,9 +576,76 @@ module Assembler =
                     let! i = assembleExprS i
                     return sprintf "%s[%s]" v i
 
-                | CMatrixFromCols _ | CMatrixFromRows _ ->
-                    return failwith "[GLSL] not implemented"
+                | CMatrixFromCols(t,cols) ->
+                    let! cols = cols |> List.mapS assembleExprS
+                    let! rev = AssemblerState.reverseMatrixLogic
+                    let t = assembleType t
 
+                    let code = sprintf "%s(%s)" t.Name (String.concat ", " cols)
+                    if rev then return sprintf "transpose(%s)" code
+                    else return code
+
+                | CMatrixFromRows(t, rows) ->
+                    let! rows = rows |> List.mapS assembleExprS
+                    let! rev = AssemblerState.reverseMatrixLogic
+                    let t = assembleType t
+
+                    let code = sprintf "%s(%s)" t.Name (String.concat ", " rows)
+                    if rev then return code
+                    else return sprintf "transpose(%s)" code
+
+                | CNewMatrix(t, elems) ->
+                    match t with
+                        | CMatrix(_,rows,cols) ->
+                            let! elems = elems |> List.mapS assembleExprS
+                            let! rev = AssemblerState.reverseMatrixLogic
+                            let t = assembleType t
+
+                            if rev then 
+                                return sprintf "%s(%s)" t.Name (String.concat ", " elems)
+                            else
+                                // transpose
+                                let elems =
+                                    let elems = List.toArray elems
+                                    [
+                                        for ri in 0 .. rows - 1 do
+                                            for ci in 0 .. cols - 1 do
+                                                yield elems.[rows * ci + ri]
+                                    ]
+
+                                return sprintf "%s(%s)" t.Name (String.concat ", " elems)
+
+                        | t ->
+                            return failwithf "[GLSL] invalid matrix type %A" t
+                
+                | CMatrixRow(t, m, row) ->
+                    match t with
+                        | CVector(_,d) ->
+                            let! m = assembleExprS m
+                            let! rev = AssemblerState.reverseMatrixLogic
+                            if rev then 
+                                return sprintf "%s[%d]" m row
+                            else 
+                                let t = assembleType t
+                                let args = List.init d (fun i -> sprintf "%s[%d][%d]" m i row)
+                                return sprintf "%s(%s)" t.Name (String.concat ", " args)
+                        | _ ->
+                            return failwith "sadsadsad"
+
+                | CMatrixCol(t, m, col) ->
+                    match t with
+                        | CVector(_,d) ->
+                            let! m = assembleExprS m
+                            let! rev = AssemblerState.reverseMatrixLogic
+                            if rev then 
+                                let t = assembleType t
+                                let args = List.init d (fun i -> sprintf "%s[%d][%d]" m i col)
+                                return sprintf "%s(%s)" t.Name (String.concat ", " args)
+                            else
+                                return sprintf "%s[%d]" m col
+                        | _ ->
+                            return failwith "sadsadsad"
+                    
 
         }
     

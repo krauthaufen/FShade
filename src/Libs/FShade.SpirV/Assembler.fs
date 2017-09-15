@@ -1054,7 +1054,7 @@ module Assembler =
                     yield OpExtInst(tid, id, 1u, int GLSLExtInstruction.Length, [| v |])
                     return id
 
-                | CMatrixElement _ | CMatrixFromCols _ | CMatrixFromRows _ ->
+                | CMatrixElement _ | CMatrixFromCols _ | CMatrixFromRows _ | CNewMatrix _ | CMatrixRow _ | CMatrixCol _ ->
                     return failwith "not implemented"
                     
                 | CConvert(t, e) ->

@@ -372,7 +372,202 @@ module IntrinsicFunctions =
                 exactly <@ Single.IsInfinity @>
                 exactly <@ Double.IsInfinity @>
             ]
-            
+
+            // ==========================================================================
+            // VECTOR relations
+            // ==========================================================================
+            CIntrinsic.tagged "any(lessThan({0},{1}))", [
+                exactly <@ fun (u : V2d) (v : V2d) -> u.AnySmaller(v) @>
+                exactly <@ V2d.AnySmaller : V2d * V2d -> bool @>
+                exactly <@ fun (u : V3d) (v : V3d) -> u.AnySmaller(v) @>
+                exactly <@ V3d.AnySmaller : V3d * V3d -> bool @>
+                exactly <@ fun (u : V4d) (v : V4d) -> u.AnySmaller(v) @>
+                exactly <@ V4d.AnySmaller : V4d * V4d -> bool @>
+
+                exactly <@ fun (u : V2i) (v : V2i) -> u.AnySmaller(v) @>
+                exactly <@ V2i.AnySmaller : V2i * V2i -> bool @>
+                exactly <@ fun (u : V3i) (v : V3i) -> u.AnySmaller(v) @>
+                exactly <@ V3i.AnySmaller : V3i * V3i -> bool @>
+                exactly <@ fun (u : V4i) (v : V4i) -> u.AnySmaller(v) @>
+                exactly <@ V4i.AnySmaller : V4i * V4i -> bool @>
+            ]
+
+            CIntrinsic.tagged "all(lessThan({0},{1}))", [
+                exactly <@ fun (u : V2d) (v : V2d) -> u.AllSmaller(v) @>
+                exactly <@ V2d.AllSmaller : V2d * V2d -> bool @>
+                exactly <@ fun (u : V3d) (v : V3d) -> u.AllSmaller(v) @>
+                exactly <@ V3d.AllSmaller : V3d * V3d -> bool @>
+                exactly <@ fun (u : V4d) (v : V4d) -> u.AllSmaller(v) @>
+                exactly <@ V4d.AllSmaller : V4d * V4d -> bool @>
+
+                exactly <@ fun (u : V2i) (v : V2i) -> u.AllSmaller(v) @>
+                exactly <@ V2i.AllSmaller : V2i * V2i -> bool @>
+                exactly <@ fun (u : V3i) (v : V3i) -> u.AllSmaller(v) @>
+                exactly <@ V3i.AllSmaller : V3i * V3i -> bool @>
+                exactly <@ fun (u : V4i) (v : V4i) -> u.AllSmaller(v) @>
+                exactly <@ V4i.AllSmaller : V4i * V4i -> bool @>
+            ]
+
+            CIntrinsic.tagged "any(lessThanEqual({0},{1}))", [
+                exactly <@ fun (u : V2d) (v : V2d) -> u.AnySmallerOrEqual(v) @>
+                exactly <@ V2d.AnySmallerOrEqual : V2d * V2d -> bool @>
+                exactly <@ fun (u : V3d) (v : V3d) -> u.AnySmallerOrEqual(v) @>
+                exactly <@ V3d.AnySmallerOrEqual : V3d * V3d -> bool @>
+                exactly <@ fun (u : V4d) (v : V4d) -> u.AnySmallerOrEqual(v) @>
+                exactly <@ V4d.AnySmallerOrEqual : V4d * V4d -> bool @>
+
+                exactly <@ fun (u : V2i) (v : V2i) -> u.AnySmallerOrEqual(v) @>
+                exactly <@ V2i.AnySmallerOrEqual : V2i * V2i -> bool @>
+                exactly <@ fun (u : V3i) (v : V3i) -> u.AnySmallerOrEqual(v) @>
+                exactly <@ V3i.AnySmallerOrEqual : V3i * V3i -> bool @>
+                exactly <@ fun (u : V4i) (v : V4i) -> u.AnySmallerOrEqual(v) @>
+                exactly <@ V4i.AnySmallerOrEqual : V4i * V4i -> bool @>
+            ]
+
+            CIntrinsic.tagged "all(lessThanEqual({0},{1}))", [
+                exactly <@ fun (u : V2d) (v : V2d) -> u.AllSmallerOrEqual(v) @>
+                exactly <@ V2d.AllSmallerOrEqual : V2d * V2d -> bool @>
+                exactly <@ fun (u : V3d) (v : V3d) -> u.AllSmallerOrEqual(v) @>
+                exactly <@ V3d.AllSmallerOrEqual : V3d * V3d -> bool @>
+                exactly <@ fun (u : V4d) (v : V4d) -> u.AllSmallerOrEqual(v) @>
+                exactly <@ V4d.AllSmallerOrEqual : V4d * V4d -> bool @>
+
+                exactly <@ fun (u : V2i) (v : V2i) -> u.AllSmallerOrEqual(v) @>
+                exactly <@ V2i.AllSmallerOrEqual : V2i * V2i -> bool @>
+                exactly <@ fun (u : V3i) (v : V3i) -> u.AllSmallerOrEqual(v) @>
+                exactly <@ V3i.AllSmallerOrEqual : V3i * V3i -> bool @>
+                exactly <@ fun (u : V4i) (v : V4i) -> u.AllSmallerOrEqual(v) @>
+                exactly <@ V4i.AllSmallerOrEqual : V4i * V4i -> bool @>
+            ]
+
+            CIntrinsic.tagged "any(greaterThan({0},{1}))", [
+                exactly <@ fun (u : V2d) (v : V2d) -> u.AnyGreater(v) @>
+                exactly <@ V2d.AnyGreater : V2d * V2d -> bool @>
+                exactly <@ fun (u : V3d) (v : V3d) -> u.AnyGreater(v) @>
+                exactly <@ V3d.AnyGreater : V3d * V3d -> bool @>
+                exactly <@ fun (u : V4d) (v : V4d) -> u.AnyGreater(v) @>
+                exactly <@ V4d.AnyGreater : V4d * V4d -> bool @>
+
+                exactly <@ fun (u : V2i) (v : V2i) -> u.AnyGreater(v) @>
+                exactly <@ V2i.AnyGreater : V2i * V2i -> bool @>
+                exactly <@ fun (u : V3i) (v : V3i) -> u.AnyGreater(v) @>
+                exactly <@ V3i.AnyGreater : V3i * V3i -> bool @>
+                exactly <@ fun (u : V4i) (v : V4i) -> u.AnyGreater(v) @>
+                exactly <@ V4i.AnyGreater : V4i * V4i -> bool @>
+            ]
+
+            CIntrinsic.tagged "all(greaterThan({0},{1}))", [
+                exactly <@ fun (u : V2d) (v : V2d) -> u.AllGreater(v) @>
+                exactly <@ V2d.AllGreater : V2d * V2d -> bool @>
+                exactly <@ fun (u : V3d) (v : V3d) -> u.AllGreater(v) @>
+                exactly <@ V3d.AllGreater : V3d * V3d -> bool @>
+                exactly <@ fun (u : V4d) (v : V4d) -> u.AllGreater(v) @>
+                exactly <@ V4d.AllGreater : V4d * V4d -> bool @>
+
+                exactly <@ fun (u : V2i) (v : V2i) -> u.AllGreater(v) @>
+                exactly <@ V2i.AllGreater : V2i * V2i -> bool @>
+                exactly <@ fun (u : V3i) (v : V3i) -> u.AllGreater(v) @>
+                exactly <@ V3i.AllGreater : V3i * V3i -> bool @>
+                exactly <@ fun (u : V4i) (v : V4i) -> u.AllGreater(v) @>
+                exactly <@ V4i.AllGreater : V4i * V4i -> bool @>
+            ]
+
+            CIntrinsic.tagged "any(greaterThanEqual({0},{1}))", [
+                exactly <@ fun (u : V2d) (v : V2d) -> u.AnyGreaterOrEqual(v) @>
+                exactly <@ V2d.AnyGreaterOrEqual : V2d * V2d -> bool @>
+                exactly <@ fun (u : V3d) (v : V3d) -> u.AnyGreaterOrEqual(v) @>
+                exactly <@ V3d.AnyGreaterOrEqual : V3d * V3d -> bool @>
+                exactly <@ fun (u : V4d) (v : V4d) -> u.AnyGreaterOrEqual(v) @>
+                exactly <@ V4d.AnyGreaterOrEqual : V4d * V4d -> bool @>
+
+                exactly <@ fun (u : V2i) (v : V2i) -> u.AnyGreaterOrEqual(v) @>
+                exactly <@ V2i.AnyGreaterOrEqual : V2i * V2i -> bool @>
+                exactly <@ fun (u : V3i) (v : V3i) -> u.AnyGreaterOrEqual(v) @>
+                exactly <@ V3i.AnyGreaterOrEqual : V3i * V3i -> bool @>
+                exactly <@ fun (u : V4i) (v : V4i) -> u.AnyGreaterOrEqual(v) @>
+                exactly <@ V4i.AnyGreaterOrEqual : V4i * V4i -> bool @>
+            ]
+
+            CIntrinsic.tagged "all(greaterThanEqual({0},{1}))", [
+                exactly <@ fun (u : V2d) (v : V2d) -> u.AllGreaterOrEqual(v) @>
+                exactly <@ V2d.AllGreaterOrEqual : V2d * V2d -> bool @>
+                exactly <@ fun (u : V3d) (v : V3d) -> u.AllGreaterOrEqual(v) @>
+                exactly <@ V3d.AllGreaterOrEqual : V3d * V3d -> bool @>
+                exactly <@ fun (u : V4d) (v : V4d) -> u.AllGreaterOrEqual(v) @>
+                exactly <@ V4d.AllGreaterOrEqual : V4d * V4d -> bool @>
+
+                exactly <@ fun (u : V2i) (v : V2i) -> u.AllGreaterOrEqual(v) @>
+                exactly <@ V2i.AllGreaterOrEqual : V2i * V2i -> bool @>
+                exactly <@ fun (u : V3i) (v : V3i) -> u.AllGreaterOrEqual(v) @>
+                exactly <@ V3i.AllGreaterOrEqual : V3i * V3i -> bool @>
+                exactly <@ fun (u : V4i) (v : V4i) -> u.AllGreaterOrEqual(v) @>
+                exactly <@ V4i.AllGreaterOrEqual : V4i * V4i -> bool @>
+            ]
+
+            CIntrinsic.tagged "any(equal({0},{1}))", [
+                exactly <@ fun (u : V2d) (v : V2d) -> u.AnyEqual(v) @>
+                exactly <@ V2d.AnyEqual : V2d * V2d -> bool @>
+                exactly <@ fun (u : V3d) (v : V3d) -> u.AnyEqual(v) @>
+                exactly <@ V3d.AnyEqual : V3d * V3d -> bool @>
+                exactly <@ fun (u : V4d) (v : V4d) -> u.AnyEqual(v) @>
+                exactly <@ V4d.AnyEqual : V4d * V4d -> bool @>
+
+                exactly <@ fun (u : V2i) (v : V2i) -> u.AnyEqual(v) @>
+                exactly <@ V2i.AnyEqual : V2i * V2i -> bool @>
+                exactly <@ fun (u : V3i) (v : V3i) -> u.AnyEqual(v) @>
+                exactly <@ V3i.AnyEqual : V3i * V3i -> bool @>
+                exactly <@ fun (u : V4i) (v : V4i) -> u.AnyEqual(v) @>
+                exactly <@ V4i.AnyEqual : V4i * V4i -> bool @>
+            ]
+
+            CIntrinsic.tagged "all(equal({0},{1}))", [
+                exactly <@ fun (u : V2d) (v : V2d) -> u.AllEqual(v) @>
+                exactly <@ V2d.AllEqual : V2d * V2d -> bool @>
+                exactly <@ fun (u : V3d) (v : V3d) -> u.AllEqual(v) @>
+                exactly <@ V3d.AllEqual : V3d * V3d -> bool @>
+                exactly <@ fun (u : V4d) (v : V4d) -> u.AllEqual(v) @>
+                exactly <@ V4d.AllEqual : V4d * V4d -> bool @>
+
+                exactly <@ fun (u : V2i) (v : V2i) -> u.AllEqual(v) @>
+                exactly <@ V2i.AllEqual : V2i * V2i -> bool @>
+                exactly <@ fun (u : V3i) (v : V3i) -> u.AllEqual(v) @>
+                exactly <@ V3i.AllEqual : V3i * V3i -> bool @>
+                exactly <@ fun (u : V4i) (v : V4i) -> u.AllEqual(v) @>
+                exactly <@ V4i.AllEqual : V4i * V4i -> bool @>
+            ]
+
+            CIntrinsic.tagged "any(notEqual({0},{1}))", [
+                exactly <@ fun (u : V2d) (v : V2d) -> u.AnyDifferent(v) @>
+                exactly <@ V2d.AnyDifferent : V2d * V2d -> bool @>
+                exactly <@ fun (u : V3d) (v : V3d) -> u.AnyDifferent(v) @>
+                exactly <@ V3d.AnyDifferent : V3d * V3d -> bool @>
+                exactly <@ fun (u : V4d) (v : V4d) -> u.AnyDifferent(v) @>
+                exactly <@ V4d.AnyDifferent : V4d * V4d -> bool @>
+
+                exactly <@ fun (u : V2i) (v : V2i) -> u.AnyDifferent(v) @>
+                exactly <@ V2i.AnyDifferent : V2i * V2i -> bool @>
+                exactly <@ fun (u : V3i) (v : V3i) -> u.AnyDifferent(v) @>
+                exactly <@ V3i.AnyDifferent : V3i * V3i -> bool @>
+                exactly <@ fun (u : V4i) (v : V4i) -> u.AnyDifferent(v) @>
+                exactly <@ V4i.AnyDifferent : V4i * V4i -> bool @>
+            ]
+
+            CIntrinsic.tagged "all(notEqual({0},{1}))", [
+                exactly <@ fun (u : V2d) (v : V2d) -> u.AllDifferent(v) @>
+                exactly <@ V2d.AllDifferent : V2d * V2d -> bool @>
+                exactly <@ fun (u : V3d) (v : V3d) -> u.AllDifferent(v) @>
+                exactly <@ V3d.AllDifferent : V3d * V3d -> bool @>
+                exactly <@ fun (u : V4d) (v : V4d) -> u.AllDifferent(v) @>
+                exactly <@ V4d.AllDifferent : V4d * V4d -> bool @>
+
+                exactly <@ fun (u : V2i) (v : V2i) -> u.AllDifferent(v) @>
+                exactly <@ V2i.AllDifferent : V2i * V2i -> bool @>
+                exactly <@ fun (u : V3i) (v : V3i) -> u.AllDifferent(v) @>
+                exactly <@ V3i.AllDifferent : V3i * V3i -> bool @>
+                exactly <@ fun (u : V4i) (v : V4i) -> u.AllDifferent(v) @>
+                exactly <@ V4i.AllDifferent : V4i * V4i -> bool @>
+            ]
+
             // ==========================================================================
             // GEOMETRIC
             // ==========================================================================
@@ -443,6 +638,53 @@ module IntrinsicFunctions =
                 exactly <@ fun (v : M44d) -> v.Inverse @>
                 generic <@ Mat.inverse : M22d -> M22d @>
             ]
+
+            
+            // ==========================================================================
+            // BITWISE stuff
+            // ==========================================================================
+            CIntrinsic.simple "bitfieldExtract", [ 
+                exactly <@ Bitwise.BitFieldExtract : uint32 * _ * _ -> _ @> 
+                exactly <@ Bitwise.BitFieldExtract : int * _ * _ -> _ @> 
+                exactly <@ Bitwise.BitFieldExtract : uint64 * _ * _ -> _ @> 
+                exactly <@ Bitwise.BitFieldExtract : int64 * _ * _ -> _ @> 
+            ]
+
+            CIntrinsic.simple "bitfieldInsert", [ 
+                exactly <@ Bitwise.BitFieldInsert : uint32 * _ * _ * _ -> _ @> 
+                exactly <@ Bitwise.BitFieldInsert : int * _ * _ * _ -> _ @> 
+                exactly <@ Bitwise.BitFieldInsert : uint64 * _ * _ * _ -> _ @> 
+                exactly <@ Bitwise.BitFieldInsert : int64 * _ * _ * _ -> _ @> 
+            ]
+
+            CIntrinsic.simple "bitfieldReverse", [ 
+                exactly <@ Bitwise.BitFieldReverse : uint32 -> _ @> 
+                exactly <@ Bitwise.BitFieldReverse : int -> _ @> 
+                exactly <@ Bitwise.BitFieldReverse : uint64 -> _ @> 
+                exactly <@ Bitwise.BitFieldReverse : int64 -> _ @> 
+            ]
+
+            CIntrinsic.simple "bitCount", [ 
+                exactly <@ Bitwise.BitCount : uint32 -> _ @> 
+                exactly <@ Bitwise.BitCount : int -> _ @> 
+                exactly <@ Bitwise.BitCount : uint64 -> _ @> 
+                exactly <@ Bitwise.BitCount : int64 -> _ @> 
+            ]
+
+            CIntrinsic.simple "findMSB", [ 
+                exactly <@ Bitwise.MSB : uint32 -> _ @> 
+                exactly <@ Bitwise.MSB : int -> _ @> 
+                exactly <@ Bitwise.MSB : uint64 -> _ @> 
+                exactly <@ Bitwise.MSB : int64 -> _ @> 
+            ]
+
+            CIntrinsic.simple "findLSB", [ 
+                exactly <@ Bitwise.LSB : uint32 -> _ @> 
+                exactly <@ Bitwise.LSB : int -> _ @> 
+                exactly <@ Bitwise.LSB : uint64 -> _ @> 
+                exactly <@ Bitwise.LSB : int64 -> _ @> 
+            ]
+
 
             // ==========================================================================
             // GLOBAL

@@ -230,6 +230,40 @@ module Primitives =
         let w = float (v &&& 0xFFu) / 255.0
         V4d(2.0 * x - 1.0, 2.0 * y - 1.0, 2.0 * z - 1.0, 2.0 * w - 1.0)
 
+    [<AbstractClass; Sealed>]
+    type Bitwise private() = 
+        static member BitFieldExtract (v : uint32, offset : int, bits : int) : uint32 = failwith ""
+        static member BitFieldExtract (v : int, offset : int, bits : int) : int = failwith ""
+        static member BitFieldExtract (v : uint64, offset : int, bits : int) : uint64 = failwith ""
+        static member BitFieldExtract (v : int64, offset : int, bits : int) : int64 = failwith ""
+
+        static member BitFieldInsert (v : uint32, insert : uint32, offset : int, bits : int) : uint32 = failwith ""
+        static member BitFieldInsert (v : int, insert : int, offset : int, bits : int) : int = failwith ""
+        static member BitFieldInsert (v : uint64, insert : uint64, offset : int, bits : int) : uint64 = failwith ""
+        static member BitFieldInsert (v : int64, insert : int64, offset : int, bits : int) : int64 = failwith ""
+
+        static member BitFieldReverse (v : uint32) : uint32 = failwith ""
+        static member BitFieldReverse (v : int) : int = failwith ""
+        static member BitFieldReverse (v : uint64) : uint64 = failwith ""
+        static member BitFieldReverse (v : int64) : int64 = failwith ""
+
+        static member BitCount (v : uint32) : int = failwith ""
+        static member BitCount (v : int) : int = failwith ""
+        static member BitCount (v : uint64) : int = failwith ""
+        static member BitCount (v : int64) : int = failwith ""
+
+        static member MSB(v : uint32) : int = failwith ""
+        static member MSB(v : int) : int = failwith ""
+        static member MSB(v : uint64) : int = failwith ""
+        static member MSB(v : int64) : int = failwith ""
+
+        static member LSB(v : uint32) : int = failwith ""
+        static member LSB(v : int) : int = failwith ""
+        static member LSB(v : uint64) : int = failwith ""
+        static member LSB(v : int64) : int = failwith ""
+
+
+
     let getGlobalId() : V3i = failwith "_"
     let getWorkGroupId() : V3i = failwith ""
     let getLocalId() : V3i = failwith ""

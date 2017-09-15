@@ -457,46 +457,28 @@ module Compiler =
 
                 // matrix swizzles
                 | Method("get_R0", [MatrixOf _]), [m] -> 
-                    match m.ctype, ct with
-                        | CMatrix(_,r,c), CVector(t, d) -> CNewVector(ct, d, List.init c (fun c -> CMatrixElement(t, m, 0, c))) |> Some
-                        | _ -> None
+                    CMatrixRow(ct, m, 0) |> Some
 
                 | Method("get_R1", [MatrixOf _]), [m] -> 
-                    match m.ctype, ct with
-                        | CMatrix(_,r,c), CVector(t, d) -> CNewVector(ct, d, List.init c (fun c -> CMatrixElement(t, m, 1, c))) |> Some
-                        | _ -> None
-                    
+                    CMatrixRow(ct, m, 1) |> Some
+
                 | Method("get_R2", [MatrixOf _]), [m] -> 
-                    match m.ctype, ct with
-                        | CMatrix(_,r,c), CVector(t, d) -> CNewVector(ct, d, List.init c (fun c -> CMatrixElement(t, m, 2, c))) |> Some
-                        | _ -> None
+                    CMatrixRow(ct, m, 2) |> Some
                     
                 | Method("get_R3", [MatrixOf _]), [m] -> 
-                    match m.ctype, ct with
-                        | CMatrix(_,r,c), CVector(t, d) -> CNewVector(ct, d, List.init c (fun c -> CMatrixElement(t, m, 3, c))) |> Some
-                        | _ -> None
+                    CMatrixRow(ct, m, 3) |> Some
 
                 | Method("get_C0", [MatrixOf _]), [m] -> 
-                    match m.ctype, ct with
-                        | CMatrix(_,r,c), CVector(t, d) -> CNewVector(ct, d, List.init r (fun r -> CMatrixElement(t, m, r, 0))) |> Some
-                        | _ -> None
+                    CMatrixCol(ct, m, 0) |> Some
 
                 | Method("get_C1", [MatrixOf _]), [m] -> 
-                    match m.ctype, ct with
-                        | CMatrix(_,r,c), CVector(t, d) -> CNewVector(ct, d, List.init r (fun r -> CMatrixElement(t, m, r, 1))) |> Some
-                        | _ -> None
+                    CMatrixCol(ct, m, 1) |> Some
 
                 | Method("get_C2", [MatrixOf _]), [m] -> 
-                    match m.ctype, ct with
-                        | CMatrix(_,r,c), CVector(t, d) -> CNewVector(ct, d, List.init r (fun r -> CMatrixElement(t, m, r, 2))) |> Some
-                        | _ -> None
+                    CMatrixCol(ct, m, 2) |> Some
 
                 | Method("get_C3", [MatrixOf _]), [m] -> 
-                    match m.ctype, ct with
-                        | CMatrix(_,r,c), CVector(t, d) -> CNewVector(ct, d, List.init r (fun r -> CMatrixElement(t, m, r, 3))) |> Some
-                        | _ -> None
-
-
+                    CMatrixCol(ct, m, 3) |> Some
 
 
                 | Method("op_BooleanAnd", _), [l;r]         -> CExpr.CAnd(l, r) |> Some
@@ -526,6 +508,12 @@ module Compiler =
                 | VectorOf(d, t) ->
                     CNewVector(CType.ofType b ctor.DeclaringType, d, args) |> Some
 
+                | MatrixOf(s, t) ->
+                    let args = List.toArray args
+                    if args.Length = s.X * s.Y then
+                        CNewMatrix(CType.ofType b ctor.DeclaringType, Array.toList args) |> Some
+                    else
+                        None
                 | _ ->
                     None
 
