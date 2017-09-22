@@ -483,6 +483,12 @@ module Assembler =
                     let s = assembleVecSwizzle s
                     return sprintf "%s.%s" v s
 
+                | CVecItem(_, v, i) ->
+                    let! v = assembleExprS v
+                    let! i = assembleExprS i
+                    return sprintf "%s[%s]" v i
+                    
+
                 | CNewVector(r, _, args) ->
                     let! args = assembleExprsS ", " args
                     let t = assembleType r

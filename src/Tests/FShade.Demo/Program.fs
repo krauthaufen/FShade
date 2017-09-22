@@ -525,20 +525,24 @@ let scan1 (v : float) =
 
     (left, right)
 
+let sammy =
+    sampler2d {
+        textureArray uniform?Texture 10
+        filter Filter.Anisotropic
+    }
+
 [<LocalSize(X = 32)>]
 let computer (f : Expr<float -> float -> float>) (a : float[]) (b : float[]) (c : Image2d<Formats.r32f>) =
     compute {
         let id = getGlobalId()
         let i = id.X
 
-        let sad : float[] = allocateShared 1
+        let aasd = sammy.[0].Sample(V2d.Zero).[i % 4]
 
-        let hugo = a.[i] * 7.0 + 2.0
-        sad.[0] <- hugo
+        let hugo = a.[i] * 7.0 + 2.0 * aasd
 
-        let (l,r) = scan1 hugo
-        b.[i] <- (%f) a.[i] (float l)
-
+        //let (l,r) = scan1 hugo
+        b.[i] <- (%f) a.[i] hugo
     }
 
 

@@ -904,8 +904,11 @@ type ShaderTextureHandle(semantic : string, scope : UniformScope) =
         member x.Semantic = semantic
         member x.Scope = scope
 
+    member x.WithIndex (i : int) =
+        ShaderTextureHandle(semantic + string i, scope)
 
     new() = ShaderTextureHandle(null, Unchecked.defaultof<UniformScope>)       
+    
 
 type TextureMustBeSpecified = TextureMustBeSpecified
 
@@ -916,35 +919,40 @@ type SamplerBaseBuilder() =
     member x.Texture(b : TextureMustBeSpecified, t : ShaderTextureHandle) =
         (t, SamplerState.empty)
 
+    [<CustomOperation("textureArray")>]
+    member x.TextureArray(b : TextureMustBeSpecified, t : ShaderTextureHandle, count : int) =
+        ((t, count), SamplerState.empty)
+
+
     [<CustomOperation("addressU")>]
-    member x.AddressU((t : ShaderTextureHandle, h : SamplerState), w : WrapMode) = t,{ h with AddressU = Some w }
+    member x.AddressU((t, h : SamplerState), w : WrapMode) = t,{ h with AddressU = Some w }
              
     [<CustomOperation("addressV")>]
-    member x.AddressV((t : ShaderTextureHandle, h : SamplerState), w : WrapMode) = t,{ h with AddressV = Some w }
+    member x.AddressV((t, h : SamplerState), w : WrapMode) = t,{ h with AddressV = Some w }
              
     [<CustomOperation("addressW")>]
-    member x.AddressW((t : ShaderTextureHandle, h : SamplerState), w : WrapMode) = t,{ h with AddressW = Some w }
+    member x.AddressW((t, h : SamplerState), w : WrapMode) = t,{ h with AddressW = Some w }
              
     [<CustomOperation("maxAnisotropy")>]
-    member x.MaxAnisotropy((t : ShaderTextureHandle, h : SamplerState), a : int) = t,{ h with MaxAnisotropy = Some a }
+    member x.MaxAnisotropy((t, h : SamplerState), a : int) = t,{ h with MaxAnisotropy = Some a }
              
     [<CustomOperation("borderColor")>]
-    member x.BorderColor((t : ShaderTextureHandle, h : SamplerState), c : C4f) = t,{ h with BorderColor = Some c }
+    member x.BorderColor((t, h : SamplerState), c : C4f) = t,{ h with BorderColor = Some c }
              
     [<CustomOperation("maxLod")>]
-    member x.MaxLod((t : ShaderTextureHandle, h : SamplerState), c : float) = t,{ h with MaxLod = Some c }
+    member x.MaxLod((t, h : SamplerState), c : float) = t,{ h with MaxLod = Some c }
              
     [<CustomOperation("minLod")>]
-    member x.MinLod((t : ShaderTextureHandle, h : SamplerState), c : float) = t,{ h with MinLod = Some c }
+    member x.MinLod((t, h : SamplerState), c : float) = t,{ h with MinLod = Some c }
              
     [<CustomOperation("mipLodBias")>]
-    member x.MipLodBias((t : ShaderTextureHandle, h : SamplerState), c : float) = t,{ h with MipLodBias = Some c }
+    member x.MipLodBias((t, h : SamplerState), c : float) = t,{ h with MipLodBias = Some c }
              
     [<CustomOperation("filter")>]
-    member x.Filter((t : ShaderTextureHandle, h : SamplerState), f : Filter) = t,{ h with Filter = Some f }
+    member x.Filter((t, h : SamplerState), f : Filter) = t,{ h with Filter = Some f }
 
     [<CustomOperation("comparison")>]
-    member x.Comparison((t : ShaderTextureHandle, h : SamplerState), f : ComparisonFunction) = t,{ h with Comparison = Some f }
+    member x.Comparison((t, h : SamplerState), f : ComparisonFunction) = t,{ h with Comparison = Some f }
 
 [<AutoOpen>]
 module UniformExtensions =

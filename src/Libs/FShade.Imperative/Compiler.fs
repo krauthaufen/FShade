@@ -411,6 +411,7 @@ module Compiler =
                 | (MethodQuote <@ Vec.xyz : V4d -> V3d @> _), [v] -> CVecSwizzle(ct, v, CVecComponent.xyz) |> Some
                 | (MethodQuote <@ Vec.yzw : V4d -> V3d @> _), [v] -> CVecSwizzle(ct, v, CVecComponent.yzw) |> Some
 
+                | Method("get_Item", [VectorOf _; Int32]), [v;i] -> CVecItem(ct, v, i) |> Some
 
                 | Method("get_ZW", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Z; CVecComponent.W]) |> Some
                 | Method("get_WZ", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.W; CVecComponent.Z]) |> Some
