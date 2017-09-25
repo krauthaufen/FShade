@@ -220,7 +220,9 @@ module ExprExtensions =
             let withDebug = m.CreateDelegate(typeof<WithDebugDel>) |> unbox<WithDebugDel>
 
             fun (e : Expr) (debug : list<Expr>) ->
-                withDebug.Invoke(e, debug)
+                match e.CustomAttributes, debug with
+                    | [], [] -> e
+                    | _ -> withDebug.Invoke(e, debug)
 
     module private Pickler =
         open MBrace.FsPickler
@@ -229,6 +231,7 @@ module ExprExtensions =
         open Microsoft.FSharp.Reflection
 
         let registry = new CustomPicklerRegistry()
+
 
         let varPickler (r : IPicklerResolver) =
             let makeVar (name : string) (t : string) (isMutable : bool) = Var(name, Type.GetType t, isMutable)
@@ -246,8 +249,11 @@ module ExprExtensions =
 
                 let rec writer (ws : WriteState) (e : Expr) =
             
-                    match e with    
+                    match Reflection.withAttributes e [] with    
                         | NewTuple [String "DebugRange"; _] ->
+                            ()
+
+                        | NewTuple [String "Method"; _] ->
                             ()
 
                         | ShapeVar v -> 
@@ -290,6 +296,16 @@ module ExprExtensions =
                         None
             )
 
+        member x.Method =
+            x.CustomAttributes |> List.tryPick (fun e ->
+                match e with
+                    | NewTuple [String "Method"; Value((:? System.Reflection.MethodBase as m),_)] ->
+                        Some m
+                    | _ ->
+                        None
+            )
+            
+
         member x.NamedValues =
             match x with
                 | ValueWithName(v, t, name) ->
@@ -308,8 +324,10 @@ module ExprExtensions =
                 | [], [] -> x
                 | _ -> Reflection.withAttributes x attributes
 
-
+                
         static member ComputeHash(e : Expr) =
+            let e = e.WithAttributes []
+
             use s = Pickler.murmur.Create()
             Pickler.pickler.Serialize(s, e)
             s.ComputeHash() |> Convert.ToBase64String

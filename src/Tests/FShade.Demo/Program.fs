@@ -341,57 +341,6 @@ module TessDeconstruct =
         }
 
 
-    //[<MethodImpl(MethodImplOptions.NoInlining)>]
-    let manyArgs (a : int) (b : float) (c : byte) (d : int64) (e : uint64) (f : string) (g : obj) =
-        float a + b + float c + float d + float e + float f.Length + float (g.GetHashCode())
-
-    let someFunction (a : V4d) (b : V4d) (c : V4d) = a + b * c
-    
-    let testLocalLambdaNoClosure() =
-        let someFunction (a : V4d) (b : V4d) (c : V4d) = a + b * c
-        let test2 = someFunction V4d.IIII
-        let test3 = test2 V4d.IIII
-        let s0 = FunctionSignature.ofFunction test3
-        let s1 = FunctionSignature.ofFunction (fun a -> someFunction V4d.IIII V4d.IIII a)
-        s0 = s1
-
-    let testLocalLambdaNoClosure7() =
-        let manyArgs (a : int) (b : float) (c : byte) (d : int64) (e : uint64) (f : string) (g : obj) =
-            float a + b + float c + float d
-            
-        let test2 = manyArgs 1 2.0 3uy
-        let test3 = test2 4L 5UL "6"
-        let s0 = FunctionSignature.ofFunction test3
-        let s1 = FunctionSignature.ofFunction (fun a -> manyArgs 1 2.0 3uy 4L 5UL "6" a)
-        s0 = s1
-
-
-    let testStatic3Args() =
-        let test2 = someFunction V4d.IIII
-        let test3 = test2 V4d.IIII
-        let s0 = FunctionSignature.ofFunction test3
-        let s1 = FunctionSignature.ofFunction (fun a -> someFunction V4d.IIII V4d.IIII a)
-        s0 = s1
-
-    let testStatic7Args() =
-        let test2 = manyArgs 1 2.0 3uy
-        let test3 = test2 4L 5UL "6"
-        let s0 = FunctionSignature.ofFunction test3
-        let s1 = FunctionSignature.ofFunction (fun a -> manyArgs 1 2.0 3uy 4L 5UL "6" a)
-        s0 = s1
-
-
-
-    let signatureTest() =
-        //printfn "local3:  %A" (testLocalLambdaNoClosure())
-        //printfn "static3: %A" (testStatic3Args())
-        //printfn "local7:  %A" (testLocalLambdaNoClosure7())
-        printfn "static7: %A" (testStatic7Args())
-
-        System.Environment.Exit 0
-        let s = FunctionSignature.ofFunction manyArgs
-        printfn "%A" s
-
     let run() =
 
         let config =
@@ -528,8 +477,6 @@ let computer (f : Expr<float -> float -> float>) (a : float[]) (b : float[]) (c 
         let id = getGlobalId()
         let i = id.X + 17
 
-
-
         let aasd = sammy.[0].Sample(V2d.Zero).[i % 4]
 
         //let (l,r) = scan1 hugo
@@ -541,11 +488,16 @@ let computer (f : Expr<float -> float -> float>) (a : float[]) (b : float[]) (c 
 
 
 
+
+
 [<LocalSize(X = MaxLocalSize)>]
 let scan (add : Expr<'a -> 'a -> 'a>) (zero : Expr<'a>) (input : 'a[]) (output : 'a[]) =
     compute {
         let elems = LocalSize.X
         let temp = allocateShared<'a> LocalSize.X
+
+
+
 
         let gid = getGlobalId().X
         let lid = getLocalId().X
@@ -621,27 +573,42 @@ open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Quotations.Patterns
 open Microsoft.FSharp.Quotations.DerivedPatterns
 
+let sepp1 a b c d e f =
+    let m = MethodBase.GetCurrentMethod()
+    printfn "%A" m
+    a + b + c + d + e + f
+
 [<EntryPoint>]
 let main args =
-    let a = computer <@ (+) @> null null
-    let b = a (Image2d<Formats.r32f>()) 
-    let c = b 1 0.5 1
+//    let a = computer <@ (+) @> null null
+//    let b = a (Image2d<Formats.r32f>()) 
+//    let c = b 1 0.5 1
+//
+//    let meth = 
+//        c.CustomAttributes |> List.tryPick (fun att ->
+//            match att with
+//                | NewTuple [ String "Method"; Value((:? MethodBase as m),_) ] -> Some m
+//                | _ -> None
+//        )
+//
+//    printfn "%A" meth
+//
+//    System.Environment.Exit 0
+//
+//    let mutable g = 10
+//
+//    let sepp  a b c d e f =
+//        let m = MethodBase.GetCurrentMethod()
+//        printfn "%A" m
+//        a + b + c + d + e + f + g
 
-    let meth = 
-        c.CustomAttributes |> List.tryPick (fun att ->
-            match att with
-                | NewTuple [ String "Method"; Value((:? MethodBase as m),_) ] -> Some m
-                | _ -> None
-        )
-
-    printfn "%A" meth
-
-    System.Environment.Exit 0
-
+//
+//    sepp1 1 2 3 4 5 6 |> ignore
+//    //g <- 10
+//    System.Environment.Exit 0
 
 //    let e = scan <@ (+) @> <@ 0 @> null null
 //    for i in 1 .. 5 do Expr.ComputeHash e |> ignore
-//
 //
 //    let iter = 1000
 //    let mutable hash = ""
@@ -651,17 +618,17 @@ let main args =
 //    sw.Stop()
 //    Log.line "took: %A" (sw.MicroTime / iter)
 //    Log.line "%s" hash
-//
+
 //    TessDeconstruct.signatureTest()
 //    TessDeconstruct.run()
 //    System.Environment.Exit 0
 //
-//    let maxGroupSize = V3i(128, 1024, 1024)
-//    let test = ComputeShader.ofFunction maxGroupSize (computer <@ (+) @>)
-//    let m = ComputeShader.toModule test
-//    let glsl = ModuleCompiler.compileGLSLVulkan m
-//    printfn "%s" glsl.code
-//    System.Environment.Exit 0
+    let maxGroupSize = V3i(128, 1024, 1024)
+    let test = ComputeShader.ofFunction maxGroupSize (computer <@ (+) @>)
+    let m = ComputeShader.toModule test
+    let glsl = ModuleCompiler.compileGLSLVulkan m
+    printfn "%s" glsl.code
+    System.Environment.Exit 0
 //
 //
 //    effectTest()

@@ -53,13 +53,11 @@ module ComputeShader =
     
     [<AutoOpen>]
     module private Utils =
-        open FunctionSignature
         open System.Reflection.Emit
 
         type Invoker<'a, 'b>() =
             static let invoke =
                 let t = typeof<'a>
-                let m = t.InvokeMethod
 
                 let rec decompose (t : Type) =
                     if FSharpType.IsFunction t then
@@ -308,30 +306,64 @@ module ComputeShader =
             csShared        = Map.empty
         }
 
-    let private cache = System.Collections.Concurrent.ConcurrentDictionary<IFunctionSignature * V3i, ComputeShader>()
+    let private cache = System.Collections.Concurrent.ConcurrentDictionary<string * V3i, ComputeShader>()
+
+    
 
     let ofFunction (maxLocalSize : V3i) (f : 'a -> 'b) : ComputeShader =
-        let signature = FunctionSignature.ofFunction f
+        match tryExtractExpr f with
+            | Some body ->
+                let hash = Expr.ComputeHash body
 
-        cache.GetOrAdd((signature, maxLocalSize), fun (signature, maxLocalSize) ->
-            let localSize = 
-                match FunctionSignature.tryGetAttribute<LocalSizeAttribute> signature with
-                    | Some size -> V3i(size.X, size.Y, size.Z)
-                    | _ -> V3i(0, 0, 0)
+                cache.GetOrAdd((hash, maxLocalSize), fun (signature, maxLocalSize) ->
+                    let localSize =
+                        match body.Method with
+                            | Some mb -> 
+                                match mb.GetCustomAttributes<LocalSizeAttribute>() |> Seq.tryHead with
+                                    | Some att -> V3i(att.X, att.Y, att.Z)
+                                    | _ -> 
+                                        Log.warn "[FShade] compute shader without local-size"
+                                        V3i(1,1,1)
+                            | None ->
+                                Log.warn "[FShade] compute shader without local-size"
+                                V3i(1,1,1)
 
-            let localSize =
-                V3i(
-                    (if localSize.X = MaxLocalSize then maxLocalSize.X else localSize.X),
-                    (if localSize.Y = MaxLocalSize then maxLocalSize.Y else localSize.Y),
-                    (if localSize.Z = MaxLocalSize then maxLocalSize.Z else localSize.Z)
-                )
+                    let localSize =
+                        V3i(
+                            (if localSize.X = MaxLocalSize then maxLocalSize.X else localSize.X),
+                            (if localSize.Y = MaxLocalSize then maxLocalSize.Y else localSize.Y),
+                            (if localSize.Z = MaxLocalSize then maxLocalSize.Z else localSize.Z)
+                        )
 
-            match tryExtractExpr f with
-                | Some body ->
                     ofExpr localSize body
-                | _ ->
-                    failwithf "[FShade] cannot create compute shader using function: %A" f
-        )
+
+
+                )
+            | None ->
+                failwithf "[FShade] cannot create compute shader using function: %A" f
+//
+//
+//        let signature = FunctionSignature.ofFunction f
+//
+//        cache.GetOrAdd((signature, maxLocalSize), fun (signature, maxLocalSize) ->
+//            let localSize = 
+//                match FunctionSignature.tryGetAttribute<LocalSizeAttribute> signature with
+//                    | Some size -> V3i(size.X, size.Y, size.Z)
+//                    | _ -> V3i(0, 0, 0)
+//
+//            let localSize =
+//                V3i(
+//                    (if localSize.X = MaxLocalSize then maxLocalSize.X else localSize.X),
+//                    (if localSize.Y = MaxLocalSize then maxLocalSize.Y else localSize.Y),
+//                    (if localSize.Z = MaxLocalSize then maxLocalSize.Z else localSize.Z)
+//                )
+//
+//            match tryExtractExpr f with
+//                | Some body ->
+//                    ofExpr localSize body
+//                | _ ->
+//                    failwithf "[FShade] cannot create compute shader using function: %A" f
+//        )
 
     let toEntryPoint (s : ComputeShader) =
         let bufferArguments = 
