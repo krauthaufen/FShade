@@ -7,8 +7,11 @@ open Microsoft.FSharp.Reflection
 open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Quotations.Patterns
 open Microsoft.FSharp.Quotations.DerivedPatterns
+open Microsoft.FSharp.Quotations.ExprShape
 
 open Aardvark.Base
+
+#nowarn "8989"
 
 module Peano = 
     let private peanoTypes =
@@ -195,8 +198,124 @@ module ExprExtensions =
 
         let unroll = getMethodInfo <@ Preprocessor.unroll : unit -> unit @>
 
+    module private Reflection = 
+        open System.Reflection.Emit
+
+        type private WithDebugDel = delegate of Expr * list<Expr> -> Expr
+
+        let withAttributes =
+            let fi = typeof<Expr>.GetField("term", BindingFlags.NonPublic ||| BindingFlags.Instance)
+            let ctor = typeof<Expr>.GetConstructor(BindingFlags.NonPublic ||| BindingFlags.Static ||| BindingFlags.CreateInstance ||| BindingFlags.Instance, Type.DefaultBinder, CallingConventions.Any, [| fi.FieldType; typeof<list<Expr>> |], null)
+
+            let m = DynamicMethod("withoutDebug", MethodAttributes.Static ||| MethodAttributes.Public, CallingConventions.Standard, typeof<Expr>, [| typeof<Expr>; typeof<list<Expr>> |], typeof<Expr>, true)
+            let il = m.GetILGenerator()
+
+            il.Emit(OpCodes.Ldarg_0)
+            il.Emit(OpCodes.Ldfld, fi)
+            il.Emit(OpCodes.Ldarg_1)
+            il.Emit(OpCodes.Newobj, ctor)
+            il.Emit(OpCodes.Ret)
+
+        
+            let withDebug = m.CreateDelegate(typeof<WithDebugDel>) |> unbox<WithDebugDel>
+
+            fun (e : Expr) (debug : list<Expr>) ->
+                withDebug.Invoke(e, debug)
+
+    module private Pickler =
+        open MBrace.FsPickler
+        open MBrace.FsPickler.Combinators
+        open MBrace.FsPickler.Hashing
+        open Microsoft.FSharp.Reflection
+
+        let registry = new CustomPicklerRegistry()
+
+        let varPickler (r : IPicklerResolver) =
+            let makeVar (name : string) (t : string) (isMutable : bool) = Var(name, Type.GetType t, isMutable)
+            Pickler.product makeVar
+            ^+ Pickler.field (fun (v : Var) -> v.Name) Pickler.string
+            ^+ Pickler.field (fun (v : Var) -> v.Type.Name) Pickler.string
+            ^. Pickler.field (fun (v : Var) -> v.IsMutable) Pickler.bool
+
+        let exprPickler (r : IPicklerResolver) =
+            let varPickler = r.Resolve<Var>()
+            let infoPickler = r.Resolve<obj>()
+
+            Pickler.fix (fun self ->
+                let selfList = Pickler.list self
+
+                let rec writer (ws : WriteState) (e : Expr) =
+            
+                    match e with    
+                        | NewTuple [String "DebugRange"; _] ->
+                            ()
+
+                        | ShapeVar v -> 
+                            Pickler.string.Write ws "Kind" "Var"
+                            varPickler.Write ws "Var" v
+
+
+                        | ShapeLambda(v, b) ->
+                            Pickler.string.Write ws "Kind" "Lambda"
+                            varPickler.Write ws "Var" v
+                            self.Write ws "Body" b
+
+                        | ShapeCombination(o, args) ->
+                            Pickler.string.Write ws "Kind" "Comb"
+                            infoPickler.Write ws "Info" o
+                            selfList.Write ws "Children" args
+
+                let reader (rs : ReadState) : Expr =
+                    failwith ""
+
+                Pickler.FromPrimitives(reader, writer)
+            )
+
+        do registry.RegisterFactory varPickler
+           registry.RegisterFactory exprPickler
+
+        let cache = PicklerCache.FromCustomPicklerRegistry registry
+        let murmur = MurMur3() :> IHashStreamFactory
+        let pickler = FsPickler.CreateBinarySerializer(picklerResolver = cache)
+
 
     type Expr with
+    
+        member x.DebugRange =
+            x.CustomAttributes |> List.tryPick (fun e ->
+                match e with
+                    | NewTuple [String "DebugRange"; NewTuple [ String file; Int32 startLine; Int32 startCol; Int32 endLine; Int32 endCol]] ->
+                        Some(file, startLine, startCol, endLine, endCol)
+                    | _ ->
+                        None
+            )
+
+        member x.NamedValues =
+            match x with
+                | ValueWithName(v, t, name) ->
+                    if name.Contains "@" then Map.empty
+                    else Map.ofList [name, (v,t)]
+                | ShapeVar _ -> Map.empty
+                | ShapeLambda(_,b) -> b.NamedValues
+                | ShapeCombination(_,args) ->
+                    let mutable res = Map.empty
+                    for a in args do
+                        res <- Map.union res a.NamedValues
+                    res
+
+        member x.WithAttributes(attributes : list<Expr>) =
+            match attributes, x.CustomAttributes with
+                | [], [] -> x
+                | _ -> Reflection.withAttributes x attributes
+
+
+        static member ComputeHash(e : Expr) =
+            use s = Pickler.murmur.Create()
+            Pickler.pickler.Serialize(s, e)
+            s.ComputeHash() |> Convert.ToBase64String
+
+        member x.ComputeHash() =
+            Expr.ComputeHash x
 
         static member Ignore(e : Expr) =
             if e.Type = typeof<unit> then 

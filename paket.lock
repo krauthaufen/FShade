@@ -36,7 +36,8 @@ NUGET
       System.Collections.Immutable (>= 1.2)
   remote: https://api.nuget.org/v3/index.json
     FSharp.Core (4.0.0.1)
-    FsPickler (3.3)
+    FsPickler (4.0)
+      FSharp.Core (>= 3.1)
     Microsoft.NETCore.Platforms (2.0)
     NETStandard.Library (2.0)
       Microsoft.NETCore.Platforms (>= 1.1)

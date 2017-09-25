@@ -53,33 +53,69 @@ module ComputeShader =
     
     [<AutoOpen>]
     module private Utils =
-        
-        let rec (|FunctionType|_|) (t : Type) =
-            if t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<_ -> _> then
-                let args = t.GetGenericArguments()
-                let invoke = t.GetMethod("Invoke",BindingFlags.Public ||| BindingFlags.Instance, Type.DefaultBinder, CallingConventions.Any, [|args.[0]|], null)
-                Some(args.[0], args.[1], invoke)
-            else
-                match t.BaseType with
-                    | null -> None
-                    | FunctionType(a, r, m) -> Some(a, r, m)
-                    | _ -> None
+        open FunctionSignature
+        open System.Reflection.Emit
 
-        let rec tryExtractExpr (f : obj) =
-            match f with
+        type Invoker<'a, 'b>() =
+            static let invoke =
+                let t = typeof<'a>
+                let m = t.InvokeMethod
+
+                let rec decompose (t : Type) =
+                    if FSharpType.IsFunction t then
+                        let (a, r) = FSharpType.GetFunctionElements t
+
+                        match decompose r with
+                            | Some (args, ret) ->
+                                Some ((a, t) :: args, ret)
+                            | None ->
+                                None
+                    elif typeof<'b>.IsAssignableFrom t then
+                        Some ([], t)
+                    else
+                        None
+
+                match decompose t with
+                    | Some (args, ret) ->
+                        match args with
+                            | [] -> 
+                                fun (v : 'a) -> unbox<'b> v
+                            | _ ->
+                                let dyn = DynamicMethod("invoker", MethodAttributes.Static ||| MethodAttributes.Public, CallingConventions.Standard, typeof<'b>, [| t |], t, true)
+
+                                let il = dyn.GetILGenerator()
+
+                                il.Emit(OpCodes.Ldarg_0)
+                                for a, fType in args do
+                                    if a.IsValueType then 
+                                        let l = il.DeclareLocal(a)
+                                        il.Emit(OpCodes.Ldloc, l)
+                                    else 
+                                        il.Emit(OpCodes.Ldnull)
+
+                                    let m = fType.GetMethod("Invoke", [| a |])
+                                    il.EmitCall(OpCodes.Callvirt, m, null)
+
+                                il.Emit(OpCodes.Ret)
+
+
+                                let d = dyn.CreateDelegate(typeof<Func<'a, 'b>>) |> unbox<Func<'a, 'b>>
+
+
+                                d.Invoke
+                    | None ->
+                        fun (v : 'a) -> failwithf "[FShade] cannot invoke type %A" t
+                        
+            static member Invoke(f : 'a) =
+                invoke f 
+
+        let rec tryExtractExpr (f : 'a) =
+            match f :> obj with
                 | null -> None
                 | :? Expr as e -> Some e
                 | _ ->
-                    match f.GetType() with
-                        | FunctionType(a,_,invoke) ->
-                            let argument =
-                                if a.IsValueType then Activator.CreateInstance(a)
-                                else null
-
-                            let r = invoke.Invoke(f, [|argument|])
-                            tryExtractExpr r
-                        | _ ->
-                            None
+                    try Invoker<'a, Expr>.Invoke f |> Some
+                    with _ -> None
 
         let rec preprocessCompute (localSize : V3i) (sizes : Dictionary<string, int>) (e : Expr) =
             match e with

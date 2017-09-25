@@ -28,6 +28,9 @@ module Parser =
 
             member x.Delete (file : string) =
                 files.TryRemove file |> ignore
+                
+            member x.SafeExists(fileName) = 
+                files.ContainsKey(fileName) || defaultFileSystem.SafeExists(fileName)
 
             interface IFileSystem with
                 // Implement the service to open files for reading and writing
@@ -60,8 +63,7 @@ module Parser =
                     defaultFileSystem.IsPathRootedShim(fileName)
 
                 // Implement the service related to file existence and deletion
-                member x.SafeExists(fileName) = 
-                    files.ContainsKey(fileName) || defaultFileSystem.SafeExists(fileName)
+                member x.SafeExists(fileName) = x.SafeExists(fileName)
                 member x.FileDelete(fileName) = 
                     defaultFileSystem.FileDelete(fileName)
 
@@ -78,9 +80,10 @@ module Parser =
         let checker = FSharpChecker.Create(keepAssemblyContents=true)
 
         let resolve (file : string) =
-            let path = Path.Combine(Environment.CurrentDirectory, file)
+            let dir = Environment.CurrentDirectory
+            let path = Path.Combine(dir, file)
             if File.Exists path then
-                Some ("-r: " + path)
+                Some ("-r: " + Path.GetFullPath path )
             else
                 None
 
@@ -277,6 +280,7 @@ module Parser =
                             | None -> return failwith "[Expr] cannot resolve base-value"
 
                     | BasicPatterns.Call(target, meth, genArgs1, genArgs2, args) ->
+                        
                         let genArgs1 = List.map toType genArgs1
                         let genArgs2 = List.map toType genArgs2
                         let mi = toMethod meth genArgs1 genArgs2
@@ -373,7 +377,7 @@ module Parser =
 
 
                     | BasicPatterns.Lambda(v,body) ->
-                        let var = Var(v.DisplayName, toType v.FullType)
+                        let var = Var(v.LogicalName, toType v.FullType)
                         do! putVar var
                         let! body = ofFSharpExprS body
                         return Expr.Lambda(var, body)

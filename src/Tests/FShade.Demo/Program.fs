@@ -340,8 +340,10 @@ module TessDeconstruct =
             return V4d(a, 0.0, 0.0, 1.0)
         }
 
+
+    //[<MethodImpl(MethodImplOptions.NoInlining)>]
     let manyArgs (a : int) (b : float) (c : byte) (d : int64) (e : uint64) (f : string) (g : obj) =
-        float a + b + float c + float d
+        float a + b + float c + float d + float e + float f.Length + float (g.GetHashCode())
 
     let someFunction (a : V4d) (b : V4d) (c : V4d) = a + b * c
     
@@ -381,9 +383,9 @@ module TessDeconstruct =
 
 
     let signatureTest() =
-        printfn "local3:  %A" (testLocalLambdaNoClosure())
-        printfn "static3: %A" (testStatic3Args())
-        printfn "local7:  %A" (testLocalLambdaNoClosure7())
+        //printfn "local3:  %A" (testLocalLambdaNoClosure())
+        //printfn "static3: %A" (testStatic3Args())
+        //printfn "local7:  %A" (testLocalLambdaNoClosure7())
         printfn "static7: %A" (testStatic7Args())
 
         System.Environment.Exit 0
@@ -391,17 +393,6 @@ module TessDeconstruct =
         printfn "%A" s
 
     let run() =
-//
-//        let test =
-//            Effect.ofFunction loopUnroll
-//                |> Effect.toModule (Map.ofList ["Colors", 0])
-//                |> ModuleCompiler.compileSpirV
-//
-//        for i in test.instructions do
-//            printfn "%A" i
-//        System.Environment.Exit 0
-
-
 
         let config =
             EffectConfig.ofList [
@@ -532,18 +523,22 @@ let sammy =
     }
 
 [<LocalSize(X = 32)>]
-let computer (f : Expr<float -> float -> float>) (a : float[]) (b : float[]) (c : Image2d<Formats.r32f>) =
+let computer (f : Expr<float -> float -> float>) (a : float[]) (b : float[]) (c : Image2d<Formats.r32f>) (d : int) (e : float) (x : int)=
     compute {
         let id = getGlobalId()
-        let i = id.X
+        let i = id.X + 17
+
+
 
         let aasd = sammy.[0].Sample(V2d.Zero).[i % 4]
 
+        //let (l,r) = scan1 hugo
         let hugo = a.[i] * 7.0 + 2.0 * aasd
 
-        //let (l,r) = scan1 hugo
         b.[i] <- (%f) a.[i] hugo
     }
+
+
 
 
 [<LocalSize(X = MaxLocalSize)>]
@@ -610,105 +605,150 @@ let code (v : int) (a : int[]) (b : int[]) =
 
     }
 
+open TessDeconstruct
+
+let inline getSelf() =
+    MethodBase.GetCurrentMethod()
+
+[<LocalSize(X = 1000)>]
+let sepp (a : int) (b : int) (c : int) (d : int) (e : int) (f : int) =
+    let m = getSelf()
+    let att = m.GetCustomAttributes<LocalSizeAttribute>() |> Seq.toList
+    printfn "%A" att
+    a * b + c * d + e + f
+
+open Microsoft.FSharp.Quotations
+open Microsoft.FSharp.Quotations.Patterns
+open Microsoft.FSharp.Quotations.DerivedPatterns
+
 [<EntryPoint>]
 let main args =
-    //TessDeconstruct.signatureTest()
+    let a = computer <@ (+) @> null null
+    let b = a (Image2d<Formats.r32f>()) 
+    let c = b 1 0.5 1
+
+    let meth = 
+        c.CustomAttributes |> List.tryPick (fun att ->
+            match att with
+                | NewTuple [ String "Method"; Value((:? MethodBase as m),_) ] -> Some m
+                | _ -> None
+        )
+
+    printfn "%A" meth
+
+    System.Environment.Exit 0
+
+
+//    let e = scan <@ (+) @> <@ 0 @> null null
+//    for i in 1 .. 5 do Expr.ComputeHash e |> ignore
+//
+//
+//    let iter = 1000
+//    let mutable hash = ""
+//    let sw = System.Diagnostics.Stopwatch.StartNew()
+//    for i in 1 .. iter do
+//        hash <- Expr.ComputeHash e
+//    sw.Stop()
+//    Log.line "took: %A" (sw.MicroTime / iter)
+//    Log.line "%s" hash
+//
+//    TessDeconstruct.signatureTest()
 //    TessDeconstruct.run()
 //    System.Environment.Exit 0
-
-    let maxGroupSize = V3i(128, 1024, 1024)
-    let test = ComputeShader.ofFunction maxGroupSize (computer <@ (+) @>)
-    let m = ComputeShader.toModule test
-    let glsl = ModuleCompiler.compileGLSLVulkan m
-    printfn "%s" glsl.code
-    System.Environment.Exit 0
-
-
-    effectTest()
-    System.Environment.Exit 0
-
-    composeTest()
-    System.Environment.Exit 0
-
-
-    let optimized = 
-        Optimizer.eliminateDeadCode 
-            <@
-                // long dependency chain test
-                // needs 4 iterations in fixpoint search when a is used
-                // a <- b <- c <- d <- a ...
-                let mutable a = 0
-                let mutable b = 0
-                let mutable c = 0
-                let mutable d = 0
-                for i in 0 .. 2 .. 10 do
-                    a <- a + b
-                    b <- b + c
-                    c <- c + d
-                    d <- d + a
-                sink(a,a)
-
-                // unused y should be remove but side-effect 'z <- z + 1' should remain
-                let mutable y = 0 
-                let mutable z = 1
-                if (z <- z + 1; y < 10) then
-                    y <- 10
-                else
-                    y <- 100
-                sink(z,z)
-
-
-                // since t is unused it should be removed
-                let mutable t = 0
-                let mutable s = 0
-                while (t <- t + 1; s < 10) do
-                    s <- s + 1
-                sink(s,s)
-
-                // fun fact: do-while looks like:
-                let mutable t = 0
-                while (
-                        t <- t + 1
-                        t < 10
-                ) do ()
-
-                // array should remain
-                let mutable x = 0
-                let arr = [| V2i.Zero; V2i.Zero; V2i.Zero; V2i.Zero |]
-                for i in 3 .. -1 .. 0 do
-                    arr.[i].X <- i
-
-                sink(arr, arr)
-
-                let mutable bla = Arr<4 N, int> [| 1;2;3;4 |]
-                let cnt = Bla.test(bla)
-                sink(bla, bla)
-
-
-                // Dot could modify r here (since this is always byref)
-                let mutable r = V2d.II
-                let test = r.Dot(r)
-                sink(r,r)
-
-            @>
-    
-    let entry =
-        Expr.Lambda(Var("unitVar", typeof<unit>), optimized)
-            |> Module.ofLambda "test"
-
+//
+//    let maxGroupSize = V3i(128, 1024, 1024)
+//    let test = ComputeShader.ofFunction maxGroupSize (computer <@ (+) @>)
+//    let m = ComputeShader.toModule test
+//    let glsl = ModuleCompiler.compileGLSLVulkan m
+//    printfn "%s" glsl.code
+//    System.Environment.Exit 0
+//
+//
+//    effectTest()
+//    System.Environment.Exit 0
+//
+//    composeTest()
+//    System.Environment.Exit 0
+//
+//
+//    let optimized = 
+//        Optimizer.eliminateDeadCode 
+//            <@
+//                // long dependency chain test
+//                // needs 4 iterations in fixpoint search when a is used
+//                // a <- b <- c <- d <- a ...
+//                let mutable a = 0
+//                let mutable b = 0
+//                let mutable c = 0
+//                let mutable d = 0
+//                for i in 0 .. 2 .. 10 do
+//                    a <- a + b
+//                    b <- b + c
+//                    c <- c + d
+//                    d <- d + a
+//                sink(a,a)
+//
+//                // unused y should be remove but side-effect 'z <- z + 1' should remain
+//                let mutable y = 0 
+//                let mutable z = 1
+//                if (z <- z + 1; y < 10) then
+//                    y <- 10
+//                else
+//                    y <- 100
+//                sink(z,z)
+//
+//
+//                // since t is unused it should be removed
+//                let mutable t = 0
+//                let mutable s = 0
+//                while (t <- t + 1; s < 10) do
+//                    s <- s + 1
+//                sink(s,s)
+//
+//                // fun fact: do-while looks like:
+//                let mutable t = 0
+//                while (
+//                        t <- t + 1
+//                        t < 10
+//                ) do ()
+//
+//                // array should remain
+//                let mutable x = 0
+//                let arr = [| V2i.Zero; V2i.Zero; V2i.Zero; V2i.Zero |]
+//                for i in 3 .. -1 .. 0 do
+//                    arr.[i].X <- i
+//
+//                sink(arr, arr)
+//
+//                let mutable bla = Arr<4 N, int> [| 1;2;3;4 |]
+//                let cnt = Bla.test(bla)
+//                sink(bla, bla)
+//
+//
+//                // Dot could modify r here (since this is always byref)
+//                let mutable r = V2d.II
+//                let test = r.Dot(r)
+//                sink(r,r)
+//
+//            @>
+//    
 //    let entry =
-//        Module.ofLambda "test" <@ fun () ->
-//            let mutable a = 0
-//            let mutable b = 0
-//            for i in 8 .. -1 .. 0 do
-//                a <- a + 1
-//                b <- b + 1
-//            a
-//        @>
-
-    let entry =
-        entry |> ModuleCompiler.compileGLSL glsl410
-
-    printfn "%s" entry.code
+//        Expr.Lambda(Var("unitVar", typeof<unit>), optimized)
+//            |> Module.ofLambda "test"
+//
+////    let entry =
+////        Module.ofLambda "test" <@ fun () ->
+////            let mutable a = 0
+////            let mutable b = 0
+////            for i in 8 .. -1 .. 0 do
+////                a <- a + 1
+////                b <- b + 1
+////            a
+////        @>
+//
+//    let entry =
+//        entry |> ModuleCompiler.compileGLSL glsl410
+//
+//    printfn "%s" entry.code
     0
 

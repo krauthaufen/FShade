@@ -15,7 +15,7 @@ nuget Newtonsoft.Json           ~> 8.0.2
 
 nuget NUnit                     ~> 3.5.0
 nuget FsUnit                    ~> 2.3.2
-nuget FsPickler                 ~> 3.3.0
+nuget FsPickler                 ~> 4.0.0
 group Build
 framework: net45
 content: none
