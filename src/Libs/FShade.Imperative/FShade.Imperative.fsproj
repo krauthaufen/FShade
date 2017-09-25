@@ -8,7 +8,7 @@
     <ProjectGuid>1223c55b-5634-4764-b5bd-bf9ad95c073b</ProjectGuid>
     <OutputType>Library</OutputType>
     <RootNamespace>FShade.Imperative</RootNamespace>
-    <AssemblyName>FShade.Imperative</AssemblyName>
+    <AssemblyName>FShade.Imperative.Compiled</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>

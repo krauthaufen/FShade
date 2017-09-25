@@ -58,11 +58,12 @@ RESTRICTION: == net45
 NUGET
   remote: https://api.nuget.org/v3/index.json
     FAKE (4.63) - content: none
+    ilmerge (2.14.1208)
     Mono.Cecil (0.10.0-beta6) - content: none
     SourceLink.Fake (1.1) - content: none
 GITHUB
   remote: vrvis/Aardvark.Fake
-    FULLPROJECT (c4f9d04cc0c00c2f2081296ce30195ae997148f5)
+    FULLPROJECT (02934ce0408f1b142d08173c958a5501c36a8ff2)
       FAKE (>= 4.63 < 4.64)
       Mono.Cecil (>= 0.10.0-beta6 < 0.11)
       SourceLink.Fake (>= 1.1 < 1.2)
