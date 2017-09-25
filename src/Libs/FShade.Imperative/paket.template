@@ -1,12 +1,8 @@
-type file
+type project
 id FShade.Imperative
 authors Georg Haaser
 description
     F# embedded shaders
-dependencies
-	Aardvark.Base ~> LOCKEDVERSION 
-	Aardvark.Base.FSharp ~> LOCKEDVERSION 
-	FSharp.Core ~> LOCKEDVERSION 
 files
     ..\..\..\bin\Release\FShade.Imperative.dll ==> lib\net45
     ..\..\..\bin\Release\FShade.Imperative.pdb ==> lib\net45

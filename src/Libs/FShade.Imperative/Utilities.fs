@@ -220,7 +220,9 @@ module ExprExtensions =
             let withDebug = m.CreateDelegate(typeof<WithDebugDel>) |> unbox<WithDebugDel>
 
             fun (e : Expr) (debug : list<Expr>) ->
-                withDebug.Invoke(e, debug)
+                match e.CustomAttributes, debug with
+                    | [], [] -> e
+                    | _ -> withDebug.Invoke(e, debug)
 
     module private Pickler =
         open MBrace.FsPickler
@@ -324,7 +326,7 @@ module ExprExtensions =
 
                 
         static member ComputeHash(e : Expr) =
-            let e = Reflection.withAttributes e []
+            let e = e.WithAttributes []
 
             use s = Pickler.murmur.Create()
             Pickler.pickler.Serialize(s, e)

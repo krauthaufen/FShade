@@ -3,8 +3,6 @@ id FShade.Core
 authors Georg Haaser
 description
     F# embedded shaders
-dependencies
-	FShade.Imperative = CURRENTVERSION
 files
     ..\..\..\bin\Release\FShade.Core.dll ==> lib\net45
     ..\..\..\bin\Release\FShade.Core.pdb ==> lib\net45
