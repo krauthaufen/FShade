@@ -343,6 +343,7 @@ type CExpr =
     | CDot of CType * CExpr * CExpr
     | CCross of CType * CExpr * CExpr
     | CVecSwizzle of CType * CExpr * list<CVecComponent>
+    | CVecItem of CType * CExpr * CExpr
     | CMatrixElement of t : CType * m : CExpr * r : int * c : int
     | CNewVector of t : CType * d : int * components : list<CExpr>
 
@@ -409,6 +410,7 @@ type CExpr =
             | CDot(t,_,_) -> t
             | CCross(t,_,_) -> t
             | CVecSwizzle(t,_,_) -> t
+            | CVecItem(t,_,_) -> t
             | CMatrixElement(t,_,_,_) -> t
             | CNewVector(t,_,_) -> t
 
@@ -517,6 +519,11 @@ module CExpr =
             | CVecSwizzle(t,e,_) ->
                 used.AddType t
                 visit used e
+
+            | CVecItem(t,e,i) ->
+                used.AddType t
+                visit used e
+                visit used i
 
             | CMatrixElement(t, m, _, _) ->
                 used.AddType t

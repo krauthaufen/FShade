@@ -297,6 +297,8 @@ module Primitives =
             with get () = z
             and set v = z <- v
 
+        override __.ToString() =
+            sprintf "LocalSize(X=%d, Y=%d, Z=%d)" x y z
 
     type TessCoord<'a> = class end
 
@@ -309,6 +311,8 @@ module Primitives =
 
 [<AutoOpen>]
 module ShaderBuilders =
+    open Microsoft.FSharp.Quotations
+
     type BaseBuilder() =
         member x.For(a : Arr<'d, 'a>, f : 'a -> unit) : unit =
             for i in a do f i
@@ -388,10 +392,28 @@ module ShaderBuilders =
             member x.OutputTopology = None
 
     type ComputeBuilder() =
-        inherit BaseBuilder()
+        member x.For(a : Arr<'d, 'a>, f : 'a -> unit) : unit =
+            for i in a do f i
+
+        member x.For(a : seq<'a>, f : 'a -> unit) : unit =
+            for i in a do f i
+
+        member x.While(guard : unit -> bool, b : unit) =
+            ()
+
+        member x.Combine(l : unit, r : 'a) = r
+
+        member x.Zero() = ()
+        member x.Delay f = f()
 
         member x.Quote() = ()
-        member x.Zero() = ()
+
+        member inline x.Run(e : Expr<'a>) : Expr<'a> =
+            let m = MethodBase.GetCurrentMethod()
+            if isNull m then
+                e
+            else
+                e.WithAttributes(Expr.NewTuple [ Expr.Value "Method"; Expr.Value m] :: e.CustomAttributes) |> Expr.Cast
 
         interface IShaderBuilder with
             member x.ShaderStage = ShaderStage.Compute

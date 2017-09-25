@@ -303,7 +303,6 @@ type Sampler1d(tex : ISemanticValue, state : SamplerState) =
     member x.Item
         with get(coord : int, level : int) : V4d = failwith ""
 
-
 type Sampler2dArrayShadowMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
         member x.Texture = tex
@@ -629,7 +628,6 @@ type Sampler2d(tex : ISemanticValue, state : SamplerState) =
     member x.Item
         with get(coord : V2i, level : int) : V4d = failwith ""
 
-
 type Sampler3dShadowMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
         member x.Texture = tex
@@ -788,7 +786,6 @@ type Sampler3d(tex : ISemanticValue, state : SamplerState) =
     
     member x.Item
         with get(coord : V3i, level : int) : V4d = failwith ""
-
 
 type SamplerCubeArrayShadowMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -1164,7 +1161,6 @@ type IntSampler1d(tex : ISemanticValue, state : SamplerState) =
     member x.Item
         with get(coord : int, level : int) : V4i = failwith ""
 
-
 type IntSampler2dArrayMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
         member x.Texture = tex
@@ -1330,7 +1326,6 @@ type IntSampler2d(tex : ISemanticValue, state : SamplerState) =
     member x.Item
         with get(coord : V2i, level : int) : V4i = failwith ""
 
-
 type IntSampler3dMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
         member x.Texture = tex
@@ -1412,7 +1407,6 @@ type IntSampler3d(tex : ISemanticValue, state : SamplerState) =
     
     member x.Item
         with get(coord : V3i, level : int) : V4i = failwith ""
-
 
 type IntSamplerCubeArrayMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -1532,6 +1526,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler1dArrayShadowMS(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> Sampler1dArrayShadowMS(t.WithIndex(i), s))
 
     let sampler1dArrayShadowMS = Sampler1dArrayShadowMSBuilder()
     
@@ -1539,6 +1535,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler1dArrayMS(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> Sampler1dArrayMS(t.WithIndex(i), s))
 
     let sampler1dArrayMS = Sampler1dArrayMSBuilder()
     
@@ -1546,6 +1544,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler1dArrayShadow(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> Sampler1dArrayShadow(t.WithIndex(i), s))
 
     let sampler1dArrayShadow = Sampler1dArrayShadowBuilder()
     
@@ -1553,6 +1553,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler1dArray(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> Sampler1dArray(t.WithIndex(i), s))
 
     let sampler1dArray = Sampler1dArrayBuilder()
     
@@ -1560,6 +1562,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler1dShadowMS(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> Sampler1dShadowMS(t.WithIndex(i), s))
 
     let sampler1dShadowMS = Sampler1dShadowMSBuilder()
     
@@ -1567,6 +1571,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler1dMS(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> Sampler1dMS(t.WithIndex(i), s))
 
     let sampler1dMS = Sampler1dMSBuilder()
     
@@ -1574,6 +1580,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler1dShadow(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> Sampler1dShadow(t.WithIndex(i), s))
 
     let sampler1dShadow = Sampler1dShadowBuilder()
     
@@ -1581,6 +1589,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler1d(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> Sampler1d(t.WithIndex(i), s))
 
     let sampler1d = Sampler1dBuilder()
     
@@ -1588,6 +1598,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler2dArrayShadowMS(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> Sampler2dArrayShadowMS(t.WithIndex(i), s))
 
     let sampler2dArrayShadowMS = Sampler2dArrayShadowMSBuilder()
     
@@ -1595,6 +1607,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler2dArrayMS(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> Sampler2dArrayMS(t.WithIndex(i), s))
 
     let sampler2dArrayMS = Sampler2dArrayMSBuilder()
     
@@ -1602,6 +1616,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler2dArrayShadow(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> Sampler2dArrayShadow(t.WithIndex(i), s))
 
     let sampler2dArrayShadow = Sampler2dArrayShadowBuilder()
     
@@ -1609,6 +1625,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler2dArray(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> Sampler2dArray(t.WithIndex(i), s))
 
     let sampler2dArray = Sampler2dArrayBuilder()
     
@@ -1616,6 +1634,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler2dShadowMS(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> Sampler2dShadowMS(t.WithIndex(i), s))
 
     let sampler2dShadowMS = Sampler2dShadowMSBuilder()
     
@@ -1623,6 +1643,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler2dMS(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> Sampler2dMS(t.WithIndex(i), s))
 
     let sampler2dMS = Sampler2dMSBuilder()
     
@@ -1630,6 +1652,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler2dShadow(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> Sampler2dShadow(t.WithIndex(i), s))
 
     let sampler2dShadow = Sampler2dShadowBuilder()
     
@@ -1637,6 +1661,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler2d(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> Sampler2d(t.WithIndex(i), s))
 
     let sampler2d = Sampler2dBuilder()
     
@@ -1644,6 +1670,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler3dShadowMS(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> Sampler3dShadowMS(t.WithIndex(i), s))
 
     let sampler3dShadowMS = Sampler3dShadowMSBuilder()
     
@@ -1651,6 +1679,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler3dMS(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> Sampler3dMS(t.WithIndex(i), s))
 
     let sampler3dMS = Sampler3dMSBuilder()
     
@@ -1658,6 +1688,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler3dShadow(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> Sampler3dShadow(t.WithIndex(i), s))
 
     let sampler3dShadow = Sampler3dShadowBuilder()
     
@@ -1665,6 +1697,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler3d(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> Sampler3d(t.WithIndex(i), s))
 
     let sampler3d = Sampler3dBuilder()
     
@@ -1672,6 +1706,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             SamplerCubeArrayShadowMS(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> SamplerCubeArrayShadowMS(t.WithIndex(i), s))
 
     let samplerCubeArrayShadowMS = SamplerCubeArrayShadowMSBuilder()
     
@@ -1679,6 +1715,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             SamplerCubeArrayMS(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> SamplerCubeArrayMS(t.WithIndex(i), s))
 
     let samplerCubeArrayMS = SamplerCubeArrayMSBuilder()
     
@@ -1686,6 +1724,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             SamplerCubeArrayShadow(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> SamplerCubeArrayShadow(t.WithIndex(i), s))
 
     let samplerCubeArrayShadow = SamplerCubeArrayShadowBuilder()
     
@@ -1693,6 +1733,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             SamplerCubeArray(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> SamplerCubeArray(t.WithIndex(i), s))
 
     let samplerCubeArray = SamplerCubeArrayBuilder()
     
@@ -1700,6 +1742,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             SamplerCubeShadowMS(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> SamplerCubeShadowMS(t.WithIndex(i), s))
 
     let samplerCubeShadowMS = SamplerCubeShadowMSBuilder()
     
@@ -1707,6 +1751,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             SamplerCubeMS(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> SamplerCubeMS(t.WithIndex(i), s))
 
     let samplerCubeMS = SamplerCubeMSBuilder()
     
@@ -1714,6 +1760,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             SamplerCubeShadow(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> SamplerCubeShadow(t.WithIndex(i), s))
 
     let samplerCubeShadow = SamplerCubeShadowBuilder()
     
@@ -1721,6 +1769,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             SamplerCube(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> SamplerCube(t.WithIndex(i), s))
 
     let samplerCube = SamplerCubeBuilder()
     
@@ -1728,6 +1778,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             IntSampler1dArrayMS(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> IntSampler1dArrayMS(t.WithIndex(i), s))
 
     let intSampler1dArrayMS = IntSampler1dArrayMSBuilder()
     
@@ -1735,6 +1787,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             IntSampler1dArray(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> IntSampler1dArray(t.WithIndex(i), s))
 
     let intSampler1dArray = IntSampler1dArrayBuilder()
     
@@ -1742,6 +1796,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             IntSampler1dMS(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> IntSampler1dMS(t.WithIndex(i), s))
 
     let intSampler1dMS = IntSampler1dMSBuilder()
     
@@ -1749,6 +1805,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             IntSampler1d(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> IntSampler1d(t.WithIndex(i), s))
 
     let intSampler1d = IntSampler1dBuilder()
     
@@ -1756,6 +1814,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             IntSampler2dArrayMS(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> IntSampler2dArrayMS(t.WithIndex(i), s))
 
     let intSampler2dArrayMS = IntSampler2dArrayMSBuilder()
     
@@ -1763,6 +1823,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             IntSampler2dArray(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> IntSampler2dArray(t.WithIndex(i), s))
 
     let intSampler2dArray = IntSampler2dArrayBuilder()
     
@@ -1770,6 +1832,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             IntSampler2dMS(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> IntSampler2dMS(t.WithIndex(i), s))
 
     let intSampler2dMS = IntSampler2dMSBuilder()
     
@@ -1777,6 +1841,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             IntSampler2d(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> IntSampler2d(t.WithIndex(i), s))
 
     let intSampler2d = IntSampler2dBuilder()
     
@@ -1784,6 +1850,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             IntSampler3dMS(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> IntSampler3dMS(t.WithIndex(i), s))
 
     let intSampler3dMS = IntSampler3dMSBuilder()
     
@@ -1791,6 +1859,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             IntSampler3d(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> IntSampler3d(t.WithIndex(i), s))
 
     let intSampler3d = IntSampler3dBuilder()
     
@@ -1798,6 +1868,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             IntSamplerCubeArrayMS(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> IntSamplerCubeArrayMS(t.WithIndex(i), s))
 
     let intSamplerCubeArrayMS = IntSamplerCubeArrayMSBuilder()
     
@@ -1805,6 +1877,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             IntSamplerCubeArray(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> IntSamplerCubeArray(t.WithIndex(i), s))
 
     let intSamplerCubeArray = IntSamplerCubeArrayBuilder()
     
@@ -1812,6 +1886,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             IntSamplerCubeMS(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> IntSamplerCubeMS(t.WithIndex(i), s))
 
     let intSamplerCubeMS = IntSamplerCubeMSBuilder()
     
@@ -1819,6 +1895,8 @@ module SamplerBuilders =
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             IntSamplerCube(t, s)
+        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            Array.init count (fun i -> IntSamplerCube(t.WithIndex(i), s))
 
     let intSamplerCube = IntSamplerCubeBuilder()
     

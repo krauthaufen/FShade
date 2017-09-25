@@ -288,18 +288,21 @@ let run() =
 
 
             if not s && not a && not m then
-                line  "member x.Item"
-                line  "    with get (coord : %s) : %s = failwith \"\"" texelCoordType returnType 
-                line  ""
-
-                if coordComponents > 1 then
-                    let argNames = ["cx"; "cy"; "cz"; "cw"]
-                    let args = argNames |> List.take coordComponents |> List.map (sprintf "%s : int") |> String.concat ", "
-                    line  "member x.Item"
-                    line  "    with get (%s) : %s = failwith \"\"" args returnType 
-                    line  ""
-
+                line "member x.Item"
+                line "    with get (coord : %s) : %s = failwith \"\"" texelCoordType returnType 
+                line ""
+                line "member x.Item"
+                line "    with get(coord : %s, level : int) : %s = failwith \"\"" texelCoordType returnType 
+                
+//                if coordComponents > 1 then
+//                    let argNames = ["cx"; "cy"; "cz"; "cw"]
+//                    let args = argNames |> List.take coordComponents |> List.map (sprintf "%s : int") |> String.concat ", "
+//                    line  "member x.Item"
+//                    line  "    with get (%s) : %s = failwith \"\"" args returnType 
+//                    line  ""
+        
         stop()
+        //line ""
 
 
     line  "[<AutoOpen>]"
@@ -336,6 +339,8 @@ let run() =
         line  "inherit SamplerBaseBuilder()"
         line  "member x.Run((t : ShaderTextureHandle, s : SamplerState)) ="
         line  "    %s(t, s)" typeName
+        line  "member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) ="
+        line  "    Array.init count (fun i -> %s(t.WithIndex(i), s))" typeName
         stop  ()
         line  "let %s = %s()" valueName builderName
         line  ""
@@ -423,6 +428,7 @@ let run() =
         line "and set(%s) (v : %s) : unit = failwith \"\"" itemArgs returnType
         stop()
 
+
         if t = SamplerType.Int then
             line "member x.AtomicAdd(%s, data : int) : int = failwith \"\"" itemArgs
             line "member x.AtomicMin(%s, data : int) : int = failwith \"\"" itemArgs
@@ -443,3 +449,4 @@ let run() =
     File.WriteAllText(fileName, str)
 
     ()
+

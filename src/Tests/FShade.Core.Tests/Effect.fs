@@ -66,17 +66,17 @@ let ``[OfFunction] local``() =
     e0 |> should equal e1
 
 [<Test>]
-let ``[OfFunction] local with closure``() =
-    let a = 2.0
-    let shader2 (p : V4d) (v : Vertex) =
+let ``[OfFunction] local with closure value``() =
+    let aaaa = 2.0
+    let shader213 (p : V4d) (v : Vertex) =
         vertex {
-            return { v with pos = a * p }
+            return {  pos = aaaa * p; color = v.color }
         } 
 
-    let e0 = Effect.ofFunction (shader2 V4d.OIOI)
-    let e1 = Effect.ofFunction (shader2 V4d.OIOI)
+    let e0 = Effect.ofFunction (shader213 V4d.OIOI)
+    let e1 = Effect.ofFunction (shader213 V4d.OIOI)
     e0 |> should equal e1
-    let e2 = Effect.ofFunction (shader2 V4d.IOIO)
+    let e2 = Effect.ofFunction (shader213 V4d.IOIO)
     e2 |> should not' (equal e1)
 
 [<Test>] 

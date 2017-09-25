@@ -1041,6 +1041,13 @@ module Assembler =
                     yield OpVectorShuffle(tid, id, v, v, comp)
                     return id
 
+                | CVecItem(t, v, i) ->
+                    let! v = assembleExpr v
+                    let! i = assembleExpr i
+                    let! id = SpirV.id
+                    yield OpVectorExtractDynamic(tid, id, v, i)
+                    return id
+
                 | CNewVector(t, d, args) ->
                     let! args = args |> List.mapS assembleExpr
                     let! id = SpirV.id

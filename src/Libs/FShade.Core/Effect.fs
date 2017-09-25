@@ -136,7 +136,7 @@ module EffectConfig =
 /// the Effect module provides functions for accessing, creating and modifying effects.
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Effect =
-    let private effectCache = System.Collections.Concurrent.ConcurrentDictionary<IFunctionSignature, Effect>()
+    let private effectCache = System.Collections.Concurrent.ConcurrentDictionary<string, Effect>()
     let private composeCache = System.Collections.Concurrent.ConcurrentDictionary<string, Effect>()
 
     [<CompilerMessage("clearCaches is considered harmful", 4321, IsError=false, IsHidden=true)>]
@@ -231,9 +231,13 @@ module Effect =
 
     /// creates an effect from a shader-function
     let ofFunction (shaderFunction : 'a -> Expr<'b>) =
-        let signature = FunctionSignature.ofFunction shaderFunction
-        effectCache.GetOrAdd(signature, fun _ ->
-            Shader.ofFunction shaderFunction |> ofList
+        let expression = 
+            try shaderFunction Unchecked.defaultof<'a>
+            with _ -> failwith "[FShade] shader functions may not access their vertex-input statically"
+
+        let hash = Expr.ComputeHash expression
+        effectCache.GetOrAdd(hash, fun _ ->
+            Shader.ofExpr typeof<'a> expression |> ofList
         )
 
     /// gets a Map<ShaderStage, Shader> for the effect containing all Shaders.

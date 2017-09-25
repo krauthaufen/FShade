@@ -53,33 +53,67 @@ module ComputeShader =
     
     [<AutoOpen>]
     module private Utils =
-        
-        let rec (|FunctionType|_|) (t : Type) =
-            if t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<_ -> _> then
-                let args = t.GetGenericArguments()
-                let invoke = t.GetMethod("Invoke",BindingFlags.Public ||| BindingFlags.Instance, Type.DefaultBinder, CallingConventions.Any, [|args.[0]|], null)
-                Some(args.[0], args.[1], invoke)
-            else
-                match t.BaseType with
-                    | null -> None
-                    | FunctionType(a, r, m) -> Some(a, r, m)
-                    | _ -> None
+        open System.Reflection.Emit
 
-        let rec tryExtractExpr (f : obj) =
-            match f with
+        type Invoker<'a, 'b>() =
+            static let invoke =
+                let t = typeof<'a>
+
+                let rec decompose (t : Type) =
+                    if FSharpType.IsFunction t then
+                        let (a, r) = FSharpType.GetFunctionElements t
+
+                        match decompose r with
+                            | Some (args, ret) ->
+                                Some ((a, t) :: args, ret)
+                            | None ->
+                                None
+                    elif typeof<'b>.IsAssignableFrom t then
+                        Some ([], t)
+                    else
+                        None
+
+                match decompose t with
+                    | Some (args, ret) ->
+                        match args with
+                            | [] -> 
+                                fun (v : 'a) -> unbox<'b> v
+                            | _ ->
+                                let dyn = DynamicMethod("invoker", MethodAttributes.Static ||| MethodAttributes.Public, CallingConventions.Standard, typeof<'b>, [| t |], t, true)
+
+                                let il = dyn.GetILGenerator()
+
+                                il.Emit(OpCodes.Ldarg_0)
+                                for a, fType in args do
+                                    if a.IsValueType then 
+                                        let l = il.DeclareLocal(a)
+                                        il.Emit(OpCodes.Ldloc, l)
+                                    else 
+                                        il.Emit(OpCodes.Ldnull)
+
+                                    let m = fType.GetMethod("Invoke", [| a |])
+                                    il.EmitCall(OpCodes.Callvirt, m, null)
+
+                                il.Emit(OpCodes.Ret)
+
+
+                                let d = dyn.CreateDelegate(typeof<Func<'a, 'b>>) |> unbox<Func<'a, 'b>>
+
+
+                                d.Invoke
+                    | None ->
+                        fun (v : 'a) -> failwithf "[FShade] cannot invoke type %A" t
+                        
+            static member Invoke(f : 'a) =
+                invoke f 
+
+        let rec tryExtractExpr (f : 'a) =
+            match f :> obj with
                 | null -> None
                 | :? Expr as e -> Some e
                 | _ ->
-                    match f.GetType() with
-                        | FunctionType(a,_,invoke) ->
-                            let argument =
-                                if a.IsValueType then Activator.CreateInstance(a)
-                                else null
-
-                            let r = invoke.Invoke(f, [|argument|])
-                            tryExtractExpr r
-                        | _ ->
-                            None
+                    try Invoker<'a, Expr>.Invoke f |> Some
+                    with _ -> None
 
         let rec preprocessCompute (localSize : V3i) (sizes : Dictionary<string, int>) (e : Expr) =
             match e with
@@ -272,30 +306,64 @@ module ComputeShader =
             csShared        = Map.empty
         }
 
-    let private cache = System.Collections.Concurrent.ConcurrentDictionary<IFunctionSignature * V3i, ComputeShader>()
+    let private cache = System.Collections.Concurrent.ConcurrentDictionary<string * V3i, ComputeShader>()
+
+    
 
     let ofFunction (maxLocalSize : V3i) (f : 'a -> 'b) : ComputeShader =
-        let signature = FunctionSignature.ofFunction f
+        match tryExtractExpr f with
+            | Some body ->
+                let hash = Expr.ComputeHash body
 
-        cache.GetOrAdd((signature, maxLocalSize), fun (signature, maxLocalSize) ->
-            let localSize = 
-                match FunctionSignature.tryGetAttribute<LocalSizeAttribute> signature with
-                    | Some size -> V3i(size.X, size.Y, size.Z)
-                    | _ -> V3i(0, 0, 0)
+                cache.GetOrAdd((hash, maxLocalSize), fun (signature, maxLocalSize) ->
+                    let localSize =
+                        match body.Method with
+                            | Some mb -> 
+                                match mb.GetCustomAttributes<LocalSizeAttribute>() |> Seq.tryHead with
+                                    | Some att -> V3i(att.X, att.Y, att.Z)
+                                    | _ -> 
+                                        Log.warn "[FShade] compute shader without local-size"
+                                        V3i(1,1,1)
+                            | None ->
+                                Log.warn "[FShade] compute shader without local-size"
+                                V3i(1,1,1)
 
-            let localSize =
-                V3i(
-                    (if localSize.X = MaxLocalSize then maxLocalSize.X else localSize.X),
-                    (if localSize.Y = MaxLocalSize then maxLocalSize.Y else localSize.Y),
-                    (if localSize.Z = MaxLocalSize then maxLocalSize.Z else localSize.Z)
-                )
+                    let localSize =
+                        V3i(
+                            (if localSize.X = MaxLocalSize then maxLocalSize.X else localSize.X),
+                            (if localSize.Y = MaxLocalSize then maxLocalSize.Y else localSize.Y),
+                            (if localSize.Z = MaxLocalSize then maxLocalSize.Z else localSize.Z)
+                        )
 
-            match tryExtractExpr f with
-                | Some body ->
                     ofExpr localSize body
-                | _ ->
-                    failwithf "[FShade] cannot create compute shader using function: %A" f
-        )
+
+
+                )
+            | None ->
+                failwithf "[FShade] cannot create compute shader using function: %A" f
+//
+//
+//        let signature = FunctionSignature.ofFunction f
+//
+//        cache.GetOrAdd((signature, maxLocalSize), fun (signature, maxLocalSize) ->
+//            let localSize = 
+//                match FunctionSignature.tryGetAttribute<LocalSizeAttribute> signature with
+//                    | Some size -> V3i(size.X, size.Y, size.Z)
+//                    | _ -> V3i(0, 0, 0)
+//
+//            let localSize =
+//                V3i(
+//                    (if localSize.X = MaxLocalSize then maxLocalSize.X else localSize.X),
+//                    (if localSize.Y = MaxLocalSize then maxLocalSize.Y else localSize.Y),
+//                    (if localSize.Z = MaxLocalSize then maxLocalSize.Z else localSize.Z)
+//                )
+//
+//            match tryExtractExpr f with
+//                | Some body ->
+//                    ofExpr localSize body
+//                | _ ->
+//                    failwithf "[FShade] cannot create compute shader using function: %A" f
+//        )
 
     let toEntryPoint (s : ComputeShader) =
         let bufferArguments = 
