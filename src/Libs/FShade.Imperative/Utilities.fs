@@ -220,9 +220,7 @@ module ExprExtensions =
             let withDebug = m.CreateDelegate(typeof<WithDebugDel>) |> unbox<WithDebugDel>
 
             fun (e : Expr) (debug : list<Expr>) ->
-                match e.CustomAttributes, debug with
-                    | [], [] -> e
-                    | _ -> withDebug.Invoke(e, debug)
+                withDebug.Invoke(e, debug)
 
     module private Pickler =
         open MBrace.FsPickler
@@ -250,16 +248,14 @@ module ExprExtensions =
                 let rec writer (ws : WriteState) (e : Expr) =
             
                     match Reflection.withAttributes e [] with    
-                        | NewTuple [String "DebugRange"; _] ->
-                            ()
-
-                        | NewTuple [String "Method"; _] ->
+                        
+                        | NewTuple [String "DebugRange"; _ ]
+                        | NewTuple [String "Method"; _ ] ->
                             ()
 
                         | ShapeVar v -> 
                             Pickler.string.Write ws "Kind" "Var"
                             varPickler.Write ws "Var" v
-
 
                         | ShapeLambda(v, b) ->
                             Pickler.string.Write ws "Kind" "Lambda"
@@ -272,14 +268,31 @@ module ExprExtensions =
                             selfList.Write ws "Children" args
 
                 let reader (rs : ReadState) : Expr =
-                    failwith ""
+                    let kind = Pickler.string.Read rs "Kind"
+                    match kind with
+                        | "Var" ->
+                            let v = varPickler.Read rs "Var"
+                            Expr.Var v
+
+                        | "Lambda" ->
+                            let v = varPickler.Read rs "Var"
+                            let b = self.Read rs "Body"
+                            Expr.Lambda(v,b)
+
+                        | "Comb" ->
+                            let o = infoPickler.Read rs "Info"
+                            let c = selfList.Read rs "Children"
+                            RebuildShapeCombination(o, c)
+                            
+                        | _ ->
+                            failwithf "invalid expression kind: %A" kind
 
                 Pickler.FromPrimitives(reader, writer)
             )
 
         do registry.RegisterFactory varPickler
            registry.RegisterFactory exprPickler
-
+            
         let cache = PicklerCache.FromCustomPicklerRegistry registry
         let murmur = MurMur3() :> IHashStreamFactory
         let pickler = FsPickler.CreateBinarySerializer(picklerResolver = cache)
@@ -326,7 +339,7 @@ module ExprExtensions =
 
                 
         static member ComputeHash(e : Expr) =
-            let e = e.WithAttributes []
+            let e = Reflection.withAttributes e []
 
             use s = Pickler.murmur.Create()
             Pickler.pickler.Serialize(s, e)
