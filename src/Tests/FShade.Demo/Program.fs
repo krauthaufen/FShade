@@ -485,18 +485,11 @@ let computer (f : Expr<float -> float -> float>) (a : float[]) (b : float[]) (c 
         b.[i] <- (%f) a.[i] hugo
     }
 
-
-
-
-
-
 [<LocalSize(X = MaxLocalSize)>]
 let scan (add : Expr<'a -> 'a -> 'a>) (zero : Expr<'a>) (input : 'a[]) (output : 'a[]) =
     compute {
         let elems = LocalSize.X
         let temp = allocateShared<'a> LocalSize.X
-
-
 
 
         let gid = getGlobalId().X
@@ -607,21 +600,31 @@ let main args =
 //    //g <- 10
 //    System.Environment.Exit 0
 
-//    let e = scan <@ (+) @> <@ 0 @> null null
-//    for i in 1 .. 5 do Expr.ComputeHash e |> ignore
-//
-//    let iter = 1000
-//    let mutable hash = ""
-//    let sw = System.Diagnostics.Stopwatch.StartNew()
-//    for i in 1 .. iter do
-//        hash <- Expr.ComputeHash e
-//    sw.Stop()
-//    Log.line "took: %A" (sw.MicroTime / iter)
-//    Log.line "%s" hash
+
+
+
+    let e = scan <@ (+) @> <@ 0 @> null null
+    for i in 1 .. 5 do Expr.ComputeHash e |> ignore
+
+    let test = e |> Expr.Pickle |> Expr.UnPickle
+
+    if test.ToString() <> e.ToString() then
+        Log.warn "asdbsajdnsad"
+
+
+
+    let iter = 1000
+    let mutable hash = ""
+    let sw = System.Diagnostics.Stopwatch.StartNew()
+    for i in 1 .. iter do
+        hash <- Expr.ComputeHash e
+    sw.Stop()
+    Log.line "took: %A" (sw.MicroTime / iter)
+    Log.line "%s" hash
+    System.Environment.Exit 0
 
 //    TessDeconstruct.signatureTest()
 //    TessDeconstruct.run()
-//    System.Environment.Exit 0
 //
     let maxGroupSize = V3i(128, 1024, 1024)
     let test = ComputeShader.ofFunction maxGroupSize (computer <@ (+) @>)

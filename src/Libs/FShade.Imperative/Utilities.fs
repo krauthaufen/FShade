@@ -202,6 +202,8 @@ module ExprExtensions =
         open System.Reflection.Emit
 
         type private WithDebugDel = delegate of Expr * list<Expr> -> Expr
+        type private NewVarDel = delegate of string * Type * Option<bool> * int64 -> Var
+        type private GetStampDel = delegate of Var -> int64
 
         let withAttributes =
             let fi = typeof<Expr>.GetField("term", BindingFlags.NonPublic ||| BindingFlags.Instance)
@@ -222,79 +224,296 @@ module ExprExtensions =
             fun (e : Expr) (debug : list<Expr>) ->
                 withDebug.Invoke(e, debug)
 
+        let newVar =
+            
+            let fi = typeof<Var>.GetField("stamp", BindingFlags.NonPublic ||| BindingFlags.Instance)
+            let ctor = typeof<Var>.GetConstructor(BindingFlags.Public ||| BindingFlags.NonPublic ||| BindingFlags.Static ||| BindingFlags.CreateInstance ||| BindingFlags.Instance, Type.DefaultBinder, CallingConventions.Any, [| typeof<string>; typeof<Type>; typeof<Option<bool>> |], null)
+            
+            let m = DynamicMethod("newVar", MethodAttributes.Static ||| MethodAttributes.Public, CallingConventions.Standard, typeof<Var>, [| typeof<string>; typeof<Type>; typeof<Option<bool>>; typeof<int64> |], typeof<Var>, true)
+            let il = m.GetILGenerator()
+
+
+            il.Emit(OpCodes.Ldarg_0)
+            il.Emit(OpCodes.Ldarg_1)
+            il.Emit(OpCodes.Ldarg_2)
+            il.Emit(OpCodes.Newobj, ctor)
+            il.Emit(OpCodes.Dup)
+            il.Emit(OpCodes.Ldarg_3)
+            il.Emit(OpCodes.Stfld, fi)
+
+            il.Emit(OpCodes.Ret)
+
+        
+            let newVar = m.CreateDelegate(typeof<NewVarDel>) |> unbox<NewVarDel>
+
+            fun (name : string, typ : Type, isMutable : bool, stamp : int64) ->
+                newVar.Invoke(name, typ, Some isMutable, stamp)
+
+        let getStamp =
+            
+            let fi = typeof<Var>.GetField("stamp", BindingFlags.NonPublic ||| BindingFlags.Instance)
+
+            let m = DynamicMethod("newVar", MethodAttributes.Static ||| MethodAttributes.Public, CallingConventions.Standard, typeof<int64>, [| typeof<Var> |], typeof<Var>, true)
+            let il = m.GetILGenerator()
+
+            il.Emit(OpCodes.Ldarg_0)
+            il.Emit(OpCodes.Ldfld, fi)
+            il.Emit(OpCodes.Ret)
+
+            let getStamp = m.CreateDelegate(typeof<GetStampDel>) |> unbox<GetStampDel>
+
+            fun (v : Var) -> getStamp.Invoke(v)
+
+    type Var with
+        member x.Stamp = Reflection.getStamp x
+
+        static member New(name, t, isMutable, stamp) = Reflection.newVar(name, t, isMutable, stamp)
+
     module private Pickler =
         open MBrace.FsPickler
         open MBrace.FsPickler.Combinators
         open MBrace.FsPickler.Hashing
         open Microsoft.FSharp.Reflection
+        open System.Reflection.Emit
 
-        let registry = new CustomPicklerRegistry()
 
+        type ExprPicklerFunctions private() =
 
-        let varPickler (r : IPicklerResolver) =
-            let makeVar (name : string) (t : string) (isMutable : bool) = Var(name, Type.GetType t, isMutable)
-            Pickler.product makeVar
-            ^+ Pickler.field (fun (v : Var) -> v.Name) Pickler.string
-            ^+ Pickler.field (fun (v : Var) -> v.Type.Name) Pickler.string
-            ^. Pickler.field (fun (v : Var) -> v.IsMutable) Pickler.bool
+            static member ExprPicklerGeneric(r : IPicklerResolver) : Pickler<Expr<'a>> =
+                let expr = r.Resolve<Expr>()
+                expr |> Pickler.wrap Expr.Cast (fun e -> Reflection.withAttributes e [])
+                
+            static member VarPickler (r : IPicklerResolver) : Pickler<Var> =
+                let makeVar (name : string) (t : Type) (isMutable : bool) (stamp : int64) = 
+                    Var.New(name, t, isMutable, stamp)
+                    
+                let read (rs : ReadState) =
+                    let name = Pickler.string.Read rs "Name"
+                    let typ = Pickler.auto.Read rs "Type"
+                    let isMutable = Pickler.bool.Read rs "IsMutable"
+                    let stamp = Pickler.int64.Read rs "Stamp"
 
-        let exprPickler (r : IPicklerResolver) =
-            let varPickler = r.Resolve<Var>()
-            let infoPickler = r.Resolve<obj>()
+                    Var.New(name, typ, isMutable, stamp)
 
-            Pickler.fix (fun self ->
-                let selfList = Pickler.list self
-
-                let rec writer (ws : WriteState) (e : Expr) =
-            
-                    match Reflection.withAttributes e [] with    
+                let write (ws : WriteState) (value : Var) =
+                    if ws.IsHashComputation then
+                        Pickler.string.Write ws "Name" value.Name
+                        Pickler.string.Write ws "Type" value.Type.FullName
+                        Pickler.bool.Write ws "IsMutable" value.IsMutable
+                    else
+                        Pickler.string.Write ws "Name" value.Name
+                        Pickler.auto.Write ws "Type" value.Type
+                        Pickler.bool.Write ws "IsMutable" value.IsMutable
+                        Pickler.int64.Write ws "Stamp" value.Stamp
                         
-                        | NewTuple [String "DebugRange"; _ ]
-                        | NewTuple [String "Method"; _ ] ->
-                            ()
 
-                        | ShapeVar v -> 
-                            Pickler.string.Write ws "Kind" "Var"
-                            varPickler.Write ws "Var" v
+                Pickler.FromPrimitives(read, write)
 
-                        | ShapeLambda(v, b) ->
-                            Pickler.string.Write ws "Kind" "Lambda"
-                            varPickler.Write ws "Var" v
-                            self.Write ws "Body" b
+            static member ExprPickler(r : IPicklerResolver) : Pickler<Expr> =
+                let varPickler = r.Resolve<Var>()
+                let infoPickler = r.Resolve<obj>()
 
-                        | ShapeCombination(o, args) ->
-                            Pickler.string.Write ws "Kind" "Comb"
-                            infoPickler.Write ws "Info" o
-                            selfList.Write ws "Children" args
+                Pickler.fix (fun self ->
+                    let selfList = Pickler.list self
 
-                let reader (rs : ReadState) : Expr =
-                    let kind = Pickler.string.Read rs "Kind"
-                    match kind with
-                        | "Var" ->
-                            let v = varPickler.Read rs "Var"
-                            Expr.Var v
+                    let rec writer (ws : WriteState) (e : Expr) =
+                        match Reflection.withAttributes e [] with    
 
-                        | "Lambda" ->
-                            let v = varPickler.Read rs "Var"
-                            let b = self.Read rs "Body"
-                            Expr.Lambda(v,b)
+                            | ShapeVar v -> 
+                                Pickler.string.Write ws "Kind" "Var"
+                                varPickler.Write ws "Var" v
 
-                        | "Comb" ->
-                            let o = infoPickler.Read rs "Info"
-                            let c = selfList.Read rs "Children"
-                            RebuildShapeCombination(o, c)
+                            | ShapeLambda(v, b) ->
+                                Pickler.string.Write ws "Kind" "Lambda"
+                                varPickler.Write ws "Var" v
+                                self.Write ws "Body" b
+
+                            | ShapeCombination(o, args) ->
+                                Pickler.string.Write ws "Kind" "Comb"
+                                infoPickler.Write ws "Info" o
+                                selfList.Write ws "Children" args
+
+                    let reader (rs : ReadState) : Expr =
+                        let kind = Pickler.string.Read rs "Kind"
+                        match kind with
+                            | "Var" ->
+                                let v = varPickler.Read rs "Var"
+                                Expr.Var v
+
+                            | "Lambda" ->
+                                let v = varPickler.Read rs "Var"
+                                let b = self.Read rs "Body"
+                                Expr.Lambda(v,b)
+
+                            | "Comb" ->
+                                let o = infoPickler.Read rs "Info"
+                                let c = selfList.Read rs "Children"
+                                RebuildShapeCombination(o, c)
                             
+                            | _ ->
+                                failwithf "invalid expression kind: %A" kind
+
+                    Pickler.FromPrimitives(reader, writer)
+                )
+
+        let tryUnifyTypes (decl : Type) (real : Type) =
+            let assignment = System.Collections.Generic.Dictionary<Type, Type>()
+
+            let rec recurse (decl : Type) (real : Type) =
+                if decl = real then
+                    true
+
+                elif decl.IsGenericParameter then
+                    match assignment.TryGetValue decl with
+                        | (true, old) ->
+                            if old.IsAssignableFrom real then 
+                                true
+
+                            elif real.IsAssignableFrom old then
+                                assignment.[decl] <- real
+                                true
+
+                            else 
+                                false
                         | _ ->
-                            failwithf "invalid expression kind: %A" kind
-
-                Pickler.FromPrimitives(reader, writer)
-            )
-
-        do registry.RegisterFactory varPickler
-           registry.RegisterFactory exprPickler
+                            assignment.[decl] <- real
+                            true
             
+                elif decl.IsArray then
+                    if real.IsArray then
+                        let de = decl.GetElementType()
+                        let re = real.GetElementType()
+                        recurse de re
+                    else
+                        false
+
+                elif decl.ContainsGenericParameters then
+                    let dgen = decl.GetGenericTypeDefinition()
+                    let rgen = 
+                        if real.IsGenericType then real.GetGenericTypeDefinition()
+                        else real
+
+                    if dgen = rgen then
+                        let dargs = decl.GetGenericArguments()
+                        let rargs = real.GetGenericArguments()
+                        Array.forall2 recurse dargs rargs
+
+                    elif dgen.IsInterface then
+                        let rface = real.GetInterface(dgen.FullName)
+                        if isNull rface then
+                            false
+                        else
+                            recurse decl rface
+
+                    elif not (isNull real.BaseType) then
+                        recurse decl real.BaseType
+
+                    else
+                        false
+
+                elif decl.IsAssignableFrom real then
+                    true
+
+                else
+                    false
+
+
+            if recurse decl real then
+                Some (assignment |> Dictionary.toSeq |> HMap.ofSeq)
+            else
+                None
+
+        type PicklerRegistry(types : list<Type>) =
+
+            let picklerGen = typedefof<Pickler<_>>
+            let allMeths = types |> List.collect (fun t -> t.GetMethods(BindingFlags.Static ||| BindingFlags.Public ||| BindingFlags.NonPublic) |> Array.toList) //Introspection.GetAllMethodsWithAttribute<MyCrazyAttribute>() |> Seq.map (fun m -> m.E0) |> Seq.toArray
+
+            let upcastToPicker (mi : MethodInfo) =
+                let meth = 
+                    DynamicMethod(
+                        sprintf "upcasted.%s" mi.Name,
+                        MethodAttributes.Public ||| MethodAttributes.Static,
+                        CallingConventions.Standard,
+                        typeof<Pickler>,
+                        [| typeof<IPicklerResolver> |],
+                        typeof<obj>,
+                        true
+                    )
+                let il = meth.GetILGenerator()
+
+                il.Emit(OpCodes.Ldarg_0)
+                il.Emit(OpCodes.Tailcall)
+                il.EmitCall(OpCodes.Call, mi, null)
+                il.Emit(OpCodes.Ret)
+                let func = 
+                    meth.CreateDelegate(typeof<Func<IPicklerResolver, Pickler>>) 
+                        |> unbox<Func<IPicklerResolver, Pickler>>        
+                fun (r : IPicklerResolver) -> func.Invoke(r)
+
+            let genericThings = 
+                allMeths
+                    |> List.filter (fun mi -> mi.GetGenericArguments().Length > 0)
+                    |> List.choose (fun mi ->
+                        let ret = mi.ReturnType
+                        if ret.IsGenericType && ret.GetGenericTypeDefinition() = picklerGen && mi.GetParameters().Length = 1 then
+                            let pickledType = ret.GetGenericArguments().[0]
+
+                            let tryInstantiate (t : Type) =
+                                match tryUnifyTypes pickledType t with
+                                    | Some ass ->
+                                        let targs = mi.GetGenericArguments() |> Array.map (fun a -> ass.[a])
+                                        let mi = mi.MakeGenericMethod targs
+                                        Some (upcastToPicker mi)
+                                            
+                                    | None ->
+                                        None
+                                        
+
+                            Some tryInstantiate
+                        else
+                            Log.warn "bad custom pickler"
+                            None
+                    )
+
+            let nonGenericThings = 
+                allMeths
+                    |> List.filter (fun mi -> mi.GetGenericArguments().Length = 0)
+                    |> List.choose (fun mi ->
+                        let ret = mi.ReturnType
+                        if ret.IsGenericType && ret.GetGenericTypeDefinition() = picklerGen && mi.GetParameters().Length = 1 then
+                            let pickledType = ret.GetGenericArguments().[0]
+
+                            let create = upcastToPicker mi
+                            Some (pickledType, create)
+
+                        else
+                            Log.warn "bad custom pickler"
+                            None
+                    )
+                    |> Dictionary.ofList
+
+                    
+            member x.GetRegistration(t : Type) : CustomPicklerRegistration =
+                if t.IsGenericType then
+                    match genericThings |> List.tryPick (fun a -> a t) with
+                        | Some r -> 
+                            CustomPicklerRegistration.CustomPickler r
+                        | None ->
+                            match nonGenericThings.TryGetValue t with   
+                                | (true, r) -> CustomPicklerRegistration.CustomPickler r
+                                | _ -> CustomPicklerRegistration.UnRegistered
+                else
+                    match nonGenericThings.TryGetValue t with   
+                        | (true, r) -> CustomPicklerRegistration.CustomPickler r
+                        | _ -> CustomPicklerRegistration.UnRegistered
+
+            interface ICustomPicklerRegistry with
+                /// Look up pickler registration for particular type
+                member x.GetRegistration(t : Type) : CustomPicklerRegistration = x.GetRegistration t
+
+        let registry = PicklerRegistry [ typeof<ExprPicklerFunctions> ]
+
         let cache = PicklerCache.FromCustomPicklerRegistry registry
-        let murmur = MurMur3() :> IHashStreamFactory
         let pickler = FsPickler.CreateBinarySerializer(picklerResolver = cache)
 
 
@@ -337,13 +556,17 @@ module ExprExtensions =
                 | [], [] -> x
                 | _ -> Reflection.withAttributes x attributes
 
+        static member Pickle (e : Expr) =
+            Pickler.pickler.Pickle(e)
+
+        static member UnPickle (data : byte[]) : Expr =
+            Pickler.pickler.UnPickle(data)
+            
                 
         static member ComputeHash(e : Expr) =
             let e = Reflection.withAttributes e []
 
-            use s = Pickler.murmur.Create()
-            Pickler.pickler.Serialize(s, e)
-            s.ComputeHash() |> Convert.ToBase64String
+            Pickler.pickler.ComputeHash(e).Hash |> Convert.ToBase64String
 
         member x.ComputeHash() =
             Expr.ComputeHash x
