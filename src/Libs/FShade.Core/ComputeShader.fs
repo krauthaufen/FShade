@@ -38,6 +38,8 @@ type ComputeImage =
 
 type ComputeShader =
     {
+        csId            : string
+        csMethod        : MethodBase
         csLocalSize     : V3i
         csBuffers       : Map<string, ComputeBuffer>
         csImages        : Map<string, ComputeImage>
@@ -200,7 +202,7 @@ module ComputeShader =
 
 
 
-    let ofExpr (localSize : V3i) (body0 : Expr) =
+    let private ofExprInternal (meth : MethodBase) (hash : string) (localSize : V3i) (body0 : Expr) =
         let body1, state = Preprocessor.preprocess localSize body0
         let body2 = Optimizer.ConstantFolding.evaluateConstants'' (fun m -> m.DeclaringType.FullName = "FShade.Primitives") body1
 
@@ -296,6 +298,8 @@ module ComputeShader =
         
 
         {
+            csId            = hash
+            csMethod        = meth
             csLocalSize     = localSize
             csBuffers       = buffers
             csImages        = images
@@ -307,8 +311,16 @@ module ComputeShader =
         }
 
     let private cache = System.Collections.Concurrent.ConcurrentDictionary<string * V3i, ComputeShader>()
-
     
+    let ofExpr (localSize : V3i) (body : Expr) =
+        let hash = Expr.ComputeHash body
+        cache.GetOrAdd((hash, localSize), fun (signature, localSize) ->
+            let meth =
+                match body.Method with
+                    | Some mb -> mb
+                    | None -> null
+            ofExprInternal meth hash localSize body
+        )
 
     let ofFunction (maxLocalSize : V3i) (f : 'a -> 'b) : ComputeShader =
         match tryExtractExpr f with
@@ -316,17 +328,17 @@ module ComputeShader =
                 let hash = Expr.ComputeHash body
 
                 cache.GetOrAdd((hash, maxLocalSize), fun (signature, maxLocalSize) ->
-                    let localSize =
+                    let localSize, meth =
                         match body.Method with
                             | Some mb -> 
                                 match mb.GetCustomAttributes<LocalSizeAttribute>() |> Seq.tryHead with
-                                    | Some att -> V3i(att.X, att.Y, att.Z)
+                                    | Some att -> V3i(att.X, att.Y, att.Z), mb
                                     | _ -> 
                                         Log.warn "[FShade] compute shader without local-size"
-                                        V3i(1,1,1)
+                                        V3i(1,1,1), mb
                             | None ->
                                 Log.warn "[FShade] compute shader without local-size"
-                                V3i(1,1,1)
+                                V3i(1,1,1), null
 
                     let localSize =
                         V3i(
@@ -335,7 +347,7 @@ module ComputeShader =
                             (if localSize.Z = MaxLocalSize then maxLocalSize.Z else localSize.Z)
                         )
 
-                    ofExpr localSize body
+                    ofExprInternal meth hash localSize body
 
 
                 )
