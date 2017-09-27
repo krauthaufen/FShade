@@ -573,6 +573,8 @@ let sepp1 a b c d e f =
 
 [<EntryPoint>]
 let main args =
+    InputLayouts.run()
+    System.Environment.Exit 0
 //    let a = computer <@ (+) @> null null
 //    let b = a (Image2d<Formats.r32f>()) 
 //    let c = b 1 0.5 1

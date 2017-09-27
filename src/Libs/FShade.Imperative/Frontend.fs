@@ -478,6 +478,116 @@ module EntryPoint =
         }
       
 
+                
+    let setInputs (inputs : MapExt<string, Type>) (e : EntryPoint) =
+        let oldInputs = 
+            e.inputs |> List.map (fun input -> input.paramSemantic, input) |> MapExt.ofList
+
+        let createInput (name : string) (i : Option<EntryParameter>) (t : Option<Type>) : EntryParameter =
+            match t with
+                | Some t ->
+                    match i with
+                        | Some i ->
+                            if i.paramType <> t then
+                                failwithf "[FShade] shader input %A has type %A but is required to have %A" name i.paramType t
+
+                            i
+
+                        | None ->
+                            {
+                                paramType = t
+                                paramName = name
+                                paramSemantic = name
+                                paramDecorations = Set.ofList [ParameterDecoration.Interpolation InterpolationMode.Default]
+                            }
+                | None -> 
+                    failwithf "[FShade] shader uses input %s which is not given in layout" name
+              
+        let newInputs =
+            MapExt.map2 createInput oldInputs inputs
+
+        { e with inputs = newInputs |> MapExt.toList |> List.map snd }
+
+    let setUniforms (decorations : Type -> list<UniformDecoration>) (uniforms : MapExt<string, Type>) (uniformBuffers : MapExt<string, MapExt<string, Type>>) (e : EntryPoint) =
+        let oldBuffers =
+            e.uniforms 
+                |> List.choose (fun u -> match u.uniformBuffer with | Some b -> Some (b, u) | _ -> None)
+                |> List.groupBy fst 
+                |> List.map (fun (b,us) -> b, us |> List.map snd)
+                |> MapExt.ofList
+
+        let oldUniforms =
+            e.uniforms 
+                |> List.choose (fun u -> match u.uniformBuffer with | None -> Some(u.uniformName,u) | _ -> None)
+                |> MapExt.ofList
+
+
+        let createBuffer (bufferName : string) (l : Option<list<Uniform>>) (r : Option<MapExt<string, Type>>) =
+            match r with
+                | Some r ->
+                    let l = defaultArg l [] |> List.map (fun u -> u.uniformName, u) |> MapExt.ofList
+
+                    let createUniform (name : string) (l : Option<Uniform>) (r : Option<Type>) =
+                        match r with
+                            | Some r ->
+                                match l with
+                                    | Some l ->
+                                        if l.uniformType <> r then
+                                            failwithf "[FShade] uniform %s/%s has invalid type %A (expected %A)" bufferName name l.uniformType r
+                                        l
+                                    | None ->
+                                        {
+                                            uniformType = r
+                                            uniformName = name
+                                            uniformDecorations = decorations r
+                                            uniformBuffer = Some bufferName
+                                        }
+
+                            | None ->
+                                failwithf "[FShade] shader requests uniform %s/%s which is not part of the layout" bufferName name
+
+                    MapExt.map2 createUniform l r
+                        |> MapExt.toList
+                        |> List.map snd
+
+                | None ->
+                    failwithf "[FShade] shader requests uniform-buffer %s which is not part of the layout" bufferName
+
+        let createUniform (name : string) (l : Option<Uniform>) (r : Option<Type>) =
+            match r with
+                | Some r ->
+                    match l with
+                        | Some l ->
+                            if l.uniformType <> r then
+                                failwithf "[FShade] uniform %s has invalid type %A (expected: %A)" name l.uniformType r
+                            l
+                        | None ->
+                            {
+                                uniformName = name
+                                uniformType = r
+                                uniformDecorations = decorations r
+                                uniformBuffer = None
+                            }
+                | None ->
+                    failwithf "[FShade] shader requests uniform %s which is not part of layout" name
+
+        let newBuffers =
+            MapExt.map2 createBuffer oldBuffers uniformBuffers
+                |> MapExt.toList
+                |> List.collect (fun (_,u) -> u |> List.map (fun u -> u.uniformName, u))
+                |> MapExt.ofList
+
+        let newUniforms =
+            MapExt.map2 createUniform oldUniforms uniforms
+
+        let result =
+            MapExt.union newBuffers newUniforms
+                |> MapExt.toList
+                |> List.map snd
+
+        { e with uniforms = result }
+
+
 type Module = { entries : list<EntryPoint>; tryGetOverrideCode : MethodBase -> Option<Expr> }
        
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]

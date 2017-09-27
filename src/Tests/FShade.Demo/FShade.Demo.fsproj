@@ -51,6 +51,7 @@
     <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="InputLayouts.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
