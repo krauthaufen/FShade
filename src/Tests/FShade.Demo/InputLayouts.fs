@@ -22,7 +22,7 @@ module Shaders =
     type UniformScope with
         member x.A : float = uniform?BufferA?ValueA
         member x.B : float = uniform?BufferA?ValueB
-        member x.C : float = uniform?BufferB?ValueC
+        member x.C : float = uniform?BufferA?ValueC
 
     let vert (v : Vertex) =
         vertex {
@@ -31,12 +31,12 @@ module Shaders =
     
     let frag1 (v : Vertex) =
         fragment {
-            return V4d.IIII * uniform.A * uniform.C
+            return V4d.IIII * uniform.A * uniform.B
         }
 
     let frag2 (v : Vertex) =
         fragment {
-            return thing.Sample(v.tc) * uniform.B
+            return thing.Sample(v.tc) * uniform.C
         }
 
 

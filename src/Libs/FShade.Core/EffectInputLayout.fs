@@ -33,9 +33,45 @@ module EffectInputLayout =
         let unifyBuffers (l : MapExt<string, Type>) (r : MapExt<string, Type>) =
             MapExt.unionWith unifyTypes l r
 
+        let resolve (lb : string, lt : Type) (rb : string, rt : Type) =
+            if lt <> rt then
+                failwithf "[FShade] cannot unify %A and %A" lt rt
+
+            if lb = rb then
+                (lb, lt)
+            else
+                ("ConflictingBuffers", lt)
+
+
+        let lBufferUniforms =
+            l.eUniformBuffers 
+                |> MapExt.toList 
+                |> List.collect (fun (b,us) ->
+                    us |> MapExt.toList |> List.map (fun (n,t) -> n,(b, t))
+                  )   
+                |> MapExt.ofList
+
+        let rBufferUniforms =
+            r.eUniformBuffers 
+                |> MapExt.toList 
+                |> List.collect (fun (b,us) ->
+                    us |> MapExt.toList |> List.map (fun (n,t) -> n,(b, t))
+                  )   
+                |> MapExt.ofList
+
+        let bufferUniforms =
+            MapExt.unionWith resolve lBufferUniforms rBufferUniforms
+                |> MapExt.toList
+                |> List.map (fun (n,(b,t)) ->
+                    b, (n,t)
+                   )
+                |> List.groupBy fst
+                |> List.map (fun (b, bnts) -> (b, MapExt.ofList <| List.map (fun (_,(n,t)) -> n,t) bnts))
+                |> MapExt.ofList
+
         {
             eInputs = MapExt.unionWith unifyTypes l.eInputs r.eInputs
-            eUniformBuffers = MapExt.unionWith unifyBuffers l.eUniformBuffers r.eUniformBuffers
+            eUniformBuffers = bufferUniforms
             eUniforms = MapExt.unionWith unifyTypes l.eUniforms r.eUniforms
         }
 
