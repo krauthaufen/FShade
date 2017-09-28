@@ -449,6 +449,8 @@ module ComputeShader =
 
     let toModule (shader : ComputeShader) : Module =
         {
+            hash = shader.csId
+            userData = shader
             entries = [ toEntryPoint shader ]
             tryGetOverrideCode = Shader.tryGetOverrideCode shader.csLocalSize
         }

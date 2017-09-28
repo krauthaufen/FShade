@@ -580,13 +580,19 @@ module EntryPoint =
         { e with uniforms = result }
 
 
-type Module = { entries : list<EntryPoint>; tryGetOverrideCode : MethodBase -> Option<Expr> }
+type Module = 
+    { 
+        hash : string
+        userData : obj
+        entries : list<EntryPoint>
+        tryGetOverrideCode : MethodBase -> Option<Expr> 
+    }
        
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Module =
 
     let ofLambda (name : string) (e : Expr) =
-        { entries = [EntryPoint.ofLambda name e]; tryGetOverrideCode = constF None }
+        { hash = Expr.ComputeHash e; userData = null; entries = [EntryPoint.ofLambda name e]; tryGetOverrideCode = constF None }
 
     let ofLambdas (l : list<string * Expr>) =
-        { entries = l |> List.map (uncurry EntryPoint.ofLambda); tryGetOverrideCode = constF None }
+        { hash = Guid.NewGuid() |> string; userData = null; entries = l |> List.map (uncurry EntryPoint.ofLambda); tryGetOverrideCode = constF None }
