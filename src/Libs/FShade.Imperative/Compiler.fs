@@ -1037,6 +1037,8 @@ module Compiler =
                             let! ct = toCTypeS e.Type
                             return CField(ct, t, f.Name)
 
+
+
                 | PropertyGet(None, pi, []) ->
                     return! Expr.Value(pi.GetValue(null), pi.PropertyType) |> toCExprS
                     
@@ -1059,6 +1061,15 @@ module Compiler =
                         let! t = toCExprS t
                         return CField(ct, t, case.Name + "_" + pi.Name)
                         
+                    elif FSharpType.IsUnion(pi.DeclaringType, true) then
+                        let! ct = toCTypeS e.Type
+                        let case = 
+                            FSharpType.GetUnionCases(pi.DeclaringType, true)
+                                |> Seq.find (fun ci -> ci.GetFields() |> Array.exists ((=) pi))
+                        let! t = toCExprS t
+                        return CField(ct, t, case.Name + "_" + pi.Name)
+                        
+
                     else
                         return! Expr.Call(t, pi.GetMethod, []) |> toCExprS
                     
