@@ -440,6 +440,11 @@ type ExpressionSubstitutionExtensions private() =
                             | Some index -> Expr.ReadInput(kind, e.Type, name, index)
                             | None -> e
 
+            | CallFunction(utility, args) ->
+                let args = args |> List.map (substituteReads substitute)
+                let utility = utility |> UtilityFunction.map (substituteReads substitute)
+                Expr.CallFunction(utility, args)
+
             | ShapeLambda(v,b) -> Expr.Lambda(v, substituteReads substitute b)
             | ShapeVar _ -> e
             | ShapeCombination(o, args) ->

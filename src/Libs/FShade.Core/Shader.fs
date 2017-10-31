@@ -1288,8 +1288,8 @@ module Shader =
         let sideEffects = sideEffects.[shader.shaderStage]
         let newBody, state = 
             shader.shaderBody
-                |> Optimizer.inlining //' (fun _ -> true)
-                |> Optimizer.DeExpr.deExpr
+                |> Optimizer.inlining
+                |> Optimizer.hoistImperativeConstructs
                 |> Optimizer.evaluateConstants' sideEffects.Contains
                 |> Optimizer.eliminateDeadCode' sideEffects.Contains
                 |> Optimizer.evaluateConstants' sideEffects.Contains

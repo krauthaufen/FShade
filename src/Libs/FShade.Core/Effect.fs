@@ -516,7 +516,148 @@ module Effect =
         effects |> Seq.fold compose2 empty
 
 
+    module private Helpers =
+        type Vertex = { [<SourceVertexIndex>] i : int }
 
+        let nopPoint (p : Point<Vertex>) =
+            point {
+                yield p.Value
+            }
 
-        
+        let nopLine (p : Line<Vertex>) =
+            point {
+                yield p.P0
+                yield p.P1
+            }
 
+        let nopTriangle (p : Triangle<Vertex>) =
+            point {
+                yield p.P0
+                yield p.P1
+                yield p.P2
+            }
+
+        let nopGS =
+            Map.ofList [
+                InputTopology.Point, ofFunction(nopPoint).GeometryShader.Value
+                InputTopology.Line, ofFunction(nopLine).GeometryShader.Value
+                InputTopology.Triangle, ofFunction(nopTriangle).GeometryShader.Value
+            ]
+
+    let toLayeredEffect (layers : int) (uniforms : Set<string>) (topology : InputTopology) (effect : Effect) = 
+        if effect.TessControlShader.IsSome || effect.TessEvalShader.IsSome then
+            failwithf "[FShade] effects containing tessellation shaders cannot be layered automatically"
+
+        let geometryShader =
+            match effect.VertexShader, effect.GeometryShader with
+                | None, None ->
+                    match Map.tryFind topology Helpers.nopGS with
+                        | Some gs ->
+                            gs
+                        | None ->
+                            failwithf "[FShade] bad topology for layered shader: %A" topology
+
+                | Some vs, None ->
+                    match Map.tryFind topology Helpers.nopGS with
+                        | Some gs ->
+                            Shader.compose2 gs vs
+                        | None ->
+                            failwithf "[FShade] bad topology for layered shader: %A" topology
+                    
+                | None, Some gs ->
+                    gs
+
+                | Some vs, Some gs ->
+                    failwithf "[FShade] layering GS not implemented atm."
+
+        let geometryShader =
+            let layer = Var("layer", typeof<int>)
+
+            let mutable perLayerUniforms = Map.empty
+
+            let newBody = 
+                geometryShader.shaderBody.SubstituteReads (fun kind typ name index ->
+                    match kind with
+                        | ParameterKind.Uniform when Set.contains name uniforms ->
+                            match index with
+                                | Some index ->
+                                    let old = geometryShader.shaderUniforms.[name]
+                                    let typ = Peano.getArrayType layers old.uniformType
+                                    perLayerUniforms <- Map.add name { old with uniformType = typ } perLayerUniforms
+                                    let arrInput = Expr.ReadInput(kind, typ, name)
+                                    let layerItem = Expr.PropertyGet(arrInput, arrInput.Type.GetProperty("Item"), [Expr.Var layer])
+                                    let realItem = Expr.PropertyGet(layerItem, layerItem.Type.GetProperty("Item"), [index])
+
+                                    realItem |> Some
+                                    
+                                | None ->
+                                    let old = geometryShader.shaderUniforms.[name]
+                                    let typ = Peano.getArrayType layers old.uniformType
+                                    perLayerUniforms <- Map.add name { old with uniformType = typ } perLayerUniforms
+                                    let arrInput = Expr.ReadInput(kind, typ, name) 
+                                    let realItem = Expr.PropertyGet(arrInput, arrInput.Type.GetProperty("Item"), [Expr.Var layer])
+                                    realItem |> Some
+                        | _ ->
+                            None
+                )
+
+            let newBody =
+                Expr.ForIntegerRangeLoop(
+                    layer, Expr.Value 0, Expr.Value (layers - 1), 
+                    Expr.Sequential(
+                        newBody,
+                        <@ restartStrip() @>
+                    )
+                )
+                
+            let geometryShader = Shader.withBody newBody geometryShader
+            geometryShader
+
+        let fragmentShader =
+            match effect.FragmentShader with
+                | Some fragmentShader ->
+                    let layer = Expr.ReadInput(ParameterKind.Input, typeof<int>, Intrinsics.Layer)
+                    let mutable perLayerUniforms = Map.empty
+
+                    let newBody = 
+                        fragmentShader.shaderBody.SubstituteReads (fun kind typ name index ->
+                            match kind with
+                                | ParameterKind.Uniform when Set.contains name uniforms ->
+                                    match index with
+                                        | Some index ->
+                                            let old = fragmentShader.shaderUniforms.[name]
+                                            let typ = Peano.getArrayType layers old.uniformType
+                                            perLayerUniforms <- Map.add name { old with uniformType = typ } perLayerUniforms
+                                            let arrInput = Expr.ReadInput(kind, typ, name)
+                                            let layerItem = Expr.PropertyGet(arrInput, arrInput.Type.GetProperty("Item"), [layer])
+                                            let realItem = Expr.PropertyGet(layerItem, layerItem.Type.GetProperty("Item"), [index])
+
+                                            realItem |> Some
+                                    
+                                        | None ->
+                                            let old = fragmentShader.shaderUniforms.[name]
+                                            let typ = Peano.getArrayType layers old.uniformType
+                                            perLayerUniforms <- Map.add name { old with uniformType = typ } perLayerUniforms
+                                            let arrInput = Expr.ReadInput(kind, typ, name) 
+                                            let realItem = Expr.PropertyGet(arrInput, arrInput.Type.GetProperty("Item"), [layer])
+                                            realItem |> Some
+                                | _ ->
+                                    None
+                        )
+
+                    let fragmentShader = Shader.withBody newBody  fragmentShader
+//                        let uniforms = Map.union fragmentShader.shaderUniforms perLayerUniforms
+//                        { Shader.withBody newBody { fragmentShader with shaderUniforms = uniforms } with
+//                            shaderUniforms = uniforms
+//                        }
+
+                    fragmentShader |> Some
+                    
+                | None ->
+                    None
+
+        match fragmentShader with
+            | Some fs ->
+                Effect(Map.ofList [ShaderStage.Geometry, geometryShader; ShaderStage.Fragment, fs])
+            | None ->
+                ofList [ geometryShader ]

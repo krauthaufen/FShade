@@ -89,6 +89,10 @@ module Optimizer =
                 | AddressOf (MutableArgument v) -> Some v
                 | _ -> None
 
+    /// The dead code elimination removes unused bindings from the code
+    /// e.g. `let a = someFunction(x,y) in 10` gets reduced to `10` assuming
+    /// that all functions are pure except the ones identified by the given function.
+    /// this handling seems proper since most GLSL functions are pure (except for discard, EmitVertex, etc.)
     module DeadCodeElimination = 
 
         type EliminationState =
@@ -641,6 +645,10 @@ module Optimizer =
             let mutable state = { EliminationState.empty with isGlobalSideEffect = isSideEffect }
             run.Run(&state)
 
+    /// the constant folding pass tries to evaluate constant expressions throughout the tree.
+    /// e.g. `let a = 10 * 2 + 3 in ...` translates to `let a = 23 in ...` and so on.
+    /// NOTE: since some built-in F# functions cannot be invoked dynamically (using reflection) the
+    ///       module contains a list of many functions but may print a warning in certain scenarios.
     module ConstantFolding =
         
         type State = 
@@ -907,30 +915,130 @@ module Optimizer =
                 "op_Inequality", ((<>) : float -> float -> bool) :> obj
                 "op_Inequality", ((<>) : decimal -> decimal -> bool) :> obj
 
+                
+                "ToSByte", (int8 : int8 -> _) :> obj
+                "ToSByte", (int8 : int16 -> _) :> obj
+                "ToSByte", (int8 : int32 -> _) :> obj
+                "ToSByte", (int8 : int64 -> _) :> obj
+                "ToSByte", (int8 : uint8 -> _) :> obj
+                "ToSByte", (int8 : uint16 -> _) :> obj
+                "ToSByte", (int8 : uint32 -> _) :> obj
+                "ToSByte", (int8 : uint64 -> _) :> obj
+                "ToSByte", (int8 : float32 -> _) :> obj
+                "ToSByte", (int8 : float -> _) :> obj
+                "ToSByte", (int8 : decimal -> _) :> obj
+                
+                "ToByte", (uint8 : int8 -> _) :> obj
+                "ToByte", (uint8 : int16 -> _) :> obj
+                "ToByte", (uint8 : int32 -> _) :> obj
+                "ToByte", (uint8 : int64 -> _) :> obj
+                "ToByte", (uint8 : uint8 -> _) :> obj
+                "ToByte", (uint8 : uint16 -> _) :> obj
+                "ToByte", (uint8 : uint32 -> _) :> obj
+                "ToByte", (uint8 : uint64 -> _) :> obj
+                "ToByte", (uint8 : float32 -> _) :> obj
+                "ToByte", (uint8 : float -> _) :> obj
+                "ToByte", (uint8 : decimal -> _) :> obj
+                
+                "ToInt16", (int16 : int8 -> _) :> obj
+                "ToInt16", (int16 : int16 -> _) :> obj
+                "ToInt16", (int16 : int32 -> _) :> obj
+                "ToInt16", (int16 : int64 -> _) :> obj
+                "ToInt16", (int16 : uint8 -> _) :> obj
+                "ToInt16", (int16 : uint16 -> _) :> obj
+                "ToInt16", (int16 : uint32 -> _) :> obj
+                "ToInt16", (int16 : uint64 -> _) :> obj
+                "ToInt16", (int16 : float32 -> _) :> obj
+                "ToInt16", (int16 : float -> _) :> obj
+                "ToInt16", (int16 : decimal -> _) :> obj
+                
+                "ToUInt16", (uint16 : int8 -> _) :> obj
+                "ToUInt16", (uint16 : int16 -> _) :> obj
+                "ToUInt16", (uint16 : int32 -> _) :> obj
+                "ToUInt16", (uint16 : int64 -> _) :> obj
+                "ToUInt16", (uint16 : uint8 -> _) :> obj
+                "ToUInt16", (uint16 : uint16 -> _) :> obj
+                "ToUInt16", (uint16 : uint32 -> _) :> obj
+                "ToUInt16", (uint16 : uint64 -> _) :> obj
+                "ToUInt16", (uint16 : float32 -> _) :> obj
+                "ToUInt16", (uint16 : float -> _) :> obj
+                "ToUInt16", (uint16 : decimal -> _) :> obj
+                
+                
+                "ToInt", (int : int8 -> _) :> obj
+                "ToInt", (int : int16 -> _) :> obj
+                "ToInt", (int : int32 -> _) :> obj
+                "ToInt", (int : int64 -> _) :> obj
+                "ToInt", (int : uint8 -> _) :> obj
+                "ToInt", (int : uint16 -> _) :> obj
+                "ToInt", (int : uint32 -> _) :> obj
+                "ToInt", (int : uint64 -> _) :> obj
+                "ToInt", (int : float32 -> _) :> obj
+                "ToInt", (int : float -> _) :> obj
+                "ToInt", (int : decimal -> _) :> obj
+                
+                "ToUInt32", (uint32 : int8 -> _) :> obj
+                "ToUInt32", (uint32 : int16 -> _) :> obj
+                "ToUInt32", (uint32 : int32 -> _) :> obj
+                "ToUInt32", (uint32 : int64 -> _) :> obj
+                "ToUInt32", (uint32 : uint8 -> _) :> obj
+                "ToUInt32", (uint32 : uint16 -> _) :> obj
+                "ToUInt32", (uint32 : uint32 -> _) :> obj
+                "ToUInt32", (uint32 : uint64 -> _) :> obj
+                "ToUInt32", (uint32 : float32 -> _) :> obj
+                "ToUInt32", (uint32 : float -> _) :> obj
+                "ToUInt32", (uint32 : decimal -> _) :> obj
+                
+                "ToInt64", (int64 : int8 -> _) :> obj
+                "ToInt64", (int64 : int16 -> _) :> obj
+                "ToInt64", (int64 : int32 -> _) :> obj
+                "ToInt64", (int64 : int64 -> _) :> obj
+                "ToInt64", (int64 : uint8 -> _) :> obj
+                "ToInt64", (int64 : uint16 -> _) :> obj
+                "ToInt64", (int64 : uint32 -> _) :> obj
+                "ToInt64", (int64 : uint64 -> _) :> obj
+                "ToInt64", (int64 : float32 -> _) :> obj
+                "ToInt64", (int64 : float -> _) :> obj
+                "ToInt64", (int64 : decimal -> _) :> obj
+                
+                "ToUInt64", (uint64 : int8 -> _) :> obj
+                "ToUInt64", (uint64 : int16 -> _) :> obj
+                "ToUInt64", (uint64 : int32 -> _) :> obj
+                "ToUInt64", (uint64 : int64 -> _) :> obj
+                "ToUInt64", (uint64 : uint8 -> _) :> obj
+                "ToUInt64", (uint64 : uint16 -> _) :> obj
+                "ToUInt64", (uint64 : uint32 -> _) :> obj
+                "ToUInt64", (uint64 : uint64 -> _) :> obj
+                "ToUInt64", (uint64 : float32 -> _) :> obj
+                "ToUInt64", (uint64 : float -> _) :> obj
+                "ToUInt64", (uint64 : decimal -> _) :> obj
+                
+                "ToSingle", (float32 : int8 -> _) :> obj
+                "ToSingle", (float32 : int16 -> _) :> obj
+                "ToSingle", (float32 : int32 -> _) :> obj
+                "ToSingle", (float32 : int64 -> _) :> obj
+                "ToSingle", (float32 : uint8 -> _) :> obj
+                "ToSingle", (float32 : uint16 -> _) :> obj
+                "ToSingle", (float32 : uint32 -> _) :> obj
+                "ToSingle", (float32 : uint64 -> _) :> obj
+                "ToSingle", (float32 : float32 -> _) :> obj
+                "ToSingle", (float32 : float -> _) :> obj
+                "ToSingle", (float32 : decimal -> _) :> obj
+                
+                "ToDouble", (float : int8 -> _) :> obj
+                "ToDouble", (float : int16 -> _) :> obj
+                "ToDouble", (float : int32 -> _) :> obj
+                "ToDouble", (float : int64 -> _) :> obj
+                "ToDouble", (float : uint8 -> _) :> obj
+                "ToDouble", (float : uint16 -> _) :> obj
+                "ToDouble", (float : uint32 -> _) :> obj
+                "ToDouble", (float : uint64 -> _) :> obj
+                "ToDouble", (float : float32 -> _) :> obj
+                "ToDouble", (float : float -> _) :> obj
+                "ToDouble", (float : decimal -> _) :> obj
+
 
             ]
-
-//        let rec (|EqualityCondition|_|) (e : Expr) =
-//            match e with
-//                | Call(None, Method("op_Equality", _), ([Var v; Value(c, _)] | [Value(c, _); Var v])) ->
-//                    Some (Map.ofList [v, c])
-//
-//                | AndAlso(EqualityCondition l, EqualityCondition r) ->
-//                    Some (Map.union l r)
-//
-//                | _ ->
-//                    None
-//
-//        let rec (|InequalityCondition|_|) (e : Expr) =
-//            match e with
-//                | Call(None, Method("op_Inequality", _), ([Var v; Value(c, _)] | [Value(c, _); Var v])) ->
-//                    Some (Map.ofList [v, c])
-//
-//                | OrElse(InequalityCondition l, InequalityCondition r) ->
-//                    Some (Map.union l r)
-//
-//                | _ ->
-//                    None
 
         let rec evaluateConstantsS (e : Expr) =
             state {
@@ -1901,420 +2009,248 @@ module Optimizer =
             let mutable state = { State.empty with functions = functions }
             run.Run(&state)
 
-    module DeExpr =
+    module StatementHoisting =
+        
+        type Hoisting =
+            {
+                finalize : Option<Expr -> Expr>
+            }
 
-        let rec extractStatements (e : Expr) : Option<Expr -> Expr> * Expr =
-            match e with
-                | Let(v,e,b) ->
-                    let rest, b = extractStatements b
-                    match rest with
-                        | Some rest -> 
-                            Some (fun b -> Expr.Let(v,e,rest b)), b
-                        | None ->
-                            Some (fun b -> Expr.Let(v,e,b)), b
+            static member Zero = { finalize = None }
 
-                | Sequential(l,r) ->
-                    let rb, r = extractStatements r
-                    match rb with
-                        | Some rb ->
-                            Some (fun f -> Expr.Seq [l; rb f]), r
-                        | None ->
-                            Some (fun f -> Expr.Seq [l; f]), r
-                            
+            static member (+) (l : Hoisting, r : Hoisting) =
+                match l.finalize, r.finalize with
+                    | Some lf, Some rf -> { finalize = Some (lf >> rf) }
+                    | Some _, None -> l
+                    | None, Some _ -> r
+                    | None, None -> l
+
+            static member Sequential (e : Expr) =
+                { finalize = Some (fun f -> Expr.Seq [e; f]) }
+
+        let rec processExpression (expr : Expr) : Expr * Hoisting =
+            match expr with
+                | WriteOutputs _
                 | AddressSet _ 
-                | FieldSet _ 
-                | PropertySet _
                 | ForInteger _ 
                 | ForEach _ 
-                | VarSet _ 
+                | FieldSet _
+                | PropertySet _ 
                 | WhileLoop _ ->
-                    Some (fun f -> Expr.Seq [e; f]), Expr.Unit
-
-                | AddressOf e ->
-                    match extractStatements e with
-                        | Some rb, e -> Some rb, Expr.AddressOf e
-                        | None, e -> None, Expr.AddressOf e
-                        
-                | Application(l,a) ->
-                    match extractList [l;a] with
-                        | Some rb, [l;a] -> Some rb, Expr.Application(l, a)
-                        | None, [l;a] -> None, Expr.Application(l, a)
-                        | _ -> failwith "impossible"
-
-                | CallFunction(f, args) ->
-                    let f = f |> UtilityFunction.map deExpr
-                    match extractList args with
-                        | Some rb, args -> Some rb, Expr.CallFunction(f, args)
-                        | None, args -> None, Expr.CallFunction(f, args)
-
-                | Call(None, mi, args) ->
-                    match extractList args with
-                        | Some rb, args -> Some rb, Expr.Call(mi, args)
-                        | None, args -> None, Expr.Call(mi, args)
-
-                | Call(Some t, mi, args) ->
-                    match extractList (t :: args) with
-                        | Some rb, (t :: args) -> Some rb, Expr.Call(t, mi, args)
-                        | None, (t :: args) -> None, Expr.Call(t, mi, args)
-                        | _ -> failwith "impossible"
-                    
-                | Coerce(e, t) ->
-                    match extractStatements e with
-                        | Some rb, e -> Some rb, Expr.Coerce(e, t)
-                        | None, e -> None, Expr.Coerce(e, t)
-
-                | FieldGet(Some t, f) ->
-                    match extractStatements t with
-                        | Some rb, t -> Some rb, Expr.FieldGet(t, f)
-                        | None, t -> None, Expr.FieldGet(t, f)
-                        
-                | IfThenElse(cond, i, e) ->
-                    match extractStatements cond with
-                        | Some rb, cond -> Some rb, Expr.IfThenElse(cond, i, e)
-                        | None, cond -> None, Expr.IfThenElse(cond, i, e)
-
-                | NewArray(t, args) ->
-                    match extractList args with
-                        | Some rb, args -> Some rb, Expr.NewArray(t, args) 
-                        | None, args -> None, Expr.NewArray(t, args) 
-
-                        
-                | NewObject(ctor, args) ->
-                    match extractList args with
-                        | Some rb, args -> Some rb, Expr.NewObject(ctor, args) 
-                        | None, args -> None, Expr.NewObject(ctor, args) 
-
-                | NewRecord(t, args) ->
-                    match extractList args with
-                        | Some rb, args -> Some rb, Expr.NewRecord(t, args) 
-                        | None, args -> None, Expr.NewRecord(t, args) 
-
-                | NewTuple(args) ->
-                    match extractList args with
-                        | Some rb, args -> Some rb, Expr.NewTuple(args) 
-                        | None, args -> None, Expr.NewTuple(args) 
-
-                | NewUnionCase(ci, args) ->
-                    match extractList args with
-                        | Some rb, args -> Some rb, Expr.NewUnionCase(ci, args) 
-                        | None, args -> None, Expr.NewUnionCase(ci, args) 
-
-                | PropertyGet(None, pi, indices) ->
-                    match extractList indices with
-                        | Some rb, indices -> Some rb, Expr.PropertyGet(pi, indices)
-                        | None, indices -> None, Expr.PropertyGet(pi, indices)
-
-                | PropertyGet(Some t, pi, indices) ->
-                    match extractList (t :: indices) with
-                        | Some rb, t :: indices -> Some rb, Expr.PropertyGet(t, pi, indices)
-                        | None, t :: indices -> None, Expr.PropertyGet(t, pi, indices)
-                        | _ -> failwith "impossible"
-
-                        
-                | TupleGet(t, i) ->
-                    match extractStatements t with
-                        | Some rb, t -> Some rb, Expr.TupleGet(t, i)
-                        | None, t -> None, Expr.TupleGet(t, i)
-
-                | TypeTest(v, t) ->
-                    match extractStatements v with
-                        | Some rb, v -> Some rb, Expr.TypeTest(v, t)
-                        | None, v -> None, Expr.TypeTest(v, t)
-                        
-                | UnionCaseTest(v, ci) ->
-                    match extractStatements v with
-                        | Some rb, v -> Some rb, Expr.UnionCaseTest(v, ci)
-                        | None, v -> None, Expr.UnionCaseTest(v, ci)
-
-                | e ->
-                    None, e
-        
-        and extractList (l : list<Expr>) =
-            match l with
-                | [] -> None, []
-                | a :: r ->
-                    let rebuildA, a = extractStatements a
-                    let rebuildRest, r = extractList r
-                    match rebuildA, rebuildRest with
-                        | Some ra, Some rr ->
-                            Some (ra >> rr), a :: r
-                        | Some ra, None ->
-                            Some ra, a :: r
-                        | None, Some rr ->
-                            Some rr, a :: r
-                        | None, None ->
-                            None, a :: r
-
-        and extractMapL (l : list<string * (Option<Expr> * Expr)>) =
-            match l with
-                | [] -> None, []
-                | (name, (ai, av)) :: r ->
-                    let rai = ai |> Option.map extractStatements
-                    let rav, av = extractStatements av
-                    let rr, r = extractMapL r
-
-                    let ra, ai =
-                        match rai with
-                            | Some(Some rai, ai) -> 
-                                match rav with
-                                    | Some rav -> Some (rai >> rav), Some ai
-                                    | None -> Some rai, Some ai
-
-                            | Some(None, ai) ->
-                                rav, Some ai
-
-                            | None -> 
-                                rav, None
-
-                    match ra, rr with
-                        | Some ra, Some rr ->
-                            Some (ra >> rr), (name, (ai, av)) :: r
-                        | Some ra, None ->
-                            Some ra, (name, (ai, av)) :: r
-                        | None, Some rr ->
-                            Some rr, (name, (ai, av)) :: r
-                        | None, None ->
-                            None, (name, (ai, av)) :: r
-
-        and extractMap (l : Map<string, Option<Expr> * Expr>) =
-            let rb, e = l |> Map.toList |> extractMapL
-            rb, Map.ofList e
-
-        and deExpr (e : Expr) =
-            match e with
-                | WriteOutputs values ->
-                    match extractMap values with
-                        | Some rb, values ->
-                            Expr.WriteOutputs(values) |> rb |> deExpr
-                        | None, values ->
-                            Expr.WriteOutputs(values)
-
-                | Let(v, e, b) ->
-                    let b = deExpr b
-                    match extractStatements e with
-                        | Some rb, e ->
-                            Expr.Let(v,e,b) |> rb |> deExpr
-                        | None, e ->
-                            Expr.Let(v,e,b)
-
-                | CallFunction(f, args) ->
-                    let f = f |> UtilityFunction.map deExpr
-                    match extractList args with  
-                        | Some rb, args ->
-                            Expr.CallFunction(f, args) |> rb |> deExpr
-                        | None, args ->
-                            Expr.CallFunction(f, args)
-
-                | Call(None, mi, args) ->
-                    match extractList args with  
-                        | Some rb, args ->
-                            Expr.Call(mi, args) |> rb |> deExpr
-                        | None, args ->
-                            Expr.Call(mi, args)
-                    
-                | Call(Some t, mi, args) ->
-                    match extractList (t :: args) with
-                        | Some rb, t :: args ->
-                            Expr.Call(t, mi, args) |> rb |> deExpr
-                        | None, t :: args ->
-                            Expr.Call(t, mi, args)
-                        | _ ->
-                            failwith "impossible"
-
-                | AddressOf e ->
-                    match extractStatements e with
-                        | Some rb, e ->
-                            Expr.AddressOf(e) |> rb |> deExpr
-                        | None, e ->
-                            Expr.AddressOf e
-
-                
-                | AddressSet(v, e) ->
-                    match extractList [v;e] with
-                        | Some rb, [v;e] ->
-                            Expr.AddressSet(v, e) |> rb |> deExpr
-                        | None, [v;e]->
-                            Expr.AddressSet(v, e)
-                        | _ ->
-                            failwith "impossible"
-
-                | Application(l,a) ->
-                    match extractList [l;a] with
-                        | Some rb, [l;a] ->
-                            Expr.Application(l, a) |> rb |> deExpr
-                        | None, [l;a] ->
-                            Expr.Application(l, a)
-                        | _ ->
-                            failwith "impossible"
-
-                | ForInteger(v, first, step, last, body) ->
-                    let body = deExpr body
-                    match extractList [first; step; last] with
-                        | Some rb, [first; step; last] ->
-                            Expr.ForInteger(v, first, step, last, body)
-                        | None, [first; step; last] ->
-                            Expr.ForInteger(v, first, step, last, body)
-                        | _ ->
-                            failwith "impossible"
-
-                | ForEach(v, s, body) ->
-                    let body = deExpr body
-                    match extractStatements s with
-                        | Some rb, s ->
-                            Expr.ForEach(v, s, body) |> rb |> deExpr
-                        | None, s ->
-                            Expr.ForEach(v, s, body)
-
-                | Coerce(e, t) ->
-                    match extractStatements e with
-                        | Some rb, e ->
-                            Expr.Coerce(e, t) |> rb |> deExpr
-                        | None, e ->
-                            Expr.Coerce(e,t)
-
-                | DefaultValue t ->
-                    e
-
-                | FieldGet(None, f) ->
-                    Expr.FieldGet(f)
-
-                | FieldGet(Some t, f) ->
-                    match extractStatements t with
-                        | Some rb, t -> Expr.FieldGet(t, f) |> rb |> deExpr
-                        | None, t -> Expr.FieldGet(t, f)
-
-                | FieldSet(None, f, value) ->
-                    match extractStatements value with
-                        | Some rb, value -> Expr.FieldSet(f, value) |> rb |> deExpr
-                        | None, value -> Expr.FieldSet(f, value)
-
-                | FieldSet(Some t, f, value) ->
-                    match extractList [t; value] with
-                        | Some rb, [t;value] -> Expr.FieldSet(t, f, value) |> rb |> deExpr
-                        | None, [t;value] -> Expr.FieldSet(t, f, value)
-                        | _ ->
-                            failwith "impossible"
-
-                | IfThenElse(cond, i, e) when e.Type = typeof<unit> ->
-                    match extractStatements cond with
-                        | Some rb, cond -> Expr.IfThenElse(cond, i, e) |> rb |> deExpr
-                        | None, cond -> Expr.IfThenElse(cond, deExpr i, deExpr e)
-
-                | IfThenElse(cond, i, e) ->
-                    match extractStatements cond with
-                        | Some rb, cond -> Expr.IfThenElse(cond, i, e) |> rb |> deExpr
-                        | None, cond -> Expr.IfThenElse(cond, deExpr i, deExpr e)
-
-                | Lambda(v,b) ->
-                    Expr.Lambda(v, deExpr b)
-
-                | NewArray(t, args) ->
-                    match extractList args with
-                        | Some rb, args -> Expr.NewArray(t, args) |> rb |> deExpr
-                        | None, args -> Expr.NewArray(t, args)
-
-                | NewDelegate(t, vars, body) ->
-                    let body = deExpr body
-                    Expr.NewDelegate(t, vars, body)
-                    
-                | NewObject(ctor, args) ->
-                    match extractList args with
-                        | Some rb, args -> Expr.NewObject(ctor, args) |> rb |> deExpr
-                        | None, args -> Expr.NewObject(ctor, args)
-
-                | NewRecord(t, args) ->
-                    match extractList args with
-                        | Some rb, args -> Expr.NewRecord(t, args) |> rb |> deExpr
-                        | None, args -> Expr.NewRecord(t, args)
-
-                | NewTuple(args) ->
-                    match extractList args with
-                        | Some rb, args -> Expr.NewTuple(args) |> rb |> deExpr
-                        | None, args -> Expr.NewTuple(args)
-                        
-                | NewUnionCase(ci, args) ->
-                    match extractList args with
-                        | Some rb, args -> Expr.NewUnionCase(ci, args) |> rb |> deExpr
-                        | None, args -> Expr.NewUnionCase(ci, args)
-                        
-                | PropertyGet(None, pi, indices) ->
-                    match extractList indices with
-                        | Some rb, indices -> Expr.PropertyGet(pi, indices) |> rb |> deExpr
-                        | None, indices -> Expr.PropertyGet(pi, indices)
-                        
-                | PropertyGet(Some t, pi, indices) ->
-                    match extractList (t :: indices) with
-                        | Some rb, t :: indices -> Expr.PropertyGet(t, pi, indices) |> rb |> deExpr
-                        | None, t :: indices -> Expr.PropertyGet(t, pi, indices)
-                        | _ ->
-                            failwith "impossible"
-
-                | PropertySet(None, pi, indices, value) ->
-                    match extractList (value :: indices) with
-                        | Some rb, value :: indices -> Expr.PropertySet(pi, value, indices) |> rb |> deExpr
-                        | None, value :: indices -> Expr.PropertySet(pi, value, indices)
-                        | _ ->
-                            failwith "impossible"
-                    
-                | PropertySet(Some t, pi, indices, value) ->
-                    match extractList (t :: value :: indices) with
-                        | Some rb, t :: value :: indices -> Expr.PropertySet(t, pi, value, indices) |> rb |> deExpr
-                        | None, t :: value :: indices -> Expr.PropertySet(t, pi, value, indices)
-                        | _ ->
-                            failwith "impossible"
-                        
-                | QuoteRaw e -> Expr.QuoteRaw e
-                | QuoteTyped e -> Expr.QuoteTyped e
+                    let expr = processStatement expr
+                    Expr.Unit, Hoisting.Sequential expr
 
                 | Sequential(l,r) ->
-                    Expr.Sequential (deExpr l, deExpr r)
+                    let l = processStatement l
+                    let r, rh = processExpression r
+                    r, rh + Hoisting.Sequential l
 
+
+                | Let(v,e,b) ->
+                    let b, bh = processExpression b
+                    let e, eh = processExpression e
+                    b, bh + eh + { finalize = Some (fun f -> Expr.Let(v, e, f)) } 
+
+
+                | TryFinally _ -> failwith ""
+                | TryWith _ -> failwith ""
                 
-                | TryFinally(t,f) ->
-                    let t = deExpr t
-                    let f = deExpr f
-                    Expr.TryFinally(t, f)
+                | AddressOf e ->
+                    let e, eh = processExpression e
+                    Expr.AddressOf(e), eh
+
+                | Application(l,a) ->
+                    let l, lh = processExpression l
+                    let a, ah = processExpression a
+                    Expr.Application(l,a), lh + ah
+
+                | CallFunction(utility, args) ->
+                    let args, ah = processManyExpresions args
+                    let utility = utility |> UtilityFunction.map processStatement
+                    Expr.CallFunction(utility, args), ah
                     
-                | TryWith(a, b, c, d, e) ->
-                    let a = deExpr a
-                    let c = deExpr c
-                    let e = deExpr e
-                    Expr.TryWith(a, b, c, d, e)
+                | Call(None, mi, args) ->
+                    let args, ah = processManyExpresions args
+                    Expr.Call(mi, args), ah
+                    
+                | Call(Some t, mi, args) ->
+                    let t, th = processExpression t
+                    let args, ah = processManyExpresions args
+                    Expr.Call(t, mi, args), th + ah
 
                     
-                | TupleGet(t, i) ->
-                    match extractStatements t with
-                        | Some rb, t -> Expr.TupleGet(t, i) |> rb |> deExpr
-                        | None, t -> Expr.TupleGet(t,i)
+                | Coerce(e, t) ->
+                    let e, eh = processExpression e
+                    Expr.Coerce(e, t), eh
 
-                        
-                | TypeTest(e, t) ->
-                    match extractStatements e with
-                        | Some rb, e -> Expr.TypeTest(e, t) |> rb |> deExpr
-                        | None, e -> Expr.TypeTest(e, t)
+                | DefaultValue t ->
+                    Expr.DefaultValue t, Hoisting.Zero
 
-                | UnionCaseTest(e, ci) ->
-                    match extractStatements e with
-                        | Some rb, e -> Expr.UnionCaseTest(e, ci) |> rb |> deExpr
-                        | None, e -> Expr.UnionCaseTest(e, ci)
+                | FieldGet(None, f) ->
+                    Expr.FieldGet(f), Hoisting.Zero
+
+                | FieldGet(Some t, f) ->
+                    let t, th = processExpression t
+                    Expr.FieldGet(t, f), th
+
+                | IfThenElse(c, i, e) ->
+                    let c, ch = processExpression c
+                    Expr.IfThenElse(c, i, e), ch
+
+                | Lambda(v,b) ->
+                    Expr.Lambda(v, processStatement b), Hoisting.Zero
+
+                | NewArray(t, args) ->
+                    let args, ah = processManyExpresions args
+                    Expr.NewArray(t, args), ah
+
+                | NewDelegate(t, vars, body) ->
+                    Expr.NewDelegate(t, vars, processStatement body), Hoisting.Zero
+
+                | NewObject(ctor, args) ->
+                    let args, ah = processManyExpresions args
+                    Expr.NewObject(ctor, args), ah
+
+                | NewRecord(t, args) ->
+                    let args, ah = processManyExpresions args
+                    Expr.NewRecord(t, args), ah
+
+                | NewTuple(args) ->
+                    let args, ah = processManyExpresions args
+                    Expr.NewTuple(args), ah
+
+                | NewUnionCase(ci, args) ->
+                    let args, ah = processManyExpresions args
+                    Expr.NewUnionCase(ci, args), ah
+
+                | PropertyGet(None, pi, ii) ->
+                    let ii, ih = processManyExpresions ii
+                    Expr.PropertyGet(pi, ii), ih
+
+                | PropertyGet(Some t, pi, ii) ->
+                    let t, th = processExpression t
+                    let ii, ih = processManyExpresions ii
+                    Expr.PropertyGet(t, pi, ii), th + ih
+
+                | QuoteRaw _ | QuoteTyped _ -> failwith "not supported"
+
+                | TupleGet(v, i) ->
+                    let v, vh = processExpression v
+                    Expr.TupleGet(v, i), vh
+
+                | TypeTest(v,t) ->
+                    let v, vh = processExpression v
+                    Expr.TypeTest(v, t), vh
+
+                | UnionCaseTest(v, ci) ->
+                    let v, vh = processExpression v
+                    Expr.UnionCaseTest(v,ci), vh
 
                 | Value _ ->
-                    e
-
-                | VarSet(v,e) ->
-                    match extractStatements e with
-                        | Some rb, e -> Expr.VarSet(v, e) |> rb |> deExpr
-                        | None, e -> Expr.VarSet(v, e)
+                    expr, Hoisting.Zero
 
                 | Var _ ->
-                    e
+                    expr, Hoisting.Zero
 
-                | WhileLoop(guard, body) ->
-                    Expr.WhileLoop(guard, deExpr body)
 
-                | _ ->
-                    failwithf "[FShade] unexpected expression %A" e
+                | _ -> failwithf "[FShade] unexpected expression %A" expr
 
+        and processManyExpresions (l : list<Expr>) =
+            List.foldBack (fun a (r, rh) ->
+                let a, ah = processExpression a
+                (a :: r, ah + rh)
+            ) l ([], Hoisting.Zero)
+
+        and processStatement (expr : Expr) : Expr =
+            let inline apply (h : Hoisting) (e : Expr) =
+                match h.finalize with
+                    | Some f -> e |> f |> processStatement
+                    | None -> e
+
+            match expr with 
+                | WriteOutputs outputs -> 
+                    let mutable res = Map.empty
+                    let mutable hoist = Hoisting.Zero
+                    for (name, (idx,value)) in Map.toSeq outputs do
+                        match idx with
+                            | Some idx ->
+                                let idx, ih = processExpression idx
+                                let v, vh = processExpression value
+                                res <- Map.add name (Some idx, v) res
+                                hoist <- hoist + ih + vh
+                            | None ->
+                                let v, vh = processExpression value
+                                res <- Map.add name (None, v) res
+                                hoist <- hoist + vh
+                          
+                          
+                    Expr.WriteOutputs(res) |> apply hoist 
+
+                | AddressSet(v,e) ->
+                    let v, vh = processExpression v
+                    let e, eh = processExpression e 
+                    Expr.AddressSet(v,e) |> apply (vh + eh)
+
+                | ForInteger(v, start, step, stop, body) ->
+                    let body = processStatement body
+                    
+                    let start, h0 = processExpression start
+                    let step, h1 = processExpression step
+                    let stop, h2 = processExpression stop
+
+                    Expr.ForInteger(v, start, step, stop, body) |> apply (h0 + h1 + h2)
+
+                     
+                | ForEach(v,s,body) ->
+                    let body = processStatement body
+                    let s, sh = processExpression s
+
+                    Expr.ForEach(v, s, body) |> apply sh
+
+
+                | FieldSet(None, f, value) ->
+                    let value, vh = processExpression value
+                    Expr.FieldSet(f, value) |> apply vh
+
+                | FieldSet(Some t, f, value) ->
+                    let t, th = processExpression t
+                    let value, vh = processExpression value
+                    Expr.FieldSet(t, f, value) |> apply (th + vh)
+
+                | PropertySet(None, pi, index, value) ->
+                    let index, ih = processManyExpresions index
+                    let value, vh = processExpression value
+                    Expr.PropertySet(pi, value, index) |> apply (ih + vh)
+
+                | PropertySet(Some t, pi, index, value) ->
+                    let t, th = processExpression t 
+                    let index, ih = processManyExpresions index
+                    let value, vh = processExpression value
+                    Expr.PropertySet(t, pi, value, index) |> apply (th + ih + vh)
+                     
+                | WhileLoop (guard, body) ->
+                    let body = processStatement body
+                    Expr.WhileLoop(guard, body)
+
+                | Sequential(l,r) ->
+                    let l = processStatement l
+                    let r = processStatement r
+                    Expr.Sequential(l,r)
+
+
+                | Let(v,e,b) ->
+                    let b = processStatement b
+                    let e, eh = processExpression e
+                    Expr.Let(v,e,b) |> apply eh
+
+                | e ->
+                    let e, eh = processExpression e
+                    match eh.finalize with
+                        | Some f -> f e
+                        | None -> e
+
+        let hoistImperative (e : Expr) =
+            processStatement e
 
 
     /// creates a new expression only containing e's visible side-effects.
@@ -2347,11 +2283,20 @@ module Optimizer =
     let evaluateConstants' (isSideEffect : MethodInfo -> bool)  (e : Expr) =
         ConstantFolding.evaluateConstants' isSideEffect e
 
+    /// creates a new expression by lifting all shader inputs to function-arguments until they can be read. (in the shader's main entry)
     let liftInputs (e : Expr) =
         InputLifting.liftInputs e
-
+        
+    /// inlines copy variables, trivial expressions, input-reads and functions annotated with the [<Inline>] attribute
     let inlining (e : Expr) =
         Inlining.inlining e
-
+        
+    /// inlines copy variables, trivial expressions, input-reads and functions annotated with the [<Inline>] attribute.
+    /// Function inlining can be forced using the given callback.
     let inlining' (f : UtilityFunction -> bool) (e : Expr) =
         Inlining.inlining' f e
+
+    /// hoists imperative constructs. For example `let a = let b = 10 in b * 199` translates to `let b = 10 in let a = b * 199`.
+    /// this ensures that most imperative constructs occur on statement-level and can easily be compiled to C like languages.
+    let hoistImperativeConstructs (e : Expr) =
+        StatementHoisting.processStatement e
