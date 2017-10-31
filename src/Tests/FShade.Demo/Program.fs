@@ -350,9 +350,7 @@ module TessDeconstruct =
             ]
 
         let effect =
-            Effect.compose [Effect.ofFunction geometry; Effect.ofFunction frag]
-
-        Effect.debugRanges effect |> printfn "ranges: %A"
+            Effect.compose [Effect.ofFunction test]
 
         let cModule = 
             effect
@@ -573,7 +571,7 @@ let sepp1 a b c d e f =
 
 [<EntryPoint>]
 let main args =
-    InputLayouts.run()
+    TessDeconstruct.run()
     System.Environment.Exit 0
 //    let a = computer <@ (+) @> null null
 //    let b = a (Image2d<Formats.r32f>()) 

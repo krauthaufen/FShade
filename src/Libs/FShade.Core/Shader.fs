@@ -440,7 +440,11 @@ module private Preprocessor =
                                 if Map.containsKey name s.outputs then 
                                     s
                                 else 
-                                    { s with State.outputs = Map.add name { paramType = value.Type; paramInterpolation = InterpolationMode.Default } s.outputs }
+                                    let typ =
+                                        match idx with
+                                            | None -> value.Type
+                                            | Some _ -> value.Type.MakeArrayType()
+                                    { s with State.outputs = Map.add name { paramType = typ; paramInterpolation = InterpolationMode.Default } s.outputs }
                             ) 
 
 
