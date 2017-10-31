@@ -17,6 +17,41 @@ open FShade.Imperative
 module Optimizer =
     open Aardvark.Base.Monads.State
 
+    module UtilityFunction =
+
+        let rec (|TrivialOrInput|_|) (e : Expr) =
+            match e with
+                | Var _ 
+                | Value _
+                | FieldGet(None, _)
+                | PropertyGet(None, _, [])
+                | TupleGet(Trivial, _)
+                | PropertyGet(Some TrivialOrInput, (FSharpTypeProperty | ArrayLengthProperty), [])
+                | FieldGet(Some TrivialOrInput, _) 
+                | ReadInput(_, _, None) 
+                | ReadInput(_, _, Some TrivialOrInput) -> 
+                    Some()
+                | _ ->
+                    None
+
+        let inlineCode (f : UtilityFunction) (args : list<Expr>) =
+            let rec wrap (v : list<Var>) (e : list<Expr>) (b : Expr) =
+                match v, e with
+                    | [], [] -> 
+                        b
+
+                    | v :: vs, (TrivialOrInput as ev) :: es ->
+                        let b = b.Substitute(fun vi -> if vi = v then Some ev else None)
+                        wrap vs es b
+
+                    | v :: vs, e :: es ->
+                        Expr.Let(v,e, wrap vs es b)
+
+                    | _ ->
+                        failwithf "[FShade] bad arity for utility function call"
+
+            wrap f.functionArguments args f.functionBody
+
     [<AutoOpen>]
     module Helpers = 
         module State =
@@ -156,6 +191,10 @@ module Optimizer =
                         let! a = eliminateDeadCodeS a
                         let! l = eliminateDeadCodeS l
                         return Expr.Application(l, a)
+
+                    | CallFunction(utility, args) ->
+                        let code = UtilityFunction.inlineCode utility args
+                        return! withoutValueS code
 
                     | Call(t, mi, args) ->
                         let! needed = callNeededS t mi args
@@ -428,6 +467,40 @@ module Optimizer =
                         let! l = eliminateDeadCodeS l
                         return Expr.Application(l, a)
            
+                    | CallFunction(utility, args) ->
+                        if utility.returnType = typeof<unit> then
+                            let code = UtilityFunction.inlineCode utility args
+                            return! withoutValueS code
+                        else
+                            // TODO: is the call needed???
+                            let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
+                            let! s = State.get
+
+                            let utility =
+                                utility |> UtilityFunction.map (fun b ->
+                                    let mutable innerState = { EliminationState.empty with isGlobalSideEffect = s.isGlobalSideEffect }
+                                    eliminateDeadCodeS(b).Run(&innerState)
+                                )
+
+                            let usedVariables = utility.functionBody.GetFreeVars() |> Set.ofSeq
+                            let allArgsUsed = List.forall (fun v -> Set.contains v usedVariables) utility.functionArguments
+
+                            if allArgsUsed then
+                                return Expr.CallFunction(utility, args)
+                            else
+                                let args, values = 
+                                    List.zip utility.functionArguments args
+                                        |> List.filter (fun (v,_) -> Set.contains v usedVariables)
+                                        |> List.unzip
+
+                                let utility =
+                                    { utility with
+                                        functionArguments = args
+                                        functionTag = null   
+                                    }
+
+                                return Expr.CallFunction(utility, values)
+
                     | Call(t, mi, args) ->
                         let! needed = 
                             if e.Type <> typeof<unit> then State.value true
@@ -923,6 +996,17 @@ module Optimizer =
                             | Unit -> return Expr.Unit
                             | _ -> return Expr.ForEach(v, s, b)
 
+                    | CallFunction(utility, args) ->
+                        let! args = args |> List.mapS evaluateConstantsS
+                        let! s = State.get
+                        let utility =
+                            utility |> UtilityFunction.map (fun e ->
+                                let mutable innerState = { State.empty with isGlobalSideEffect = s.isGlobalSideEffect }
+                                evaluateConstantsS(e).Run(&innerState)
+                            )
+
+                        return Expr.CallFunction(utility, args)
+
        
                     | Call(None, mi, args) ->
                         let! needed = State.needsCall mi
@@ -1196,7 +1280,1042 @@ module Optimizer =
             let run = evaluateConstantsS e
             let mutable state = { State.empty with isGlobalSideEffect = isSideEffect }
             run.Run(&state)
-            
+       
+    module InputLifting =
+        type State =
+            {
+                usedInputs : Map<string, ParameterDescription>
+            }
+                 
+        [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+        module State =
+            let empty = 
+                { 
+                    usedInputs = Map.empty
+                }
+
+        
+        let rec liftInputsS (e : Expr) : State<State, Expr> =
+            state {
+                match e with
+
+                    | ReadInput(ParameterKind.Input, name, idx) ->
+                        do! State.modify (fun s ->
+                            if Map.containsKey name s.usedInputs then
+                                s
+                            else
+                                let typ =
+                                    match idx with
+                                        | Some _ -> e.Type.MakeArrayType()
+                                        | _ -> e.Type
+                                { s with usedInputs = Map.add name (ParameterDescription.ofType typ) s.usedInputs }
+                        )
+                        return e
+
+                    | ReadInput(kind, name, idx) ->
+                        match idx with
+                            | Some idx ->
+                                let! idx = liftInputsS idx
+                                return Expr.ReadInput(kind, e.Type, name, idx)
+                            | None ->
+                                return Expr.ReadInput(kind, e.Type, name)
+                                
+                    | WriteOutputs outputs -> 
+                        let! outputs = 
+                            outputs |> Map.mapS (fun name (idx, value) ->
+                                state {
+                                    let! idx = Option.mapS liftInputsS idx
+                                    let! value = liftInputsS value
+                                    return (idx, value)
+                                }
+                            )
+                        return Expr.WriteOutputs outputs
+
+                    | AddressOf e ->
+                        let! e = liftInputsS e
+                        return Expr.AddressOf e
+
+                    | AddressSet(v, e) ->
+                        let! v = liftInputsS v
+                        let! e = liftInputsS e
+                        return Expr.AddressSet(v,e)
+
+                    | Application(lambda, arg) ->
+                        let! lambda = liftInputsS lambda
+                        let! arg = liftInputsS arg
+                        return Expr.Application(lambda, arg)
+
+                    | ForInteger(v, first, step, last, body) ->
+                        let! first = liftInputsS first
+                        let! step = liftInputsS step
+                        let! last = liftInputsS last
+                        let! body = liftInputsS body
+                        return Expr.ForInteger(v, first, step, last, body)
+
+                    | ForEach(v, s, b) ->
+                        let! s = liftInputsS s
+                        let! b = liftInputsS b
+                        return Expr.ForEach(v, s, b)
+
+                    | CallFunction(utility, args) ->
+                        
+                        let mutable usedInputs = Map.empty
+                        let newBody = liftFunctionInputsS(utility.functionBody).Run(&usedInputs)
+
+                        let (vars, values) = usedInputs |> Map.toList |> List.map snd |> List.unzip
+
+                        let utility =
+                            { utility with
+                                functionArguments = utility.functionArguments @ vars
+                                functionBody = newBody
+                                functionId = Expr.ComputeHash newBody
+                                functionTag = null
+                            }
+
+
+                        let! values = values |> List.mapS liftInputsS
+                        return Expr.CallFunction(utility, args @ values)
+                        
+       
+                    | Call(None, mi, args) ->
+                        let! args = args |> List.mapS liftInputsS
+                        return Expr.Call(mi, args)
+
+                    | Call(Some t, mi, args) ->
+                        let! t = liftInputsS t
+                        let! args = args |> List.mapS liftInputsS
+                        return Expr.Call(t, mi, args)
+                        
+                    | Coerce(e, t) ->
+                        let! e = liftInputsS e
+                        return Expr.Coerce(e, t)
+
+                    | DefaultValue t ->
+                        return e
+
+                    | FieldGet(None, f) ->
+                        return e
+
+                    | FieldGet(Some t, f) ->
+                        let! t = liftInputsS t
+                        return Expr.FieldGet(t, f)
+
+                    | FieldSet(None, f, value) ->
+                        let! value = liftInputsS value
+                        return Expr.FieldSet(f, value)
+
+                    | FieldSet(Some t, f, value) ->
+                        let! t = liftInputsS t
+                        let! value = liftInputsS value
+                        return Expr.FieldSet(t, f, value)
+
+                    | IfThenElse(cond, i, e) ->
+                        let! cond = liftInputsS cond
+                        let! i = liftInputsS i
+                        let! e = liftInputsS e
+                        return Expr.IfThenElse(cond, i, e)
+
+                    | Lambda(v,b) ->
+                        let! b = liftInputsS b
+                        return Expr.Lambda(v,b)
+
+                    | Let(v, e, b) ->
+                        let! e = liftInputsS e
+                        let! b = liftInputsS b
+                        return Expr.Let(v,e,b)
+
+                    | NewArray(t, args) ->
+                        let! args = args |> List.mapS liftInputsS
+                        return Expr.NewArray(t, args)
+
+                    | NewDelegate(t, vars, body) ->
+                        let! body = liftInputsS body
+                        return Expr.NewDelegate(t, vars, body)
+
+                    | NewObject(ctor, args) ->
+                        let! args = args |> List.mapS liftInputsS
+                        return Expr.NewObject(ctor, args)
+
+                    | NewRecord(t, args) ->
+                        let! args = args |> List.mapS liftInputsS
+                        return Expr.NewRecord(t, args)
+
+                    | NewUnionCase(ci, args) ->
+                        let! args = args |> List.mapS liftInputsS
+                        return Expr.NewUnionCase(ci, args)
+
+                    | PropertyGet(None, pi, indices) ->
+                        let! indices = indices |> List.mapS liftInputsS
+                        return Expr.PropertyGet(pi, indices)
+
+                    | PropertyGet(Some t, pi, indices) ->
+                        let! t = liftInputsS t
+                        let! indices = indices |> List.mapS liftInputsS
+                        return Expr.PropertyGet(t, pi, indices)
+                        
+                    | PropertySet(None, pi, indices, value) ->
+                        let! value = liftInputsS value
+                        let! indices = indices |> List.mapS liftInputsS
+                        return Expr.PropertySet(pi, value, indices)
+
+                    | PropertySet(Some t, pi, indices, value) ->
+                        let! t = liftInputsS t
+                        let! value = liftInputsS value
+                        let! indices = indices |> List.mapS liftInputsS
+                        return Expr.PropertySet(t, pi, value, indices)
+                        
+                    | QuoteRaw e ->
+                        let! e = liftInputsS e
+                        return Expr.QuoteRaw e
+
+                    | QuoteTyped e ->
+                        let! e = liftInputsS e
+                        return Expr.QuoteTyped e
+
+                    | Sequential(l,r) ->
+                        let! l = liftInputsS l
+                        let! r = liftInputsS r
+                        return Expr.Sequential(l,r)
+
+                    | TryFinally(t, f) ->
+                        let! t = liftInputsS t
+                        let! f = liftInputsS f
+                        return Expr.TryFinally(t, f)
+
+                    | TryWith(a, b, c, d, e) ->
+                        let! a = liftInputsS a
+                        let! c = liftInputsS c
+                        let! e = liftInputsS e
+                        return Expr.TryWith(a, b, c, d, e)
+
+                    | TupleGet(t, i) ->
+                        let! t = liftInputsS t
+                        return Expr.TupleGet(t, i)
+
+                    | TypeTest(t, i) ->
+                        let! t = liftInputsS t
+                        return Expr.TypeTest(t,i)
+
+                    | UnionCaseTest(e, ci) ->
+                        let! e = liftInputsS e
+                        return Expr.UnionCaseTest(e, ci)
+
+                    | Value _ ->
+                        return e
+
+                    | VarSet(v, e) ->
+                        let! e = liftInputsS e
+                        return Expr.VarSet(v,e)
+
+                    | Var v ->
+                        return e
+
+                    | WhileLoop(guard, body) ->
+                        let! guard = liftInputsS guard
+                        let! body = liftInputsS body
+                        return Expr.WhileLoop(guard, body)
+
+
+                    | _ ->
+                        return failwithf "[FShade] unexpected expression %A" e
+            }
+
+        and liftFunctionInputsS (e : Expr) : State<Map<_,_>, Expr> =
+            state {
+                match e with
+                    | ReadInput(ParameterKind.Input, name, idx) ->
+                        let! (s : Map<string, Var * Expr>) = State.get
+
+                        let idxHash = idx |> Option.map Expr.ComputeHash |> Option.defaultValue ""
+                        let key = name + idxHash
+
+                        match Map.tryFind key s with
+                            | Some (v,_) -> 
+                                return Expr.Var v
+                            | None ->
+                                let v = Var(name, e.Type)
+                                do! State.put (Map.add key (v,e) s)
+                                return Expr.Var v
+
+                    | ReadInput(kind, name, idx) ->
+                        match idx with
+                            | Some idx ->
+                                let! idx = liftFunctionInputsS idx
+                                return Expr.ReadInput(kind, e.Type, name, idx)
+                            | None ->
+                                return Expr.ReadInput(kind, e.Type, name)
+
+                    | CallFunction(utility, args) ->
+                        let mutable usedInputs = Map.empty
+                        let newBody = liftFunctionInputsS(utility.functionBody).Run(&usedInputs)
+
+                        let (vars, values) = usedInputs |> Map.toList |> List.map snd |> List.unzip
+
+                        let utility =
+                            { utility with
+                                functionArguments = utility.functionArguments @ vars
+                                functionBody = newBody
+                                functionId = Expr.ComputeHash newBody
+                                functionTag = null
+                            }
+
+
+                        let! values = values |> List.mapS liftFunctionInputsS
+                        return Expr.CallFunction(utility, args @ values)
+
+                        
+                    | ShapeVar v -> 
+                        return Expr.Var v
+
+                    | ShapeLambda(v, b) ->
+                        let! b = liftFunctionInputsS b
+                        return Expr.Lambda(v, b)
+
+                    | ShapeCombination(o, args) -> 
+                        let! args = args |> List.mapS liftFunctionInputsS
+                        return RebuildShapeCombination(o, args)
+            }
+
+        let liftInputs (e : Expr) =
+            let run = liftInputsS(e)
+            let mutable state = State.empty
+            let res = run.Run(&state)
+            res
+
+    module Inlining =
+        type State =
+            {
+                variables   : bool
+                trivial     : bool
+                inputs      : bool
+                functions   : UtilityFunction -> bool
+            }
+
+                 
+        [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+        module State =
+            let empty = 
+                { 
+                    variables = true
+                    trivial = true
+                    inputs = true
+                    functions = fun _ -> false
+                }
+
+            let inlineFunction (f : UtilityFunction) =
+                State.get |> State.map (fun s -> s.functions f)
+
+            let variables = State.get |> State.map (fun s -> s.variables)
+            let trivial = State.get |> State.map (fun s -> s.trivial)
+            let inputs = State.get |> State.map (fun s -> s.inputs)
+
+            let rec (|TrivialOrInput|_|) (e : Expr) =
+                match e with
+                    | Var _ 
+                    | Value _
+                    | FieldGet(None, _)
+                    | PropertyGet(None, _, [])
+                    | TupleGet(Trivial, _)
+                    | PropertyGet(Some TrivialOrInput, (FSharpTypeProperty | ArrayLengthProperty), [])
+                    | FieldGet(Some TrivialOrInput, _) 
+                    | ReadInput(_, _, None) 
+                    | ReadInput(_, _, Some TrivialOrInput) -> 
+                        Some()
+                    | _ ->
+                        None
+
+            let rec (|OnlyVar|_|) (e : Expr) =
+                match e with
+                    | Var _ 
+                    | Value _ ->
+                        Some ()
+                    | _ -> 
+                        None
+                        
+            let rec (|OnlyInputs|_|) (e : Expr) =
+                match e with
+                    | ReadInput _ ->
+                        Some ()
+                    | _ -> 
+                        None
+                        
+            let rec (|InputOrVar|_|) (e : Expr) =
+                match e with
+                    | ReadInput _ 
+                    | Var _ ->
+                        Some ()
+                    | _ -> 
+                        None
+            let letValuePattern =
+                State.get |> State.map (fun s ->
+                    match s.variables, s.trivial, s.inputs with
+                        | (false | true), true, true ->
+                            (|TrivialOrInput|_|)
+
+                        | (false | true), true, false ->
+                            (|Trivial|_|)
+
+                        | true, false, false ->
+                            (|OnlyVar|_|)
+
+                        | false, false, true ->
+                            (|OnlyInputs|_|)
+
+                        | true, false, true ->
+                            (|InputOrVar|_|)
+
+                        | false, false, false ->
+                            fun _ -> None
+                )
+
+
+        let rec inlineS (e : Expr) =
+            state {
+                match e with
+                    | WriteOutputs map ->
+                        let! map = map |> Map.mapS (fun name (idx, value) ->
+                            state {
+                                let! idx = idx |> Option.mapS inlineS
+                                let! value = inlineS value
+                                return (idx, value)
+                            }
+                        )
+                        return Expr.WriteOutputs map
+
+                    | ReadInput(kind, name, idx) ->
+                        match idx with
+                            | Some idx ->
+                                let! idx = inlineS idx
+                                return Expr.ReadInput(kind, e.Type, name, idx)
+                            | None ->
+                                return e
+
+                    | AddressOf e ->
+                        let! e = inlineS e
+                        return Expr.AddressOf e
+
+                    | AddressSet(v,e) ->
+                        let! v = inlineS v
+                        let! e = inlineS e
+                        return Expr.AddressSet(v,e)
+
+                    | Application(lambda, arg) ->
+                        let! lambda = inlineS lambda
+                        let! arg = inlineS arg
+                        return Expr.Application(lambda, arg)
+                    
+                    | ForInteger(v, first, step, last, body) ->
+                        let! first = inlineS first
+                        let! step = inlineS step
+                        let! last = inlineS last
+                        let! body = inlineS body
+                        return Expr.ForInteger(v, first, step, last, body)
+
+                    | ForEach(v, s, b) ->
+                        let! s = inlineS s
+                        let! b = inlineS b
+                        return Expr.ForEach(v, s, b)
+
+                    | CallFunction(utility, args) ->
+                        let! inl = State.inlineFunction utility
+                        if inl || utility.functionIsInline then
+                            let code = UtilityFunction.inlineCode utility args
+                            return! inlineS code
+                        else
+                            let! args = args |> List.mapS inlineS
+                            let! s = State.get
+                            let utility =
+                                utility |> UtilityFunction.map (fun b ->
+                                    let mutable innerState = s
+                                    inlineS(b).Run(&innerState)
+                                )
+                            let utility = { utility with functionTag = null }
+                            return Expr.CallFunction(utility, args)
+
+                    | Call(None, mi, args) ->
+                        let! args = args |> List.mapS inlineS
+                        return Expr.Call(mi, args)
+
+                    | Call(Some t, mi, args) ->
+                        let! t = inlineS t
+                        let! args = args |> List.mapS inlineS
+                        return Expr.Call(t, mi, args)
+
+                    | Coerce(e, t) ->
+                        let! e = inlineS e
+                        return Expr.Coerce(e,t)
+
+                    | DefaultValue _ -> 
+                        return e
+
+                    | FieldGet(None, f) ->
+                        return e
+
+                    | FieldGet(Some t, f) ->
+                        let! t = inlineS t
+                        return Expr.FieldGet(t, f)
+
+                    | FieldSet(None, f, value) ->
+                        let! value = inlineS value
+                        return Expr.FieldSet(f, value)
+
+                    | FieldSet(Some t, f, value) ->
+                        let! t = inlineS t
+                        let! value = inlineS value
+                        return Expr.FieldSet(t, f, value)
+
+                    | IfThenElse(cond, i, e) ->
+                        let! cond = inlineS cond
+                        let! i = inlineS i
+                        let! e = inlineS e
+                        return Expr.IfThenElse(cond, i, e)
+
+                    | Lambda(v, b) ->
+                        let! b = inlineS b
+                        return Expr.Lambda(v, b)
+
+                    | Let(v, e, b) when v.IsMutable ->
+                        let! e = inlineS e
+                        let! b = inlineS b
+                        return Expr.Let(v, e, b)
+
+                    | Let(v, e, b) ->
+                        let! pattern = State.letValuePattern
+                        let! e = inlineS e
+
+                        match pattern e with
+                            | Some () ->
+                                let b = b.Substitute(fun vi -> if vi = v then Some e else None)
+                                return! inlineS b
+                            | None ->
+                                let! b = inlineS b
+                                return Expr.Let(v, e, b)
+
+                    | NewArray(t, args) ->
+                        let! args = args |> List.mapS inlineS
+                        return Expr.NewArray(t, args)
+                        
+                    | NewDelegate(t, vars, body) ->
+                        let! body = inlineS body
+                        return Expr.NewDelegate(t, vars, body)
+
+                    | NewObject(ctor, args) ->
+                        let! args = args |> List.mapS inlineS
+                        return Expr.NewObject(ctor, args)
+
+                    | NewRecord(t, args) ->
+                        let! args = args |> List.mapS inlineS
+                        return Expr.NewRecord(t, args)
+                        
+                    | NewTuple(args) ->
+                        let! args = args |> List.mapS inlineS
+                        return Expr.NewTuple args
+                        
+                    | NewUnionCase(ci, args) ->
+                        let! args = args |> List.mapS inlineS
+                        return Expr.NewUnionCase(ci, args)
+
+                    | PropertyGet(None, pi, indices) ->
+                        let! indices = indices |> List.mapS inlineS
+                        return Expr.PropertyGet(pi, indices)
+
+                    | PropertyGet(Some t, pi, indices) ->
+                        let! t = inlineS t
+                        let! indices = indices |> List.mapS inlineS
+                        return Expr.PropertyGet(t, pi, indices)
+                        
+                    | PropertySet(None, pi, indices, value) ->
+                        let! value = inlineS value
+                        let! indices = indices |> List.mapS inlineS
+                        return Expr.PropertySet(pi, value, indices)
+                        
+                    | PropertySet(Some t, pi, indices, value) ->
+                        let! t = inlineS t
+                        let! value = inlineS value
+                        let! indices = indices |> List.mapS inlineS
+                        return Expr.PropertySet(t, pi, value, indices)
+
+                    | QuoteRaw e ->
+                        let! e = inlineS e
+                        return Expr.QuoteRaw e
+                        
+                    | QuoteTyped e ->
+                        let! e = inlineS e
+                        return Expr.QuoteTyped e
+
+                    | Sequential(l, r) ->
+                        let! l = inlineS l
+                        let! r = inlineS r
+                        return Expr.Sequential(l, r)
+
+                    | TryFinally(t,f) ->
+                        let! t = inlineS t
+                        let! f = inlineS f
+                        return Expr.TryFinally(t, f)
+
+                    | TryWith(a, b, c, d, e) ->
+                        let! a = inlineS a
+                        let! c = inlineS c
+                        let! e = inlineS e
+                        return Expr.TryWith(a, b, c, d, e)
+
+                    | TupleGet(t, i) ->
+                        let! t = inlineS t
+                        return Expr.TupleGet(t, i)
+
+                    | TypeTest(v, t) ->
+                        let! v = inlineS v
+                        return Expr.TypeTest(v, t)
+
+                    | UnionCaseTest(e, ci) ->
+                        let! e = inlineS e
+                        return Expr.UnionCaseTest(e, ci)
+                        
+                    | Value _ ->
+                        return e
+                        
+                    | VarSet (v, e) ->
+                        let! e = inlineS e
+                        return Expr.VarSet (v, e)
+
+                    | Var v ->
+                        return e
+
+                    | WhileLoop(guard, body) ->
+                        let! guard = inlineS guard
+                        let! body = inlineS body
+                        return Expr.WhileLoop(guard, body)
+
+                    | _ -> 
+                        return failwithf "[FShade] unexpected expression %A" e
+            }
+
+        let inlining (e : Expr) =
+            let run = inlineS(e)
+            let mutable state = State.empty
+            run.Run(&state)
+
+
+        let inlining' (functions : UtilityFunction -> bool) (e : Expr) =
+            let run = inlineS(e)
+            let mutable state = { State.empty with functions = functions }
+            run.Run(&state)
+
+    module DeExpr =
+
+        let rec extractStatements (e : Expr) : Option<Expr -> Expr> * Expr =
+            match e with
+                | Let(v,e,b) ->
+                    let rest, b = extractStatements b
+                    match rest with
+                        | Some rest -> 
+                            Some (fun b -> Expr.Let(v,e,rest b)), b
+                        | None ->
+                            Some (fun b -> Expr.Let(v,e,b)), b
+
+                | Sequential(l,r) ->
+                    let rb, r = extractStatements r
+                    match rb with
+                        | Some rb ->
+                            Some (fun f -> Expr.Seq [l; rb f]), r
+                        | None ->
+                            Some (fun f -> Expr.Seq [l; f]), r
+                            
+                | AddressSet _ 
+                | FieldSet _ 
+                | PropertySet _
+                | ForInteger _ 
+                | ForEach _ 
+                | VarSet _ 
+                | WhileLoop _ ->
+                    Some (fun f -> Expr.Seq [e; f]), Expr.Unit
+
+                | AddressOf e ->
+                    match extractStatements e with
+                        | Some rb, e -> Some rb, Expr.AddressOf e
+                        | None, e -> None, Expr.AddressOf e
+                        
+                | Application(l,a) ->
+                    match extractList [l;a] with
+                        | Some rb, [l;a] -> Some rb, Expr.Application(l, a)
+                        | None, [l;a] -> None, Expr.Application(l, a)
+                        | _ -> failwith "impossible"
+
+                | CallFunction(f, args) ->
+                    let f = f |> UtilityFunction.map deExpr
+                    match extractList args with
+                        | Some rb, args -> Some rb, Expr.CallFunction(f, args)
+                        | None, args -> None, Expr.CallFunction(f, args)
+
+                | Call(None, mi, args) ->
+                    match extractList args with
+                        | Some rb, args -> Some rb, Expr.Call(mi, args)
+                        | None, args -> None, Expr.Call(mi, args)
+
+                | Call(Some t, mi, args) ->
+                    match extractList (t :: args) with
+                        | Some rb, (t :: args) -> Some rb, Expr.Call(t, mi, args)
+                        | None, (t :: args) -> None, Expr.Call(t, mi, args)
+                        | _ -> failwith "impossible"
+                    
+                | Coerce(e, t) ->
+                    match extractStatements e with
+                        | Some rb, e -> Some rb, Expr.Coerce(e, t)
+                        | None, e -> None, Expr.Coerce(e, t)
+
+                | FieldGet(Some t, f) ->
+                    match extractStatements t with
+                        | Some rb, t -> Some rb, Expr.FieldGet(t, f)
+                        | None, t -> None, Expr.FieldGet(t, f)
+                        
+                | IfThenElse(cond, i, e) ->
+                    match extractStatements cond with
+                        | Some rb, cond -> Some rb, Expr.IfThenElse(cond, i, e)
+                        | None, cond -> None, Expr.IfThenElse(cond, i, e)
+
+                | NewArray(t, args) ->
+                    match extractList args with
+                        | Some rb, args -> Some rb, Expr.NewArray(t, args) 
+                        | None, args -> None, Expr.NewArray(t, args) 
+
+                        
+                | NewObject(ctor, args) ->
+                    match extractList args with
+                        | Some rb, args -> Some rb, Expr.NewObject(ctor, args) 
+                        | None, args -> None, Expr.NewObject(ctor, args) 
+
+                | NewRecord(t, args) ->
+                    match extractList args with
+                        | Some rb, args -> Some rb, Expr.NewRecord(t, args) 
+                        | None, args -> None, Expr.NewRecord(t, args) 
+
+                | NewTuple(args) ->
+                    match extractList args with
+                        | Some rb, args -> Some rb, Expr.NewTuple(args) 
+                        | None, args -> None, Expr.NewTuple(args) 
+
+                | NewUnionCase(ci, args) ->
+                    match extractList args with
+                        | Some rb, args -> Some rb, Expr.NewUnionCase(ci, args) 
+                        | None, args -> None, Expr.NewUnionCase(ci, args) 
+
+                | PropertyGet(None, pi, indices) ->
+                    match extractList indices with
+                        | Some rb, indices -> Some rb, Expr.PropertyGet(pi, indices)
+                        | None, indices -> None, Expr.PropertyGet(pi, indices)
+
+                | PropertyGet(Some t, pi, indices) ->
+                    match extractList (t :: indices) with
+                        | Some rb, t :: indices -> Some rb, Expr.PropertyGet(t, pi, indices)
+                        | None, t :: indices -> None, Expr.PropertyGet(t, pi, indices)
+                        | _ -> failwith "impossible"
+
+                        
+                | TupleGet(t, i) ->
+                    match extractStatements t with
+                        | Some rb, t -> Some rb, Expr.TupleGet(t, i)
+                        | None, t -> None, Expr.TupleGet(t, i)
+
+                | TypeTest(v, t) ->
+                    match extractStatements v with
+                        | Some rb, v -> Some rb, Expr.TypeTest(v, t)
+                        | None, v -> None, Expr.TypeTest(v, t)
+                        
+                | UnionCaseTest(v, ci) ->
+                    match extractStatements v with
+                        | Some rb, v -> Some rb, Expr.UnionCaseTest(v, ci)
+                        | None, v -> None, Expr.UnionCaseTest(v, ci)
+
+                | e ->
+                    None, e
+        
+        and extractList (l : list<Expr>) =
+            match l with
+                | [] -> None, []
+                | a :: r ->
+                    let rebuildA, a = extractStatements a
+                    let rebuildRest, r = extractList r
+                    match rebuildA, rebuildRest with
+                        | Some ra, Some rr ->
+                            Some (ra >> rr), a :: r
+                        | Some ra, None ->
+                            Some ra, a :: r
+                        | None, Some rr ->
+                            Some rr, a :: r
+                        | None, None ->
+                            None, a :: r
+
+        and extractMapL (l : list<string * (Option<Expr> * Expr)>) =
+            match l with
+                | [] -> None, []
+                | (name, (ai, av)) :: r ->
+                    let rai = ai |> Option.map extractStatements
+                    let rav, av = extractStatements av
+                    let rr, r = extractMapL r
+
+                    let ra, ai =
+                        match rai with
+                            | Some(Some rai, ai) -> 
+                                match rav with
+                                    | Some rav -> Some (rai >> rav), Some ai
+                                    | None -> Some rai, Some ai
+
+                            | Some(None, ai) ->
+                                rav, Some ai
+
+                            | None -> 
+                                rav, None
+
+                    match ra, rr with
+                        | Some ra, Some rr ->
+                            Some (ra >> rr), (name, (ai, av)) :: r
+                        | Some ra, None ->
+                            Some ra, (name, (ai, av)) :: r
+                        | None, Some rr ->
+                            Some rr, (name, (ai, av)) :: r
+                        | None, None ->
+                            None, (name, (ai, av)) :: r
+
+        and extractMap (l : Map<string, Option<Expr> * Expr>) =
+            let rb, e = l |> Map.toList |> extractMapL
+            rb, Map.ofList e
+
+        and deExpr (e : Expr) =
+            match e with
+                | WriteOutputs values ->
+                    match extractMap values with
+                        | Some rb, values ->
+                            Expr.WriteOutputs(values) |> rb |> deExpr
+                        | None, values ->
+                            Expr.WriteOutputs(values)
+
+                | Let(v, e, b) ->
+                    let b = deExpr b
+                    match extractStatements e with
+                        | Some rb, e ->
+                            Expr.Let(v,e,b) |> rb |> deExpr
+                        | None, e ->
+                            Expr.Let(v,e,b)
+
+                | CallFunction(f, args) ->
+                    let f = f |> UtilityFunction.map deExpr
+                    match extractList args with  
+                        | Some rb, args ->
+                            Expr.CallFunction(f, args) |> rb |> deExpr
+                        | None, args ->
+                            Expr.CallFunction(f, args)
+
+                | Call(None, mi, args) ->
+                    match extractList args with  
+                        | Some rb, args ->
+                            Expr.Call(mi, args) |> rb |> deExpr
+                        | None, args ->
+                            Expr.Call(mi, args)
+                    
+                | Call(Some t, mi, args) ->
+                    match extractList (t :: args) with
+                        | Some rb, t :: args ->
+                            Expr.Call(t, mi, args) |> rb |> deExpr
+                        | None, t :: args ->
+                            Expr.Call(t, mi, args)
+                        | _ ->
+                            failwith "impossible"
+
+                | AddressOf e ->
+                    match extractStatements e with
+                        | Some rb, e ->
+                            Expr.AddressOf(e) |> rb |> deExpr
+                        | None, e ->
+                            Expr.AddressOf e
+
+                
+                | AddressSet(v, e) ->
+                    match extractList [v;e] with
+                        | Some rb, [v;e] ->
+                            Expr.AddressSet(v, e) |> rb |> deExpr
+                        | None, [v;e]->
+                            Expr.AddressSet(v, e)
+                        | _ ->
+                            failwith "impossible"
+
+                | Application(l,a) ->
+                    match extractList [l;a] with
+                        | Some rb, [l;a] ->
+                            Expr.Application(l, a) |> rb |> deExpr
+                        | None, [l;a] ->
+                            Expr.Application(l, a)
+                        | _ ->
+                            failwith "impossible"
+
+                | ForInteger(v, first, step, last, body) ->
+                    let body = deExpr body
+                    match extractList [first; step; last] with
+                        | Some rb, [first; step; last] ->
+                            Expr.ForInteger(v, first, step, last, body)
+                        | None, [first; step; last] ->
+                            Expr.ForInteger(v, first, step, last, body)
+                        | _ ->
+                            failwith "impossible"
+
+                | ForEach(v, s, body) ->
+                    let body = deExpr body
+                    match extractStatements s with
+                        | Some rb, s ->
+                            Expr.ForEach(v, s, body) |> rb |> deExpr
+                        | None, s ->
+                            Expr.ForEach(v, s, body)
+
+                | Coerce(e, t) ->
+                    match extractStatements e with
+                        | Some rb, e ->
+                            Expr.Coerce(e, t) |> rb |> deExpr
+                        | None, e ->
+                            Expr.Coerce(e,t)
+
+                | DefaultValue t ->
+                    e
+
+                | FieldGet(None, f) ->
+                    Expr.FieldGet(f)
+
+                | FieldGet(Some t, f) ->
+                    match extractStatements t with
+                        | Some rb, t -> Expr.FieldGet(t, f) |> rb |> deExpr
+                        | None, t -> Expr.FieldGet(t, f)
+
+                | FieldSet(None, f, value) ->
+                    match extractStatements value with
+                        | Some rb, value -> Expr.FieldSet(f, value) |> rb |> deExpr
+                        | None, value -> Expr.FieldSet(f, value)
+
+                | FieldSet(Some t, f, value) ->
+                    match extractList [t; value] with
+                        | Some rb, [t;value] -> Expr.FieldSet(t, f, value) |> rb |> deExpr
+                        | None, [t;value] -> Expr.FieldSet(t, f, value)
+                        | _ ->
+                            failwith "impossible"
+
+                | IfThenElse(cond, i, e) when e.Type = typeof<unit> ->
+                    match extractStatements cond with
+                        | Some rb, cond -> Expr.IfThenElse(cond, i, e) |> rb |> deExpr
+                        | None, cond -> Expr.IfThenElse(cond, deExpr i, deExpr e)
+
+                | IfThenElse(cond, i, e) ->
+                    match extractStatements cond with
+                        | Some rb, cond -> Expr.IfThenElse(cond, i, e) |> rb |> deExpr
+                        | None, cond -> Expr.IfThenElse(cond, deExpr i, deExpr e)
+
+                | Lambda(v,b) ->
+                    Expr.Lambda(v, deExpr b)
+
+                | NewArray(t, args) ->
+                    match extractList args with
+                        | Some rb, args -> Expr.NewArray(t, args) |> rb |> deExpr
+                        | None, args -> Expr.NewArray(t, args)
+
+                | NewDelegate(t, vars, body) ->
+                    let body = deExpr body
+                    Expr.NewDelegate(t, vars, body)
+                    
+                | NewObject(ctor, args) ->
+                    match extractList args with
+                        | Some rb, args -> Expr.NewObject(ctor, args) |> rb |> deExpr
+                        | None, args -> Expr.NewObject(ctor, args)
+
+                | NewRecord(t, args) ->
+                    match extractList args with
+                        | Some rb, args -> Expr.NewRecord(t, args) |> rb |> deExpr
+                        | None, args -> Expr.NewRecord(t, args)
+
+                | NewTuple(args) ->
+                    match extractList args with
+                        | Some rb, args -> Expr.NewTuple(args) |> rb |> deExpr
+                        | None, args -> Expr.NewTuple(args)
+                        
+                | NewUnionCase(ci, args) ->
+                    match extractList args with
+                        | Some rb, args -> Expr.NewUnionCase(ci, args) |> rb |> deExpr
+                        | None, args -> Expr.NewUnionCase(ci, args)
+                        
+                | PropertyGet(None, pi, indices) ->
+                    match extractList indices with
+                        | Some rb, indices -> Expr.PropertyGet(pi, indices) |> rb |> deExpr
+                        | None, indices -> Expr.PropertyGet(pi, indices)
+                        
+                | PropertyGet(Some t, pi, indices) ->
+                    match extractList (t :: indices) with
+                        | Some rb, t :: indices -> Expr.PropertyGet(t, pi, indices) |> rb |> deExpr
+                        | None, t :: indices -> Expr.PropertyGet(t, pi, indices)
+                        | _ ->
+                            failwith "impossible"
+
+                | PropertySet(None, pi, indices, value) ->
+                    match extractList (value :: indices) with
+                        | Some rb, value :: indices -> Expr.PropertySet(pi, value, indices) |> rb |> deExpr
+                        | None, value :: indices -> Expr.PropertySet(pi, value, indices)
+                        | _ ->
+                            failwith "impossible"
+                    
+                | PropertySet(Some t, pi, indices, value) ->
+                    match extractList (t :: value :: indices) with
+                        | Some rb, t :: value :: indices -> Expr.PropertySet(t, pi, value, indices) |> rb |> deExpr
+                        | None, t :: value :: indices -> Expr.PropertySet(t, pi, value, indices)
+                        | _ ->
+                            failwith "impossible"
+                        
+                | QuoteRaw e -> Expr.QuoteRaw e
+                | QuoteTyped e -> Expr.QuoteTyped e
+
+                | Sequential(l,r) ->
+                    Expr.Sequential (deExpr l, deExpr r)
+
+                
+                | TryFinally(t,f) ->
+                    let t = deExpr t
+                    let f = deExpr f
+                    Expr.TryFinally(t, f)
+                    
+                | TryWith(a, b, c, d, e) ->
+                    let a = deExpr a
+                    let c = deExpr c
+                    let e = deExpr e
+                    Expr.TryWith(a, b, c, d, e)
+
+                    
+                | TupleGet(t, i) ->
+                    match extractStatements t with
+                        | Some rb, t -> Expr.TupleGet(t, i) |> rb |> deExpr
+                        | None, t -> Expr.TupleGet(t,i)
+
+                        
+                | TypeTest(e, t) ->
+                    match extractStatements e with
+                        | Some rb, e -> Expr.TypeTest(e, t) |> rb |> deExpr
+                        | None, e -> Expr.TypeTest(e, t)
+
+                | UnionCaseTest(e, ci) ->
+                    match extractStatements e with
+                        | Some rb, e -> Expr.UnionCaseTest(e, ci) |> rb |> deExpr
+                        | None, e -> Expr.UnionCaseTest(e, ci)
+
+                | Value _ ->
+                    e
+
+                | VarSet(v,e) ->
+                    match extractStatements e with
+                        | Some rb, e -> Expr.VarSet(v, e) |> rb |> deExpr
+                        | None, e -> Expr.VarSet(v, e)
+
+                | Var _ ->
+                    e
+
+                | WhileLoop(guard, body) ->
+                    Expr.WhileLoop(guard, deExpr body)
+
+                | _ ->
+                    failwithf "[FShade] unexpected expression %A" e
+
+
 
     /// creates a new expression only containing e's visible side-effects.
     /// NOTE: all methods are assumed to be pure (except for the ones returning void/unit)
@@ -1227,3 +2346,12 @@ module Optimizer =
     /// NOTE: isSideEffect needs to determine whether a Method has non-local side-effects.
     let evaluateConstants' (isSideEffect : MethodInfo -> bool)  (e : Expr) =
         ConstantFolding.evaluateConstants' isSideEffect e
+
+    let liftInputs (e : Expr) =
+        InputLifting.liftInputs e
+
+    let inlining (e : Expr) =
+        Inlining.inlining e
+
+    let inlining' (f : UtilityFunction -> bool) (e : Expr) =
+        Inlining.inlining' f e

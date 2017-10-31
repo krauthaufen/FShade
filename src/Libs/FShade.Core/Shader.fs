@@ -228,7 +228,7 @@ module private Preprocessor =
         }
         
     let shaderUtilityFunctions = System.Collections.Concurrent.ConcurrentDictionary<V3i * MethodBase, Option<Expr * State>>()
-
+    
 
     type Preprocess<'a> = State<State, 'a>
 
@@ -690,20 +690,67 @@ module private Preprocessor =
                     let! b = preprocessNormalS b
                     return Expr.Let(v, e, b)
 
-                | Call(t, mi, args) ->
-                    let! s = State.get
-                    match preprocessMethod s.localSize mi with
-                        | Some(_, innerState) ->
+                | CallFunction(utility, args) ->
+                    let! args = args |> List.mapS preprocessNormalS
+                    match utility.functionTag with
+                        | :? State as innerState ->
                             do! State.modify (fun s -> { s with uniforms = Map.union s.uniforms innerState.uniforms })
-                        | None ->
-                            ()
+                            return Expr.CallFunction(utility, args)
 
+                        | _ ->
+                            
+                            let mutable innerState = State.empty
+                            let processedF =
+                                utility |> UtilityFunction.map (fun b -> 
+                                    let run : Preprocess<Expr> = preprocessS b
+                                    run.Run(&innerState)
+                                )
+                                
+
+                            let processedF = { processedF with functionTag = innerState }
+                            do! State.modify (fun s -> { s with uniforms = Map.union s.uniforms innerState.uniforms })
+
+                            return Expr.CallFunction(processedF, args)
+
+                | Call(t, mi, args) ->
                     let! args = args |> List.mapS preprocessNormalS
                     let! t = t |> Option.mapS preprocessNormalS
 
-                    match t with
-                        | Some t -> return Expr.Call(t, mi, args)
-                        | None -> return Expr.Call(mi, args)
+                    match UtilityFunction.tryCreate mi with
+                        | Some utility ->
+
+                            let mutable innerState = State.empty
+                            let processedF =
+                                utility |> UtilityFunction.map (fun b -> 
+                                    let run : Preprocess<Expr> = preprocessS b
+                                    run.Run(&innerState)
+                                )
+
+                            let processedF = { processedF with functionTag = innerState }
+                            do! State.modify (fun s -> { s with uniforms = Map.union s.uniforms innerState.uniforms })
+
+                            match t with    
+                                | Some t -> return Expr.CallFunction(processedF, t :: args)
+                                | None -> return Expr.CallFunction(processedF, args)
+
+                        | None -> 
+                            match t with
+                                | Some t -> return Expr.Call(t, mi, args)
+                                | None -> return Expr.Call(mi, args)
+//                            
+//                    let! s = State.get
+//                    match preprocessMethod s.localSize mi with
+//                        | Some(_, innerState) ->
+//                            do! State.modify (fun s -> { s with uniforms = Map.union s.uniforms innerState.uniforms })
+//                        | None ->
+//                            ()
+//
+//                    let! args = args |> List.mapS preprocessNormalS
+//                    let! t = t |> Option.mapS preprocessNormalS
+//
+//                    match t with
+//                        | Some t -> return Expr.Call(t, mi, args)
+//                        | None -> return Expr.Call(mi, args)
                             
 
 
@@ -1241,8 +1288,12 @@ module Shader =
         let sideEffects = sideEffects.[shader.shaderStage]
         let newBody, state = 
             shader.shaderBody
+                |> Optimizer.inlining //' (fun _ -> true)
+                |> Optimizer.DeExpr.deExpr
                 |> Optimizer.evaluateConstants' sideEffects.Contains
                 |> Optimizer.eliminateDeadCode' sideEffects.Contains
+                |> Optimizer.evaluateConstants' sideEffects.Contains
+                |> Optimizer.liftInputs
                 |> Preprocessor.preprocess V3i.Zero
 
         let newOutputVertices =
@@ -1264,8 +1315,8 @@ module Shader =
                     shader.shaderOutputVertices
 
         { shader with
-            shaderInputs = shader.shaderInputs |> Map.filter (fun n _ -> state.inputs.ContainsKey n)
-            shaderUniforms = shader.shaderUniforms |> Map.filter (fun n _ -> state.uniforms.ContainsKey n)
+            shaderInputs = state.inputs |> Map.map (fun name desc -> match Map.tryFind name shader.shaderInputs with | Some od when od.paramType = desc.paramType -> od | _ -> desc) //shader.shaderInputs |> Map.filter (fun n _ -> state.inputs.ContainsKey n)
+            shaderUniforms = state.uniforms |> Map.map (fun name u -> match Map.tryFind name shader.shaderUniforms with Some ou when ou.uniformType = u.uniformType -> ou | _ -> u) //shader.shaderUniforms |> Map.filter (fun n _ -> state.uniforms.ContainsKey n)
             shaderOutputVertices = newOutputVertices
             shaderBody = newBody
         }

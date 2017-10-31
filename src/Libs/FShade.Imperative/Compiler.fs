@@ -50,6 +50,7 @@ module Compiler =
         | ManagedFunction of name : string * args : list<Var> * body : Expr
         | CompiledFunction of signature : CFunctionSignature * body : CStatement
         | ManagedFunctionWithSignature of signature : CFunctionSignature * body : Expr
+        | Utility of UtilityFunction
 
         member x.Signature (b : IBackend) =
             match x with
@@ -62,6 +63,9 @@ module Compiler =
                 | ManagedFunctionWithSignature(s,_) ->
                     s
 
+                | Utility u ->
+                    CFunctionSignature.ofFunction b u.uniqueName u.functionArguments u.returnType
+                    
     type ConstantDefinition = { cName : string; cType : Type; cValue : Expr }
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -1001,6 +1005,34 @@ module Compiler =
                             // TODO: assumes that the function does not have side-effects
                             return! Expr.Value(mi.Invoke(null, [||]), mi.ReturnType) |> toCExprS
 
+                | CallFunction(f, args) ->
+                    let! args = args |> List.mapS toCExprS
+                    let! s = State.get
+
+                    match f.functionMethod with
+                        | Some (:? MethodInfo as mi) ->
+                            match Helpers.tryGetBuiltInMethod s.moduleState.backend mi args with
+                                | Some e -> 
+                                    return e
+                                | None ->
+                                    let! intrinsic = CompilerState.tryGetIntrinsic mi
+                                    match intrinsic with
+                                        | Some i ->
+                                            let! ct = toCTypeS e.Type
+                                            let args = 
+                                                match i.arguments with
+                                                    | Some order -> order |> List.map (fun i -> args.[i])
+                                                    | None -> args
+                                            return CCallIntrinsic(ct, i, List.toArray args)
+                                        | _ ->
+                                            let! def = FunctionDefinition.Utility f |> CompilerState.useGlobalFunction f.uniqueName
+                                            return CCall(def, List.toArray args)
+                        | _ ->
+                            let! def = FunctionDefinition.Utility f |> CompilerState.useGlobalFunction f.uniqueName
+                            return CCall(def, List.toArray args)
+
+                
+
                 | Call(None, mi, t :: args) | Call(Some t, mi, args) ->
                     let args = t :: args
                     let! args = args |> List.mapS toCExprS
@@ -1525,6 +1557,13 @@ module Compiler =
                 | ManagedFunctionWithSignature(signature, body) ->
                     let! body = toCStatementS true body
                     return CFunctionDef(signature, body)
+
+                | Utility u ->
+                    let! s = State.get
+                    let! body = toCStatementS true u.functionBody
+                    let signature = f.Signature s.moduleState.backend
+                    return CFunctionDef(signature, body)
+
 
         }
 

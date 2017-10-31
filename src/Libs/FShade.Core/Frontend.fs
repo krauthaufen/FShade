@@ -7,6 +7,8 @@ open Aardvark.Base
 
 open FShade
 
+type InlineAttribute = FShade.Imperative.InlineAttribute
+
 [<AutoOpen>]
 module Primitives =
     let inline private shaderOnlyAccess() = failwith "[FShade] cannot execute shader-only function"

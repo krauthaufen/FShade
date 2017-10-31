@@ -52,6 +52,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="InputLayouts.fs" />
+    <Compile Include="UtilityFunctions.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

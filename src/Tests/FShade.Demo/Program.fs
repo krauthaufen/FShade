@@ -571,7 +571,7 @@ let sepp1 a b c d e f =
 
 [<EntryPoint>]
 let main args =
-    TessDeconstruct.run()
+    Examples.UtiliyFunctions.run()
     System.Environment.Exit 0
 //    let a = computer <@ (+) @> null null
 //    let b = a (Image2d<Formats.r32f>()) 
