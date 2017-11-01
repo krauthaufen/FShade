@@ -1953,83 +1953,371 @@ module Shader =
                     shaderDebugRange = None
                 }
 
-        let private topologyCompatible (lOutput : Option<OutputTopology>) (rInput : Option<InputTopology>) =
-            match lOutput, rInput with
-                | Some OutputTopology.Points, Some InputTopology.Point
-                | Some OutputTopology.LineStrip, Some InputTopology.Line 
-                | Some OutputTopology.TriangleStrip, Some InputTopology.Triangle ->
-                    true
-                | _ -> 
-                    false
+        [<AutoOpen>]
+        module private GSCompositionHelpers =
+            let topologyCompatible (lOutput : Option<OutputTopology>) (rInput : Option<InputTopology>) =
+                match lOutput, rInput with
+                    | Some OutputTopology.Points, Some InputTopology.Point
+                    | Some OutputTopology.LineStrip, Some InputTopology.Line 
+                    | Some OutputTopology.TriangleStrip, Some InputTopology.Triangle ->
+                        true
+                    | _ -> 
+                        false
 
-        [<ReflectedDefinition>]
-        type TriangleStream<'d when 'd :> INatural> =
-            {
-                indices                     : Arr<'d, int>
-                mutable triangleCount       : int
+            [<ReflectedDefinition>]
+            type TriangleStream<'d when 'd :> INatural> =
+                {
+                    indices                     : Arr<'d, int>
+                    mutable count               : int
 
-                mutable p0                  : int
-                mutable p1                  : int
-                mutable p2                  : int
-                mutable vs                  : int
-            }
-
-            static member Create() =
-                { 
-                    indices = Arr<'d, int>()
-                    triangleCount = 0
-                    p0 = -1
-                    p1 = -1
-                    p2 = -1
-                    vs = 0
+                    mutable p0                  : int
+                    mutable p1                  : int
+                    mutable p2                  : int
+                    mutable vs                  : int
                 }
 
-            member x.EmitVertex(vi : int) =
-                match x.vs with
-                    | 0 -> 
-                        x.p0 <- vi
-                        x.vs <- 1
-                    | 1 ->
-                        x.p1 <- vi
-                        x.vs <- 2
-                    | 2 ->
-                        x.p2 <- vi
-                        x.vs <- 3
-
-                        let bi = 3 * x.triangleCount
-                        x.indices.[bi + 0] <- x.p0
-                        x.indices.[bi + 1] <- x.p1
-                        x.indices.[bi + 2] <- x.p2
-                        
-                        // 0 1 2   2 1 3   2 3 4
-                        if x.triangleCount % 2 = 0 then
-                            x.p0 <- x.p2
+                member x.EmitVertex(vi : int) =
+                    match x.vs with
+                        | 0 -> 
+                            x.p0 <- vi
+                            x.vs <- 1
+                        | 1 ->
+                            x.p1 <- vi
                             x.vs <- 2
-                        else
-                            x.p1 <- x.p2
-                            x.vs <- 2
+                        | 2 ->
+                            x.p2 <- vi
+                            x.vs <- 3
+
+                            let bi = 3 * x.count
+                            x.indices.[bi + 0] <- x.p0
+                            x.indices.[bi + 1] <- x.p1
+                            x.indices.[bi + 2] <- x.p2
                         
-                        x.triangleCount <- x.triangleCount + 1
+                            // 0 1 2   2 1 3   2 3 4
+                            if x.count % 2 = 0 then
+                                x.p0 <- x.p2
+                                x.vs <- 2
+                            else
+                                x.p1 <- x.p2
+                                x.vs <- 2
+                        
+                            x.count <- x.count + 1
 
-                    | _ ->
-                        ()
+                        | _ ->
+                            ()
 
-            [<Inline>]
-            member x.Reset() =
-                x.triangleCount <- 0
-                x.vs <- 0
-                x.p0 <- -1
-                x.p1 <- -1
-                x.p2 <- -1
+                [<Inline>]
+                member x.Reset() =
+                    x.count <- 0
+                    x.vs <- 0
+                    x.p0 <- -1
+                    x.p1 <- -1
+                    x.p2 <- -1
+                    for i in 0 .. Peano.typeSize<'d> - 1 do
+                        x.indices.[i] <- -1
 
-            [<Inline>]
-            member x.EndPrimitive() =
-                x.vs <- 0
+                [<Inline>]
+                member x.EndPrimitive() =
+                    x.vs <- 0
                 
-            [<Inline>]
-            member x.GetIndex(pi : int, fvi : int) =
-                x.indices.[3 * pi + fvi]
+                [<Inline>]
+                member x.GetIndex(pi : int, fvi : int) =
+                    x.indices.[3 * pi + fvi]
+                
+            [<ReflectedDefinition>]
+            type LineStream<'d when 'd :> INatural> =
+                {
+                    indices                     : Arr<'d, int>
+                    mutable count               : int
 
+                    mutable p0                  : int
+                    mutable p1                  : int
+                    mutable vs                  : int
+                }
+
+                [<Inline>]
+                member x.Reset() =
+                    x.count <- 0
+                    x.vs <- 0
+                    x.p0 <- -1
+                    x.p1 <- -1
+                    for i in 0 .. Peano.typeSize<'d> - 1 do
+                        x.indices.[i] <- -1
+
+                member x.EmitVertex(vi : int) =
+                    match x.vs with
+                        | 0 -> 
+                            x.p0 <- vi
+                            x.vs <- 1
+                        | 1 ->
+                            x.p1 <- vi
+                            x.vs <- 2
+
+                            let bi = 2 * x.count
+                            x.indices.[bi + 0] <- x.p0
+                            x.indices.[bi + 1] <- x.p1
+                        
+                            x.p0 <- x.p1
+                            x.vs <- 1
+                        
+                            x.count <- x.count + 1
+
+                        | _ ->
+                            ()
+
+                [<Inline>]
+                member x.EndPrimitive() =
+                    x.vs <- 0
+                  
+                [<Inline>]
+                member x.GetIndex(pi : int, fvi : int) =
+                    x.indices.[2 * pi + fvi]
+                              
+            [<ReflectedDefinition>]
+            type PointStream<'d when 'd :> INatural> =
+                {
+                    indices                     : Arr<'d, int>
+                    mutable count               : int
+                }
+
+                [<Inline>]
+                member x.Reset() =
+                    x.count <- 0
+                    for i in 0 .. Peano.typeSize<'d> - 1 do
+                        x.indices.[i] <- -1
+
+                member x.EmitVertex(vi : int) =
+                    x.indices.[x.count] <- vi
+                    x.count <- x.count + 1
+              
+                [<Inline>]
+                member x.EndPrimitive() =
+                    ()
+                  
+                [<Inline>]
+                member x.GetIndex(pi : int, fvi : int) =
+                    x.indices.[pi]
+                
+            type ReflectedStream(t : OutputTopology, maxPrimitives : int) =
+                
+                let maxIndices =
+                    match t with
+                        | OutputTopology.Points -> maxPrimitives
+                        | OutputTopology.LineStrip -> maxPrimitives * 2
+                        | OutputTopology.TriangleStrip -> maxPrimitives * 3
+                    
+                let tStream =
+                    match t with
+                        | OutputTopology.Points -> typedefof<PointStream<_>>.MakeGenericType [| Peano.getPeanoType maxIndices |]
+                        | OutputTopology.LineStrip -> typedefof<LineStream<_>>.MakeGenericType [| Peano.getPeanoType maxIndices |]
+                        | OutputTopology.TriangleStrip -> typedefof<TriangleStream<_>>.MakeGenericType [| Peano.getPeanoType maxIndices |]
+                        
+                let mReset          = tStream.GetMethod("Reset", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
+                let mEmitVertex     = tStream.GetMethod("EmitVertex", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
+                let mEndPrimitive   = tStream.GetMethod("EndPrimitive", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
+                let mGetIndex       = tStream.GetMethod("GetIndex", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
+                let pCount          = tStream.GetProperty("count", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
+                
+
+                let stream = Var("stream", tStream, true)
+
+                member x.VerticesPerPrimitive = 
+                    match t with
+                        | OutputTopology.Points -> 1
+                        | OutputTopology.LineStrip -> 2
+                        | OutputTopology.TriangleStrip -> 3
+
+                member x.Declare(body : Expr) =
+                    Expr.Let(
+                        stream, Expr.DefaultValue tStream,
+                        Expr.Seq [
+                            Expr.Call(Expr.Var stream, mReset, [])
+                            body
+                        ]
+                    )
+
+                member x.EmitVertex(index : Expr<int>) : Expr<unit> =
+                    Expr.Call(Expr.Var stream, mEmitVertex, [index]) |> Expr.Cast
+                    
+                member x.EndPrimitive() : Expr<unit> =
+                    Expr.Call(Expr.Var stream, mEndPrimitive, []) |> Expr.Cast
+
+                member x.GetIndex(pi : Expr<int>, fvi : Expr<int>) : Expr<int> =
+                    Expr.Call(Expr.Var stream, mGetIndex, [pi.Raw; fvi.Raw]) |> Expr.Cast
+
+                member x.Count : Expr<int> = 
+                    Expr.PropertyGet(Expr.Var stream, pCount) |> Expr.Cast 
+
+            let (<+>) (l : Range1i) (r : Range1i) =
+                let max =
+                    if l.Max = Int32.MaxValue || r.Max = Int32.MaxValue then Int32.MaxValue
+                    else l.Max + r.Max
+
+                Range1i(l.Min + r.Min, max)
+
+            open Aardvark.Base.Monads.State
+
+            type State =
+                {
+                    minVertices : int
+                    maxVertices : int
+
+                    vc : int
+
+                    minPrimitives : int
+                    maxPrimitives : int
+                }
+
+            [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+            module State =
+
+                let empty =
+                    {
+                        minVertices = 0
+                        maxVertices = 0
+                        vc = 0
+                        minPrimitives = 0
+                        maxPrimitives = 0
+
+                    }
+
+                let reset() = State.modify (fun s -> { s with vc = 0 })
+
+                let add(vc : int) = 
+                    State.modify (fun s ->
+                        if s.vc = vc - 1 then
+                            { s with
+                                minVertices = s.minVertices + 1
+                                maxVertices = if s.maxVertices = Int32.MaxValue then Int32.MaxValue else s.maxVertices + 1
+                                minPrimitives = s.minPrimitives + 1
+                                maxPrimitives = if s.maxPrimitives = Int32.MaxValue then Int32.MaxValue else s.maxPrimitives + 1
+                                vc = vc
+                            }
+                            
+                        else
+                            { s with
+                                minVertices = s.minVertices + 1
+                                maxVertices = if s.maxVertices = Int32.MaxValue then Int32.MaxValue else s.maxVertices + 1
+                                vc = s.vc + 1
+                            }
+                    )
+
+                let merge (vc : int) (l : State) (r : State) =
+                    if l.vc = r.vc then
+                        {
+                            minVertices = min l.minVertices r.minVertices
+                            maxVertices = max l.maxVertices r.maxVertices
+                            vc = l.vc
+                            minPrimitives = min l.minPrimitives r.minPrimitives
+                            maxPrimitives = max l.maxPrimitives r.maxPrimitives
+                        }
+                    else
+                        {
+                            vc = vc
+                            minPrimitives = min l.minPrimitives r.minPrimitives
+                            maxPrimitives = max l.maxPrimitives r.maxPrimitives
+                            minVertices = min l.minVertices r.minVertices
+                            maxVertices = max l.maxVertices r.maxVertices
+                        }
+                        
+                let kill() =
+                    State.modify (fun s -> { s with maxVertices = Int32.MaxValue; maxPrimitives = Int32.MaxValue })
+
+            
+
+            let rec primitiveCount (vc : int) (e : Expr) : State<State, unit> =
+                state {
+                    match e with
+                        | SpecificCall <@ emitVertex() @> _->
+                            do! State.add(vc)
+
+                        | SpecificCall <@ endPrimitive() @> _ | SpecificCall <@ restartStrip() @> _ ->
+                            do! State.reset()
+
+                        | Sequential(l,r) ->
+                            do! primitiveCount vc l
+                            do! primitiveCount vc r
+
+                        | IfThenElse(c,i,e) ->
+                            do! primitiveCount vc c
+                            
+                            let! s = State.get
+
+                            let mutable iState = s
+                            let mutable eState = s
+                            do (primitiveCount vc i).Run(&iState)
+                            do (primitiveCount vc e).Run(&eState)
+
+                            do! State.put (State.merge vc iState eState)
+
+                            
+                        | ForInteger(v, first, step, last, body) ->
+                            do! primitiveCount vc first
+                            do! primitiveCount vc step
+                            do! primitiveCount vc last
+                        
+                            match first, step, last with
+                                | Int32 first, Int32 step, Int32 last -> 
+                                    for i in [first .. step .. last] do
+                                        do! primitiveCount vc body
+                                | _ ->
+                                    let mutable inner = State.empty
+                                    (primitiveCount vc body).Run(&inner)
+                                    if inner.maxVertices <> 0 then
+                                        do! State.kill()
+                                        
+                        //| ForEach(v, s, b) ->
+                            
+
+                        | WhileLoop(guard, body) ->
+                            let mutable inner = State.empty
+                            (primitiveCount vc (Expr.Sequential(guard, body))).Run(&inner)
+                            if inner.maxVertices <> 0 then
+                                do! State.kill()
+                                
+                        | ShapeVar v -> ()
+                        | ShapeLambda(v, b) -> 
+                            do! primitiveCount vc b
+                        | ShapeCombination(o, args) ->  
+                            for a in args do
+                                 do! primitiveCount vc a
+                }
+
+
+            let getPrimitiveCount (vc : int) (e : Expr) =
+                let mutable state = State.empty
+                (primitiveCount vc e).Run(&state)
+                Range1i(state.minPrimitives, state.maxPrimitives)
+                
+
+            type Stats =
+                {
+                    maxVertices     : Option<int>
+                    maxPrimitives   : Option<int>
+                    maxVC           : Option<int>
+                }
+
+                static member (+) (l : Stats, r : Stats) =
+                    {
+                        maxVertices = 
+                            match l.maxVertices, r.maxVertices with
+                                | Some l, Some r -> Some (l + r)
+                                | None, _ -> None
+                                | _, None -> None
+                                
+                        maxPrimitives = 
+                            match l.maxPrimitives, r.maxPrimitives with
+                                | Some l, Some r -> Some (l + r)
+                                | None, _ -> None
+                                | _, None -> None
+                                
+                        maxVC = 
+                            match l.maxVC, r.maxVC with
+                                | Some l, Some r -> Some (l + r)
+                                | None, _ -> None
+                                | _, None -> None
+                    }
+                
 
         let gsgs (lShader : Shader) (rShader : Shader) =
             if not (topologyCompatible lShader.shaderOutputTopology rShader.shaderInputTopology) then
@@ -2037,16 +2325,29 @@ module Shader =
 
             match lShader.shaderOutputVertices with
                 | ShaderOutputVertices.Computed count | ShaderOutputVertices.UserGiven count ->
+
+                    let lOutputTopology = lShader.shaderOutputTopology.Value
+
+//                    let lOutputVertices =
+//                        match lOutputTopology with
+//                            | OutputTopology.Points -> 1
+//                            | OutputTopology.LineStrip -> 2
+//                            | OutputTopology.TriangleStrip -> 3
+//
+//                    
+//                    let primCount = getPrimitiveCount lOutputVertices lShader.shaderBody
+//                    printfn "primCount: %A" primCount
+
+
                     // pass all needed inputs along
                     let lShader = lShader |> withOutputs (rShader.shaderInputs |> Map.map (fun _ d -> d.paramType.GetElementType()))
 
                     // determine the maximal number of indices needed
-                    let lOutputTopology = lShader.shaderOutputTopology.Value
-                    let indexCount =
+                    let maxPrimitives =
                         match lOutputTopology with
                             | OutputTopology.Points -> count
-                            | OutputTopology.LineStrip -> 2 * (count - 1)
-                            | OutputTopology.TriangleStrip -> 3 * (count - 2)
+                            | OutputTopology.LineStrip -> count - 1
+                            | OutputTopology.TriangleStrip -> count - 2
 
                     // introduce variables for all composition semantics
                     let composeVars = 
@@ -2057,6 +2358,8 @@ module Shader =
 
                     // maintain an index 
                     let currentVertex = Var("currentVertex", typeof<int>, true)
+                    
+                    let stream = ReflectedStream(lShader.shaderOutputTopology.Value, maxPrimitives)
 
                     let lBody =
                         lShader.shaderBody.SubstituteWrites (fun outputs ->
@@ -2072,28 +2375,16 @@ module Shader =
                             Some result
                         )
 
-                    let streamType = typedefof<TriangleStream<_>>.MakeGenericType [| Peano.getPeanoType indexCount |]
-                    let stream = Var("stream", streamType, true)
-                    let streamCreate = streamType.GetMethod("Create", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Static)
-                    let streamEmit = streamType.GetMethod("EmitVertex", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
-                    let streamRestart = streamType.GetMethod("EndPrimitive", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
-                    let streamGetIndex = streamType.GetMethod("GetIndex", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
-                    let streamReset = streamType.GetMethod("Reset", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
-
-                    let streamCount = streamType.GetProperty("triangleCount", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
-                    let streamIndices = streamType.GetProperty("indices", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
-
-
                     let lBody =
                         let rec replace (e : Expr) =
                             match e with
                                 | SpecificCall <@ restartStrip @> _
                                 | SpecificCall <@ endPrimitive @> _ ->
-                                    Expr.Call(Expr.Var stream, streamRestart, [])
-                                
+                                    stream.EndPrimitive() :> Expr
+
                                 | SpecificCall <@ emitVertex @> _ ->
                                     Expr.Seq [
-                                        Expr.Call(Expr.Var stream, streamEmit, [Expr.Var currentVertex])
+                                        stream.EmitVertex(Expr.Var(currentVertex) |> Expr.Cast) :> Expr
                                         Expr.VarSet(currentVertex, <@ (%%(Expr.Var(currentVertex)) : int) + 1 @>)
                                     ]
 
@@ -2116,17 +2407,9 @@ module Shader =
                             for v in Map.values composeVars do
                                 yield v, None
                             yield currentVertex, Some (Expr.Value 0)
-                            yield stream, None //Some (Expr.Call(streamCreate, []))
                         ]   
 
-
-                    let rInputCount =
-                        match rShader.shaderInputTopology.Value with
-                            | InputTopology.Point -> 1
-                            | InputTopology.Line -> 2
-                            | InputTopology.Triangle -> 3
-                            | t -> failwithf "[FShade] bad input topology %A" t
-
+                    let rInputCount = stream.VerticesPerPrimitive
                     let rPrimitiveId = Var("primitiveId", typeof<int>)
                     let rIndices = Var("indices", Peano.getArrayType rInputCount typeof<int>)
 
@@ -2149,15 +2432,10 @@ module Shader =
                             )
 
 
-                        let getIndex (pi : Expr) (i : int) =
-                            Expr.ArrayAccess(
-                                Expr.PropertyGet(Expr.Var stream, streamIndices, []),
-                                <@@ 3 * (%%pi : int) + i @@>
-                            )
+                        let getIndex (pi : Expr) (i : int) = stream.GetIndex(Expr.Cast pi, <@ i @>)
 
-                        let primtiveCount = Expr.PropertyGet(Expr.Var stream, streamCount)
                         Expr.ForIntegerRangeLoop(
-                            rPrimitiveId, Expr.Value 0, <@@ (%%primtiveCount : int) - 1 @@>, 
+                            rPrimitiveId, Expr.Value 0, <@@ %(stream.Count) - 1 @@>, 
                             Expr.Let(rIndices, Expr.DefaultValue rIndices.Type,
                                 Expr.Seq [
                                     for i in 0 .. rInputCount - 1 do
@@ -2171,19 +2449,18 @@ module Shader =
 
                     let body =
                         bind variables (
-                            Expr.Seq [
-                                Expr.Call(Expr.Var stream, streamReset, [])
-                                lBody
-                                rBody
-                            ]
+                            stream.Declare (
+                                Expr.Seq [
+                                    lBody
+                                    rBody
+                                ]
+                            )
                         )
 
                     let outputVerices =
                         match rShader.shaderOutputVertices with
                             | ShaderOutputVertices.UserGiven rc | ShaderOutputVertices.Computed rc ->
-                                let maxPrimitiveCount = indexCount / rInputCount
-
-                                ShaderOutputVertices.UserGiven (maxPrimitiveCount * rc)
+                                ShaderOutputVertices.UserGiven (maxPrimitives * rc)
 
                             | _ ->
                                 ShaderOutputVertices.Unknown
@@ -2197,7 +2474,6 @@ module Shader =
                             shaderOutputVertices = outputVerices
                         }
 
-                    //rShader |> withBody body
 
                 | _ ->
                     failwithf "[FShade] cannot compose GeometryShader without vertex-count"
