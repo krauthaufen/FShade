@@ -109,10 +109,27 @@ module UtilityFunction =
 
                 match e with
                     | Lambdas(args, body) ->
+                        let args = List.concat args
+
+                        let args, body = 
+                            if m.IsStatic then 
+                                args, body
+                            else
+                                match args with
+                                    | this :: args ->
+                                        let mThis = Var(this.Name, this.Type, true)
+                                        let body = body.Substitute(fun vi -> if vi = this then Some (Expr.Var mThis) else None)
+                                        mThis :: args, body
+                                    | _ ->
+                                        args, body
+
+                        let args =
+                            args |> List.filter (fun a -> a.Type <> typeof<unit>)
+
                         Some {
                             functionId = Expr.ComputeHash body
                             functionName = methodName m
-                            functionArguments = List.concat args
+                            functionArguments = args
                             functionBody = body
                             functionMethod = Some m
                             functionTag = null
@@ -175,8 +192,13 @@ module ExpressionExtensions =
         static member CallFunction(f : UtilityFunction, args : list<Expr>) =
             assert ( List.forall2 (fun (v : Var) (e : Expr) -> v.Type.IsAssignableFrom e.Type) f.functionArguments args )
 
+            let args =
+                match args with
+                    | [] -> Expr.Unit
+                    | args -> Expr.NewTuple args
+
             Expr.Coerce(
-                Expr.NewTuple [Expr.Value "__FUNCTIONCALL__"; Expr.Value f; Expr.NewTuple args ], 
+                Expr.NewTuple [Expr.Value "__FUNCTIONCALL__"; Expr.Value f; args ], 
                 f.returnType
             )
 
@@ -232,8 +254,11 @@ module ExpressionExtensions =
 
     let (|CallFunction|_|) (e : Expr) =
         match e with
-            | Coerce(NewTuple [ String "__FUNCTIONCALL__"; Value((:? UtilityFunction as f), _); NewTuple args], t) when t = f.returnType ->
-                Some(f, args)
+            | Coerce(NewTuple [ String "__FUNCTIONCALL__"; Value((:? UtilityFunction as f), _); args], t) when t = f.returnType ->
+                match args with
+                    | Unit -> Some(f,[])
+                    | NewTuple args -> Some(f, args)
+                    | _ -> None
             | _ ->
                 None
 

@@ -197,8 +197,11 @@ module Optimizer =
                         return Expr.Application(l, a)
 
                     | CallFunction(utility, args) ->
-                        let code = UtilityFunction.inlineCode utility args
-                        return! withoutValueS code
+                        let! self = eliminateDeadCodeS e
+                        if self.Type = typeof<unit> then
+                            return e
+                        else
+                            return Expr.Ignore e
 
                     | Call(t, mi, args) ->
                         let! needed = callNeededS t mi args
@@ -472,38 +475,40 @@ module Optimizer =
                         return Expr.Application(l, a)
            
                     | CallFunction(utility, args) ->
-                        if utility.returnType = typeof<unit> then
-                            let code = UtilityFunction.inlineCode utility args
-                            return! withoutValueS code
+                        // TODO: is the call needed???
+                        let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
+                        let! s = State.get
+
+                        let utility =
+                            utility |> UtilityFunction.map (fun b ->
+                                let mutable innerState = { EliminationState.empty with isGlobalSideEffect = s.isGlobalSideEffect }
+
+                                for a in utility.functionArguments do
+                                    if a.IsMutable then
+                                        innerState <- { innerState with usedVariables = Set.add a innerState.usedVariables }
+                                        
+
+                                eliminateDeadCodeS(b).Run(&innerState)
+                            )
+
+                        let usedVariables = utility.functionBody.GetFreeVars() |> Set.ofSeq
+                        let allArgsUsed = List.forall (fun v -> Set.contains v usedVariables) utility.functionArguments
+
+                        if allArgsUsed then
+                            return Expr.CallFunction(utility, args)
                         else
-                            // TODO: is the call needed???
-                            let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
-                            let! s = State.get
+                            let args, values = 
+                                List.zip utility.functionArguments args
+                                    |> List.filter (fun (v,_) -> Set.contains v usedVariables)
+                                    |> List.unzip
 
                             let utility =
-                                utility |> UtilityFunction.map (fun b ->
-                                    let mutable innerState = { EliminationState.empty with isGlobalSideEffect = s.isGlobalSideEffect }
-                                    eliminateDeadCodeS(b).Run(&innerState)
-                                )
+                                { utility with
+                                    functionArguments = args
+                                    functionTag = null   
+                                }
 
-                            let usedVariables = utility.functionBody.GetFreeVars() |> Set.ofSeq
-                            let allArgsUsed = List.forall (fun v -> Set.contains v usedVariables) utility.functionArguments
-
-                            if allArgsUsed then
-                                return Expr.CallFunction(utility, args)
-                            else
-                                let args, values = 
-                                    List.zip utility.functionArguments args
-                                        |> List.filter (fun (v,_) -> Set.contains v usedVariables)
-                                        |> List.unzip
-
-                                let utility =
-                                    { utility with
-                                        functionArguments = args
-                                        functionTag = null   
-                                    }
-
-                                return Expr.CallFunction(utility, values)
+                            return Expr.CallFunction(utility, values)
 
                     | Call(t, mi, args) ->
                         let! needed = 
@@ -1162,10 +1167,11 @@ module Optimizer =
                             | _ -> return Expr.Coerce(e, t)
 
                     | DefaultValue t ->
-                        if t.IsValueType then
-                            return Expr.Value(Activator.CreateInstance t, t)
-                        else
-                            return Expr.Value(null, t)
+                        return Expr.DefaultValue t
+//                        if t.IsValueType then
+//                            return Expr.Value(Activator.CreateInstance t, t)
+//                        else
+//                            return Expr.Value(null, t)
 
                     | FieldGet(None, f) ->
                         let! n = State.needsField f
@@ -2036,6 +2042,7 @@ module Optimizer =
                 | ForEach _ 
                 | FieldSet _
                 | PropertySet _ 
+                | VarSet _
                 | WhileLoop _ ->
                     let expr = processStatement expr
                     Expr.Unit, Hoisting.Sequential expr
@@ -2242,6 +2249,10 @@ module Optimizer =
                     let b = processStatement b
                     let e, eh = processExpression e
                     Expr.Let(v,e,b) |> apply eh
+
+                | VarSet(v,e) ->
+                    let e, eh = processExpression e
+                    Expr.VarSet(v,e) |> apply eh
 
                 | e ->
                     let e, eh = processExpression e

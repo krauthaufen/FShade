@@ -1953,6 +1953,258 @@ module Shader =
                     shaderDebugRange = None
                 }
 
+        let private topologyCompatible (lOutput : Option<OutputTopology>) (rInput : Option<InputTopology>) =
+            match lOutput, rInput with
+                | Some OutputTopology.Points, Some InputTopology.Point
+                | Some OutputTopology.LineStrip, Some InputTopology.Line 
+                | Some OutputTopology.TriangleStrip, Some InputTopology.Triangle ->
+                    true
+                | _ -> 
+                    false
+
+        [<ReflectedDefinition>]
+        type TriangleStream<'d when 'd :> INatural> =
+            {
+                indices                     : Arr<'d, int>
+                mutable triangleCount       : int
+
+                mutable p0                  : int
+                mutable p1                  : int
+                mutable p2                  : int
+                mutable vs                  : int
+            }
+
+            static member Create() =
+                { 
+                    indices = Arr<'d, int>()
+                    triangleCount = 0
+                    p0 = -1
+                    p1 = -1
+                    p2 = -1
+                    vs = 0
+                }
+
+            member x.EmitVertex(vi : int) =
+                match x.vs with
+                    | 0 -> 
+                        x.p0 <- vi
+                        x.vs <- 1
+                    | 1 ->
+                        x.p1 <- vi
+                        x.vs <- 2
+                    | 2 ->
+                        x.p2 <- vi
+                        x.vs <- 3
+
+                        let bi = 3 * x.triangleCount
+                        x.indices.[bi + 0] <- x.p0
+                        x.indices.[bi + 1] <- x.p1
+                        x.indices.[bi + 2] <- x.p2
+                        
+                        // 0 1 2   2 1 3   2 3 4
+                        if x.triangleCount % 2 = 0 then
+                            x.p0 <- x.p2
+                            x.vs <- 2
+                        else
+                            x.p1 <- x.p2
+                            x.vs <- 2
+                        
+                        x.triangleCount <- x.triangleCount + 1
+
+                    | _ ->
+                        ()
+
+            [<Inline>]
+            member x.Reset() =
+                x.triangleCount <- 0
+                x.vs <- 0
+                x.p0 <- -1
+                x.p1 <- -1
+                x.p2 <- -1
+
+            [<Inline>]
+            member x.EndPrimitive() =
+                x.vs <- 0
+                
+            [<Inline>]
+            member x.GetIndex(pi : int, fvi : int) =
+                x.indices.[3 * pi + fvi]
+
+
+        let gsgs (lShader : Shader) (rShader : Shader) =
+            if not (topologyCompatible lShader.shaderOutputTopology rShader.shaderInputTopology) then
+                failwithf "[FShade] cannot compose geometryshaders with mismatching topologies: %A vs %A" lShader.shaderOutputTopology rShader.shaderInputTopology
+
+            match lShader.shaderOutputVertices with
+                | ShaderOutputVertices.Computed count | ShaderOutputVertices.UserGiven count ->
+                    // pass all needed inputs along
+                    let lShader = lShader |> withOutputs (rShader.shaderInputs |> Map.map (fun _ d -> d.paramType.GetElementType()))
+
+                    // determine the maximal number of indices needed
+                    let lOutputTopology = lShader.shaderOutputTopology.Value
+                    let indexCount =
+                        match lOutputTopology with
+                            | OutputTopology.Points -> count
+                            | OutputTopology.LineStrip -> 2 * (count - 1)
+                            | OutputTopology.TriangleStrip -> 3 * (count - 2)
+
+                    // introduce variables for all composition semantics
+                    let composeVars = 
+                        lShader.shaderOutputs |> Map.map (fun name desc ->
+                            let arrType = Peano.getArrayType count desc.paramType
+                            Var(name, arrType) 
+                        )
+
+                    // maintain an index 
+                    let currentVertex = Var("currentVertex", typeof<int>, true)
+
+                    let lBody =
+                        lShader.shaderBody.SubstituteWrites (fun outputs ->
+                            let result =
+                                Expr.Seq [
+                                    for (name, (i,o)) in Map.toSeq outputs do
+                                        if Option.isSome i then failwithf "[FShade] indexed output-write not possible atm."
+
+                                        let v = composeVars.[name]
+                                        yield Expr.ArraySet(Expr.Var v, Expr.Var currentVertex, o)
+                                ]
+
+                            Some result
+                        )
+
+                    let streamType = typedefof<TriangleStream<_>>.MakeGenericType [| Peano.getPeanoType indexCount |]
+                    let stream = Var("stream", streamType, true)
+                    let streamCreate = streamType.GetMethod("Create", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Static)
+                    let streamEmit = streamType.GetMethod("EmitVertex", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
+                    let streamRestart = streamType.GetMethod("EndPrimitive", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
+                    let streamGetIndex = streamType.GetMethod("GetIndex", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
+                    let streamReset = streamType.GetMethod("Reset", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
+
+                    let streamCount = streamType.GetProperty("triangleCount", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
+                    let streamIndices = streamType.GetProperty("indices", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
+
+
+                    let lBody =
+                        let rec replace (e : Expr) =
+                            match e with
+                                | SpecificCall <@ restartStrip @> _
+                                | SpecificCall <@ endPrimitive @> _ ->
+                                    Expr.Call(Expr.Var stream, streamRestart, [])
+                                
+                                | SpecificCall <@ emitVertex @> _ ->
+                                    Expr.Seq [
+                                        Expr.Call(Expr.Var stream, streamEmit, [Expr.Var currentVertex])
+                                        Expr.VarSet(currentVertex, <@ (%%(Expr.Var(currentVertex)) : int) + 1 @>)
+                                    ]
+
+                                | ShapeLambda(v,b) -> Expr.Lambda(v, replace b)
+                                | ShapeCombination(o, args) -> RebuildShapeCombination(o, args |> List.map replace)
+                                | ShapeVar v -> Expr.Var v
+
+                        replace lBody
+
+                    let rec bind (l : list<Var * Option<Expr>>) (body : Expr) =
+                        match l with
+                            | [] -> body
+                            | (v,e) :: rest ->
+                                match e with
+                                    | Some e -> Expr.Let(v, e, bind rest body)
+                                    | None -> Expr.Let(v, Expr.DefaultValue v.Type, bind rest body) 
+
+                    let variables =
+                        [
+                            for v in Map.values composeVars do
+                                yield v, None
+                            yield currentVertex, Some (Expr.Value 0)
+                            yield stream, None //Some (Expr.Call(streamCreate, []))
+                        ]   
+
+
+                    let rInputCount =
+                        match rShader.shaderInputTopology.Value with
+                            | InputTopology.Point -> 1
+                            | InputTopology.Line -> 2
+                            | InputTopology.Triangle -> 3
+                            | t -> failwithf "[FShade] bad input topology %A" t
+
+                    let rPrimitiveId = Var("primitiveId", typeof<int>)
+                    let rIndices = Var("indices", Peano.getArrayType rInputCount typeof<int>)
+
+                    let rBody =
+                        let rBody =
+                            rShader.shaderBody.SubstituteReads (fun kind typ name index ->
+                                match kind with
+                                    | ParameterKind.Input ->
+                                        match index with
+                                            | Some index ->
+                                                let index = Expr.ArrayAccess(Expr.Var rIndices, index) 
+                                                let v = composeVars.[name]
+                                                Some (Expr.ArrayAccess(Expr.Var v, index))
+
+                                            | None ->
+                                                None
+                                                //failwith "[FShade] GeometryShader cannot read non-indexed input"
+                                    | _ ->
+                                        None
+                            )
+
+
+                        let getIndex (pi : Expr) (i : int) =
+                            Expr.ArrayAccess(
+                                Expr.PropertyGet(Expr.Var stream, streamIndices, []),
+                                <@@ 3 * (%%pi : int) + i @@>
+                            )
+
+                        let primtiveCount = Expr.PropertyGet(Expr.Var stream, streamCount)
+                        Expr.ForIntegerRangeLoop(
+                            rPrimitiveId, Expr.Value 0, <@@ (%%primtiveCount : int) - 1 @@>, 
+                            Expr.Let(rIndices, Expr.DefaultValue rIndices.Type,
+                                Expr.Seq [
+                                    for i in 0 .. rInputCount - 1 do
+                                        yield Expr.ArraySet(Expr.Var rIndices, Expr.Value i, getIndex (Expr.Var rPrimitiveId) i)
+                                    yield rBody
+                                    yield <@@ restartStrip() @@>
+                                ]
+                            )
+                        )
+
+
+                    let body =
+                        bind variables (
+                            Expr.Seq [
+                                Expr.Call(Expr.Var stream, streamReset, [])
+                                lBody
+                                rBody
+                            ]
+                        )
+
+                    let outputVerices =
+                        match rShader.shaderOutputVertices with
+                            | ShaderOutputVertices.UserGiven rc | ShaderOutputVertices.Computed rc ->
+                                let maxPrimitiveCount = indexCount / rInputCount
+
+                                ShaderOutputVertices.UserGiven (maxPrimitiveCount * rc)
+
+                            | _ ->
+                                ShaderOutputVertices.Unknown
+
+                    optimize 
+                        { rShader with
+                            shaderBody = Preprocessor.preprocess V3i.Zero body |> fst
+                            shaderInputTopology = lShader.shaderInputTopology
+                            shaderUniforms = Map.union lShader.shaderUniforms rShader.shaderUniforms
+                            shaderInputs = lShader.shaderInputs
+                            shaderOutputVertices = outputVerices
+                        }
+
+                    //rShader |> withBody body
+
+                | _ ->
+                    failwithf "[FShade] cannot compose GeometryShader without vertex-count"
+
+
+
+
     /// composes two shaders respecting their stages.
     ///     - implemented: { Vertex->Vertex; Geometry->Vertex; Fragment->Fragment }
     ///     - future:           { Tessellation->Vertex; Geometry->Geometry }
@@ -1970,6 +2222,8 @@ module Shader =
             | ShaderStage.Geometry, ShaderStage.Vertex ->
                 Composition.gsvs l r
 
+            | ShaderStage.Geometry, ShaderStage.Geometry ->
+                Composition.gsgs l r
 
             | _ ->
                 failwithf "[FShade] cannot compose %AShader with %AShader" l.shaderStage r.shaderStage

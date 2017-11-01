@@ -544,6 +544,17 @@ module Effect =
                 InputTopology.Triangle, ofFunction(nopTriangle).GeometryShader.Value
             ]
 
+    let substituteUniforms (substitute : string -> Type -> Option<Expr> -> Option<Expr>) (effect : Effect) =
+        effect |> map (fun shader ->
+            shader |> Shader.substituteReads (fun kind typ name index ->
+                match kind with
+                    | ParameterKind.Uniform ->
+                        substitute name typ index
+                    | _ ->
+                        None
+            )
+        )
+
     let toLayeredEffect (layers : int) (uniforms : Set<string>) (topology : InputTopology) (effect : Effect) = 
         if effect.TessControlShader.IsSome || effect.TessEvalShader.IsSome then
             failwithf "[FShade] effects containing tessellation shaders cannot be layered automatically"
@@ -602,13 +613,22 @@ module Effect =
                 )
 
             let newBody =
-                Expr.ForIntegerRangeLoop(
-                    layer, Expr.Value 0, Expr.Value (layers - 1), 
-                    Expr.Sequential(
-                        newBody,
-                        <@ restartStrip() @>
-                    )
+                newBody.SubstituteWrites(fun outputs ->
+                    let o = Map.add Intrinsics.Layer (None, Expr.Var layer) outputs
+                    Expr.WriteOutputs o |> Some
                 )
+
+            let newBody =
+//                Expr.Sequential(
+//                    <@ Preprocessor.unroll() @>,
+                    Expr.ForIntegerRangeLoop(
+                        layer, Expr.Value 0, Expr.Value (layers - 1), 
+                        Expr.Sequential(
+                            newBody,
+                            <@ restartStrip() @>
+                        )
+                    )
+//                )
                 
             let geometryShader = Shader.withBody newBody geometryShader
             geometryShader
@@ -646,11 +666,6 @@ module Effect =
                         )
 
                     let fragmentShader = Shader.withBody newBody  fragmentShader
-//                        let uniforms = Map.union fragmentShader.shaderUniforms perLayerUniforms
-//                        { Shader.withBody newBody { fragmentShader with shaderUniforms = uniforms } with
-//                            shaderUniforms = uniforms
-//                        }
-
                     fragmentShader |> Some
                     
                 | None ->

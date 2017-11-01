@@ -591,8 +591,40 @@ module ExprExtensions =
 
         /// creates an array-indexing expression using the supplied arguments
         static member ArrayAccess(arr : Expr, index : Expr) =
-            let get = Methods.getArray.MakeGenericMethod([| arr.Type.GetElementType() |])
-            Expr.Call(get, [arr;index])
+            match arr.Type with
+                | ArrayOf t -> 
+                    let get = Methods.getArray.MakeGenericMethod([| arr.Type.GetElementType() |])
+                    Expr.Call(get, [arr;index])
+                | t ->
+                    let prop = t.GetProperty "Item"
+
+                    if isNull prop then
+                        failwithf "[FShade] not an array type: %A" t
+
+                    let ip = prop.GetIndexParameters()
+                    if ip.Length <> 1 || ip.[0].ParameterType <> typeof<int> then
+                        failwithf "[FShade] not an array type: %A" t
+
+                    Expr.PropertyGet(arr, prop, [index])
+            
+        /// creates an array-indexing expression using the supplied arguments
+        static member ArraySet(arr : Expr, index : Expr, value : Expr) =
+            match arr.Type with
+                | ArrayOf t -> 
+                    let set = Methods.setArray.MakeGenericMethod([| t |])
+                    Expr.Call(set, [arr;index;value])
+                | t ->
+                    let prop = t.GetProperty "Item"
+
+                    if isNull prop then
+                        failwithf "[FShade] not an array type: %A" t
+
+                    let ip = prop.GetIndexParameters()
+                    if ip.Length <> 1 || ip.[0].ParameterType <> typeof<int> then
+                        failwithf "[FShade] not an array type: %A" t
+                        
+
+                    Expr.PropertySet(arr, prop, value, [index])
 
         /// creates a new fixed-size-array using the given element-type and values
         static member NewFixedArray(et : Type, values : list<Expr>) =

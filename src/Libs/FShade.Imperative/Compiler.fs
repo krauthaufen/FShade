@@ -70,15 +70,31 @@ module Compiler =
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module FunctionDefinition =
+        let private handleThis (isStatic : bool) (args : list<list<Var>>) (body : Expr) =
+            let args = List.concat args
+            if isStatic then 
+                args, body
+            else
+                match args with
+                    | self :: rest ->
+                        let mSelf = Var(self.Name, self.Type, true) 
+                        let body = body.Substitute(fun vi -> if vi = self then Some (Expr.Var mSelf) else None)
+                                    
+                        mSelf :: rest, body
+                    | _ ->
+                        args, body
+
         let ofMethodBase (tryGetOverrideCode : MethodBase -> Option<Expr>) (mi : MethodBase) =
             let name = methodName mi
             match tryGetOverrideCode mi with
                 | Some (Lambdas(args, body)) ->
-                    ManagedFunction(name, List.concat args, body)
+                    let args, body = handleThis mi.IsStatic args body
+                    ManagedFunction(name, args, body)
                 | _ ->
                     match Expr.TryGetReflectedDefinition mi with
                         | Some (Lambdas(args, body)) ->
-                            ManagedFunction(name, List.concat args, body)
+                            let args, body = handleThis mi.IsStatic args body
+                            ManagedFunction(name, args, body)
                         | _ ->
                             failwithf "[FShade] cannot call function %A since it is not reflectable" mi
 
@@ -1236,16 +1252,21 @@ module Compiler =
                 | Sequential(Unroll, Cons((ForInteger(v, first, step, last, b) as loop), rest)) ->
                     let! rest = rest |> List.mapS (toCStatementS isLast)
 
-                    let! v = toCVarS v
+                    let loopBody (i : int) = b.Substitute(fun vi -> if vi = v then Some (Expr.Value(i)) else None)
+
+
+                    
                     match first, step, last with
                         | DerivedPatterns.Int32 first, DerivedPatterns.Int32 step, DerivedPatterns.Int32 last ->
                             let range = [ first .. step .. last ]
-                            let! b = toCStatementS false b
+
+                            let! code = 
+                                range |> List.mapS (fun i ->
+                                    toCStatementS false (loopBody i) |> State.map (fun s -> CIsolated [s])
+                                )
+
                             return CSequential [
-                                yield CDeclare(v, None)
-                                for i in range do
-                                    yield CWrite(CLVar v, CExpr.CValue(CType.CInt(true, 32), CIntegral (int64 i)))
-                                    yield CIsolated [b]
+                                yield! code
                                 yield! rest
                             ]
                         | _ ->
