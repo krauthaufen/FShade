@@ -100,7 +100,7 @@ module UtiliyFunctions =
             Effect.compose [
                 Effect.ofFunction gs0
                 Effect.ofFunction gs1
-                //Effect.ofFunction gs1
+                Effect.ofFunction gs1
             ]
 
         print effect

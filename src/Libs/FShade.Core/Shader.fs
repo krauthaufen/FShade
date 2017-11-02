@@ -40,6 +40,8 @@ type Shader =
         shaderOutputTopology : Option<OutputTopology>
         /// the optional maximal vertex-count for the shader
         shaderOutputVertices : ShaderOutputVertices
+        /// the optional maximal vertex-count for the shader
+        shaderOutputPrimitives : Option<int>
         /// the body for the shader
         shaderBody : Expr
         /// the shader's source info (if any)
@@ -884,6 +886,7 @@ module private Preprocessor =
                 shaderInputTopology     = state.inputTopology
                 shaderOutputTopology    = builder.OutputTopology
                 shaderOutputVertices    = outputVertices
+                shaderOutputPrimitives  = None
                 shaderBody              = body
                 shaderDebugRange        = None
             }
@@ -971,6 +974,229 @@ module private Preprocessor =
 
             | ShapeVar _ ->
                 Map.empty
+
+
+
+module private GeometryInfo =
+
+    type Info =
+        {
+            maxVertices : int
+            maxPrimitives : int
+            maxVC : int
+        } with
+
+        static member Zero = { maxVertices = 0; maxPrimitives = 0; maxVC = 0 }
+
+        static member Add (l : Info, r : Info) = 
+            {
+                maxVertices = l.maxVertices + r.maxVertices
+                maxPrimitives = l.maxPrimitives + r.maxPrimitives
+                maxVC = l.maxVC + r.maxVC
+            }
+        static member Merge (l : Info, r : Info) = 
+            {
+                maxVertices = max l.maxVertices r.maxVertices
+                maxPrimitives = max l.maxPrimitives r.maxPrimitives
+                maxVC = max l.maxVC r.maxVC
+            }
+
+    type Stats =
+        {
+            stripCount      : int
+            info            : Option<Info>
+        }
+
+        static member Create (stripCount : int) =
+            { 
+                stripCount = stripCount
+                info = Some Info.Zero
+            }
+                    
+        member l.EmitVertex() =
+            {
+                stripCount = l.stripCount
+                info =
+                    match l.info with
+                        | Some i ->
+                            Some {
+                                maxVertices = i.maxVertices + 1
+                                maxPrimitives =
+                                    if i.maxVC >= l.stripCount - 1 then
+                                        (i.maxPrimitives + 1)
+                                    else
+                                        i.maxPrimitives
+                                maxVC = min l.stripCount (i.maxVC + 1)
+                            }
+                        | None -> 
+                            None
+            }
+
+        static member Add (l : Stats, r : Stats) =
+            {
+                stripCount = min l.stripCount r.stripCount
+                info = (match l.info, r.info with | Some l, Some r -> Some (Info.Add(l, r)) | _ -> None)
+            }
+
+        static member Merge (l : Stats, r : Stats) =
+            {
+                stripCount = min l.stripCount r.stripCount
+                info = (match l.info, r.info with | Some l, Some r -> Some (Info.Merge(l,r)) | _ -> None)
+            }
+
+    let rec tryGetUpperBound (e : Expr) =
+        match e with
+            | Int32 v -> 
+                Some v
+
+            | SpecificCall <@ min @> (_,_,[l;r]) ->
+                match tryGetUpperBound l, tryGetUpperBound r with
+                    | Some l, Some r -> Some (min l r)
+                    | l, None -> l
+                    | None, r -> r
+
+            | SpecificCall <@ (+) @> (_,_,[l;r]) ->
+                match tryGetUpperBound l, tryGetUpperBound r with
+                    | Some l, Some r -> Some (l + r)
+                    | _ -> None
+
+            | SpecificCall <@ (-) @> (_,_,[l;r]) ->
+                match tryGetUpperBound l, tryGetLowerBound r with
+                    | Some l, Some r -> Some (l - r)
+                    | _ -> None
+
+            | SpecificCall <@ (*) @> (_,_,[l;r]) ->
+                match tryGetUpperBound l, tryGetUpperBound r with
+                    | Some l, Some r -> Some (l * r)
+                    | _ -> None
+
+            | SpecificCall <@ (/) @> (_,_,[l;r]) ->
+                match tryGetUpperBound l, tryGetLowerBound r with
+                    | Some l, Some r -> Some (l / r)
+                    | _ -> None
+
+            | IfThenElse(c, i, e) ->
+                match c with
+                    | Bool true -> tryGetUpperBound i
+                    | Bool false -> tryGetUpperBound e
+                    | _ ->
+                        match tryGetUpperBound i, tryGetUpperBound e with
+                            | Some i, Some e -> Some (max i e)
+                            | _ -> None
+
+
+
+            | _ -> None
+                
+    and tryGetLowerBound (e : Expr) =
+        match e with    
+            | Int32 v -> 
+                Some v
+
+            | SpecificCall <@ max @> (_,_,[l;r]) ->
+                match tryGetUpperBound l, tryGetUpperBound r with
+                    | Some l, Some r -> Some (max l r)
+                    | l, None -> l
+                    | None, r -> r
+                            
+            | SpecificCall <@ (+) @> (_,_,[l;r]) ->
+                match tryGetUpperBound l, tryGetUpperBound r with
+                    | Some l, Some r -> Some (l + r)
+                    | _ -> None
+
+            | SpecificCall <@ (-) @> (_,_,[l;r]) ->
+                match tryGetLowerBound l, tryGetUpperBound r with
+                    | Some l, Some r -> Some (l - r)
+                    | _ -> None
+
+            | SpecificCall <@ (*) @> (_,_,[l;r]) ->
+                match tryGetLowerBound l, tryGetLowerBound r with
+                    | Some l, Some r -> Some (l * r)
+                    | _ -> None
+                            
+
+            | SpecificCall <@ (/) @> (_,_,[l;r]) ->
+                match tryGetLowerBound l, tryGetUpperBound r with
+                    | Some l, Some r -> Some (l / r)
+                    | _ -> None
+
+
+            | IfThenElse(c, i, e) ->
+                match c with
+                    | Bool true -> tryGetLowerBound i
+                    | Bool false -> tryGetLowerBound e
+                    | _ ->
+                        match tryGetLowerBound i, tryGetLowerBound e with
+                            | Some i, Some e -> Some (max i e)
+                            | _ -> None
+
+            | _ ->
+                None
+
+    let rec geometryStats (s : Stats) (e : Expr) =
+        match e with
+            | SpecificCall <@ emitVertex() @> _ ->
+                s.EmitVertex()
+
+            | SpecificCall <@ restartStrip() @> _ | SpecificCall <@ endPrimitive() @> _ ->
+                match s.info with
+                    | Some i -> { s with info = Some { i with maxVC = 0 } }
+                    | None -> s
+
+            | ForInteger(v, min, step, max, body) ->
+                let bodyStats = geometryStats (Stats.Create s.stripCount) body
+                match bodyStats.info with
+                    | Some { maxVertices = 0 } ->
+                        s
+                            
+                    | Some info ->
+                        match tryGetLowerBound min, tryGetLowerBound step, tryGetUpperBound max with
+                            | Some min, Some step, Some max ->
+                                let mutable res = s
+                                for i in [min .. step .. max] do
+                                    res <- geometryStats res body
+
+                                res
+                            | _ ->
+                                { s with info = None }
+                    | None ->
+                        { s with info = None }
+                
+            | Sequential(l,r) ->
+                let ls = geometryStats s l
+                let rs = geometryStats ls r
+                rs
+
+            | IfThenElse(c,i,e) ->
+                let s = geometryStats s c
+
+                let si = geometryStats s i
+                let se = geometryStats s e
+
+                Stats.Merge(si, se)
+
+            | WhileLoop(guard, body) ->
+                let s = geometryStats (Stats.Create s.stripCount) (Expr.Seq [body; guard])
+
+                match s.info with
+                    | Some { maxVertices = 0 } ->
+                        s
+                    | _ ->
+                        { s with info = None }
+
+            | ShapeCombination(o, args) ->
+                let mutable res = s
+                for a in args do
+                    res <- geometryStats res a
+
+                res
+
+            | ShapeVar _ ->
+                s
+
+            | ShapeLambda(_,b) ->
+                geometryStats s b
+                
 
 
 
@@ -1296,28 +1522,38 @@ module Shader =
                 |> Optimizer.liftInputs
                 |> Preprocessor.preprocess V3i.Zero
 
-        let newOutputVertices =
+        let newOutputVertices, newOutputPrimitives =
             match shader.shaderStage with
                 | ShaderStage.Geometry ->
                     match shader.shaderOutputVertices with
                         | ShaderOutputVertices.Computed _ | ShaderOutputVertices.Unknown ->
-                            let range = Expr.computeCallCount emitVertexMeth newBody
-                            let maxVertices =
-                                if range.Max = Int32.MaxValue then
-                                    Log.warn "[FShade] could not determine max-vertex-count (using 32)"
-                                    32
-                                else
-                                    range.Max
-                            ShaderOutputVertices.Computed range.Max
+                            let outputVertices =
+                                match shader.shaderOutputTopology.Value with
+                                    | OutputTopology.Points -> 1
+                                    | OutputTopology.LineStrip -> 2
+                                    | OutputTopology.TriangleStrip -> 3
+
+                            let stats = GeometryInfo.geometryStats (GeometryInfo.Stats.Create outputVertices) newBody
+
+                            let maxVertices, maxPrimitives =
+                                match stats.info with
+                                    | Some { maxVertices = v; maxPrimitives = p } ->
+                                        v, Some p
+                                    | _ ->
+                                        Log.warn "[FShade] could not determine max-vertex-count (using 32)"
+                                        32, None
+
+                            ShaderOutputVertices.Computed maxVertices, maxPrimitives
                         | ov ->
-                            ov
+                            ov, shader.shaderOutputPrimitives
                 | _ ->
-                    shader.shaderOutputVertices
+                    shader.shaderOutputVertices, shader.shaderOutputPrimitives
 
         { shader with
             shaderInputs = state.inputs |> Map.map (fun name desc -> match Map.tryFind name shader.shaderInputs with | Some od when od.paramType = desc.paramType -> od | _ -> desc) //shader.shaderInputs |> Map.filter (fun n _ -> state.inputs.ContainsKey n)
             shaderUniforms = state.uniforms |> Map.map (fun name u -> match Map.tryFind name shader.shaderUniforms with Some ou when ou.uniformType = u.uniformType -> ou | _ -> u) //shader.shaderUniforms |> Map.filter (fun n _ -> state.uniforms.ContainsKey n)
             shaderOutputVertices = newOutputVertices
+            shaderOutputPrimitives = newOutputPrimitives
             shaderBody = newBody
         }
 
@@ -1720,6 +1956,7 @@ module Shader =
                     shaderInputTopology     = None
                     shaderOutputTopology    = None
                     shaderOutputVertices    = ShaderOutputVertices.Unknown
+                    shaderOutputPrimitives  = None
                     shaderBody =
                         attributes
                             |> Map.map (fun n t -> None, Expr.ReadInput(ParameterKind.Input, t, n))
@@ -2149,102 +2386,6 @@ module Shader =
                     Expr.PropertyGet(Expr.Var stream, pCount) |> Expr.Cast 
 
 
-            let inline private add (l : Option<'a>) (r : Option<'a>) =
-                match l, r with
-                    | Some l, Some r -> Some (l + r)
-                    | _ -> None
-                    
-            let inline private max (l : Option<'a>) (r : Option<'a>) =
-                match l, r with
-                    | Some l, Some r -> Some (max l r)
-                    | _ -> None
-
-            type Stats =
-                {
-                    stripCount      : int
-                    maxVertices     : Option<int>
-                    maxPrimitives   : Option<int>
-                    maxVC           : Option<int>
-                }
-
-                static member Create (stripCount : int) =
-                    { 
-                        stripCount = stripCount
-                        maxVertices = Some 0
-                        maxPrimitives = Some 0
-                        maxVC = Some 0
-                    }
-                    
-                member l.EmitVertex() =
-                    {
-                        stripCount = l.stripCount
-                        maxVertices = l.maxVertices |> Option.map (fun l -> l + 1)
-                        maxPrimitives =
-                            match l.maxPrimitives, l.maxVC with
-                                | Some mp, Some vc ->
-                                    if vc >= l.stripCount - 1 then
-                                        Some (mp + 1)
-                                    else
-                                        Some mp
-                                | _ ->
-                                    None
-                        maxVC = l.maxVC |> Option.map (fun v -> min l.stripCount (v + r))
-                    }
-                static member (+) (l : Stats, r : Stats) =
-                    {
-                        stripCount = min l.stripCount r.stripCount
-                        maxVertices = add l.maxVertices r.maxVertices 
-                        maxPrimitives = add l.maxPrimitives r.maxPrimitives 
-                        maxVC = add l.maxVC r.maxVC 
-                    }
-                static member (|||) (l : Stats, r : Stats) =
-                    {
-                        stripCount = min l.stripCount r.stripCount
-                        maxVertices = max l.maxVertices r.maxVertices 
-                        maxPrimitives = max l.maxPrimitives r.maxPrimitives 
-                        maxVC = max l.maxVC r.maxVC 
-                    }
-
-            let rec tryGetUpperBound (e : Expr) =
-                match e with
-                    | Int32 v -> 
-                        Some v
-
-                    | SpecificCall <@ min @> (_,_,[l;r]) ->
-                        match tryGetUpperBound l, tryGetUpperBound r with
-                            | Some l, Some r -> Some (min l r)
-                            | l, None -> l
-                            | None, r -> r
-
-                    | SpecificCall <@ (+) @> (_,_,[l;r]) ->
-                        match tryGetUpperBound l, tryGetUpperBound r with
-                            | Some l, Some r -> Some (l + r)
-                            | _ -> None
-
-                    | SpecificCall <@ (-) @> (_,_,[l;r]) ->
-                        match tryGetUpperBound l, tryGetUpperBound r with
-                            | Some l, Some r -> Some (l - r)
-                            | _ -> None
-
-                    | IfThenElse(c, i, e) ->
-                        
-
-                    | _ -> None
-                        
-
-            let rec geometryStats (s : Stats) (primitiveVertices : int) (e : Expr) =
-                match e with
-                    | SpecificCall <@ emitVertex() @> _ ->
-                        s.EmitVertex()
-
-                    | SpecificCall <@ restartStrip() @> _ | SpecificCall <@ endPrimitive() @> _ ->
-                        { s with maxVC = Some 0 }
-
-                    | ForInteger(v, min, step, max, body) ->
-                        
-
-                
-
         let gsgs (lShader : Shader) (rShader : Shader) =
             if not (topologyCompatible lShader.shaderOutputTopology rShader.shaderInputTopology) then
                 failwithf "[FShade] cannot compose geometryshaders with mismatching topologies: %A vs %A" lShader.shaderOutputTopology rShader.shaderInputTopology
@@ -2270,10 +2411,13 @@ module Shader =
 
                     // determine the maximal number of indices needed
                     let maxPrimitives =
-                        match lOutputTopology with
-                            | OutputTopology.Points -> count
-                            | OutputTopology.LineStrip -> count - 1
-                            | OutputTopology.TriangleStrip -> count - 2
+                        match lShader.shaderOutputPrimitives with
+                            | Some p -> p
+                            | None ->
+                                match lOutputTopology with
+                                    | OutputTopology.Points -> count
+                                    | OutputTopology.LineStrip -> count - 1
+                                    | OutputTopology.TriangleStrip -> count - 2
 
                     // introduce variables for all composition semantics
                     let composeVars = 
@@ -2391,6 +2535,11 @@ module Shader =
                             | _ ->
                                 ShaderOutputVertices.Unknown
 
+                    let outputPrimitives =
+                        match rShader.shaderOutputPrimitives with
+                            | Some rp -> Some (maxPrimitives * rp)
+                            | None -> None
+
                     optimize 
                         { rShader with
                             shaderBody = Preprocessor.preprocess V3i.Zero body |> fst
@@ -2398,13 +2547,12 @@ module Shader =
                             shaderUniforms = Map.union lShader.shaderUniforms rShader.shaderUniforms
                             shaderInputs = lShader.shaderInputs
                             shaderOutputVertices = outputVerices
+                            shaderOutputPrimitives = outputPrimitives
                         }
 
 
                 | _ ->
                     failwithf "[FShade] cannot compose GeometryShader without vertex-count"
-
-
 
 
     /// composes two shaders respecting their stages.
