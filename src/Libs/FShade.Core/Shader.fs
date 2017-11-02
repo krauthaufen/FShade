@@ -2148,175 +2148,101 @@ module Shader =
                 member x.Count : Expr<int> = 
                     Expr.PropertyGet(Expr.Var stream, pCount) |> Expr.Cast 
 
-            let (<+>) (l : Range1i) (r : Range1i) =
-                let max =
-                    if l.Max = Int32.MaxValue || r.Max = Int32.MaxValue then Int32.MaxValue
-                    else l.Max + r.Max
 
-                Range1i(l.Min + r.Min, max)
-
-            open Aardvark.Base.Monads.State
-
-            type State =
-                {
-                    minVertices : int
-                    maxVertices : int
-
-                    vc : int
-
-                    minPrimitives : int
-                    maxPrimitives : int
-                }
-
-            [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-            module State =
-
-                let empty =
-                    {
-                        minVertices = 0
-                        maxVertices = 0
-                        vc = 0
-                        minPrimitives = 0
-                        maxPrimitives = 0
-
-                    }
-
-                let reset() = State.modify (fun s -> { s with vc = 0 })
-
-                let add(vc : int) = 
-                    State.modify (fun s ->
-                        if s.vc = vc - 1 then
-                            { s with
-                                minVertices = s.minVertices + 1
-                                maxVertices = if s.maxVertices = Int32.MaxValue then Int32.MaxValue else s.maxVertices + 1
-                                minPrimitives = s.minPrimitives + 1
-                                maxPrimitives = if s.maxPrimitives = Int32.MaxValue then Int32.MaxValue else s.maxPrimitives + 1
-                                vc = vc
-                            }
-                            
-                        else
-                            { s with
-                                minVertices = s.minVertices + 1
-                                maxVertices = if s.maxVertices = Int32.MaxValue then Int32.MaxValue else s.maxVertices + 1
-                                vc = s.vc + 1
-                            }
-                    )
-
-                let merge (vc : int) (l : State) (r : State) =
-                    if l.vc = r.vc then
-                        {
-                            minVertices = min l.minVertices r.minVertices
-                            maxVertices = max l.maxVertices r.maxVertices
-                            vc = l.vc
-                            minPrimitives = min l.minPrimitives r.minPrimitives
-                            maxPrimitives = max l.maxPrimitives r.maxPrimitives
-                        }
-                    else
-                        {
-                            vc = vc
-                            minPrimitives = min l.minPrimitives r.minPrimitives
-                            maxPrimitives = max l.maxPrimitives r.maxPrimitives
-                            minVertices = min l.minVertices r.minVertices
-                            maxVertices = max l.maxVertices r.maxVertices
-                        }
-                        
-                let kill() =
-                    State.modify (fun s -> { s with maxVertices = Int32.MaxValue; maxPrimitives = Int32.MaxValue })
-
-            
-
-            let rec primitiveCount (vc : int) (e : Expr) : State<State, unit> =
-                state {
-                    match e with
-                        | SpecificCall <@ emitVertex() @> _->
-                            do! State.add(vc)
-
-                        | SpecificCall <@ endPrimitive() @> _ | SpecificCall <@ restartStrip() @> _ ->
-                            do! State.reset()
-
-                        | Sequential(l,r) ->
-                            do! primitiveCount vc l
-                            do! primitiveCount vc r
-
-                        | IfThenElse(c,i,e) ->
-                            do! primitiveCount vc c
-                            
-                            let! s = State.get
-
-                            let mutable iState = s
-                            let mutable eState = s
-                            do (primitiveCount vc i).Run(&iState)
-                            do (primitiveCount vc e).Run(&eState)
-
-                            do! State.put (State.merge vc iState eState)
-
-                            
-                        | ForInteger(v, first, step, last, body) ->
-                            do! primitiveCount vc first
-                            do! primitiveCount vc step
-                            do! primitiveCount vc last
-                        
-                            match first, step, last with
-                                | Int32 first, Int32 step, Int32 last -> 
-                                    for i in [first .. step .. last] do
-                                        do! primitiveCount vc body
-                                | _ ->
-                                    let mutable inner = State.empty
-                                    (primitiveCount vc body).Run(&inner)
-                                    if inner.maxVertices <> 0 then
-                                        do! State.kill()
-                                        
-                        //| ForEach(v, s, b) ->
-                            
-
-                        | WhileLoop(guard, body) ->
-                            let mutable inner = State.empty
-                            (primitiveCount vc (Expr.Sequential(guard, body))).Run(&inner)
-                            if inner.maxVertices <> 0 then
-                                do! State.kill()
-                                
-                        | ShapeVar v -> ()
-                        | ShapeLambda(v, b) -> 
-                            do! primitiveCount vc b
-                        | ShapeCombination(o, args) ->  
-                            for a in args do
-                                 do! primitiveCount vc a
-                }
-
-
-            let getPrimitiveCount (vc : int) (e : Expr) =
-                let mutable state = State.empty
-                (primitiveCount vc e).Run(&state)
-                Range1i(state.minPrimitives, state.maxPrimitives)
-                
+            let inline private add (l : Option<'a>) (r : Option<'a>) =
+                match l, r with
+                    | Some l, Some r -> Some (l + r)
+                    | _ -> None
+                    
+            let inline private max (l : Option<'a>) (r : Option<'a>) =
+                match l, r with
+                    | Some l, Some r -> Some (max l r)
+                    | _ -> None
 
             type Stats =
                 {
+                    stripCount      : int
                     maxVertices     : Option<int>
                     maxPrimitives   : Option<int>
                     maxVC           : Option<int>
                 }
 
+                static member Create (stripCount : int) =
+                    { 
+                        stripCount = stripCount
+                        maxVertices = Some 0
+                        maxPrimitives = Some 0
+                        maxVC = Some 0
+                    }
+                    
+                member l.EmitVertex() =
+                    {
+                        stripCount = l.stripCount
+                        maxVertices = l.maxVertices |> Option.map (fun l -> l + 1)
+                        maxPrimitives =
+                            match l.maxPrimitives, l.maxVC with
+                                | Some mp, Some vc ->
+                                    if vc >= l.stripCount - 1 then
+                                        Some (mp + 1)
+                                    else
+                                        Some mp
+                                | _ ->
+                                    None
+                        maxVC = l.maxVC |> Option.map (fun v -> min l.stripCount (v + r))
+                    }
                 static member (+) (l : Stats, r : Stats) =
                     {
-                        maxVertices = 
-                            match l.maxVertices, r.maxVertices with
-                                | Some l, Some r -> Some (l + r)
-                                | None, _ -> None
-                                | _, None -> None
-                                
-                        maxPrimitives = 
-                            match l.maxPrimitives, r.maxPrimitives with
-                                | Some l, Some r -> Some (l + r)
-                                | None, _ -> None
-                                | _, None -> None
-                                
-                        maxVC = 
-                            match l.maxVC, r.maxVC with
-                                | Some l, Some r -> Some (l + r)
-                                | None, _ -> None
-                                | _, None -> None
+                        stripCount = min l.stripCount r.stripCount
+                        maxVertices = add l.maxVertices r.maxVertices 
+                        maxPrimitives = add l.maxPrimitives r.maxPrimitives 
+                        maxVC = add l.maxVC r.maxVC 
                     }
+                static member (|||) (l : Stats, r : Stats) =
+                    {
+                        stripCount = min l.stripCount r.stripCount
+                        maxVertices = max l.maxVertices r.maxVertices 
+                        maxPrimitives = max l.maxPrimitives r.maxPrimitives 
+                        maxVC = max l.maxVC r.maxVC 
+                    }
+
+            let rec tryGetUpperBound (e : Expr) =
+                match e with
+                    | Int32 v -> 
+                        Some v
+
+                    | SpecificCall <@ min @> (_,_,[l;r]) ->
+                        match tryGetUpperBound l, tryGetUpperBound r with
+                            | Some l, Some r -> Some (min l r)
+                            | l, None -> l
+                            | None, r -> r
+
+                    | SpecificCall <@ (+) @> (_,_,[l;r]) ->
+                        match tryGetUpperBound l, tryGetUpperBound r with
+                            | Some l, Some r -> Some (l + r)
+                            | _ -> None
+
+                    | SpecificCall <@ (-) @> (_,_,[l;r]) ->
+                        match tryGetUpperBound l, tryGetUpperBound r with
+                            | Some l, Some r -> Some (l - r)
+                            | _ -> None
+
+                    | IfThenElse(c, i, e) ->
+                        
+
+                    | _ -> None
+                        
+
+            let rec geometryStats (s : Stats) (primitiveVertices : int) (e : Expr) =
+                match e with
+                    | SpecificCall <@ emitVertex() @> _ ->
+                        s.EmitVertex()
+
+                    | SpecificCall <@ restartStrip() @> _ | SpecificCall <@ endPrimitive() @> _ ->
+                        { s with maxVC = Some 0 }
+
+                    | ForInteger(v, min, step, max, body) ->
+                        
+
                 
 
         let gsgs (lShader : Shader) (rShader : Shader) =
