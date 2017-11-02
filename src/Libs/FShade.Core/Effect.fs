@@ -525,13 +525,13 @@ module Effect =
             }
 
         let nopLine (p : Line<Vertex>) =
-            point {
+            line {
                 yield p.P0
                 yield p.P1
             }
 
         let nopTriangle (p : Triangle<Vertex>) =
-            point {
+            triangle {
                 yield p.P0
                 yield p.P1
                 yield p.P2

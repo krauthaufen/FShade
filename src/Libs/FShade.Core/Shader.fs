@@ -1012,13 +1012,20 @@ module private GeometryInfo =
                 stripCount = stripCount
                 info = Some Info.Zero
             }
+           
+        member x.RestartStrip() =
+            match x.info with
+                | Some info ->
+                    { x with info = Some { info with maxVC = 0 } }
+                | None ->
+                    x
                     
         member l.EmitVertex() =
-            {
-                stripCount = l.stripCount
-                info =
-                    match l.info with
-                        | Some i ->
+            match l.info with
+                | Some i ->
+                    {
+                        stripCount = l.stripCount
+                        info =
                             Some {
                                 maxVertices = i.maxVertices + 1
                                 maxPrimitives =
@@ -1028,9 +1035,9 @@ module private GeometryInfo =
                                         i.maxPrimitives
                                 maxVC = min l.stripCount (i.maxVC + 1)
                             }
-                        | None -> 
-                            None
-            }
+                    }
+                | None ->
+                    l
 
         static member Add (l : Stats, r : Stats) =
             {
@@ -1139,9 +1146,7 @@ module private GeometryInfo =
                 s.EmitVertex()
 
             | SpecificCall <@ restartStrip() @> _ | SpecificCall <@ endPrimitive() @> _ ->
-                match s.info with
-                    | Some i -> { s with info = Some { i with maxVC = 0 } }
-                    | None -> s
+                s.RestartStrip()
 
             | ForInteger(v, min, step, max, body) ->
                 let bodyStats = geometryStats (Stats.Create s.stripCount) body
@@ -1159,6 +1164,7 @@ module private GeometryInfo =
                                 res
                             | _ ->
                                 { s with info = None }
+
                     | None ->
                         { s with info = None }
                 
@@ -2221,27 +2227,24 @@ module Shader =
                         | 1 ->
                             x.p1 <- vi
                             x.vs <- 2
-                        | 2 ->
+                        | vs ->
                             x.p2 <- vi
-                            x.vs <- 3
+                            x.vs <- vs + 1
 
                             let bi = 3 * x.count
                             x.indices.[bi + 0] <- x.p0
                             x.indices.[bi + 1] <- x.p1
                             x.indices.[bi + 2] <- x.p2
                         
-                            // 0 1 2   2 1 3   2 3 4
-                            if x.count % 2 = 0 then
-                                x.p0 <- x.p2
-                                x.vs <- 2
-                            else
-                                x.p1 <- x.p2
-                                x.vs <- 2
-                        
-                            x.count <- x.count + 1
+                            let indexInStrip = vs - 3
 
-                        | _ ->
-                            ()
+                            // 0 1 2   2 1 3   2 3 4   4 3 5   4 5 6
+                            if indexInStrip % 2 = 0 then x.p0 <- x.p2
+                            else x.p1 <- x.p2
+                            x.count <- x.count + 1
+                            x.p2 <- -1
+                        
+
 
                 [<Inline>]
                 member x.Reset() =
@@ -2256,6 +2259,9 @@ module Shader =
                 [<Inline>]
                 member x.EndPrimitive() =
                     x.vs <- 0
+                    x.p0 <- -1
+                    x.p1 <- -1
+                    x.p2 <- -1
                 
                 [<Inline>]
                 member x.GetIndex(pi : int, fvi : int) =
