@@ -205,7 +205,7 @@ module ComputeShader =
     let private ofExprInternal (meth : MethodBase) (hash : string) (localSize : V3i) (body0 : Expr) =
         let body1, state = Preprocessor.preprocess localSize body0
         let body2 = Optimizer.ConstantFolding.evaluateConstants'' (fun m -> m.DeclaringType.FullName = "FShade.Primitives") body1
-
+        let body2 = Optimizer.liftInputs body2
 
         let mutable buffers = Map.empty
         let mutable images = Map.empty
@@ -257,7 +257,7 @@ module ComputeShader =
                     addBuffer name t true false
 
         for (name, p) in Map.toSeq state.outputs do
-            addBuffer name (p.paramType.MakeArrayType()) false true
+            addBuffer name p.paramType false true
 
 
 
