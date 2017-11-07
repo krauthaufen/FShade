@@ -774,13 +774,29 @@ module Compiler =
     let toCVarOfTypeS (v : Var) (t : CType) =
         State.custom (fun s ->
             match Map.tryFind v s.variables with
-                | Some v -> s, v
+                | Some v -> 
+                    s, v
+
                 | None ->
                     match Map.tryFind v.Name s.nameIndices with
                         | Some index ->
-                            let name = v.Name + string index
+                            let mutable index = index
+                            let mutable name = v.Name + string index
+
+                            let rec findName (index : int) (indices : Map<string, int>) =
+                                let n = v.Name + string index
+                                match Map.tryFind n indices with
+                                    | Some i ->
+                                        findName (index + 1) indices
+                                    | None ->
+                                        let indices = Map.add n 1 indices
+                                        let indices = Map.add v.Name (index + 1) indices
+                                        n, indices
+
+                            let name, indices = findName index s.nameIndices
+
                             let res = { ctype = t; name = name }
-                            let state = { s with nameIndices = Map.add v.Name (index + 1) s.nameIndices; variables = Map.add v res s.variables }
+                            let state = { s with nameIndices = indices; variables = Map.add v res s.variables }
                             state, res
                         | None ->
                             let res = { ctype = t; name = v.Name }
