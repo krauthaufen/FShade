@@ -2263,6 +2263,112 @@ module Optimizer =
         let hoistImperative (e : Expr) =
             processStatement e
 
+    module CSE =
+        
+        type ExprPointer = { self : Expr; parent : Option<ExprPointer> }
+
+        type State = 
+            {
+                inputs : Set<Var>
+                inputVars : Map<string, Var>
+            }
+
+        let getVar (name : string) (t : Type) =
+            State.custom (fun s ->
+                match Map.tryFind name s.inputVars with
+                    | Some v -> s, v
+                    | None ->
+                        let v = Var(name, t)
+                        let s = { s with inputVars = Map.add name v s.inputVars; inputs = Set.add v s.inputs }
+                        s, v
+            )
+        
+        let rec substituteInputs (e : Expr) =
+            state {
+                match e with
+                    | ReadInput(ParameterKind.Input,name,index) ->
+                        match index with
+                            | Some index ->
+                                let! v = getVar name (e.Type.MakeArrayType())
+                                return Expr.ArrayAccess(Expr.Var v, index)
+
+                            | None ->
+                                let! v = getVar name e.Type
+                                return Expr.Var v
+
+                    | CallFunction(f, args) ->
+                        let! args = args |> List.mapS substituteInputs
+                        let! body = substituteInputs f.functionBody
+                        let f = { f with functionBody = body }
+                        return Expr.CallFunction(f, args)
+
+                    | ShapeCombination(o, args) ->
+                        let! args = args |> List.mapS substituteInputs
+                        return RebuildShapeCombination(o, args)
+
+                    | ShapeLambda(v,b) ->
+                        let! b = substituteInputs b
+                        return Expr.Lambda(v, b)
+
+                    | ShapeVar v ->
+                        return Expr.Var v
+            }
+
+        let rec getInputPointers (parent : Option<ExprPointer>) (e : Expr) =
+            state {
+                match e with
+//                    | ReadInput(ParameterKind.Input,name,index) ->
+//                        let! s = State.get
+//                        let v = s.inputs.[name]
+//
+//                        match index with
+//                            | Some index ->
+//                                        
+//                            | None ->
+//                                
+//                        return MapExt.ofList [ name, [{ self = e; parent = parent }]]
+
+                    | ShapeCombination(o, args) ->
+                        let p = { self = e; parent = parent }
+                        let mutable res = MapExt.empty
+                        for a in args do
+                            let! inner = getInputPointers (Some p) a
+                            res <- MapExt.unionWith (@) res inner
+
+                        return res
+
+                    | ShapeLambda(_,b) ->
+                        return! getInputPointers (Some { self = e; parent = parent }) b
+
+                    | ShapeVar v ->
+                        let! s = State.get
+                        if Set.contains v s.inputs then
+                            return MapExt.ofList [ v, [{ self = e; parent = parent }]]
+                        else
+                            return MapExt.empty
+            }
+
+        let findIndexedCommonSubExpressions (body : Expr) =
+            let pointers =
+                state {
+                    let! e = substituteInputs body
+                    return! getInputPointers None e
+                }
+
+            let mutable state = { inputs = Set.empty; inputVars = Map.empty }
+            let pointers = pointers.Run(&state)
+
+            for (v, ptrs) in MapExt.toSeq pointers do
+                
+
+                
+                ()
+
+
+
+
+
+
 
     /// creates a new expression only containing e's visible side-effects.
     /// NOTE: all methods are assumed to be pure (except for the ones returning void/unit)
