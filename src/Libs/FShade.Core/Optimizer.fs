@@ -12,6 +12,163 @@ open Microsoft.FSharp.Reflection
 open Aardvark.Base
 open FShade.Imperative
 
+module PrettyPrinter =
+    open Aardvark.Base.Monads.State
+
+    let rec print (e : Expr) =
+        match e with
+            | IfThenElse(c,i,Unit) ->
+                let c = print c
+                let i = print i
+                sprintf "if %s then\r\n%s" c (String.indent 1 i)
+               
+            | IfThenElse(c,i,e) ->
+                let c = print c
+                let i = print i
+                let e = print e
+                sprintf "if %s then\r\n%s\r\nelse\r\n%s" c (String.indent 1 i) (String.indent 2 i)
+               
+            | ForInteger(v, start, step, stop, body) ->
+                let start = print start
+                let stop = print stop
+                let body = print body
+                match step with
+                    | Int32 1 ->
+                        sprintf "for %s in %s .. %s do\r\n%s" v.Name start stop (String.indent 1 body)
+                    | _ ->
+                        let step = print step
+                        sprintf "for %s in %s .. %s .. %s do\r\n%s" v.Name start step stop (String.indent 1 body)
+                             
+            | ForEach(v, seq, body) ->
+                let seq = print seq
+                let body = print body
+                sprintf "for %s in %s do\r\n%s" v.Name seq (String.indent 1 body)
+
+            | WhileLoop(guard, body) ->
+                let guard = print guard
+                let body = print body
+                sprintf "while %s do\r\n%s" guard (String.indent 1 body)
+                
+            | Lambdas(args, body) ->
+                let args = args |> List.map (List.map (fun v -> v.Name) >> String.concat ", " >> sprintf "(%s)") |> String.concat " "
+                let body = print body
+                sprintf "fun %s ->\r\n%s" args (String.indent 1 body)
+                  
+            | ReadInput(kind, name, index) ->
+                let indexer = 
+                    match index with
+                        | Some idx -> print idx |> sprintf ".[%s]"
+                        | None -> ""
+                sprintf "%s%s" name indexer
+
+            | WriteOutputs outputs ->
+                outputs |> Map.toSeq |> Seq.map (fun (name,(index, value)) ->
+                    let indexer = 
+                        match index with
+                            | Some idx -> print idx |> sprintf ".[%s]"
+                            | None -> ""
+
+                    let value = print value
+                    sprintf "%s%s = %s" name indexer value
+                )
+                |> String.concat "\r\n"
+
+            | Call(None, mi, args) ->
+                let args = args |> List.map print |> String.concat ", "
+                sprintf "%s(%s)" mi.Name args
+
+            | Call(Some t, mi, args) ->
+                let t = print t
+                let args = args |> List.map print |> String.concat ", "
+                sprintf "%s.%s(%s)" t mi.Name args
+            
+            | Let(v,e,b) ->
+                let e = print e
+                let b = print b
+                if v.IsMutable then
+                    sprintf "let mutable %s = %s\r\n%s" v.Name e b
+                else
+                    sprintf "let %s = %s\r\n%s" v.Name e b
+
+            | Sequential(l,r) ->
+                let l = print l
+                let r = print r
+                sprintf "%s\r\n%s" l r
+
+            | Var v ->
+                v.Name
+
+            | FieldGet(None, f) ->
+                sprintf "%s" f.Name
+
+            | FieldGet(Some t, f) ->
+                let t = print t
+                sprintf "%s.%s" t f.Name
+                
+            | PropertyGet(None, p, indices) ->
+                let indexers =
+                    match indices with
+                        | [] -> ""
+                        | i -> i |> List.map print |> String.concat ", " |> sprintf ".[%s]"
+                sprintf "%s%s" p.Name indexers
+
+            | PropertyGet(Some t, f, indices) ->
+                let indexers =
+                    match indices with
+                        | [] -> ""
+                        | i -> i |> List.map print |> String.concat ", " |> sprintf ".[%s]"
+
+                let t = print t
+                if f.Name = "Item" && not (List.isEmpty indices) then
+                    sprintf "%s%s" t indexers
+                else
+                    sprintf "%s.%s%s" t f.Name indexers
+
+            | VarSet(v, e) ->
+                let e = print e
+                sprintf "%s <- %s" v.Name e
+
+            | FieldSet(None, f, value) ->
+                let value = print value
+                sprintf "%s <- %s" f.Name value 
+
+            | FieldSet(Some t, f, value) ->
+                let t = print t
+                let value = print value
+                sprintf "%s.%s <- %s" t f.Name value 
+
+            | PropertySet(None, p, indices, value) ->
+                let indexers =
+                    match indices with
+                        | [] -> ""
+                        | i -> i |> List.map print |> String.concat ", " |> sprintf ".[%s]"
+
+                let value = print value
+                sprintf "%s%s <- %s" p.Name indexers value
+                
+            | PropertySet(Some t, p, indices, value) ->
+                let indexers =
+                    match indices with
+                        | [] -> ""
+                        | i -> i |> List.map print |> String.concat ", " |> sprintf ".[%s]"
+
+                let value = print value
+                let t = print t
+                if p.Name = "Item" && not (List.isEmpty indices) then
+                    sprintf "%s.%s <- %s" t indexers value
+                else
+                    sprintf "%s.%s%s <- %s" t p.Name indexers value
+
+            | Value(v,_) ->
+                sprintf "%A" v
+
+            | ShapeCombination(o, args) ->
+                let args = args |> List.map print |> String.concat ", "
+                sprintf "%A(%s)" o args
+
+            | _ ->
+                failwith ""
+
 
 [<AutoOpen>]
 module Optimizer =
@@ -2265,68 +2422,47 @@ module Optimizer =
 
     module CSE =
         
+        module List =
+            let rec mapOption (f : 'a -> Option<'b>) (l : list<'a>) =
+                match l with
+                    | [] -> Some []
+                    | h :: t ->
+                        match f h with
+                            | Some h ->
+                                match mapOption f t with
+                                    | Some t -> Some (h :: t)
+                                    | None -> None
+                            | None ->
+                                None
+
         type ExprPointer = { self : Expr; parent : Option<ExprPointer> }
 
-        type State = 
-            {
-                inputs : Set<Var>
-                inputVars : Map<string, Var>
-            }
+//        type ExprPointer =
+//            | Input of name : string * index : Option<Expr> * parent : Option<ExprPointer>
+//            | Expr of e : Expr * parent : Option<ExprPointer>
 
-        let getVar (name : string) (t : Type) =
-            State.custom (fun s ->
-                match Map.tryFind name s.inputVars with
-                    | Some v -> s, v
-                    | None ->
-                        let v = Var(name, t)
-                        let s = { s with inputVars = Map.add name v s.inputVars; inputs = Set.add v s.inputs }
-                        s, v
-            )
-        
-        let rec substituteInputs (e : Expr) =
-            state {
-                match e with
-                    | ReadInput(ParameterKind.Input,name,index) ->
-                        match index with
-                            | Some index ->
-                                let! v = getVar name (e.Type.MakeArrayType())
-                                return Expr.ArrayAccess(Expr.Var v, index)
-
-                            | None ->
-                                let! v = getVar name e.Type
-                                return Expr.Var v
-
-                    | CallFunction(f, args) ->
-                        let! args = args |> List.mapS substituteInputs
-                        let! body = substituteInputs f.functionBody
-                        let f = { f with functionBody = body }
-                        return Expr.CallFunction(f, args)
-
-                    | ShapeCombination(o, args) ->
-                        let! args = args |> List.mapS substituteInputs
-                        return RebuildShapeCombination(o, args)
-
-                    | ShapeLambda(v,b) ->
-                        let! b = substituteInputs b
-                        return Expr.Lambda(v, b)
-
-                    | ShapeVar v ->
-                        return Expr.Var v
-            }
 
         let rec getInputPointers (parent : Option<ExprPointer>) (e : Expr) =
             state {
                 match e with
-//                    | ReadInput(ParameterKind.Input,name,index) ->
-//                        let! s = State.get
-//                        let v = s.inputs.[name]
-//
-//                        match index with
-//                            | Some index ->
-//                                        
-//                            | None ->
-//                                
-//                        return MapExt.ofList [ name, [{ self = e; parent = parent }]]
+                    | ReadInput(ParameterKind.Input,name,index) ->
+                        return MapExt.ofList [name, [(index, parent)]]
+                           
+                    | WriteOutputs outputs ->
+                        let mutable res = MapExt.empty
+                        for (_,(i, v)) in Map.toSeq outputs do
+                            match i with
+                                | Some i ->
+                                    let! ip = getInputPointers (Some { self = e; parent = parent}) i
+                                    res <- MapExt.unionWith (@) res ip
+                                | None ->
+                                    ()
+
+                            let! vp = getInputPointers (Some { self = e; parent = parent}) v
+                            res <- MapExt.unionWith (@) res vp
+
+
+                        return res
 
                     | ShapeCombination(o, args) ->
                         let p = { self = e; parent = parent }
@@ -2341,32 +2477,135 @@ module Optimizer =
                         return! getInputPointers (Some { self = e; parent = parent }) b
 
                     | ShapeVar v ->
-                        let! s = State.get
-                        if Set.contains v s.inputs then
-                            return MapExt.ofList [ v, [{ self = e; parent = parent }]]
-                        else
-                            return MapExt.empty
+                        return MapExt.empty
             }
 
         let findIndexedCommonSubExpressions (body : Expr) =
-            let pointers =
-                state {
-                    let! e = substituteInputs body
-                    return! getInputPointers None e
-                }
-
-            let mutable state = { inputs = Set.empty; inputVars = Map.empty }
+            let pointers = getInputPointers None body
+            let mutable state = ()
             let pointers = pointers.Run(&state)
 
+            let removeIndex (e : Expr) =
+                match e with
+                    | WriteOutputs _ ->
+                        None
+
+                    | _ ->
+                        let mutable uniqueIndex = None
+                        let mutable success = true
+                        let res = 
+                            e.SubstituteReads(fun kind typ name index ->
+                                match kind, index with
+                                    | ParameterKind.Input, Some index ->
+                                        let iHash = Expr.ComputeHash index
+                                        match uniqueIndex with
+                                            | Some (hash, i) ->
+                                                if hash <> iHash then
+                                                    success <- false
+                                            | None ->
+                                                uniqueIndex <- Some(iHash, index)
+
+
+                                        Expr.Var(Var(name, typ)) |> Some
+                                    | _ ->
+                                        None
+                            )
+                        if success then
+                            match uniqueIndex with
+                                | Some(_,i) ->
+                                    Some (i, res)
+                                | None ->
+                                    None
+                        else
+                            None
+
+            let allEqualModIndex (es : list<ExprPointer>) =
+                match es |> List.map (fun p -> p.self) |> List.mapOption removeIndex with
+                    | Some indicesAndValues ->
+                        let hashes = indicesAndValues |> List.map (snd >> Expr.ComputeHash)
+                        match hashes with
+                            | h :: t -> List.forall ((=) h) t
+                            | _ -> true
+                    | None ->
+                        false
+
+
+            let mutable before = Map.empty
+            let mutable replacements = HMap.empty
+
             for (v, ptrs) in MapExt.toSeq pointers do
-                
+                let mutable last = None
+                let mutable parents =  ptrs |> List.mapOption snd
+                        
+                while Option.isSome parents && allEqualModIndex parents.Value do
+                    last <- parents
+                    parents <- List.mapOption (fun e -> e.parent) parents.Value
+
+                match last with
+                    | Some ((h::_) as last) ->
+                        let last = last |> List.map (fun l -> l.self)
+
+                        let h = 
+                            h.self.SubstituteReads(fun kind typ name index ->
+                                Expr.ReadInput(kind, typ, name) |> Some
+                            )
+
+                        let mutable names = Set.empty
+
+                        let repl =
+                            last |> List.map (fun e ->
+                                let mutable index = Unchecked.defaultof<Expr>
+                 
+                                e.SubstituteReads(fun kind typ name idx ->
+                                    match kind, idx with
+                                        | ParameterKind.Input, Some i ->
+                                            index <- i
+                                            names <- Set.add name names
+                                        | _ -> 
+                                            ()
+                                    None
+                                ) |> ignore
+
+                                let inputName = names |> String.concat ""
+                                e, Expr.ReadInput(ParameterKind.Input, e.Type, inputName, index)
+                            ) |> HMap.ofList
+
+                        replacements <- HMap.union replacements repl
+                        let inputName = names |> String.concat ""
+                        before <- Map.add inputName h before    
+                        
+
+                    | _ ->
+                        ()
+
 
                 
                 ()
 
+            let rec apply (e : Expr) =
+                match HMap.tryFind e replacements with
+                    | Some r -> 
+                        r
+                    | None ->
+                        match e with
+                            | ShapeCombination(o, args) ->
+                                RebuildShapeCombination(o, List.map apply args)
+                            | ShapeLambda(v,b) ->
+                                Expr.Lambda(v, apply b)
+                            | ShapeVar v ->
+                                Expr.Var v
+           
+            let body = apply body
+            let vs = Expr.WriteOutputs(before |> Map.map (fun _ e -> None, e))
+            
+            printfn "VERTEX"
+            printfn "%s" (PrettyPrinter.print vs)
 
+            
+            printfn "GEOMETRY"
+            printfn "%s" (PrettyPrinter.print body)
 
-
+            ()
 
 
 

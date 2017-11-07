@@ -68,11 +68,11 @@ module UtiliyFunctions =
             return V4d.IIII * g v.hugo.X v.hugo.Y * float c
         }
 
-    let gs0 (v : Triangle<Vertex1>) =
+    let gs0 (v : Triangle<Vertex>) =
         triangle {
-            yield { v.P0 with hugo = V3d.IOO }
-            yield { v.P1 with hugo = V3d.OIO }
-            yield { v.P2 with hugo = V3d.OOI }
+            yield { v.P0 with pos = 3.0 * v.P0.pos * v.P0.hugo.X }
+            yield { v.P1 with pos = 3.0 * v.P1.pos * v.P0.hugo.X }
+            yield { v.P2 with pos = 3.0 * v.P2.pos * v.P0.hugo.X }
         }
 
     let gs1 (v : Triangle<Vertex>) =
@@ -121,10 +121,12 @@ module UtiliyFunctions =
         let effect =
             Effect.compose [
                 Effect.ofFunction gs0
-                Effect.ofFunction gs1
+                //Effect.ofFunction gs1
             ]
 
-        print [ "Heinz", typeof<int> ] effect
+        effect.GeometryShader.Value.shaderBody |> Optimizer.CSE.findIndexedCommonSubExpressions
+
+        //print [ "Heinz", typeof<int> ] effect
         System.Environment.Exit 0
 
         let effect = 
