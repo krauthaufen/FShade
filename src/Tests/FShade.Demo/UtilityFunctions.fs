@@ -17,10 +17,17 @@ module UtiliyFunctions =
 
     type Vertex = 
         { 
+            [<SourceVertexIndex>] i : int
             [<Position>] pos : V4d
             [<Semantic("Hugo")>] hugo: V3d 
         }
-        
+ 
+    type Vertex1 = 
+        { 
+            [<Position>] pos : V4d
+            [<Semantic("Hugo")>] hugo: V3d 
+        }
+       
     [<ReflectedDefinition; AutoOpen>]
     module Helpers =
         [<Inline>]
@@ -46,10 +53,22 @@ module UtiliyFunctions =
             // should be removed
             monster 12.0
 
-            return V4d.IIII * g v.hugo.X v.hugo.Y
+
+            let a = 10 * int v.pos.X
+            let b = a * 2
+            let a = 100 * int v.pos.Y
+            let b = b + a * 2
+            let a1 = 1000 * int v.pos.Z
+
+
+            let c = b + a1
+
+
+
+            return V4d.IIII * g v.hugo.X v.hugo.Y * float c
         }
 
-    let gs0 (v : Triangle<Vertex>) =
+    let gs0 (v : Triangle<Vertex1>) =
         triangle {
             yield { v.P0 with hugo = V3d.IOO }
             yield { v.P1 with hugo = V3d.OIO }
@@ -68,7 +87,7 @@ module UtiliyFunctions =
 
         }
 
-    let print (effect : Effect) =
+    let print (add : list<string * System.Type>) (effect : Effect) =
         match effect.LastShader with
             | Some shader ->
                 let mutable index = 0
@@ -77,12 +96,15 @@ module UtiliyFunctions =
                     index <- i + 1
                     i
 
+                let existing = shader.shaderOutputs |> Map.remove Intrinsics.SourceVertexIndex |> Map.map (fun name desc -> desc.paramType, id())
+                let additional = add |> Map.ofList |> Map.map (fun name t -> t, id())
+
                 let config =
                     {
                         depthRange      = Range1d(-1.0, 1.0)
                         flipHandedness  = false
                         lastStage       = shader.shaderStage
-                        outputs         = shader.shaderOutputs |> Map.map (fun name desc -> desc.paramType, id())
+                        outputs         = Map.union existing additional 
                     }
                 let glsl = 
                     effect
@@ -100,10 +122,9 @@ module UtiliyFunctions =
             Effect.compose [
                 Effect.ofFunction gs0
                 Effect.ofFunction gs1
-                Effect.ofFunction gs1
             ]
 
-        print effect
+        print [ "Heinz", typeof<int> ] effect
         System.Environment.Exit 0
 
         let effect = 

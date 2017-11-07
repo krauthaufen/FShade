@@ -526,15 +526,14 @@ module Effect =
 
         let nopLine (p : Line<Vertex>) =
             line {
-                yield p.P0
-                yield p.P1
+                for i in 0 .. 1 do
+                    yield p.[i]
             }
 
         let nopTriangle (p : Triangle<Vertex>) =
             triangle {
-                yield p.P0
-                yield p.P1
-                yield p.P2
+                for i in 0 .. 2 do
+                    yield p.[i]
             }
 
         let nopGS =
@@ -579,7 +578,12 @@ module Effect =
                     gs
 
                 | Some vs, Some gs ->
-                    failwithf "[FShade] layering GS not implemented atm."
+                    match Map.tryFind gs.shaderInputTopology.Value Helpers.nopGS with
+                        | Some nop ->
+                            let vs = Shader.compose2 nop vs
+                            Shader.compose2 vs gs
+                        | None ->
+                            failwithf "[FShade] bad topology for layered shader: %A" gs.shaderInputTopology.Value
 
         let geometryShader =
             let layer = Var("layer", typeof<int>)

@@ -582,13 +582,13 @@ module private Preprocessor =
 
                 // tri.P0.pos -> ReadInput(pos, 0)
                 | InputRead vertexType (PrimitiveVertexGet(p, index), semantic, parameter) ->
-                    if semantic = Intrinsics.SourceVertexIndex then
-                        let! index = preprocessNormalS index
-                        return index
-                    else
-                        let! index = preprocessNormalS index
-                        do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
-                        return Expr.ReadInput(ParameterKind.Input, e.Type, semantic, index)
+//                    if semantic = Intrinsics.SourceVertexIndex then
+//                        let! index = preprocessNormalS index
+//                        return index
+//                    else
+                    let! index = preprocessNormalS index
+                    do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
+                    return Expr.ReadInput(ParameterKind.Input, e.Type, semantic, index)
 
                 // real vertex-read needed
                 | PrimitiveVertexGet(p, index) ->
@@ -600,12 +600,12 @@ module private Preprocessor =
                             state {
                                 let interpolation = f.Interpolation
                                 let semantic = f.Semantic 
-                                if semantic = Intrinsics.SourceVertexIndex then
-                                    return index
-                                else
-                                    let parameter = { paramType = f.PropertyType; paramInterpolation = interpolation }
-                                    do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
-                                    return Expr.ReadInput(ParameterKind.Input, f.PropertyType, semantic, index)
+//                                if semantic = Intrinsics.SourceVertexIndex then
+//                                    return index
+//                                else
+                                let parameter = { paramType = f.PropertyType; paramInterpolation = interpolation }
+                                do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
+                                return Expr.ReadInput(ParameterKind.Input, f.PropertyType, semantic, index)
                             }
                         )
                         
@@ -622,11 +622,11 @@ module private Preprocessor =
 
                     match index with
                         | Some index -> 
-                            if semantic = Intrinsics.SourceVertexIndex then
-                                return index
-                            else
-                                do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
-                                return Expr.ReadInput(ParameterKind.Input, parameter.paramType, semantic, index)
+//                            if semantic = Intrinsics.SourceVertexIndex then
+//                                return index
+//                            else
+                            do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
+                            return Expr.ReadInput(ParameterKind.Input, parameter.paramType, semantic, index)
                         | _ ->
                             do! State.readInput semantic parameter
                             return Expr.ReadInput(ParameterKind.Input, parameter.paramType, semantic)
@@ -1313,6 +1313,7 @@ module Shader =
                 
             ShaderStage.Geometry,
                 Map.ofList [
+                    Intrinsics.SourceVertexIndex, typeof<int[]>
                     Intrinsics.PointSize, typeof<float>
                     Intrinsics.ClipDistance, typeof<float[]>
                     Intrinsics.PrimitiveId, typeof<int>
@@ -1880,14 +1881,19 @@ module Shader =
     /// translates a shader to an EntryPoint which can be used for compiling
     /// the shader to a CAst
     let toEntryPoint (prev : Option<Shader>) (s : Shader) (next : Option<Shader>) =
+        let mutable hasSourceVertexIndex = false
         let inputs = 
-            s.shaderInputs |> Map.toList |> List.map (fun (n,i) -> 
-                { 
-                    paramName = n
-                    paramSemantic = n
-                    paramType = i.paramType
-                    paramDecorations = Set.ofList [ParameterDecoration.Interpolation i.paramInterpolation]
-                }
+            s.shaderInputs |> Map.toList |> List.choose (fun (n,i) -> 
+                if s.shaderStage = ShaderStage.Geometry && n = Intrinsics.SourceVertexIndex then
+                    hasSourceVertexIndex <- true
+                    None
+                else
+                    Some { 
+                        paramName = n
+                        paramSemantic = n
+                        paramType = i.paramType
+                        paramDecorations = Set.ofList [ParameterDecoration.Interpolation i.paramInterpolation]
+                    }
             )
 
         let outputs = 
@@ -1917,6 +1923,19 @@ module Shader =
         let prevStage = prev |> Option.map stage
         let nextStage = next |> Option.map stage
 
+        let body =
+            if hasSourceVertexIndex then
+                s.shaderBody.SubstituteReads(fun kind typ name index ->
+                    match kind, index with
+                        | ParameterKind.Input, Some i when name = Intrinsics.SourceVertexIndex ->
+                            Some i
+                        | _ ->
+                            None
+                
+                )
+            else
+                s.shaderBody
+
   
         {
             conditional = s.shaderStage |> string |> Some
@@ -1925,7 +1944,7 @@ module Shader =
             outputs     = outputs
             uniforms    = uniforms
             arguments   = []
-            body        = s.shaderBody
+            body        = body
             decorations = 
                 [
                     yield EntryDecoration.Stages { 
@@ -2400,16 +2419,6 @@ module Shader =
                 | ShaderOutputVertices.Computed count | ShaderOutputVertices.UserGiven count ->
 
                     let lOutputTopology = lShader.shaderOutputTopology.Value
-
-//                    let lOutputVertices =
-//                        match lOutputTopology with
-//                            | OutputTopology.Points -> 1
-//                            | OutputTopology.LineStrip -> 2
-//                            | OutputTopology.TriangleStrip -> 3
-//
-//                    
-//                    let primCount = getPrimitiveCount lOutputVertices lShader.shaderBody
-//                    printfn "primCount: %A" primCount
 
 
                     // pass all needed inputs along
