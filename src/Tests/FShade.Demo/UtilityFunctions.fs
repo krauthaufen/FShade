@@ -15,6 +15,9 @@ module UtiliyFunctions =
         member x.B : float = x?B
         member x.AB : float = x?AB
 
+        member x.X : M44d = x?X
+        member x.Y : M44d = x?Y
+
     type Vertex = 
         { 
             [<SourceVertexIndex>] i : int
@@ -40,12 +43,13 @@ module UtiliyFunctions =
             let x = 10.0 * FShade.Imperative.ExpressionExtensions.ShaderIO.ReadInput<float>(FShade.Imperative.ParameterKind.Input, "SomeInput")
             a + b * uniform.A + x
   
+        [<Inline>]
         let g (a : float) (b : float) =
             f a a + uniform.AB
 
     let vs (v : Vertex) =
         vertex {
-            return { v with pos = uniform.A * v.pos }
+            return { v with pos = (uniform.X * uniform.Y) * v.pos }
         }
 
     let shader (v : Vertex) =
@@ -54,11 +58,11 @@ module UtiliyFunctions =
             monster 12.0
 
 
-            let a = 10 * int v.pos.X
+            let a = 10 // * int v.pos.X
             let b = a * 2
-            let a = 100 * int v.pos.Y
+            let a = 100 //* int v.pos.Y
             let b = b + a * 2
-            let a1 = 1000 * int v.pos.Z
+            let a1 = 1000 //* int v.pos.Z
 
 
             let c = b + a1
@@ -70,10 +74,16 @@ module UtiliyFunctions =
 
     let gs0 (v : Triangle<Vertex>) =
         triangle {
-            yield { v.P0 with pos = 3.0 * v.P0.pos * v.P0.hugo.X }
-            yield { v.P1 with pos = 3.0 * v.P1.pos * v.P0.hugo.X }
-            yield { v.P2 with pos = 3.0 * v.P2.pos * v.P0.hugo.X }
+
+            let a = 3.0 * v.P0.pos * v.P0.hugo.X
+            let b = 3.0 * v.P1.pos * v.P1.hugo.X
+            let c = 3.0 * v.P2.pos * v.P2.hugo.X
+
+            yield { v.P0 with pos = a + b; hugo = v.P0.pos.XYZ + v.P0.hugo }
+            yield { v.P1 with pos = b + c; hugo = v.P1.pos.XYZ + v.P1.hugo }
+            yield { v.P2 with pos = c + a; hugo = v.P2.pos.XYZ + v.P2.hugo }
         }
+
 
     let gs1 (v : Triangle<Vertex>) =
         triangle {
@@ -106,28 +116,43 @@ module UtiliyFunctions =
                         lastStage       = shader.shaderStage
                         outputs         = Map.union existing additional 
                     }
+
+                let glsl410 =
+                    GLSL.Backend.Create {
+                        version                 = System.Version(4,1)
+                        enabledExtensions       = Set.ofList [ ]
+                        createUniformBuffers    = true
+                        createBindings          = true
+                        createDescriptorSets    = true
+                        stepDescriptorSets      = false
+                        createInputLocations    = true
+                        createPerStageUniforms  = false
+                        reverseMatrixLogic      = true
+                    }
+
                 let glsl = 
                     effect
                         // compile the thing
                         |> Effect.toModule config
-                        |> ModuleCompiler.compileGLSL410
+                        |> ModuleCompiler.compileGLSL glsl410
+
                 printfn "%s" glsl.code
 
             | None ->
                 ()
 
     let run() =
-
-        let effect =
-            Effect.compose [
-                Effect.ofFunction gs0
-                //Effect.ofFunction gs1
-            ]
-
-        effect.GeometryShader.Value.shaderBody |> Optimizer.CSE.findIndexedCommonSubExpressions
-
-        //print [ "Heinz", typeof<int> ] effect
-        System.Environment.Exit 0
+//
+//        let effect =
+//            Effect.compose [
+//                Effect.ofFunction gs0
+//                //Effect.ofFunction gs1
+//            ]
+//
+//        effect.GeometryShader.Value.shaderBody |> Optimizer.CSE.findIndexedCommonSubExpressions
+//
+//        //print [ "Heinz", typeof<int> ] effect
+//        System.Environment.Exit 0
 
         let effect = 
             Effect.compose [
@@ -135,26 +160,22 @@ module UtiliyFunctions =
                 Effect.ofFunction shader
             ]
 
-        let glsl = 
-            effect
-                // decompose derived uniforms here
-                |> Effect.substituteUniforms (fun name typ index ->
-                    if name = "AB" then
-                        let a = Expr.ReadInput<float>(ParameterKind.Uniform, "A")
-                        let b = Expr.ReadInput<float>(ParameterKind.Uniform, "B")
-                        Some <@@ (%a) * (%b) @@>
-                    else
-                        None
-                   )
-                // one of the uniforms gets layered
-                |> Effect.toLayeredEffect 2 (Set.ofList [ "A" ]) InputTopology.Triangle
+        effect
+            // decompose derived uniforms here
+            |> Effect.substituteUniforms (fun name typ index ->
+                if name = "AB" then
+                    let a = Expr.ReadInput<float>(ParameterKind.Uniform, "A")
+                    let b = Expr.ReadInput<float>(ParameterKind.Uniform, "B")
+                    Some <@@ (%a) * (%b) @@>
+                else
+                    None
+                )
+            // one of the uniforms gets layered
+            |> Effect.toLayeredEffect 2 (Set.ofList [ "A" ]) InputTopology.Triangle
                 
-                // compile the thing
-                |> Effect.toModule (EffectConfig.ofList [Intrinsics.Color, typeof<V4d>, 0])
-                |> ModuleCompiler.compileGLSL410
-
-        printfn "%s" glsl.code
-//
+            // compile the thing
+            |> print []
+////
 //        let e =
 //            <@
 //                let thing =

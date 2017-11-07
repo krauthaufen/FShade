@@ -368,7 +368,26 @@ module Compiler =
                     let rt = r.ctype 
                     match lt, rt with
                         | CMatrix _, CMatrix _              -> CMulMatMat(ct, l, r) |> Some
-                        | CMatrix _, CVector _              -> CMulMatVec(ct, l, r) |> Some
+                        | CMatrix _, CVector _              ->
+                            
+                            let rec etractMatrices (e : CExpr) =
+                                match e with
+                                    | CMulMatMat(_, lm, rm) ->
+                                        etractMatrices lm @ etractMatrices rm
+                                    | _ ->
+                                        [e]
+                             
+                            let mats = etractMatrices l
+
+                            let mul (m : CExpr) (v : CExpr) =
+                                let rType =
+                                    match m.ctype with
+                                        | CMatrix(t, r, c) -> CVector(t, r)
+                                        | t -> failwithf "[FShade] not a matrix type: %A" t
+                                CMulMatVec(rType, m, v)
+
+                            List.foldBack mul mats r |> Some
+
                         | CVector _, CMatrix(b,rows,cols)   -> CMulMatVec(ct, CTranspose(CMatrix(b,cols,rows), r), l) |> Some
                         | _                                 -> CExpr.CMul(ct, l, r) |> Some
 

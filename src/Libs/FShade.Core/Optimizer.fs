@@ -2420,6 +2420,7 @@ module Optimizer =
         let hoistImperative (e : Expr) =
             processStatement e
 
+
     module CSE =
         
         module List =
@@ -2436,11 +2437,6 @@ module Optimizer =
                                 None
 
         type ExprPointer = { self : Expr; parent : Option<ExprPointer> }
-
-//        type ExprPointer =
-//            | Input of name : string * index : Option<Expr> * parent : Option<ExprPointer>
-//            | Expr of e : Expr * parent : Option<ExprPointer>
-
 
         let rec getInputPointers (parent : Option<ExprPointer>) (e : Expr) =
             state {
