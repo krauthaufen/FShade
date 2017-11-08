@@ -63,6 +63,7 @@ type EntryDecoration =
     | OutputTopology of OutputTopology
     | OutputVertices of int
     | LocalSize of V3i
+    | Invocations of int
 
 type EntryPoint =
     {

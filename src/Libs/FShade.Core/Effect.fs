@@ -586,8 +586,7 @@ module Effect =
                             failwithf "[FShade] bad topology for layered shader: %A" gs.shaderInputTopology.Value
 
         let geometryShader =
-            let layer = Var("layer", typeof<int>)
-
+            let layer = Expr.ReadInput(ParameterKind.Input, typeof<int>, Intrinsics.InvocationId)
             let mutable perLayerUniforms = Map.empty
 
             let newBody = 
@@ -600,7 +599,7 @@ module Effect =
                                     let typ = Peano.getArrayType layers old.uniformType
                                     perLayerUniforms <- Map.add name { old with uniformType = typ } perLayerUniforms
                                     let arrInput = Expr.ReadInput(kind, typ, name)
-                                    let layerItem = Expr.PropertyGet(arrInput, arrInput.Type.GetProperty("Item"), [Expr.Var layer])
+                                    let layerItem = Expr.PropertyGet(arrInput, arrInput.Type.GetProperty("Item"), [layer])
                                     let realItem = Expr.PropertyGet(layerItem, layerItem.Type.GetProperty("Item"), [index])
 
                                     realItem |> Some
@@ -610,31 +609,45 @@ module Effect =
                                     let typ = Peano.getArrayType layers old.uniformType
                                     perLayerUniforms <- Map.add name { old with uniformType = typ } perLayerUniforms
                                     let arrInput = Expr.ReadInput(kind, typ, name) 
-                                    let realItem = Expr.PropertyGet(arrInput, arrInput.Type.GetProperty("Item"), [Expr.Var layer])
+                                    let realItem = Expr.PropertyGet(arrInput, arrInput.Type.GetProperty("Item"), [layer])
                                     realItem |> Some
                         | _ ->
                             None
                 )
-
+                
+            //let layer = Var("layer", typeof<int>)
             let newBody =
-                newBody.SubstituteWrites(fun outputs ->
-                    let o = Map.add Intrinsics.Layer (None, Expr.Var layer) outputs
+                newBody 
+                // make all layer-reads top level
+                |> Optimizer.liftInputs
+
+//                // replace layer reads with loop variable
+//                |> Expr.substituteReads (fun kind typ name index ->
+//                    match kind, index with
+//                        | ParameterKind.Input, None when name = Intrinsics.Layer -> Some (Expr.Var layer)
+//                        | _ -> None
+//                )
+
+                // add layer to output
+                |> Expr.substituteWrites (fun outputs ->
+                    let o = Map.add Intrinsics.Layer (None, layer) outputs
                     Expr.WriteOutputs o |> Some
                 )
 
-            let newBody =
-//                Expr.Sequential(
-//                    <@ Preprocessor.unroll() @>,
-                    Expr.ForIntegerRangeLoop(
-                        layer, Expr.Value 0, Expr.Value (layers - 1), 
-                        Expr.Sequential(
-                            newBody,
-                            <@ restartStrip() @>
-                        )
-                    )
+
+//            let newBody =
+//                Expr.ForIntegerRangeLoop(
+//                    layer, Expr.Value 0, Expr.Value (layers - 1), 
+//                    Expr.Sequential(
+//                        newBody,
+//                        <@ restartStrip() @>
+//                    )
 //                )
+
+            
+
                 
-            let geometryShader = Shader.withBody newBody geometryShader
+            let geometryShader = Shader.withBody newBody { geometryShader with shaderInvocations = layers }
             geometryShader
 
         let fragmentShader =

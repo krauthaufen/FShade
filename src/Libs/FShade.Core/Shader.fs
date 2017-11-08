@@ -42,6 +42,8 @@ type Shader =
         shaderOutputVertices : ShaderOutputVertices
         /// the optional maximal vertex-count for the shader
         shaderOutputPrimitives : Option<int>
+        /// the number of shader invocations (only useful for some stages)
+        shaderInvocations : int
         /// the body for the shader
         shaderBody : Expr
         /// the shader's source info (if any)
@@ -887,6 +889,7 @@ module private Preprocessor =
                 shaderOutputTopology    = builder.OutputTopology
                 shaderOutputVertices    = outputVertices
                 shaderOutputPrimitives  = None
+                shaderInvocations       = 1
                 shaderBody              = body
                 shaderDebugRange        = None
             }
@@ -1953,6 +1956,8 @@ module Shader =
                         next = nextStage 
                     }
 
+                    yield EntryDecoration.Invocations s.shaderInvocations
+
                     match s.shaderInputTopology with
                         | Some t -> yield EntryDecoration.InputTopology t
                         | None -> ()
@@ -1982,6 +1987,7 @@ module Shader =
                     shaderOutputTopology    = None
                     shaderOutputVertices    = ShaderOutputVertices.Unknown
                     shaderOutputPrimitives  = None
+                    shaderInvocations       = 1
                     shaderBody =
                         attributes
                             |> Map.map (fun n t -> None, Expr.ReadInput(ParameterKind.Input, t, n))

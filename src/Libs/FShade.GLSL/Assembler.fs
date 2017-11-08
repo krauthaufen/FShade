@@ -1012,7 +1012,8 @@ module Assembler =
                         let inputTopology = e.cDecorations |> List.tryPick (function EntryDecoration.InputTopology t -> Some t | _ -> None) |> Option.get
                         let outputTopology = e.cDecorations |> List.tryPick (function EntryDecoration.OutputTopology(t) -> Some(t) | _ -> None) |> Option.get
                         let vertexCount = e.cDecorations |> List.tryPick (function EntryDecoration.OutputVertices(t) -> Some(t) | _ -> None) |> Option.get
-                        
+                        let invocations = e.cDecorations |> List.tryPick (function EntryDecoration.Invocations i -> Some i | _ -> None) |> Option.defaultValue 1
+
                         let inputPrimitive =
                             match inputTopology with
                                 | InputTopology.Point -> "points"
@@ -1029,8 +1030,10 @@ module Assembler =
                                 | OutputTopology.TriangleStrip -> "triangle_strip"
 
                         [
-                            sprintf "layout(%s) in;" inputPrimitive
-                            sprintf "layout(%s, max_vertices = %d) out;" outputPrimitive vertexCount
+                            yield sprintf "layout(%s) in;" inputPrimitive
+                            yield sprintf "layout(%s, max_vertices = %d) out;" outputPrimitive vertexCount
+                            if invocations > 1 then
+                                yield sprintf "layout(invocations = %d) in;" invocations
                         ]
 
                     | ShaderStage.TessControl ->
