@@ -2043,7 +2043,7 @@ module Shader =
                     |> Map.map (fun _ p -> p.paramType)
         
 
-    module private Composition = 
+    module internal Composition = 
         let simple (l : Shader) (r : Shader) =
             let needed  = Map.intersect l.shaderOutputs r.shaderInputs
             let passed  = Map.difference l.shaderOutputs r.shaderOutputs
@@ -2415,7 +2415,26 @@ module Shader =
 
                 member x.Count : Expr<int> = 
                     Expr.PropertyGet(Expr.Var stream, pCount) |> Expr.Cast 
+            
+            type Expr with
+                static member Lets (vs : seq<Var * Option<Expr>>, body : Expr) =
+                    let rec doit (l : list<Var * Option<Expr>>) =
+                        match l with
+                            | [] -> body
+                            | (v,e) :: rest ->
+                                let e = match e with | Some e -> e | None -> Expr.DefaultValue(v.Type)
+                                Expr.Let(v, e, doit rest)
 
+                    vs |> Seq.toList |> doit
+
+                static member Repeat(n : int, body : Expr -> Expr) =
+                    match n with
+                        | 0 -> Expr.Unit
+                        | 1 -> body (Expr.Value 0)
+                        | n -> 
+                            let i = Var("i", typeof<int>)
+                            Expr.ForIntegerRangeLoop(i, Expr.Value 0, Expr.Value (n - 1), body (Expr.Var i))
+                    
 
         let gsgs (lShader : Shader) (rShader : Shader) =
             if not (topologyCompatible lShader.shaderOutputTopology rShader.shaderInputTopology) then
@@ -2563,6 +2582,7 @@ module Shader =
 
                     optimize 
                         { rShader with
+                            shaderInvocations = lShader.shaderInvocations * rShader.shaderInvocations
                             shaderBody = Preprocessor.preprocess V3i.Zero body |> fst
                             shaderInputTopology = lShader.shaderInputTopology
                             shaderUniforms = Map.union lShader.shaderUniforms rShader.shaderUniforms
@@ -2575,6 +2595,95 @@ module Shader =
                 | _ ->
                     failwithf "[FShade] cannot compose GeometryShader without vertex-count"
 
+        let vsgs (lShader : Shader) (rShader : Shader) =
+            
+            let inputVertices =
+                match rShader.shaderInputTopology.Value with
+                    | InputTopology.Point -> 1
+                    | InputTopology.Line -> 2
+                    | InputTopology.Triangle -> 3
+                    | InputTopology.LineAdjacency -> 4
+                    | InputTopology.TriangleAdjacency -> 5
+                    | InputTopology.Patch n -> n
+
+            let vars =
+                lShader.shaderOutputs |> Map.remove Intrinsics.SourceVertexIndex |> Map.map (fun name desc ->
+                    if inputVertices = 1 then
+                        Var(name, desc.paramType, true)
+                    else
+                        Var(name, Peano.getArrayType inputVertices desc.paramType)
+                )
+
+            let write (name : string) (index : Expr) (value : Expr) =
+                let v = vars.[name]
+
+                if v.IsMutable && v.Type = value.Type then
+                    assert (match index with | Int32 0 -> true | _ -> false)
+                    Expr.VarSet(v, value)
+
+                else
+                    Expr.ArraySet(Expr.Var v, index, value)
+                    
+            let tryRead (name : string) (index : Expr) =
+                match Map.tryFind name vars with
+                    | Some v ->
+                        match v.Type with
+                            | ArrOf _ | ArrayOf _ -> 
+                                Some (Expr.ArrayAccess(Expr.Var v, index))
+                            | _ -> 
+                                assert ( match index with | Int32 0 -> true | _ -> false)
+                                Some (Expr.Var v)
+                    | None ->
+                        None
+
+            let rBody = 
+                rShader.shaderBody.SubstituteReads (fun kind typ name index ->
+                    match kind, index with
+                        | ParameterKind.Input, Some index ->
+                            tryRead name index
+                        | _ ->
+                            None
+                )
+
+            let rBody =
+                Expr.Lets(
+                    vars |> Map.values |> Seq.map (fun v -> v, None),
+                    Expr.Seq [
+                        Expr.Repeat(inputVertices, fun index -> 
+                            let body = lShader.shaderBody
+
+                            let body =
+                                body.SubstituteReads(fun kind typ name ii ->
+                                    assert (Option.isNone ii)
+                                    match kind with
+                                        | ParameterKind.Input ->
+                                            Expr.ReadInput(kind, typ, name, index) |> Some
+                                        | _ ->
+                                            None
+                                )
+
+                            let body = 
+                                body.SubstituteWrites (fun outputs ->
+                                    let values = outputs |> Map.remove Intrinsics.SourceVertexIndex |> Map.toList
+
+                                    let writes = 
+                                        values |> List.map (fun (name, (idx,value)) ->
+                                            assert (Option.isNone idx)
+                                            write name index value
+                                        )
+
+                                    Some (Expr.Seq writes)
+                                )
+
+                            body
+                        )
+
+                        rBody
+                    ]
+                )
+
+
+            withBody rBody rShader
 
     /// composes two shaders respecting their stages.
     ///     - implemented: { Vertex->Vertex; Geometry->Vertex; Fragment->Fragment }

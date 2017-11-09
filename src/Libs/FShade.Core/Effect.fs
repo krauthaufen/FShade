@@ -554,7 +554,53 @@ module Effect =
             )
         )
 
-    let toLayeredEffect (layers : int) (uniforms : Set<string>) (topology : InputTopology) (effect : Effect) = 
+    module private LayerHelpers = 
+
+        let withLayeredUniforms (uniforms : Map<string, string>) (layerCount : int) (layer : Expr) (shader : Shader) =
+            let mutable perLayerUniforms = Map.empty
+            let mutable removed = Map.empty
+
+            let newBody = 
+                shader.shaderBody.SubstituteReads(fun kind typ oldName index ->
+                    match kind with
+                        | ParameterKind.Uniform ->
+                            match Map.tryFind oldName uniforms with
+                                | Some newName ->
+                                    match index with
+                                        | Some index ->
+                                            let old = shader.shaderUniforms.[oldName]
+                                            let typ = Peano.getArrayType layerCount old.uniformType
+                                            perLayerUniforms <- Map.add newName { old with uniformName = newName; uniformType = typ } perLayerUniforms
+                                            removed <- Map.add oldName () removed
+                                            let arrInput = Expr.ReadInput(kind, typ, newName)
+                                            let layerItem = Expr.ArrayAccess(arrInput, layer) //Expr.PropertyGet(arrInput, arrInput.Type.GetProperty("Item"), [layer])
+                                            let realItem = Expr.ArrayAccess(arrInput, index) //Expr.PropertyGet(layerItem, layerItem.Type.GetProperty("Item"), [index])
+
+                                            realItem |> Some
+                                    
+                                        | None ->
+                                            let old = shader.shaderUniforms.[oldName]
+                                            let typ = Peano.getArrayType layerCount old.uniformType
+                                            perLayerUniforms <- Map.add newName { old with uniformName = newName; uniformType = typ } perLayerUniforms
+                                            removed <- Map.add oldName () removed
+                                            let arrInput = Expr.ReadInput(kind, typ, newName) 
+                                            let realItem = Expr.ArrayAccess(arrInput, layer) //Expr.PropertyGet(arrInput, arrInput.Type.GetProperty("Item"), [layer])
+                                            realItem |> Some
+                                | _ ->
+                                    None
+                        | _ ->
+                            None
+                )
+
+
+            let uniforms = Map.union (Map.difference shader.shaderUniforms removed) perLayerUniforms
+                    
+
+            Shader.withBody newBody { shader with shaderUniforms = uniforms }
+
+
+
+    let toLayeredEffect (layers : int) (uniforms : Map<string, string>) (topology : InputTopology) (effect : Effect) = 
         if effect.TessControlShader.IsSome || effect.TessEvalShader.IsSome then
             failwithf "[FShade] effects containing tessellation shaders cannot be layered automatically"
 
@@ -578,113 +624,33 @@ module Effect =
                     gs
 
                 | Some vs, Some gs ->
-                    match Map.tryFind gs.shaderInputTopology.Value Helpers.nopGS with
-                        | Some nop ->
-                            let vs = Shader.compose2 nop vs
-                            Shader.compose2 vs gs
-                        | None ->
-                            failwithf "[FShade] bad topology for layered shader: %A" gs.shaderInputTopology.Value
+                    Shader.Composition.vsgs vs gs
+//                    match Map.tryFind gs.shaderInputTopology.Value Helpers.nopGS with
+//                        | Some nop ->
+//                            let vs = Shader.compose2 nop vs
+//                            Shader.compose2 vs gs
+//                        | None ->
+//                            failwithf "[FShade] bad topology for layered shader: %A" gs.shaderInputTopology.Value
 
         let geometryShader =
             let layer = Expr.ReadInput(ParameterKind.Input, typeof<int>, Intrinsics.InvocationId)
-            let mutable perLayerUniforms = Map.empty
+            let gs = LayerHelpers.withLayeredUniforms uniforms layers layer geometryShader
 
-            let newBody = 
-                geometryShader.shaderBody.SubstituteReads (fun kind typ name index ->
-                    match kind with
-                        | ParameterKind.Uniform when Set.contains name uniforms ->
-                            match index with
-                                | Some index ->
-                                    let old = geometryShader.shaderUniforms.[name]
-                                    let typ = Peano.getArrayType layers old.uniformType
-                                    perLayerUniforms <- Map.add name { old with uniformType = typ } perLayerUniforms
-                                    let arrInput = Expr.ReadInput(kind, typ, name)
-                                    let layerItem = Expr.PropertyGet(arrInput, arrInput.Type.GetProperty("Item"), [layer])
-                                    let realItem = Expr.PropertyGet(layerItem, layerItem.Type.GetProperty("Item"), [index])
-
-                                    realItem |> Some
-                                    
-                                | None ->
-                                    let old = geometryShader.shaderUniforms.[name]
-                                    let typ = Peano.getArrayType layers old.uniformType
-                                    perLayerUniforms <- Map.add name { old with uniformType = typ } perLayerUniforms
-                                    let arrInput = Expr.ReadInput(kind, typ, name) 
-                                    let realItem = Expr.PropertyGet(arrInput, arrInput.Type.GetProperty("Item"), [layer])
-                                    realItem |> Some
-                        | _ ->
-                            None
-                )
-                
-            //let layer = Var("layer", typeof<int>)
             let newBody =
-                newBody 
-                // make all layer-reads top level
-                |> Optimizer.liftInputs
-
-//                // replace layer reads with loop variable
-//                |> Expr.substituteReads (fun kind typ name index ->
-//                    match kind, index with
-//                        | ParameterKind.Input, None when name = Intrinsics.Layer -> Some (Expr.Var layer)
-//                        | _ -> None
-//                )
-
-                // add layer to output
-                |> Expr.substituteWrites (fun outputs ->
+                gs.shaderBody.SubstituteWrites (fun outputs ->
                     let o = Map.add Intrinsics.Layer (None, layer) outputs
                     Expr.WriteOutputs o |> Some
                 )
 
-
-//            let newBody =
-//                Expr.ForIntegerRangeLoop(
-//                    layer, Expr.Value 0, Expr.Value (layers - 1), 
-//                    Expr.Sequential(
-//                        newBody,
-//                        <@ restartStrip() @>
-//                    )
-//                )
-
-            
-
-                
-            let geometryShader = Shader.withBody newBody { geometryShader with shaderInvocations = layers }
-            geometryShader
+            { gs with shaderInvocations = layers } |> Shader.withBody newBody
 
         let fragmentShader =
             match effect.FragmentShader with
                 | Some fragmentShader ->
                     let layer = Expr.ReadInput(ParameterKind.Input, typeof<int>, Intrinsics.Layer)
-                    let mutable perLayerUniforms = Map.empty
-
-                    let newBody = 
-                        fragmentShader.shaderBody.SubstituteReads (fun kind typ name index ->
-                            match kind with
-                                | ParameterKind.Uniform when Set.contains name uniforms ->
-                                    match index with
-                                        | Some index ->
-                                            let old = fragmentShader.shaderUniforms.[name]
-                                            let typ = Peano.getArrayType layers old.uniformType
-                                            perLayerUniforms <- Map.add name { old with uniformType = typ } perLayerUniforms
-                                            let arrInput = Expr.ReadInput(kind, typ, name)
-                                            let layerItem = Expr.PropertyGet(arrInput, arrInput.Type.GetProperty("Item"), [layer])
-                                            let realItem = Expr.PropertyGet(layerItem, layerItem.Type.GetProperty("Item"), [index])
-
-                                            realItem |> Some
-                                    
-                                        | None ->
-                                            let old = fragmentShader.shaderUniforms.[name]
-                                            let typ = Peano.getArrayType layers old.uniformType
-                                            perLayerUniforms <- Map.add name { old with uniformType = typ } perLayerUniforms
-                                            let arrInput = Expr.ReadInput(kind, typ, name) 
-                                            let realItem = Expr.PropertyGet(arrInput, arrInput.Type.GetProperty("Item"), [layer])
-                                            realItem |> Some
-                                | _ ->
-                                    None
-                        )
-
-                    let fragmentShader = Shader.withBody newBody  fragmentShader
-                    fragmentShader |> Some
-                    
+                    fragmentShader
+                        |> LayerHelpers.withLayeredUniforms uniforms layers layer 
+                        |> Some
                 | None ->
                     None
 

@@ -11,9 +11,9 @@ open System.Reflection
 module UtiliyFunctions =
     
     type UniformScope with
-        member x.A : float = x?A
-        member x.B : float = x?B
-        member x.AB : float = x?AB
+        member x.A : float = x?Bla?A
+        member x.B : float = x?Bla?B
+        member x.AB : float = x?Bla?AB
 
         member x.X : M44d = x?X
         member x.Y : M44d = x?Y
@@ -45,7 +45,7 @@ module UtiliyFunctions =
   
         [<Inline>]
         let g (a : float) (b : float) =
-            f a a + uniform.AB
+            f a a + uniform.A + uniform.B
 
     let vs (v : Vertex) =
         vertex {
@@ -157,21 +157,22 @@ module UtiliyFunctions =
         let effect = 
             Effect.compose [
                 Effect.ofFunction vs
+                Effect.ofFunction gs0
                 Effect.ofFunction shader
             ]
 
         effect
-            // decompose derived uniforms here
-            |> Effect.substituteUniforms (fun name typ index ->
-                if name = "AB" then
-                    let a = Expr.ReadInput<float>(ParameterKind.Uniform, "A")
-                    let b = Expr.ReadInput<float>(ParameterKind.Uniform, "B")
-                    Some <@@ (%a) * (%b) @@>
-                else
-                    None
-                )
+//            // decompose derived uniforms here
+//            |> Effect.substituteUniforms (fun name typ index ->
+//                if name = "AB" then
+//                    let a = Expr.ReadInput<float>(ParameterKind.Uniform, "A")
+//                    let b = Expr.ReadInput<float>(ParameterKind.Uniform, "B")
+//                    Some <@@ (%a) * (%b) @@>
+//                else
+//                    None
+//                )
             // one of the uniforms gets layered
-            |> Effect.toLayeredEffect 2 (Set.ofList [ "A" ]) InputTopology.Triangle
+            |> Effect.toLayeredEffect 2 (Map.ofList [ "A", "As" ]) InputTopology.Triangle
                 
             // compile the thing
             |> print []
