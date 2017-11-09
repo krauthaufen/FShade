@@ -88,6 +88,8 @@ module private UtilityFunctionHelpers =
         let str : string = str.Replace("=", "")
         str
 
+
+[<CustomEquality; NoComparison>]
 type UtilityFunction =
     {
         functionId          : string
@@ -101,6 +103,16 @@ type UtilityFunction =
     member x.uniqueName = x.functionName + "_" + cleanHash x.functionId
     member x.returnType = x.functionBody.Type
     
+    override x.GetHashCode() = x.uniqueName.GetHashCode()
+    override x.Equals(o) =
+        match o with
+            | :? UtilityFunction as o ->
+                x.functionId = o.functionId &&
+                x.functionName = o.functionName &&
+                List.forall2 (fun (l : Var) (r : Var) -> l.Name = r.Name && l.Type = r.Type && l.IsMutable = r.IsMutable) x.functionArguments o.functionArguments
+            | _ ->
+                false
+
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module UtilityFunction =
     let tryCreate (m : MethodBase) =

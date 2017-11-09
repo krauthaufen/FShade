@@ -686,7 +686,12 @@ module Compiler =
 
         let useGlobalFunction (key : obj) (f : FunctionDefinition) =
             State.custom (fun s ->
-                { s with moduleState = { s.moduleState with globalFunctions = HMap.add key f s.moduleState.globalFunctions } }, f.Signature s.moduleState.backend
+                match HMap.tryFind key s.moduleState.globalFunctions with
+                    | Some signature ->
+                        s, signature.Signature s.moduleState.backend
+                    | _ -> 
+                        let signature = f.Signature s.moduleState.backend
+                        { s with moduleState = { s.moduleState with globalFunctions = HMap.add key f s.moduleState.globalFunctions } }, signature 
             )
 
         let useCtor (key : obj) (f : FunctionDefinition) =

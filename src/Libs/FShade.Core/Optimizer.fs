@@ -1695,6 +1695,10 @@ module Optimizer =
                         let! b = liftInputsS b
                         return Expr.Let(v,e,b)
 
+                    | NewTuple(args) ->
+                        let! args = args |> List.mapS liftInputsS
+                        return Expr.NewTuple args
+
                     | NewArray(t, args) ->
                         let! args = args |> List.mapS liftInputsS
                         return Expr.NewArray(t, args)
@@ -1817,6 +1821,7 @@ module Optimizer =
                                 return Expr.ReadInput(kind, e.Type, name)
 
                     | CallFunction(utility, args) ->
+                        let! args = args |> List.mapS liftFunctionInputsS
                         let mutable usedInputs = Map.empty
                         let newBody = liftFunctionInputsS(utility.functionBody).Run(&usedInputs)
 
