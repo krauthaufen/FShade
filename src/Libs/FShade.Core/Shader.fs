@@ -943,6 +943,10 @@ module private Preprocessor =
 
                 Option.toList t @ args |> List.fold (fun s a -> Map.union s (computeIO localSize a)) inner
 
+            | CallFunction(f, args) ->
+                let used = args |> List.fold (fun m e -> Map.union m (computeIO localSize e)) Map.empty
+
+                Map.union (computeIO localSize f.functionBody) used
 
             | ShapeCombination(o, args) ->
                 args |> List.fold (fun m e -> Map.union m (computeIO localSize e)) Map.empty
@@ -2683,7 +2687,7 @@ module Shader =
                 )
 
 
-            withBody rBody rShader
+            withBody rBody { rShader with shaderUniforms = Map.union lShader.shaderUniforms rShader.shaderUniforms }
 
     /// composes two shaders respecting their stages.
     ///     - implemented: { Vertex->Vertex; Geometry->Vertex; Fragment->Fragment }

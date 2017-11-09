@@ -15,8 +15,8 @@ module UtiliyFunctions =
         member x.B : float = x?Bla?B
         member x.AB : float = x?Bla?AB
 
-        member x.X : M44d = x?X
-        member x.Y : M44d = x?Y
+        member x.X : M44d = x?Buffy?X
+        member x.Y : M44d = x?Buffy?Y
 
     type Vertex = 
         { 
@@ -43,7 +43,7 @@ module UtiliyFunctions =
             let x = 10.0 * FShade.Imperative.ExpressionExtensions.ShaderIO.ReadInput<float>(FShade.Imperative.ParameterKind.Input, "SomeInput")
             a + b * uniform.A + x
   
-        [<Inline>]
+        //[<Inline>]
         let g (a : float) (b : float) =
             f a a + uniform.A + uniform.B
 
@@ -51,6 +51,15 @@ module UtiliyFunctions =
         vertex {
             return { v with pos = (uniform.X * uniform.Y) * v.pos }
         }
+
+    let sammy =
+        sampler3d {
+            texture uniform?Blau
+        }
+
+    [<ReflectedDefinition>]
+    let funny v =
+        sammy.Sample v
 
     let shader (v : Vertex) =
         fragment {
@@ -69,7 +78,7 @@ module UtiliyFunctions =
 
 
 
-            return V4d.IIII * g v.hugo.X v.hugo.Y * float c
+            return funny (V3d(a,a,a)) + V4d.IIII * g v.hugo.X v.hugo.Y * float c
         }
 
     let gs0 (v : Triangle<Vertex>) =
