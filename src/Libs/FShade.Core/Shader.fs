@@ -1582,6 +1582,7 @@ module Shader =
             try shaderFunction Unchecked.defaultof<'a>
             with _ -> failwith "[FShade] shader functions may not access their vertex-input statically"
 
+
         ofExpr typeof<'a> expression
 
     let withBody (newBody : Expr) (shader : Shader) =

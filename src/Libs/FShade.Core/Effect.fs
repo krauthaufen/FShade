@@ -15,7 +15,8 @@ open FShade.Imperative
 
 /// Effect encapsulates a set of shaders for the various ShaderStages defined by FShade.
 type Effect internal(id : string, shaders : Map<ShaderStage, Shader>, composedOf : list<Effect>) =
-    
+    let mutable sourceDefintion : Option<Expr * Type> = None
+
     let inputToplogy =
         lazy (
             shaders |> Map.toSeq |> Seq.tryPick (fun (_,s) ->
@@ -63,6 +64,10 @@ type Effect internal(id : string, shaders : Map<ShaderStage, Shader>, composedOf
     static member internal NewId() =
         Guid.NewGuid().ToByteArray() |> Convert.ToBase64String
 
+    member x.SourceDefintion
+        with get() = sourceDefintion
+        and internal set d = sourceDefintion <- d
+      
     member x.IsEmpty            = id = ""
 
     /// gets a unique id for this effect
@@ -227,17 +232,22 @@ module Effect =
         
     /// creates an effect from an expression (assuming expressions as returned by shader-functions)
     let ofExpr (inputType : Type) (e : Expr) =
-        Shader.ofExpr inputType e |> ofList
+        let effect = Shader.ofExpr inputType e |> ofList
+        effect.SourceDefintion <- Some (e, inputType)
+        effect
 
     /// creates an effect from a shader-function
     let ofFunction (shaderFunction : 'a -> Expr<'b>) =
         let expression = 
             try shaderFunction Unchecked.defaultof<'a>
             with _ -> failwith "[FShade] shader functions may not access their vertex-input statically"
-
+            
         let hash = Expr.ComputeHash expression
         effectCache.GetOrAdd(hash, fun _ ->
-            Shader.ofExpr typeof<'a> expression |> ofList
+            let range = expression.DebugRange
+            let effect = Shader.ofExpr typeof<'a> expression |> ofList
+            effect.SourceDefintion <- Some (expression.Raw, typeof<'a>)
+            effect
         )
 
     /// gets a Map<ShaderStage, Shader> for the effect containing all Shaders.

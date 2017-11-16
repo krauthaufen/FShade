@@ -5,14 +5,14 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>68f98117-2010-402f-8d92-ba758cdf1511</ProjectGuid>
-    <OutputType>Exe</OutputType>
-    <RootNamespace>FShade.Demo</RootNamespace>
-    <AssemblyName>FShade.Demo</AssemblyName>
+    <ProjectGuid>9780fd2c-ef72-48e9-813e-bcc120423738</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <RootNamespace>FShade.Debug</RootNamespace>
+    <AssemblyName>FShade.Debug</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
-    <Name>FShade.Demo</Name>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <Name>FShade.Debug</Name>
     <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -23,12 +23,8 @@
     <OutputPath>..\..\..\bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <PlatformTarget>AnyCPU</PlatformTarget>
     <DocumentationFile>
     </DocumentationFile>
-    <Prefer32Bit>false</Prefer32Bit>
-    <OtherFlags>
-    </OtherFlags>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -37,12 +33,8 @@
     <OutputPath>..\..\..\bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <PlatformTarget>AnyCPU</PlatformTarget>
     <DocumentationFile>
     </DocumentationFile>
-    <Prefer32Bit>false</Prefer32Bit>
-    <OtherFlags>
-    </OtherFlags>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
@@ -51,36 +43,19 @@
     <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="InputLayouts.fs" />
-    <Compile Include="UtilityFunctions.fs" />
-    <Compile Include="Program.fs" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\Libs\FShade.Core\FShade.Core.fsproj">
+    <ProjectReference Include="..\FShade.Core\FShade.Core.fsproj">
       <Name>FShade.Core</Name>
       <Project>{0f39c812-b7fb-4210-9e83-19d85a1cd10d}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\..\Libs\FShade.Debug\FShade.Debug.fsproj">
-      <Name>FShade.Debug</Name>
-      <Project>{9780fd2c-ef72-48e9-813e-bcc120423738}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\..\Libs\FShade.GLSL\FShade.GLSL.fsproj">
-      <Name>FShade.GLSL</Name>
-      <Project>{13af9c38-cca2-47c5-b4de-a7342f0d2961}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\..\Libs\FShade.Imperative\FShade.Imperative.fsproj">
+    <ProjectReference Include="..\FShade.Imperative\FShade.Imperative.fsproj">
       <Name>FShade.Imperative</Name>
       <Project>{1223c55b-5634-4764-b5bd-bf9ad95c073b}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\..\Libs\FShade.SpirV\FShade.SpirV.fsproj">
-      <Name>FShade.SpirV</Name>
-      <Project>{9af9aa30-5fb6-4420-9a8e-0220bd3357b7}</Project>
-      <Private>True</Private>
-    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="EffectCompiler.fs" />
   </ItemGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
@@ -167,23 +142,6 @@
       <ItemGroup>
         <Reference Include="FSharp.Core">
           <HintPath>..\..\..\packages\FSharp.Core\lib\net40\FSharp.Core.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
-      <ItemGroup>
-        <Reference Include="System.Runtime.Serialization">
-          <Paket>True</Paket>
-        </Reference>
-        <Reference Include="System.Xml">
-          <Paket>True</Paket>
-        </Reference>
-        <Reference Include="FsPickler">
-          <HintPath>..\..\..\packages\FsPickler\lib\net45\FsPickler.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
