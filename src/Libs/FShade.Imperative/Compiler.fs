@@ -862,33 +862,43 @@ module Compiler =
 
     let rec asExternalS (e : Expr) =
         state {
-            let free = CompilerState.free e
+            let mutable variables = HMap.empty
+            let mutable inputValues = HMap.empty
+            let! globals = State.get |> State.map (fun s -> s.moduleState.globalParameters)
+
+            let getVar (kind : ParameterKind) (name : string) (typ : Type) (idx : Option<Expr>) =
+                let key = (kind, name, typ, idx)
+                match HMap.tryFind key variables with
+                    | Some v -> v
+                    | None ->
+                        let suffix =
+                            match idx with
+                                | Some idx -> Expr.ComputeHash idx
+                                | None -> ""
+                        let v = Var(name + suffix, typ)
+                        variables <- HMap.add key v variables
+                        inputValues <- HMap.add v key inputValues
+                        v
+
+
+            let e = 
+                e.SubstituteReads (fun kind typ name idx ->
+                    if kind = ParameterKind.Uniform && Set.contains name globals then 
+                        None
+                    else
+                        let v = getVar kind name typ idx
+                        Some (Expr.Var v)
+                )
+
+            let free = e.GetFreeVars() |> HSet.ofSeq
             if HSet.isEmpty free then
                 return! CompilerState.useConstant e e
             else
                 let! globals = State.get |> State.map (fun s -> s.moduleState.globalParameters)
                 let free = free |> HSet.toArray
  
-                let newVariables = HashSet()
-
-                let freeArgs = 
-                    free |> Array.choose (fun f ->
-                        match f with
-                            | CompilerState.Free.Variable v ->
-                                Some v
-
-                            | CompilerState.Free.Global(kind, n, t, idx) ->
-                                if kind = ParameterKind.Uniform && Set.contains n globals then 
-                                    None
-                                else 
-                                    let v = Var(n, t, (kind = ParameterKind.Output))
-                                    newVariables.Add v |> ignore
-                                    Some v
-                    )
-
-
                 let! parameters =
-                    freeArgs |> Array.mapS (fun v ->
+                    free |> Array.mapS (fun v ->
                         state {
                             let! t = toCTypeS v.Type
                             return { name = v.Name; ctype = t; modifier = (if v.IsMutable then CParameterModifier.ByRef else CParameterModifier.In) }
@@ -898,25 +908,23 @@ module Compiler =
                 let! args = 
                     free |> Array.mapS (fun f ->
                         state {
-                            match f with
-                                | CompilerState.Free.Variable v ->
-                                    let! v = toCVarS v
+                            match HMap.tryFind f inputValues with
+                                | Some (kind, n, t, idx) ->
+                                    match kind with
+                                        | ParameterKind.Input | ParameterKind.Uniform ->
+                                            let expression = 
+                                                match idx with
+                                                    | Some idx -> Expr.ReadInput(kind, t, n, idx)
+                                                    | None -> Expr.ReadInput(kind, t, n)
+                                            let! e = toCExprS expression
+                                            return Some e
+                                        | _ ->
+                                            return failwithf "[FShade] cannot use output %A as closure in function" n
+                                    
+                                | None ->
+                                    let! v = toCVarS f
                                     return Some (CVar v)
 
-                                | CompilerState.Free.Global(kind, n, t, idx) ->
-                                    if kind = ParameterKind.Uniform && Set.contains n globals then 
-                                        return None
-                                    else 
-                                        match kind with
-                                            | ParameterKind.Input | ParameterKind.Uniform ->
-                                                let expression = 
-                                                    match idx with
-                                                        | Some idx -> Expr.ReadInput(kind, t, n, idx)
-                                                        | None -> Expr.ReadInput(kind, t, n)
-                                                let! e = toCExprS expression
-                                                return Some e
-                                            | _ ->
-                                                return failwithf "[FShade] cannot use output %A as closure in function" n
                         }
                     ) 
 
@@ -932,10 +940,12 @@ module Compiler =
                         parameters = parameters
                     }
 
+               
+
                 let definition = ManagedFunctionWithSignature(signature, e)
 
                 let! signature = 
-                    if freeArgs.Length = free.Length then CompilerState.useGlobalFunction (e :> obj) definition
+                    if HMap.isEmpty inputValues then CompilerState.useGlobalFunction (e :> obj) definition
                     else CompilerState.useLocalFunction (e :> obj) definition
 
 
