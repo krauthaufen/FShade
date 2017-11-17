@@ -72,6 +72,7 @@
     <Compile Include="EffectInputLayout.fs" />
     <Compile Include="Effect.fs" />
     <Compile Include="ComputeShader.fs" />
+    <Compile Include="EffectDebugger.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />

@@ -1,7 +1,11 @@
 ﻿namespace FShade.Debug
 
+open System
+open System.Diagnostics
+open System.Reflection
 open System.IO
 open System.Text
+open Aardvark.Base
 open FShade
 open Microsoft.FSharp.Compiler
 open Microsoft.FSharp.Compiler.Interactive.Shell
@@ -13,21 +17,30 @@ module EffectCompiler =
     let outStream = new StringWriter(new StringBuilder())
     let errStream = new StringWriter(err)
 
-    let private startupCode =
+    let assemblies =
+        [
+            "Aardvark.Base"
+            "Aardvark.Base.TypeProviders"
+            "Aardvark.Base.FSharp"
+            "FShade.Imperative"
+            "FShade.Core"
+        ]
+
+    let asmPaths =
+        assemblies |> List.choose (fun name ->
+            let a = Assembly.Load name
+            try Some a.Location
+            with _ -> None
+        )
+
+
+    let private composeCode =
         String.concat "\r\n" [
-            sprintf "System.Environment.CurrentDirectory <- @\"%s\"" System.Environment.CurrentDirectory 
-            "#r @\"Aardvark.Base.dll\" "
-            "#r @\"Aardvark.Base.TypeProviders.dll\" "
-            "#r @\"Aardvark.Base.FSharp.dll\" "
-            "#r @\"FShade.Imperative.dll\" "
-            "#r @\"FShade.Core.dll\" "
-            "#r @\"FShade.GLSL.dll\" "
-            
             "open Microsoft.FSharp.Quotations"
             "open FShade"
-
+             
             "let mutable currentEffect = None"
-
+             
             "type ComposeBuilder() ="
             "   member x.Bind(f : 'a -> Expr<'b>, g : unit -> list<Effect>) = (Effect.ofFunction f) :: g()"
             "   member x.Return (()) = []"
@@ -35,19 +48,35 @@ module EffectCompiler =
             "   member x.Delay(f : unit -> list<Effect>) = f"
             "   member x.Combine(l : list<Effect>, r : unit -> list<Effect>) = l @ r()"
             "   member x.Run(r : unit -> list<Effect>) = currentEffect <- Some (Effect.compose (r()))"
-
+             
             "let compose = ComposeBuilder()"
         ]
 
+    let private bootCode =
+        let loads = asmPaths |> Seq.map (sprintf "#r @\"%s\"") |> String.concat "\r\n"
+        String.concat "\r\n" [
+            loads
+            "module Setup = "
+            String.indent 1 composeCode
+        ]
+
+    let private setupCode =
+        let loads = asmPaths |> Seq.map (sprintf "#r @\"%s\"") |> String.concat "\r\n"
+        String.concat "\r\n" [
+            "#if FSHADEDEBUG"
+            "#else"
+            loads
+            composeCode
+            "#endif"
+        ]
+
     let private fsi =
-        let argv = [| "FsiAnyCPU.exe";  "--noninteractive" |]
+        let argv = [| "FsiAnyCPU.exe";  "--noninteractive"; "--define:FSHADEDEBUG" |]
         let fsiConfig = FsiEvaluationSession.GetDefaultConfiguration()
         FsiEvaluationSession.Create(fsiConfig, argv, inStream, outStream, errStream) 
 
-    open System
-
-    let currentProp = 
-        match fsi.EvalInteractionNonThrowing startupCode with
+    let private currentProp = 
+        match fsi.EvalInteractionNonThrowing bootCode with
             | Choice1Of2 (), _ -> 
 
                 let rec all (t : Type) =
@@ -66,9 +95,156 @@ module EffectCompiler =
 
             | _, err -> 
                 None
+            
+    do File.WriteAllText(Path.Combine(System.Environment.CurrentDirectory, "Setup.fsx"), setupCode)
 
-    let mutable private index = 2
-                                  
+    open System.Diagnostics
+    let exec (folder : string) (cmd : string) (args : list<string>) =
+        let args = String.concat " " args
+        let info = ProcessStartInfo(cmd, args)
+        info.UseShellExecute <- false
+        info.RedirectStandardOutput <- true
+        info.RedirectStandardError <- true
+        info.WorkingDirectory <- folder
+
+        let proc = Process.Start(info)
+        proc.WaitForExit()
+
+        if proc.ExitCode <> 0 then
+            let out = proc.StandardOutput.ReadToEnd()
+            let err = proc.StandardError.ReadToEnd()
+
+            printfn "%s %s failed: %s" cmd args err
+            failwithf "%s" err
+        else
+            ()
+
+    let tryExec (folder : string) (cmd : string) (args : list<string>) =
+        let args = String.concat " " args
+        let info = ProcessStartInfo(cmd, args)
+        info.UseShellExecute <- false
+        info.RedirectStandardOutput <- true
+        info.RedirectStandardError <- true
+        info.WorkingDirectory <- folder
+
+        let proc = Process.Start(info)
+        proc.WaitForExit()
+        if proc.ExitCode = 0 then
+            Some (proc.StandardOutput.ReadToEnd())
+        else
+            None
+
+
+    module Git = 
+        let private lineBreak = System.Text.RegularExpressions.Regex("(\r\n)|(\n)")
+
+        type FileStatus =
+            | NoStatus
+            | Modified
+            | Deleted
+            | Added
+            | Renamed
+            | Copied
+            | Unmerged
+            | Untracked
+
+        
+        type Status =
+            | NotARepository
+            | Clean
+            | Dirty of Map<string, FileStatus * FileStatus>
+
+        let private fileStatus c =
+            match c with
+                | ' ' -> NoStatus
+                | 'M' -> Modified
+                | 'D' -> Deleted
+                | 'A' -> Added
+                | 'R' -> Renamed
+                | 'C' -> Copied
+                | 'U' -> Unmerged
+                | '?' -> Untracked
+                | _ -> NoStatus
+
+        let status (folder : string) =
+            match tryExec folder "git" ["status"; "-s"] with
+                | Some str when System.String.IsNullOrWhiteSpace str -> Clean
+                | Some str -> 
+                    let lines = lineBreak.Split(str) |> Array.toList
+
+                    let files = 
+                        lines |> List.choose (fun line ->
+                            if line.Length > 2 then
+                                let x = fileStatus line.[0]
+                                let y = fileStatus line.[1]
+                                let rest = line.Substring 3
+
+                                Some (rest, (x,y))
+
+                            else
+                                None
+                        )
+                    Dirty (Map.ofList files)
+                | None -> 
+                    NotARepository
+
+        let add (folder : string) (pattern : string) =
+            exec folder "git" ["add"; pattern]
+            
+        let commit (folder : string) (message : string) =
+            exec folder "git" ["commit"; "-m"; "\"" + message + "\""]
+               
+        let init (folder : string)  =
+            exec folder "git" ["init"]
+
+    let appName =
+        try Path.GetFileNameWithoutExtension(Assembly.GetEntryAssembly().Location)
+        with _ -> Guid.NewGuid() |> string
+
+    let debugDir =
+        let desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
+        let dir = Path.Combine(desktop, appName)
+        if Directory.Exists dir then
+            
+            let files = 
+                Directory.GetFiles(dir) 
+                    |> Seq.map Path.GetFileName
+                    |> Set.ofSeq
+
+            match Git.status dir with
+                | Git.Clean ->
+                    ()
+
+                | Git.Dirty files ->
+                    Git.add dir "."
+                    Git.commit dir "backup"
+
+                | Git.NotARepository ->
+                    Git.init dir
+                    if not (Set.isEmpty files) then
+                        Git.add dir "."
+                        Git.commit dir "backup"
+
+            for f in files do
+                let p = Path.Combine(dir, f)
+                File.Delete p
+
+            File.WriteAllText(Path.Combine(dir, "Setup.fsx"), setupCode)
+
+
+        else
+            Directory.CreateDirectory dir |> ignore
+            File.WriteAllText(Path.Combine(dir, "Setup.fsx"), setupCode)
+            Git.init dir
+            Git.add dir "."
+            Git.commit dir "import"
+        
+        dir
+
+    let init() =
+        if not (Directory.Exists debugDir) then
+            failwith "init failed"
+                    
     let private toPascalCase (str : string) =
         if str.Length > 0 then
             if str.[0] >= 'a' || str.[0] <= 'Z' then
@@ -78,7 +254,7 @@ module EffectCompiler =
         else
             str
 
-    let evalScript fileName  =
+    let tryCompile fileName  =
         lock fsi (fun () ->
             let value, errors = fsi.EvalScriptNonThrowing fileName
             match value with
