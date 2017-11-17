@@ -10,94 +10,8 @@ open FShade
 open Microsoft.FSharp.Compiler
 open Microsoft.FSharp.Compiler.Interactive.Shell
 
-module EffectCompiler =
-    
-    let err = new StringBuilder()
-    let inStream = new StringReader("")
-    let outStream = new StringWriter(new StringBuilder())
-    let errStream = new StringWriter(err)
-
-    let assemblies =
-        [
-            "Aardvark.Base"
-            "Aardvark.Base.TypeProviders"
-            "Aardvark.Base.FSharp"
-            "FShade.Imperative"
-            "FShade.Core"
-        ]
-
-    let asmPaths =
-        assemblies |> List.choose (fun name ->
-            let a = Assembly.Load name
-            try Some a.Location
-            with _ -> None
-        )
-
-
-    let private composeCode =
-        String.concat "\r\n" [
-            "open Microsoft.FSharp.Quotations"
-            "open FShade"
-             
-            "let mutable currentEffect = None"
-             
-            "type ComposeBuilder() ="
-            "   member x.Bind(f : 'a -> Expr<'b>, g : unit -> list<Effect>) = (Effect.ofFunction f) :: g()"
-            "   member x.Return (()) = []"
-            "   member x.Zero() = []"
-            "   member x.Delay(f : unit -> list<Effect>) = f"
-            "   member x.Combine(l : list<Effect>, r : unit -> list<Effect>) = l @ r()"
-            "   member x.Run(r : unit -> list<Effect>) = currentEffect <- Some (Effect.compose (r()))"
-             
-            "let compose = ComposeBuilder()"
-        ]
-
-    let private bootCode =
-        let loads = asmPaths |> Seq.map (sprintf "#r @\"%s\"") |> String.concat "\r\n"
-        String.concat "\r\n" [
-            loads
-            "module Setup = "
-            String.indent 1 composeCode
-        ]
-
-    let private setupCode =
-        let loads = asmPaths |> Seq.map (sprintf "#r @\"%s\"") |> String.concat "\r\n"
-        String.concat "\r\n" [
-            "#if FSHADEDEBUG"
-            "#else"
-            loads
-            composeCode
-            "#endif"
-        ]
-
-    let private fsi =
-        let argv = [| "FsiAnyCPU.exe";  "--noninteractive"; "--define:FSHADEDEBUG" |]
-        let fsiConfig = FsiEvaluationSession.GetDefaultConfiguration()
-        FsiEvaluationSession.Create(fsiConfig, argv, inStream, outStream, errStream) 
-
-    let private currentProp = 
-        match fsi.EvalInteractionNonThrowing bootCode with
-            | Choice1Of2 (), _ -> 
-
-                let rec all (t : Type) =
-                    let all = t.GetNestedTypes() |> Array.collect all
-                    Array.append [| t |] all
-
-                let allTypes = fsi.DynamicAssembly.GetTypes() |> Array.collect all
-                allTypes |> Array.tryPick (fun t ->
-                    let prop = t.GetProperty("currentEffect")
-                    if isNull prop || prop.PropertyType <> typeof<Option<Effect>> then
-                        None
-                    else
-                        Some prop
-                )
-
-
-            | _, err -> 
-                None
-            
-    do File.WriteAllText(Path.Combine(System.Environment.CurrentDirectory, "Setup.fsx"), setupCode)
-
+[<AutoOpen>]
+module internal GitHelpers =
     open System.Diagnostics
     let exec (folder : string) (cmd : string) (args : list<string>) =
         let args = String.concat " " args
@@ -194,8 +108,100 @@ module EffectCompiler =
         let commit (folder : string) (message : string) =
             exec folder "git" ["commit"; "-m"; "\"" + message + "\""]
                
+        let amend (folder : string) =
+            exec folder "git" ["commit"; "--amend"; "--no-edit"; "--allow-empty"]
+
         let init (folder : string)  =
             exec folder "git" ["init"]
+
+
+module EffectCompiler =
+    
+    let err = new StringBuilder()
+    let inStream = new StringReader("")
+    let outStream = new StringWriter(new StringBuilder())
+    let errStream = new StringWriter(err)
+
+    let assemblies =
+        [
+            "Aardvark.Base"
+            "Aardvark.Base.TypeProviders"
+            "Aardvark.Base.FSharp"
+            "FShade.Imperative"
+            "FShade.Core"
+        ]
+
+    let asmPaths =
+        assemblies |> List.choose (fun name ->
+            let a = Assembly.Load name
+            try Some a.Location
+            with _ -> None
+        )
+
+
+    let private composeCode =
+        String.concat "\r\n" [
+            "open Microsoft.FSharp.Quotations"
+            "open FShade"
+             
+            "let mutable currentEffect = None"
+             
+            "type ComposeBuilder() ="
+            "   member x.Bind(f : 'a -> Expr<'b>, g : unit -> list<Effect>) = (Effect.ofFunction f) :: g()"
+            "   member x.Return (()) = []"
+            "   member x.Zero() = []"
+            "   member x.Delay(f : unit -> list<Effect>) = f"
+            "   member x.Combine(l : list<Effect>, r : unit -> list<Effect>) = l @ r()"
+            "   member x.Run(r : unit -> list<Effect>) = currentEffect <- Some (Effect.compose (r()))"
+             
+            "let compose = ComposeBuilder()"
+        ]
+
+    let private bootCode =
+        let loads = asmPaths |> Seq.map (sprintf "#r @\"%s\"") |> String.concat "\r\n"
+        String.concat "\r\n" [
+            loads
+            "module Setup = "
+            String.indent 1 composeCode
+        ]
+
+    let private setupCode =
+        let loads = asmPaths |> Seq.map (sprintf "#r @\"%s\"") |> String.concat "\r\n"
+        String.concat "\r\n" [
+            "#if FSHADEDEBUG"
+            "#else"
+            loads
+            composeCode
+            "#endif"
+        ]
+
+    let private fsi =
+        let argv = [| "FsiAnyCPU.exe";  "--noninteractive"; "--define:FSHADEDEBUG" |]
+        let fsiConfig = FsiEvaluationSession.GetDefaultConfiguration()
+        FsiEvaluationSession.Create(fsiConfig, argv, inStream, outStream, errStream) 
+
+    let private currentProp = 
+        match fsi.EvalInteractionNonThrowing bootCode with
+            | Choice1Of2 (), _ -> 
+
+                let rec all (t : Type) =
+                    let all = t.GetNestedTypes() |> Array.collect all
+                    Array.append [| t |] all
+
+                let allTypes = fsi.DynamicAssembly.GetTypes() |> Array.collect all
+                allTypes |> Array.tryPick (fun t ->
+                    let prop = t.GetProperty("currentEffect")
+                    if isNull prop || prop.PropertyType <> typeof<Option<Effect>> then
+                        None
+                    else
+                        Some prop
+                )
+
+
+            | _, err -> 
+                None
+            
+    do File.WriteAllText(Path.Combine(System.Environment.CurrentDirectory, "Setup.fsx"), setupCode)
 
     let appName =
         try Path.GetFileNameWithoutExtension(Assembly.GetEntryAssembly().Location)
@@ -210,7 +216,7 @@ module EffectCompiler =
                 Directory.GetFiles(dir) 
                     |> Seq.map Path.GetFileName
                     |> Set.ofSeq
-
+                    
             match Git.status dir with
                 | Git.Clean ->
                     ()
@@ -229,20 +235,38 @@ module EffectCompiler =
                 let p = Path.Combine(dir, f)
                 File.Delete p
 
+            let compDir = Path.Combine(dir, "compositions")
+            if Directory.Exists compDir then
+                Directory.Delete(compDir, true)
+            
+            File.WriteAllText(Path.Combine(dir, ".gitignore"), "/compositions")
             File.WriteAllText(Path.Combine(dir, "Setup.fsx"), setupCode)
-
+            
+            match Git.status dir with
+                | Git.Dirty _ ->
+                    Git.add dir "."
+                    Git.commit dir "import"
+                | _ ->
+                    ()
 
         else
             Directory.CreateDirectory dir |> ignore
             File.WriteAllText(Path.Combine(dir, "Setup.fsx"), setupCode)
+            File.WriteAllText(Path.Combine(dir, ".gitignore"), "/compositions")
             Git.init dir
             Git.add dir "."
             Git.commit dir "import"
         
         dir
 
+    let compDir =
+        let dir = Path.Combine(debugDir, "compositions")
+        if not (Directory.Exists dir) then
+            Directory.CreateDirectory(dir) |> ignore
+        dir
+
     let init() =
-        if not (Directory.Exists debugDir) then
+        if not (Directory.Exists compDir) then
             failwith "init failed"
                     
     let private toPascalCase (str : string) =

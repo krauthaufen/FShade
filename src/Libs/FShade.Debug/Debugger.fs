@@ -25,10 +25,10 @@ module EffectDebugger =
                             | None ->
                                 None
 
-        let getLeafs (e : Effect) =
+        let rec getLeafs (e : Effect) =
             match e.ComposedOf with
                 | [] -> [e]
-                | l -> l
+                | l -> l |> List.collect getLeafs
 
         let md5 = System.Security.Cryptography.MD5.Create()
 
@@ -96,6 +96,19 @@ module EffectDebugger =
                     ()
         )
 
+    let unknownCache = Dict<string, Effect>()
+    let compositions = Dict<string, ModRef<list<string>> * IMod<Effect>>()
+
+    let private compChanged (file : string) =
+        let name = Path.GetFileNameWithoutExtension file
+        match compositions.TryGetValue name with
+            | (true, (r,_)) ->
+                let lines = File.ReadAllLines(file) |> Array.toList |> List.filter (System.String.IsNullOrWhiteSpace >> not)
+                transact (fun () -> r.Value <- lines)
+            | _ ->
+                ()
+
+
     let private run(o : obj) =
         while true do
             sem.Wait()
@@ -110,9 +123,12 @@ module EffectDebugger =
                             System.Guid.NewGuid() |> string
 
                     try
-                        updateCompiled file code (fun () ->
-                            compileFile file
-                        )
+                        if Path.GetExtension file = ".comp" then
+                            compChanged file
+                        else
+                            updateCompiled file code (fun () ->
+                                compileFile file
+                            )
                     with _ -> 
                         Log.warn "[FShade] updating %A failed" (Path.GetFileName file)
                 | _ ->
@@ -125,14 +141,14 @@ module EffectDebugger =
             Log.line "[FShade] changed %A" (Path.GetFileName f)
             sem.Release() |> ignore
 
-    let private register (e : Effect) =
+    let private tryRegister (e : Effect) =
         lock lockObj (fun () ->
             if active then
                 match tryGetName e with
                     | Some name ->
                         match registered.TryGetValue name with
                             | (true, (o,evt)) -> 
-                                evt :> IMod<_>
+                                Some (name, evt :> IMod<_>)
                             | _ -> 
                                 match CodeGenerator.tryGetCode e with
                                     | Some code ->
@@ -141,52 +157,105 @@ module EffectDebugger =
 
                                         let fileName = name + ".fsx"
                                         let filePath = Path.Combine(EffectCompiler.debugDir, fileName)
+                                        updateCompiled filePath code id
 
                                         File.WriteAllText(filePath, code)
-                                        updateCompiled filePath code id
+                                        Git.add EffectCompiler.debugDir fileName
+                                        Git.amend EffectCompiler.debugDir
+
+
                                         changed filePath
 
-                                        evt :> IMod<_>
+                                        Some (name, evt :> IMod<_>)
                         
                                     | None ->
-                                        Mod.constant e
+                                        None
                     | None ->
-                        Mod.constant e
+                        None
             else
-                Mod.constant e
+                None
         )
+
+    let private register (e : Effect) =
+        match tryRegister e with
+            | Some (name, e) -> e
+            | None -> Mod.constant e
+
+
+    let private registerPiecewise (e : Effect) =
+        match registered.TryGetValue e.Id with
+            | (true, (_,m)) -> 
+                m :> IMod<_>
+
+            | _ -> 
+                let mutable names = []
+                let leafs = 
+                    e |> getLeafs |> List.map (fun c ->
+                        match tryRegister c with
+                            | Some (n, cc) ->
+                                names <- names @ [n]
+                                cc
+                            | None ->
+                                unknownCache.[c.Id] <- c
+                                names <- names @ [c.Id]
+                                Mod.constant c
+                    )
+
+                let mutable isNew = false
+
+                let fileName = md5.ComputeHash(System.Text.Encoding.UTF8.GetBytes e.Id) |> System.Guid |> string
+
+                let _, result = 
+                    compositions.GetOrCreate(fileName, fun _ -> 
+                        isNew <- true
+
+                        let names = Mod.init names
+                        let result = 
+                            names |> Mod.bind (fun names ->
+                                names |> List.choose (fun name ->
+                                    match registered.TryGetValue name with
+                                        | (true, (_,e)) -> Some (e :> IMod<_>)
+                                        | _ -> 
+                                            match unknownCache.TryGetValue name with
+                                                | (true, e) -> Some (Mod.constant e)
+                                                | _ -> None
+                                                
+                                )
+                                |> Mod.mapN Effect.compose
+                            )
+
+                        names, result
+                    )
+
+                if isNew then
+                    let file = Path.Combine(EffectCompiler.compDir, fileName + ".comp")
+                    File.WriteAllLines(file, names)
+
+                result
+
 
     let attach() =
         lock lockObj (fun () ->
             if not active then
                 EffectCompiler.init()
+
+                let compWatch = new FileSystemWatcher(EffectCompiler.compDir, "*.comp")
+                compWatch.Changed.Add (fun e -> changed e.FullPath)
+                compWatch.Renamed.Add (fun e -> changed e.FullPath)
+                compWatch.EnableRaisingEvents <- true
+
+
                 active <- true
-            
-//
-//                for f in Directory.GetFiles(EffectCompiler.debugDir, "*.fsx") do
-////                    let repoFile = Path.Combine(EffectCompiler.repoFolder, Path.GetFileName f)
-////                    if File.Exists repoFile then
-////                        compiledContent.[f] <- File.ReadAllText repoFile
-//                    changed f
 
                 thread.Start()
 
                 let w = new FileSystemWatcher(EffectCompiler.debugDir, "*.fsx")
-                w.Created.Add (fun e ->
-                    changed e.FullPath
-                )
-
-                w.Changed.Add (fun e ->
-                    changed e.FullPath
-                )
-
-                w.Renamed.Add (fun e ->
-                    changed e.FullPath
-                )
-
+                w.Created.Add (fun e -> changed e.FullPath)
+                w.Changed.Add (fun e -> changed e.FullPath)
+                w.Renamed.Add (fun e -> changed e.FullPath)
                 w.EnableRaisingEvents <- true
 
-                EffectDebugger.registerFun <- Some (fun e -> register e :> obj)
+                EffectDebugger.registerFun <- Some (fun e -> registerPiecewise e :> obj)
 
         )
 
