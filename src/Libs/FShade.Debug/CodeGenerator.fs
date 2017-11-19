@@ -296,6 +296,41 @@ module CodeGenerator =
             | [] -> [e]
             | l -> l
 
+
+    let rec private getUsedUniformExtensions (e : Expr) =
+        match e with
+            
+            | Uniform(u) ->
+                match e with
+                    | PropertyGet(_, prop, _) ->
+                        HSet.ofList [ prop :> MemberInfo, u ]
+                        
+                    | Call(_,mi,_) ->
+                        HSet.ofList [ mi :> MemberInfo, u ]
+                    | _ ->
+                        HSet.empty
+
+            | Call(t, mi, args) ->
+                let set = t |> Option.map getUsedUniformExtensions |> Option.defaultValue HSet.empty
+                let set = args |> List.map getUsedUniformExtensions |> List.fold HSet.union set
+
+                let set = 
+                    match Expr.TryGetReflectedDefinition mi with
+                        | Some e -> 
+                            let inner = getUsedUniformExtensions e
+                            HSet.union set inner
+                        | None -> set
+
+                set
+            
+
+            | ShapeCombination(o, args) ->
+                args |> List.map getUsedUniformExtensions |> HSet.unionMany
+            | ShapeVar _ ->
+                HSet.empty
+            | ShapeLambda(_,b) ->
+                getUsedUniformExtensions b
+
     let tryGetCode (e : Effect) : Option<string> =
         let leafs = getLeafs e
 
@@ -353,8 +388,28 @@ module CodeGenerator =
 
                 // TODO: sort used
 
+                let allUniforms =
+                    definitions
+                        |> List.map (fun (_,e,_) -> getUsedUniformExtensions e) 
+                        |> HSet.unionMany
+                        |> HSet.map (fun (mem, u) ->
+                            
+                            let name = mem.Name
+
+                            let name =
+                                let arr = name.Split [|'.'|]
+                                arr.[arr.Length - 1]
+
+                            let name = 
+                                if name.StartsWith "get_" then name.Substring 4
+                                else name
+
+                            (name, u)
+                        )
+                        |> Map.ofSeq
+
                 let uniformDefs = 
-                    e.Uniforms 
+                    allUniforms
                         |> Map.toList
                         |> List.choose (fun (name, u) ->
                             match u.uniformValue with
@@ -365,6 +420,7 @@ module CodeGenerator =
                                                 "uniform"
                                             | Some p ->
                                                 fullName p + "?" + s.Name
+
                                     let bufferName = fullName scope
                                     let typ = Aardvark.Base.ReflectionHelpers.getPrettyName u.uniformType
                                     let str = sprintf "    member x.%s : %s = %s?%s" name typ bufferName realName
@@ -392,7 +448,7 @@ module CodeGenerator =
                         str
 
                 let samplers =
-                    e.Uniforms 
+                    allUniforms
                         |> Map.toList
                         |> List.choose (fun (samplerName, u) ->
                             match u.uniformValue, u.uniformType with
@@ -457,6 +513,7 @@ module CodeGenerator =
                         yield "#load \"Setup.fsx\""
                         yield "open Setup"
                         yield "open Aardvark.Base"
+                        yield "open FShade.Imperative"
                         yield "open FShade"
                         yield ""
 
@@ -471,13 +528,17 @@ module CodeGenerator =
                             yield s
                             yield ""
 
-                        yield "[<ReflectedDefinition; AutoOpen>]"
-                        yield "module Utils ="
-                        for u in used do
-                            if u.mustInline then
-                                yield "    [<Inline>]"
-                            yield String.indent 1 u.code
-                            yield ""
+                        match used with
+                            | [] -> ()
+                            | _ -> 
+                                yield "[<ReflectedDefinition; AutoOpen>]"
+                                yield "module Utils ="
+                                for u in used do
+                                    if u.mustInline then
+                                        yield "    [<Inline>]"
+                                    yield String.indent 1 u.code
+                                    yield ""
+                                yield ""
                                         
 
                         for (inputType, r, definition) in definitions do
@@ -499,10 +560,28 @@ module CodeGenerator =
                                         let i = f.Interpolation
                                         let typ = Aardvark.Base.ReflectionHelpers.getPrettyName f.PropertyType
 
+                                        let atts = f.GetCustomAttributesData() |> Seq.toList |> List.filter (fun a -> typeof<SemanticAttribute>.IsAssignableFrom a.AttributeType)
+
                                         let atts =
-                                            [
-                                                if sem <> f.Name then
-                                                    yield sprintf "Semantic(\"%s\")" sem
+                                            [   
+                                                for a in atts do
+                                                    let args = a.ConstructorArguments |> Seq.toList |> List.map (fun a -> match a.Value with | :? string as str -> "\"" + str + "\"" | _ -> string a) |> String.concat ", "
+                                                    let name = a.Constructor.DeclaringType.Name
+
+                                                    let name =
+                                                        if name.EndsWith "Attribute" then name.Substring(0, name.Length - 9)
+                                                        else name
+
+                                                    if a.AttributeType.Assembly.GetName().Name = "FShade.Core" then
+                                                        match args with
+                                                            | "" -> yield name
+                                                            | _ -> yield sprintf "%s(%s)" name args
+                                                    else
+                                                        yield sprintf "Semantic(\"%s\")" sem
+
+//
+//                                                if sem <> f.Name then
+//                                                    yield sprintf "Semantic(\"%s\")" sem
 
                                                 if i <> InterpolationMode.Default then
                                                     yield sprintf "Interpolation(InterpolationMode.%A)" i
@@ -520,10 +599,10 @@ module CodeGenerator =
                                 ]
 
 
-                            for o in definition.opened do 
-                                yield sprintf "    open %s" o
-
-                            yield ""
+                            //for o in definition.opened do 
+                            //    yield sprintf "    open %s" o
+                            //
+                            //yield ""
 
                             yield String.indent 1 vertexDef
 
