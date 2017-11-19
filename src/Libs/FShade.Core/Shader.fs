@@ -412,6 +412,9 @@ module private Preprocessor =
             let! vertexType = State.vertexType
 
             match e with
+                | LetCopyOfStruct(e) ->
+                    return! preprocessNormalS e
+
                 | ReadInput(kind, name, idx) ->
                     let! idx = idx |> Option.mapS preprocessNormalS
 
