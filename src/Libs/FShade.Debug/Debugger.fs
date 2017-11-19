@@ -6,6 +6,7 @@ open FShade.Debug
 open System.IO
 open System.Collections.Concurrent
 open Microsoft.FSharp.Quotations
+open FShade.Imperative
 
 module EffectDebugger =
     
@@ -181,6 +182,18 @@ module EffectDebugger =
             | Some (name, e) -> e
             | None -> Mod.constant e
 
+    let private printConfig = { EffectConfig.empty with outputs = Map.ofList ["Colors", (typeof<V4d>, 0) ] }
+    let private printOutput (name : string) (effect : Effect) =
+        
+        let glsl =
+            effect 
+            |> Effect.toModule printConfig
+            |> ModuleCompiler.compileGLSL410
+
+        let file = Path.Combine(EffectCompiler.outDir, name + ".glsl")
+        File.WriteAllText(file, glsl.code)
+
+        effect
 
     let private registerPiecewise (e : Effect) =
         match registered.TryGetValue e.Id with
@@ -221,7 +234,8 @@ module EffectDebugger =
                                                 | _ -> None
                                                 
                                 )
-                                |> Mod.mapN Effect.compose
+                                |> Mod.mapN (Effect.compose >> printOutput fileName)
+                                
                             )
 
                         names, result

@@ -48,6 +48,11 @@
       <Project>{0f39c812-b7fb-4210-9e83-19d85a1cd10d}</Project>
       <Private>True</Private>
     </ProjectReference>
+    <ProjectReference Include="..\FShade.GLSL\FShade.GLSL.fsproj">
+      <Name>FShade.GLSL</Name>
+      <Project>{13af9c38-cca2-47c5-b4de-a7342f0d2961}</Project>
+      <Private>True</Private>
+    </ProjectReference>
     <ProjectReference Include="..\FShade.Imperative\FShade.Imperative.fsproj">
       <Name>FShade.Imperative</Name>
       <Project>{1223c55b-5634-4764-b5bd-bf9ad95c073b}</Project>

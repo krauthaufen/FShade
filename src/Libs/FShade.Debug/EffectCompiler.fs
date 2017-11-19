@@ -239,7 +239,12 @@ module EffectCompiler =
             if Directory.Exists compDir then
                 Directory.Delete(compDir, true)
             
-            File.WriteAllText(Path.Combine(dir, ".gitignore"), "/compositions")
+            let outDir = Path.Combine(dir, "glsl")
+            if Directory.Exists outDir then
+                Directory.Delete(outDir, true)
+
+
+            File.WriteAllText(Path.Combine(dir, ".gitignore"), "/compositions\r\n/glsl")
             File.WriteAllText(Path.Combine(dir, "Setup.fsx"), setupCode)
             
             match Git.status dir with
@@ -252,7 +257,7 @@ module EffectCompiler =
         else
             Directory.CreateDirectory dir |> ignore
             File.WriteAllText(Path.Combine(dir, "Setup.fsx"), setupCode)
-            File.WriteAllText(Path.Combine(dir, ".gitignore"), "/compositions")
+            File.WriteAllText(Path.Combine(dir, ".gitignore"), "/compositions\r\n/glsl")
             Git.init dir
             Git.add dir "."
             Git.commit dir "import"
@@ -261,6 +266,12 @@ module EffectCompiler =
 
     let compDir =
         let dir = Path.Combine(debugDir, "compositions")
+        if not (Directory.Exists dir) then
+            Directory.CreateDirectory(dir) |> ignore
+        dir
+
+    let outDir =
+        let dir = Path.Combine(debugDir, "glsl")
         if not (Directory.Exists dir) then
             Directory.CreateDirectory(dir) |> ignore
         dir
