@@ -31,8 +31,6 @@ module EffectDebugger =
                 | [] -> [e]
                 | l -> l |> List.collect getLeafs
 
-        let md5 = System.Security.Cryptography.MD5.Create()
-
         let tryGetName (e : Effect) =
             let leafs = getLeafs e
 
@@ -60,13 +58,19 @@ module EffectDebugger =
                 | None ->
                     None
 
-    let mutable private active = false
     let private registered = Dict<string, Effect * ModRef<Effect>>()
     let private lockObj = obj()
 
     let private sem = new System.Threading.SemaphoreSlim(0)
     let private queue = ConcurrentHashQueue<string>()
     let private compiledContent = Dict<string, string>()
+
+    
+    let private md5 = System.Security.Cryptography.MD5.Create()
+
+    let private getCompositionName (e : Effect) =
+        md5.ComputeHash(System.Text.Encoding.UTF8.GetBytes e.Id) |> System.Guid |> string
+
 
     let private updateCompiled (file : string) (code : string) (f : unit -> unit) =
         lock compiledContent (fun () ->
@@ -144,7 +148,7 @@ module EffectDebugger =
 
     let private tryRegister (e : Effect) =
         lock lockObj (fun () ->
-            if active then
+            if EffectDebugger.isAttached then
                 match tryGetName e with
                     | Some name ->
                         match registered.TryGetValue name with
@@ -183,17 +187,20 @@ module EffectDebugger =
             | None -> Mod.constant e
 
     let private printConfig = { EffectConfig.empty with outputs = Map.ofList ["Colors", (typeof<V4d>, 0) ] }
-    let private printOutput (name : string) (effect : Effect) =
-        
-        let glsl =
-            effect 
-            |> Effect.toModule printConfig
-            |> ModuleCompiler.compileGLSL410
-
-        let file = Path.Combine(EffectCompiler.outDir, name + ".glsl")
-        File.WriteAllText(file, glsl.code)
-
+    let private glslNames = Dict<Effect, string>()
+    let private registerOutput (name : string) (effect : Effect) =
+        glslNames.[effect] <- name
         effect
+
+    let private printOutput (effect : Effect) (code : string) =
+        match glslNames.TryGetValue effect with
+            | (true, name) ->
+                let file = Path.Combine(EffectCompiler.outDir, name + ".glsl")
+                File.WriteAllText(file, code)
+            | _ ->
+                ()
+
+
 
     let private registerPiecewise (e : Effect) =
         match registered.TryGetValue e.Id with
@@ -216,7 +223,7 @@ module EffectDebugger =
 
                 let mutable isNew = false
 
-                let fileName = md5.ComputeHash(System.Text.Encoding.UTF8.GetBytes e.Id) |> System.Guid |> string
+                let fileName = getCompositionName e
 
                 let _, result = 
                     compositions.GetOrCreate(fileName, fun _ -> 
@@ -234,7 +241,7 @@ module EffectDebugger =
                                                 | _ -> None
                                                 
                                 )
-                                |> Mod.mapN (Effect.compose >> printOutput fileName)
+                                |> Mod.mapN (Effect.compose >> registerOutput fileName)
                                 
                             )
 
@@ -250,16 +257,15 @@ module EffectDebugger =
 
     let attach() =
         lock lockObj (fun () ->
-            if not active then
+            if not EffectDebugger.isAttached then
                 EffectCompiler.init()
+                EffectDebugger.isAttached <- true
+                EffectDebugger.saveCode <- printOutput
 
                 let compWatch = new FileSystemWatcher(EffectCompiler.compDir, "*.comp")
                 compWatch.Changed.Add (fun e -> changed e.FullPath)
                 compWatch.Renamed.Add (fun e -> changed e.FullPath)
                 compWatch.EnableRaisingEvents <- true
-
-
-                active <- true
 
                 thread.Start()
 
