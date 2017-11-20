@@ -187,13 +187,13 @@ module EffectDebugger =
             | None -> Mod.constant e
 
     let private printConfig = { EffectConfig.empty with outputs = Map.ofList ["Colors", (typeof<V4d>, 0) ] }
-    let private glslNames = Dict<Effect, string>()
+    let private glslNames = Dict<string, string>()
     let private registerOutput (name : string) (effect : Effect) =
-        glslNames.[effect] <- name
+        glslNames.[effect.Id] <- name
         effect
 
     let private printOutput (effect : Effect) (code : string) =
-        match glslNames.TryGetValue effect with
+        match glslNames.TryGetValue effect.Id with
             | (true, name) ->
                 let file = Path.Combine(EffectCompiler.outDir, name + ".glsl")
                 File.WriteAllText(file, code)
