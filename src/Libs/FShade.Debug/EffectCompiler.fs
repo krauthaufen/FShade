@@ -276,9 +276,8 @@ module EffectCompiler =
             Directory.CreateDirectory(dir) |> ignore
         dir
 
-    let init() =
-        if not (Directory.Exists compDir) then
-            failwith "init failed"
+
+        
                     
     let private toPascalCase (str : string) =
         if str.Length > 0 then
@@ -300,3 +299,32 @@ module EffectCompiler =
                 | _ -> 
                     Choice2Of2 errors
         )
+
+    let private dummyShader =
+        String.concat "\r\n" [
+            "open Aardvark.Base"
+            "open FShade"
+            "open Setup"
+            ""
+            "type Vertex = { [<Position>] pos : V4d }"
+            ""
+            "let shader(v : Vertex) ="
+            "    vertex {"
+            "        return { v with pos = 3.0 * v.pos }"
+            "    }"
+            ""
+            "compose {"
+            "    do! shader"
+            "}"
+        ]
+
+    let init() =
+        if not (Directory.Exists compDir) then
+            failwith "init failed"
+
+        let temp = Path.GetTempFileName() + ".fsx"
+        File.WriteAllText(temp, dummyShader)
+        match tryCompile temp with
+            | Choice1Of2 _ -> ()
+            | _ -> Log.warn "bad"
+        File.Delete temp
