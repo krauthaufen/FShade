@@ -321,6 +321,10 @@ module Assembler =
         match t with
             | CArray(et, len) ->
                 sprintf "%s %s[%d]" (assembleType et).Name name.Name len
+
+            | CPointer(_,et) ->
+                sprintf "%s %s[]" (assembleType et).Name name.Name
+
             | t ->
                 sprintf "%s %s" (assembleType t).Name name.Name
         
@@ -840,25 +844,37 @@ module Assembler =
                             fields |> List.map (fun u -> 
                                 let decl = assembleDeclaration u.cUniformType (checkName u.cUniformName)
                                 let decl = sprintf "%s;" decl 
-                                decl, u.cUniformDecorations
+                                decl, u.cUniformName, u.cUniformDecorations
                             )
                         match name with
                             | Some "SharedMemory" ->
-                                let fields = fields |> List.map (fun (d,_) -> sprintf "shared %s" d) |> String.concat "\r\n"
+                                let fields = fields |> List.map (fun (d,_,_) -> sprintf "shared %s" d) |> String.concat "\r\n"
                                 return fields
+
+                            | Some "StorageBuffer" ->
+                                let! buffers =
+                                    fields |> List.mapS (fun (d,name,_) ->
+                                        state {
+                                            let! binding = AssemblerState.newBinding
+                                            let prefix = uniformLayout [] set binding
+                                            return sprintf "%sbuffer %sSSB { %s };" prefix name d
+                                        }
+                                    )
+
+                                return buffers |> String.concat "\r\n"
                                 
                             | Some bufferName when config.createUniformBuffers ->
                                 let bufferName = checkName bufferName
                                 let! binding = AssemblerState.newBinding
                                     
-                                let fields = fields |> List.map fst |> String.concat "\r\n"
+                                let fields = fields |> List.map (fun (d,_,_) -> d) |> String.concat "\r\n"
                                 let prefix = uniformLayout [] set binding
                             
                                 return sprintf "%suniform %s\r\n{\r\n%s\r\n};\r\n" prefix bufferName.Name (String.indent fields)
 
                             | _ ->
                                 let! definitions = 
-                                    fields |> List.mapS (fun (f, decorations) ->
+                                    fields |> List.mapS (fun (f, _, decorations) ->
                                         state {
                                             let! binding = AssemblerState.newBinding
                                             let prefix = uniformLayout decorations set binding
