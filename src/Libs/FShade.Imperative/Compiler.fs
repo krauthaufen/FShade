@@ -354,6 +354,47 @@ module Compiler =
                     )
                     |> String.concat "\r\n"
 
+
+        module private Simplification = 
+
+            let mulMatVec (m : CExpr) (v : CExpr) =
+                let rType =
+                    match m.ctype with
+                        | CMatrix(t, r, c) -> CVector(t, r)
+                        | t -> failwithf "[FShade] not a matrix type: %A" t
+                CMulMatVec(rType, m, v)
+
+                
+            let mulVecMat (v : CExpr) (m : CExpr) =
+                let rType =
+                    match m.ctype with
+                        | CMatrix(t, r, c) -> CVector(t, c)
+                        | t -> failwithf "[FShade] not a matrix type: %A" t
+
+                CMulVecMat(rType, v, m)
+
+            let rec extractMatrices (e : CExpr) =
+                match e with
+                    | CMulMatMat(t,l,r) ->
+                        extractMatrices l @ extractMatrices r
+                    | _ ->
+                        [e]
+
+            let rec simplifyMatrixTerm (e : CExpr) =
+                match e with
+                    | CMulMatVec(_,m, v) ->
+                        match extractMatrices m with
+                            | [m] -> e
+                            | many -> List.foldBack mulMatVec many v
+
+                    | CMulVecMat(_,v,m) ->
+                        match extractMatrices m with
+                            | [m] -> e
+                            | many -> List.fold mulVecMat v many// v * m0 * m1 * m2
+                            
+                    | _ ->
+                        e
+
         let rec tryGetBuiltInMethod (b : IBackend) (mi : MethodInfo) (args : list<CExpr>) =
             let ct = CType.ofType b mi.ReturnType
             match mi, args with
@@ -368,32 +409,15 @@ module Compiler =
                 | Method("op_LeftShift", _), [l;r]          -> CExpr.CLeftShift(ct, l, r) |> Some
                 | Method("op_RightShift", _), [l;r]         -> CExpr.CRightShift(ct, l, r) |> Some
             
+               
+
                 | Method("op_Multiply", _), [l;r] ->
                     let lt = l.ctype
                     let rt = r.ctype 
                     match lt, rt with
                         | CMatrix _, CMatrix _              -> CMulMatMat(ct, l, r) |> Some
-                        | CMatrix _, CVector _              ->
-                            
-                            let rec etractMatrices (e : CExpr) =
-                                match e with
-                                    | CMulMatMat(_, lm, rm) ->
-                                        etractMatrices lm @ etractMatrices rm
-                                    | _ ->
-                                        [e]
-                             
-                            let mats = etractMatrices l
-
-                            let mul (m : CExpr) (v : CExpr) =
-                                let rType =
-                                    match m.ctype with
-                                        | CMatrix(t, r, c) -> CVector(t, r)
-                                        | t -> failwithf "[FShade] not a matrix type: %A" t
-                                CMulMatVec(rType, m, v)
-
-                            List.foldBack mul mats r |> Some
-
-                        | CVector _, CMatrix(b,rows,cols)   -> CMulMatVec(ct, CTranspose(CMatrix(b,cols,rows), r), l) |> Some
+                        | CMatrix _, CVector _              -> CMulMatVec(ct, l, r) |> Simplification.simplifyMatrixTerm |> Some
+                        | CVector _, CMatrix(b,rows,cols)   -> CMulVecMat(ct, l, r) |> Simplification.simplifyMatrixTerm |> Some
                         | _                                 -> CExpr.CMul(ct, l, r) |> Some
 
                 // transpose
@@ -433,7 +457,7 @@ module Compiler =
                 | Method("TransformDir", [MatrixOf _; VectorOf _]), [m;v] ->
                     match ct, v.ctype with
                         | CVector(rt, rd), CVector(t, d) ->
-                            let res = CMulMatVec(CVector(rt, rd + 1), m, CNewVector(CVector(t, d + 1), d, [v; zero t]))
+                            let res = CMulMatVec(CVector(rt, rd + 1), m, CNewVector(CVector(t, d + 1), d, [v; zero t])) |> Simplification.simplifyMatrixTerm
                             CVecSwizzle(ct, res, CVecComponent.first rd) |> Some
                         | _ ->
                             None
@@ -443,7 +467,7 @@ module Compiler =
                 | Method("TransformPos", [MatrixOf _; VectorOf _]), [m;v] ->
                     match ct, v.ctype with
                         | CVector(rt, rd), CVector(t, d) ->
-                            let res = CMulMatVec(CVector(rt, rd + 1), m, CNewVector(CVector(t, d + 1), d, [v; one t]))
+                            let res = CMulMatVec(CVector(rt, rd + 1), m, CNewVector(CVector(t, d + 1), d, [v; one t])) |> Simplification.simplifyMatrixTerm
                             CVecSwizzle(ct, res, CVecComponent.first rd) |> Some
                         | _ ->
                             None
@@ -452,7 +476,7 @@ module Compiler =
                 | Method("TransposedTransformDir", [MatrixOf _; VectorOf _]), [m;v] ->
                     match ct, v.ctype with
                         | CVector(rt, rd), CVector(t, d) ->
-                            let res = CMulVecMat(CVector(rt, rd + 1), CNewVector(CVector(t, d + 1), d, [v; zero t]), m)
+                            let res = CMulVecMat(CVector(rt, rd + 1), CNewVector(CVector(t, d + 1), d, [v; zero t]), m) |> Simplification.simplifyMatrixTerm
                             CVecSwizzle(ct, res, CVecComponent.first rd) |> Some
                         | _ ->
                             None
@@ -461,7 +485,7 @@ module Compiler =
                 | Method("TransposedTransformPos", [MatrixOf _; VectorOf _]), [m;v] ->
                     match ct, v.ctype with
                         | CVector(rt, rd), CVector(t, d) ->
-                            let res = CMulVecMat(CVector(rt, rd + 1), CNewVector(CVector(t, d + 1), d, [v; one t]), m)
+                            let res = CMulVecMat(CVector(rt, rd + 1), CNewVector(CVector(t, d + 1), d, [v; one t]), m) |> Simplification.simplifyMatrixTerm
                             CVecSwizzle(ct, res, CVecComponent.first rd) |> Some
                         | _ ->
                             None

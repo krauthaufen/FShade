@@ -53,7 +53,7 @@ module UtiliyFunctions =
         vertex {
             let m = M44d.Identity * v.pos
 
-            let m = M33d.op_Explicit uniform.X * v.pos.XYZ
+            let m = (uniform.X * uniform.Y).TransformDir v.pos.XYZ
 
             return { v with pos = (uniform.X * uniform.Y) * V4d(m, 1.0) }
         }
