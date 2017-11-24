@@ -176,6 +176,20 @@ module ReflectionPatterns =
 
             | _ -> None
 
+    let (|MatrixValue|_|) (v : obj) =
+        match v with
+            | :? IMatrix as m ->
+                let values =
+                    [|
+                        for r in 0 .. int m.Dim.Y - 1 do
+                            for c in 0 .. int m.Dim.X - 1 do
+                                yield m.GetValue(int64 c, int64 r)
+                    |]
+                let bt = values.[0].GetType()
+                Some (bt, values)
+            | _ -> 
+                None
+
     let (|SwitchableType|_|) (t : Type) =
         match t with
             | Integral 

@@ -302,6 +302,11 @@ module Compiler =
                     | VectorValue(bt, args) ->
                         let ctor = t.GetConstructor(Array.create args.Length bt)
                         Expr.NewObject(ctor, args |> Array.toList |> List.map (fun v -> Expr.Value(v, bt))) |> Some
+
+                    | MatrixValue(bt, args) ->
+                        let ctor = t.GetConstructor(Array.create args.Length bt)
+                        Expr.NewObject(ctor, args |> Array.toList |> List.map (fun v -> Expr.Value(v, bt))) |> Some
+
                     | _ ->
                         None
 

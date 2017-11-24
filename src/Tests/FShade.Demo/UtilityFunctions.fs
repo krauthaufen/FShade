@@ -51,7 +51,8 @@ module UtiliyFunctions =
 
     let vs (v : Vertex) =
         vertex {
-            return { v with pos = (uniform.X * uniform.Y) * v.pos }
+            let m = M44d.Identity * v.pos
+            return { v with pos = (uniform.X * uniform.Y) * m }
         }
 
     let sammy =
@@ -189,37 +190,44 @@ module UtiliyFunctions =
             Report.Line("{0}", sb.ToString())
 
     let run() =
-        EffectDebugger.attach()
+        //EffectDebugger.attach()
 
         let effect = 
             Effect.compose [
-                Effect.ofFunction gs0
+                Effect.ofFunction vs
                 Effect.ofFunction shader
             ]
+        let glsl =
+            effect
+                |> Effect.toModule { EffectConfig.empty with outputs = Map.ofList ["Colors", (typeof<V4d>, 0)] }
+                |> ModuleCompiler.compileGLSL410
 
-        let changeable = 
-            match EffectDebugger.register effect with
-                | Some o -> o |> unbox<IMod<Effect>>
-                | None -> Mod.constant effect
-
-        let subsription = 
-            changeable |> Mod.unsafeRegisterCallbackKeepDisposable (fun replacement ->
-                Log.start "updated %A" effect.Id
-                try
-                    let glsl =
-                        replacement
-                            |> Effect.toModule { EffectConfig.empty with outputs = Map.ofList ["Colors", (typeof<V4d>, 0)] }
-                            |> ModuleCompiler.compileGLSL410
+        logLines glsl.code 
 
 
-                    logLines glsl.code 
-                finally 
-                    Log.stop()
-            )
+//        let changeable = 
+//            match EffectDebugger.register effect with
+//                | Some o -> o |> unbox<IMod<Effect>>
+//                | None -> Mod.constant effect
 
-
-        System.Console.ReadLine() |> ignore
-        subsription.Dispose()
+//        let subsription = 
+//            changeable |> Mod.unsafeRegisterCallbackKeepDisposable (fun replacement ->
+//                Log.start "updated %A" effect.Id
+//                try
+//                    let glsl =
+//                        replacement
+//                            |> Effect.toModule { EffectConfig.empty with outputs = Map.ofList ["Colors", (typeof<V4d>, 0)] }
+//                            |> ModuleCompiler.compileGLSL410
+//
+//
+//                    logLines glsl.code 
+//                finally 
+//                    Log.stop()
+//            )
+//
+//
+//        System.Console.ReadLine() |> ignore
+//        subsription.Dispose()
 
         System.Environment.Exit 0
         
