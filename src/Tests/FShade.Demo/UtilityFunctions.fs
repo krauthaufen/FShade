@@ -52,7 +52,10 @@ module UtiliyFunctions =
     let vs (v : Vertex) =
         vertex {
             let m = M44d.Identity * v.pos
-            return { v with pos = (uniform.X * uniform.Y) * m }
+
+            let m = M33d.op_Explicit uniform.X * v.pos.XYZ
+
+            return { v with pos = (uniform.X * uniform.Y) * V4d(m, 1.0) }
         }
 
     let sammy =

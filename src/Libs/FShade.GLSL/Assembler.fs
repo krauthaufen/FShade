@@ -455,7 +455,7 @@ module Assembler =
                             return sprintf "mod(%s, %s)" l r
                             
 
-                | CMulMatMat(_, l, r) | CMulMatVec(_, l, r) ->
+                | CMulMatMat(_, l, r) | CMulMatVec(_, l, r) | CMulVecMat(_, l, r) ->
                     let! reverse = AssemblerState.reverseMatrixLogic
                     let! l = assembleExprS l
                     let! r = assembleExprS r
@@ -467,6 +467,12 @@ module Assembler =
                     let! m = assembleExprS m
                     if reverse then return sprintf "%s[%d][%d]" m r c
                     else return sprintf "%s[%d][%d]" m c r
+
+                | CConvertMatrix(t, m) ->
+                    let t = assembleType t
+                    let! m = assembleExprS m
+                    return sprintf "%s(%s)" t.Name m
+
 
                 | CTranspose(_, m) ->
                     let! m = assembleExprS m

@@ -448,6 +448,51 @@ module Compiler =
                         | _ ->
                             None
 
+                // transposedTransformDir
+                | Method("TransposedTransformDir", [MatrixOf _; VectorOf _]), [m;v] ->
+                    match ct, v.ctype with
+                        | CVector(rt, rd), CVector(t, d) ->
+                            let res = CMulVecMat(CVector(rt, rd + 1), CNewVector(CVector(t, d + 1), d, [v; zero t]), m)
+                            CVecSwizzle(ct, res, CVecComponent.first rd) |> Some
+                        | _ ->
+                            None
+
+                // transposedTransformDir
+                | Method("TransposedTransformPos", [MatrixOf _; VectorOf _]), [m;v] ->
+                    match ct, v.ctype with
+                        | CVector(rt, rd), CVector(t, d) ->
+                            let res = CMulVecMat(CVector(rt, rd + 1), CNewVector(CVector(t, d + 1), d, [v; one t]), m)
+                            CVecSwizzle(ct, res, CVecComponent.first rd) |> Some
+                        | _ ->
+                            None
+
+                
+                
+                | MethodQuote <@ m22d : M22f -> _ @> _, [m] 
+                | MethodQuote <@ m33d : M33f -> _ @> _, [m] 
+                | MethodQuote <@ m34d : M34f -> _ @> _, [m] 
+                | MethodQuote <@ m44d : M44f -> _ @> _, [m] 
+                | MethodQuote <@ m22f : M22d -> _ @> _, [m] 
+                | MethodQuote <@ m33f : M33d -> _ @> _, [m] 
+                | MethodQuote <@ m34f : M34d -> _ @> _, [m] 
+                | MethodQuote <@ m44f : M44d -> _ @> _, [m] 
+                | MethodQuote <@ m22i : M22d -> _ @> _, [m] 
+                | MethodQuote <@ m33i : M33d -> _ @> _, [m] 
+                | MethodQuote <@ m34i : M34d -> _ @> _, [m] 
+                | MethodQuote <@ m44i : M44d -> _ @> _, [m] 
+                | MethodQuote <@ m22l : M22d -> _ @> _, [m] 
+                | MethodQuote <@ m33l : M33d -> _ @> _, [m] 
+                | MethodQuote <@ m34l : M34d -> _ @> _, [m] 
+                | MethodQuote <@ m44l : M44d -> _ @> _, [m] 
+                | Method("UpperLeftM33", [MatrixOf _]), [m]
+                | Method("op_Explicit", [MatrixOf _]), [m] ->
+                    match ct with
+                        | CMatrix(et, r, c) ->
+                            CConvertMatrix(ct, m) |> Some
+                        | _ ->
+                            None 
+
+
                 // vector swizzles
                 | (MethodQuote <@ Vec.xy : V4d -> V2d @> _ ), [v] -> CVecSwizzle(ct, v, CVecComponent.xy) |> Some
                 | (MethodQuote <@ Vec.yz : V4d -> V2d @> _), [v] -> CVecSwizzle(ct, v, CVecComponent.yz) |> Some

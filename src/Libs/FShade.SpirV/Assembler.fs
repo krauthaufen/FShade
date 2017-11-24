@@ -922,7 +922,7 @@ module Assembler =
                         | _ -> failwithf "[FShade] cannot add %A" t
                     return id
                     
-                | CMul(t, l, r) | CMulMatVec(t, l, r) | CMulMatMat(t, l, r) ->
+                | CMul(t, l, r) | CMulMatVec(t, l, r) | CMulMatMat(t, l, r) | CMulVecMat(t, l, r) ->
                     let! lid = assembleExpr l
                     let! rid = assembleExpr r
                     let! id = SpirV.id
@@ -1061,7 +1061,7 @@ module Assembler =
                     yield OpExtInst(tid, id, 1u, int GLSLExtInstruction.Length, [| v |])
                     return id
 
-                | CMatrixElement _ | CMatrixFromCols _ | CMatrixFromRows _ | CNewMatrix _ | CMatrixRow _ | CMatrixCol _ ->
+                | CMatrixElement _ | CMatrixFromCols _ | CMatrixFromRows _ | CNewMatrix _ | CMatrixRow _ | CMatrixCol _ | CConvertMatrix _ ->
                     return failwith "not implemented"
                     
                 | CConvert(t, e) ->
