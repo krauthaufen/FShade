@@ -340,11 +340,13 @@ type CExpr =
     | CTranspose of CType * CExpr
     | CMulMatMat of CType * CExpr * CExpr
     | CMulMatVec of CType * CExpr * CExpr
+    | CMulVecMat of CType * CExpr * CExpr
     | CDot of CType * CExpr * CExpr
     | CCross of CType * CExpr * CExpr
     | CVecSwizzle of CType * CExpr * list<CVecComponent>
     | CVecItem of CType * CExpr * CExpr
     | CMatrixElement of t : CType * m : CExpr * r : int * c : int
+    | CConvertMatrix of t : CType * m : CExpr
     | CNewVector of t : CType * d : int * components : list<CExpr>
 
     | CNewMatrix of t : CType * elements : list<CExpr>
@@ -407,11 +409,13 @@ type CExpr =
             | CTranspose(t,_) -> t
             | CMulMatMat(t,_,_) -> t
             | CMulMatVec(t,_,_) -> t
+            | CMulVecMat(t,_,_) -> t
             | CDot(t,_,_) -> t
             | CCross(t,_,_) -> t
             | CVecSwizzle(t,_,_) -> t
             | CVecItem(t,_,_) -> t
             | CMatrixElement(t,_,_,_) -> t
+            | CConvertMatrix(t,_) -> t
             | CNewVector(t,_,_) -> t
 
             | CNewMatrix(t,_) -> t
@@ -505,12 +509,12 @@ module CExpr =
                     | Some i -> visit used i
                     | _ -> ()
 
-            | CNeg(t,e) | CNot(t,e) | CTranspose(t,e) | CVecLength(t,e) | CConvert(t,e) | CAddressOf(t,e) ->
+            | CNeg(t,e) | CNot(t,e) | CTranspose(t,e) | CVecLength(t,e) | CConvert(t,e) | CAddressOf(t,e) | CConvertMatrix(t,e) ->
                 used.AddType t
                 visit used e
 
             | CAdd(t,l,r) | CSub(t,l,r) | CMul(t,l,r) | CDiv(t,l,r) | CMod(t,l,r)
-            | CMulMatMat(t,l,r) | CMulMatVec(t,l,r) | CDot(t,l,r) | CCross(t,l,r)
+            | CMulMatMat(t,l,r) | CMulMatVec(t,l,r) | CMulVecMat(t,l,r) | CDot(t,l,r) | CCross(t,l,r)
             | CBitAnd(t,l,r) | CBitOr(t,l,r) | CBitXor(t,l,r) | CLeftShift(t,l,r) | CRightShift(t,l,r) ->
                 used.AddType t
                 visit used l

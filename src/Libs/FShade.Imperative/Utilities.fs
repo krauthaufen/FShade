@@ -176,6 +176,20 @@ module ReflectionPatterns =
 
             | _ -> None
 
+    let (|MatrixValue|_|) (v : obj) =
+        match v with
+            | :? IMatrix as m ->
+                let values =
+                    [|
+                        for r in 0 .. int m.Dim.Y - 1 do
+                            for c in 0 .. int m.Dim.X - 1 do
+                                yield m.GetValue(int64 c, int64 r)
+                    |]
+                let bt = values.[0].GetType()
+                Some (bt, values)
+            | _ -> 
+                None
+
     let (|SwitchableType|_|) (t : Type) =
         match t with
             | Integral 
@@ -565,7 +579,6 @@ module ExprExtensions =
                 
         static member ComputeHash(e : Expr) =
             let e = Reflection.withAttributes e []
-
             Pickler.pickler.ComputeHash(e).Hash |> Convert.ToBase64String
 
         member x.ComputeHash() =
@@ -592,8 +605,40 @@ module ExprExtensions =
 
         /// creates an array-indexing expression using the supplied arguments
         static member ArrayAccess(arr : Expr, index : Expr) =
-            let get = Methods.getArray.MakeGenericMethod([| arr.Type.GetElementType() |])
-            Expr.Call(get, [arr;index])
+            match arr.Type with
+                | ArrayOf t -> 
+                    let get = Methods.getArray.MakeGenericMethod([| arr.Type.GetElementType() |])
+                    Expr.Call(get, [arr;index])
+                | t ->
+                    let prop = t.GetProperty "Item"
+
+                    if isNull prop then
+                        failwithf "[FShade] not an array type: %A" t
+
+                    let ip = prop.GetIndexParameters()
+                    if ip.Length <> 1 || ip.[0].ParameterType <> typeof<int> then
+                        failwithf "[FShade] not an array type: %A" t
+
+                    Expr.PropertyGet(arr, prop, [index])
+            
+        /// creates an array-indexing expression using the supplied arguments
+        static member ArraySet(arr : Expr, index : Expr, value : Expr) =
+            match arr.Type with
+                | ArrayOf t -> 
+                    let set = Methods.setArray.MakeGenericMethod([| t |])
+                    Expr.Call(set, [arr;index;value])
+                | t ->
+                    let prop = t.GetProperty "Item"
+
+                    if isNull prop then
+                        failwithf "[FShade] not an array type: %A" t
+
+                    let ip = prop.GetIndexParameters()
+                    if ip.Length <> 1 || ip.[0].ParameterType <> typeof<int> then
+                        failwithf "[FShade] not an array type: %A" t
+                        
+
+                    Expr.PropertySet(arr, prop, value, [index])
 
         /// creates a new fixed-size-array using the given element-type and values
         static member NewFixedArray(et : Type, values : list<Expr>) =
@@ -846,16 +891,13 @@ module ExprExtensions =
     /// code less readable and more complicated
     let (|LetCopyOfStruct|_|) (e : Expr) =
         match e with
-            | Let(v, e, b) when v.Name = "copyOfStruct" ->
-                if v.Type.IsValueType then
-                    // TODO: find a better way for detecting this
-                    let mutable count = 0
-                    let newBody = b.Substitute(fun vi -> if v = vi then count <- count + 1; Some e else None) 
-                    if count = 0 then Some b
-                    elif count = 1 then Some newBody
-                    else None
-                else
-                    None
+            | Let(v, e, b) when v.Name = "copyOfStruct" && v.Type.IsValueType ->
+                // TODO: find a better way for detecting this
+                let mutable count = 0
+                let newBody = b.Substitute(fun vi -> if v = vi then count <- count + 1; Some e else None) 
+                if count = 0 then Some b
+                elif count = 1 then Some newBody
+                else None
             | _ ->
                 None
 

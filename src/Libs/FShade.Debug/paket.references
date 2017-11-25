@@ -1,0 +1,5 @@
+Aardvark.Base
+Aardvark.Base.FSharp
+FSharp.Core
+FSharp.Compiler.Service
+Aardvark.Base.Incremental

@@ -321,6 +321,10 @@ module Assembler =
         match t with
             | CArray(et, len) ->
                 sprintf "%s %s[%d]" (assembleType et).Name name.Name len
+
+            | CPointer(_,et) ->
+                sprintf "%s %s[]" (assembleType et).Name name.Name
+
             | t ->
                 sprintf "%s %s" (assembleType t).Name name.Name
         
@@ -451,7 +455,7 @@ module Assembler =
                             return sprintf "mod(%s, %s)" l r
                             
 
-                | CMulMatMat(_, l, r) | CMulMatVec(_, l, r) ->
+                | CMulMatMat(_, l, r) | CMulMatVec(_, l, r) | CMulVecMat(_, l, r) ->
                     let! reverse = AssemblerState.reverseMatrixLogic
                     let! l = assembleExprS l
                     let! r = assembleExprS r
@@ -463,6 +467,12 @@ module Assembler =
                     let! m = assembleExprS m
                     if reverse then return sprintf "%s[%d][%d]" m r c
                     else return sprintf "%s[%d][%d]" m c r
+
+                | CConvertMatrix(t, m) ->
+                    let t = assembleType t
+                    let! m = assembleExprS m
+                    return sprintf "%s(%s)" t.Name m
+
 
                 | CTranspose(_, m) ->
                     let! m = assembleExprS m
@@ -840,25 +850,37 @@ module Assembler =
                             fields |> List.map (fun u -> 
                                 let decl = assembleDeclaration u.cUniformType (checkName u.cUniformName)
                                 let decl = sprintf "%s;" decl 
-                                decl, u.cUniformDecorations
+                                decl, u.cUniformName, u.cUniformDecorations
                             )
                         match name with
                             | Some "SharedMemory" ->
-                                let fields = fields |> List.map (fun (d,_) -> sprintf "shared %s" d) |> String.concat "\r\n"
+                                let fields = fields |> List.map (fun (d,_,_) -> sprintf "shared %s" d) |> String.concat "\r\n"
                                 return fields
+
+                            | Some "StorageBuffer" ->
+                                let! buffers =
+                                    fields |> List.mapS (fun (d,name,_) ->
+                                        state {
+                                            let! binding = AssemblerState.newBinding
+                                            let prefix = uniformLayout [] set binding
+                                            return sprintf "%sbuffer %sSSB { %s };" prefix name d
+                                        }
+                                    )
+
+                                return buffers |> String.concat "\r\n"
                                 
                             | Some bufferName when config.createUniformBuffers ->
                                 let bufferName = checkName bufferName
                                 let! binding = AssemblerState.newBinding
                                     
-                                let fields = fields |> List.map fst |> String.concat "\r\n"
+                                let fields = fields |> List.map (fun (d,_,_) -> d) |> String.concat "\r\n"
                                 let prefix = uniformLayout [] set binding
                             
                                 return sprintf "%suniform %s\r\n{\r\n%s\r\n};\r\n" prefix bufferName.Name (String.indent fields)
 
                             | _ ->
                                 let! definitions = 
-                                    fields |> List.mapS (fun (f, decorations) ->
+                                    fields |> List.mapS (fun (f, _, decorations) ->
                                         state {
                                             let! binding = AssemblerState.newBinding
                                             let prefix = uniformLayout decorations set binding
@@ -1012,7 +1034,8 @@ module Assembler =
                         let inputTopology = e.cDecorations |> List.tryPick (function EntryDecoration.InputTopology t -> Some t | _ -> None) |> Option.get
                         let outputTopology = e.cDecorations |> List.tryPick (function EntryDecoration.OutputTopology(t) -> Some(t) | _ -> None) |> Option.get
                         let vertexCount = e.cDecorations |> List.tryPick (function EntryDecoration.OutputVertices(t) -> Some(t) | _ -> None) |> Option.get
-                        
+                        let invocations = e.cDecorations |> List.tryPick (function EntryDecoration.Invocations i -> Some i | _ -> None) |> Option.defaultValue 1
+
                         let inputPrimitive =
                             match inputTopology with
                                 | InputTopology.Point -> "points"
@@ -1029,8 +1052,10 @@ module Assembler =
                                 | OutputTopology.TriangleStrip -> "triangle_strip"
 
                         [
-                            sprintf "layout(%s) in;" inputPrimitive
-                            sprintf "layout(%s, max_vertices = %d) out;" outputPrimitive vertexCount
+                            yield sprintf "layout(%s) in;" inputPrimitive
+                            yield sprintf "layout(%s, max_vertices = %d) out;" outputPrimitive vertexCount
+                            if invocations > 1 then
+                                yield sprintf "layout(invocations = %d) in;" invocations
                         ]
 
                     | ShaderStage.TessControl ->

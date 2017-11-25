@@ -50,6 +50,7 @@ module Compiler =
         | ManagedFunction of name : string * args : list<Var> * body : Expr
         | CompiledFunction of signature : CFunctionSignature * body : CStatement
         | ManagedFunctionWithSignature of signature : CFunctionSignature * body : Expr
+        | Utility of UtilityFunction
 
         member x.Signature (b : IBackend) =
             match x with
@@ -62,19 +63,38 @@ module Compiler =
                 | ManagedFunctionWithSignature(s,_) ->
                     s
 
+                | Utility u ->
+                    CFunctionSignature.ofFunction b u.uniqueName u.functionArguments u.returnType
+                    
     type ConstantDefinition = { cName : string; cType : Type; cValue : Expr }
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module FunctionDefinition =
+        let private handleThis (isStatic : bool) (args : list<list<Var>>) (body : Expr) =
+            let args = List.concat args
+            if isStatic then 
+                args, body
+            else
+                match args with
+                    | self :: rest ->
+                        let mSelf = Var(self.Name, self.Type, true) 
+                        let body = body.Substitute(fun vi -> if vi = self then Some (Expr.Var mSelf) else None)
+                                    
+                        mSelf :: rest, body
+                    | _ ->
+                        args, body
+
         let ofMethodBase (tryGetOverrideCode : MethodBase -> Option<Expr>) (mi : MethodBase) =
             let name = methodName mi
             match tryGetOverrideCode mi with
                 | Some (Lambdas(args, body)) ->
-                    ManagedFunction(name, List.concat args, body)
+                    let args, body = handleThis mi.IsStatic args body
+                    ManagedFunction(name, args, body)
                 | _ ->
                     match Expr.TryGetReflectedDefinition mi with
                         | Some (Lambdas(args, body)) ->
-                            ManagedFunction(name, List.concat args, body)
+                            let args, body = handleThis mi.IsStatic args body
+                            ManagedFunction(name, args, body)
                         | _ ->
                             failwithf "[FShade] cannot call function %A since it is not reflectable" mi
 
@@ -282,6 +302,11 @@ module Compiler =
                     | VectorValue(bt, args) ->
                         let ctor = t.GetConstructor(Array.create args.Length bt)
                         Expr.NewObject(ctor, args |> Array.toList |> List.map (fun v -> Expr.Value(v, bt))) |> Some
+
+                    | MatrixValue(bt, args) ->
+                        let ctor = t.GetConstructor(Array.create args.Length bt)
+                        Expr.NewObject(ctor, args |> Array.toList |> List.map (fun v -> Expr.Value(v, bt))) |> Some
+
                     | _ ->
                         None
 
@@ -329,6 +354,47 @@ module Compiler =
                     )
                     |> String.concat "\r\n"
 
+
+        module private Simplification = 
+
+            let mulMatVec (m : CExpr) (v : CExpr) =
+                let rType =
+                    match m.ctype with
+                        | CMatrix(t, r, c) -> CVector(t, r)
+                        | t -> failwithf "[FShade] not a matrix type: %A" t
+                CMulMatVec(rType, m, v)
+
+                
+            let mulVecMat (v : CExpr) (m : CExpr) =
+                let rType =
+                    match m.ctype with
+                        | CMatrix(t, r, c) -> CVector(t, c)
+                        | t -> failwithf "[FShade] not a matrix type: %A" t
+
+                CMulVecMat(rType, v, m)
+
+            let rec extractMatrices (e : CExpr) =
+                match e with
+                    | CMulMatMat(t,l,r) ->
+                        extractMatrices l @ extractMatrices r
+                    | _ ->
+                        [e]
+
+            let rec simplifyMatrixTerm (e : CExpr) =
+                match e with
+                    | CMulMatVec(_,m, v) ->
+                        match extractMatrices m with
+                            | [m] -> e
+                            | many -> List.foldBack mulMatVec many v
+
+                    | CMulVecMat(_,v,m) ->
+                        match extractMatrices m with
+                            | [m] -> e
+                            | many -> List.fold mulVecMat v many// v * m0 * m1 * m2
+                            
+                    | _ ->
+                        e
+
         let rec tryGetBuiltInMethod (b : IBackend) (mi : MethodInfo) (args : list<CExpr>) =
             let ct = CType.ofType b mi.ReturnType
             match mi, args with
@@ -343,13 +409,15 @@ module Compiler =
                 | Method("op_LeftShift", _), [l;r]          -> CExpr.CLeftShift(ct, l, r) |> Some
                 | Method("op_RightShift", _), [l;r]         -> CExpr.CRightShift(ct, l, r) |> Some
             
+               
+
                 | Method("op_Multiply", _), [l;r] ->
                     let lt = l.ctype
                     let rt = r.ctype 
                     match lt, rt with
                         | CMatrix _, CMatrix _              -> CMulMatMat(ct, l, r) |> Some
-                        | CMatrix _, CVector _              -> CMulMatVec(ct, l, r) |> Some
-                        | CVector _, CMatrix(b,rows,cols)   -> CMulMatVec(ct, CTranspose(CMatrix(b,cols,rows), r), l) |> Some
+                        | CMatrix _, CVector _              -> CMulMatVec(ct, l, r) |> Simplification.simplifyMatrixTerm |> Some
+                        | CVector _, CMatrix(b,rows,cols)   -> CMulVecMat(ct, l, r) |> Simplification.simplifyMatrixTerm |> Some
                         | _                                 -> CExpr.CMul(ct, l, r) |> Some
 
                 // transpose
@@ -389,7 +457,7 @@ module Compiler =
                 | Method("TransformDir", [MatrixOf _; VectorOf _]), [m;v] ->
                     match ct, v.ctype with
                         | CVector(rt, rd), CVector(t, d) ->
-                            let res = CMulMatVec(CVector(rt, rd + 1), m, CNewVector(CVector(t, d + 1), d, [v; zero t]))
+                            let res = CMulMatVec(CVector(rt, rd + 1), m, CNewVector(CVector(t, d + 1), d, [v; zero t])) |> Simplification.simplifyMatrixTerm
                             CVecSwizzle(ct, res, CVecComponent.first rd) |> Some
                         | _ ->
                             None
@@ -399,10 +467,55 @@ module Compiler =
                 | Method("TransformPos", [MatrixOf _; VectorOf _]), [m;v] ->
                     match ct, v.ctype with
                         | CVector(rt, rd), CVector(t, d) ->
-                            let res = CMulMatVec(CVector(rt, rd + 1), m, CNewVector(CVector(t, d + 1), d, [v; one t]))
+                            let res = CMulMatVec(CVector(rt, rd + 1), m, CNewVector(CVector(t, d + 1), d, [v; one t])) |> Simplification.simplifyMatrixTerm
                             CVecSwizzle(ct, res, CVecComponent.first rd) |> Some
                         | _ ->
                             None
+
+                // transposedTransformDir
+                | Method("TransposedTransformDir", [MatrixOf _; VectorOf _]), [m;v] ->
+                    match ct, v.ctype with
+                        | CVector(rt, rd), CVector(t, d) ->
+                            let res = CMulVecMat(CVector(rt, rd + 1), CNewVector(CVector(t, d + 1), d, [v; zero t]), m) |> Simplification.simplifyMatrixTerm
+                            CVecSwizzle(ct, res, CVecComponent.first rd) |> Some
+                        | _ ->
+                            None
+
+                // transposedTransformDir
+                | Method("TransposedTransformPos", [MatrixOf _; VectorOf _]), [m;v] ->
+                    match ct, v.ctype with
+                        | CVector(rt, rd), CVector(t, d) ->
+                            let res = CMulVecMat(CVector(rt, rd + 1), CNewVector(CVector(t, d + 1), d, [v; one t]), m) |> Simplification.simplifyMatrixTerm
+                            CVecSwizzle(ct, res, CVecComponent.first rd) |> Some
+                        | _ ->
+                            None
+
+                
+                
+                | MethodQuote <@ m22d : M22f -> _ @> _, [m] 
+                | MethodQuote <@ m33d : M33f -> _ @> _, [m] 
+                | MethodQuote <@ m34d : M34f -> _ @> _, [m] 
+                | MethodQuote <@ m44d : M44f -> _ @> _, [m] 
+                | MethodQuote <@ m22f : M22d -> _ @> _, [m] 
+                | MethodQuote <@ m33f : M33d -> _ @> _, [m] 
+                | MethodQuote <@ m34f : M34d -> _ @> _, [m] 
+                | MethodQuote <@ m44f : M44d -> _ @> _, [m] 
+                | MethodQuote <@ m22i : M22d -> _ @> _, [m] 
+                | MethodQuote <@ m33i : M33d -> _ @> _, [m] 
+                | MethodQuote <@ m34i : M34d -> _ @> _, [m] 
+                | MethodQuote <@ m44i : M44d -> _ @> _, [m] 
+                | MethodQuote <@ m22l : M22d -> _ @> _, [m] 
+                | MethodQuote <@ m33l : M33d -> _ @> _, [m] 
+                | MethodQuote <@ m34l : M34d -> _ @> _, [m] 
+                | MethodQuote <@ m44l : M44d -> _ @> _, [m] 
+                | Method("UpperLeftM33", [MatrixOf _]), [m]
+                | Method("op_Explicit", [MatrixOf _]), [m] ->
+                    match ct with
+                        | CMatrix(et, r, c) ->
+                            CConvertMatrix(ct, m) |> Some
+                        | _ ->
+                            None 
+
 
                 // vector swizzles
                 | (MethodQuote <@ Vec.xy : V4d -> V2d @> _ ), [v] -> CVecSwizzle(ct, v, CVecComponent.xy) |> Some
@@ -647,7 +760,12 @@ module Compiler =
 
         let useGlobalFunction (key : obj) (f : FunctionDefinition) =
             State.custom (fun s ->
-                { s with moduleState = { s.moduleState with globalFunctions = HMap.add key f s.moduleState.globalFunctions } }, f.Signature s.moduleState.backend
+                match HMap.tryFind key s.moduleState.globalFunctions with
+                    | Some signature ->
+                        s, signature.Signature s.moduleState.backend
+                    | _ -> 
+                        let signature = f.Signature s.moduleState.backend
+                        { s with moduleState = { s.moduleState with globalFunctions = HMap.add key f s.moduleState.globalFunctions } }, signature 
             )
 
         let useCtor (key : obj) (f : FunctionDefinition) =
@@ -754,13 +872,29 @@ module Compiler =
     let toCVarOfTypeS (v : Var) (t : CType) =
         State.custom (fun s ->
             match Map.tryFind v s.variables with
-                | Some v -> s, v
+                | Some v -> 
+                    s, v
+
                 | None ->
                     match Map.tryFind v.Name s.nameIndices with
                         | Some index ->
-                            let name = v.Name + string index
+                            let mutable index = index
+                            let mutable name = v.Name + string index
+
+                            let rec findName (index : int) (indices : Map<string, int>) =
+                                let n = v.Name + string index
+                                match Map.tryFind n indices with
+                                    | Some i ->
+                                        findName (index + 1) indices
+                                    | None ->
+                                        let indices = Map.add n 1 indices
+                                        let indices = Map.add v.Name (index + 1) indices
+                                        n, indices
+
+                            let name, indices = findName index s.nameIndices
+
                             let res = { ctype = t; name = name }
-                            let state = { s with nameIndices = Map.add v.Name (index + 1) s.nameIndices; variables = Map.add v res s.variables }
+                            let state = { s with nameIndices = indices; variables = Map.add v res s.variables }
                             state, res
                         | None ->
                             let res = { ctype = t; name = v.Name }
@@ -1011,6 +1145,34 @@ module Compiler =
                             // TODO: assumes that the function does not have side-effects
                             return! Expr.Value(mi.Invoke(null, [||]), mi.ReturnType) |> toCExprS
 
+                | CallFunction(f, args) ->
+                    let! args = args |> List.mapS toCExprS
+                    let! s = State.get
+
+                    match f.functionMethod with
+                        | Some (:? MethodInfo as mi) ->
+                            match Helpers.tryGetBuiltInMethod s.moduleState.backend mi args with
+                                | Some e -> 
+                                    return e
+                                | None ->
+                                    let! intrinsic = CompilerState.tryGetIntrinsic mi
+                                    match intrinsic with
+                                        | Some i ->
+                                            let! ct = toCTypeS e.Type
+                                            let args = 
+                                                match i.arguments with
+                                                    | Some order -> order |> List.map (fun i -> args.[i])
+                                                    | None -> args
+                                            return CCallIntrinsic(ct, i, List.toArray args)
+                                        | _ ->
+                                            let! def = FunctionDefinition.Utility f |> CompilerState.useGlobalFunction f.uniqueName
+                                            return CCall(def, List.toArray args)
+                        | _ ->
+                            let! def = FunctionDefinition.Utility f |> CompilerState.useGlobalFunction f.uniqueName
+                            return CCall(def, List.toArray args)
+
+                
+
                 | Call(None, mi, t :: args) | Call(Some t, mi, args) ->
                     let args = t :: args
                     let! args = args |> List.mapS toCExprS
@@ -1214,16 +1376,21 @@ module Compiler =
                 | Sequential(Unroll, Cons((ForInteger(v, first, step, last, b) as loop), rest)) ->
                     let! rest = rest |> List.mapS (toCStatementS isLast)
 
-                    let! v = toCVarS v
+                    let loopBody (i : int) = b.Substitute(fun vi -> if vi = v then Some (Expr.Value(i)) else None)
+
+
+                    
                     match first, step, last with
                         | DerivedPatterns.Int32 first, DerivedPatterns.Int32 step, DerivedPatterns.Int32 last ->
                             let range = [ first .. step .. last ]
-                            let! b = toCStatementS false b
+
+                            let! code = 
+                                range |> List.mapS (fun i ->
+                                    toCStatementS false (loopBody i) |> State.map (fun s -> CIsolated [s])
+                                )
+
                             return CSequential [
-                                yield CDeclare(v, None)
-                                for i in range do
-                                    yield CWrite(CLVar v, CExpr.CValue(CType.CInt(true, 32), CIntegral (int64 i)))
-                                    yield CIsolated [b]
+                                yield! code
                                 yield! rest
                             ]
                         | _ ->
@@ -1535,6 +1702,13 @@ module Compiler =
                 | ManagedFunctionWithSignature(signature, body) ->
                     let! body = toCStatementS true body
                     return CFunctionDef(signature, body)
+
+                | Utility u ->
+                    let! s = State.get
+                    let! body = toCStatementS true u.functionBody
+                    let signature = f.Signature s.moduleState.backend
+                    return CFunctionDef(signature, body)
+
 
         }
 

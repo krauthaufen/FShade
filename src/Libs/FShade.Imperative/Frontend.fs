@@ -63,6 +63,7 @@ type EntryDecoration =
     | OutputTopology of OutputTopology
     | OutputVertices of int
     | LocalSize of V3i
+    | Invocations of int
 
 type EntryPoint =
     {
@@ -75,6 +76,93 @@ type EntryPoint =
         body        : Expr
         decorations : list<EntryDecoration>
     }
+
+[<AttributeUsage(AttributeTargets.Method ||| AttributeTargets.Property)>]
+type InlineAttribute() = inherit System.Attribute()
+
+[<AutoOpen>]
+module private UtilityFunctionHelpers =
+    let cleanHash (str : string) =
+        let str : string = str.Replace("+", "_")
+        let str : string = str.Replace("/", "00")
+        let str : string = str.Replace("=", "")
+        str
+
+
+[<CustomEquality; NoComparison>]
+type UtilityFunction =
+    {
+        functionId          : string
+        functionName        : string
+        functionArguments   : list<Var>
+        functionBody        : Expr
+        functionMethod      : Option<MethodBase>
+        functionTag         : obj
+        functionIsInline    : bool
+    }
+    member x.uniqueName = x.functionName + "_" + cleanHash x.functionId
+    member x.returnType = x.functionBody.Type
+    
+    override x.GetHashCode() = x.uniqueName.GetHashCode()
+    override x.Equals(o) =
+        match o with
+            | :? UtilityFunction as o ->
+                x.functionId = o.functionId &&
+                x.functionName = o.functionName &&
+                List.forall2 (fun (l : Var) (r : Var) -> l.Name = r.Name && l.Type = r.Type && l.IsMutable = r.IsMutable) x.functionArguments o.functionArguments
+            | _ ->
+                false
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module UtilityFunction =
+    let tryCreate (m : MethodBase) =
+        match Expr.TryGetReflectedDefinition m with
+            | Some e ->
+                let isInline = m.GetCustomAttributes(typeof<InlineAttribute>, true) |> Seq.isEmpty |> not
+
+                match e with
+                    | Lambdas(args, body) ->
+                        let args = List.concat args
+
+                        let args, body = 
+                            if m.IsStatic then 
+                                args, body
+                            else
+                                match args with
+                                    | this :: args ->
+                                        let mThis = Var(this.Name, this.Type, true)
+                                        let body = body.Substitute(fun vi -> if vi = this then Some (Expr.Var mThis) else None)
+                                        mThis :: args, body
+                                    | _ ->
+                                        args, body
+
+                        let args =
+                            args |> List.filter (fun a -> a.Type <> typeof<unit>)
+
+                        Some {
+                            functionId = Expr.ComputeHash body
+                            functionName = methodName m
+                            functionArguments = args
+                            functionBody = body
+                            functionMethod = Some m
+                            functionTag = null
+                            functionIsInline = isInline
+                        }
+                    | _ ->
+                        None
+            | None ->
+                None
+
+    let ofMethodBase (m : MethodBase) =
+        match tryCreate m with
+            | Some f -> f
+            | None -> failwithf "[FShade] utility function %A is not reflectable" m
+
+    let map (mapping : Expr -> Expr) (f : UtilityFunction) =
+        let b = mapping f.functionBody
+        { f with functionBody = b; functionId = Expr.ComputeHash b }
+
+    
 
 [<AutoOpen>]
 module ExpressionExtensions =
@@ -113,6 +201,22 @@ module ExpressionExtensions =
             failwith "[FShade] cannot write outputs in host-code"
 
     type Expr with
+
+        static member CallFunction(f : UtilityFunction, args : list<Expr>) =
+            assert ( List.forall2 (fun (v : Var) (e : Expr) -> v.Type.IsAssignableFrom e.Type) f.functionArguments args )
+
+            let args =
+                match args with
+                    | [] -> Expr.Unit
+                    | args -> Expr.NewTuple args
+
+            Expr.Coerce(
+                Expr.NewTuple [Expr.Value "__FUNCTIONCALL__"; Expr.Value f; args ], 
+                f.returnType
+            )
+
+
+
         static member ReadInput<'a>(kind : ParameterKind, name : string) : Expr<'a> =
             let mi = ShaderIO.ReadInputMeth.MakeGenericMethod [| typeof<'a> |]
             Expr.Call(mi, [ Expr.Value(kind); Expr.Value(name) ]) |> Expr.Cast
@@ -158,6 +262,18 @@ module ExpressionExtensions =
                         map <- Map.add name (index, value) map
 
             Expr.WriteOutputs map
+
+
+
+    let (|CallFunction|_|) (e : Expr) =
+        match e with
+            | Coerce(NewTuple [ String "__FUNCTIONCALL__"; Value((:? UtilityFunction as f), _); args], t) when t = f.returnType ->
+                match args with
+                    | Unit -> Some(f,[])
+                    | NewTuple args -> Some(f, args)
+                    | _ -> None
+            | _ ->
+                None
 
     let (|ReadInput|_|) (e : Expr) =
         match e with
@@ -361,6 +477,11 @@ type ExpressionSubstitutionExtensions private() =
                         match index with
                             | Some index -> Expr.ReadInput(kind, e.Type, name, index)
                             | None -> e
+
+            | CallFunction(utility, args) ->
+                let args = args |> List.map (substituteReads substitute)
+                let utility = utility |> UtilityFunction.map (substituteReads substitute)
+                Expr.CallFunction(utility, args)
 
             | ShapeLambda(v,b) -> Expr.Lambda(v, substituteReads substitute b)
             | ShapeVar _ -> e

@@ -15,7 +15,8 @@ open FShade.Imperative
 
 /// Effect encapsulates a set of shaders for the various ShaderStages defined by FShade.
 type Effect internal(id : string, shaders : Map<ShaderStage, Shader>, composedOf : list<Effect>) =
-    
+    let mutable sourceDefintion : Option<Expr * Type> = None
+
     let inputToplogy =
         lazy (
             shaders |> Map.toSeq |> Seq.tryPick (fun (_,s) ->
@@ -63,6 +64,10 @@ type Effect internal(id : string, shaders : Map<ShaderStage, Shader>, composedOf
     static member internal NewId() =
         Guid.NewGuid().ToByteArray() |> Convert.ToBase64String
 
+    member x.SourceDefintion
+        with get() = sourceDefintion
+        and internal set d = sourceDefintion <- d
+      
     member x.IsEmpty            = id = ""
 
     /// gets a unique id for this effect
@@ -227,17 +232,22 @@ module Effect =
         
     /// creates an effect from an expression (assuming expressions as returned by shader-functions)
     let ofExpr (inputType : Type) (e : Expr) =
-        Shader.ofExpr inputType e |> ofList
+        let effect = Shader.ofExpr inputType e |> ofList
+        effect.SourceDefintion <- Some (e, inputType)
+        effect
 
     /// creates an effect from a shader-function
     let ofFunction (shaderFunction : 'a -> Expr<'b>) =
         let expression = 
             try shaderFunction Unchecked.defaultof<'a>
             with _ -> failwith "[FShade] shader functions may not access their vertex-input statically"
-
+            
         let hash = Expr.ComputeHash expression
         effectCache.GetOrAdd(hash, fun _ ->
-            Shader.ofExpr typeof<'a> expression |> ofList
+            let range = expression.DebugRange
+            let effect = Shader.ofExpr typeof<'a> expression |> ofList
+            effect.SourceDefintion <- Some (expression.Raw, typeof<'a>)
+            effect
         )
 
     /// gets a Map<ShaderStage, Shader> for the effect containing all Shaders.
@@ -516,7 +526,146 @@ module Effect =
         effects |> Seq.fold compose2 empty
 
 
+    module private Helpers =
+        type Vertex = { [<SourceVertexIndex>] i : int }
+
+        let nopPoint (p : Point<Vertex>) =
+            point {
+                yield p.Value
+            }
+
+        let nopLine (p : Line<Vertex>) =
+            line {
+                for i in 0 .. 1 do
+                    yield p.[i]
+            }
+
+        let nopTriangle (p : Triangle<Vertex>) =
+            triangle {
+                for i in 0 .. 2 do
+                    yield p.[i]
+            }
+
+        let nopGS =
+            Map.ofList [
+                InputTopology.Point, ofFunction(nopPoint).GeometryShader.Value
+                InputTopology.Line, ofFunction(nopLine).GeometryShader.Value
+                InputTopology.Triangle, ofFunction(nopTriangle).GeometryShader.Value
+            ]
+
+    let substituteUniforms (substitute : string -> Type -> Option<Expr> -> Option<Expr>) (effect : Effect) =
+        effect |> map (fun shader ->
+            shader |> Shader.substituteReads (fun kind typ name index ->
+                match kind with
+                    | ParameterKind.Uniform ->
+                        substitute name typ index
+                    | _ ->
+                        None
+            )
+        )
+
+    module private LayerHelpers = 
+
+        let withLayeredUniforms (uniforms : Map<string, string>) (layerCount : int) (layer : Expr) (shader : Shader) =
+            let mutable perLayerUniforms = Map.empty
+            let mutable removed = Map.empty
+
+            let newBody = 
+                shader.shaderBody.SubstituteReads(fun kind typ oldName index ->
+                    match kind with
+                        | ParameterKind.Uniform ->
+                            match Map.tryFind oldName uniforms with
+                                | Some newName ->
+                                    match index with
+                                        | Some index ->
+                                            let old = shader.shaderUniforms.[oldName]
+                                            let typ = Peano.getArrayType layerCount old.uniformType
+                                            perLayerUniforms <- Map.add newName { old with uniformName = newName; uniformType = typ } perLayerUniforms
+                                            removed <- Map.add oldName () removed
+                                            let arrInput = Expr.ReadInput(kind, typ, newName)
+                                            let layerItem = Expr.ArrayAccess(arrInput, layer) //Expr.PropertyGet(arrInput, arrInput.Type.GetProperty("Item"), [layer])
+                                            let realItem = Expr.ArrayAccess(arrInput, index) //Expr.PropertyGet(layerItem, layerItem.Type.GetProperty("Item"), [index])
+
+                                            realItem |> Some
+                                    
+                                        | None ->
+                                            let old = shader.shaderUniforms.[oldName]
+                                            let typ = Peano.getArrayType layerCount old.uniformType
+                                            perLayerUniforms <- Map.add newName { old with uniformName = newName; uniformType = typ } perLayerUniforms
+                                            removed <- Map.add oldName () removed
+                                            let arrInput = Expr.ReadInput(kind, typ, newName) 
+                                            let realItem = Expr.ArrayAccess(arrInput, layer) //Expr.PropertyGet(arrInput, arrInput.Type.GetProperty("Item"), [layer])
+                                            realItem |> Some
+                                | _ ->
+                                    None
+                        | _ ->
+                            None
+                )
 
 
-        
+            let uniforms = Map.union (Map.difference shader.shaderUniforms removed) perLayerUniforms
+                    
 
+            Shader.withBody newBody { shader with shaderUniforms = uniforms }
+
+
+
+    let toLayeredEffect (layers : int) (uniforms : Map<string, string>) (topology : InputTopology) (effect : Effect) = 
+        if effect.TessControlShader.IsSome || effect.TessEvalShader.IsSome then
+            failwithf "[FShade] effects containing tessellation shaders cannot be layered automatically"
+
+        let geometryShader =
+            match effect.VertexShader, effect.GeometryShader with
+                | None, None ->
+                    match Map.tryFind topology Helpers.nopGS with
+                        | Some gs ->
+                            gs
+                        | None ->
+                            failwithf "[FShade] bad topology for layered shader: %A" topology
+
+                | Some vs, None ->
+                    match Map.tryFind topology Helpers.nopGS with
+                        | Some gs ->
+                            Shader.compose2 gs vs
+                        | None ->
+                            failwithf "[FShade] bad topology for layered shader: %A" topology
+                    
+                | None, Some gs ->
+                    gs
+
+                | Some vs, Some gs ->
+                    Shader.Composition.vsgs vs gs
+//                    match Map.tryFind gs.shaderInputTopology.Value Helpers.nopGS with
+//                        | Some nop ->
+//                            let vs = Shader.compose2 nop vs
+//                            Shader.compose2 vs gs
+//                        | None ->
+//                            failwithf "[FShade] bad topology for layered shader: %A" gs.shaderInputTopology.Value
+
+        let geometryShader =
+            let layer = Expr.ReadInput(ParameterKind.Input, typeof<int>, Intrinsics.InvocationId)
+            let gs = LayerHelpers.withLayeredUniforms uniforms layers layer geometryShader
+
+            let newBody =
+                gs.shaderBody.SubstituteWrites (fun outputs ->
+                    let o = Map.add Intrinsics.Layer (None, layer) outputs
+                    Expr.WriteOutputs o |> Some
+                )
+
+            { gs with shaderInvocations = layers } |> Shader.withBody newBody
+
+        let fragmentShader =
+            match effect.FragmentShader with
+                | Some fragmentShader ->
+                    let layer = Expr.ReadInput(ParameterKind.Input, typeof<int>, Intrinsics.Layer)
+                    fragmentShader
+                        |> LayerHelpers.withLayeredUniforms uniforms layers layer 
+                        |> Some
+                | None ->
+                    None
+
+        match fragmentShader with
+            | Some fs ->
+                Effect(Map.ofList [ShaderStage.Geometry, geometryShader; ShaderStage.Fragment, fs])
+            | None ->
+                ofList [ geometryShader ]

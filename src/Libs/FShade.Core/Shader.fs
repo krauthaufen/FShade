@@ -40,6 +40,10 @@ type Shader =
         shaderOutputTopology : Option<OutputTopology>
         /// the optional maximal vertex-count for the shader
         shaderOutputVertices : ShaderOutputVertices
+        /// the optional maximal vertex-count for the shader
+        shaderOutputPrimitives : Option<int>
+        /// the number of shader invocations (only useful for some stages)
+        shaderInvocations : int
         /// the body for the shader
         shaderBody : Expr
         /// the shader's source info (if any)
@@ -228,7 +232,7 @@ module private Preprocessor =
         }
         
     let shaderUtilityFunctions = System.Collections.Concurrent.ConcurrentDictionary<V3i * MethodBase, Option<Expr * State>>()
-
+    
 
     type Preprocess<'a> = State<State, 'a>
 
@@ -408,6 +412,9 @@ module private Preprocessor =
             let! vertexType = State.vertexType
 
             match e with
+                | LetCopyOfStruct(e) ->
+                    return! preprocessNormalS e
+
                 | ReadInput(kind, name, idx) ->
                     let! idx = idx |> Option.mapS preprocessNormalS
 
@@ -580,13 +587,13 @@ module private Preprocessor =
 
                 // tri.P0.pos -> ReadInput(pos, 0)
                 | InputRead vertexType (PrimitiveVertexGet(p, index), semantic, parameter) ->
-                    if semantic = Intrinsics.SourceVertexIndex then
-                        let! index = preprocessNormalS index
-                        return index
-                    else
-                        let! index = preprocessNormalS index
-                        do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
-                        return Expr.ReadInput(ParameterKind.Input, e.Type, semantic, index)
+//                    if semantic = Intrinsics.SourceVertexIndex then
+//                        let! index = preprocessNormalS index
+//                        return index
+//                    else
+                    let! index = preprocessNormalS index
+                    do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
+                    return Expr.ReadInput(ParameterKind.Input, e.Type, semantic, index)
 
                 // real vertex-read needed
                 | PrimitiveVertexGet(p, index) ->
@@ -598,12 +605,12 @@ module private Preprocessor =
                             state {
                                 let interpolation = f.Interpolation
                                 let semantic = f.Semantic 
-                                if semantic = Intrinsics.SourceVertexIndex then
-                                    return index
-                                else
-                                    let parameter = { paramType = f.PropertyType; paramInterpolation = interpolation }
-                                    do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
-                                    return Expr.ReadInput(ParameterKind.Input, f.PropertyType, semantic, index)
+//                                if semantic = Intrinsics.SourceVertexIndex then
+//                                    return index
+//                                else
+                                let parameter = { paramType = f.PropertyType; paramInterpolation = interpolation }
+                                do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
+                                return Expr.ReadInput(ParameterKind.Input, f.PropertyType, semantic, index)
                             }
                         )
                         
@@ -620,11 +627,11 @@ module private Preprocessor =
 
                     match index with
                         | Some index -> 
-                            if semantic = Intrinsics.SourceVertexIndex then
-                                return index
-                            else
-                                do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
-                                return Expr.ReadInput(ParameterKind.Input, parameter.paramType, semantic, index)
+//                            if semantic = Intrinsics.SourceVertexIndex then
+//                                return index
+//                            else
+                            do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
+                            return Expr.ReadInput(ParameterKind.Input, parameter.paramType, semantic, index)
                         | _ ->
                             do! State.readInput semantic parameter
                             return Expr.ReadInput(ParameterKind.Input, parameter.paramType, semantic)
@@ -690,20 +697,67 @@ module private Preprocessor =
                     let! b = preprocessNormalS b
                     return Expr.Let(v, e, b)
 
-                | Call(t, mi, args) ->
-                    let! s = State.get
-                    match preprocessMethod s.localSize mi with
-                        | Some(_, innerState) ->
+                | CallFunction(utility, args) ->
+                    let! args = args |> List.mapS preprocessNormalS
+                    match utility.functionTag with
+                        | :? State as innerState ->
                             do! State.modify (fun s -> { s with uniforms = Map.union s.uniforms innerState.uniforms })
-                        | None ->
-                            ()
+                            return Expr.CallFunction(utility, args)
 
+                        | _ ->
+                            
+                            let mutable innerState = State.empty
+                            let processedF =
+                                utility |> UtilityFunction.map (fun b -> 
+                                    let run : Preprocess<Expr> = preprocessS b
+                                    run.Run(&innerState)
+                                )
+                                
+
+                            let processedF = { processedF with functionTag = innerState }
+                            do! State.modify (fun s -> { s with uniforms = Map.union s.uniforms innerState.uniforms })
+
+                            return Expr.CallFunction(processedF, args)
+
+                | Call(t, mi, args) ->
                     let! args = args |> List.mapS preprocessNormalS
                     let! t = t |> Option.mapS preprocessNormalS
 
-                    match t with
-                        | Some t -> return Expr.Call(t, mi, args)
-                        | None -> return Expr.Call(mi, args)
+                    match UtilityFunction.tryCreate mi with
+                        | Some utility ->
+
+                            let mutable innerState = State.empty
+                            let processedF =
+                                utility |> UtilityFunction.map (fun b -> 
+                                    let run : Preprocess<Expr> = preprocessS b
+                                    run.Run(&innerState)
+                                )
+
+                            let processedF = { processedF with functionTag = innerState }
+                            do! State.modify (fun s -> { s with uniforms = Map.union s.uniforms innerState.uniforms })
+
+                            match t with    
+                                | Some t -> return Expr.CallFunction(processedF, t :: args)
+                                | None -> return Expr.CallFunction(processedF, args)
+
+                        | None -> 
+                            match t with
+                                | Some t -> return Expr.Call(t, mi, args)
+                                | None -> return Expr.Call(mi, args)
+//                            
+//                    let! s = State.get
+//                    match preprocessMethod s.localSize mi with
+//                        | Some(_, innerState) ->
+//                            do! State.modify (fun s -> { s with uniforms = Map.union s.uniforms innerState.uniforms })
+//                        | None ->
+//                            ()
+//
+//                    let! args = args |> List.mapS preprocessNormalS
+//                    let! t = t |> Option.mapS preprocessNormalS
+//
+//                    match t with
+//                        | Some t -> return Expr.Call(t, mi, args)
+//                        | None -> return Expr.Call(mi, args)
                             
 
 
@@ -837,6 +891,8 @@ module private Preprocessor =
                 shaderInputTopology     = state.inputTopology
                 shaderOutputTopology    = builder.OutputTopology
                 shaderOutputVertices    = outputVertices
+                shaderOutputPrimitives  = None
+                shaderInvocations       = 1
                 shaderBody              = body
                 shaderDebugRange        = None
             }
@@ -890,6 +946,10 @@ module private Preprocessor =
 
                 Option.toList t @ args |> List.fold (fun s a -> Map.union s (computeIO localSize a)) inner
 
+            | CallFunction(f, args) ->
+                let used = args |> List.fold (fun m e -> Map.union m (computeIO localSize e)) Map.empty
+
+                Map.union (computeIO localSize f.functionBody) used
 
             | ShapeCombination(o, args) ->
                 args |> List.fold (fun m e -> Map.union m (computeIO localSize e)) Map.empty
@@ -924,6 +984,235 @@ module private Preprocessor =
 
             | ShapeVar _ ->
                 Map.empty
+
+
+
+module private GeometryInfo =
+
+    type Info =
+        {
+            maxVertices : int
+            maxPrimitives : int
+            maxVC : int
+        } with
+
+        static member Zero = { maxVertices = 0; maxPrimitives = 0; maxVC = 0 }
+
+        static member Add (l : Info, r : Info) = 
+            {
+                maxVertices = l.maxVertices + r.maxVertices
+                maxPrimitives = l.maxPrimitives + r.maxPrimitives
+                maxVC = l.maxVC + r.maxVC
+            }
+        static member Merge (l : Info, r : Info) = 
+            {
+                maxVertices = max l.maxVertices r.maxVertices
+                maxPrimitives = max l.maxPrimitives r.maxPrimitives
+                maxVC = max l.maxVC r.maxVC
+            }
+
+    type Stats =
+        {
+            stripCount      : int
+            info            : Option<Info>
+        }
+
+        static member Create (stripCount : int) =
+            { 
+                stripCount = stripCount
+                info = Some Info.Zero
+            }
+           
+        member x.RestartStrip() =
+            match x.info with
+                | Some info ->
+                    { x with info = Some { info with maxVC = 0 } }
+                | None ->
+                    x
+                    
+        member l.EmitVertex() =
+            match l.info with
+                | Some i ->
+                    {
+                        stripCount = l.stripCount
+                        info =
+                            Some {
+                                maxVertices = i.maxVertices + 1
+                                maxPrimitives =
+                                    if i.maxVC >= l.stripCount - 1 then
+                                        (i.maxPrimitives + 1)
+                                    else
+                                        i.maxPrimitives
+                                maxVC = min l.stripCount (i.maxVC + 1)
+                            }
+                    }
+                | None ->
+                    l
+
+        static member Add (l : Stats, r : Stats) =
+            {
+                stripCount = min l.stripCount r.stripCount
+                info = (match l.info, r.info with | Some l, Some r -> Some (Info.Add(l, r)) | _ -> None)
+            }
+
+        static member Merge (l : Stats, r : Stats) =
+            {
+                stripCount = min l.stripCount r.stripCount
+                info = (match l.info, r.info with | Some l, Some r -> Some (Info.Merge(l,r)) | _ -> None)
+            }
+
+    let rec tryGetUpperBound (e : Expr) =
+        match e with
+            | Int32 v -> 
+                Some v
+
+            | SpecificCall <@ min @> (_,_,[l;r]) ->
+                match tryGetUpperBound l, tryGetUpperBound r with
+                    | Some l, Some r -> Some (min l r)
+                    | l, None -> l
+                    | None, r -> r
+
+            | SpecificCall <@ (+) @> (_,_,[l;r]) ->
+                match tryGetUpperBound l, tryGetUpperBound r with
+                    | Some l, Some r -> Some (l + r)
+                    | _ -> None
+
+            | SpecificCall <@ (-) @> (_,_,[l;r]) ->
+                match tryGetUpperBound l, tryGetLowerBound r with
+                    | Some l, Some r -> Some (l - r)
+                    | _ -> None
+
+            | SpecificCall <@ (*) @> (_,_,[l;r]) ->
+                match tryGetUpperBound l, tryGetUpperBound r with
+                    | Some l, Some r -> Some (l * r)
+                    | _ -> None
+
+            | SpecificCall <@ (/) @> (_,_,[l;r]) ->
+                match tryGetUpperBound l, tryGetLowerBound r with
+                    | Some l, Some r -> Some (l / r)
+                    | _ -> None
+
+            | IfThenElse(c, i, e) ->
+                match c with
+                    | Bool true -> tryGetUpperBound i
+                    | Bool false -> tryGetUpperBound e
+                    | _ ->
+                        match tryGetUpperBound i, tryGetUpperBound e with
+                            | Some i, Some e -> Some (max i e)
+                            | _ -> None
+
+
+
+            | _ -> None
+                
+    and tryGetLowerBound (e : Expr) =
+        match e with    
+            | Int32 v -> 
+                Some v
+
+            | SpecificCall <@ max @> (_,_,[l;r]) ->
+                match tryGetUpperBound l, tryGetUpperBound r with
+                    | Some l, Some r -> Some (max l r)
+                    | l, None -> l
+                    | None, r -> r
+                            
+            | SpecificCall <@ (+) @> (_,_,[l;r]) ->
+                match tryGetUpperBound l, tryGetUpperBound r with
+                    | Some l, Some r -> Some (l + r)
+                    | _ -> None
+
+            | SpecificCall <@ (-) @> (_,_,[l;r]) ->
+                match tryGetLowerBound l, tryGetUpperBound r with
+                    | Some l, Some r -> Some (l - r)
+                    | _ -> None
+
+            | SpecificCall <@ (*) @> (_,_,[l;r]) ->
+                match tryGetLowerBound l, tryGetLowerBound r with
+                    | Some l, Some r -> Some (l * r)
+                    | _ -> None
+                            
+
+            | SpecificCall <@ (/) @> (_,_,[l;r]) ->
+                match tryGetLowerBound l, tryGetUpperBound r with
+                    | Some l, Some r -> Some (l / r)
+                    | _ -> None
+
+
+            | IfThenElse(c, i, e) ->
+                match c with
+                    | Bool true -> tryGetLowerBound i
+                    | Bool false -> tryGetLowerBound e
+                    | _ ->
+                        match tryGetLowerBound i, tryGetLowerBound e with
+                            | Some i, Some e -> Some (max i e)
+                            | _ -> None
+
+            | _ ->
+                None
+
+    let rec geometryStats (s : Stats) (e : Expr) =
+        match e with
+            | SpecificCall <@ emitVertex() @> _ ->
+                s.EmitVertex()
+
+            | SpecificCall <@ restartStrip() @> _ | SpecificCall <@ endPrimitive() @> _ ->
+                s.RestartStrip()
+
+            | ForInteger(v, min, step, max, body) ->
+                let bodyStats = geometryStats (Stats.Create s.stripCount) body
+                match bodyStats.info with
+                    | Some { maxVertices = 0 } ->
+                        s
+                            
+                    | Some info ->
+                        match tryGetLowerBound min, tryGetLowerBound step, tryGetUpperBound max with
+                            | Some min, Some step, Some max ->
+                                let mutable res = s
+                                for i in [min .. step .. max] do
+                                    res <- geometryStats res body
+
+                                res
+                            | _ ->
+                                { s with info = None }
+
+                    | None ->
+                        { s with info = None }
+                
+            | Sequential(l,r) ->
+                let ls = geometryStats s l
+                let rs = geometryStats ls r
+                rs
+
+            | IfThenElse(c,i,e) ->
+                let s = geometryStats s c
+
+                let si = geometryStats s i
+                let se = geometryStats s e
+
+                Stats.Merge(si, se)
+
+            | WhileLoop(guard, body) ->
+                let s = geometryStats (Stats.Create s.stripCount) (Expr.Seq [body; guard])
+
+                match s.info with
+                    | Some { maxVertices = 0 } ->
+                        s
+                    | _ ->
+                        { s with info = None }
+
+            | ShapeCombination(o, args) ->
+                let mutable res = s
+                for a in args do
+                    res <- geometryStats res a
+
+                res
+
+            | ShapeVar _ ->
+                s
+
+            | ShapeLambda(_,b) ->
+                geometryStats s b
+                
 
 
 
@@ -1034,6 +1323,7 @@ module Shader =
                 
             ShaderStage.Geometry,
                 Map.ofList [
+                    Intrinsics.SourceVertexIndex, typeof<int[]>
                     Intrinsics.PointSize, typeof<float>
                     Intrinsics.ClipDistance, typeof<float[]>
                     Intrinsics.PrimitiveId, typeof<int>
@@ -1241,32 +1531,46 @@ module Shader =
         let sideEffects = sideEffects.[shader.shaderStage]
         let newBody, state = 
             shader.shaderBody
+                |> Optimizer.inlining
+                |> Optimizer.hoistImperativeConstructs
                 |> Optimizer.evaluateConstants' sideEffects.Contains
                 |> Optimizer.eliminateDeadCode' sideEffects.Contains
+                |> Optimizer.evaluateConstants' sideEffects.Contains
+                |> Optimizer.liftInputs
                 |> Preprocessor.preprocess V3i.Zero
 
-        let newOutputVertices =
+        let newOutputVertices, newOutputPrimitives =
             match shader.shaderStage with
                 | ShaderStage.Geometry ->
                     match shader.shaderOutputVertices with
                         | ShaderOutputVertices.Computed _ | ShaderOutputVertices.Unknown ->
-                            let range = Expr.computeCallCount emitVertexMeth newBody
-                            let maxVertices =
-                                if range.Max = Int32.MaxValue then
-                                    Log.warn "[FShade] could not determine max-vertex-count (using 32)"
-                                    32
-                                else
-                                    range.Max
-                            ShaderOutputVertices.Computed range.Max
+                            let outputVertices =
+                                match shader.shaderOutputTopology.Value with
+                                    | OutputTopology.Points -> 1
+                                    | OutputTopology.LineStrip -> 2
+                                    | OutputTopology.TriangleStrip -> 3
+
+                            let stats = GeometryInfo.geometryStats (GeometryInfo.Stats.Create outputVertices) newBody
+
+                            let maxVertices, maxPrimitives =
+                                match stats.info with
+                                    | Some { maxVertices = v; maxPrimitives = p } ->
+                                        v, Some p
+                                    | _ ->
+                                        Log.warn "[FShade] could not determine max-vertex-count (using 32)"
+                                        32, None
+
+                            ShaderOutputVertices.Computed maxVertices, maxPrimitives
                         | ov ->
-                            ov
+                            ov, shader.shaderOutputPrimitives
                 | _ ->
-                    shader.shaderOutputVertices
+                    shader.shaderOutputVertices, shader.shaderOutputPrimitives
 
         { shader with
-            shaderInputs = shader.shaderInputs |> Map.filter (fun n _ -> state.inputs.ContainsKey n)
-            shaderUniforms = shader.shaderUniforms |> Map.filter (fun n _ -> state.uniforms.ContainsKey n)
+            shaderInputs = state.inputs |> Map.map (fun name desc -> match Map.tryFind name shader.shaderInputs with | Some od when od.paramType = desc.paramType -> od | _ -> desc) //shader.shaderInputs |> Map.filter (fun n _ -> state.inputs.ContainsKey n)
+            shaderUniforms = state.uniforms |> Map.map (fun name u -> match Map.tryFind name shader.shaderUniforms with Some ou when ou.uniformType = u.uniformType -> ou | _ -> u) //shader.shaderUniforms |> Map.filter (fun n _ -> state.uniforms.ContainsKey n)
             shaderOutputVertices = newOutputVertices
+            shaderOutputPrimitives = newOutputPrimitives
             shaderBody = newBody
         }
 
@@ -1280,6 +1584,7 @@ module Shader =
         let expression = 
             try shaderFunction Unchecked.defaultof<'a>
             with _ -> failwith "[FShade] shader functions may not access their vertex-input statically"
+
 
         ofExpr typeof<'a> expression
 
@@ -1587,14 +1892,19 @@ module Shader =
     /// translates a shader to an EntryPoint which can be used for compiling
     /// the shader to a CAst
     let toEntryPoint (prev : Option<Shader>) (s : Shader) (next : Option<Shader>) =
+        let mutable hasSourceVertexIndex = false
         let inputs = 
-            s.shaderInputs |> Map.toList |> List.map (fun (n,i) -> 
-                { 
-                    paramName = n
-                    paramSemantic = n
-                    paramType = i.paramType
-                    paramDecorations = Set.ofList [ParameterDecoration.Interpolation i.paramInterpolation]
-                }
+            s.shaderInputs |> Map.toList |> List.choose (fun (n,i) -> 
+                if s.shaderStage = ShaderStage.Geometry && n = Intrinsics.SourceVertexIndex then
+                    hasSourceVertexIndex <- true
+                    None
+                else
+                    Some { 
+                        paramName = n
+                        paramSemantic = n
+                        paramType = i.paramType
+                        paramDecorations = Set.ofList [ParameterDecoration.Interpolation i.paramInterpolation]
+                    }
             )
 
         let outputs = 
@@ -1624,6 +1934,19 @@ module Shader =
         let prevStage = prev |> Option.map stage
         let nextStage = next |> Option.map stage
 
+        let body =
+            if hasSourceVertexIndex then
+                s.shaderBody.SubstituteReads(fun kind typ name index ->
+                    match kind, index with
+                        | ParameterKind.Input, Some i when name = Intrinsics.SourceVertexIndex ->
+                            Some i
+                        | _ ->
+                            None
+                
+                )
+            else
+                s.shaderBody
+
   
         {
             conditional = s.shaderStage |> string |> Some
@@ -1632,7 +1955,7 @@ module Shader =
             outputs     = outputs
             uniforms    = uniforms
             arguments   = []
-            body        = s.shaderBody
+            body        = body
             decorations = 
                 [
                     yield EntryDecoration.Stages { 
@@ -1640,6 +1963,8 @@ module Shader =
                         self = s.shaderStage
                         next = nextStage 
                     }
+
+                    yield EntryDecoration.Invocations s.shaderInvocations
 
                     match s.shaderInputTopology with
                         | Some t -> yield EntryDecoration.InputTopology t
@@ -1669,6 +1994,8 @@ module Shader =
                     shaderInputTopology     = None
                     shaderOutputTopology    = None
                     shaderOutputVertices    = ShaderOutputVertices.Unknown
+                    shaderOutputPrimitives  = None
+                    shaderInvocations       = 1
                     shaderBody =
                         attributes
                             |> Map.map (fun n t -> None, Expr.ReadInput(ParameterKind.Input, t, n))
@@ -1724,7 +2051,7 @@ module Shader =
                     |> Map.map (fun _ p -> p.paramType)
         
 
-    module private Composition = 
+    module internal Composition = 
         let simple (l : Shader) (r : Shader) =
             let needed  = Map.intersect l.shaderOutputs r.shaderInputs
             let passed  = Map.difference l.shaderOutputs r.shaderOutputs
@@ -1902,6 +2229,470 @@ module Shader =
                     shaderDebugRange = None
                 }
 
+        [<AutoOpen>]
+        module private GSCompositionHelpers =
+            let topologyCompatible (lOutput : Option<OutputTopology>) (rInput : Option<InputTopology>) =
+                match lOutput, rInput with
+                    | Some OutputTopology.Points, Some InputTopology.Point
+                    | Some OutputTopology.LineStrip, Some InputTopology.Line 
+                    | Some OutputTopology.TriangleStrip, Some InputTopology.Triangle ->
+                        true
+                    | _ -> 
+                        false
+
+            [<ReflectedDefinition>]
+            type TriangleStream<'d when 'd :> INatural> =
+                {
+                    indices                     : Arr<'d, int>
+                    mutable count               : int
+
+                    mutable p0                  : int
+                    mutable p1                  : int
+                    mutable p2                  : int
+                    mutable vs                  : int
+                }
+
+                member x.EmitVertex(vi : int) =
+                    match x.vs with
+                        | 0 -> 
+                            x.p0 <- vi
+                            x.vs <- 1
+                        | 1 ->
+                            x.p1 <- vi
+                            x.vs <- 2
+                        | vs ->
+                            x.p2 <- vi
+                            x.vs <- vs + 1
+
+                            let bi = 3 * x.count
+                            x.indices.[bi + 0] <- x.p0
+                            x.indices.[bi + 1] <- x.p1
+                            x.indices.[bi + 2] <- x.p2
+                        
+                            let indexInStrip = vs - 3
+
+                            // 0 1 2   2 1 3   2 3 4   4 3 5   4 5 6
+                            if indexInStrip % 2 = 0 then x.p0 <- x.p2
+                            else x.p1 <- x.p2
+                            x.count <- x.count + 1
+                            x.p2 <- -1
+                        
+
+
+                [<Inline>]
+                member x.Reset() =
+                    x.count <- 0
+                    x.vs <- 0
+                    x.p0 <- -1
+                    x.p1 <- -1
+                    x.p2 <- -1
+                    for i in 0 .. Peano.typeSize<'d> - 1 do
+                        x.indices.[i] <- -1
+
+                [<Inline>]
+                member x.EndPrimitive() =
+                    x.vs <- 0
+                    x.p0 <- -1
+                    x.p1 <- -1
+                    x.p2 <- -1
+                
+                [<Inline>]
+                member x.GetIndex(pi : int, fvi : int) =
+                    x.indices.[3 * pi + fvi]
+                
+            [<ReflectedDefinition>]
+            type LineStream<'d when 'd :> INatural> =
+                {
+                    indices                     : Arr<'d, int>
+                    mutable count               : int
+
+                    mutable p0                  : int
+                    mutable p1                  : int
+                    mutable vs                  : int
+                }
+
+                [<Inline>]
+                member x.Reset() =
+                    x.count <- 0
+                    x.vs <- 0
+                    x.p0 <- -1
+                    x.p1 <- -1
+                    for i in 0 .. Peano.typeSize<'d> - 1 do
+                        x.indices.[i] <- -1
+
+                member x.EmitVertex(vi : int) =
+                    match x.vs with
+                        | 0 -> 
+                            x.p0 <- vi
+                            x.vs <- 1
+                        | 1 ->
+                            x.p1 <- vi
+                            x.vs <- 2
+
+                            let bi = 2 * x.count
+                            x.indices.[bi + 0] <- x.p0
+                            x.indices.[bi + 1] <- x.p1
+                        
+                            x.p0 <- x.p1
+                            x.vs <- 1
+                        
+                            x.count <- x.count + 1
+
+                        | _ ->
+                            ()
+
+                [<Inline>]
+                member x.EndPrimitive() =
+                    x.vs <- 0
+                  
+                [<Inline>]
+                member x.GetIndex(pi : int, fvi : int) =
+                    x.indices.[2 * pi + fvi]
+                              
+            [<ReflectedDefinition>]
+            type PointStream<'d when 'd :> INatural> =
+                {
+                    indices                     : Arr<'d, int>
+                    mutable count               : int
+                }
+
+                [<Inline>]
+                member x.Reset() =
+                    x.count <- 0
+                    for i in 0 .. Peano.typeSize<'d> - 1 do
+                        x.indices.[i] <- -1
+
+                member x.EmitVertex(vi : int) =
+                    x.indices.[x.count] <- vi
+                    x.count <- x.count + 1
+              
+                [<Inline>]
+                member x.EndPrimitive() =
+                    ()
+                  
+                [<Inline>]
+                member x.GetIndex(pi : int, fvi : int) =
+                    x.indices.[pi]
+                
+            type ReflectedStream(t : OutputTopology, maxPrimitives : int) =
+                
+                let maxIndices =
+                    match t with
+                        | OutputTopology.Points -> maxPrimitives
+                        | OutputTopology.LineStrip -> maxPrimitives * 2
+                        | OutputTopology.TriangleStrip -> maxPrimitives * 3
+                    
+                let tStream =
+                    match t with
+                        | OutputTopology.Points -> typedefof<PointStream<_>>.MakeGenericType [| Peano.getPeanoType maxIndices |]
+                        | OutputTopology.LineStrip -> typedefof<LineStream<_>>.MakeGenericType [| Peano.getPeanoType maxIndices |]
+                        | OutputTopology.TriangleStrip -> typedefof<TriangleStream<_>>.MakeGenericType [| Peano.getPeanoType maxIndices |]
+                        
+                let mReset          = tStream.GetMethod("Reset", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
+                let mEmitVertex     = tStream.GetMethod("EmitVertex", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
+                let mEndPrimitive   = tStream.GetMethod("EndPrimitive", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
+                let mGetIndex       = tStream.GetMethod("GetIndex", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
+                let pCount          = tStream.GetProperty("count", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
+                
+
+                let stream = Var("stream", tStream, true)
+
+                member x.VerticesPerPrimitive = 
+                    match t with
+                        | OutputTopology.Points -> 1
+                        | OutputTopology.LineStrip -> 2
+                        | OutputTopology.TriangleStrip -> 3
+
+                member x.Declare(body : Expr) =
+                    Expr.Let(
+                        stream, Expr.DefaultValue tStream,
+                        Expr.Seq [
+                            Expr.Call(Expr.Var stream, mReset, [])
+                            body
+                        ]
+                    )
+
+                member x.EmitVertex(index : Expr<int>) : Expr<unit> =
+                    Expr.Call(Expr.Var stream, mEmitVertex, [index]) |> Expr.Cast
+                    
+                member x.EndPrimitive() : Expr<unit> =
+                    Expr.Call(Expr.Var stream, mEndPrimitive, []) |> Expr.Cast
+
+                member x.GetIndex(pi : Expr<int>, fvi : Expr<int>) : Expr<int> =
+                    Expr.Call(Expr.Var stream, mGetIndex, [pi.Raw; fvi.Raw]) |> Expr.Cast
+
+                member x.Count : Expr<int> = 
+                    Expr.PropertyGet(Expr.Var stream, pCount) |> Expr.Cast 
+            
+            type Expr with
+                static member Lets (vs : seq<Var * Option<Expr>>, body : Expr) =
+                    let rec doit (l : list<Var * Option<Expr>>) =
+                        match l with
+                            | [] -> body
+                            | (v,e) :: rest ->
+                                let e = match e with | Some e -> e | None -> Expr.DefaultValue(v.Type)
+                                Expr.Let(v, e, doit rest)
+
+                    vs |> Seq.toList |> doit
+
+                static member Repeat(n : int, body : Expr -> Expr) =
+                    match n with
+                        | 0 -> Expr.Unit
+                        | 1 -> body (Expr.Value 0)
+                        | n -> 
+                            let i = Var("i", typeof<int>)
+                            Expr.ForIntegerRangeLoop(i, Expr.Value 0, Expr.Value (n - 1), body (Expr.Var i))
+                    
+
+        let gsgs (lShader : Shader) (rShader : Shader) =
+            if not (topologyCompatible lShader.shaderOutputTopology rShader.shaderInputTopology) then
+                failwithf "[FShade] cannot compose geometryshaders with mismatching topologies: %A vs %A" lShader.shaderOutputTopology rShader.shaderInputTopology
+
+            match lShader.shaderOutputVertices with
+                | ShaderOutputVertices.Computed count | ShaderOutputVertices.UserGiven count ->
+
+                    let lOutputTopology = lShader.shaderOutputTopology.Value
+
+
+                    // pass all needed inputs along
+                    let lShader = lShader |> withOutputs (rShader.shaderInputs |> Map.map (fun _ d -> d.paramType.GetElementType()))
+
+                    // determine the maximal number of indices needed
+                    let maxPrimitives =
+                        match lShader.shaderOutputPrimitives with
+                            | Some p -> p
+                            | None ->
+                                match lOutputTopology with
+                                    | OutputTopology.Points -> count
+                                    | OutputTopology.LineStrip -> count - 1
+                                    | OutputTopology.TriangleStrip -> count - 2
+
+                    // introduce variables for all composition semantics
+                    let composeVars = 
+                        lShader.shaderOutputs |> Map.map (fun name desc ->
+                            let arrType = Peano.getArrayType count desc.paramType
+                            Var(name, arrType) 
+                        )
+
+                    // maintain an index 
+                    let currentVertex = Var("currentVertex", typeof<int>, true)
+                    
+                    let stream = ReflectedStream(lShader.shaderOutputTopology.Value, maxPrimitives)
+
+                    let lBody =
+                        lShader.shaderBody.SubstituteWrites (fun outputs ->
+                            let result =
+                                Expr.Seq [
+                                    for (name, (i,o)) in Map.toSeq outputs do
+                                        if Option.isSome i then failwithf "[FShade] indexed output-write not possible atm."
+
+                                        let v = composeVars.[name]
+                                        yield Expr.ArraySet(Expr.Var v, Expr.Var currentVertex, o)
+                                ]
+
+                            Some result
+                        )
+
+                    let lBody =
+                        let rec replace (e : Expr) =
+                            match e with
+                                | SpecificCall <@ restartStrip @> _
+                                | SpecificCall <@ endPrimitive @> _ ->
+                                    stream.EndPrimitive() :> Expr
+
+                                | SpecificCall <@ emitVertex @> _ ->
+                                    Expr.Seq [
+                                        stream.EmitVertex(Expr.Var(currentVertex) |> Expr.Cast) :> Expr
+                                        Expr.VarSet(currentVertex, <@ (%%(Expr.Var(currentVertex)) : int) + 1 @>)
+                                    ]
+
+                                | ShapeLambda(v,b) -> Expr.Lambda(v, replace b)
+                                | ShapeCombination(o, args) -> RebuildShapeCombination(o, args |> List.map replace)
+                                | ShapeVar v -> Expr.Var v
+
+                        replace lBody
+
+                    let rec bind (l : list<Var * Option<Expr>>) (body : Expr) =
+                        match l with
+                            | [] -> body
+                            | (v,e) :: rest ->
+                                match e with
+                                    | Some e -> Expr.Let(v, e, bind rest body)
+                                    | None -> Expr.Let(v, Expr.DefaultValue v.Type, bind rest body) 
+
+                    let variables =
+                        [
+                            for v in Map.values composeVars do
+                                yield v, None
+                            yield currentVertex, Some (Expr.Value 0)
+                        ]   
+
+                    let rInputCount = stream.VerticesPerPrimitive
+                    let rPrimitiveId = Var("primitiveId", typeof<int>)
+                    let rIndices = Var("indices", Peano.getArrayType rInputCount typeof<int>)
+
+                    let rBody =
+                        let rBody =
+                            rShader.shaderBody.SubstituteReads (fun kind typ name index ->
+                                match kind with
+                                    | ParameterKind.Input ->
+                                        match index with
+                                            | Some index ->
+                                                let index = Expr.ArrayAccess(Expr.Var rIndices, index) 
+                                                let v = composeVars.[name]
+                                                Some (Expr.ArrayAccess(Expr.Var v, index))
+
+                                            | None ->
+                                                None
+                                                //failwith "[FShade] GeometryShader cannot read non-indexed input"
+                                    | _ ->
+                                        None
+                            )
+
+
+                        let getIndex (pi : Expr) (i : int) = stream.GetIndex(Expr.Cast pi, <@ i @>)
+
+                        Expr.ForIntegerRangeLoop(
+                            rPrimitiveId, Expr.Value 0, <@@ %(stream.Count) - 1 @@>, 
+                            Expr.Let(rIndices, Expr.DefaultValue rIndices.Type,
+                                Expr.Seq [
+                                    for i in 0 .. rInputCount - 1 do
+                                        yield Expr.ArraySet(Expr.Var rIndices, Expr.Value i, getIndex (Expr.Var rPrimitiveId) i)
+                                    yield rBody
+                                    yield <@@ restartStrip() @@>
+                                ]
+                            )
+                        )
+
+
+                    let body =
+                        bind variables (
+                            stream.Declare (
+                                Expr.Seq [
+                                    lBody
+                                    rBody
+                                ]
+                            )
+                        )
+
+                    let outputVerices =
+                        match rShader.shaderOutputVertices with
+                            | ShaderOutputVertices.UserGiven rc | ShaderOutputVertices.Computed rc ->
+                                ShaderOutputVertices.UserGiven (maxPrimitives * rc)
+
+                            | _ ->
+                                ShaderOutputVertices.Unknown
+
+                    let outputPrimitives =
+                        match rShader.shaderOutputPrimitives with
+                            | Some rp -> Some (maxPrimitives * rp)
+                            | None -> None
+
+                    optimize 
+                        { rShader with
+                            shaderInvocations = lShader.shaderInvocations * rShader.shaderInvocations
+                            shaderBody = Preprocessor.preprocess V3i.Zero body |> fst
+                            shaderInputTopology = lShader.shaderInputTopology
+                            shaderUniforms = Map.union lShader.shaderUniforms rShader.shaderUniforms
+                            shaderInputs = lShader.shaderInputs
+                            shaderOutputVertices = outputVerices
+                            shaderOutputPrimitives = outputPrimitives
+                        }
+
+
+                | _ ->
+                    failwithf "[FShade] cannot compose GeometryShader without vertex-count"
+
+        let vsgs (lShader : Shader) (rShader : Shader) =
+            
+            let inputVertices =
+                match rShader.shaderInputTopology.Value with
+                    | InputTopology.Point -> 1
+                    | InputTopology.Line -> 2
+                    | InputTopology.Triangle -> 3
+                    | InputTopology.LineAdjacency -> 4
+                    | InputTopology.TriangleAdjacency -> 5
+                    | InputTopology.Patch n -> n
+
+            let vars =
+                lShader.shaderOutputs |> Map.remove Intrinsics.SourceVertexIndex |> Map.map (fun name desc ->
+                    if inputVertices = 1 then
+                        Var(name, desc.paramType, true)
+                    else
+                        Var(name, Peano.getArrayType inputVertices desc.paramType)
+                )
+
+            let write (name : string) (index : Expr) (value : Expr) =
+                let v = vars.[name]
+
+                if v.IsMutable && v.Type = value.Type then
+                    assert (match index with | Int32 0 -> true | _ -> false)
+                    Expr.VarSet(v, value)
+
+                else
+                    Expr.ArraySet(Expr.Var v, index, value)
+                    
+            let tryRead (name : string) (index : Expr) =
+                match Map.tryFind name vars with
+                    | Some v ->
+                        match v.Type with
+                            | ArrOf _ | ArrayOf _ -> 
+                                Some (Expr.ArrayAccess(Expr.Var v, index))
+                            | _ -> 
+                                assert ( match index with | Int32 0 -> true | _ -> false)
+                                Some (Expr.Var v)
+                    | None ->
+                        None
+
+            let rBody = 
+                rShader.shaderBody.SubstituteReads (fun kind typ name index ->
+                    match kind, index with
+                        | ParameterKind.Input, Some index ->
+                            tryRead name index
+                        | _ ->
+                            None
+                )
+
+            let rBody =
+                Expr.Lets(
+                    vars |> Map.values |> Seq.map (fun v -> v, None),
+                    Expr.Seq [
+                        Expr.Repeat(inputVertices, fun index -> 
+                            let body = lShader.shaderBody
+
+                            let body =
+                                body.SubstituteReads(fun kind typ name ii ->
+                                    assert (Option.isNone ii)
+                                    match kind with
+                                        | ParameterKind.Input ->
+                                            Expr.ReadInput(kind, typ, name, index) |> Some
+                                        | _ ->
+                                            None
+                                )
+
+                            let body = 
+                                body.SubstituteWrites (fun outputs ->
+                                    let values = outputs |> Map.remove Intrinsics.SourceVertexIndex |> Map.toList
+
+                                    let writes = 
+                                        values |> List.map (fun (name, (idx,value)) ->
+                                            assert (Option.isNone idx)
+                                            write name index value
+                                        )
+
+                                    Some (Expr.Seq writes)
+                                )
+
+                            body
+                        )
+
+                        rBody
+                    ]
+                )
+
+
+            withBody rBody { rShader with shaderUniforms = Map.union lShader.shaderUniforms rShader.shaderUniforms }
+
     /// composes two shaders respecting their stages.
     ///     - implemented: { Vertex->Vertex; Geometry->Vertex; Fragment->Fragment }
     ///     - future:           { Tessellation->Vertex; Geometry->Geometry }
@@ -1919,6 +2710,8 @@ module Shader =
             | ShaderStage.Geometry, ShaderStage.Vertex ->
                 Composition.gsvs l r
 
+            | ShaderStage.Geometry, ShaderStage.Geometry ->
+                Composition.gsgs l r
 
             | _ ->
                 failwithf "[FShade] cannot compose %AShader with %AShader" l.shaderStage r.shaderStage
