@@ -196,6 +196,12 @@ module AssemblerState =
 
     let rec private neededLocations (t : CType) =
         match t with
+            | CPointer(_,et) -> 
+                neededLocations et
+
+            | CType.CBool _ | CType.CFloat _ | CType.CInt _ ->
+                1
+
             | CMatrix(et, rows, cols) ->
                 let l = CVector(et, rows) |> neededLocations
                 l * cols
@@ -205,11 +211,9 @@ module AssemblerState =
                 let inner = neededLocations et
                 inner * len
 
-            | CStruct _ ->
+            | CStruct _ | CIntrinsic _ | CVoid ->
                 failwith "[GLSL] no struct inputs allowed"
 
-            | _ ->
-                1
 
     let newLocation (kind : ParameterKind) (t : CType) =
         State.custom (fun s ->
