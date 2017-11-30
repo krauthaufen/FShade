@@ -67,9 +67,19 @@ module UtiliyFunctions =
             addressW WrapMode.Mirror
         }
 
-    [<ReflectedDefinition>]
+    let eric =
+        sampler3d {
+            textureArray uniform?Blau 4
+            filter Filter.Anisotropic
+            addressU WrapMode.Clamp
+            addressV WrapMode.Wrap
+            addressW WrapMode.Mirror
+        }
+
+    [<ReflectedDefinition; Inline>]
     let funny v =
-        sammy.Sample v
+        eric.[0].Sample v + eric.[1].Sample v
+        //sammy.Sample v
 
     let shader (v : Vertex) =
         fragment {
