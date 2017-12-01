@@ -47,6 +47,16 @@ module UtiliyFunctions =
   
         //[<Inline>]
         let g (a : float) (b : float) =
+            let arr = Arr<8 N, int> [1..8]
+
+            for i in 0 .. 7 do
+                arr.[i] <- i
+
+            
+            let mutable a = a
+            for i in 0 .. 7 do
+                a <- a + float arr.[i]
+
             f a a + uniform.A + uniform.B
 
     let vs (v : Vertex) =

@@ -158,7 +158,7 @@ module private Preprocessor =
 
     [<AutoOpen>] 
     module OtherPatterns =
-
+        
         let (|Primitive|_|) (e : Expr) =
             let iface = e.Type.GetInterface("Primitive`1")
             if isNull iface then
@@ -213,6 +213,48 @@ module private Preprocessor =
                 | ReadInput(_,_,(None | Some TrivialInput))
                 | FieldGet((None | Some TrivialInput), _) ->
                     Some ()
+                | _ ->
+                    None
+
+        let private (|Cons|Nil|Other|) (u : UnionCaseInfo) =
+            if u.DeclaringType.IsGenericType && u.DeclaringType.GetGenericTypeDefinition() = typedefof<list<_>> then
+                if u.GetFields().Length = 2 then
+                    Cons
+                else 
+                    Nil
+            else
+                Other
+
+        let rec (|NewList|_|) (e : Expr) =
+            match e with
+                | NewUnionCase(Cons, [h; NewList r]) ->
+                    Some (h :: r)
+                | NewUnionCase(Nil, []) ->
+                    Some []
+                | _-> 
+                    None
+                    
+        let rec (|NewSeq|_|) (e : Expr) : Option<list<Expr>> =
+            match e with
+                | Coerce(NewSeq args, _) -> Some args
+                | NewArray(_,args) -> Some args
+                | NewList(args) -> Some args
+                | RangeSequence(Int32 min, Int32 step, Int32 max) -> Some (List.map Expr.Value [min .. step .. max ])
+                | _ -> None
+
+        let private (|ArrCtor|_|) (c : ConstructorInfo) =
+            match c.DeclaringType with
+                | ArrOf(l,t) -> Some (l,t)
+                | _ -> None
+
+        let (|NewArr|_|) (e : Expr) =
+            match e with
+                | NewObject(ArrCtor(l,t), args) ->
+                    match args with
+                        | [] -> Some(t,l,[])
+                        | [NewSeq args] -> Some(t,l,args)
+                        | _ -> None
+
                 | _ ->
                     None
 
@@ -393,6 +435,8 @@ module private Preprocessor =
 
                         | _ ->
                             return failwith "[FShade] could not evaluate size for allocateShared"
+
+
 
                 | ShapeLambda(v, b) ->
                     let! b = preprocessComputeS b
@@ -616,6 +660,7 @@ module private Preprocessor =
                         
                     return Expr.NewRecord(e.Type, args)
 
+
                 // vertex.pos -> ReadInput(pos)
                 | InputRead vertexType (vertex, semantic, parameter) ->
                     let! index =
@@ -758,9 +803,21 @@ module private Preprocessor =
 //                    match t with
 //                        | Some t -> return Expr.Call(t, mi, args)
 //                        | None -> return Expr.Call(mi, args)
-                            
 
+                | NewArr(t, l, []) ->
+                    return Expr.DefaultValue(e.Type)
 
+                | NewArr(t, l, args) ->
+                    let! args = args |> List.mapS preprocessNormalS
+                    let t = Var("arr", e.Type, false)
+                    return Expr.Let(
+                        t, Expr.DefaultValue(e.Type),
+                        Expr.Seq [
+                            args |> List.mapi (fun i a -> Expr.ArraySet(Expr.Var t, Expr.Value i, a)) |> Expr.Seq
+                            Expr.Var t
+                        ]
+                    )             
+                                   
                 | ShapeCombination(o, args) ->
                     let! args = args |> List.mapS preprocessNormalS
                     return RebuildShapeCombination(o, args)
@@ -781,7 +838,7 @@ module private Preprocessor =
                 else State.value e
 
             let! e1 = preprocessNormalS e0
-            return e1
+            return Optimizer.hoistImperativeConstructs e1
         }
 
     and getOutputValues (sem : string) (value : Expr) : Preprocess<list<string * Option<Expr> * Expr>> =
