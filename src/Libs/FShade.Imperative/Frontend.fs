@@ -20,7 +20,7 @@ type ParameterDecoration =
     | Memory of MemoryType
     | Const
     | Slot of int
-    | StorageBuffer
+    | StorageBuffer of read : bool * write : bool
     | Shared
     
 [<RequireQualifiedAccess>]

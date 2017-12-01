@@ -937,7 +937,7 @@ module Assembler =
                                             | InterpolationMode.PerPatch -> return Some "patch"
                                             | _ -> return None
 
-                                    | ParameterDecoration.StorageBuffer ->
+                                    | ParameterDecoration.StorageBuffer(read, write) ->
                                         let! binding =
                                             if config.createBindings then AssemblerState.newBinding
                                             else State.value -1
@@ -954,7 +954,13 @@ module Assembler =
 
                                         let args = "std430" :: args |> String.concat ","
 
-                                        return Some (sprintf "layout(%s) buffer " args + (p.cParamSemantic + "_ssb"))
+                                        let rw =
+                                            match read, write with
+                                                | false, true -> " writeonly"
+                                                | true, false -> " readonly"
+                                                | _ -> ""
+
+                                        return Some (sprintf "layout(%s) buffer%s " args rw + (p.cParamSemantic + "_ssb"))
 
                                     | ParameterDecoration.Shared -> 
                                         return Some "shared"
@@ -966,7 +972,7 @@ module Assembler =
                         )
 
 
-                    let isBuffer = p.cParamDecorations |> Seq.exists (function ParameterDecoration.StorageBuffer -> true | _ -> false)
+                    let isBuffer = p.cParamDecorations |> Seq.exists (function ParameterDecoration.StorageBuffer  _-> true | _ -> false)
 
                     let slot = p.cParamDecorations |> Seq.tryPick (function ParameterDecoration.Slot s -> Some s | _ -> None)
 

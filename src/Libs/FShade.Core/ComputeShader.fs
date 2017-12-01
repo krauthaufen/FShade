@@ -384,7 +384,7 @@ module ComputeShader =
                     paramName = n
                     paramSemantic = n
                     paramType = i.contentType.MakeArrayType()
-                    paramDecorations = Set.ofList [ParameterDecoration.StorageBuffer]
+                    paramDecorations = Set.ofList [ParameterDecoration.StorageBuffer(i.read, i.write)]
                 }
             )
 
