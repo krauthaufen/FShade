@@ -286,6 +286,20 @@ module Optimizer =
                     if initial.usedVariables = final.usedVariables then return res
                     else return! fix m
                 }
+                
+        [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+        module List =
+            let rec existsS (f : 'a -> State<'s, bool>) (l : list<'a>) =
+                state {
+                    match l with
+                        | [] -> return false
+                        | h :: t ->
+                            let! r = f h
+                            if r then 
+                                return true
+                            else
+                                return! existsS f t
+                }
 
         let private staticallyNeededCalls =
             HashSet.ofList [
@@ -321,6 +335,42 @@ module Optimizer =
                             return List.exists2 needsMutableParameter parameters args
             }
 
+        let rec private hasSideEffectsS (e : Expr) =
+            state {
+                match e with
+                    | CallFunction(utility, args) ->
+                        let! aa = args |> List.existsS hasSideEffectsS
+                        if aa then
+                            return true
+                        else
+                            return! hasSideEffectsS utility.functionBody
+                    | Call(t, mi, args) ->
+                        let! ts = t |> Option.mapS hasSideEffectsS
+                        match ts with
+                            | Some true -> 
+                                return true
+                            | _ ->
+                                let! aa = args |> List.existsS hasSideEffectsS
+                                if aa then 
+                                    return true
+                                else
+                                    let! state = State.get
+
+                                    if state.isGlobalSideEffect mi || staticallyNeededCalls.Contains mi then
+                                        return true
+                                    else
+                                        return false
+
+                    | ShapeLambda(_,b) ->
+                        return! hasSideEffectsS b
+
+                    | ShapeVar _ ->
+                        return false
+
+                    | ShapeCombination(o, args) ->
+                        return! List.existsS hasSideEffectsS args
+            }
+
         let rec withoutValueS (e : Expr) : State<EliminationState, Expr> =
             state {
                 match e with
@@ -354,11 +404,15 @@ module Optimizer =
                         return Expr.Application(l, a)
 
                     | CallFunction(utility, args) ->
-                        let! self = eliminateDeadCodeS e
-                        if self.Type = typeof<unit> then
-                            return e
+                        let! sideEffects = hasSideEffectsS utility.functionBody
+                        if sideEffects then
+                            let! self = eliminateDeadCodeS e
+                            if self.Type = typeof<unit> then
+                                return e
+                            else
+                                return Expr.Ignore e
                         else
-                            return Expr.Ignore e
+                            return Expr.Unit
 
                     | Call(t, mi, args) ->
                         let! needed = callNeededS t mi args

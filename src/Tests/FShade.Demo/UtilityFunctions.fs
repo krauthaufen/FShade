@@ -22,13 +22,13 @@ module UtiliyFunctions =
         { 
             [<SourceVertexIndex>] i : int
             [<Position>] pos : V4d
-            [<Semantic("Hugo")>] hugo: V3d 
+            [<Semantic("Hugo"); Interpolation(InterpolationMode.Centroid)>] hugo: V3d 
         }
  
     type Vertex1 = 
         { 
             [<Position>] pos : V4d
-            [<Semantic("Hugo")>] hugo: V3d 
+            [<Semantic("Hugo"); Interpolation(InterpolationMode.Centroid)>] hugo: V3d 
         }
        
     [<ReflectedDefinition; AutoOpen>]
@@ -64,6 +64,8 @@ module UtiliyFunctions =
             let m = M44d.Identity * v.pos
 
             let m = (uniform.X * uniform.Y).TransformDir v.pos.XYZ
+
+            let test = g 1.0 2.9
 
             return { v with pos = (uniform.X * uniform.Y) * V4d(m, 1.0) }
         }
