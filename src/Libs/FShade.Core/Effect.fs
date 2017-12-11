@@ -428,13 +428,30 @@ module Effect =
                 |> withDepthRange config.flipHandedness config.depthRange
                 
 
-        let rec entryPoints (lastStage : Option<Shader>) (shaders : list<Shader>) =
+        let rec entryPoints (lastOutputs : list<EntryParameter>) (lastStage : Option<Shader>) (shaders : list<Shader>) =
             match shaders with
                 | [] -> 
                     []
 
                 | [shader] -> 
-                    let entry = Shader.toEntryPoint lastStage shader None
+                    
+                    let mutable inputs = shader.shaderInputs
+                    for o in lastOutputs do
+                        match Map.tryFind o.paramSemantic inputs with
+                            | Some ({ paramInterpolation = InterpolationMode.Default } as input) ->
+                                let outInterpolation = o.paramDecorations |> Seq.tryPick (function ParameterDecoration.Interpolation m -> Some m | _ -> None)
+                                match outInterpolation with
+                                    | Some outInterpolation ->
+                                        inputs <- Map.add o.paramSemantic { input with paramInterpolation = outInterpolation } inputs
+                                    | None ->
+                                        ()
+
+                            | _ ->
+                                ()
+                        ()
+                    
+
+                    let entry = Shader.toEntryPoint lastStage { shader with shaderInputs = inputs } None
 
                     let mutable free = Set.ofList (entry.outputs |> List.mapi (fun i _ -> i))
 
@@ -456,7 +473,7 @@ module Effect =
 
                 | shader :: next :: after ->
                     let shaderEntry = Shader.toEntryPoint lastStage shader (Some next) 
-                    shaderEntry :: entryPoints (Some shader) (next :: after)
+                    shaderEntry :: entryPoints shaderEntry.outputs (Some shader) (next :: after)
 
 
         let shaders = toList effect
@@ -464,7 +481,7 @@ module Effect =
         {
             hash = effect.Id
             userData = effect
-            entries = entryPoints None shaders
+            entries = entryPoints [] None shaders
             tryGetOverrideCode = Shader.tryGetOverrideCode V3i.Zero 
         }
 

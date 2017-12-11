@@ -28,7 +28,18 @@ module UtiliyFunctions =
     type Vertex1 = 
         { 
             [<Position>] pos : V4d
-            [<Semantic("Hugo"); Interpolation(InterpolationMode.Centroid)>] hugo: V3d 
+            [<Semantic("Hugo")>] hugo: V3d 
+        }
+ 
+    type DummyVertex =
+        {
+            [<Semantic("Bla")>] c : V3d
+        }
+
+    let tess (v : Triangle<DummyVertex>) =
+        tessellation {
+            let! c = tessellateTriangle 1.0 (1.0, 1.0, 1.0)
+            return { c = c }
         }
        
     [<ReflectedDefinition; AutoOpen>]
@@ -93,7 +104,7 @@ module UtiliyFunctions =
         eric.[0].Sample v + eric.[1].Sample v
         //sammy.Sample v
 
-    let shader (v : Vertex) =
+    let shader (v : Vertex1) =
         fragment {
             // should be removed
             monster 12.0
@@ -220,6 +231,7 @@ module UtiliyFunctions =
         let effect = 
             Effect.compose [
                 Effect.ofFunction vs
+                Effect.ofFunction tess
                 Effect.ofFunction shader
             ]
         let glsl =

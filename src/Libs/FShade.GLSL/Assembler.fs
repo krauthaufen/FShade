@@ -905,7 +905,7 @@ module Assembler =
         state {
             let! stages = AssemblerState.stages
             let! builtIn = AssemblerState.tryGetParameterName kind p.cParamSemantic
-
+            let selfStage = stages.self
 
 
             match builtIn with
@@ -926,15 +926,20 @@ module Assembler =
                         |> List.chooseS (fun d ->
                             state {
                                 match d with
-                                    | ParameterDecoration.Const -> return Some "const"
+                                    | ParameterDecoration.Const -> 
+                                        return Some "const"
+
                                     | ParameterDecoration.Interpolation m ->
-                                        match m with
-                                            | InterpolationMode.Centroid -> return Some "centroid"
-                                            | InterpolationMode.Flat -> return Some "flat"
-                                            | InterpolationMode.NoPerspective -> return Some "noperspective"
-                                            | InterpolationMode.Perspective -> return Some "perspective"
-                                            | InterpolationMode.Sample -> return Some "sample"
-                                            | InterpolationMode.PerPatch -> return Some "patch"
+                                        match selfStage, kind, m with
+                                            | ShaderStage.Fragment, ParameterKind.Input, InterpolationMode.Centroid -> return Some "centroid"
+                                            | ShaderStage.Fragment, ParameterKind.Input, InterpolationMode.Flat -> return Some "flat"
+                                            | ShaderStage.Fragment, ParameterKind.Input, InterpolationMode.NoPerspective -> return Some "noperspective"
+                                            | ShaderStage.Fragment, ParameterKind.Input, InterpolationMode.Perspective -> return Some "perspective"
+                                            | ShaderStage.Fragment, ParameterKind.Input, InterpolationMode.Sample -> return Some "sample"
+
+                                            | ShaderStage.TessEval, ParameterKind.Input, InterpolationMode.PerPatch -> return Some "patch"
+                                            | ShaderStage.TessControl, ParameterKind.Output, InterpolationMode.PerPatch -> return Some "patch"
+
                                             | _ -> return None
 
                                     | ParameterDecoration.StorageBuffer(read, write) ->

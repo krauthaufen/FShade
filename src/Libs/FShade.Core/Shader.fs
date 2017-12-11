@@ -321,7 +321,21 @@ module private Preprocessor =
 
         let readInput (name : string) (desc : ParameterDescription) = 
             State.modify (fun s ->
-                { s with State.inputs = Map.add name desc s.inputs }
+                match Map.tryFind name s.inputs with
+                    | Some odesc ->
+                        if odesc.paramType = desc.paramType then
+                            let newInterpolation =
+                                match odesc.paramInterpolation, desc.paramInterpolation with
+                                    | InterpolationMode.Default, o -> o
+                                    | o, InterpolationMode.Default -> o
+                                    | o, n ->
+                                        if o = n then o
+                                        else failwithf "[FShade] conflicting interpolationmodes for %s: %A vs %A" name o n
+                            { s with State.inputs = Map.add name { desc with paramInterpolation = newInterpolation } s.inputs }
+                        else
+                            failwithf "[FShade] conflicting input types for %s: %A vs %A" name odesc.paramType desc.paramType
+                    | None ->
+                        { s with State.inputs = Map.add name desc s.inputs }
             )
 
         let readUniform (p : UniformParameter) = 
