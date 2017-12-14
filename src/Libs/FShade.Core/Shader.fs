@@ -1654,8 +1654,11 @@ module Shader =
     let ofFunction (shaderFunction : 'a -> Expr<'b>) =
         let expression = 
             try shaderFunction Unchecked.defaultof<'a>
-            with _ -> failwith "[FShade] shader functions may not access their vertex-input statically"
-
+            with 
+                | :? System.NullReferenceException as n -> 
+                    failwithf "[FShade] shader functions may not access their vertex-input statically (inner cause - NullReferenceException: %A)" n.StackTrace
+                | e -> 
+                    failwithf "[FShade] failed to execute shader function.\nInner cause: %A at\n%A" e e.StackTrace
 
         ofExpr typeof<'a> expression
 
