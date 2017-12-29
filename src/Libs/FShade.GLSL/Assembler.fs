@@ -959,11 +959,11 @@ module Assembler =
 
                                         let args = "std430" :: args |> String.concat ","
 
-                                        let rw =
-                                            match read, write with
-                                                | false, true -> " writeonly"
-                                                | true, false -> " readonly"
-                                                | _ -> ""
+                                        let rw = ""
+//                                            match read, write with
+//                                                | false, true -> " writeonly"
+//                                                | true, false -> " readonly"
+//                                                | _ -> ""
 
                                         return Some (sprintf "layout(%s) buffer%s " args rw + (p.cParamSemantic + "_ssb"))
 
