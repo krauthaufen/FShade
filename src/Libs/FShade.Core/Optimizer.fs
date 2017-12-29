@@ -1348,9 +1348,7 @@ module Optimizer =
                                         | _ -> 
                                             return
                                                 try Expr.Value(mi.Invoke(null, values |> List.toArray), e.Type)
-                                                with e -> 
-                                                    Log.warn "could not evaluate %A: %A" mi e
-                                                    Expr.Call(mi, args)
+                                                with e -> Expr.Call(mi, args)
                                 | _ ->
                                     return Expr.Call(mi, args) 
 
