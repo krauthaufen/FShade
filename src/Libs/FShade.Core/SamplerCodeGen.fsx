@@ -70,12 +70,12 @@ type SampleVariants =
 let samplerFunction (comment : string) (variants : SampleVariants) (name : string) (args : list<string * string>) (ret : string) =
     let args = args |> List.map (fun (n,t) -> sprintf "%s : %s" n t) |> String.concat ", "
     line "/// %s" comment
-    line "member x.%s(%s) : %s = failwith \"\"" name args ret
+    line "member x.%s(%s) : %s = onlyInShaderCode \"%s\"" name args ret name
     line ""
 
     if (variants &&& SampleVariants.Bias) <> SampleVariants.None then
         line "/// %s with lod-bias" comment
-        line "member x.%s(%s, lodBias : float) : %s = failwith \"\"" name args ret
+        line "member x.%s(%s, lodBias : float) : %s = onlyInShaderCode \"%s\"" name args ret name
         line ""
 
 
@@ -173,15 +173,15 @@ let run() =
 
 
         line  "/// the mipmap-levels for the sampler"
-        line  "member x.MipMapLevels : int = failwith \"\""
+        line  "member x.MipMapLevels : int = onlyInShaderCode \"MipMapLevels\""
         line  ""
 
         line  "/// the size for the sampler"
-        line  "member x.GetSize (level : int) : %s = failwith \"\"" sizeType
+        line  "member x.GetSize (level : int) : %s = onlyInShaderCode \"GetSize\"" sizeType
         line  ""
 
         line  "/// the size for the sampler"
-        line  "member x.Size : %s = failwith \"\"" sizeType
+        line  "member x.Size : %s = onlyInShaderCode \"Size\"" sizeType
         line  ""
 
 
@@ -289,16 +289,16 @@ let run() =
 
             if not s && not a && not m then
                 line "member x.Item"
-                line "    with get (coord : %s) : %s = failwith \"\"" texelCoordType returnType 
+                line "    with get (coord : %s) : %s = onlyInShaderCode \"Fetch\"" texelCoordType returnType 
                 line ""
                 line "member x.Item"
-                line "    with get(coord : %s, level : int) : %s = failwith \"\"" texelCoordType returnType 
+                line "    with get(coord : %s, level : int) : %s = onlyInShaderCode \"Fetch\"" texelCoordType returnType 
                 
 //                if coordComponents > 1 then
 //                    let argNames = ["cx"; "cy"; "cz"; "cw"]
 //                    let args = argNames |> List.take coordComponents |> List.map (sprintf "%s : int") |> String.concat ", "
 //                    line  "member x.Item"
-//                    line  "    with get (%s) : %s = failwith \"\"" args returnType 
+//                    line  "    with get (%s) : %s = onlyInShaderCode \"Fetch\"" args returnType 
 //                    line  ""
         
         stop()
@@ -411,7 +411,7 @@ let run() =
         line  "static member IsMultisampled = %s" (if m then "true" else "false")
         line  ""
 
-        line "member x.Size : %s = failwith \"\"" sizeType
+        line "member x.Size : %s = onlyInShaderCode \"Size\"" sizeType
 
 
         let args =
@@ -424,20 +424,20 @@ let run() =
         let itemArgs = args |> List.map (fun (n,t) -> sprintf "%s : %s" n t) |> String.concat ", "
 
         start "member x.Item"
-        line "with get(%s) : %s = failwith \"\"" itemArgs returnType
-        line "and set(%s) (v : %s) : unit = failwith \"\"" itemArgs returnType
+        line "with get(%s) : %s = onlyInShaderCode \"fetch\"" itemArgs returnType
+        line "and set(%s) (v : %s) : unit = onlyInShaderCode \"write\"" itemArgs returnType
         stop()
 
 
         if t = SamplerType.Int then
-            line "member x.AtomicAdd(%s, data : int) : int = failwith \"\"" itemArgs
-            line "member x.AtomicMin(%s, data : int) : int = failwith \"\"" itemArgs
-            line "member x.AtomicMax(%s, data : int) : int = failwith \"\"" itemArgs
-            line "member x.AtomicAnd(%s, data : int) : int = failwith \"\"" itemArgs
-            line "member x.AtomicOr(%s, data : int) : int = failwith \"\"" itemArgs
-            line "member x.AtomicXor(%s, data : int) : int = failwith \"\"" itemArgs
-            line "member x.AtomicExchange(%s, data : int) : int = failwith \"\"" itemArgs
-            line "member x.AtomicCompareExchange(%s, cmp : int, data : int) : int = failwith \"\"" itemArgs
+            line "member x.AtomicAdd(%s, data : int) : int = onlyInShaderCode \"AtomicAdd\"" itemArgs
+            line "member x.AtomicMin(%s, data : int) : int = onlyInShaderCode \"AtomicMin\"" itemArgs
+            line "member x.AtomicMax(%s, data : int) : int = onlyInShaderCode \"AtomicMax\"" itemArgs
+            line "member x.AtomicAnd(%s, data : int) : int = onlyInShaderCode \"AtomicAnd\"" itemArgs
+            line "member x.AtomicOr(%s, data : int) : int = onlyInShaderCode \"AtomicOr\"" itemArgs
+            line "member x.AtomicXor(%s, data : int) : int = onlyInShaderCode \"AtomicXor\"" itemArgs
+            line "member x.AtomicExchange(%s, data : int) : int = onlyInShaderCode \"AtomicExchange\"" itemArgs
+            line "member x.AtomicCompareExchange(%s, cmp : int, data : int) : int = onlyInShaderCode \"AtomicCompareExchange\"" itemArgs
 
 
         stop()

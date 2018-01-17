@@ -408,7 +408,9 @@ module Assembler =
 
                         | :? string as format ->
                             let! args = args |> Array.mapS (assembleExprS >> State.map (fun a -> a :> obj))
-                            return String.Format(format, args)
+                            return 
+                                try String.Format(format, args)
+                                with _ -> failwithf "[FShade] invalid string format: %A (%d args)" format args.Length
                             
                         | _ ->
                             return failwithf "[FShade] invalid GLSL intrinsic: %A" func

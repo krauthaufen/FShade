@@ -1346,9 +1346,17 @@ module Optimizer =
                                         | (true, f) -> 
                                             return Expr.Value(f values, e.Type)
                                         | _ -> 
-                                            return
-                                                try Expr.Value(mi.Invoke(null, values |> List.toArray), e.Type)
-                                                with e -> Expr.Call(mi, args)
+                                            let value = 
+                                                try mi.Invoke(null, values |> List.toArray) |> Some
+                                                with 
+                                                    | :? FShadeOnlyInShaderCodeException -> None
+                                                    | _ -> 
+                                                        Log.warn "[FShade] could not evaluate: %A" mi
+                                                        None
+
+                                            match value with
+                                                | Some v -> return Expr.Value(v, e.Type)
+                                                | None -> return Expr.Call(mi, args)
                                 | _ ->
                                     return Expr.Call(mi, args) 
 
@@ -1362,10 +1370,17 @@ module Optimizer =
                         else
                             match t, args with
                                 | Value(tv,_), AllConstant values -> 
-                                    try
-                                        return Expr.Value(mi.Invoke(tv, List.toArray values), e.Type)
-                                    with _ ->
-                                        return Expr.Call(t, mi, args)
+                                    
+                                    let value = 
+                                        try mi.Invoke(tv, values |> List.toArray) |> Some
+                                        with 
+                                            | :? FShadeOnlyInShaderCodeException -> None
+                                            | _ -> 
+                                                Log.warn "[FShade] could not evaluate: %A" mi
+                                                None
+                                    match value with    
+                                        | Some v -> return Expr.Value(v, e.Type)
+                                        | None -> return Expr.Call(t, mi, args)
                                 | _ ->
                                     return Expr.Call(t, mi, args)
 
@@ -1487,8 +1502,18 @@ module Optimizer =
                         let! indices = indices |> List.mapS evaluateConstantsS
                         let! n = State.needsProperty pi
                         match indices with
-                            | AllConstant indices when not n ->
-                                return Expr.Value(pi.GetValue(null, List.toArray indices), e.Type)
+                            | AllConstant indexValues when not n ->
+                                let value = 
+                                    try pi.GetValue(null, List.toArray indexValues) |> Some
+                                    with 
+                                        | :? FShadeOnlyInShaderCodeException -> None
+                                        | _ -> 
+                                            Log.warn "[FShade] could not evaluate: %A" pi
+                                            None
+                                match value with
+                                    | Some value -> return Expr.Value(value, e.Type)
+                                    | None -> return Expr.PropertyGet(pi, indices)
+
                             | _ ->
                                 return Expr.PropertyGet(pi, indices)
 
@@ -1497,8 +1522,18 @@ module Optimizer =
                         let! indices = indices |> List.mapS evaluateConstantsS
                         let! n = State.needsProperty pi
                         match t, indices with
-                            | Value(t,_), AllConstant indices when not n && not (isNull t)->
-                                return Expr.Value(pi.GetValue(t, List.toArray indices), e.Type)
+                            | Value(tv,_), AllConstant indexValues when not n && not (isNull tv)->
+                                let value = 
+                                    try pi.GetValue(tv, List.toArray indexValues) |> Some
+                                    with 
+                                        | :? FShadeOnlyInShaderCodeException -> None
+                                        | _ -> 
+                                            Log.warn "[FShade] could not evaluate: %A" pi
+                                            None
+
+                                match value with
+                                    | Some value -> return Expr.Value(value, e.Type)
+                                    | None -> return Expr.PropertyGet(t, pi, indices)
                             | _ ->
                                 return Expr.PropertyGet(t, pi, indices)
 
