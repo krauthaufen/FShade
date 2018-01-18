@@ -476,9 +476,19 @@ module Effect =
                     [ { entry with outputs = outputs } ]
 
                 | shader :: next :: after ->
-                    let shaderEntry = Shader.toEntryPoint lastStage shader (Some next) 
-                    shaderEntry :: entryPoints shaderEntry.outputs (Some shader) (next :: after)
 
+                    let mutable outputs = shader.shaderOutputs
+                    for (sem,i) in Map.toSeq next.shaderInputs do 
+                        if i.paramInterpolation <> InterpolationMode.Default then
+                            match Map.tryFind sem outputs with
+                                | Some ({ paramInterpolation = InterpolationMode.Default } as output) ->
+                                    outputs <- Map.add sem { output with paramInterpolation = i.paramInterpolation } outputs
+                                | _ ->
+                                    ()
+                    
+
+                    let shaderEntry = Shader.toEntryPoint lastStage { shader with shaderOutputs = outputs } (Some next) 
+                    shaderEntry :: entryPoints shaderEntry.outputs (Some shader) (next :: after)
 
         let shaders = toList effect
 

@@ -908,7 +908,7 @@ module Assembler =
             let! stages = AssemblerState.stages
             let! builtIn = AssemblerState.tryGetParameterName kind p.cParamSemantic
             let selfStage = stages.self
-
+            let nextStage = stages.next
 
             match builtIn with
                 | Some name -> 
@@ -932,15 +932,23 @@ module Assembler =
                                         return Some "const"
 
                                     | ParameterDecoration.Interpolation m ->
-                                        match selfStage, kind, m with
-                                            | ShaderStage.Fragment, ParameterKind.Input, InterpolationMode.Centroid -> return Some "centroid"
-                                            | ShaderStage.Fragment, ParameterKind.Input, InterpolationMode.Flat -> return Some "flat"
-                                            | ShaderStage.Fragment, ParameterKind.Input, InterpolationMode.NoPerspective -> return Some "noperspective"
-                                            | ShaderStage.Fragment, ParameterKind.Input, InterpolationMode.Perspective -> return Some "perspective"
-                                            | ShaderStage.Fragment, ParameterKind.Input, InterpolationMode.Sample -> return Some "sample"
+                                        
+                                        let isFragmentInput =
+                                            (selfStage = ShaderStage.Fragment && kind = ParameterKind.Input) ||
+                                            (nextStage = Some ShaderStage.Fragment && kind = ParameterKind.Output)
+                            
+                                        let isTessPatch =
+                                            (selfStage = ShaderStage.TessEval && kind = ParameterKind.Input) ||
+                                            (selfStage = ShaderStage.TessControl && kind = ParameterKind.Output)
 
-                                            | ShaderStage.TessEval, ParameterKind.Input, InterpolationMode.PerPatch -> return Some "patch"
-                                            | ShaderStage.TessControl, ParameterKind.Output, InterpolationMode.PerPatch -> return Some "patch"
+                                        match isTessPatch, isFragmentInput, m with
+                                            | _, true, InterpolationMode.Centroid -> return Some "centroid"
+                                            | _, true, InterpolationMode.Flat -> return Some "flat"
+                                            | _, true, InterpolationMode.NoPerspective -> return Some "noperspective"
+                                            | _, true, InterpolationMode.Perspective -> return Some "perspective"
+                                            | _, true, InterpolationMode.Sample -> return Some "sample"
+
+                                            | true, _, InterpolationMode.PerPatch -> return Some "patch"
 
                                             | _ -> return None
 
