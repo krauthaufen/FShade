@@ -588,50 +588,53 @@ module Effect =
     module private LayerHelpers = 
 
         let withLayeredUniforms (uniforms : Map<string, string>) (layerCount : int) (layer : Expr) (shader : Shader) =
-            let mutable perLayerUniforms = Map.empty
-            let mutable removed = Map.empty
+            if Map.isEmpty uniforms then
+                shader
+            else
+                let mutable perLayerUniforms = Map.empty
+                let mutable removed = Map.empty
 
-            let newBody = 
-                shader.shaderBody.SubstituteReads(fun kind typ oldName index ->
-                    match kind with
-                        | ParameterKind.Uniform ->
-                            match Map.tryFind oldName uniforms with
-                                | Some newName ->
-                                    match index with
-                                        | Some index ->
-                                            let old = shader.shaderUniforms.[oldName]
-                                            let typ = Peano.getArrayType layerCount old.uniformType
-                                            perLayerUniforms <- Map.add newName { old with uniformName = newName; uniformType = typ } perLayerUniforms
-                                            removed <- Map.add oldName () removed
-                                            let arrInput = Expr.ReadInput(kind, typ, newName)
-                                            let layerItem = Expr.ArrayAccess(arrInput, layer) //Expr.PropertyGet(arrInput, arrInput.Type.GetProperty("Item"), [layer])
-                                            let realItem = Expr.ArrayAccess(arrInput, index) //Expr.PropertyGet(layerItem, layerItem.Type.GetProperty("Item"), [index])
+                let newBody = 
+                    shader.shaderBody.SubstituteReads(fun kind typ oldName index ->
+                        match kind with
+                            | ParameterKind.Uniform ->
+                                match Map.tryFind oldName uniforms with
+                                    | Some newName ->
+                                        match index with
+                                            | Some index ->
+                                                let old = shader.shaderUniforms.[oldName]
+                                                let typ = Peano.getArrayType layerCount old.uniformType
+                                                perLayerUniforms <- Map.add newName { old with uniformName = newName; uniformType = typ } perLayerUniforms
+                                                removed <- Map.add oldName () removed
+                                                let arrInput = Expr.ReadInput(kind, typ, newName)
+                                                let layerItem = Expr.ArrayAccess(arrInput, layer) //Expr.PropertyGet(arrInput, arrInput.Type.GetProperty("Item"), [layer])
+                                                let realItem = Expr.ArrayAccess(arrInput, index) //Expr.PropertyGet(layerItem, layerItem.Type.GetProperty("Item"), [index])
 
-                                            realItem |> Some
+                                                realItem |> Some
                                     
-                                        | None ->
-                                            let old = shader.shaderUniforms.[oldName]
-                                            let typ = Peano.getArrayType layerCount old.uniformType
-                                            perLayerUniforms <- Map.add newName { old with uniformName = newName; uniformType = typ } perLayerUniforms
-                                            removed <- Map.add oldName () removed
-                                            let arrInput = Expr.ReadInput(kind, typ, newName) 
-                                            let realItem = Expr.ArrayAccess(arrInput, layer) //Expr.PropertyGet(arrInput, arrInput.Type.GetProperty("Item"), [layer])
-                                            realItem |> Some
-                                | _ ->
-                                    None
-                        | _ ->
-                            None
-                )
+                                            | None ->
+                                                let old = shader.shaderUniforms.[oldName]
+                                                let typ = Peano.getArrayType layerCount old.uniformType
+                                                perLayerUniforms <- Map.add newName { old with uniformName = newName; uniformType = typ } perLayerUniforms
+                                                removed <- Map.add oldName () removed
+                                                let arrInput = Expr.ReadInput(kind, typ, newName) 
+                                                let realItem = Expr.ArrayAccess(arrInput, layer) //Expr.PropertyGet(arrInput, arrInput.Type.GetProperty("Item"), [layer])
+                                                realItem |> Some
+                                    | _ ->
+                                        None
+                            | _ ->
+                                None
+                    )
 
 
-            let uniforms = Map.union (Map.difference shader.shaderUniforms removed) perLayerUniforms
+                let uniforms = Map.union (Map.difference shader.shaderUniforms removed) perLayerUniforms
                     
 
-            Shader.withBody newBody { shader with shaderUniforms = uniforms }
+                Shader.withBody newBody { shader with shaderUniforms = uniforms }
 
 
 
-    let toLayeredEffect (layers : int) (uniforms : Map<string, string>) (topology : InputTopology) (effect : Effect) = 
+    let toLayeredEffect' (layerSemantic : string) (layers : int) (uniforms : Map<string, string>) (topology : InputTopology) (effect : Effect) = 
         if effect.TessControlShader.IsSome || effect.TessEvalShader.IsSome then
             failwithf "[FShade] effects containing tessellation shaders cannot be layered automatically"
 
@@ -669,7 +672,7 @@ module Effect =
 
             let newBody =
                 gs.shaderBody.SubstituteWrites (fun outputs ->
-                    let o = Map.add Intrinsics.Layer (None, layer) outputs
+                    let o = Map.add layerSemantic (None, layer) outputs
                     Expr.WriteOutputs o |> Some
                 )
 
@@ -678,7 +681,7 @@ module Effect =
         let fragmentShader =
             match effect.FragmentShader with
                 | Some fragmentShader ->
-                    let layer = Expr.ReadInput(ParameterKind.Input, typeof<int>, Intrinsics.Layer)
+                    let layer = Expr.ReadInput(ParameterKind.Input, typeof<int>, layerSemantic)
                     fragmentShader
                         |> LayerHelpers.withLayeredUniforms uniforms layers layer 
                         |> Some
@@ -690,3 +693,9 @@ module Effect =
                 Effect(Map.ofList [ShaderStage.Geometry, geometryShader; ShaderStage.Fragment, fs])
             | None ->
                 ofList [ geometryShader ]
+
+    let toLayeredEffect (layers : int) (uniforms : Map<string, string>) (topology : InputTopology) (effect : Effect) = 
+        toLayeredEffect' Intrinsics.Layer layers uniforms topology effect
+
+    let toMultiViewportEffect (viewports : int) (uniforms : Map<string, string>) (topology : InputTopology) (effect : Effect) = 
+        toLayeredEffect' Intrinsics.ViewportIndex viewports uniforms topology effect

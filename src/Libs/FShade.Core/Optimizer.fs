@@ -1349,7 +1349,7 @@ module Optimizer =
                                             let value = 
                                                 try mi.Invoke(null, values |> List.toArray) |> Some
                                                 with 
-                                                    | :? FShadeOnlyInShaderCodeException -> None
+                                                    | ShaderOnlyExn _ -> None
                                                     | _ -> 
                                                         Log.warn "[FShade] could not evaluate: %A" mi
                                                         None
@@ -1374,7 +1374,7 @@ module Optimizer =
                                     let value = 
                                         try mi.Invoke(tv, values |> List.toArray) |> Some
                                         with 
-                                            | :? FShadeOnlyInShaderCodeException -> None
+                                            | ShaderOnlyExn _ -> None
                                             | _ -> 
                                                 Log.warn "[FShade] could not evaluate: %A" mi
                                                 None
@@ -1506,7 +1506,7 @@ module Optimizer =
                                 let value = 
                                     try pi.GetValue(null, List.toArray indexValues) |> Some
                                     with 
-                                        | :? FShadeOnlyInShaderCodeException -> None
+                                        | ShaderOnlyExn _ -> None
                                         | _ -> 
                                             Log.warn "[FShade] could not evaluate: %A" pi
                                             None
@@ -1526,7 +1526,7 @@ module Optimizer =
                                 let value = 
                                     try pi.GetValue(tv, List.toArray indexValues) |> Some
                                     with 
-                                        | :? FShadeOnlyInShaderCodeException -> None
+                                        | ShaderOnlyExn _ -> None
                                         | _ -> 
                                             Log.warn "[FShade] could not evaluate: %A" pi
                                             None

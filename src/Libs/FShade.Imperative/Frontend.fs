@@ -17,6 +17,27 @@ open FShade
 
 exception FShadeOnlyInShaderCodeException of string 
 
+[<AutoOpen>]
+module FShadeOnlyInShaderCodeExceptionPattern =
+    let rec (|ShaderOnlyExn|_|) (e : Exception) =
+        match e with
+            | FShadeOnlyInShaderCodeException n -> 
+                Some n
+
+            | :? TargetInvocationException as e ->
+                match e.InnerException with
+                    | ShaderOnlyExn n -> Some n 
+                    | _ -> None
+
+            | :? AggregateException as a ->
+                match Seq.toList a.InnerExceptions with
+                    | [ ShaderOnlyExn n ] -> Some n 
+                    | _ -> None
+                
+
+            | _ ->
+                None
+
 
 
 [<RequireQualifiedAccess>]
