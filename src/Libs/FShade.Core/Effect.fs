@@ -432,28 +432,28 @@ module Effect =
                 |> withDepthRange config.flipHandedness config.depthRange
                 
 
-        let rec entryPoints (lastOutputs : list<EntryParameter>) (lastStage : Option<Shader>) (shaders : list<Shader>) =
+        let rec entryPoints (last : Option<Shader>) (lastStage : Option<Shader>) (shaders : list<Shader>) =
             match shaders with
                 | [] -> 
                     []
 
                 | [shader] -> 
                     
-                    let mutable inputs = shader.shaderInputs
-                    for o in lastOutputs do
-                        match Map.tryFind o.paramSemantic inputs with
-                            | Some ({ paramInterpolation = InterpolationMode.Default } as input) ->
-                                let outInterpolation = o.paramDecorations |> Seq.tryPick (function ParameterDecoration.Interpolation m -> Some m | _ -> None)
-                                match outInterpolation with
-                                    | Some outInterpolation ->
-                                        inputs <- Map.add o.paramSemantic { input with paramInterpolation = outInterpolation } inputs
-                                    | None ->
-                                        ()
-
-                            | _ ->
-                                ()
-                        ()
-                    
+                    let inputs =
+                        match last with
+                            | Some last -> 
+                                shader.shaderInputs |> Map.map (fun sem i ->
+                                    if i.paramInterpolation = InterpolationMode.Default then
+                                        match Map.tryFind sem last.shaderOutputs with
+                                            | Some { paramInterpolation = outMode } ->
+                                                { i with paramInterpolation = outMode }
+                                            | _ ->
+                                                i
+                                    else
+                                        i
+                                )
+                            | None ->
+                                shader.shaderInputs
 
                     let entry = Shader.toEntryPoint lastStage { shader with shaderInputs = inputs } None
 
@@ -477,25 +477,28 @@ module Effect =
 
                 | shader :: next :: after ->
 
-                    let mutable outputs = shader.shaderOutputs
-                    for (sem,i) in Map.toSeq next.shaderInputs do 
-                        if i.paramInterpolation <> InterpolationMode.Default then
-                            match Map.tryFind sem outputs with
-                                | Some ({ paramInterpolation = InterpolationMode.Default } as output) ->
-                                    outputs <- Map.add sem { output with paramInterpolation = i.paramInterpolation } outputs
-                                | _ ->
-                                    ()
-                    
+                    let outputs =
+                        shader.shaderOutputs |> Map.map (fun sem o ->
+                            if o.paramInterpolation = InterpolationMode.Default then
+                                match Map.tryFind sem next.shaderInputs with
+                                    | Some { paramInterpolation = inMode } ->
+                                        { o with paramInterpolation = inMode }
+                                    | _ ->
+                                        o
+                            else
+                                o
+                        )
+                    let shader = { shader with shaderOutputs = outputs }
 
-                    let shaderEntry = Shader.toEntryPoint lastStage { shader with shaderOutputs = outputs } (Some next) 
-                    shaderEntry :: entryPoints shaderEntry.outputs (Some shader) (next :: after)
+                    let shaderEntry = Shader.toEntryPoint lastStage shader (Some next) 
+                    shaderEntry :: entryPoints (Some shader) (Some shader) (next :: after)
 
         let shaders = toList effect
 
         {
             hash = effect.Id
             userData = effect
-            entries = entryPoints [] None shaders
+            entries = entryPoints None None shaders
             tryGetOverrideCode = Shader.tryGetOverrideCode V3i.Zero 
         }
 
