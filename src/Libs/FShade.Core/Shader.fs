@@ -470,6 +470,12 @@ module private Preprocessor =
             let! vertexType = State.vertexType
 
             match e with
+                | Call(None, mi, [ExprValue v]) when mi.Name = "op_Splice" || mi.Name = "op_SpliceUntyped" ->
+                    if v.Type = e.Type then
+                        return! preprocessNormalS v
+                    else
+                        return! preprocessNormalS (Expr.Coerce(v, e.Type))
+
                 | LetCopyOfStruct(e) ->
                     return! preprocessNormalS e
 

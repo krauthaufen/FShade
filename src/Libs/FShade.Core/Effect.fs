@@ -246,11 +246,12 @@ module Effect =
                 | e -> 
                     failwithf "[FShade] failed to execute shader function.\nInner cause: %A at\n%A" e e.StackTrace
             
+        let expression = Expr.InlineSplices expression
         let hash = Expr.ComputeHash expression
         effectCache.GetOrAdd(hash, fun _ ->
             let range = expression.DebugRange
             let effect = Shader.ofExpr typeof<'a> expression |> ofList
-            effect.SourceDefintion <- Some (expression.Raw, typeof<'a>)
+            effect.SourceDefintion <- Some (expression, typeof<'a>)
             effect
         )
 

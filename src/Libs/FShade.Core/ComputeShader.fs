@@ -198,7 +198,9 @@ module ComputeShader =
 
                 | ShapeCombination(o, args) ->
                     RebuildShapeCombination(o, List.map (preprocessCompute localSize sizes) args)
-          
+
+
+        
 
 
 
@@ -313,6 +315,7 @@ module ComputeShader =
     let private cache = System.Collections.Concurrent.ConcurrentDictionary<string * V3i, ComputeShader>()
     
     let ofExpr (localSize : V3i) (body : Expr) =
+        let body = Expr.InlineSplices body
         let hash = Expr.ComputeHash body
         cache.GetOrAdd((hash, localSize), fun (signature, localSize) ->
             let meth =
@@ -325,6 +328,7 @@ module ComputeShader =
     let ofFunction (maxLocalSize : V3i) (f : 'a -> 'b) : ComputeShader =
         match tryExtractExpr f with
             | Some body ->
+                let body = Expr.InlineSplices body
                 let hash = Expr.ComputeHash body
 
                 cache.GetOrAdd((hash, maxLocalSize), fun (signature, maxLocalSize) ->

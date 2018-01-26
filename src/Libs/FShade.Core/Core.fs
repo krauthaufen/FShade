@@ -264,3 +264,49 @@ module UniformExtensions =
         else
             UniformStuff.Set(s, name)
             Unchecked.defaultof<'a>
+
+[<AutoOpen>]
+module SplicingExtensions =
+    open Microsoft.FSharp.Quotations
+    open Microsoft.FSharp.Quotations.Patterns
+    open Microsoft.FSharp.Quotations.ExprShape
+
+    let (~%) (e : Expr<'a>) : 'a =
+        failwith "splices cannot be evaluated"
+
+    let (~%%) (e : Expr) : 'a =
+        failwith "splices cannot be evaluated"
+
+    let rec (|ExprValue|_|) (e : Expr) =
+        match e with
+            | Coerce(ExprValue v, _) -> Some v
+            | Value((:? Expr as v),_) -> Some v
+            | _ -> None
+
+    let rec private removeValueNames (e : Expr) =
+        match e with
+            | ValueWithName(v, t, _) -> Expr.Value(v, t)
+            | ShapeVar _ -> e
+            | ShapeLambda(v,b) -> Expr.Lambda(v, removeValueNames b)
+            | ShapeCombination(o, args) ->
+                RebuildShapeCombination(o, args |> List.map removeValueNames)
+
+    let rec private inlineSplices (e : Expr) =
+        match e with
+            | Call(None, mi, [ExprValue v]) when mi.Name = "op_Splice" || mi.Name = "op_SpliceUntyped" ->
+                if v.Type = e.Type then
+                    removeValueNames v
+                else
+                    Expr.Coerce(removeValueNames v, e.Type)
+        
+            | ShapeVar _ -> e
+            | ShapeLambda(v,b) -> Expr.Lambda(v, inlineSplices b)
+            | ShapeCombination(o, args) -> RebuildShapeCombination(o, args |> List.map inlineSplices)
+            
+
+    type Expr with
+        static member InlineSplices (e : Expr) =
+            inlineSplices e
+
+        member x.InlineSplices() =
+            inlineSplices x
