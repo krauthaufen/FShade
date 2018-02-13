@@ -263,6 +263,12 @@ module Primitives =
         static member LSB(v : int64) : int = onlyInShaderCode "LSB"
 
 
+        static member FloatBitsToInt(v : float) : int = onlyInShaderCode "FloatBitsToInt"
+        static member FloatBitsToUInt(v : float) : uint32 = onlyInShaderCode "FloatBitsToUInt"
+        static member IntBitsToFloat(v : int) : float = onlyInShaderCode "IntBitsToFloat"
+        static member UIntBitsToFloat(v : uint32) : float = onlyInShaderCode "UIntBitsToFloat"
+
+
 
     let getGlobalId() : V3i = onlyInShaderCode "getGlobalId"
     let getWorkGroupId() : V3i = onlyInShaderCode "getWorkGroupId"

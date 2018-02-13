@@ -685,6 +685,20 @@ module IntrinsicFunctions =
                 exactly <@ Bitwise.LSB : int64 -> _ @> 
             ]
 
+            CIntrinsic.simple "floatBitsToInt", [
+                exactly <@ Bitwise.FloatBitsToInt @>
+            ]
+            CIntrinsic.simple "floatBitsToUInt", [
+                exactly <@ Bitwise.FloatBitsToUInt @>
+            ]
+            CIntrinsic.simple "intBitsToFloat", [
+                exactly <@ Bitwise.IntBitsToFloat @>
+            ]
+            CIntrinsic.simple "uintBitsToFloat", [
+                exactly <@ Bitwise.UIntBitsToFloat @>
+            ]
+
+
 
             // ==========================================================================
             // GLOBAL
@@ -739,7 +753,12 @@ module IntrinsicFunctions =
                         | "get_Item" when argCount = 1 -> sprintf "imageLoad(%s)" (plainArgs 0)
                         | "set_Item" when argCount = 2 -> sprintf "imageStore(%s)" (plainArgs 0)
                         | "get_Item" -> sprintf "imageLoad({0}, ivec%d(%s), 0)" argCount (plainArgs 1)
-                        | _ ->failwithf "unknown sampler function %A" name
+                        | "AtomicCompareExchange" -> sprintf "imageAtomicCompSwap(%s)" (plainArgs 0)
+                        | "AtomicAdd" -> sprintf "imageAtomicAdd(%s)" (plainArgs 0)
+
+
+
+                        | _ ->failwithf "unknown image function %A" name
                         
                 Some functionName
 
