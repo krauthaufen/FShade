@@ -465,6 +465,8 @@ module private Preprocessor =
           
         }
 
+    let private defaultOfMeth = getMethodInfo <@ Unchecked.defaultof<int> @>
+
     let rec preprocessNormalS (e : Expr) : Preprocess<Expr> =
         state {
             let! vertexType = State.vertexType
@@ -634,6 +636,10 @@ module private Preprocessor =
                 | Uniform u ->
                     do! State.readUniform u
                     return Expr.ReadInput(ParameterKind.Uniform, e.Type, u.uniformName)
+
+                | Let(var, Call(None, mi, []), b) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = defaultOfMeth ->
+                    let! b = preprocessNormalS b
+                    return Expr.Let(var, Expr.DefaultValue(mi.ReturnType), b)
 
                 // let p0 = tri.P0 in <body>
                 // store (p0 -> 0) and preprocess <body>
