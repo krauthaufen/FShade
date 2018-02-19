@@ -599,6 +599,7 @@ type CLExpr =
     | CLPtr of CType * CExpr
     | CLVecSwizzle of CType * CLExpr * list<CVecComponent>
     | CLMatrixElement of t : CType * m : CLExpr * r : int * c : int
+    | CLInput of kind : ParameterKind * ctype : CType * name : string * index : Option<CExpr>
 
     member x.ctype =
         match x with
@@ -608,6 +609,7 @@ type CLExpr =
             | CLPtr(t,_) -> t
             | CLVecSwizzle(t, _, _) -> t
             | CLMatrixElement(t, _, _, _) -> t
+            | CLInput(_,t,_,_) -> t
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module CLExpr =
@@ -621,6 +623,7 @@ module CLExpr =
             | CAddressOf(t, e) -> CLPtr(t, e)
             | CVecSwizzle(t, e, c) -> CLVecSwizzle(t, ofExpr e, c)
             | CMatrixElement(t, e, r, c) -> CLMatrixElement(t, ofExpr e, r, c)
+            | CReadInput(k,t,n,i) -> CLInput(k,t,n,i)
             | _ -> failwithf "[FShade] cannot convert CExpr toCLExpr (%A)" e
             
     let rec ofExprSafe (e : CExpr) =
@@ -646,7 +649,9 @@ module CLExpr =
                 | CMatrixElement(t, e, r, c) ->
                     let! e = ofExprSafe e
                     return CLMatrixElement(t, e, r, c)
-
+                    
+                | CReadInput(k,t,n,i) -> 
+                    return CLInput(k,t,n,i)
 
                 | _ -> 
                     return! None
@@ -660,6 +665,7 @@ module CLExpr =
             | CLPtr(t, e) -> CAddressOf(t, e)
             | CLVecSwizzle(t, e, c) -> CVecSwizzle(t, toExpr e, c)
             | CLMatrixElement(t, e, r, c) -> CMatrixElement(t, toExpr e, r, c)
+            | CLInput(k,t,n,i) -> CReadInput(k,t,n,i)
 
     let rec internal visit (used : Used) (e : CLExpr) =
         match e with
@@ -686,6 +692,11 @@ module CLExpr =
             | CLMatrixElement(t,m,_,_) ->
                 used.AddType t
                 visit used m
+
+            | CLInput(k,t,n,i) ->
+                used.AddType t
+                i |> Option.iter (CExpr.visit used)
+                
                 
 
 
