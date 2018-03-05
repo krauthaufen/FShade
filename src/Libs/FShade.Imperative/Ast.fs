@@ -141,6 +141,11 @@ module CType =
             let tagField = (CType.CInt(true, 32), "tag")
             CStruct(name, tagField :: caseFields, Some t)
             
+        elif t.IsValueType then
+            let fields = t.GetFields(BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
+            let fields = fields |> Array.sortBy (fun f -> System.Runtime.InteropServices.Marshal.OffsetOf(f.DeclaringType, f.Name)) |> Array.toList |> List.map (fun fi -> ofTypeInternal seen b fi.FieldType, fi.Name) 
+            CStruct(name, fields, Some t)
+
         else
             let fields = t.GetFields(BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
             let fields = fields |> Array.toList |> List.map (fun fi -> ofTypeInternal seen b fi.FieldType, fi.Name) 
