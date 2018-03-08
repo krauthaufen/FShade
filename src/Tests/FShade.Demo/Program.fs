@@ -20,14 +20,28 @@ let test (f : Expr<int -> int>) (hugo : int) (a : int[]) (b : int[]) =
     }
 
 
+type Vertex =
+    {
+        [<Position>]
+        pos : V4d
+    }
+
+let test2 (v : Vertex) =
+    fragment {
+        return V3d.IOO
+    }
+
 
 [<EntryPoint>]
 let main args =
     let hugo = 100
+
+    let effect = Effect.ofFunction test2
+
     let shader = ComputeShader.ofFunction (V3i(128, 128, 128)) (test <@ fun r -> hugo * r + 1 @>)
 
     let glsl =
-        shader |> ComputeShader.toModule |> ModuleCompiler.compileGLSL410
+        effect |> Effect.toModule { EffectConfig.empty with outputs = Map.ofList ["Colors", (typeof<V4d>, 0)] } |> ModuleCompiler.compileGLSL410
 
     printfn "%s" glsl.code
 

@@ -271,11 +271,6 @@ module SplicingExtensions =
     open Microsoft.FSharp.Quotations.Patterns
     open Microsoft.FSharp.Quotations.ExprShape
 
-    let (~%) (e : Expr<'a>) : 'a =
-        failwith "splices cannot be evaluated"
-
-    let (~%%) (e : Expr) : 'a =
-        failwith "splices cannot be evaluated"
 
     let rec (|ExprValue|_|) (e : Expr) =
         match e with
