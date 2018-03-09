@@ -14,14 +14,8 @@ open Aardvark.Base
 #nowarn "8989"
 
 module Peano = 
-    let private peanoTypes =
-        let s = typedefof<S<_>>
-        Seq.initInfinite id 
-            |> Seq.scan (fun last _ -> s.MakeGenericType [|last|]) typeof<Z>
-            |> Seq.cache
-
     let getPeanoType (i : int) =
-        Seq.item i peanoTypes
+        Aardvark.Base.Peano.getPeanoType i
 
     let getArrayType (i : int) (content : Type) =
         typedefof<Arr<_,_>>.MakeGenericType [| getPeanoType i; content |]
