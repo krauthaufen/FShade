@@ -268,7 +268,7 @@ module ModuleCompiler =
     module TypeCompiler =
         open SimpleOrder
 
-        type TypeGraphNode(definition : CTypeDef, dependencies : hset<TypeGraphNode>) =
+        type TypeGraphNode(definition : Option<CTypeDef>, dependencies : hset<TypeGraphNode>) =
             let mutable sortKey : SortKey = Unchecked.defaultof<SortKey>
 
             member x.Definition = definition
@@ -334,12 +334,15 @@ module ModuleCompiler =
                             match t with
                                 | CStruct(name, fields, _) ->
                                     let def = CStructDef(name, fields)
-                                    let node = TypeGraphNode(def, used)
+                                    let node = TypeGraphNode(Some def, used)
                                     s.cache.[t] <- Some node
                                     return Some node
 
                                 | _ ->
-                                    return None
+                                    if HSet.isEmpty used then
+                                        return None
+                                    else
+                                        return Some <| TypeGraphNode(None, used)
 
 
                 }
@@ -355,7 +358,7 @@ module ModuleCompiler =
                 let set = HashSet()
                 for t in graphs do visit set t
 
-                set |> HashSet.toArray |> Array.sort |> Array.toList |> List.map (fun t -> t.Definition)
+                set |> HashSet.toArray |> Array.sort |> Array.toList |> List.choose (fun t -> t.Definition)
 
         let ofTypes (types : list<CType>) =
             let compile =
