@@ -75,7 +75,7 @@ module Shader =
         vertex {
             let id = getVertexId()
             return {
-                id = uniform.RegionBuffer.[id].Id
+                id = ~~~uniform.RegionBuffer.[id].Id
                 avg = float uniform.RegionBuffer.[id].Average
                 stddev = float uniform.RegionBuffer.[id].StdDev
                 surface = uniform.RegionBuffer.[id].SurfaceCount

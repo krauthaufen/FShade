@@ -1172,6 +1172,12 @@ module Assembler =
                     yield OpBitwiseXor(tid, id, lid, rid)
                     return id
 
+                | CBitNot(t, v) ->
+                    let! vid = assembleExpr v
+                    let! id = SpirV.id
+                    yield OpNot(tid, id, vid)
+                    return id
+
                 | CLeftShift(t, l, r) ->
                     let! lid = assembleExpr l
                     let! rid = assembleExpr r

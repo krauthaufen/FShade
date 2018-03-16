@@ -401,6 +401,8 @@ module Compiler =
                 | Method("op_UnaryNegation", _), [l]        -> CExpr.CNeg(ct, l) |> Some
                 | MethodQuote <@ not @> _, [l]              -> CExpr.CNot(ct, l) |> Some
 
+                | Method("op_LogicalNot", _), [l]           -> CExpr.CBitNot(ct, l) |> Some
+
                 | Method("op_Addition", _), [l;r]           -> CExpr.CAdd(ct, l, r) |> Some
                 | Method("op_Subtraction", _), [l;r]        -> CExpr.CSub(ct, l, r) |> Some
                 | Method("op_Division", _), [l;r]           -> CExpr.CDiv(ct, l, r) |> Some

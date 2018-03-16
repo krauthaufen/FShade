@@ -544,6 +544,10 @@ module Assembler =
                     let! r = assembleExprS r
                     return sprintf "(%s ^ %s)" l r
                     
+                | CBitNot(_,v) ->
+                    let! v = assembleExprS v
+                    return sprintf "(~%s)" v
+
                 | CLeftShift(_, l, r) ->
                     let! l = assembleExprS l
                     let! r = assembleExprS r

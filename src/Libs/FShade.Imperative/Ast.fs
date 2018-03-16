@@ -369,7 +369,8 @@ type CExpr =
     | CBitAnd of CType * CExpr * CExpr
     | CBitOr of CType * CExpr * CExpr
     | CBitXor of CType * CExpr * CExpr
-    
+    | CBitNot of CType * CExpr
+
     | CLeftShift of CType * CExpr * CExpr
     | CRightShift of CType * CExpr * CExpr
 
@@ -405,6 +406,7 @@ type CExpr =
             | CBitAnd(t,_,_) -> t
             | CBitOr(t,_,_) -> t
             | CBitXor(t,_,_) -> t
+            | CBitNot(t,_) -> t
             | CLeftShift(t,_,_) -> t
             | CRightShift(t,_,_) -> t
 
@@ -514,7 +516,7 @@ module CExpr =
                     | Some i -> visit used i
                     | _ -> ()
 
-            | CNeg(t,e) | CNot(t,e) | CTranspose(t,e) | CVecLength(t,e) | CConvert(t,e) | CAddressOf(t,e) | CConvertMatrix(t,e) ->
+            | CNeg(t,e) | CBitNot(t,e) | CNot(t,e) | CTranspose(t,e) | CVecLength(t,e) | CConvert(t,e) | CAddressOf(t,e) | CConvertMatrix(t,e) ->
                 used.AddType t
                 visit used e
 
