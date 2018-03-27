@@ -294,7 +294,7 @@ module SplicingExtensions =
                 else
                     Expr.Coerce(removeValueNames v, e.Type)
         
-            | ShapeVar _ -> e
+            | ShapeVar v -> Expr.Var v
             | ShapeLambda(v,b) -> Expr.Lambda(v, inlineSplices b)
             | ShapeCombination(o, args) -> RebuildShapeCombination(o, args |> List.map inlineSplices)
             

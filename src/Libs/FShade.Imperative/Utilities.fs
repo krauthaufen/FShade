@@ -286,18 +286,107 @@ module ExprExtensions =
 
 
         type ExprPicklerFunctions private() =
+//
+//            static member TypePickler(r : IPicklerResolver) : Pickler<Type> =
+//            
+//                let read (rs : ReadState) =
+//                    let name = Pickler.string.Read rs "Name"
+//                    Type.GetType(name)
+//
+//                let write (ws : WriteState) (value : Type) =
+//                    if ws.IsHashComputation then
+//                        Pickler.string.Write ws "Name" value.FullName
+//                    else
+//                        Pickler.string.Write ws "Name" value.AssemblyQualifiedName
+//                        
+//                Pickler.FromPrimitives(read, write, useWithSubtypes = true)
+//
+//            static member UnionCasePickler(r : IPicklerResolver) : Pickler<UnionCaseInfo> =
+//                let pProp = r.Resolve<PropertyInfo>()
+//                let pType = r.Resolve<Type>()
+//
+//                let read (rs : ReadState) =
+//                    failwith "not implemented"
+//
+//                let write (ws : WriteState) (value : UnionCaseInfo) =
+//                    if ws.IsHashComputation then
+//                        pType.Write ws "Type" value.DeclaringType
+//                        let fields = value.GetFields()
+//                        Pickler.string.Write ws "Name" value.Name
+//                        Pickler.int.Write ws "Count" fields.Length
+//                        for i in 0 .. fields.Length - 1 do
+//                            pProp.Write ws (string i) fields.[i]
+//                    else
+//                        failwith "not implemented"
+//                        
+//                Pickler.FromPrimitives(read, write, useWithSubtypes = true)
+//
+//            static member PropertyInfoPickler(r : IPicklerResolver) : Pickler<PropertyInfo> =
+//                let pType = r.Resolve<Type>()
+//
+//                let read (rs : ReadState) =
+//                    failwith "not implemented"
+//
+//                let write (ws : WriteState) (value : PropertyInfo) =
+//                    if ws.IsHashComputation then
+//                        pType.Write ws "Type" value.DeclaringType
+//                        Pickler.string.Write ws "Name" value.Name
+//                    else
+//                        failwith "not implemented"
+//                        
+//                Pickler.FromPrimitives(read, write, useWithSubtypes = true)
+//                
+//            static member ConstructorInfoPickler(r : IPicklerResolver) : Pickler<ConstructorInfo> =
+//                let pType = r.Resolve<Type>()
+//
+//                let read (rs : ReadState) =
+//                    failwith "not implemented"
+//
+//                let write (ws : WriteState) (value : ConstructorInfo) =
+//                    if ws.IsHashComputation then
+//                        let args = value.GetParameters()
+//                        pType.Write ws "Type" value.DeclaringType
+//                        Pickler.int.Write ws "Count" args.Length
+//                        for i in 0 .. args.Length - 1 do
+//                            pType.Write ws (string i + "Type") args.[i].ParameterType
+//                            Pickler.string.Write ws (string i + "Name") args.[i].Name
+//
+//                    else
+//                        failwith "not implemented"
+//                        
+//                Pickler.FromPrimitives(read, write, useWithSubtypes = true)
+//                
+//            static member MethodInfoPickler(r : IPicklerResolver) : Pickler<MethodInfo> =
+//                let pType = r.Resolve<Type>()
+//
+//                let read (rs : ReadState) =
+//                    failwith "not implemented"
+//
+//                let write (ws : WriteState) (value : MethodInfo) =
+//                    if ws.IsHashComputation then
+//                        let args = value.GetParameters()
+//                        pType.Write ws "Type" value.DeclaringType
+//                        Pickler.string.Write ws "Name" value.Name
+//                        Pickler.int.Write ws "Count" args.Length
+//                        for i in 0 .. args.Length - 1 do
+//                            pType.Write ws (string i + "Type") args.[i].ParameterType
+//                            Pickler.string.Write ws (string i + "Name") args.[i].Name
+//
+//                    else
+//                        failwith "not implemented"
+//                        
+//                Pickler.FromPrimitives(read, write, useWithSubtypes = true)
 
-            static member ExprPicklerGeneric(r : IPicklerResolver) : Pickler<Expr<'a>> =
-                let expr = r.Resolve<Expr>()
-                expr |> Pickler.wrap Expr.Cast (fun e -> Reflection.withAttributes e [])
-                
+     
             static member VarPickler (r : IPicklerResolver) : Pickler<Var> =
                 let makeVar (name : string) (t : Type) (isMutable : bool) (stamp : int64) = 
                     Var.New(name, t, isMutable, stamp)
                     
+                let pType = r.Resolve<Type>()
+
                 let read (rs : ReadState) =
                     let name = Pickler.string.Read rs "Name"
-                    let typ = Pickler.auto.Read rs "Type"
+                    let typ = pType.Read rs "Type"
                     let isMutable = Pickler.bool.Read rs "IsMutable"
                     let stamp = Pickler.int64.Read rs "Stamp"
 
@@ -305,17 +394,19 @@ module ExprExtensions =
 
                 let write (ws : WriteState) (value : Var) =
                     if ws.IsHashComputation then
-                        Pickler.string.Write ws "Name" value.Name
+                        if value.Type <> typeof<unit> then
+                            Pickler.string.Write ws "Name" value.Name
+
                         Pickler.string.Write ws "Type" value.Type.FullName
                         Pickler.bool.Write ws "IsMutable" value.IsMutable
                     else
                         Pickler.string.Write ws "Name" value.Name
-                        Pickler.auto.Write ws "Type" value.Type
+                        pType.Write ws "Type" value.Type
                         Pickler.bool.Write ws "IsMutable" value.IsMutable
                         Pickler.int64.Write ws "Stamp" value.Stamp
                         
 
-                Pickler.FromPrimitives(read, write)
+                Pickler.FromPrimitives(read, write, useWithSubtypes = true)
 
             static member ExprPickler(r : IPicklerResolver) : Pickler<Expr> =
                 let varPickler = r.Resolve<Var>()
@@ -361,7 +452,7 @@ module ExprExtensions =
                             | _ ->
                                 failwithf "invalid expression kind: %A" kind
 
-                    Pickler.FromPrimitives(reader, writer)
+                    Pickler.FromPrimitives(reader, writer, useWithSubtypes = true)
                 )
 
         let tryUnifyTypes (decl : Type) (real : Type) =
@@ -430,6 +521,12 @@ module ExprExtensions =
                 Some (assignment |> Dictionary.toSeq |> HMap.ofSeq)
             else
                 None
+
+        type CoercePickler<'a, 'b> private(p : Pickler<'a>) =
+            let coercePickler = Pickler.FromPrimitives((fun rs -> p.Read rs "Upcast" |> unbox<'b>), (fun ws v -> p.Write ws "Upcast" (unbox<'a> v)))
+
+            member x.Pickler : Pickler<'b> = coercePickler
+
 
         type PicklerRegistry(types : list<Type>) =
 
@@ -500,6 +597,8 @@ module ExprExtensions =
                     )
                     |> Dictionary.ofList
 
+
+
                     
             member x.GetRegistration(t : Type) : CustomPicklerRegistration =
                 if t.IsGenericType then
@@ -514,6 +613,23 @@ module ExprExtensions =
                     match nonGenericThings.TryGetValue t with   
                         | (true, r) -> CustomPicklerRegistration.CustomPickler r
                         | _ -> CustomPicklerRegistration.UnRegistered
+//                            let pickler = 
+//                                nonGenericThings |> Seq.tryPick (fun (KeyValue(tdecl, pickler)) ->
+//                                    if tdecl.IsAssignableFrom t then
+//                                        let tc = typedefof<CoercePickler<_,_>>.MakeGenericType [| tdecl; t |]
+//                                        let resolve (r : IPicklerResolver) =
+//                                            let res = Activator.CreateInstance(tc, [| pickler r :> obj|])
+//                                            let prop = tc.GetProperty("Pickler", BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
+//                                            let real = prop.GetValue(res) |> unbox<Pickler>
+//                                            real
+//
+//                                        Some resolve
+//                                    else
+//                                        None
+//                                )
+//                            match pickler with
+//                                | Some p -> CustomPicklerRegistration.CustomPickler p
+//                                | _ -> CustomPicklerRegistration.UnRegistered
 
             interface ICustomPicklerRegistry with
                 /// Look up pickler registration for particular type
@@ -521,9 +637,19 @@ module ExprExtensions =
 
         let registry = PicklerRegistry [ typeof<ExprPicklerFunctions> ]
 
-        let cache = PicklerCache.FromCustomPicklerRegistry registry
-        let pickler = FsPickler.CreateBinarySerializer(picklerResolver = cache)
 
+        type TypeConv() =
+            interface ITypeNameConverter with
+                member x.OfSerializedType(t : TypeInfo) = 
+                    t
+                member x.ToDeserializedType(t : TypeInfo) = 
+                    t
+
+
+        let cache = PicklerCache.FromCustomPicklerRegistry registry
+        let pickler = FsPickler.CreateBinarySerializer(typeConverter = TypeConv(), picklerResolver = cache)
+
+    let computeHash (value : 'a) = Pickler.pickler.ComputeHash(value).Hash |> System.Convert.ToBase64String
 
     type Expr with
     

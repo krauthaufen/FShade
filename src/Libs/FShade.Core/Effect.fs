@@ -238,19 +238,22 @@ module Effect =
 
     /// creates an effect from a shader-function
     let ofFunction (shaderFunction : 'a -> Expr<'b>) =
-        let expression = 
+        let realEx = 
             try shaderFunction Unchecked.defaultof<'a>
             with 
                 | :? System.NullReferenceException as n -> 
                     failwithf "[FShade] shader functions may not access their vertex-input statically (inner cause - NullReferenceException: %A)" n.StackTrace
                 | e -> 
                     failwithf "[FShade] failed to execute shader function.\nInner cause: %A at\n%A" e e.StackTrace
-            
-        let expression = Expr.InlineSplices expression
+         
+        let expression = Expr.InlineSplices realEx
         let hash = Expr.ComputeHash expression
         effectCache.GetOrAdd(hash, fun _ ->
             let range = expression.DebugRange
-            let effect = Shader.ofExpr typeof<'a> expression |> ofList
+            let shader = Shader.ofExpr typeof<'a> expression
+            let map = shader |> List.map (fun s -> s.shaderStage, s) |> Map.ofList
+
+            let effect = Effect(hash, map, [])
             effect.SourceDefintion <- Some (expression, typeof<'a>)
             effect
         )
