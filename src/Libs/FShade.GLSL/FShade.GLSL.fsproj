@@ -58,6 +58,7 @@
     <Compile Include="Utilities.fs" />
     <Compile Include="IntrinsicFunctions.fs" />
     <Compile Include="IntrinsicParameters.fs" />
+    <Compile Include="UniformBufferLayout.fs" />
     <Compile Include="Assembler.fs" />
     <Compile Include="Extensions.fs" />
   </ItemGroup>

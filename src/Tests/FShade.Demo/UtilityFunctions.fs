@@ -15,8 +15,10 @@ module UtiliyFunctions =
         member x.B : float = x?Bla?B
         member x.AB : float = x?Bla?AB
 
-        member x.X : M44d = x?Buffy?X
+        member x.X : M33d = x?Buffy?X
         member x.Y : M44d = x?Buffy?Y
+
+        member x.Heinz : Arr<8 N, float> = x?Buffy?Heinz
 
     type Vertex = 
         { 
@@ -72,13 +74,13 @@ module UtiliyFunctions =
 
     let vs (v : Vertex) =
         vertex {
-            let m = M44d.Identity * v.pos
+            //let m = M44d.Identity * v.pos
 
-            let m = (uniform.X * uniform.Y).TransformDir v.pos.XYZ
+            let m = uniform.X  * uniform.Y.TransformDir v.pos.XYZ * uniform.Heinz.[0]
 
             let test = g 1.0 2.9
 
-            return { v with pos = (uniform.X * uniform.Y) * V4d(m, 1.0) }
+            return { v with pos = V4d(m, 1.0) }
         }
 
     let sammy =
@@ -104,6 +106,11 @@ module UtiliyFunctions =
         eric.[0].Sample v + eric.[1].Sample v
         //sammy.Sample v
 
+    type UniformScope with
+        member x.Stacy : float[] = uniform?StorageBuffer?Stacy 
+        member x.Ingolf : Image2d<Formats.r32f> = uniform?Ingolf
+    
+
     let shader (v : Vertex1) =
         fragment {
             // should be removed
@@ -119,9 +126,9 @@ module UtiliyFunctions =
 
             let c = b + a1
 
+            let asdv = uniform.Ingolf.[V2i.Zero].X
 
-
-            return funny (V3d(a,a,a)) + V4d.IIII * g v.hugo.X v.hugo.Y * float c
+            return funny (V3d(a,a,a)) + V4d.IIII * g v.hugo.X v.hugo.Y * float c + uniform.Stacy.[0] * asdv
         }
 
     let gs0 (v : Triangle<Vertex>) =
@@ -174,7 +181,7 @@ module UtiliyFunctions =
                         version                 = System.Version(4,1)
                         enabledExtensions       = Set.ofList [ ]
                         createUniformBuffers    = true
-                        createBindings          = true
+                        bindingMode             = GLSL.BindingMode.PerKind
                         createDescriptorSets    = true
                         stepDescriptorSets      = false
                         createInputLocations    = true

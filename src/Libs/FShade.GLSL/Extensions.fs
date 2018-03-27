@@ -12,7 +12,20 @@ module Backends =
             version                 = Version(4,1)
             enabledExtensions       = Set.ofList [ ]
             createUniformBuffers    = true
-            createBindings          = false
+            bindingMode             = BindingMode.PerKind
+            createDescriptorSets    = false
+            stepDescriptorSets      = false
+            createInputLocations    = true
+            createPerStageUniforms  = false
+            reverseMatrixLogic      = true
+        }
+
+    let glsl420 =
+        Backend.Create {
+            version                 = Version(4,2)
+            enabledExtensions       = Set.ofList [ ]
+            createUniformBuffers    = true
+            bindingMode             = BindingMode.PerKind
             createDescriptorSets    = false
             stepDescriptorSets      = false
             createInputLocations    = true
@@ -25,7 +38,7 @@ module Backends =
             version                 = Version(1,2)
             enabledExtensions       = Set.empty
             createUniformBuffers    = false
-            createBindings          = false
+            bindingMode             = BindingMode.None
             createDescriptorSets    = false
             stepDescriptorSets      = false
             createInputLocations    = false
@@ -38,7 +51,7 @@ module Backends =
             version                 = Version(4,5)
             enabledExtensions       = Set.ofList [ "GL_ARB_tessellation_shader"; "GL_ARB_separate_shader_objects"; "GL_ARB_shading_language_420pack" ]
             createUniformBuffers    = true
-            createBindings          = true
+            bindingMode             = BindingMode.Global
             createDescriptorSets    = true
             stepDescriptorSets      = false
             createInputLocations    = true
@@ -71,6 +84,9 @@ module Backends =
 
         let compileGLSL410 (module_ : Module) =
             compileGLSL glsl410 module_
+            
+        let compileGLSL420 (module_ : Module) =
+            compileGLSL glsl420 module_
 
         let compileGLSLVulkan (module_ : Module) =
             compileGLSL glslVulkan module_

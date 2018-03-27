@@ -102,7 +102,10 @@ let compileEffect (e : list<Effect>) =
 
     let glsl =
         e |> Effect.toModule { EffectConfig.empty with lastStage = lastStage; outputs = outputs } |> ModuleCompiler.compileGLSL410
-    glsl.code
+    
+    
+    
+    glsl
 
 
 type Vertex = { [<Position>] pos : V4d }
@@ -113,45 +116,18 @@ let shaderA (v : Vertex) =
     }
     
 
-let shaderB (v : Vertex) =
-    let ``builder@`` = fragment
-    <@
-        ``builder@``.Delay(fun () ->
-            ``builder@``.Return(v.pos)
-        )
-    @>
 
 [<EntryPoint>]
 let main args =
     let hugo = 100
 
-    let m = typeof<V3d>.GetMethod("Distance1", BindingFlags.Static ||| BindingFlags.Public)
+    Examples.UtiliyFunctions.run()
 
-    let unitVar = Var("unitVar", typeof<unit>)
-    let mi = typeof<FragmentBuilder>.GetMethod "Delay"
-    let ``builder@`` = FragmentBuilder()
+    let shader = Effect.ofFunction Shader.regionVertex
 
-    let body (v : Vertex) =
-        <@
-            ``builder@``.Delay(fun () ->
-                ``builder@``.Return(v.pos)
-            )
-        @>
+    let glsl = compileEffect [ shader ]
 
-    let body = body Unchecked.defaultof<Vertex>
-
-    Expr.ComputeHash body |> printfn "%A"
-
-    let a = Effect.ofFunction shaderB
-    printfn "%A" a.Id
-
-    let a = Effect.ofFunction shaderA
-    printfn "%A" a.Id
-
-//    let shader = Effect.ofFunction Shader.regionVertex
-//
-//    let glsl = compileEffect [ shader ]
-//    printfn "%s" glsl
+    printfn "%s" glsl.code
 
 
     0

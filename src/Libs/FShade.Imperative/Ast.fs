@@ -894,6 +894,7 @@ module CTypeDef =
 
 type CModule =
     {
+        cuserData   : obj
         types       : list<CTypeDef>
         values      : list<CValueDef>
     }

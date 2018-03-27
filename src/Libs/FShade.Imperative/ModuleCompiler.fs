@@ -379,6 +379,7 @@ module ModuleCompiler =
         let types = TypeCompiler.ofTypes types
 
         {
+            CModule.cuserData = m.userData
             CModule.types = types
             CModule.values = values
         }

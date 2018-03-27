@@ -10,13 +10,19 @@ open FShade
 open FShade.Imperative
 open FShade.GLSL.Utilities
 
+type BindingMode =
+    | None = 0
+    | Global = 1
+    | PerKind = 2
+
 type Config =
     {
         version                 : Version
         enabledExtensions       : Set<string>
         createUniformBuffers    : bool
 
-        createBindings          : bool
+       
+        bindingMode             : BindingMode
         createDescriptorSets    : bool
         stepDescriptorSets      : bool
         createInputLocations    : bool
@@ -28,7 +34,12 @@ type GLSLShader =
     {
         code        : string
         builtIns    : Map<ShaderStage, Map<ParameterKind, Set<string>>>
+        iface       : GLSLProgramInterface
     }
+
+type private GLSLTextureType =
+    | GLSLImage of original : Type * format : Type * dim : SamplerDimension * arr : bool * ms : bool * valueType : Type
+    | GLSLSampler of original : Type * dim : SamplerDimension * shadow : bool * arr : bool * ms : bool * valueType : Type
 
 type Backend private(config : Config) =
     inherit Compiler.Backend()
@@ -72,9 +83,14 @@ type Backend private(config : Config) =
                     if arr then sprintf "%ssampler%s%sArray%s" typePrefix dimStr msSuffix shadowSuffix
                     else sprintf "%ssampler%s%s%s" typePrefix dimStr msSuffix shadowSuffix 
 
-                CIntrinsicType.simple name |> Some
+                Some {
+                    intrinsicTypeName = name
+                    tag = GLSLTextureType.GLSLSampler(t, dim, shadow, arr, ms, valueType)
+                }
 
-            | ImageType(fmt, dim, arr, ms, valueType) ->
+            | ImageType(tFmt, dim, arr, ms, valueType) ->
+
+
                 let dimStr =
                     match dim with
                         | SamplerDimension.Sampler1d -> "1D"
@@ -89,30 +105,43 @@ type Backend private(config : Config) =
                         | "V4i" -> "i"
                         | _ -> ""
 
-                let fmt = fmt.Name
+                let fmt = tFmt.Name
 
 
                 let name = 
                     if arr then sprintf "%simage%s%sArray" typePrefix dimStr msSuffix
                     else sprintf "%simage%s%s" typePrefix dimStr msSuffix 
 
-                CIntrinsicType.simple name |> Some
+                Some {
+                    intrinsicTypeName = name
+                    tag = GLSLTextureType.GLSLImage(t, tFmt, dim, arr, ms, valueType)
+                }
                 
 
 
             | _ ->
                 None
 
+
+type InputKind =
+    | Any = 0
+    | UniformBuffer = 1
+    | StorageBuffer = 2
+    | Sampler = 3
+    | Image = 4
+
 type AssemblerState =
     {
         config                  : Config
         stages                  : ShaderStageDescription
         currentDescriptorSet    : int
-        currentBinding          : int
+        currentBinding          : Map<InputKind, int>
         currentInputLocation    : int
         currentOutputLocation   : int
         builtIn                 : Map<ShaderStage, Map<ParameterKind, Set<string>>>
         requiredExtensions      : Set<string>
+        iface                   : GLSLProgramInterface
+        textureInfos            : Map<string, list<string * SamplerState>>
     }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -122,11 +151,21 @@ module AssemblerState =
             config = c
             stages = { prev = None; self = ShaderStage.Vertex; next = None }
             currentDescriptorSet = 0
-            currentBinding = 0
+            currentBinding = Map.empty
             currentInputLocation = 0
             currentOutputLocation = 0
             builtIn = Map.empty
             requiredExtensions = Set.empty
+            iface =
+                {
+                    inputs          = []
+                    outputs         = []
+                    samplers        = []
+                    images          = []
+                    storageBuffers  = []
+                    uniformBuffers  = []
+                }
+            textureInfos = Map.empty
         }
 
 
@@ -170,14 +209,21 @@ module AssemblerState =
     let reverseMatrixLogic = State.get |> State.map (fun s -> s.config.reverseMatrixLogic)
     let config = State.get |> State.map (fun s -> s.config)
 
-    let newBinding =
+    let newBinding (kind : InputKind) =
         State.custom (fun s ->
             let c = s.config
-            if c.createBindings then
-                let b = s.currentBinding
-                { s with currentBinding = b + 1 }, b
-            else
-                s, -1
+            match c.bindingMode with
+                | BindingMode.None ->
+                    s, -1
+
+                | BindingMode.Global ->
+                    let b = Map.tryFind InputKind.Any s.currentBinding |> Option.defaultValue 0
+                    { s with currentBinding = Map.add InputKind.Any (b + 1) s.currentBinding }, b
+                | _ -> //BindingMode.PerKind ->
+                    
+                    let b = Map.tryFind kind s.currentBinding |> Option.defaultValue 0
+                    { s with currentBinding = Map.add kind (b + 1) s.currentBinding }, b
+
         )
 
     let newSet =
@@ -186,7 +232,7 @@ module AssemblerState =
             if c.createDescriptorSets then
                 let set = s.currentDescriptorSet
                 if c.stepDescriptorSets then
-                    { s with currentDescriptorSet = set + 1; currentBinding = 0 }, set
+                    { s with currentDescriptorSet = set + 1; currentBinding = Map.empty }, set
                 else
                     s, set
                     
@@ -822,7 +868,7 @@ module Assembler =
 
         }
 
-    let private uniformLayout (decorations : list<UniformDecoration>) (set : int) (binding : int) =
+    let private uniformLayout (isUniformBuffer : bool) (decorations : list<UniformDecoration>) (set : int) (binding : int) =
 
         let decorations =
             decorations |> List.choose (fun d ->
@@ -838,7 +884,10 @@ module Assembler =
             if set >= 0 then (sprintf "set = %d" set) :: decorations
             else decorations
 
-               
+        let decorations =
+            if isUniformBuffer then "std140" :: decorations
+            else decorations
+
         match decorations with
             | [] -> ""
             | d -> d |> String.concat ", " |> sprintf "layout(%s)\r\n" 
@@ -850,6 +899,7 @@ module Assembler =
             let! config = AssemblerState.config
             let buffers =
                 uniforms 
+                    |> List.map (fun u -> match u.cUniformType with | CIntrinsic { tag = (:? GLSLTextureType) } -> { u with cUniformBuffer = None } | _ -> u)
                     |> List.groupBy (fun u -> u.cUniformBuffer)
 
             let! set = AssemblerState.newSet
@@ -860,19 +910,35 @@ module Assembler =
                             fields |> List.map (fun u -> 
                                 let decl = assembleDeclaration u.cUniformType (checkName u.cUniformName)
                                 let decl = sprintf "%s;" decl 
-                                decl, u.cUniformName, u.cUniformDecorations
+                                decl, u.cUniformName, u.cUniformDecorations, u.cUniformType
                             )
                         match name with
                             | Some "SharedMemory" ->
-                                let fields = fields |> List.map (fun (d,_,_) -> sprintf "shared %s" d) |> String.concat "\r\n"
+                                let fields = fields |> List.map (fun (d,_,_,_) -> sprintf "shared %s" d) |> String.concat "\r\n"
                                 return fields
 
                             | Some "StorageBuffer" ->
                                 let! buffers =
-                                    fields |> List.mapS (fun (d,name,_) ->
+                                    fields |> List.mapS (fun (d,name,_,ct) ->
                                         state {
-                                            let! binding = AssemblerState.newBinding
-                                            let prefix = uniformLayout [] set binding
+                                            let! binding = AssemblerState.newBinding InputKind.StorageBuffer
+                                            let prefix = uniformLayout false [] set binding
+
+                                            do! State.modify (fun s ->
+                                                match ct with
+                                                    | CType.CPointer(_,ct) -> 
+                                                        let newBuffer =
+                                                            {
+                                                                ssbSet = set
+                                                                ssbBinding = binding
+                                                                ssbName = name
+                                                                ssbType = GLSLType.ofCType ct
+                                                            }
+                                                        { s with iface = { s.iface with storageBuffers = s.iface.storageBuffers @ [newBuffer] } }
+                                                    | _ ->
+                                                        failwithf "[GLSL] not a storage buffer type: %A" ct
+                                            )
+
                                             return sprintf "%sbuffer %sSSB { %s };" prefix name d
                                         }
                                     )
@@ -881,19 +947,74 @@ module Assembler =
                                 
                             | Some bufferName when config.createUniformBuffers ->
                                 let bufferName = checkName bufferName
-                                let! binding = AssemblerState.newBinding
+                                let! binding = AssemblerState.newBinding InputKind.UniformBuffer
                                     
-                                let fields = fields |> List.map (fun (d,_,_) -> d) |> String.concat "\r\n"
-                                let prefix = uniformLayout [] set binding
+                                let fieldStr = fields |> List.map (fun (d,_,_,ct) -> d) |> String.concat "\r\n"
+                                let prefix = uniformLayout true [] set binding
                             
-                                return sprintf "%suniform %s\r\n{\r\n%s\r\n};\r\n" prefix bufferName.Name (String.indent fields)
+                                do! State.modify (fun s ->
+                                    let newBuffer =
+                                        {
+                                            ubSet = set
+                                            ubBinding = binding
+                                            ubName = bufferName.Name
+                                            ubFields = fields |> List.map (fun (_,n,_,t) -> { ufName = n; ufType = GLSLType.ofCType t; ufOffset = -1 })
+                                            ubSize = -1
+                                        }
+                                    { s with iface = { s.iface with uniformBuffers = s.iface.uniformBuffers @ [newBuffer] } }
+                                )
+
+                                return sprintf "%suniform %s\r\n{\r\n%s\r\n};\r\n" prefix bufferName.Name (String.indent fieldStr)
 
                             | _ ->
                                 let! definitions = 
-                                    fields |> List.mapS (fun (f, _, decorations) ->
+                                    fields |> List.mapS (fun (f, name, decorations, ct) ->
                                         state {
-                                            let! binding = AssemblerState.newBinding
-                                            let prefix = uniformLayout decorations set binding
+                                            
+
+                                            let textureType =
+                                                match ct with   
+                                                    | CIntrinsic { tag = (:? GLSLTextureType as t)} -> Some (t, 1)
+                                                    | CArray(CIntrinsic { tag = (:? GLSLTextureType as t)}, len) -> Some (t, len)
+                                                    | _ -> None
+
+                                            let mutable prefix = ""
+
+                                            match textureType with   
+                                                | Some (t, cnt) ->
+                                                    match t with
+                                                        | GLSLTextureType.GLSLSampler(o,a,b,c,d,e) -> 
+                                                            let! binding = AssemblerState.newBinding InputKind.Sampler
+                                                            prefix <- uniformLayout false decorations set binding
+
+                                                            do! State.modify (fun s ->
+                                                                let newSampler =
+                                                                    { 
+                                                                        samplerSet = set
+                                                                        samplerBinding = binding
+                                                                        samplerName = name
+                                                                        samplerCount = cnt
+                                                                        samplerTextures = Map.tryFind name s.textureInfos |> Option.defaultValue []
+                                                                    }
+                                                                { s with iface = { s.iface with samplers = s.iface.samplers @ [newSampler] } }
+                                                            )
+                                                        | GLSLTextureType.GLSLImage(o,a,b,c,d,e) ->
+                                                            let! binding = AssemblerState.newBinding InputKind.Image
+                                                            prefix <- uniformLayout false decorations set binding
+
+                                                            do! State.modify (fun s ->
+                                                                let newImage =
+                                                                    { 
+                                                                        imageSet = set
+                                                                        imageBinding = binding
+                                                                        imageName = name
+                                                                    }
+                                                                { s with iface = { s.iface with images = s.iface.images @ [newImage] } }
+                                                            )
+   
+                                                | _ ->
+                                                    ()
+
                                             return sprintf "%suniform %s" prefix f
                                         }
                                     )
@@ -911,6 +1032,7 @@ module Assembler =
         state {
             let! stages = AssemblerState.stages
             let! builtIn = AssemblerState.tryGetParameterName kind p.cParamSemantic
+            let prevStage = stages.prev
             let selfStage = stages.self
             let nextStage = stages.next
 
@@ -925,6 +1047,9 @@ module Assembler =
                     let! set = 
                         if config.createDescriptorSets then AssemblerState.newSet
                         else State.value -1
+
+                    let mutable bSet = -1
+                    let mutable bBinding = -1
 
                     let! decorations =
                         p.cParamDecorations 
@@ -957,9 +1082,7 @@ module Assembler =
                                             | _ -> return None
 
                                     | ParameterDecoration.StorageBuffer(read, write) ->
-                                        let! binding =
-                                            if config.createBindings then AssemblerState.newBinding
-                                            else State.value -1
+                                        let! binding = AssemblerState.newBinding InputKind.StorageBuffer
 
                                         let args = []
 
@@ -970,6 +1093,9 @@ module Assembler =
                                         let args =
                                             if binding >= 0 then sprintf "binding=%d" binding :: args
                                             else args
+
+                                        bSet <- set
+                                        bBinding <- binding
 
                                         let args = "std430" :: args |> String.concat ","
 
@@ -1000,12 +1126,29 @@ module Assembler =
                             | Some slot -> State.value slot
                             | _ -> AssemblerState.newLocation kind p.cParamType
 
-                    let decorations =
+                    let layoutParams = 
                         match kind with
                             | ParameterKind.Input | ParameterKind.Output when config.createInputLocations && config.version > version120 ->
-                                sprintf "layout(location = %d)" location :: decorations
+                                [ sprintf "location = %d" location]
                             | _ ->
-                                decorations
+                                []
+
+//                    let layoutParams =
+//                        match kind with
+//                            | ParameterKind.Input when Option.isNone prevStage ->
+//                                (sprintf "binding = %d" location) :: layoutParams
+//
+//                            | ParameterKind.Output when Option.isNone nextStage ->
+//                                (sprintf "binding = %d" location) :: layoutParams
+//
+//                            | _ ->
+//                                layoutParams
+//
+
+                    let decorations =
+                        match layoutParams with
+                            | [] -> decorations
+                            | _ -> sprintf "layout(%s)" (String.concat ", " layoutParams) :: decorations
                 
                     let decorations = 
                         match decorations with
@@ -1028,6 +1171,46 @@ module Assembler =
                                 | ParameterKind.Output -> "varying ", ""
                                 | _ -> "", ""
                     
+
+                    if isBuffer then
+                        do! State.modify (fun s ->
+                            match p.cParamType with
+                                | CType.CPointer(_,ct) -> 
+                                    let newBuffer =
+                                        {
+                                            ssbSet = bSet
+                                            ssbBinding = bBinding
+                                            ssbName = p.cParamName
+                                            ssbType = GLSLType.ofCType ct
+                                        }
+                                    { s with iface = { s.iface with storageBuffers = s.iface.storageBuffers @ [newBuffer] } }
+                                | _ ->
+                                    failwithf "[GLSL] not a storage buffer type: %A" p.cParamType
+                        )
+
+
+                    if Option.isNone prevStage && kind = ParameterKind.Input then
+                        do! State.modify (fun s ->
+                            let newInput =
+                                {        
+                                    paramType       = GLSLType.ofCType p.cParamType
+                                    paramName       = p.cParamName
+                                    paramLocation   = location
+                                }
+                            { s with iface = { s.iface with inputs = s.iface.inputs @ [newInput] }}
+                        )
+
+                    if Option.isNone nextStage && kind = ParameterKind.Output then
+                        do! State.modify (fun s ->
+                            let newOutput =
+                                {        
+                                    paramType       = GLSLType.ofCType p.cParamType
+                                    paramName       = p.cParamName
+                                    paramLocation   = location
+                                }
+                            { s with iface = { s.iface with outputs = s.iface.outputs @ [newOutput] }}
+                        )
+
 
                     match p.cParamType with
                         | CArray(t,l) ->
@@ -1186,7 +1369,7 @@ module Assembler =
                 sprintf "struct %s\r\n{\r\n%s\r\n};" (glslName name).Name (String.indent fields)
 
     let assemble (backend : Backend) (m : CModule) =
-
+        
         let c = backend.Config
         let definitions =
             state {
@@ -1210,9 +1393,29 @@ module Assembler =
                         values
                     ]
             }
+        
+        
+
         let mutable state = AssemblerState.ofConfig c
+
+        match m.cuserData with  
+            | :? Effect as e ->
+                state <- 
+                    { state with 
+                        textureInfos =
+                            e.Uniforms |> Map.choose (fun name p ->
+                                match p.uniformValue with
+                                    | UniformValue.Sampler(name, s) -> Some [name, s]
+                                    | UniformValue.SamplerArray arr -> Some (Array.toList arr)
+                                    | _ -> None
+                            )
+                    }
+            | _ ->
+                ()
+
         let code = definitions.Run(&state) |> String.concat "\r\n\r\n"
         {
             code        = code
             builtIns    = state.builtIn
+            iface       = { state.iface with uniformBuffers = state.iface.uniformBuffers |> List.map LayoutStd140.applyLayout }
         }
