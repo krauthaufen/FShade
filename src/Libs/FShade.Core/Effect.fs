@@ -436,7 +436,7 @@ module Effect =
     /// creates a Module for the given effect which can be used for compilation.              
     let toModule (config : EffectConfig) (effect : Effect) =
         
-        let effect =
+        let effectLinked =
             effect
                 |> link config.lastStage (Map.map (fun _ -> fst) config.outputs)
                 |> withDepthRange config.flipHandedness config.depthRange
@@ -503,7 +503,7 @@ module Effect =
                     let shaderEntry = Shader.toEntryPoint lastStage shader (Some next) 
                     shaderEntry :: entryPoints (Some shader) (Some shader) (next :: after)
 
-        let shaders = toList effect
+        let shaders = toList effectLinked
 
         {
             hash = effect.Id
