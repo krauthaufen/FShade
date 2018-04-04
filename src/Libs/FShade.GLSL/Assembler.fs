@@ -209,7 +209,7 @@ module AssemblerState =
     let reverseMatrixLogic = State.get |> State.map (fun s -> s.config.reverseMatrixLogic)
     let config = State.get |> State.map (fun s -> s.config)
 
-    let newBinding (kind : InputKind) =
+    let newBinding (kind : InputKind) (cnt : int) =
         State.custom (fun s ->
             let c = s.config
             match c.bindingMode with
@@ -218,11 +218,11 @@ module AssemblerState =
 
                 | BindingMode.Global ->
                     let b = Map.tryFind InputKind.Any s.currentBinding |> Option.defaultValue 0
-                    { s with currentBinding = Map.add InputKind.Any (b + 1) s.currentBinding }, b
+                    { s with currentBinding = Map.add InputKind.Any (b + cnt) s.currentBinding }, b
                 | _ -> //BindingMode.PerKind ->
                     
                     let b = Map.tryFind kind s.currentBinding |> Option.defaultValue 0
-                    { s with currentBinding = Map.add kind (b + 1) s.currentBinding }, b
+                    { s with currentBinding = Map.add kind (b + cnt) s.currentBinding }, b
 
         )
 
@@ -921,7 +921,7 @@ module Assembler =
                                 let! buffers =
                                     fields |> List.mapS (fun (d,name,_,ct) ->
                                         state {
-                                            let! binding = AssemblerState.newBinding InputKind.StorageBuffer
+                                            let! binding = AssemblerState.newBinding InputKind.StorageBuffer 1
                                             let prefix = uniformLayout false [] set binding
 
                                             do! State.modify (fun s ->
@@ -947,7 +947,7 @@ module Assembler =
                                 
                             | Some bufferName when config.createUniformBuffers ->
                                 let bufferName = checkName bufferName
-                                let! binding = AssemblerState.newBinding InputKind.UniformBuffer
+                                let! binding = AssemblerState.newBinding InputKind.UniformBuffer 1
                                     
                                 let fieldStr = fields |> List.map (fun (d,_,_,ct) -> d) |> String.concat "\r\n"
                                 let prefix = uniformLayout true [] set binding
@@ -984,7 +984,7 @@ module Assembler =
                                                 | Some (t, cnt) ->
                                                     match t with
                                                         | GLSLTextureType.GLSLSampler(o,a,b,c,d,e) -> 
-                                                            let! binding = AssemblerState.newBinding InputKind.Sampler
+                                                            let! binding = AssemblerState.newBinding InputKind.Sampler cnt
                                                             prefix <- uniformLayout false decorations set binding
 
                                                             do! State.modify (fun s ->
@@ -999,7 +999,7 @@ module Assembler =
                                                                 { s with iface = { s.iface with samplers = s.iface.samplers @ [newSampler] } }
                                                             )
                                                         | GLSLTextureType.GLSLImage(o,a,b,c,d,e) ->
-                                                            let! binding = AssemblerState.newBinding InputKind.Image
+                                                            let! binding = AssemblerState.newBinding InputKind.Image cnt
                                                             prefix <- uniformLayout false decorations set binding
 
                                                             do! State.modify (fun s ->
@@ -1082,7 +1082,7 @@ module Assembler =
                                             | _ -> return None
 
                                     | ParameterDecoration.StorageBuffer(read, write) ->
-                                        let! binding = AssemblerState.newBinding InputKind.StorageBuffer
+                                        let! binding = AssemblerState.newBinding InputKind.StorageBuffer 1
 
                                         let args = []
 
