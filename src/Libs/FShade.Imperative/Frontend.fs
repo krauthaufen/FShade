@@ -59,6 +59,7 @@ type Uniform =
         uniformName         : string
         uniformDecorations  : list<UniformDecoration>
         uniformBuffer       : Option<string>
+        uniformTextureInfo  : list<string * obj>
     }
 
 type ParameterKind =
@@ -446,6 +447,7 @@ module EntryPoint =
                                 uniformType = r
                                 uniformDecorations = decorations r
                                 uniformBuffer = None
+                                uniformTextureInfo = []
                             }
                 | None ->
                     failwithf "[FShade] shader requests uniform %s which is not part of layout" name
@@ -466,6 +468,7 @@ module EntryPoint =
                                 uniformName = name
                                 uniformDecorations = decorations rType
                                 uniformBuffer = Some rBuffer
+                                uniformTextureInfo = []
                             }
                 | None ->
                     failwithf "[FShade] shader requests uniform %s which is not part of layout" name

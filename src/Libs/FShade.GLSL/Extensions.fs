@@ -20,9 +20,9 @@ module Backends =
             reverseMatrixLogic      = true
         }
 
-    let glsl420 =
+    let glsl430 =
         Backend.Create {
-            version                 = Version(4,2)
+            version                 = Version(4,3)
             enabledExtensions       = Set.ofList [ ]
             createUniformBuffers    = true
             bindingMode             = BindingMode.PerKind
@@ -85,8 +85,8 @@ module Backends =
         let compileGLSL410 (module_ : Module) =
             compileGLSL glsl410 module_
             
-        let compileGLSL420 (module_ : Module) =
-            compileGLSL glsl420 module_
+        let compileGLSL430 (module_ : Module) =
+            compileGLSL glsl430 module_
 
         let compileGLSLVulkan (module_ : Module) =
             compileGLSL glslVulkan module_

@@ -2009,11 +2009,19 @@ module Shader =
                     match u.uniformValue with
                         | Attribute(scope, name) -> Some scope.FullName
                         | _ -> None
+
+                let textureInfos =
+                    match u.uniformValue with
+                        | UniformValue.Sampler (n,s) -> [n,s :> obj]
+                        | UniformValue.SamplerArray arr -> Array.toList arr |> List.map (fun (n,s) -> n, s :> obj)
+                        | _ -> []
+
                 { 
                     uniformName = u.uniformName
                     uniformType = u.uniformType
                     uniformBuffer = uniformBuffer
                     uniformDecorations = u.decorations
+                    uniformTextureInfo = textureInfos
                 }
             )
 

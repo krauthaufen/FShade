@@ -10,6 +10,7 @@ type EffectInputLayout =
         eInputs          : MapExt<string, Type>
         eUniformBuffers  : MapExt<string, MapExt<string, Type>>
         eUniforms        : MapExt<string, Type>
+        eTextures        : MapExt<string, list<string * SamplerState>>
     }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -21,6 +22,7 @@ module EffectInputLayout =
             eInputs = MapExt.empty
             eUniformBuffers = MapExt.empty
             eUniforms = MapExt.empty
+            eTextures = MapExt.empty
         }
 
     let unify (l : EffectInputLayout) (r : EffectInputLayout) =
@@ -69,17 +71,25 @@ module EffectInputLayout =
                 |> List.map (fun (b, bnts) -> (b, MapExt.ofList <| List.map (fun (_,(n,t)) -> n,t) bnts))
                 |> MapExt.ofList
 
+        let unifyTexture lList rList =
+            match rList with
+                | [] -> lList
+                | r -> r
+                
+
         {
             eInputs = MapExt.unionWith unifyTypes l.eInputs r.eInputs
             eUniformBuffers = bufferUniforms
             eUniforms = MapExt.unionWith unifyTypes l.eUniforms r.eUniforms
+            eTextures = MapExt.unionWith unifyTexture l.eTextures r.eTextures
         }
 
     let ofModule (m : Module) =
         let mutable inputs          = MapExt.empty
         let mutable uniformBuffers  = MapExt.empty
         let mutable uniforms        = MapExt.empty
-        
+        let mutable textureInfos    = MapExt.empty
+
         for e in m.entries do
             let prev = e.decorations |> List.tryPick (function EntryDecoration.Stages { prev = prev } -> Some prev | _ -> None)
 
@@ -112,6 +122,12 @@ module EffectInputLayout =
                                     |> Some
                             )
                     | None ->
+
+                        textureInfos <-
+                            textureInfos |> MapExt.alter u.uniformName (fun oldInfos ->
+                                u.uniformTextureInfo |> List.map (fun (n,v) -> n, unbox<SamplerState> v) |> Some
+                            )
+
                         uniforms <-
                             uniforms |> MapExt.alter u.uniformName (fun oldType ->
                                 match oldType with
@@ -127,6 +143,7 @@ module EffectInputLayout =
             eInputs = inputs
             eUniforms = uniforms
             eUniformBuffers = uniformBuffers
+            eTextures = textureInfos
         }
 
     let ofModules (m : seq<Module>) =
