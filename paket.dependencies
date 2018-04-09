@@ -1,25 +1,22 @@
-framework: net45
+framework: netstandard2.0, net461, netcoreapp2.0
 source https://api.nuget.org/v3/index.json
 source https://vrvis.myget.org/F/aardvark_public/api/v3/index.json
 
-nuget FSharp.Core ~> 4.0.0
+nuget FSharp.Core               ~> 4.3.0
 
-nuget Aardvark.Base             ~> 3.0.57
-nuget Aardvark.Base.Essentials  ~> 3.0.57
-nuget Aardvark.Base.FSharp      ~> 3.0.57
-nuget Aardvark.Base.Incremental ~> 3.0.57
+nuget Aardvark.Base             ~> 4.0.0
+nuget Aardvark.Base.FSharp      ~> 4.0.0
+nuget Aardvark.Base.Incremental ~> 4.0.0
 
-nuget FSharp.Compiler.Service   ~> 9.0.1
+nuget FSharp.Compiler.Service   ~> 22.0.3
+nuget FsPickler                 ~> 5.2.0
 
-nuget Newtonsoft.Json           ~> 8.0.2
+nuget NUnit                     ~> 3.9.0
+nuget FsUnit                    ~> 3.1.0
 
-nuget NUnit                     ~> 3.5.0
-nuget FsUnit                    ~> 2.3.2
-nuget FsPickler                 ~> 4.0.0
 group Build
 framework: net45
 content: none
 source https://api.nuget.org/v3/index.json
 source https://vrvis.myget.org/F/aardvark_public/api/v3/index.json
-
-github vrvis/Aardvark.Fake:standalone
+github aardvark-platform/aardvark.fake:v4

@@ -12,6 +12,7 @@ open Microsoft.FSharp.Quotations.Patterns
 open Aardvark.Base
 open Aardvark.Base.TypeInfo
 open Aardvark.Base.TypeInfo.Patterns
+open Aardvark.Base.Sorting
 
 open FShade
 
