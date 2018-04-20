@@ -189,12 +189,12 @@ module CodeGenerator =
             let lines = File.readAllLines file
             let code = String.concat "\r\n" lines
 
-            let projOptions = 
-                checker.GetProjectOptionsFromScript(file, code)
-                    |> Async.RunSynchronously
+            //let projOptions, _ = 
+            //    checker.GetProjectOptionsFromScript(file, code)
+            //        |> Async.RunSynchronously
 
             let parseFileResults = 
-                checker.ParseFileInProject(file, code, projOptions)  
+                checker.ParseFile(file, code, FSharpParsingOptions.Default)  
                     |> Async.RunSynchronously
 
             if parseFileResults.ParseHadErrors then

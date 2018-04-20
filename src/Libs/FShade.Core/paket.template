@@ -3,6 +3,4 @@ id FShade.Core
 authors Georg Haaser
 description
     F# embedded shaders
-files
-    ..\..\..\bin\Release\FShade.Core.dll ==> lib\net45
-    ..\..\..\bin\Release\FShade.Core.pdb ==> lib\net45
+include-pdbs true

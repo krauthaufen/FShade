@@ -3,6 +3,4 @@ id FShade.Imperative
 authors Georg Haaser
 description
     F# embedded shaders
-files
-    ..\..\..\bin\Release\FShade.Imperative.dll ==> lib\net45
-    ..\..\..\bin\Release\FShade.Imperative.pdb ==> lib\net45
+include-pdbs true

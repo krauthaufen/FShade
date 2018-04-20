@@ -149,7 +149,7 @@ module Effect =
         effectCache.Clear()
         composeCache.Clear()
 
-    let empty = Effect("", Lazy.CreateFromValue(Map.empty), [])
+    let empty = Effect("", Lazy<Map<ShaderStage, Shader>>.CreateFromValue(Map.empty), [])
     
     /// gets a unique id for this effect
     let inline id (effect : Effect) = effect.Id
@@ -203,7 +203,7 @@ module Effect =
             if stage <> shader.shaderStage then 
                 failwithf "[FShade] inconsistent shader-map: %A claims to be %A" shader.shaderStage stage
 
-        Effect (Lazy.CreateFromValue(shaders))
+        Effect (Lazy<Map<ShaderStage, Shader>>.CreateFromValue(shaders))
         
     /// creates an effect from a sequence of shaders
     let ofSeq (shaders : seq<Shader>) =
@@ -231,7 +231,7 @@ module Effect =
         
     /// creates an effect from a single shaders
     let ofShader (shader : Shader) =
-        Effect (Lazy.CreateFromValue(Map.ofList [shader.shaderStage, shader]))
+        Effect (Lazy<Map<ShaderStage, Shader>>.CreateFromValue(Map.ofList [shader.shaderStage, shader]))
         
     /// creates an effect from an expression (assuming expressions as returned by shader-functions)
     let ofExpr (inputType : Type) (e : Expr) =
@@ -714,7 +714,7 @@ module Effect =
 
         match fragmentShader with
             | Some fs ->
-                Effect(Map.ofList [ShaderStage.Geometry, geometryShader; ShaderStage.Fragment, fs] |> Lazy.CreateFromValue)
+                Effect(Map.ofList [ShaderStage.Geometry, geometryShader; ShaderStage.Fragment, fs] |> Lazy<Map<ShaderStage, Shader>>.CreateFromValue)
             | None ->
                 ofList [ geometryShader ]
 
