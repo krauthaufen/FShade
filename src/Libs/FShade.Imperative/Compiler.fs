@@ -942,6 +942,8 @@ module Compiler =
             let mutable inputValues = HMap.empty
             let! globals = State.get |> State.map (fun s -> s.moduleState.globalParameters)
 
+
+
             let getVar (kind : ParameterKind) (name : string) (typ : Type) (idx : Option<Expr>) =
                 let key = (kind, name, typ, idx)
                 match HMap.tryFind key variables with
@@ -976,8 +978,8 @@ module Compiler =
                 let! parameters =
                     free |> Array.mapS (fun v ->
                         state {
-                            let! t = toCTypeS v.Type
-                            return { name = v.Name; ctype = t; modifier = (if v.IsMutable then CParameterModifier.ByRef else CParameterModifier.In) }
+                            let! v1 = toCVarS v
+                            return { name = v1.name; ctype = v1.ctype; modifier = (if v.IsMutable then CParameterModifier.ByRef else CParameterModifier.In) }
                         }
                     )   
                     
