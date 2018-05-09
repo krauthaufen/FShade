@@ -123,19 +123,17 @@ let ``[While] counting and changing used/unused values``() =
 
 [<Test>] 
 let ``[This] mutable this preseved``() =
-    let ii : Expr<V2d> = 
-        Expr.Value(V2d(1.0, 1.0)) |> Expr.Cast
-
+    let v = V2d(1.0, 1.0)
     let input =
         <@
-            let mutable a = %ii
+            let mutable a = v
             let b = a.Dot(a)
             keep a
         @>
 
     let expected =
         <@
-            let mutable a = %ii
+            let mutable a = v
             ignore(a.Dot(a))
             keep a
         @>
@@ -144,19 +142,18 @@ let ``[This] mutable this preseved``() =
 
 [<Test>] 
 let ``[This] immutable this removed``() =
-    let ii : Expr<V2d> = 
-        Expr.Value(V2d(1.0, 1.0)) |> Expr.Cast
 
+    let v = V2d(1.0, 1.0)
     let input =
         <@
-            let a = %ii
+            let a = v
             let b = a.Dot(a)
             keep a
         @>
 
     let expected =
         <@
-            keep %ii
+            keep v
         @>
 
     input |> Opt.run |> should exprEqual expected

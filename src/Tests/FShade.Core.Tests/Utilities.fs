@@ -38,5 +38,6 @@ module Utilities =
 
         let run (expression : Expr) =
             expression
+                |> Optimizer.inlining
                 |> Optimizer.evaluateConstants' isSideEffect
                 |> Optimizer.eliminateDeadCode' isSideEffect

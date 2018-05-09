@@ -21,7 +21,9 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FShade.Debug", "Libs\FShade
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FShade.Core.Tests", "Tests\FShade.Core.Tests\FShade.Core.Tests.fsproj", "{62361729-0158-4F5A-84B9-F99DC1FB8F68}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FShade.Demo", "Tests\FShade.Demo\FShade.Demo.fsproj", "{5D7411A4-C6A7-459F-A418-173F8CF611B9}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FShade.Demo", "Tests\FShade.Demo\FShade.Demo.fsproj", "{5D7411A4-C6A7-459F-A418-173F8CF611B9}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FShade.GLSL.Tests", "Tests\FShade.GLSL.Tests\FShade.GLSL.Tests.fsproj", "{F692FFEE-C41D-4422-8B42-3B6F3695C19E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -57,6 +59,10 @@ Global
 		{5D7411A4-C6A7-459F-A418-173F8CF611B9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5D7411A4-C6A7-459F-A418-173F8CF611B9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5D7411A4-C6A7-459F-A418-173F8CF611B9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F692FFEE-C41D-4422-8B42-3B6F3695C19E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F692FFEE-C41D-4422-8B42-3B6F3695C19E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F692FFEE-C41D-4422-8B42-3B6F3695C19E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F692FFEE-C41D-4422-8B42-3B6F3695C19E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -69,6 +75,7 @@ Global
 		{9780FD2C-EF72-48E9-813E-BCC120423738} = {DED21639-183F-4933-8C0B-29D298275C9F}
 		{62361729-0158-4F5A-84B9-F99DC1FB8F68} = {686A736B-81BD-4A26-8B4C-0A7D1AED5150}
 		{5D7411A4-C6A7-459F-A418-173F8CF611B9} = {686A736B-81BD-4A26-8B4C-0A7D1AED5150}
+		{F692FFEE-C41D-4422-8B42-3B6F3695C19E} = {686A736B-81BD-4A26-8B4C-0A7D1AED5150}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {C16A5D1C-CE3C-4F04-8C5E-55E39649BD6D}
