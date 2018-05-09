@@ -1,5 +1,6 @@
 ﻿namespace FShade.GLSL
 
+open Aardvark.Base
 open FShade.Imperative
 open FShade
 
@@ -68,6 +69,7 @@ type GLSLProgramInterface =
         images          : list<GLSLImage>
         storageBuffers  : list<GLSLStorageBuffer>
         uniformBuffers  : list<GLSLUniformBuffer>
+        usedBuiltIns    : MapExt<ShaderStage, MapExt<ParameterKind, Set<string>>>
     }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
