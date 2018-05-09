@@ -978,8 +978,13 @@ module Compiler =
                 let! parameters =
                     free |> Array.mapS (fun v ->
                         state {
-                            let! v1 = toCVarS v
-                            return { name = v1.name; ctype = v1.ctype; modifier = (if v.IsMutable then CParameterModifier.ByRef else CParameterModifier.In) }
+                            match HMap.tryFind v inputValues with
+                                | Some _ -> 
+                                    let! t = toCTypeS v.Type
+                                    return { name = v.Name; ctype = t; modifier = CParameterModifier.In }
+                                | None -> 
+                                    let! v1 = toCVarS v
+                                    return { name = v1.name; ctype = v1.ctype; modifier = (if v.IsMutable then CParameterModifier.ByRef else CParameterModifier.In) }
                         }
                     )   
                     
