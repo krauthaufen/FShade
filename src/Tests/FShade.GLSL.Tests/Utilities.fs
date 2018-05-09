@@ -36,6 +36,16 @@ module GLSL =
         ]
 
 
+    let glslang (stage : ShaderStage) (code : string) =
+        let defines = [sprintf "%A" stage]
+        let res = 
+            match GLSLang.tryCompile (toGLSLangStage stage) "main" defines code with
+                | Some _, warn -> 
+                    if String.IsNullOrWhiteSpace warn then Success
+                    else Warning warn
+                | None, err ->
+                    Error err
+        res
 
     let compile (e : list<Effect>) =
         let e = Effect.compose e
@@ -55,18 +65,31 @@ module GLSL =
 
         let glsl = ModuleCompiler.compileGLSL430 module_
         
+        glsl.code,
         module_.entries |> List.map (fun e ->
             let stage = e.decorations |> List.tryPick (function FShade.Imperative.EntryDecoration.Stages { self = s } -> Some s | _ -> None) |> Option.get
             
-            let defines = [sprintf "%A" stage]
-            match GLSLang.tryCompile (toGLSLangStage stage) "main" defines glsl.code with
-                | Some _, warn -> 
-                    if String.IsNullOrWhiteSpace warn then Success
-                    else Warning warn
-                | None, err ->
-                    Error err
-
+            let res = glslang stage glsl.code
+            
+            stage, res
         )
+
+    let shouldCompile (e : list<Effect>) =
+        let code, res = compile e
+
+        Console.WriteLine("====================== CODE ======================")
+        Console.WriteLine(code)
+        Console.WriteLine("====================== CODE ======================")
+        
+
+        for (stage, r) in res do
+            Console.WriteLine("{0}: {1}", stage, sprintf "%A" r)
+            match r with
+                | Success -> ()
+                | Warning w -> ()
+                | Error e -> failwithf "ERROR: %A" e
+
+
 
 [<SetUpFixture>]
 type Setup() =
