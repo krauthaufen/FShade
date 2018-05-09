@@ -65,7 +65,7 @@ module GLSL =
 
         let glsl = ModuleCompiler.compileGLSL430 module_
         
-        glsl.code,
+        glsl,
         module_.entries |> List.map (fun e ->
             let stage = e.decorations |> List.tryPick (function FShade.Imperative.EntryDecoration.Stages { self = s } -> Some s | _ -> None) |> Option.get
             
@@ -75,13 +75,25 @@ module GLSL =
         )
 
     let shouldCompile (e : list<Effect>) =
-        let code, res = compile e
+        let glsl, res = compile e
 
         Console.WriteLine("====================== CODE ======================")
-        Console.WriteLine(code)
+        Console.WriteLine(glsl.code)
         Console.WriteLine("====================== CODE ======================")
         
+        let inOut = glsl.iface.usedBuiltIns
+        
+        Console.WriteLine("======================= IO =======================")
+        for (stage, inOut) in MapExt.toSeq inOut do
+            Console.WriteLine("{0}", stage)
+            for (kind, set) in MapExt.toSeq inOut do
+                Console.WriteLine("  {0}", kind)
+                for s in set do
+                    Console.WriteLine("    {0}", s)
+                    
+        Console.WriteLine("======================= IO =======================")
 
+        
         for (stage, r) in res do
             Console.WriteLine("{0}: {1}", stage, sprintf "%A" r)
             match r with

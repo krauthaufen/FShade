@@ -33,7 +33,6 @@ type Config =
 type GLSLShader =
     {
         code        : string
-        builtIns    : Map<ShaderStage, Map<ParameterKind, Set<string>>>
         iface       : GLSLProgramInterface
     }
 
@@ -138,7 +137,6 @@ type AssemblerState =
         currentBinding          : Map<InputKind, int>
         currentInputLocation    : int
         currentOutputLocation   : int
-        builtIn                 : Map<ShaderStage, Map<ParameterKind, Set<string>>>
         requiredExtensions      : Set<string>
         iface                   : GLSLProgramInterface
         textureInfos            : Map<string, list<string * SamplerState>>
@@ -154,7 +152,6 @@ module AssemblerState =
             currentBinding = Map.empty
             currentInputLocation = 0
             currentOutputLocation = 0
-            builtIn = Map.empty
             requiredExtensions = Set.empty
             iface =
                 {
@@ -164,6 +161,7 @@ module AssemblerState =
                     images          = []
                     storageBuffers  = []
                     uniformBuffers  = []
+                    usedBuiltIns    = MapExt.empty
                 }
             textureInfos = Map.empty
         }
@@ -176,19 +174,19 @@ module AssemblerState =
     
     let useBuiltIn (kind : ParameterKind) (name : string) =
         State.modify (fun s ->
-            let stage =s.stages.self
+            let stage = s.stages.self
 
-            let old = 
-                match Map.tryFind stage s.builtIn with
-                    | Some b -> b
-                    | None -> Map.empty
-            
-            let oldSet =
-                match Map.tryFind kind old with
-                    | Some s -> s
-                    | None -> Set.empty
+            let usedBuiltIns = 
+                s.iface.usedBuiltIns |> MapExt.alter stage (fun o ->
+                    let o = o |> Option.defaultValue MapExt.empty
+                    o |> MapExt.alter kind (fun s ->
+                        let s = s |> Option.defaultValue Set.empty
+                        Set.add name s |> Some
+                    )
+                    |> Some
+                )
 
-            { s with builtIn = Map.add stage (Map.add kind (Set.add name oldSet) old) s.builtIn }
+            { s with iface = { s.iface with usedBuiltIns = usedBuiltIns } }
         )
 
     let tryGetParameterName (kind : ParameterKind) (name : string) =
@@ -1416,6 +1414,8 @@ module Assembler =
         let code = definitions.Run(&state) |> String.concat "\r\n\r\n"
         {
             code        = code
-            builtIns    = state.builtIn
-            iface       = { state.iface with uniformBuffers = state.iface.uniformBuffers |> List.map LayoutStd140.applyLayout }
+            iface       = 
+                { state.iface with 
+                    uniformBuffers = state.iface.uniformBuffers |> List.map LayoutStd140.applyLayout 
+                }
         }
