@@ -973,21 +973,42 @@ module Compiler =
                 return! CompilerState.useConstant e e
             else
                 let! globals = State.get |> State.map (fun s -> s.moduleState.globalParameters)
-                let free = free |> HSet.toArray
- 
-                let! parameters =
-                    free |> Array.mapS (fun v ->
-                        state {
+                let free = 
+                    free
+                        |> HSet.toArray
+                        |> Array.sortBy (fun v -> 
                             match HMap.tryFind v inputValues with
-                                | Some _ -> 
-                                    let! t = toCTypeS v.Type
-                                    return { name = v.Name; ctype = t; modifier = CParameterModifier.In }
-                                | None -> 
-                                    let! v1 = toCVarS v
-                                    return { name = v1.name; ctype = v1.ctype; modifier = (if v.IsMutable then CParameterModifier.ByRef else CParameterModifier.In) }
-                        }
-                    )   
+                                | Some (_,n,_,_) -> 0, n
+                                | None -> 1, v.Name
+                            )
+ 
                     
+                let! oldState = State.get
+                let parameters, newState = 
+                    let parameters =
+                        free 
+                        |> Array.mapS (fun v ->
+                            state {
+                                let! v1 = toCVarS v
+                                return { name = v1.name; ctype = v1.ctype; modifier = (if v.IsMutable then CParameterModifier.ByRef else CParameterModifier.In) }
+                            }
+                        )   
+
+                    let mutable oldState =
+                        {
+                            nameIndices         = Map.empty
+                            variables           = Map.empty
+                            reservedNames       = oldState.reservedNames
+
+                            usedFunctions       = HMap.empty
+                            usedConstants       = HSet.empty
+                            usedGlobals         = HSet.empty
+                            moduleState         = oldState.moduleState
+                        }
+                    parameters.Run(&oldState), oldState.moduleState 
+                do! State.modify (fun s -> { s with moduleState = newState })
+
+
                 let! args = 
                     free |> Array.mapS (fun f ->
                         state {
@@ -1000,18 +1021,17 @@ module Compiler =
                                                     | Some idx -> Expr.ReadInput(kind, t, n, idx)
                                                     | None -> Expr.ReadInput(kind, t, n)
                                             let! e = toCExprS expression
-                                            return Some e
+                                            return e
                                         | _ ->
                                             return failwithf "[FShade] cannot use output %A as closure in function" n
                                     
                                 | None ->
                                     let! v = toCVarS f
-                                    return Some (CVar v)
+                                    return CVar v
 
                         }
                     ) 
-
-                let args = Array.choose id args
+                    
 
                 let! name = CompilerState.newGlobalName "helper"
                 let! returnType = toCTypeS e.Type

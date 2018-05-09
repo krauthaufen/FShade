@@ -117,14 +117,26 @@ let shaderA (v : Vertex) =
     
 
 
+let funny (v : Vertex) =
+    vertex {
+        if v.pos.X > 0.0 then
+            let Positions = v.pos.W + v.pos.X
+            let (a,b) = 
+                let v = 2.0 * v.pos
+                (v.X, v.Y + 1.0 + Positions)
+            return { v with pos = V4d(a,b,b,a) }
+        else
+            return { pos = V4d.Zero }
+    }
+
+
 [<EntryPoint>]
 let main args =
     let hugo = 100
 
-    Examples.UtiliyFunctions.run()
+    //Examples.UtiliyFunctions.run()
 
-    let shader = Effect.ofFunction Shader.regionVertex
-
+    let shader = Effect.ofFunction funny
     let glsl = compileEffect [ shader ]
 
     printfn "%s" glsl.code
