@@ -504,11 +504,11 @@ type Module =
         tryGetOverrideCode : MethodBase -> Option<Expr> 
     }
        
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module Module =
+//[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+//module Module =
 
-    let ofLambda (name : string) (e : Expr) =
-        { hash = Expr.ComputeHash e; userData = null; entries = [EntryPoint.ofLambda name e]; tryGetOverrideCode = constF None }
+//    let ofLambda (name : string) (e : Expr) =
+//        { hash = Expr.ComputeHash e; userData = null; entries = [EntryPoint.ofLambda name e]; tryGetOverrideCode = constF None }
 
-    let ofLambdas (l : list<string * Expr>) =
-        { hash = Guid.NewGuid() |> string; userData = null; entries = l |> List.map (uncurry EntryPoint.ofLambda); tryGetOverrideCode = constF None }
+//    let ofLambdas (l : list<string * Expr>) =
+//        { hash = Guid.NewGuid() |> string; userData = null; entries = l |> List.map (uncurry EntryPoint.ofLambda); tryGetOverrideCode = constF None }

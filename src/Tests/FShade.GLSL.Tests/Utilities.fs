@@ -6,7 +6,6 @@ open System.Text
 open System.Text.RegularExpressions
 open Aardvark.Base
 open GLSLang
-open NUnit.Framework
 open FShade
 open FShade.GLSL
 
@@ -102,10 +101,13 @@ module GLSL =
                 | Error e -> failwithf "ERROR: %A" e
 
 
-
-[<SetUpFixture>]
 type Setup() =
-    [<OneTimeSetUp>]
-    static member Setup() =
-        Environment.CurrentDirectory <- Path.GetDirectoryName(typeof<Setup>.Assembly.Location)
-        Aardvark.Init()
+    static let initialized = ref false
+
+    static member Run() =
+        lock initialized (fun () ->
+            if not !initialized then
+                Environment.CurrentDirectory <- Path.GetDirectoryName(typeof<Setup>.Assembly.Location)
+                Aardvark.Init()
+                initialized := true
+        )

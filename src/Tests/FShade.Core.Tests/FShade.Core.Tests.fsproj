@@ -14,6 +14,7 @@
     <Compile Include="Utilities.fs" />
     <Compile Include="Optimizer.fs" />
     <Compile Include="Effect.fs" />
+    <Compile Include="Hashes.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Libs\FShade.Core\FShade.Core.fsproj" />

@@ -1,8 +1,8 @@
 Aardvark.Base
 Aardvark.Base.FSharp
-NUnit
-FsUnit
+xunit
+xunit.runner.visualstudio
+FsUnit.xUnit
 FSharp.Core
 GLSLangSharp
-NUnit3TestAdapter
 Microsoft.NET.Test.Sdk

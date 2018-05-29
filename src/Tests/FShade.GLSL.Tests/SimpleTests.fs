@@ -3,7 +3,7 @@
 open System
 open Aardvark.Base
 open FShade
-open NUnit.Framework
+open Xunit
 open FsUnit
 open FShade.Tests
 
@@ -15,8 +15,10 @@ type Vertex =
         
 
     
-[<Test>]
+[<Fact>]
 let ``Broken GLSL Shader``() =
+    Setup.Run()
+
     let code = 
         String.concat "\r\n" [
             "#version 430"
@@ -34,8 +36,10 @@ let ``Broken GLSL Shader``() =
 
 
 
-[<Test>]
+[<Fact>]
 let ``Simple fragment shader``() =
+    Setup.Run()
+
     let frag (v : Vertex) =
         fragment {
             return v.c
@@ -44,8 +48,10 @@ let ``Simple fragment shader``() =
     GLSL.shouldCompile [ Effect.ofFunction frag ]
         
 
-[<Test>]
+[<Fact>]
 let ``Helper with duplicate names``() =
+    Setup.Run()
+
     let vert (v : Vertex) =
         vertex {
             if v.pos.X > 0.0 then
@@ -69,8 +75,10 @@ type PointSizeVertex =
     }
         
 
-[<Test>]
+[<Fact>]
 let ``PointSize shader``() =
+    Setup.Run()
+
     let vert (v : PointSizeVertex) =
         vertex {
             if v.pos.X > 0.0 then

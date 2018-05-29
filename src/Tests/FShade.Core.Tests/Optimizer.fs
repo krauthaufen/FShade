@@ -6,8 +6,8 @@ open Microsoft.FSharp.Quotations.DerivedPatterns
 open Microsoft.FSharp.Quotations.ExprShape
 
 open FsUnit
-open NUnit.Framework
-open NUnit.Framework.Constraints
+open Xunit
+open Xunit.Sdk
 
 open Aardvark.Base
 open Aardvark.Base.Monads.State
@@ -15,7 +15,7 @@ open Aardvark.Base.Monads.State
 open FShade
 
 
-[<Test>]
+[<Fact>]
 let ``[For] long dependency chain for used variable``() =
     let input =
         <@
@@ -39,7 +39,7 @@ let ``[For] long dependency chain for used variable``() =
 
     input |> Opt.run |> should exprEqual expected
 
-[<Test>]
+[<Fact>]
 let ``[For] parallel increment``() =
     let input =
         <@
@@ -63,7 +63,7 @@ let ``[For] parallel increment``() =
 
 
 
-[<Test>]
+[<Fact>]
 let ``[While] changing unused value``() =
     let input =
         <@ 
@@ -77,7 +77,7 @@ let ``[While] changing unused value``() =
 
     input |> Opt.run |> should exprEqual expected
 
-[<Test>]
+[<Fact>]
 let ``[While] counting and changing value``() =
     let input =
         <@ 
@@ -94,7 +94,7 @@ let ``[While] counting and changing value``() =
 
     input |> Opt.run  |> should exprEqual expected
 
-[<Test>]
+[<Fact>]
 let ``[While] counting and changing used/unused values``() =
     let input =
         <@ 
@@ -121,7 +121,7 @@ let ``[While] counting and changing used/unused values``() =
 
 
 
-[<Test>] 
+[<Fact>]
 let ``[This] mutable this preseved``() =
     let v = V2d(1.0, 1.0)
     let input =
@@ -140,7 +140,7 @@ let ``[This] mutable this preseved``() =
 
     input |> Opt.run |> should exprEqual expected
 
-[<Test>] 
+[<Fact>]
 let ``[This] immutable this removed``() =
 
     let v = V2d(1.0, 1.0)
@@ -159,7 +159,7 @@ let ``[This] immutable this removed``() =
     input |> Opt.run |> should exprEqual expected
 
 
-[<Test>] 
+[<Fact>]
 let ``[Let] immutable binding inlined``() =
     let input =
         <@
@@ -174,7 +174,7 @@ let ``[Let] immutable binding inlined``() =
 
     input |> Opt.run |> should exprEqual expected
 
-[<Test>] 
+[<Fact>]
 let ``[Let] mutable binding preserved``() =
     let input =
         <@

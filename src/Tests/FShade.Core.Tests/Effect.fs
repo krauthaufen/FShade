@@ -6,8 +6,8 @@ open Microsoft.FSharp.Quotations.DerivedPatterns
 open Microsoft.FSharp.Quotations.ExprShape
 
 open FsUnit
-open NUnit.Framework
-open NUnit.Framework.Constraints
+open Xunit
+open Xunit.Sdk
 
 open Aardvark.Base
 open Aardvark.Base.Monads.State
@@ -36,27 +36,29 @@ let shader3 (a : V4d) (b : V4d) (v : Vertex) =
     vertex {
         return { v with pos = a + b * v.pos }
     }
-
-[<SetUp>]
+    
 let setup() =
     Effect.clearCaches()
 
-[<Test>]
+[<Fact>]
 let ``[OfFunction] static``() =
+    setup()
     let e0 = Effect.ofFunction shader0
     let e1 = Effect.ofFunction shader0
     e0 |> should equal e1
 
-[<Test>]
+[<Fact>]
 let ``[OfFunction] static with closure``() =
+    setup()
     let e0 = Effect.ofFunction (shader1 V4d.OIOI)
     let e1 = Effect.ofFunction (shader1 V4d.OIOI)
     e0 |> should equal e1
     let e2 = Effect.ofFunction (shader1 V4d.IOIO)
     e2 |> should not' (equal e1)
 
-[<Test>]
+[<Fact>]
 let ``[OfFunction] local``() =
+    setup()
     let shader2 (v : Vertex) =
         vertex {
             return { v with pos = V4d.IIII }
@@ -65,8 +67,9 @@ let ``[OfFunction] local``() =
     let e1 = Effect.ofFunction shader2
     e0 |> should equal e1
 
-[<Test>]
+[<Fact>]
 let ``[OfFunction] local with closure value``() =
+    setup()
     let aaaa = 2.0
     let shader213 (p : V4d) (v : Vertex) =
         vertex {
@@ -79,8 +82,9 @@ let ``[OfFunction] local with closure value``() =
     let e2 = Effect.ofFunction (shader213 V4d.IOIO)
     e2 |> should not' (equal e1)
 
-[<Test>] 
+[<Fact>] 
 let ``[OfFunction] static curried closure``() =
+    setup()
     let t0 = shader3 V4d.Zero
     let t1 = t0 V4d.IIII
 
@@ -92,8 +96,9 @@ let ``[OfFunction] static curried closure``() =
     let e3 = Effect.ofFunction (fun a -> shader3 V4d.IIII V4d.Zero a)
     e3 |> should not' (equal e0)
 
-[<Test>] 
+[<Fact>] 
 let ``[OfFunction] local curried closure``() =
+    setup()
     let shader2 (a : V4d) (b : V4d) (v : Vertex) =
         vertex {
             return { v with pos = a + b + v.pos }
@@ -114,8 +119,9 @@ let ``[OfFunction] local curried closure``() =
 
 
 
-[<Test>]
+[<Fact>]
 let ``[Compose] associativity``() =
+    setup()
     let a = Effect.ofFunction shader0
     let b = Effect.ofFunction (shader1 V4d.IIII)
     let c = Effect.ofFunction (shader3 V4d.IIII V4d.IIII)
@@ -125,16 +131,18 @@ let ``[Compose] associativity``() =
 
     l |> should equal r
 
-[<Test>]
+[<Fact>]
 let ``[Compose] neutral element``() =
+    setup()
     let z = Effect.empty
     let a = Effect.ofFunction shader0
 
     Effect.compose [ z; a ] |> should equal a
     Effect.compose [ a; z ] |> should equal a
 
-[<Test>] 
+[<Fact>] 
 let ``[Compose] caching``() =
+    setup()
     let a = Effect.ofFunction shader0
     let b = Effect.ofFunction (shader1 V4d.IIII)
     let c = Effect.ofFunction (shader3 V4d.IIII V4d.IIII)

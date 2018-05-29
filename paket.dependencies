@@ -11,11 +11,12 @@ nuget Aardvark.Base.Incremental ~> 4.0.0
 nuget FSharp.Compiler.Service   ~> 22.0.3
 nuget FsPickler                 ~> 5.2.0
 
-nuget NUnit                     ~> 3.10.0
-nuget NUnit3TestAdapter         ~> 3.10.0
-nuget FsUnit                    ~> 3.1.0
+nuget xunit                     ~> 2.3.1
+nuget xunit.runner.visualstudio ~> 2.3.1
+nuget FsUnit.xUnit              ~> 3.1.0
+
 nuget GLSLangSharp              ~> 0.4.0
-nuget Microsoft.NET.Test.Sdk    ~> 15.7.0
+nuget Microsoft.NET.Test.Sdk    ~> 15.7.2
 
 group Build
 framework: net45
