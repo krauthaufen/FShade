@@ -189,3 +189,115 @@ let ``[Let] mutable binding preserved``() =
         @>
 
     input |> Opt.run |> should exprEqual expected
+
+[<Fact>]
+let ``[Hoist] lifting bindings``() =
+    let input =
+        <@
+            let a =
+                let mutable b = 10
+                b
+            keep a
+        @>
+
+    let expected =
+        <@
+            let mutable b = 10
+            let a = b
+            keep a
+        @>
+    input |> Opt.run |> should exprEqual expected
+
+[<Fact>]
+let ``[Hoist] lifting for loops``() =
+    let input =
+        <@
+            let a =
+                let mutable b = 10
+                for i in 0 .. 10 do
+                    b <- b + 1
+                b
+            keep a
+        @>
+
+    let expected =
+        <@
+            let mutable b = 10
+            for i in 0 .. 10 do
+                b <- b + 1
+            let a = b
+            keep a
+        @>
+    input |> Opt.run |> should exprEqual expected
+
+[<ReflectedDefinition; Inline>]
+let util (a : int) (b : int) =
+    let mutable c = a + 2*b
+    for i in 0 .. 10 do
+        c <- c / 2
+    c
+
+[<Fact>]
+let ``[Hoist] inline function``() =
+    let input =
+        <@
+            fun x y ->
+                let a = util x y
+                keep a
+        @>
+
+    let expected =
+        <@
+            fun x y ->
+                let mutable c = x + 2*y
+                for i in 0 .. 10 do
+                    c <- c / 2
+                let a = c
+                keep a
+        @>
+    input |> Opt.run |> should exprEqual expected
+
+
+[<Fact>]
+let ``[Hoist] if in expression``() =
+    let input =
+        <@
+            fun x y ->
+                let mutable c = x + 2*y
+                let a = 
+                    if x < 10 then
+                        c <- 5
+                    c
+                keep a
+        @>
+
+    let expected =
+        <@
+            fun x y ->
+                let mutable c = x + 2*y
+                if x < 10 then
+                    c <- 5
+                let a = c
+                keep a
+        @>
+    input |> Opt.run |> should exprEqual expected
+
+let test (e : Expr<int -> int>) (v : Expr<int>) =
+    <@
+        (%e) %v
+    @>
+
+[<Fact>]
+let ``[Quote] inlining possible``() =
+    let input =
+        <@
+            fun x ->
+                %(test <@ (fun a -> a + 1) @> <@ x @>)
+        @>
+
+    let expected =
+        <@
+            fun x ->
+                x + 1
+        @>
+    input |> Opt.run |> should exprEqual expected

@@ -1285,6 +1285,8 @@ module Optimizer =
                         let! v = evaluateConstantsS v
                         let! e = evaluateConstantsS e
                         return Expr.AddressSet(v, e)
+                        
+                 
 
                     | Application(lambda, arg) ->
                         let! lambda = evaluateConstantsS lambda
@@ -1330,7 +1332,16 @@ module Optimizer =
                             )
 
                         return Expr.CallFunction(utility, args)
+                        
 
+                    | Call(None, mi, [v]) when mi.Name = "op_Splice" || mi.Name = "op_SpliceUntyped" ->
+                        let! v = evaluateConstantsS v
+                        match v with
+                            | ExprValue ve -> 
+                                let! ve = evaluateConstantsS ve
+                                return ve
+                            | _ -> 
+                                return Expr.Call(mi, [v])
        
                     | Call(None, mi, args) ->
                         let! needed = State.needsCall mi
@@ -1549,12 +1560,16 @@ module Optimizer =
                         return Expr.PropertySet(t, pi, value, indices)
                         
                     | QuoteRaw e ->
-                        let! e = evaluateConstantsS e
-                        return Expr.QuoteRaw e
+                        //let! e = evaluateConstantsS e
+                        return Expr.Value(e)
                         
-                    | QuoteTyped e ->
-                        let! e = evaluateConstantsS e
-                        return Expr.QuoteTyped e
+                    | QuoteTyped te ->
+                        let! te = evaluateConstantsS te
+                        let mi = typeof<Expr>.GetMethod("Cast")
+                        let mi = mi.MakeGenericMethod [| te.Type |]
+                        let v = mi.Invoke(null, [|te :> obj|])
+                        
+                        return Expr.Value(v, e.Type)
 
                     | Sequential(l, r) ->
                         let! l = evaluateConstantsS l
@@ -1957,12 +1972,14 @@ module Optimizer =
                  
         [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
         module State =
+            open System.Diagnostics
+
             let empty = 
                 { 
                     variables = true
                     trivial = true
                     inputs = true
-                    functions = fun _ -> false
+                    functions = fun f -> f.functionIsInline
                 }
 
             let inlineFunction (f : UtilityFunction) =
@@ -1974,6 +1991,9 @@ module Optimizer =
 
             let rec (|TrivialOrInput|_|) (e : Expr) =
                 match e with
+                    | Var v when v.IsMutable -> 
+                        None
+
                     | Var _ 
                     | Value _
                     | FieldGet(None, _)
@@ -1989,6 +2009,8 @@ module Optimizer =
 
             let rec (|OnlyVar|_|) (e : Expr) =
                 match e with
+                    | Var v when v.IsMutable -> 
+                        None
                     | Var _ 
                     | Value _ ->
                         Some ()
@@ -2004,6 +2026,8 @@ module Optimizer =
                         
             let rec (|InputOrVar|_|) (e : Expr) =
                 match e with
+                    | Var v when v.IsMutable -> 
+                        None
                     | ReadInput _ 
                     | Var _ ->
                         Some ()
@@ -2061,6 +2085,10 @@ module Optimizer =
                         let! v = inlineS v
                         let! e = inlineS e
                         return Expr.AddressSet(v,e)
+
+                    | Application(Lambda(v,b), e) ->
+                        let r = Expr.Let(v, e, b)
+                        return! inlineS r
 
                     | Application(lambda, arg) ->
                         let! lambda = inlineS lambda
@@ -2296,6 +2324,14 @@ module Optimizer =
                     let expr = processStatement expr
                     Expr.Unit, Hoisting.Sequential expr
 
+                | IfThenElse _ when expr.Type = typeof<unit> ->
+                    let expr = processStatement expr
+                    Expr.Unit, Hoisting.Sequential expr
+                    
+                    
+                | Sequential(a, Sequential(b,c)) ->
+                    Expr.Sequential(Expr.Sequential(a,b), c) |> processExpression
+
                 | Sequential(l,r) ->
                     let l = processStatement l
                     let r, rh = processExpression r
@@ -2388,7 +2424,12 @@ module Optimizer =
                     let ii, ih = processManyExpresions ii
                     Expr.PropertyGet(t, pi, ii), th + ih
 
-                | QuoteRaw _ | QuoteTyped _ -> failwith "not supported"
+                | QuoteRaw e ->
+                    Expr.QuoteRaw e, Hoisting.Zero
+                    
+                | QuoteTyped e -> 
+                    Expr.QuoteTyped e, Hoisting.Zero
+
 
                 | TupleGet(v, i) ->
                     let v, vh = processExpression v
@@ -2485,8 +2526,9 @@ module Optimizer =
                     Expr.PropertySet(t, pi, value, index) |> apply (th + ih + vh)
                      
                 | WhileLoop (guard, body) ->
+                    let guard, gh = processExpression guard
                     let body = processStatement body
-                    Expr.WhileLoop(guard, body)
+                    Expr.WhileLoop(guard, body) |> apply gh
 
                 | Sequential(l,r) ->
                     let l = processStatement l
@@ -2502,6 +2544,12 @@ module Optimizer =
                 | VarSet(v,e) ->
                     let e, eh = processExpression e
                     Expr.VarSet(v,e) |> apply eh
+
+                | IfThenElse(c,i,e) when e.Type = typeof<unit> ->
+                    let c, ch = processExpression c
+                    let i = processStatement i
+                    let e = processStatement e
+                    Expr.IfThenElse(c,i,e) |> apply ch
 
                 | e ->
                     let e, eh = processExpression e

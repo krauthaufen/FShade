@@ -50,8 +50,8 @@ type Shader =
         shaderDebugRange : Option<DebugRange>
     }
 
-
-module private Preprocessor =
+[<CompilerMessage("Preprocessor should not be used directly", 4321, IsHidden = true)>]
+module Preprocessor =
     
     open System.Reflection
     open System.Collections.Generic

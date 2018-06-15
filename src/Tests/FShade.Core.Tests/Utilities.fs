@@ -14,6 +14,8 @@ open Aardvark.Base.Monads.State
 
 open FShade
 
+#nowarn "4321"
+
 [<AutoOpen>]
 module Utilities = 
     let keep a = ()
@@ -37,6 +39,10 @@ module Utilities =
 
         let run (expression : Expr) =
             expression
+                |> Preprocessor.preprocess V3i.Zero
+                |> fst
                 |> Optimizer.inlining
                 |> Optimizer.evaluateConstants' isSideEffect
+                |> Optimizer.inlining
                 |> Optimizer.eliminateDeadCode' isSideEffect
+                |> Optimizer.hoistImperativeConstructs
