@@ -127,7 +127,7 @@ module LayoutStd140 =
                     if s % 16 = 0 then s
                     else s + 16 - (s % 16)
 
-                GLSLType.Array(len, bt, s), s, len * s
+                GLSLType.Array(len, bt, s), 16, len * s
 
             | GLSLType.Mat(rows, cols, bt) ->
                 let narr, a, s = layout (GLSLType.Array(cols, GLSLType.Vec(rows, bt), -1))
@@ -162,16 +162,17 @@ module LayoutStd140 =
 
     let applyLayout (ub : GLSLUniformBuffer) : GLSLUniformBuffer =
         let mutable offset = 0
+        let mutable lastAlign = 16
 
         let newFields =
             ub.ubFields |> List.map (fun uf ->
-                let nufType, a, s = layout uf.ufType
-            
-                if offset % a <> 0 then
-                    offset <- offset + (a - offset % a)
+                let nufType, align, size = layout uf.ufType
+
+                if offset % align <> 0 then
+                    offset <- offset + (align - offset % align)
 
                 let res = offset
-                offset <- offset + s
+                offset <- offset + size
 
                 { uf with ufOffset = res; ufType = nufType }
             )
