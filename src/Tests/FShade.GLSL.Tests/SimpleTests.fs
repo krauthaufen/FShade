@@ -100,7 +100,7 @@ let ``PointSize shader``() =
 let fillArray (array : Arr<N<10>, V4d>) denom = 
     for i in 0 .. 9 do
         array.[i] <- V4d(float i / denom)
-    
+        
 
 [<Fact>]
 let ``Fill Array with Function``() =
@@ -111,9 +111,6 @@ let ``Fill Array with Function``() =
             let array = Arr<N<10>, V4d>()
 
             10.0 |> fillArray array
-
-            // using this instead works
-            // let array = fillArray array 10
 
             return array.[uniform?color]
         }
@@ -132,6 +129,49 @@ void .*_fillArray_.*\(vec4 array\[10], float denom\)
         sprintf "
     vec4 array\[10\];
     .*_fillArray_.*\(array, 10\.0\);
+    ColorsOut = array\[color\]"
+
+                
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [ expectedFillArrayGLSL; expectedMainGLSL ]
+
+
+[<ReflectedDefinition>]
+let fillArrayReturn (array : Arr<N<10>, V4d>) denom = 
+    for i in 0 .. 9 do
+        array.[i] <- V4d(float i / denom)
+
+    array
+    
+
+[<Fact>]
+let ``Fill Array with Return Function``() =
+    Setup.Run()
+
+    let frag (v : Vertex) =
+        fragment {
+            let array = Arr<N<10>, V4d>()
+
+
+            let array1 = fillArrayReturn array 10.0
+
+            return array1.[uniform?color]
+        }
+                
+    let expectedFillArrayGLSL =
+        sprintf "
+vec4\[10\] .*_fillArrayReturn_.*\(vec4 array\[10], float denom\)
+{
+    for\(int i = 0; \(i < 10\); i\+\+\)
+    {
+        array\[i] = vec4\(\(float\(i\) \/ denom\)\);
+    }
+    return array;
+}"
+
+    let expectedMainGLSL =
+        sprintf "
+    vec4 array\[10\];
+    vec4 array1\[10\] = .*_fillArrayReturn_.*\(array, 10\.0\);
     ColorsOut = array1\[color\]"
 
                 
@@ -154,7 +194,7 @@ let ``Fill Array with Inline Function``() =
             10.0 |> fillArrayInline array 
 
             // using this instead works
-            //fillArrayInline array 10.0
+            // fillArrayInline array 10.0
 
             return array.[uniform?color]
         }
@@ -169,5 +209,3 @@ let ``Fill Array with Inline Function``() =
     ColorsOut = array\[color\];"
                 
     GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [ expectedGLSL ]
-
-
