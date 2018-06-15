@@ -99,7 +99,31 @@ module GLSL =
                 | Success -> ()
                 | Warning w -> ()
                 | Error e -> failwithf "ERROR: %A" e
+                
 
+    let shouldContainRegex (shader : GLSLShader) (regexList : list<string>) = 
+
+        let notContained = regexList |> List.filter (fun s ->
+                if Regex.Match(shader.code, s).Success then
+                    false
+                else 
+                    true
+            )
+
+        if List.length notContained = 0 then
+            ()
+        else 
+            failwithf "ERROR: Compiled shader did not contain %A" notContained
+
+    let shouldCompileAndContainRegex (e : list<Effect>) (s : list<string>) =
+        let glsl, res = compile e
+        
+        for (stage, r) in res do
+            Console.WriteLine("{0}: {1}", stage, sprintf "%A" r)
+            match r with
+                | Success -> shouldContainRegex glsl s
+                | Warning w -> shouldContainRegex glsl s
+                | Error e -> failwithf "ERROR: %A" e
 
 type Setup() =
     static let initialized = ref false
