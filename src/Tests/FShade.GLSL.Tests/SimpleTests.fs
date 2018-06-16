@@ -211,16 +211,16 @@ let ``Fill Array with Inline Function``() =
     GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [ expectedGLSL ]
 
 
-[<ReflectedDefinition>][<Inline>]
-let sum3 a b c =
-    a + b + c
 
 [<ReflectedDefinition>][<Inline>]
-let condSum4 (a : float) (b : float) (c : float) (d : float) =
-    if a > 0.5 then
-        sum3 (b * 2.0) c d
+let valueIdentity v = v
+
+[<ReflectedDefinition>][<Inline>]
+let condTimesTwo (v : float) =
+    if v > 0.5 then
+        valueIdentity (v * 2.0)
     else 
-        a
+        valueIdentity v
         
 [<Fact>]
 let ``Nested Double Inline``() =
@@ -229,7 +229,7 @@ let ``Nested Double Inline``() =
     let frag (v : Vertex) =
         fragment {
             
-            let v = condSum4 (uniform?a) (uniform?b) (uniform?c) (uniform?d)
+            let v = condTimesTwo (uniform?value)
 
             return V4d(v)
         }
