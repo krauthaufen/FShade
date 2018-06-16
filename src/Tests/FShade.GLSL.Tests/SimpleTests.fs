@@ -209,3 +209,29 @@ let ``Fill Array with Inline Function``() =
     ColorsOut = array\[color\];"
                 
     GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [ expectedGLSL ]
+
+
+[<ReflectedDefinition>][<Inline>]
+let sum3 a b c =
+    a + b + c
+
+[<ReflectedDefinition>][<Inline>]
+let condSum4 (a : float) (b : float) (c : float) (d : float) =
+    if a > 0.5 then
+        sum3 (b * 2.0) c d
+    else 
+        a
+        
+[<Fact>]
+let ``Nested Double Inline``() =
+    Setup.Run()
+
+    let frag (v : Vertex) =
+        fragment {
+            
+            let v = condSum4 (uniform?a) (uniform?b) (uniform?c) (uniform?d)
+
+            return V4d(v)
+        }
+        
+    GLSL.shouldCompile [ Effect.ofFunction frag ] 
