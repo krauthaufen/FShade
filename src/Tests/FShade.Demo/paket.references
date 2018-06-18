@@ -4,3 +4,5 @@ Aardvark.Base.Incremental
 FSharp.Core
 FsPickler
 FSharp.Compiler.Service
+group Build
+    SourceLink.Create.CommandLine

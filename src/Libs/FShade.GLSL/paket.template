@@ -4,3 +4,4 @@ authors Georg Haaser
 description
     F# embedded shaders
 include-pdbs true
+excludedgroups Build

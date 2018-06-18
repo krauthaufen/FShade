@@ -609,10 +609,11 @@ NUGET
   remote: https://api.nuget.org/v3/index.json
     FAKE (4.63.2) - content: none
     Mono.Cecil (0.10) - content: none
+    SourceLink.Create.CommandLine (2.8.2)
     SourceLink.Fake (1.1) - content: none
 GITHUB
   remote: aardvark-platform/aardvark.fake
-    FULLPROJECT (bfae10520868567c41bfa9196a7ac7ef79bb50f6)
+    FULLPROJECT (cb65d88da922ed4d3500a4c0d419ee5512dca674)
       FAKE (>= 4.63 < 4.64)
       Mono.Cecil (>= 0.10.0-beta6 < 0.11)
       SourceLink.Fake (>= 1.1 < 1.2)
