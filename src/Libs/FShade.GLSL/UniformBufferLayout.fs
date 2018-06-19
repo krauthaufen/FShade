@@ -162,7 +162,6 @@ module LayoutStd140 =
 
     let applyLayout (ub : GLSLUniformBuffer) : GLSLUniformBuffer =
         let mutable offset = 0
-        let mutable lastAlign = 16
 
         let newFields =
             ub.ubFields |> List.map (fun uf ->
