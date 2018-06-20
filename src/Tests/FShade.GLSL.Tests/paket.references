@@ -6,5 +6,4 @@ FsUnit.xUnit
 FSharp.Core
 GLSLangSharp
 Microsoft.NET.Test.Sdk
-group Build
-    SourceLink.Create.CommandLine
+SourceLink.Create.CommandLine

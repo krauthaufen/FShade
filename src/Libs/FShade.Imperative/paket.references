@@ -2,5 +2,4 @@ Aardvark.Base
 Aardvark.Base.FSharp
 FSharp.Core
 FsPickler
-group Build
-    SourceLink.Create.CommandLine
+SourceLink.Create.CommandLine

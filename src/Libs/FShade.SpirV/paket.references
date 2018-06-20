@@ -1,5 +1,4 @@
 Aardvark.Base
 Aardvark.Base.FSharp
 FSharp.Core
-group Build
-    SourceLink.Create.CommandLine
+SourceLink.Create.CommandLine

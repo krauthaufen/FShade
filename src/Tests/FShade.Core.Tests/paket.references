@@ -5,5 +5,7 @@ xunit.runner.visualstudio
 FsUnit.xUnit
 FSharp.Core
 Microsoft.NET.Test.Sdk
-group Build
-    SourceLink.Create.CommandLine
+SourceLink.Create.CommandLine
+
+
+dotnet-sourcelink
