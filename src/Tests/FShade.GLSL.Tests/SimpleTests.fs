@@ -94,4 +94,6 @@ let ``PointSize shader``() =
     GLSL.shouldCompile [ Effect.ofFunction vert ]
 
 
-
+[<EntryPoint>]
+let main args =
+    0

@@ -16,6 +16,7 @@ open FShade.Imperative
 open System.Collections.Generic
 open Aardvark.Base.ReflectionHelpers
 
+#nowarn "4321"
 
 [<RequireQualifiedAccess>]
 type ShaderOutputVertices =
