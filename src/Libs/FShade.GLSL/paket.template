@@ -3,5 +3,6 @@ id FShade.GLSL
 authors Georg Haaser
 description
     F# embedded shaders
+include-pdbs true
 excludeddependencies 
 	SourceLink.Create.CommandLine
