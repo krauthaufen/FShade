@@ -479,6 +479,9 @@ module Preprocessor =
                     else
                         return! preprocessNormalS (Expr.Coerce(v, e.Type))
 
+                | Pipe(e) ->
+                    return! preprocessNormalS e
+
                 | LetCopyOfStruct(e) ->
                     return! preprocessNormalS e
 

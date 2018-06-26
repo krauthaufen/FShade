@@ -694,12 +694,19 @@ module Optimizer =
                             utility |> UtilityFunction.map (fun b ->
                                 let mutable innerState = { EliminationState.empty with isGlobalSideEffect = s.isGlobalSideEffect }
 
-                                for a in utility.functionArguments do
-                                    if a.IsMutable then
+                                for (v, a) in List.zip args utility.functionArguments do
+                                    let isMutable = a.IsMutable || a.Type.IsArr || a.Type.IsArray
+                                    let isUsed =
+                                        match v with
+                                            | Var v -> Set.contains v s.usedVariables
+                                            | _ -> false
+
+                                    if isMutable && isUsed then
                                         innerState <- { innerState with usedVariables = Set.add a innerState.usedVariables }
                                         
 
-                                eliminateDeadCodeS(b).Run(&innerState)
+                                let res = eliminateDeadCodeS(b).Run(&innerState)
+                                res
                             )
 
                         let usedVariables = utility.functionBody.GetFreeVars() |> Set.ofSeq
