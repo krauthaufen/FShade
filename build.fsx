@@ -1,4 +1,4 @@
-#load @"paket-files/build/aardvark-platform/sardvark.fake/DefaultSetup.fsx"
+#load @"paket-files/build/aardvark-platform/aardvark.fake/DefaultSetup.fsx"
 
 open Fake
 open System
