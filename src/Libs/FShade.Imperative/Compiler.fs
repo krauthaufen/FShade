@@ -961,11 +961,11 @@ module Compiler =
 
             let e = 
                 e.SubstituteReads (fun kind typ name idx ->
-                    if kind = ParameterKind.Uniform && Set.contains name globals then 
-                        None
-                    else
-                        let v = getVar kind name typ idx
-                        Some (Expr.Var v)
+                    //if kind = ParameterKind.Uniform && Set.contains name globals then 
+                    //    None
+                    //else
+                    let v = getVar kind name typ idx
+                    Some (Expr.Var v)
                 )
 
             let free = e.GetFreeVars() |> HSet.ofSeq

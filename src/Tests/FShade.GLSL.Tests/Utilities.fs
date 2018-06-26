@@ -118,6 +118,7 @@ module GLSL =
     let shouldCompileAndContainRegex (e : list<Effect>) (s : list<string>) =
         let glsl, res = compile e
         
+        Console.WriteLine("{0}", glsl.code)
         for (stage, r) in res do
             Console.WriteLine("{0}: {1}", stage, sprintf "%A" r)
             match r with
@@ -134,4 +135,5 @@ type Setup() =
                 Environment.CurrentDirectory <- Path.GetDirectoryName(typeof<Setup>.Assembly.Location)
                 Aardvark.Init()
                 initialized := true
+            Effect.clearCaches()
         )

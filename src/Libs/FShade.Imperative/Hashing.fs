@@ -110,13 +110,14 @@ module ExprHashExtensions =
         let private (|ReflectedCall|_|) (e : Expr) =
             match e with
                 | Call(t,mi,args) ->
+                    let isInline = mi.GetCustomAttributes<InlineAttribute>() |> Seq.isEmpty |> not
                     match Expr.TryGetReflectedDefinition mi with
                         | Some def -> 
                             let args = 
                                 match t with
                                     | Some t -> t :: args
                                     | None -> args
-                            Some (def, args)
+                            Some (isInline, def, args)
                         | None ->
                             None
                 | _ ->
@@ -189,10 +190,11 @@ module ExprHashExtensions =
                                 intrinsicPickler.Write ws "Attributes" atts
                                 selfList.Write ws "Args" args
                                 
-                            | ReflectedCall(def, args) when ws.IsHashComputation ->
+                            | ReflectedCall(isInline, def, args) when ws.IsHashComputation ->
                                 Pickler.string.Write ws "Kind" "ReflectedCall"
                                 self.Write ws "Def" def
                                 selfList.Write ws "Args" args
+                                Pickler.bool.Write ws "IsInline" isInline
 
                             | SimpleValue(value) when ws.IsHashComputation ->
                                 Pickler.string.Write ws "Kind" "SimpleValue"
