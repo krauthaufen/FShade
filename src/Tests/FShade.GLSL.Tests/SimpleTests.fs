@@ -94,6 +94,148 @@ let ``PointSize shader``() =
     GLSL.shouldCompile [ Effect.ofFunction vert ]
 
 
+
+
+[<ReflectedDefinition>]
+let fillArray (array : Arr<N<10>, V4d>) denom = 
+    for i in 0 .. 9 do
+        array.[i] <- V4d(float i / denom)
+        
+
+[<Fact>]
+let ``Fill Array with Function``() =
+    Setup.Run()
+
+    let frag (v : Vertex) =
+        fragment {
+            let array = Arr<N<10>, V4d>()
+
+            10.0 |> fillArray array
+
+            return array.[uniform?color]
+        }
+        
+    let expectedFillArrayGLSL =
+        sprintf "
+void .*_fillArray_.*\(vec4 array\[10], float denom\)
+{
+    for\(int i = 0; \(i < 10\); i\+\+\)
+    {
+        array\[i] = vec4\(\(float\(i\) \/ denom\)\);
+    }
+}"
+
+    let expectedMainGLSL =
+        sprintf "
+    vec4 array\[10\];
+    .*_fillArray_.*\(array, 10\.0\);
+    ColorsOut = array\[color\]"
+
+                
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [ expectedFillArrayGLSL; expectedMainGLSL ]
+
+
+[<ReflectedDefinition>]
+let fillArrayReturn (array : Arr<N<10>, V4d>) denom = 
+    for i in 0 .. 9 do
+        array.[i] <- V4d(float i / denom)
+
+    array
+    
+
+[<Fact>]
+let ``Fill Array with Return Function``() =
+    Setup.Run()
+
+    let frag (v : Vertex) =
+        fragment {
+            let array = Arr<N<10>, V4d>()
+
+
+            let array1 = fillArrayReturn array 10.0
+
+            return array1.[uniform?color]
+        }
+                
+    let expectedFillArrayGLSL =
+        sprintf "
+vec4\[10\] .*_fillArrayReturn_.*\(vec4 array\[10], float denom\)
+{
+    for\(int i = 0; \(i < 10\); i\+\+\)
+    {
+        array\[i] = vec4\(\(float\(i\) \/ denom\)\);
+    }
+    return array;
+}"
+
+    let expectedMainGLSL =
+        sprintf "
+    vec4 array\[10\];
+    vec4 array1\[10\] = .*_fillArrayReturn_.*\(array, 10\.0\);
+    ColorsOut = array1\[color\]"
+
+                
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [ expectedFillArrayGLSL; expectedMainGLSL ]
+
+[<ReflectedDefinition>][<Inline>]
+let fillArrayInline (array : Arr<N<10>, V4d>) denom = 
+    for i in 0 .. 9 do
+        array.[i] <- V4d(float i / denom)
+    
+
+[<Fact>]
+let ``Fill Array with Inline Function``() =
+    Setup.Run()
+
+    let frag (v : Vertex) =
+        fragment {
+            let array = Arr<N<10>, V4d>()
+
+            10.0 |> fillArrayInline array 
+
+            // using this instead works
+            // fillArrayInline array 10.0
+
+            return array.[uniform?color]
+        }
+        
+    let expectedGLSL =
+        sprintf "
+    vec4 array\[10];
+    for\(int i = 0; \(i < 10\); i\+\+\)
+    {
+        array\[i\] = vec4\(\(float\(i\) \/ 10\.0\)\);
+    }
+    ColorsOut = array\[color\];"
+                
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [ expectedGLSL ]
+
+
+
+[<ReflectedDefinition>][<Inline>]
+let valueIdentity v = v
+
+[<ReflectedDefinition>][<Inline>]
+let condTimesTwo (v : float) =
+    if v > 0.5 then
+        valueIdentity (v * 2.0)
+    else 
+        valueIdentity v
+        
+[<Fact>]
+let ``Nested Double Inline``() =
+    Setup.Run()
+
+    let frag (v : Vertex) =
+        fragment {
+            
+            let v = condTimesTwo (uniform?value)
+
+            return V4d(v)
+        }
+        
+    GLSL.shouldCompile [ Effect.ofFunction frag ] 
+    
 [<EntryPoint>]
 let main args =
     0
