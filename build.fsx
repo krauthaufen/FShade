@@ -12,7 +12,7 @@ do Environment.CurrentDirectory <- __SOURCE_DIRECTORY__
 DefaultSetup.install ["src/FShade.sln"]
 
 Target "SourceLink.Test" (fun _ ->
-    !! "bin/*.symbols.nupkg" 
+    !! "bin/*.nupkg" 
     |> Seq.iter (fun nupkg ->
         DotNetCli.RunCommand
             (fun p -> { p with WorkingDir = __SOURCE_DIRECTORY__ @@ "src" @@ "Tests" @@ "FShade.Core.Tests" } )
