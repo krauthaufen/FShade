@@ -20,8 +20,6 @@ Target "SourceLink.Test" (fun _ ->
     )
 )
 
-"CreatePackage" ==> "SourceLink.Test"
-"SourceLink.Test" ==> "Push"
 
 #if DEBUG
 do System.Diagnostics.Debugger.Launch() |> ignore
