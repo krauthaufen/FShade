@@ -12,6 +12,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Utilities.fs" />
+    <Compile Include="ConstantFolding.fs" />
     <Compile Include="SimpleTests.fs" />
   </ItemGroup>
   <ItemGroup>
