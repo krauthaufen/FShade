@@ -296,7 +296,7 @@ let ``Bad Helpers``() =
                         let b = uniform.RegionBuffer.[0]
                         V3d.III
             uniform.RegionBuffer.[id.X] <- int sampleOffsets16.[int urdar.X].X 
-            return V4d(urdar, 1.0)
+            return V4d(sampleOffsets16.[int urdar.X], 1.0)
         }
     
     //let a = ComputeShader.ofFunction V3i.III c |> ComputeShader.toModule
@@ -352,5 +352,6 @@ let ``Ref storage buffer modification``() =
 
 [<EntryPoint>]
 let main args =
-    ``Bad Helpers``()
+    ``Helper with duplicate names``()
+    //``Bad Helpers``()
     0

@@ -746,6 +746,22 @@ module Optimizer =
 
                             return Expr.CallFunction(utility, values)
 
+                    | SetArray(arr, idx, value) ->
+                        let! s = State.get
+                        let needed = 
+                            match arr with
+                                | Var v -> Set.contains v s.usedVariables
+                                | ReadInput _ -> true
+                                | _ -> false
+
+                        if needed then
+                            let! value = eliminateDeadCodeS value
+                            let! idx = eliminateDeadCodeS idx
+                            let! arr = eliminateDeadCodeS arr
+                            return Expr.ArraySet(arr, idx, value)
+                        else
+                            return Expr.Unit
+
                     | Call(t, mi, args) ->
                         let! needed = 
                             if e.Type <> typeof<unit> then State.value true

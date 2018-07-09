@@ -24,7 +24,12 @@ module Utilities =
         { new NHamcrest.Core.IsEqualMatcher<obj>(l) with
         
             override x.Matches(r : obj) =
-                l.ToString() = r.ToString()
+                match r with
+                    | :? Expr as r ->
+                        Expr.ComputeHash l = Expr.ComputeHash r
+                    | _ ->
+                        false
+                //l.ToString() = r.ToString()
         }
 
     let exprEqual (r : Expr) = 

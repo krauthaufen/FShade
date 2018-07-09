@@ -322,3 +322,29 @@ let ``[Ref] no constant folding``() =
 
 
 
+[<Fact>]
+let ``[Dead] removing unused array writes``() =
+    let input =
+        <@
+            fun (a : Arr<N<16>, int>) ->
+                let a : Arr<N<16>, int> = Unchecked.defaultof<_>
+                a.[0] <- 10
+        @>
+
+    let expected =
+        <@
+            fun (a : Arr<N<16>, int>) ->
+                ()
+        @>
+    input |> Opt.run |> should exprEqual expected
+
+[<Fact>]
+let ``[Dead] keeping used array writes``() =
+    let input =
+        <@
+            fun (a : Arr<N<16>, int>) ->
+                a.[0] <- 10
+                keep a
+        @>
+
+    input |> Opt.run |> should exprEqual input

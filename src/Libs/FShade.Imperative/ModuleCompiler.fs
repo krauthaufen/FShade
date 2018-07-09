@@ -84,11 +84,18 @@ module ModuleCompiler =
                         | _ ->
                             let mutable s = emptyState state.moduleState
                             let def = compile(key).Run(&s)
-                            do! State.modify (fun gs -> { gs with moduleState = { s.moduleState with globalFunctions = HMap.empty } })
+                            do! State.modify (fun gs -> { gs with moduleState = s.moduleState })
+
+                            let difference (l : hmap<'k, 'v>) (r : hmap<'k, 'x>) =
+                                HMap.choose2 (fun _ l r ->
+                                    match r with
+                                        | Some _ -> None
+                                        | _ -> l
+                                ) l r
 
                             let localFunctions      = s.usedFunctions |> HMap.toSeq |> Seq.map snd |> Seq.toList
-                            let globalFunctions     = s.moduleState.globalFunctions |> HMap.toSeq |> Seq.map snd |> Seq.toList
-                            let globalConstants     = s.moduleState.globalConstants |> HMap.toSeq |> Seq.map snd |> Seq.toList
+                            let globalFunctions     = difference s.moduleState.globalFunctions state.moduleState.globalFunctions |> HMap.toSeq |> Seq.map snd |> Seq.toList
+                            let globalConstants     = difference s.moduleState.globalConstants state.moduleState.globalConstants |> HMap.toSeq |> Seq.map snd |> Seq.toList
                             
                             
                             let node = GraphNode(def, HSet.empty)
