@@ -260,6 +260,25 @@ module Helper =
     type UniformScope with 
         member x.RegionBuffer : array<int> = uniform?StorageBuffer?RegionBuffer
        
+    let sampleOffsets16 =
+        [|
+            V3d(0.0,0.0,0.0) 
+            V3d(0.0,0.0,0.0) 
+            V3d(0.0,0.0,0.0)
+            V3d(0.0,0.0,0.0)
+            V3d(0.0,0.0,0.0)
+            V3d(0.0,0.0,0.0)
+            V3d(0.0,0.0,0.0)
+            V3d(0.0,0.0,0.0) 
+            V3d(0.0,0.0,0.0)
+            V3d(0.0,0.0,0.0) 
+            V3d(0.0,0.0,0.0)
+            V3d(0.0,0.0,0.0)
+            V3d(0.0,0.0,0.0) 
+            V3d(0.0,0.0,0.0)
+            V3d(0.0,0.0,0.0) 
+            V3d(0.0,0.0,0.0)
+        |]
 
 [<Fact>]
 let ``Bad Helpers``() =
@@ -276,7 +295,7 @@ let ``Bad Helpers``() =
                     | _ -> 
                         let b = uniform.RegionBuffer.[0]
                         V3d.III
-            uniform.RegionBuffer.[id.X] <- int urdar.X
+            uniform.RegionBuffer.[id.X] <- int sampleOffsets16.[int urdar.X].X 
             return V4d(urdar, 1.0)
         }
     
