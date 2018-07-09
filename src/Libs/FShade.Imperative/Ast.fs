@@ -180,6 +180,8 @@ module CParameter =
         let paramType, isByRef =
             if p.ParameterType.IsByRef then
                 p.ParameterType.GetElementType(), true
+            elif p.ParameterType.IsRef then
+                p.ParameterType.GetGenericArguments().[0], true
             else
                 p.ParameterType, false
 
@@ -196,6 +198,8 @@ module CParameter =
                 p.Type.GetElementType(), true
             elif p.IsMutable then
                 p.Type, true
+            elif p.Type.IsRef then
+                p.Type.GetGenericArguments().[0], true
             else
                 p.Type, false
 

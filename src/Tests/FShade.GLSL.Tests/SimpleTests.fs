@@ -236,6 +236,34 @@ let ``Nested Double Inline``() =
         
     GLSL.shouldCompile [ Effect.ofFunction frag ] 
     
+[<ReflectedDefinition>]
+let util (a : ref<float>) =
+    a := !a + 1.0
+
+[<Fact>]
+let ``Ref translated to inout``() =
+    Setup.Run()
+    
+    let frag (v : Vertex) =
+        fragment {
+            let a = ref v.pos.X
+            util a
+            return !a * v.c 
+        }
+
+    let rx =
+        String.concat "" [
+            "[ \t\r\n]*void[ \t]+(.*?)_util_(.*?)\(inout[ \t]+float[ \t]+a\)"
+            "[ \t\r\n]*\{"
+            "[ \t\r\n]*a[ \t]+\=[ \t]+\(a[ \t]+\+[ \t]+1\.0\);"
+            "[ \t\r\n]*\}"
+        ]
+
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [rx]
+    
+
+
 [<EntryPoint>]
 let main args =
+    ``Ref translated to inout``() 
     0

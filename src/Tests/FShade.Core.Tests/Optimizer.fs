@@ -301,3 +301,24 @@ let ``[Quote] inlining possible``() =
                 x + 1
         @>
     input |> Opt.run |> should exprEqual expected
+
+
+[<Fact>]
+let ``[Ref] no constant folding``() =
+    let input =
+        <@
+            fun x ->
+                let a = ref 1
+                !a
+        @>
+
+    let expected =
+        <@
+            fun x ->
+                let a = ref 1
+                !a
+        @>
+    input |> Opt.run |> should exprEqual expected
+
+
+

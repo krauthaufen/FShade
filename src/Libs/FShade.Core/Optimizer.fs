@@ -246,6 +246,7 @@ module Optimizer =
                         match v.Type with
                             | ArrOf _ -> Some v
                             | ArrayOf _ -> Some v
+                            | Ref _ -> Some v
                             | _ -> None
 
                 | AddressOf (MutableArgument v) -> Some v
@@ -321,7 +322,7 @@ module Optimizer =
                 else
                     let needsMutableParameter (p : ParameterInfo) (v : Expr) =
                         let pt = p.ParameterType
-                        if pt.IsByRef || pt.IsArray || pt.IsArr then
+                        if pt.IsByRef || pt.IsArray || pt.IsArr || pt.IsRef then
                             match v with
                                 | MutableArgument v -> Set.contains v state.usedVariables
                                 | _ -> false
@@ -700,7 +701,7 @@ module Optimizer =
                                 let mutable innerState = { EliminationState.empty with isGlobalSideEffect = s.isGlobalSideEffect }
 
                                 for (v, a) in List.zip args utility.functionArguments do
-                                    let isMutable = a.IsMutable || a.Type.IsArr || a.Type.IsArray
+                                    let isMutable = a.IsMutable || a.Type.IsArr || a.Type.IsArray || a.Type.IsRef
                                     let isUsed =
                                         match v with
                                             | Var v -> Set.contains v s.usedVariables
@@ -902,6 +903,7 @@ module Optimizer =
                     (mi.IsGenericMethod && mi.GetGenericMethodDefinition() = MethodInfo.ReadInputIndexed) ||
                     (mi = MethodInfo.WriteOutputs) || 
                     (mi = MethodInfo.Unroll) ||
+                    (mi.IsGenericMethod && mi.GetGenericMethodDefinition() = MethodInfo.NewRef) ||
                     (s.isGlobalSideEffect (mi :> MemberInfo))
                 )
 

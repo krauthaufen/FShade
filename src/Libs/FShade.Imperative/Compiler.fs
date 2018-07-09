@@ -8,6 +8,7 @@ open System.Runtime.CompilerServices
 open Microsoft.FSharp.Reflection
 open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Quotations.Patterns
+open Microsoft.FSharp.Quotations.ExprShape
 open Microsoft.FSharp.Quotations.DerivedPatterns
 
 open Aardvark.Base
@@ -1075,6 +1076,7 @@ module Compiler =
                 | TryFinally _
                 | TryWith _
                 | VarSet _
+                | SetRef _ 
                 | WhileLoop _ ->
                     return! asExternalS e
 
@@ -1110,6 +1112,12 @@ module Compiler =
                                 | _ -> 
                                     let! e = asExternalS e
                                     return e
+
+                | NewRef value ->
+                    return! toCExprS value
+
+                | DeRef ref ->
+                    return! toCExprS ref
 
                 | GetArray(arr, i) ->
                     let! ct = toCTypeS e.Type
@@ -1162,6 +1170,7 @@ module Compiler =
                     let! ct = toCTypeS e.Type
                     let! t = toCExprS t
                     return CField(ct, t, sprintf "Item%d" i)
+                
 
 
                 | Call(None, mi, []) ->
@@ -1434,6 +1443,13 @@ module Compiler =
                 | Unroll ->
                     Log.warn "[FShade] orphaned unroll detected"
                     return CNop
+
+                | SetRef(ref, value) ->
+                    let! r = toCLExprS ref
+                    let! v = toCExprS value
+                    match r with
+                        | Some r -> return CWrite(r, v)
+                        | None -> return failwith "[FShade] refs can only by variables"
 
                 | ForEach(v, seq, body) ->
                     let! e = asExternalS seq

@@ -9,6 +9,8 @@ open GLSLang
 open FShade
 open FShade.GLSL
 
+#nowarn "4321"
+
 module Code =
     let private whiteSpace = Regex @"[ \t\r\n]+"
     

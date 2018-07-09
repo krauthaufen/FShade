@@ -233,11 +233,38 @@ module ExpressionExtensions =
 
     let private unrollMeth = getMethodInfo <@ Preprocessor.unroll : unit -> unit @>
 
+    let private newref = getMethodInfo <@ ref @>
+    let private deref = getMethodInfo <@ (!) @>
+    let private setref = getMethodInfo <@ (:=) @>
+
+    let (|NewRef|_|) (e : Expr) =
+        match e with
+            | Call(None, mi, [v]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = newref ->
+                Some v
+            | _ ->
+                None
+
+    let (|DeRef|_|) (e : Expr) =
+        match e with
+            | Call(None, mi, [v]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = deref ->
+                Some v
+            | _ ->
+                None
+
+    let (|SetRef|_|) (e : Expr) =
+        match e with
+            | Call(None, mi, [r;v]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = setref ->
+                Some(r,v)
+            | _ ->
+                None
+
     type MethodInfo with
         static member WriteOutputs = ShaderIO.WriteOutputsMeth
         static member ReadInput = ShaderIO.ReadInputMeth
         static member ReadInputIndexed = ShaderIO.ReadInputIndexedMeth
         static member Unroll = unrollMeth
+        static member NewRef = newref
+        static member DeRef = deref
 
 module private Affected =
     open Aardvark.Base.Monads.State

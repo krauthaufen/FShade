@@ -39,6 +39,7 @@ module ReflectionPatterns =
 
     type Type with
         member x.IsArr = x.IsGenericType && x.GetGenericTypeDefinition() = typedefof<Arr<_,_>>
+        member x.IsRef = x.IsGenericType && x.GetGenericTypeDefinition() = typedefof<ref<_>>
 
      //extracts the (optional) top-most method call from an expression
     let rec tryGetMethodInfo (e : Expr) =
@@ -75,6 +76,13 @@ module ReflectionPatterns =
             getMethodInfo <@ float @> 
             getMethodInfo <@ float32 @> 
         ]
+        
+    let (|Ref|_|) (t : Type) =
+        if t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<ref<_>> then
+            let content = t.GetGenericArguments().[0]
+            Some(content)
+        else
+            None
 
     let (|ArrOf|_|) (t : Type) =
         if t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<Arr<_,_>> then
