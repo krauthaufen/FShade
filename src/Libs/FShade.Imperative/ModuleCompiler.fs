@@ -29,9 +29,12 @@ module ModuleCompiler =
 
         type GraphNode(definition : CValueDef, dependencies : hset<GraphNode>) =
             let mutable sortKey : Option<SortKey> = None
+            let mutable dependencies = dependencies
 
             member x.Definition = definition
-            member x.Dependencies = dependencies
+            member x.Dependencies 
+                with get() = dependencies
+                and set d = dependencies <- d
 
             member x.SortKey 
                 with get() = sortKey
@@ -81,12 +84,15 @@ module ModuleCompiler =
                         | _ ->
                             let mutable s = emptyState state.moduleState
                             let def = compile(key).Run(&s)
-                            do! State.modify (fun gs -> { gs with moduleState = { s.moduleState with globalFunctions = HMap.empty; globalConstants = HMap.empty } })
+                            do! State.modify (fun gs -> { gs with moduleState = { s.moduleState with globalFunctions = HMap.empty } })
 
                             let localFunctions      = s.usedFunctions |> HMap.toSeq |> Seq.map snd |> Seq.toList
                             let globalFunctions     = s.moduleState.globalFunctions |> HMap.toSeq |> Seq.map snd |> Seq.toList
                             let globalConstants     = s.moduleState.globalConstants |> HMap.toSeq |> Seq.map snd |> Seq.toList
                             
+                            
+                            let node = GraphNode(def, HSet.empty)
+                            cache.[key] <- node
 
                             let! localFunctions = localFunctions |> List.mapS (ofFunction globals)
                             let! globalFunctions = globalFunctions |> List.mapS (ofFunction globals)
@@ -100,9 +106,8 @@ module ModuleCompiler =
                                     constants
                                 ]
 
-
-                            let node = GraphNode(def, HSet.ofList dependencies)
-                            cache.[key] <- node
+                            node.Dependencies <- HSet.ofList dependencies
+                            
 
                             do! State.modify (fun gs -> 
                                 { gs with moduleState = { gs.moduleState with globalFunctions = s.moduleState.globalFunctions; globalConstants = s.moduleState.globalConstants } }
@@ -145,7 +150,10 @@ module ModuleCompiler =
                 let defines = Dictionary<SortKey, Meta>()
                 let mutable lastRootDef = order.Root
 
-                let rec flattenDependencies (g : GraphNode) =
+                let rec flattenDependencies (stack : hset<GraphNode>) (g : GraphNode) =
+                    if HSet.contains g stack then
+                        failwithf "[FShade] found cyclic definition for %A" g.Definition
+
                     let dependencies = HSet.toList g.Dependencies
                     match dependencies with
                         | [] -> 
@@ -157,7 +165,7 @@ module ModuleCompiler =
                                     g.SortKey <- Some t
 
                         | deps ->
-                            for d in dependencies do flattenDependencies d
+                            for d in dependencies do flattenDependencies (HSet.add g stack) d
                             let max = dependencies |> List.map (fun d -> d.SortKey.Value) |> List.max
                             match g.SortKey with
                                 | Some o when o < max -> g.SortKey <- Some (order.After max)
@@ -170,7 +178,7 @@ module ModuleCompiler =
                     let t0 = order.After afterLastEntry
       
                     globals.SortKey <- Some t0
-                    flattenDependencies definition
+                    flattenDependencies HSet.empty definition
                     if definition.SortKey.Value < t0 then
                         definition.SortKey <- Some (order.After t0)
 

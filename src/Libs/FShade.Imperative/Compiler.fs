@@ -959,19 +959,21 @@ module Compiler =
                         inputValues <- HMap.add v key inputValues
                         v
 
-
+            let mutable usesUniform = false
             let e = 
                 e.SubstituteReads (fun kind typ name idx ->
-                    //if kind = ParameterKind.Uniform && Set.contains name globals then 
-                    //    None
-                    //else
-                    let v = getVar kind name typ idx
-                    Some (Expr.Var v)
+                    if kind = ParameterKind.Uniform && Set.contains name globals then 
+                        usesUniform <- true
+                        None
+                    else
+                        let v = getVar kind name typ idx
+                        Some (Expr.Var v)
                 )
 
             let free = e.GetFreeVars() |> HSet.ofSeq
-            if HSet.isEmpty free then
-                return! CompilerState.useConstant e e
+            if not usesUniform && HSet.isEmpty free then
+                let hash = Expr.ComputeHash e
+                return! CompilerState.useConstant hash e
             else
                 let! globals = State.get |> State.map (fun s -> s.moduleState.globalParameters)
                 let free = 

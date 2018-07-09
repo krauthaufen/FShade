@@ -266,8 +266,8 @@ let ``Bad Helpers``() =
     Setup.Run()
 
     let c () =
-        compute {
-            let id = getGlobalId()
+        fragment {
+            let id : V3i = uniform?Bla
             let urdar =
                 match id.X with
                     | 0 -> 
@@ -277,13 +277,13 @@ let ``Bad Helpers``() =
                         let b = uniform.RegionBuffer.[0]
                         V3d.III
             uniform.RegionBuffer.[id.X] <- int urdar.X
+            return V4d(urdar, 1.0)
         }
     
-    let a = ComputeShader.ofFunction V3i.III c |> ComputeShader.toModule
-    let s = ModuleCompiler.compileGLSLVulkan a
-    printfn "%A" s.code
-    //GLSL.compile [ Effect.ofFunction c ]
-    //GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [ expectedFillArrayGLSL; expectedMainGLSL ]
+    //let a = ComputeShader.ofFunction V3i.III c |> ComputeShader.toModule
+    //let s = ModuleCompiler.compileGLSLVulkan a
+    //printfn "%A" s.code
+    GLSL.shouldCompile [ Effect.ofFunction c ]
     
 [<ReflectedDefinition>]
 let util (a : ref<float>) =
@@ -333,5 +333,5 @@ let ``Ref storage buffer modification``() =
 
 [<EntryPoint>]
 let main args =
-    ``Ref storage buffer modification``()
+    ``Bad Helpers``()
     0
