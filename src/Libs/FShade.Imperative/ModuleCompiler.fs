@@ -94,8 +94,8 @@ module ModuleCompiler =
                                 ) l r
 
                             let localFunctions      = s.usedFunctions |> HMap.toSeq |> Seq.map snd |> Seq.toList
-                            let globalFunctions     = difference s.moduleState.globalFunctions state.moduleState.globalFunctions |> HMap.toSeq |> Seq.map snd |> Seq.toList
-                            let globalConstants     = difference s.moduleState.globalConstants state.moduleState.globalConstants |> HMap.toSeq |> Seq.map snd |> Seq.toList
+                            let globalFunctions     = s.usedGlobalFunctions |> HSet.toList //difference s.moduleState.globalFunctions state.moduleState.globalFunctions |> HMap.toSeq |> Seq.map snd |> Seq.toList
+                            let globalConstants     = s.usedConstants |> HSet.toList //difference s.moduleState.globalConstants state.moduleState.globalConstants |> HMap.toSeq |> Seq.map snd |> Seq.toList
                             
                             
                             let node = GraphNode(def, HSet.empty)

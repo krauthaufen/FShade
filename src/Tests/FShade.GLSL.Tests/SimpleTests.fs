@@ -238,7 +238,7 @@ let ``Nested Double Inline``() =
 
 [<ReflectedDefinition;AutoOpen>]
 module Helper =
-    let hsv2rgb (h : float) (s : float) (v : float) =
+    let b (h : float) (s : float) (v : float) =
         let s = clamp 0.0 1.0 s
         let v = clamp 0.0 1.0 v
 
@@ -256,6 +256,12 @@ module Helper =
             | 4 -> V3d(t,p,v)
             | 5 -> V3d(v,p,q)
             | _ -> V3d(v,t,p)
+
+    let a (h : float) (s : float) (v : float) =
+        b h s v
+
+    let hsv2rgb (h : float) (s : float) (v : float)  =
+        a h s v
     
     type UniformScope with 
         member x.RegionBuffer : array<int> = uniform?StorageBuffer?RegionBuffer
@@ -352,6 +358,6 @@ let ``Ref storage buffer modification``() =
 
 [<EntryPoint>]
 let main args =
-    ``Helper with duplicate names``()
-    //``Bad Helpers``()
+    //``Helper with duplicate names``()
+    ``Bad Helpers``()
     0

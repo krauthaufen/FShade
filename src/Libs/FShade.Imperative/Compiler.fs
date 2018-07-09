@@ -689,6 +689,7 @@ module Compiler =
             reservedNames       : Set<string>
 
             usedFunctions       : hmap<obj, FunctionDefinition>
+            usedGlobalFunctions : hset<FunctionDefinition>
             usedConstants       : hset<ConstantDefinition>
             usedGlobals         : hset<string>
             moduleState         : ModuleState
@@ -765,10 +766,13 @@ module Compiler =
             State.custom (fun s ->
                 match HMap.tryFind key s.moduleState.globalFunctions with
                     | Some signature ->
-                        s, signature.Signature s.moduleState.backend
+                        { s with usedGlobalFunctions = HSet.add signature s.usedGlobalFunctions }, signature.Signature s.moduleState.backend
                     | _ -> 
                         let signature = f.Signature s.moduleState.backend
-                        { s with moduleState = { s.moduleState with globalFunctions = HMap.add key f s.moduleState.globalFunctions } }, signature 
+                        { s with 
+                            usedGlobalFunctions = HSet.add f s.usedGlobalFunctions
+                            moduleState = { s.moduleState with globalFunctions = HMap.add key f s.moduleState.globalFunctions } 
+                        }, signature 
             )
 
         let useCtor (key : obj) (f : FunctionDefinition) =
@@ -842,6 +846,7 @@ module Compiler =
             variables           = Map.empty
             reservedNames       = Set.empty
             usedFunctions       = HMap.empty
+            usedGlobalFunctions = HSet.empty
             usedConstants       = HSet.empty
             usedGlobals         = HSet.empty
             moduleState         = m
@@ -1002,7 +1007,7 @@ module Compiler =
                             nameIndices         = Map.empty
                             variables           = Map.empty
                             reservedNames       = oldState.reservedNames
-
+                            usedGlobalFunctions = HSet.empty
                             usedFunctions       = HMap.empty
                             usedConstants       = HSet.empty
                             usedGlobals         = HSet.empty
