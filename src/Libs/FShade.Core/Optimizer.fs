@@ -248,9 +248,18 @@ module Optimizer =
                             | ArrayOf _ -> Some v
                             | Ref _ -> Some v
                             | _ -> None
+                | GetArray(Var v, _) -> Some v
 
+                | RefOf (MutableArgument v) -> Some v
                 | AddressOf (MutableArgument v) -> Some v
                 | _ -> None
+
+        let rec (|StorageArgument|_|) (e : Expr) =
+            match e with
+                | RefOf (GetArray(ReadInput(ParameterKind.Uniform, _, _), _)) ->
+                    Some ()
+                | _ ->
+                    None
 
     /// The dead code elimination removes unused bindings from the code
     /// e.g. `let a = someFunction(x,y) in 10` gets reduced to `10` assuming
@@ -325,6 +334,7 @@ module Optimizer =
                         if pt.IsByRef || pt.IsArray || pt.IsArr || pt.IsRef then
                             match v with
                                 | MutableArgument v -> Set.contains v state.usedVariables
+                                | StorageArgument -> true
                                 | _ -> false
                         else
                             false
@@ -334,6 +344,8 @@ module Optimizer =
                         | Some t ->
                             match t with
                                 | MutableArgument v when Set.contains v state.usedVariables -> 
+                                    return true
+                                | StorageArgument -> 
                                     return true
                                 | _ -> 
                                     return List.exists2 needsMutableParameter parameters args
@@ -2179,7 +2191,7 @@ module Optimizer =
                         let! b = inlineS b
                         return Expr.Lambda(v, b)
 
-                    | Let(v, e, b) when v.IsMutable ->
+                    | Let(v, e, b) when v.IsMutable || v.Type.IsArr || v.Type.IsArray || v.Type.IsRef ->
                         let! e = inlineS e
                         let! b = inlineS b
                         return Expr.Let(v, e, b)

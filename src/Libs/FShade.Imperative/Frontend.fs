@@ -233,9 +233,18 @@ module ExpressionExtensions =
 
     let private unrollMeth = getMethodInfo <@ Preprocessor.unroll : unit -> unit @>
 
+    let private refof = getMethodInfo <@ (~&&) @>
     let private newref = getMethodInfo <@ ref @>
     let private deref = getMethodInfo <@ (!) @>
     let private setref = getMethodInfo <@ (:=) @>
+
+
+    let (|RefOf|_|) (e : Expr) =
+        match e with
+            | Call(None, mi, [v]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = refof ->
+                Some v
+            | _ ->
+                None
 
     let (|NewRef|_|) (e : Expr) =
         match e with

@@ -42,3 +42,6 @@ type InputTopology =
 type Preprocessor private() =
     static member unroll() = ()
 
+[<AutoOpen>]
+module Operators = 
+    let (~&&) (v : 'a) = ref v

@@ -260,10 +260,29 @@ let ``Ref translated to inout``() =
         ]
 
     GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [rx]
+
+
+[<GLSLIntrinsic("atomicAdd({0}, {1})")>]
+let atomicAdd (r : ref<int>) (v : int) = onlyInShaderCode "atomicAdd"
+
+type UniformScope with
+    member x.Test : int[] = uniform?StorageBuffer?Test
+
+[<Fact>]
+let ``Ref storage buffer modification``() =
+    Setup.Run()
+    
+    let frag (v : Vertex) =
+        fragment {
+            atomicAdd &&uniform.Test.[0] 19
+            return float uniform.Test.[0] * v.c 
+        }
+
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [ "atomicAdd" ]
     
 
 
 [<EntryPoint>]
 let main args =
-    ``Ref translated to inout``() 
+    ``Ref storage buffer modification``()
     0

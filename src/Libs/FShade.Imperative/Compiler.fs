@@ -1119,6 +1119,12 @@ module Compiler =
                 | DeRef ref ->
                     return! toCExprS ref
 
+                | RefOf v ->
+                    let! v = toCLExprS v
+                    match v with
+                        | Some v -> return CLExpr.toExpr v
+                        | None -> return failwith "[FShade] cannot get address of non L-Expression"
+
                 | GetArray(arr, i) ->
                     let! ct = toCTypeS e.Type
                     let! arr = toCExprS arr
