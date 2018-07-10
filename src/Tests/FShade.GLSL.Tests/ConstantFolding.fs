@@ -218,7 +218,7 @@ let ``Hilite``() =
             for i in 0..3 do
                 result <- result + 
                     if v.pos.W <> 0.0 then 
-                        computerXXX(v.pos, comp, myBool) 
+                        computerXXX((V4d.IIII * v.pos), comp, (if myBool then true else false)) 
                     else 
                         v.pos.XYZ
                 
@@ -261,5 +261,18 @@ let ``Hilite``() =
     if (codeC.code.IndexOf "length") < 0 then failwith "does not contain computation C"
     if (codeC.code.IndexOf "sin") >= 0 then failwith "does also contain computation A"
     if (codeC.code.IndexOf "log") >= 0 then failwith "does also contain computation B"
-        
+    
+    printfn "%s" codeC.code
 
+[<ReflectedDefinition; Inline>]
+let util (a : float) (b : float) (c : float) =
+    a + b * c
+
+[<Fact>]
+let ``Broken``() =
+    let frag2 (v : Vertex) =
+        fragment {
+            return V4d(V3d.III, util (sin v.pos.X) (cos v.pos.Y) (tan v.pos.Z))
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction frag2]

@@ -205,7 +205,7 @@ module Optimizer =
                         let mutable useCnt = 0
                         let bt = b.Substitute(fun vi -> if vi = v then inc &useCnt; Some e else None)
                         if useCnt <= 1 then
-                            bt
+                            wrap vs es bt
                         else
                             Expr.Let(v,e, wrap vs es b)
 

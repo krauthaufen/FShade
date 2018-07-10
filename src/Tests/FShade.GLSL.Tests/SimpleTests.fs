@@ -359,5 +359,5 @@ let ``Ref storage buffer modification``() =
 [<EntryPoint>]
 let main args =
     //``Helper with duplicate names``()
-    ``Bad Helpers``()
+    ConstantFolding.Hilite()
     0
