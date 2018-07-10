@@ -2221,8 +2221,23 @@ module Optimizer =
                                 let b = b.Substitute(fun vi -> if vi = v then Some e else None)
                                 return! inlineS b
                             | None ->
-                                let! b = inlineS b
-                                return Expr.Let(v, e, b)
+                                let tryInline =
+                                    match e with
+                                        | Var v when v.IsMutable -> false
+                                        | _ when e.Type.IsRef || e.Type.IsArr || e.Type.IsArray -> false
+                                        | _ -> true
+
+                                if tryInline then
+                                    let mutable cnt = 0
+                                    let nb = b.Substitute(fun vi -> if vi = v then cnt <- cnt + 1; Some e else None)
+                                    if cnt = 1 then
+                                        return! inlineS nb
+                                    else
+                                        let! b = inlineS b
+                                        return Expr.Let(v, e, b)
+                                else
+                                    let! b = inlineS b
+                                    return Expr.Let(v, e, b)
 
                     | NewArray(t, args) ->
                         let! args = args |> List.mapS inlineS

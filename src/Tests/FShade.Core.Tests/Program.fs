@@ -4,5 +4,5 @@ open System
 
 [<EntryPoint>]
 let main argv =
-    Optimizer.``[Quote] inlining possible``()
+    Optimizer.``[Hoist] inline function``()
     0 // return an integer exit code

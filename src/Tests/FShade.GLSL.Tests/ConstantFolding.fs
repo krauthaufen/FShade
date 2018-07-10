@@ -216,11 +216,11 @@ let ``Hilite``() =
 
             let mutable result = V3d.OOO
             for i in 0..3 do
-                result <- result + 
-                    if v.pos.W <> 0.0 then 
-                        computerXXX((V4d.IIII * v.pos), comp, (if myBool then true else false)) 
-                    else 
-                        v.pos.XYZ
+                
+                if v.pos.W <> 0.0 then 
+                    result <- result + computerXXX((V4d.IIII * v.pos), comp, (if myBool then true else false)) 
+                else 
+                    result <- result + v.pos.XYZ
                 
             result <- result * 2.0
             return V4d(result, 1.0)
