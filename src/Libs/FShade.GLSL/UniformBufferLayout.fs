@@ -162,6 +162,47 @@ and GLSLProgramInterface =
 
     
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module GLSLShaderInterface =
+
+    let private discardFun = 
+        {
+            name = "discard"
+            args = [||]
+            ret = GLSLType.Void
+        }
+
+    
+
+    let inline program (i : GLSLShaderInterface) = i.program
+    let inline stage (i : GLSLShaderInterface) = i.shaderStage
+    let inline entry (i : GLSLShaderInterface) = i.shaderEntry
+    let inline inputs (i : GLSLShaderInterface) = i.shaderInputs
+    let inline outputs (i : GLSLShaderInterface) = i.shaderOutputs
+    let inline samplers (i : GLSLShaderInterface) = i.shaderSamplers
+    let inline images (i : GLSLShaderInterface) = i.shaderImages
+    let inline storageBuffers (i : GLSLShaderInterface) = i.shaderStorageBuffers
+    let inline uniformBuffers (i : GLSLShaderInterface) = i.shaderUniformBuffers
+    let inline builtInFunctions (i : GLSLShaderInterface) = i.shaderBuiltInFunctions
+    let inline decorations (i : GLSLShaderInterface) = i.shaderDecorations
+    let inline builtIns (i : GLSLShaderInterface) = i.shaderBuiltIns
+    
+    let writesPointSize (iface : GLSLShaderInterface) =
+        if iface.shaderStage <> ShaderStage.Fragment then
+            MapExt.containsKey "gl_PointSize" iface.shaderBuiltInOutputs
+        else
+            false
+
+
+    let usesDiscard (iface : GLSLShaderInterface) =
+        if iface.shaderStage = ShaderStage.Fragment then
+            HSet.contains discardFun iface.shaderBuiltInFunctions
+        else
+            false
+
+
+
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module GLSLProgramInterface =
     module GLSLType =
 
@@ -253,7 +294,26 @@ module GLSLProgramInterface =
                 | [] -> None
                 | _ -> name + ":\r\n" + (entries |> Seq.collect lines |> Seq.map (fun v -> "    " + v) |> String.concat "\r\n") |> Some
 
-    
+    let inline inputs (i : GLSLProgramInterface) = i.inputs
+    let inline outputs (i : GLSLProgramInterface) = i.outputs
+    let inline samplers (i : GLSLProgramInterface) = i.samplers
+    let inline images (i : GLSLProgramInterface) = i.images
+    let inline storageBuffers (i : GLSLProgramInterface) = i.storageBuffers
+    let inline uniformBuffers (i : GLSLProgramInterface) = i.uniformBuffers
+    let inline shaders (i : GLSLProgramInterface) = i.shaders
+
+    let usesDiscard (iface : GLSLProgramInterface) =
+        match MapExt.tryFind ShaderStage.Fragment iface.shaders with
+            | Some shader -> GLSLShaderInterface.usesDiscard shader
+            | None -> false
+
+
+    let usesPointSize (iface : GLSLProgramInterface) =
+        match MapExt.neighboursAt (iface.shaders.Count-1) iface.shaders with
+            | Some (_,prev), Some(_, frag), _ when frag.shaderStage = ShaderStage.Fragment ->
+                GLSLShaderInterface.writesPointSize prev
+            | _ ->
+                false
 
     let toString (iface : GLSLProgramInterface) =
         many [
