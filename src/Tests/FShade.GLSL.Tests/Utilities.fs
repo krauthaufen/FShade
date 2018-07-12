@@ -82,16 +82,8 @@ module GLSL =
         Console.WriteLine(glsl.code)
         Console.WriteLine("====================== CODE ======================")
         
-        let inOut = glsl.iface.usedBuiltIns
-        
         Console.WriteLine("======================= IO =======================")
-        for (stage, inOut) in MapExt.toSeq inOut do
-            Console.WriteLine("{0}", stage)
-            for (kind, set) in MapExt.toSeq inOut do
-                Console.WriteLine("  {0}", kind)
-                for s in set do
-                    Console.WriteLine("    {0}", s)
-                    
+        GLSLProgramInterface.print glsl.iface
         Console.WriteLine("======================= IO =======================")
 
         

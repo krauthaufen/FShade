@@ -3,6 +3,8 @@
 open Aardvark.Base
 open FShade.Imperative
 open FShade
+open System
+
 
 type GLSLType =
     | Bool
@@ -13,12 +15,48 @@ type GLSLType =
     | Mat of rows : int * cols : int * elem : GLSLType
     | Struct of name : string * fields : list<string * GLSLType * int> * size : int
     | Array of len : int * elem : GLSLType * stride : int
+    | Image of GLSLImageType
+    | Sampler of GLSLSamplerType
+
+and GLSLImageType =
+    {
+        original    : System.Type
+        format      : Option<ImageFormat>
+        dimension   : SamplerDimension
+        isArray     : bool
+        isMS        : bool
+        valueType   : GLSLType
+    }
+
+and GLSLSamplerType =
+    {
+        original    : System.Type
+        dimension   : SamplerDimension
+        isShadow    : bool
+        isArray     : bool
+        isMS        : bool
+        valueType   : GLSLType
+    }
+
+and GLSLTextureType =
+    | GLSLImage of GLSLImageType
+    | GLSLSampler of GLSLSamplerType
+
 
 type GLSLParameter =
     {
-        paramType       : GLSLType
-        paramName       : string
-        paramLocation   : int
+        paramType           : GLSLType
+        paramName           : string
+        paramLocation       : int
+        paramSemantic       : string
+        paramInterpolation  : Option<InterpolationMode>
+    }
+
+type GLSLIntrinsic =
+    {
+        name    : string
+        args    : GLSLType[]
+        ret     : GLSLType
     }
 
 type GLSLSampler =
@@ -28,6 +66,7 @@ type GLSLSampler =
         samplerName     : string
         samplerCount    : int
         samplerTextures : list<string * SamplerState>
+        samplerType     : GLSLSamplerType
     }
 
 type GLSLImage =
@@ -35,6 +74,7 @@ type GLSLImage =
         imageSet        : int
         imageBinding    : int
         imageName       : string
+        imageType       : GLSLImageType
     }
 
 type GLSLStorageBuffer =
@@ -61,19 +101,276 @@ type GLSLUniformBuffer =
         ubSize          : int
     }
 
-type GLSLProgramInterface =
+type GLSLWinding =
+    | CCW
+    | CW
+
+type GLSLSpacing =
+    | Equal
+    | FractionalEven
+    | FractionalOdd
+
+type GLSLShaderDecoration =
+    | GLSLInvocations of int
+    | GLSLInputTopology of InputTopology
+    | GLSLOutputTopology of OutputTopology
+    | GLSLMaxVertices of int
+    | GLSLSpacing of GLSLSpacing
+    | GLSLWinding of GLSLWinding
+    | GLSLLocalSize of V3i
+
+type GLSLShaderInterface =
+    {
+        program                 : GLSLProgramInterface
+
+        shaderStage             : ShaderStage
+        shaderEntry             : string
+
+        shaderInputs            : list<GLSLParameter>
+        shaderOutputs           : list<GLSLParameter>
+        shaderSamplers          : hset<string>
+        shaderImages            : hset<string>
+        shaderStorageBuffers    : hset<string>
+        shaderUniformBuffers    : hset<string>
+        shaderBuiltInFunctions  : hset<GLSLIntrinsic>
+
+        shaderDecorations       : list<GLSLShaderDecoration>
+
+        shaderBuiltIns          : MapExt<ParameterKind, MapExt<string, GLSLType>>
+    }
+
+    member x.shaderBuiltInInputs = MapExt.tryFind ParameterKind.Input x.shaderBuiltIns |> Option.defaultValue MapExt.empty
+    member x.shaderBuiltInOutputs = MapExt.tryFind ParameterKind.Output x.shaderBuiltIns |> Option.defaultValue MapExt.empty
+
+
+and GLSLProgramInterface =
     {
         inputs          : list<GLSLParameter>
         outputs         : list<GLSLParameter>
-        samplers        : list<GLSLSampler>
-        images          : list<GLSLImage>
-        storageBuffers  : list<GLSLStorageBuffer>
-        uniformBuffers  : list<GLSLUniformBuffer>
-        usedBuiltIns    : MapExt<ShaderStage, MapExt<ParameterKind, Set<string>>>
+        samplers        : MapExt<string, GLSLSampler>
+        images          : MapExt<string, GLSLImage>
+        storageBuffers  : MapExt<string, GLSLStorageBuffer>
+        uniformBuffers  : MapExt<string, GLSLUniformBuffer>
+        shaders         : MapExt<ShaderStage, GLSLShaderInterface>
     }
+
+    [<Obsolete("use shaders.[stage].shaderBuiltIns instead")>]
+    member x.usedBuiltIns = x.shaders |> MapExt.choose (fun _ s -> if MapExt.isEmpty s.shaderBuiltIns then None else Some s.shaderBuiltIns)
+    
+    member x.firstShader = x.shaders.[MapExt.min x.shaders]
+    member x.lastShader = x.shaders.[MapExt.max x.shaders]
+
+    
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module GLSLProgramInterface =
+    module GLSLType =
+
+        let private samplerName (t : GLSLSamplerType) =
+            let dimStr =
+                match t.dimension with
+                    | SamplerDimension.Sampler1d -> "1D"
+                    | SamplerDimension.Sampler2d -> "2D"
+                    | SamplerDimension.Sampler3d -> "3D"
+                    | SamplerDimension.SamplerCube -> "Cube"
+                    | _ -> failwith "unsupported sampler dimension"
+
+            let shadowSuffix = if t.isShadow then "Shadow" else ""
+            let msSuffix = if t.isMS then "MS" else ""
+            let typePrefix = 
+                match t.valueType with
+                    | Vec(_,Int _) -> "i"
+                    | _ -> ""
+                    
+            if t.isArray then sprintf "%ssampler%s%sArray%s" typePrefix dimStr msSuffix shadowSuffix
+            else sprintf "%ssampler%s%s%s" typePrefix dimStr msSuffix shadowSuffix 
+                    
+        let private imageName (t : GLSLImageType) =
+            let dimStr =
+                match t.dimension with
+                    | SamplerDimension.Sampler1d -> "1D"
+                    | SamplerDimension.Sampler2d -> "2D"
+                    | SamplerDimension.Sampler3d -> "3D"
+                    | SamplerDimension.SamplerCube -> "Cube"
+                    | _ -> failwith "unsupported sampler dimension"
+
+            let msSuffix = if t.isMS then "MS" else ""
+            let typePrefix = 
+                match t.valueType with
+                    | Vec(_,Int _) -> "i"
+                    | _ -> ""
+
+            let fmt = 
+                match t.format with
+                    | Some fmt -> "<" + string fmt + ">"
+                    | None -> ""
+
+                    
+            if t.isArray then sprintf "%simage%s%sArray%s" typePrefix dimStr msSuffix fmt
+            else sprintf "%simage%s%s%s" typePrefix dimStr msSuffix fmt
+
+        let rec toString (t : GLSLType) =
+            match t with
+                | GLSLType.Bool -> "bool"
+                | GLSLType.Void -> "void" 
+
+                | GLSLType.Int(true, 8) -> "sbyte"
+                | GLSLType.Int(true, 16) -> "short"
+                | GLSLType.Int(true, 32) -> "int"
+                | GLSLType.Int(true, 64) -> "long"
+                | GLSLType.Int(true, b) -> sprintf "int%d" b
+                
+                | GLSLType.Int(false, 8) -> "byte"
+                | GLSLType.Int(false, 16) -> "ushort"
+                | GLSLType.Int(false, 32) -> "uint"
+                | GLSLType.Int(false, 64) -> "ulong"
+                | GLSLType.Int(false, b) -> sprintf "uint%d" b
+                
+                | GLSLType.Float 16 -> "half"
+                | GLSLType.Float (32 | 64) -> "float"
+                | GLSLType.Float b -> sprintf "float%d" b
+
+                | GLSLType.Vec(dim, elem) -> sprintf "%s%d" (toString elem) dim
+                | GLSLType.Mat(r, c, elem) -> sprintf "%s%dx%d" (toString elem) r c
+
+                | GLSLType.Struct(name,_,_) -> name
+                | GLSLType.Array(len, elem,_) -> sprintf "%s[%d]" (toString elem) len
+                | GLSLType.Image img -> imageName img
+                | GLSLType.Sampler sam -> samplerName sam
+                    
+
+    [<AutoOpen>]
+    module private Tools =
+        let lines (str : string) =
+            str.Split([| "\r\n" |], StringSplitOptions.None) :> seq<_>
+             
+
+        let many (entries : list<Option<string>>) =
+            entries |> Seq.choose id |> String.concat "\r\n"
+
+        let section (name : string) (entries : list<Option<string>>) =
+            let entries = entries |> List.choose id
+            match entries with
+                | [] -> None
+                | _ -> name + ":\r\n" + (entries |> Seq.collect lines |> Seq.map (fun v -> "    " + v) |> String.concat "\r\n") |> Some
+
+    
+
+    let toString (iface : GLSLProgramInterface) =
+        many [
+            for i in iface.inputs do
+                yield sprintf "in %s : %s // location: %d semantic: %s" i.paramName (GLSLType.toString i.paramType) i.paramLocation i.paramSemantic |> Some
+                
+            for (name, typ) in MapExt.toSeq iface.firstShader.shaderBuiltInInputs do
+                yield sprintf "in %s : %s " name (GLSLType.toString typ) |> Some
+              
+            
+            for i in iface.outputs do
+                yield sprintf "out %s : %s // location: %d semantic: %s" i.paramName (GLSLType.toString i.paramType) i.paramLocation i.paramSemantic |> Some
+            
+            for (name, typ) in MapExt.toSeq iface.lastShader.shaderBuiltInOutputs do
+                yield sprintf "out %s : %s " name (GLSLType.toString typ) |> Some
+          
+            for (_,b) in MapExt.toSeq iface.uniformBuffers do
+                let name = sprintf "ub %s { // set: %d binding: %d" b.ubName b.ubSet b.ubBinding
+                yield Some name
+                for f in b.ubFields do
+                    yield sprintf "    %s : %s // offset: %d" f.ufName (GLSLType.toString f.ufType) f.ufOffset |> Some
+                yield Some "}"
+
+            for (_,s) in MapExt.toSeq iface.storageBuffers do
+                yield sprintf "ssb %s : %s[] // set: %d binding: %d" s.ssbName (GLSLType.toString s.ssbType) s.ssbSet s.ssbBinding |> Some
+       
+            for (_,s) in MapExt.toSeq iface.samplers do
+                let suffix =
+                    if s.samplerCount > 1 then  sprintf "[%d]" s.samplerCount
+                    else ""
+                yield sprintf "sam %s : %s%s // set: %d binding: %d" s.samplerName (GLSLType.toString (GLSLType.Sampler s.samplerType)) suffix s.samplerSet s.samplerBinding |> Some
+        
+            for (_,s) in MapExt.toSeq iface.images do
+                yield sprintf "img %s : %s // set: %d binding: %d" s.imageName (GLSLType.toString (GLSLType.Image s.imageType)) s.imageSet s.imageBinding |> Some
+
+            yield section "shaders" [
+                for (stage, shader) in MapExt.toSeq iface.shaders do
+
+                    yield section (string stage) [
+                        
+                        yield sprintf "entry: \"%s\"" shader.shaderEntry |> Some
+
+                        match shader.shaderDecorations with
+                            | [] -> ()
+                            | dec ->
+                                yield "attributes: {" |> Some
+                                for d in dec do
+                                    match d with
+                                        | GLSLMaxVertices d -> yield sprintf "    max-vertices: %d" d |> Some
+                                        | GLSLInputTopology d -> yield sprintf "    input-top: %A" d |> Some
+                                        | GLSLOutputTopology d -> yield sprintf "    output-top: %A" d |> Some
+                                        | GLSLInvocations d -> yield sprintf "    invocations: %A" d |> Some
+                                        | GLSLLocalSize d -> yield sprintf "    local-size: %dx%dx%d" d.X d.Y d.Z |> Some
+                                        | GLSLSpacing d -> yield sprintf "    spacing: %A" d |> Some
+                                        | GLSLWinding d -> yield sprintf "    winding: %A" d |> Some
+                                yield "}" |> Some
+
+
+                        let usedUniforms =
+                            Seq.concat [
+                                shader.shaderUniformBuffers |> Seq.map (sprintf "ub::%s")
+                                shader.shaderStorageBuffers |> Seq.map (sprintf "ssb::%s")
+                                shader.shaderSamplers |> Seq.map (sprintf "sam::%s")
+                                shader.shaderImages |> Seq.map (sprintf "img::%s")
+                            ]
+
+                        yield sprintf "uniform {%s}" (String.concat ", " usedUniforms) |> Some
+
+                        let called = 
+                            shader.shaderBuiltInFunctions |> HSet.toList |> List.map (fun f ->
+                                let args = 
+                                    match f.args.Length with
+                                        | 0 -> [| GLSLType.Void |]
+                                        | _ -> f.args
+
+                                sprintf "%s : %s -> %s" f.name (args |> Seq.map GLSLType.toString |> String.concat " -> ") (GLSLType.toString f.ret)
+                            )
+
+                        match called with
+                            | [] -> yield "called {}" |> Some
+                            | called ->
+                                yield "called {" |> Some
+                                for c in called do
+                                    yield "    " + c |> Some
+                                yield "}" |> Some
+                        
+                        for i in shader.shaderInputs do
+                            yield sprintf "in %s : %s // location: %d semantic: %s" i.paramName (GLSLType.toString i.paramType) i.paramLocation i.paramSemantic |> Some
+                
+                        for (name, typ) in MapExt.toSeq shader.shaderBuiltInInputs do
+                            yield sprintf "in %s : %s " name (GLSLType.toString typ) |> Some
+                     
+                     
+                        for i in shader.shaderOutputs do
+                            yield sprintf "out %s : %s // location: %d semantic: %s" i.paramName (GLSLType.toString i.paramType) i.paramLocation i.paramSemantic |> Some
+                
+                        for (name, typ) in MapExt.toSeq shader.shaderBuiltInOutputs do
+                            yield sprintf "out %s : %s " name (GLSLType.toString typ) |> Some
+                       
+
+                    ]
+            ]
+
+        ]
+
+    let log (iface : GLSLProgramInterface) =
+        let str = toString iface
+        for line in lines str do
+            Log.line "%s" line
+            
+    let print (iface : GLSLProgramInterface) =
+        Console.WriteLine("{0}", toString iface)
+
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module GLSLType =
+    
     let rec ofCType (t : CType) =
         match t with    
             | CType.CBool -> GLSLType.Bool
@@ -88,7 +385,16 @@ module GLSLType =
 
             | CType.CArray(elem, len) -> GLSLType.Array(len, ofCType elem, -1)
             | CType.CStruct(name, fields,_) -> GLSLType.Struct(name, fields |> List.map (fun (t, n) -> n, ofCType t, -1), -1)
-            | _ -> failwithf "[GLSL] invalid shader IO type: %A" t
+
+            | CType.CIntrinsic a ->
+                match a.tag with
+                    | :? GLSLTextureType as t -> 
+                        match t with
+                            | GLSLImage t -> GLSLType.Image t
+                            | GLSLSampler t -> GLSLType.Sampler t
+                    | _ -> failwithf "[GLSL] bad intrinsic type: %A" a
+
+            | _ -> failwithf "[GLSL] invalid shader type: %A" t
 
 
 module LayoutStd140 =
@@ -158,7 +464,11 @@ module LayoutStd140 =
 
                 GLSLType.Struct(name, newFields, offset), largestAlign, offset
 
-
+            | GLSLType.Image _ ->
+                failwith "[GLSL] Images cannot be part of a UniformBuffer"
+                
+            | GLSLType.Sampler _ ->
+                failwith "[GLSL] Samplers cannot be part of a UniformBuffer"
 
     let applyLayout (ub : GLSLUniformBuffer) : GLSLUniformBuffer =
         let mutable offset = 0

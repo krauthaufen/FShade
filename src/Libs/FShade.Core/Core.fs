@@ -141,6 +141,60 @@ module Formats =
     type r16i() = interface ISignedFormat
     type r8i() = interface ISignedFormat
 
+[<AutoOpen>]
+module ImageFormatExtensions =
+    
+    module ImageFormat =
+        open Formats
+        open Aardvark.Base
+
+        let ofFormatType =
+            ConversionHelpers.lookupTableOption [
+                typeof<rgba32f>, ImageFormat.Rgba32f
+                typeof<rgba16f>, ImageFormat.Rgba16f
+                typeof<rg32f>, ImageFormat.Rg32f
+                typeof<rg16f>, ImageFormat.Rg16f
+                typeof<r11g11b10f>, ImageFormat.R11fG11fB10f
+                typeof<r32f>, ImageFormat.R32f
+                typeof<r16f>, ImageFormat.R16f
+
+                typeof<rgba16>, ImageFormat.Rgba16
+                typeof<rgb10a2>, ImageFormat.Rgb10A2
+                typeof<rgba8>, ImageFormat.Rgba8
+                typeof<rg16>, ImageFormat.Rg16
+                typeof<rg8>, ImageFormat.Rg8
+                typeof<r16>, ImageFormat.R16
+                typeof<r8>, ImageFormat.R8
+
+                typeof<rgba16_snorm>, ImageFormat.Rgba16
+                typeof<rgba8_snorm>, ImageFormat.Rgba8
+                typeof<rg16_snorm>, ImageFormat.Rg16
+                typeof<rg8_snorm>, ImageFormat.Rg8
+                typeof<r16_snorm>, ImageFormat.R16
+                typeof<r8_snorm>, ImageFormat.R8
+
+                typeof<rgba32ui>, ImageFormat.Rgba32ui
+                typeof<rgba16ui>, ImageFormat.Rgba16ui
+                typeof<rgb10a2ui>, ImageFormat.Rgb10A2ui
+                typeof<rgba8ui>, ImageFormat.Rgba8ui
+                typeof<rg32ui>, ImageFormat.Rg32ui
+                typeof<rg16ui>, ImageFormat.Rg16ui
+                typeof<rg8ui>, ImageFormat.Rg8ui
+                typeof<r32ui>, ImageFormat.R32ui
+                typeof<r16ui>, ImageFormat.R16ui
+                typeof<r8ui>, ImageFormat.R8ui
+
+                typeof<rgba32i>, ImageFormat.Rgba32i
+                typeof<rgba16i>, ImageFormat.Rgba16i
+                typeof<rgba8i>, ImageFormat.Rgba8i
+                typeof<rg32i>, ImageFormat.Rg32i
+                typeof<rg16i>, ImageFormat.Rg16i
+                typeof<rg8i>, ImageFormat.Rg8i
+                typeof<r32i>, ImageFormat.R32i
+                typeof<r16i>, ImageFormat.R16i
+                typeof<r8i>, ImageFormat.R8i
+            ]
+
 
 
 
