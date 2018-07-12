@@ -86,7 +86,7 @@ module ExprHashExtensions =
 
         static member New(name, t, isMutable, stamp) = Reflection.newVar(name, t, isMutable, stamp)
 
-    module private Pickler =
+    module Pickler =
         open MBrace.FsPickler
         open MBrace.FsPickler.Combinators
         open MBrace.FsPickler.Hashing

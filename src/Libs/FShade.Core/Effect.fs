@@ -239,6 +239,13 @@ module Effect =
         effect.SourceDefintion <- Some (e, inputType)
         effect
 
+
+    type private EffectKey =
+        {
+            inputSemantics : Map<string, InterpolationMode>
+            outputSemantics : Map<string, InterpolationMode>
+            body : Expr
+        }
     /// creates an effect from a shader-function
     let ofFunction (shaderFunction : 'a -> Expr<'b>) =
         let realEx = 
@@ -250,7 +257,17 @@ module Effect =
                     failwithf "[FShade] failed to execute shader function.\nInner cause: %A at\n%A" e e.StackTrace
          
         let expression = Expr.InlineSplices realEx
-        let hash = Expr.ComputeHash expression
+
+        let key = 
+            {
+                inputSemantics = FSharpType.GetRecordFields(typeof<'a>, true) |> Seq.map (fun f -> f.Semantic, f.Interpolation) |> Map.ofSeq
+                outputSemantics = FSharpType.GetRecordFields(typeof<'b>, true) |> Seq.map (fun f -> f.Semantic, f.Interpolation) |> Map.ofSeq
+                body = expression.WithAttributes []
+            }
+
+        let hash = Pickler.pickler.ComputeHash(key).Hash |> Convert.ToBase64String
+
+
         effectCache.GetOrAdd(hash, fun _ ->
             let map =
                 lazy (
