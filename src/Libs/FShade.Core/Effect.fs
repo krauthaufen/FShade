@@ -258,12 +258,30 @@ module Effect =
          
         let expression = Expr.InlineSplices realEx
 
+        let rec getRecordFields (t : Type) =
+            if FSharpType.IsRecord t then 
+                FSharpType.GetRecordFields(t, true)
+            else
+                let seq = t.GetInterface(typedefof<seq<_>>.FullName)
+                if not (isNull seq) then 
+                    getRecordFields (seq.GetGenericArguments().[0])
+                else
+                    let prim = t.GetInterface(typedefof<Primitive<_>>.FullName)
+                    if not (isNull prim) then 
+                        getRecordFields (seq.GetGenericArguments().[0])
+                    else
+                        failwithf "[FShade] bad IO-type %A" t
+
         let key = 
+            let inputFields = getRecordFields typeof<'a>
+            let outputFields = getRecordFields typeof<'b>
+                 
             {
-                inputSemantics = FSharpType.GetRecordFields(typeof<'a>, true) |> Seq.map (fun f -> f.Semantic, f.Interpolation) |> Map.ofSeq
-                outputSemantics = FSharpType.GetRecordFields(typeof<'b>, true) |> Seq.map (fun f -> f.Semantic, f.Interpolation) |> Map.ofSeq
+                inputSemantics = inputFields |> Seq.map (fun f -> f.Semantic, f.Interpolation) |> Map.ofSeq
+                outputSemantics = outputFields |> Seq.map (fun f -> f.Semantic, f.Interpolation) |> Map.ofSeq
                 body = expression.WithAttributes []
             }
+         
 
         let hash = Pickler.pickler.ComputeHash(key).Hash |> Convert.ToBase64String
 
