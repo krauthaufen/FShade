@@ -17,6 +17,7 @@ type GLSLType =
     | Array of len : int * elem : GLSLType * stride : int
     | Image of GLSLImageType
     | Sampler of GLSLSamplerType
+    | DynamicArray of GLSLType
 
 and GLSLImageType =
     {
@@ -309,6 +310,7 @@ module GLSLProgramInterface =
                 | GLSLType.Array(len, elem,_) -> sprintf "%s[%d]" (toString elem) len
                 | GLSLType.Image img -> imageName img
                 | GLSLType.Sampler sam -> samplerName sam
+                | GLSLType.DynamicArray(elem) -> sprintf "%s[]" (toString elem) 
                     
 
     [<AutoOpen>]
@@ -486,7 +488,7 @@ module GLSLType =
                             | GLSLSampler t -> GLSLType.Sampler t
                     | _ -> failwithf "[GLSL] bad intrinsic type: %A" a
 
-            | _ -> failwithf "[GLSL] invalid shader type: %A" t
+            | CType.CPointer(_,e) -> GLSLType.DynamicArray (ofCType e)
 
 
 module LayoutStd140 =
@@ -555,6 +557,9 @@ module LayoutStd140 =
                     )
 
                 GLSLType.Struct(name, newFields, offset), largestAlign, offset
+                
+            | GLSLType.DynamicArray _ ->
+                failwith "[GLSL] Images cannot be part of a UniformBuffer"
 
             | GLSLType.Image _ ->
                 failwith "[GLSL] Images cannot be part of a UniformBuffer"
