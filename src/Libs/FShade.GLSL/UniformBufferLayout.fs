@@ -119,6 +119,7 @@ type GLSLShaderDecoration =
     | GLSLWinding of GLSLWinding
     | GLSLLocalSize of V3i
 
+[<CustomEquality; NoComparison>]
 type GLSLShaderInterface =
     {
         program                 : GLSLProgramInterface
@@ -138,6 +139,37 @@ type GLSLShaderInterface =
 
         shaderBuiltIns          : MapExt<ParameterKind, MapExt<string, GLSLType>>
     }
+
+    override x.GetHashCode() =
+        HashCode.Combine(
+            x.shaderStage.GetHashCode(),
+            x.shaderEntry.GetHashCode(),
+            x.shaderInputs.GetHashCode(),
+            x.shaderOutputs.GetHashCode(),
+            x.shaderSamplers.GetHashCode(),
+            x.shaderImages.GetHashCode(),
+            x.shaderStorageBuffers.GetHashCode(),
+            x.shaderUniformBuffers.GetHashCode(),
+            x.shaderBuiltInFunctions.GetHashCode(),
+            x.shaderDecorations.GetHashCode(),
+            x.shaderBuiltIns.GetHashCode()
+        )
+    override x.Equals(o) =
+        match o with
+            | :? GLSLShaderInterface as o ->
+                x.shaderStage = o.shaderStage &&
+                x.shaderEntry = o.shaderEntry &&
+                x.shaderInputs = o.shaderInputs &&
+                x.shaderOutputs = o.shaderOutputs &&
+                x.shaderSamplers = o.shaderSamplers &&
+                x.shaderImages = o.shaderImages &&
+                x.shaderStorageBuffers = o.shaderStorageBuffers &&
+                x.shaderUniformBuffers = o.shaderUniformBuffers &&
+                x.shaderBuiltInFunctions = o.shaderBuiltInFunctions &&
+                x.shaderDecorations = o.shaderDecorations &&
+                x.shaderBuiltIns = o.shaderBuiltIns
+            | _ ->
+                false
 
     member x.shaderBuiltInInputs = MapExt.tryFind ParameterKind.Input x.shaderBuiltIns |> Option.defaultValue MapExt.empty
     member x.shaderBuiltInOutputs = MapExt.tryFind ParameterKind.Output x.shaderBuiltIns |> Option.defaultValue MapExt.empty
