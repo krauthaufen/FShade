@@ -259,18 +259,23 @@ module Effect =
         let expression = Expr.InlineSplices realEx
 
         let rec getRecordFields (t : Type) =
-            if FSharpType.IsRecord t then 
+            if FSharpType.IsRecord(t, true) then 
                 FSharpType.GetRecordFields(t, true)
-            else
-                let seq = t.GetInterface(typedefof<seq<_>>.FullName)
-                if not (isNull seq) then 
-                    getRecordFields (seq.GetGenericArguments().[0])
-                else
-                    let prim = t.GetInterface(typedefof<Primitive<_>>.FullName)
-                    if not (isNull prim) then 
-                        getRecordFields (seq.GetGenericArguments().[0])
-                    else
-                        failwithf "[FShade] bad IO-type %A" t
+            elif t.IsGenericType then
+                match t.GetGenericArguments() with
+                    | [| t |] -> getRecordFields t
+                    | _ -> [||]
+            else 
+                [||]
+                //let seq = t.GetInterface(typedefof<seq<_>>.FullName)
+                //if not (isNull seq) then 
+                //    getRecordFields (seq.GetGenericArguments().[0])
+                //else
+                //    let prim = t.GetInterface(typedefof<Primitive<_>>.Name)
+                //    if not (isNull prim) then 
+                //        getRecordFields (prim.GetGenericArguments().[0])
+                //    else
+                //        failwithf "[FShade] bad IO-type %A" t
 
         let key = 
             let inputFields = getRecordFields typeof<'a>
