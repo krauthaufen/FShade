@@ -500,6 +500,7 @@ module Interface =
     
     let addSampler (sampler : GLSLSampler) =
         State.modify (fun (s : AssemblerState) ->
+            let sampler = { sampler with samplerTextures = Map.tryFind sampler.samplerName s.textureInfos |> Option.defaultValue [] }
             let iface = 
                 { s.ifaceNew with
                     samplers = MapExt.add sampler.samplerName sampler s.ifaceNew.samplers
