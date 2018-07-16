@@ -50,7 +50,7 @@ module GLSL =
 
     let compile (e : list<Effect>) =
         let e = Effect.compose e
-
+        Console.WriteLine("COMPILE {0}", e.Id)
         let outputs, lastStage = 
             e.LastShader 
                 |> Option.map (fun s -> (s.shaderOutputs |> Map.map (fun k v -> v.paramType) |> Map.toList), s.shaderStage) 

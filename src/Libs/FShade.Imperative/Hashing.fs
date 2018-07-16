@@ -142,8 +142,11 @@ module ExprHashExtensions =
                     None
 
         type ExprPicklerFunctions private() =
-
+            static let mutable patterns : list<Expr -> Option<obj>> = []
      
+            static member AddPattern (f : Expr -> Option<obj>) =
+                patterns <- f :: patterns
+
             static member VarPickler (r : IPicklerResolver) : Pickler<Var> =
                 let makeVar (name : string) (t : Type) (isMutable : bool) (stamp : int64) = 
                     Var.New(name, t, isMutable, stamp)
@@ -199,20 +202,27 @@ module ExprHashExtensions =
                             | SimpleValue(value) when ws.IsHashComputation ->
                                 Pickler.string.Write ws "Kind" "SimpleValue"
                                 infoPickler.Write ws "Value" value
-                            
-                            | ShapeVar v -> 
-                                Pickler.string.Write ws "Kind" "Var"
-                                varPickler.Write ws "Var" v
+                            | e -> 
+                                
+                                match patterns |> List.tryPick (fun p -> p e) with
+                                    | Some res ->
+                                        Pickler.string.Write ws "Kind" "Special"
+                                        Pickler.obj.Write ws "Content" res
+                                    | None -> 
+                                        match e with
+                                            | ShapeVar v -> 
+                                                Pickler.string.Write ws "Kind" "Var"
+                                                varPickler.Write ws "Var" v
 
-                            | ShapeLambda(v, b) ->
-                                Pickler.string.Write ws "Kind" "Lambda"
-                                varPickler.Write ws "Var" v
-                                self.Write ws "Body" b
+                                            | ShapeLambda(v, b) ->
+                                                Pickler.string.Write ws "Kind" "Lambda"
+                                                varPickler.Write ws "Var" v
+                                                self.Write ws "Body" b
 
-                            | ShapeCombination(o, args) ->
-                                Pickler.string.Write ws "Kind" "Comb"
-                                infoPickler.Write ws "Info" o
-                                selfList.Write ws "Children" args
+                                            | ShapeCombination(o, args) ->
+                                                Pickler.string.Write ws "Kind" "Comb"
+                                                infoPickler.Write ws "Info" o
+                                                selfList.Write ws "Children" args
 
                     let reader (rs : ReadState) : Expr =
                         let kind = Pickler.string.Read rs "Kind"
@@ -358,7 +368,6 @@ module ExprHashExtensions =
 
                             Some tryInstantiate
                         else
-                            Log.warn "bad custom pickler"
                             None
                     )
 
@@ -374,7 +383,6 @@ module ExprHashExtensions =
                             Some (pickledType, create)
 
                         else
-                            Log.warn "bad custom pickler"
                             None
                     )
                     |> Dictionary.ofList

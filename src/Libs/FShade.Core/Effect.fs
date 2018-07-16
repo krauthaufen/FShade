@@ -280,14 +280,14 @@ module Effect =
         let key = 
             let inputFields = getRecordFields typeof<'a>
             let outputFields = getRecordFields typeof<'b>
-                 
+            
             {
                 inputSemantics = inputFields |> Seq.map (fun f -> f.Semantic, f.Interpolation) |> Map.ofSeq
                 outputSemantics = outputFields |> Seq.map (fun f -> f.Semantic, f.Interpolation) |> Map.ofSeq
                 body = expression.WithAttributes []
             }
          
-
+        Pickler.ExprPicklerFunctions.Init()
         let hash = Pickler.pickler.ComputeHash(key).Hash |> Convert.ToBase64String
 
 
