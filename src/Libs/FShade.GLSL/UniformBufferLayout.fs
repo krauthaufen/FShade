@@ -583,4 +583,24 @@ module LayoutStd140 =
                 { uf with ufOffset = res; ufType = nufType }
             )
         { ub with ubFields = newFields; ubSize = offset }
+    
+    let apply (iface : GLSLProgramInterface) =
+        // (a,(b,c))
+        // ((a,b), (c,d))
+        let inline layout a = let (t,_,_) = layout a in t
+        { iface with
+            storageBuffers = iface.storageBuffers |> MapExt.map (fun _ s -> { s with ssbType = layout s.ssbType })
+            uniformBuffers = iface.uniformBuffers |> MapExt.map (fun _ -> applyLayout)
+            inputs = iface.inputs |> List.map (fun p -> { p with paramType = layout p.paramType})
+            outputs = iface.outputs |> List.map (fun p -> { p with paramType = layout p.paramType})
+            shaders = iface.shaders |> MapExt.map (fun _ (s : GLSLShaderInterface) ->
+                { s with
+                    shaderInputs = s.shaderInputs |> List.map (fun p -> { p with paramType = layout p.paramType})
+                    shaderOutputs = s.shaderOutputs |> List.map (fun p -> { p with paramType = layout p.paramType})
+                }
+            )
+        }
+
+
+
 

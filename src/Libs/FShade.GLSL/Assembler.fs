@@ -1743,22 +1743,10 @@ module Assembler =
                 ()
 
         let code = definitions.Run(&state) |> String.concat "\r\n\r\n"
-
-        let ubs = state.ifaceNew.uniformBuffers |> MapExt.map (fun _ -> LayoutStd140.applyLayout)
-
-        let iface = 
-            { state.ifaceNew with 
-                uniformBuffers = state.ifaceNew.uniformBuffers |> MapExt.map (fun _ -> LayoutStd140.applyLayout)
-                shaders = state.ifaceNew.shaders |> MapExt.map (fun _ s ->
-                    { s with
-                        shaderUniformBuffers = s.shaderUniformBuffers
-                    }
-                )
-            }
+        let iface = LayoutStd140.apply state.ifaceNew
 
         // unsafely mutate the shader's parent
         for (_,shader) in MapExt.toSeq iface.shaders do
             Reflection.setShaderParent shader iface
         
-
         { code = code; iface = iface }
