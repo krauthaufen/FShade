@@ -17,7 +17,7 @@ type GLSLType =
     | Array of len : int * elem : GLSLType * stride : int
     | Image of GLSLImageType
     | Sampler of GLSLSamplerType
-    | DynamicArray of GLSLType
+    | DynamicArray of elem : GLSLType * stride : int
 
 and GLSLImageType =
     {
@@ -310,7 +310,7 @@ module GLSLProgramInterface =
                 | GLSLType.Array(len, elem,_) -> sprintf "%s[%d]" (toString elem) len
                 | GLSLType.Image img -> imageName img
                 | GLSLType.Sampler sam -> samplerName sam
-                | GLSLType.DynamicArray(elem) -> sprintf "%s[]" (toString elem) 
+                | GLSLType.DynamicArray(elem,_) -> sprintf "%s[]" (toString elem) 
                     
 
     [<AutoOpen>]
@@ -488,7 +488,7 @@ module GLSLType =
                             | GLSLSampler t -> GLSLType.Sampler t
                     | _ -> failwithf "[GLSL] bad intrinsic type: %A" a
 
-            | CType.CPointer(_,e) -> GLSLType.DynamicArray (ofCType e)
+            | CType.CPointer(_,e) -> GLSLType.DynamicArray (ofCType e, -1)
 
 
 module LayoutStd140 =
@@ -558,14 +558,19 @@ module LayoutStd140 =
 
                 GLSLType.Struct(name, newFields, offset), largestAlign, offset
                 
-            | GLSLType.DynamicArray _ ->
-                failwith "[GLSL] Images cannot be part of a UniformBuffer"
+            | GLSLType.DynamicArray(e,_) ->
+                let (e,align,s) = layout e
+                let s =
+                    if s % 16 = 0 then s
+                    else s + 16 - (s % 16)
 
-            | GLSLType.Image _ ->
-                failwith "[GLSL] Images cannot be part of a UniformBuffer"
+                GLSLType.DynamicArray(e, s), 16, 0
+
+            | GLSLType.Image i ->
+                GLSLType.Image i, 1, 0
                 
-            | GLSLType.Sampler _ ->
-                failwith "[GLSL] Samplers cannot be part of a UniformBuffer"
+            | GLSLType.Sampler s ->
+                GLSLType.Sampler s, 1, 0
 
     let applyLayout (ub : GLSLUniformBuffer) : GLSLUniformBuffer =
         let mutable offset = 0
