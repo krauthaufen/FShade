@@ -514,7 +514,7 @@ module LayoutStd140 =
 
             | GLSLType.Vec(3, bt) ->
                 let bt, a, s = layout bt
-                GLSLType.Vec(3, bt), 4 * a, 3 * s
+                GLSLType.Vec(3, bt), 4 * a, 4 * s
                 
             | GLSLType.Vec(d, bt) ->
                 let bt, a, s = layout bt
@@ -526,7 +526,7 @@ module LayoutStd140 =
                 let s =
                     if s % 16 = 0 then s
                     else s + 16 - (s % 16)
-
+                    
                 GLSLType.Array(len, bt, s), 16, len * s
 
             | GLSLType.Mat(rows, cols, bt) ->
@@ -539,7 +539,7 @@ module LayoutStd140 =
 
             | GLSLType.Struct(name, fields, _) ->
                 let mutable offset = 0
-                let mutable largestAlign = 0
+                //let mutable largestAlign = 0
 
                 let newFields =
                     fields |> List.map (fun (name, typ,_) ->
@@ -548,7 +548,7 @@ module LayoutStd140 =
                         if offset % align <> 0 then
                             offset <- offset + (align - offset % align)
 
-                        largestAlign <- max largestAlign align
+                        //largestAlign <- max largestAlign align
                         let res = name, typ, offset
                         offset <- offset + size
 
@@ -556,7 +556,11 @@ module LayoutStd140 =
 
                     )
 
-                GLSLType.Struct(name, newFields, offset), largestAlign, offset
+                let size =
+                    if offset % 16 = 0 then offset
+                    else offset + 16 - (offset % 16)
+                    
+                GLSLType.Struct(name, newFields, offset), 16, offset
                 
             | GLSLType.DynamicArray(e,_) ->
                 let (e,align,s) = layout e
@@ -587,7 +591,12 @@ module LayoutStd140 =
 
                 { uf with ufOffset = res; ufType = nufType }
             )
-        { ub with ubFields = newFields; ubSize = offset }
+
+        let size =
+            if offset % 16 = 0 then offset
+            else offset + 16 - (offset % 16)
+                    
+        { ub with ubFields = newFields; ubSize = size }
     
     let apply (iface : GLSLProgramInterface) =
         // (a,(b,c))
