@@ -240,7 +240,7 @@ let ``Nested Double Inline``() =
 module Helper =
     let b (h : float) (s : float) (v : float) =
         let s = clamp 0.0 1.0 s
-        let v = clamp 0.0 1.0 v
+        let v = clamp 0.0 uniform?Blubb?MaxValue v
 
         let h = h % 1.0
         let h = if h < 0.0 then h + 1.0 else h
@@ -258,6 +258,7 @@ module Helper =
             | _ -> V3d(v,t,p)
 
     let a (h : float) (s : float) (v : float) =
+        if h < 0.0 then discard()
         b h s v
 
     let hsv2rgb (h : float) (s : float) (v : float)  =
@@ -359,5 +360,5 @@ let ``Ref storage buffer modification``() =
 [<EntryPoint>]
 let main args =
     //``Helper with duplicate names``()
-    ConstantFolding.Hilite()
+    ``Bad Helpers``()
     0

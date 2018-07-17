@@ -239,6 +239,13 @@ module Effect =
         effect.SourceDefintion <- Some (e, inputType)
         effect
 
+
+    type private EffectKey =
+        {
+            inputSemantics : Map<string, InterpolationMode>
+            outputSemantics : Map<string, InterpolationMode>
+            body : Expr
+        }
     /// creates an effect from a shader-function
     let ofFunction (shaderFunction : 'a -> Expr<'b>) =
         let realEx = 
@@ -250,7 +257,40 @@ module Effect =
                     failwithf "[FShade] failed to execute shader function.\nInner cause: %A at\n%A" e e.StackTrace
          
         let expression = Expr.InlineSplices realEx
-        let hash = Expr.ComputeHash expression
+
+        let rec getRecordFields (t : Type) =
+            if FSharpType.IsRecord(t, true) then 
+                FSharpType.GetRecordFields(t, true)
+            elif t.IsGenericType then
+                match t.GetGenericArguments() with
+                    | [| t |] -> getRecordFields t
+                    | _ -> [||]
+            else 
+                [||]
+                //let seq = t.GetInterface(typedefof<seq<_>>.FullName)
+                //if not (isNull seq) then 
+                //    getRecordFields (seq.GetGenericArguments().[0])
+                //else
+                //    let prim = t.GetInterface(typedefof<Primitive<_>>.Name)
+                //    if not (isNull prim) then 
+                //        getRecordFields (prim.GetGenericArguments().[0])
+                //    else
+                //        failwithf "[FShade] bad IO-type %A" t
+
+        let key = 
+            let inputFields = getRecordFields typeof<'a>
+            let outputFields = getRecordFields typeof<'b>
+            
+            {
+                inputSemantics = inputFields |> Seq.map (fun f -> f.Semantic, f.Interpolation) |> Map.ofSeq
+                outputSemantics = outputFields |> Seq.map (fun f -> f.Semantic, f.Interpolation) |> Map.ofSeq
+                body = expression.WithAttributes []
+            }
+         
+        Pickler.ExprPicklerFunctions.Init()
+        let hash = Pickler.pickler.ComputeHash(key).Hash |> Convert.ToBase64String
+
+
         effectCache.GetOrAdd(hash, fun _ ->
             let map =
                 lazy (

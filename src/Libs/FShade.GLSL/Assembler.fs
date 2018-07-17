@@ -36,9 +36,6 @@ type GLSLShader =
         iface       : GLSLProgramInterface
     }
 
-type private GLSLTextureType =
-    | GLSLImage of original : Type * format : Type * dim : SamplerDimension * arr : bool * ms : bool * valueType : Type
-    | GLSLSampler of original : Type * dim : SamplerDimension * shadow : bool * arr : bool * ms : bool * valueType : Type
 
 type Backend private(config : Config) =
     inherit Compiler.Backend()
@@ -81,10 +78,18 @@ type Backend private(config : Config) =
                 let name = 
                     if arr then sprintf "%ssampler%s%sArray%s" typePrefix dimStr msSuffix shadowSuffix
                     else sprintf "%ssampler%s%s%s" typePrefix dimStr msSuffix shadowSuffix 
-
+                    
                 Some {
                     intrinsicTypeName = name
-                    tag = GLSLTextureType.GLSLSampler(t, dim, shadow, arr, ms, valueType)
+                    tag = 
+                        GLSLTextureType.GLSLSampler {
+                            original = t
+                            dimension = dim
+                            isShadow = shadow
+                            isArray = arr
+                            isMS = ms
+                            valueType = GLSLType.ofCType (CType.ofType x valueType)
+                        }
                 }
 
             | ImageType(tFmt, dim, arr, ms, valueType) ->
@@ -113,7 +118,15 @@ type Backend private(config : Config) =
 
                 Some {
                     intrinsicTypeName = name
-                    tag = GLSLTextureType.GLSLImage(t, tFmt, dim, arr, ms, valueType)
+                    tag = 
+                        GLSLTextureType.GLSLImage {
+                            original = t
+                            dimension = dim
+                            format = ImageFormat.ofFormatType tFmt
+                            isArray = arr
+                            isMS = ms
+                            valueType = GLSLType.ofCType (CType.ofType x valueType)
+                        }
                 }
                 
 
@@ -133,12 +146,22 @@ type AssemblerState =
     {
         config                  : Config
         stages                  : ShaderStageDescription
+
         currentDescriptorSet    : int
         currentBinding          : Map<InputKind, int>
         currentInputLocation    : int
         currentOutputLocation   : int
         requiredExtensions      : Set<string>
-        iface                   : GLSLProgramInterface
+        ifaceNew                : GLSLProgramInterface
+        
+        currentFunction         : Option<CFunctionSignature>
+        functionInfo            : hmap<CFunctionSignature, GLSLShaderInterface>
+
+        uniformBuffers          : MapExt<string, GLSLUniformBuffer>
+        samplers                : MapExt<string, GLSLSampler>
+        images                  : MapExt<string, GLSLImage>
+        storageBuffers          : MapExt<string, GLSLStorageBuffer>
+
         textureInfos            : Map<string, list<string * SamplerState>>
     }
 
@@ -153,16 +176,26 @@ module AssemblerState =
             currentInputLocation = 0
             currentOutputLocation = 0
             requiredExtensions = Set.empty
-            iface =
+            ifaceNew =
                 {
                     inputs          = []
                     outputs         = []
-                    samplers        = []
-                    images          = []
-                    storageBuffers  = []
-                    uniformBuffers  = []
-                    usedBuiltIns    = MapExt.empty
+                    samplers        = MapExt.empty
+                    images          = MapExt.empty
+                    storageBuffers  = MapExt.empty
+                    uniformBuffers  = MapExt.empty
+                    shaders         = MapExt.empty
                 }
+                
+            currentFunction = None
+            functionInfo = HMap.empty
+
+            uniformBuffers = MapExt.empty
+            samplers       = MapExt.empty
+            images         = MapExt.empty
+            storageBuffers = MapExt.empty
+
+
             textureInfos = Map.empty
         }
 
@@ -172,22 +205,7 @@ module AssemblerState =
     let prevStage = State.get |> State.map (fun s -> s.stages.prev)
     let nextStage = State.get |> State.map (fun s -> s.stages.next)
     
-    let useBuiltIn (kind : ParameterKind) (name : string) =
-        State.modify (fun s ->
-            let stage = s.stages.self
 
-            let usedBuiltIns = 
-                s.iface.usedBuiltIns |> MapExt.alter stage (fun o ->
-                    let o = o |> Option.defaultValue MapExt.empty
-                    o |> MapExt.alter kind (fun s ->
-                        let s = s |> Option.defaultValue Set.empty
-                        Set.add name s |> Some
-                    )
-                    |> Some
-                )
-
-            { s with iface = { s.iface with usedBuiltIns = usedBuiltIns } }
-        )
 
     let tryGetParameterName (kind : ParameterKind) (name : string) =
         state {
@@ -258,7 +276,6 @@ module AssemblerState =
             | CStruct _ | CIntrinsic _ | CVoid ->
                 failwith "[GLSL] no struct inputs allowed"
 
-
     let newLocation (kind : ParameterKind) (t : CType) =
         State.custom (fun s ->
             match kind with
@@ -272,6 +289,312 @@ module AssemblerState =
                     s, -1
                     
         )
+
+    
+module Interface =
+    let private modify (f : AssemblerState -> GLSLProgramInterface -> GLSLProgramInterface) =
+        State.modify (fun (s : AssemblerState) ->
+            { s with ifaceNew = f s s.ifaceNew }
+        )
+
+    let private emptyShader =
+        {
+            program                 = Unchecked.defaultof<_>
+            shaderStage             = ShaderStage.Compute
+            shaderEntry             = ""
+
+            shaderInputs            = []
+            shaderOutputs           = []
+            shaderSamplers          = HSet.empty
+            shaderImages            = HSet.empty
+            shaderStorageBuffers    = HSet.empty
+            shaderUniformBuffers    = HSet.empty
+            shaderBuiltInFunctions  = HSet.empty
+            shaderDecorations       = []
+            shaderBuiltIns          = MapExt.empty
+        }
+
+    let private updateShaderInterface (action : AssemblerState -> GLSLShaderInterface -> GLSLShaderInterface) =
+        State.modify (fun s ->
+            match s.currentFunction with
+                | Some f ->
+                    let info =
+                        match HMap.tryFind f s.functionInfo with
+                            | Some i -> i
+                            | None -> emptyShader
+                    let newInfo  = action s info
+                    { s with functionInfo = HMap.add f newInfo s.functionInfo }
+                | None ->
+                    { s with
+                        ifaceNew =
+                            { s.ifaceNew with shaders = MapExt.alter s.stages.self (function Some sh -> Some (action s sh) | None -> None) s.ifaceNew.shaders }
+                    }
+
+        )
+
+    let addDecorations (stage : ShaderStage) (dec : list<EntryDecoration>) =
+        let dec = 
+            dec |> List.choose (fun e ->
+                match e with
+                    | EntryDecoration.InputTopology t -> GLSLInputTopology t |> Some
+                    | EntryDecoration.Invocations 1 -> None
+                    | EntryDecoration.Invocations t -> GLSLInvocations t |> Some
+                    | EntryDecoration.LocalSize t -> GLSLLocalSize t |> Some
+                    | EntryDecoration.OutputTopology t -> GLSLOutputTopology t |> Some
+                    | EntryDecoration.OutputVertices t -> GLSLMaxVertices t |> Some
+                    | EntryDecoration.Stages _ -> None
+            )
+
+        let dec =
+            match stage with
+                | ShaderStage.TessEval -> [GLSLSpacing GLSLSpacing.Equal; GLSLWinding GLSLWinding.CCW] @ dec
+                | _ -> dec
+
+        match dec with
+            | [] -> State.value ()
+            | _ -> updateShaderInterface (fun _ s -> { s with shaderDecorations = s.shaderDecorations @ dec })
+
+
+
+    let newShader (entry : string) =
+        modify (fun s iface ->
+            let adjust (o : Option<GLSLShaderInterface>) =
+                match o with
+                    | Some o -> 
+                        Some o
+                    | None ->
+                        match s.stages.self with
+                            | ShaderStage.Fragment ->
+                                Some {
+                                    emptyShader with 
+                                        shaderStage             = ShaderStage.Fragment
+                                        shaderEntry             = entry
+                                        shaderBuiltIns          = MapExt.ofList [ ParameterKind.Input, MapExt.ofList ["gl_Position", GLSLType.Vec(4, GLSLType.Float 32) ] ]
+                                }
+
+                            | stage -> 
+                                Some {
+                                    emptyShader with 
+                                        shaderStage             = stage
+                                        shaderEntry             = entry
+                                }
+
+            { iface with shaders = MapExt.alter s.stages.self adjust iface.shaders }
+
+        )
+
+    let useBuiltIn (kind : ParameterKind) (name : string) (ctype : CType) =
+        modify (fun s iface ->
+            let stage = s.stages.self
+
+            let shaders = 
+                iface.shaders |> MapExt.alter stage (
+                    function 
+                    | Some o ->
+                        Some { 
+                            o with 
+                                shaderBuiltIns =
+                                    o.shaderBuiltIns |> MapExt.alter kind (fun s ->
+                                        let s = s |> Option.defaultValue MapExt.empty
+                                        MapExt.add name (GLSLType.ofCType ctype) s |> Some
+                                    )
+                        }
+                    | None ->
+                        None
+
+                )
+
+            { iface with shaders = shaders }
+        )
+
+    let addInput (location : int) (name : string) (parameter : CEntryParameter) =
+        modify (fun s iface ->
+            
+            let ip =
+                {
+                    paramType           = GLSLType.ofCType parameter.cParamType
+                    paramLocation       = location
+                    paramName           = name
+                    paramSemantic       = parameter.cParamSemantic
+                    paramInterpolation  = parameter.cParamDecorations |> Seq.tryPick (function ParameterDecoration.Interpolation m -> Some m | _ -> None)
+                }
+                
+            let iface = 
+                match s.stages.prev with
+                | None -> { iface with  inputs = iface.inputs @ [ip] }
+                | Some _ -> iface
+
+            { iface with
+                shaders = 
+                    iface.shaders 
+                    |> MapExt.alter s.stages.self (
+                        function 
+                        | Some o -> Some { o with shaderInputs = o.shaderInputs @ [ip] } 
+                        | None -> None
+                    )
+            }
+        )
+
+    let addOutput (location : int) (name : string) (parameter : CEntryParameter) =
+        modify (fun s iface ->
+            
+            let op =
+                {
+                    paramType           = GLSLType.ofCType parameter.cParamType
+                    paramLocation       = location
+                    paramName           = name
+                    paramSemantic       = parameter.cParamSemantic
+                    paramInterpolation  = parameter.cParamDecorations |> Seq.tryPick (function ParameterDecoration.Interpolation m -> Some m | _ -> None)
+                }
+                
+            let iface = 
+                match s.stages.next with
+                | None -> { iface with outputs = iface.outputs @ [op] }
+                | Some _ -> iface
+
+            { iface with
+                shaders = 
+                    iface.shaders 
+                    |> MapExt.alter s.stages.self (
+                        function 
+                        | Some o -> Some { o with shaderOutputs = o.shaderOutputs @ [op] } 
+                        | None -> None
+                    )
+            }
+        )
+
+    let addStorageBuffer (ssb : GLSLStorageBuffer) =
+        State.modify (fun (s : AssemblerState) ->
+            let iface = 
+                { s.ifaceNew with
+                    storageBuffers = MapExt.add ssb.ssbName ssb s.ifaceNew.storageBuffers
+                    shaders = 
+                        s.ifaceNew.shaders 
+                        |> MapExt.alter s.stages.self (
+                            function 
+                            | Some s -> Some { s with shaderStorageBuffers = HSet.add ssb.ssbName s.shaderStorageBuffers } 
+                            | None -> None
+                        )
+                }
+                
+            { s with ifaceNew = iface; storageBuffers = MapExt.add ssb.ssbName ssb s.storageBuffers }
+        )
+ 
+    let addUniformBuffer (ub : GLSLUniformBuffer) =
+        State.modify (fun (s : AssemblerState) ->
+            let iface = 
+                { s.ifaceNew with
+                    uniformBuffers = MapExt.add ub.ubName ub s.ifaceNew.uniformBuffers
+                    shaders = 
+                        s.ifaceNew.shaders 
+                        |> MapExt.alter s.stages.self (
+                            function 
+                            | Some s -> Some { s with shaderUniformBuffers = HSet.add ub.ubName s.shaderUniformBuffers } 
+                            | None -> None
+                        )
+                }
+
+            let buffers = ub.ubFields |> List.map (fun f -> f.ufName, ub) |> MapExt.ofList
+            { s with ifaceNew = iface; uniformBuffers = MapExt.union s.uniformBuffers buffers }
+        )
+    
+    let addSampler (sampler : GLSLSampler) =
+        State.modify (fun (s : AssemblerState) ->
+            let sampler = { sampler with samplerTextures = Map.tryFind sampler.samplerName s.textureInfos |> Option.defaultValue [] }
+            let iface = 
+                { s.ifaceNew with
+                    samplers = MapExt.add sampler.samplerName sampler s.ifaceNew.samplers
+                    shaders = 
+                        s.ifaceNew.shaders 
+                        |> MapExt.alter s.stages.self (
+                            function 
+                            | Some s -> Some { s with shaderSamplers = HSet.add sampler.samplerName s.shaderSamplers } 
+                            | None -> None
+                        )
+                }
+                
+            { s with ifaceNew = iface; samplers = MapExt.add sampler.samplerName sampler s.samplers }
+        )
+ 
+    let addImage (image : GLSLImage) =
+        State.modify (fun (s : AssemblerState) ->
+            let iface = 
+                { s.ifaceNew with
+                    images = MapExt.add image.imageName image s.ifaceNew.images
+                    shaders = 
+                        s.ifaceNew.shaders 
+                        |> MapExt.alter s.stages.self (
+                            function 
+                            | Some s -> Some { s with shaderImages = HSet.add image.imageName s.shaderImages } 
+                            | None -> None
+                        )
+                }
+                
+            { s with ifaceNew = iface; images = MapExt.add image.imageName image s.images }
+        )
+       
+    let newFunction (f : CFunctionSignature) =
+        State.modify (fun s -> { s with currentFunction = Some f })
+        
+    let endFunction =
+        State.modify (fun s -> { s with currentFunction = None })
+
+    let callBuiltIn (name : string) (args : CType[]) (ret : CType) =
+        updateShaderInterface (fun s iface ->
+            let f =
+                {
+                    name = name
+                    args = args |> Array.map GLSLType.ofCType
+                    ret = ret |> GLSLType.ofCType
+                }
+            { iface with shaderBuiltInFunctions = HSet.add f iface.shaderBuiltInFunctions}
+        )
+
+    let callFunction (f : CFunctionSignature) =
+        updateShaderInterface (fun s iface ->
+            match HMap.tryFind f s.functionInfo with
+                | Some info ->
+                    { iface with
+                        shaderUniformBuffers = HSet.union iface.shaderUniformBuffers info.shaderUniformBuffers
+                        shaderStorageBuffers = HSet.union iface.shaderStorageBuffers info.shaderStorageBuffers
+                        shaderSamplers = HSet.union iface.shaderSamplers info.shaderSamplers
+                        shaderImages = HSet.union iface.shaderImages info.shaderImages
+                        shaderBuiltInFunctions = HSet.union iface.shaderBuiltInFunctions info.shaderBuiltInFunctions
+                    }
+                | None ->
+                    iface
+        )
+     
+
+    let useUniform (name : string) =
+        updateShaderInterface (fun s shader ->
+            let uniform = 
+                MapExt.tryFind name s.uniformBuffers 
+                |> Option.map (fun v s -> { s with shaderUniformBuffers = HSet.add v.ubName s.shaderUniformBuffers })
+
+            let storage =
+                MapExt.tryFind name s.storageBuffers 
+                |> Option.map (fun v s -> { s with shaderStorageBuffers = HSet.add v.ssbName s.shaderStorageBuffers })
+
+            let sampler = 
+                MapExt.tryFind name s.samplers 
+                |> Option.map (fun v s -> { s with shaderSamplers = HSet.add v.samplerName s.shaderSamplers })
+
+            let image =
+                MapExt.tryFind name s.images 
+                |> Option.map (fun v s -> { s with shaderImages = HSet.add v.imageName s.shaderImages })
+                
+            let all =
+                [
+                    match uniform with | Some u -> yield u | None -> ()
+                    match storage with | Some u -> yield u | None -> ()
+                    match sampler with | Some u -> yield u | None -> ()
+                    match image with | Some u -> yield u | None -> ()
+                ]
+            all |> List.fold (fun s v -> v s) shader
+        )
+      
+         
 
 module Assembler =
     let version120 = Version(1,2)
@@ -425,12 +748,17 @@ module Assembler =
                     return assembleLiteral v
 
                 | CCall(func, args) ->
+                    do! Interface.callFunction func
                     let name = glslName func.name
                     let! args = args |> assembleExprsS ", "
                     return sprintf "%s(%s)" name.Name args
 
                 | CReadInput(kind, _, name, index) ->
                     let! name = parameterNameS kind name
+                    match kind with
+                        | ParameterKind.Uniform -> do! Interface.useUniform name.Name
+                        | _ -> ()
+
                     match index with
                         | Some index ->
                             let! index = assembleExprS index
@@ -438,8 +766,7 @@ module Assembler =
                         | None ->
                             return name.Name
 
-                | CCallIntrinsic(_, func, args) ->
-
+                | CCallIntrinsic(ret, func, args) ->
                     match func.additional with
                         | null -> ()
                         | :? Set<string> as exts -> do! State.modify (fun s -> { s with requiredExtensions = Set.union s.requiredExtensions exts})
@@ -447,10 +774,18 @@ module Assembler =
 
                     match func.tag with
                         | null ->
+                            do! Interface.callBuiltIn func.intrinsicName (args |> Array.map (fun e -> e.ctype)) ret
                             let! args = args |> assembleExprsS ", "
                             return sprintf "%s(%s)" func.intrinsicName args
 
                         | :? string as format ->
+                            let name =
+                                let i = format.IndexOf("(")
+                                if i >= 0 then format.Substring(0,i)
+                                else format
+
+                            do! Interface.callBuiltIn name (args |> Array.map (fun e -> e.ctype)) ret
+
                             let! args = args |> Array.mapS (assembleExprS >> State.map (fun a -> a :> obj))
                             return 
                                 try String.Format(format, args)
@@ -921,21 +1256,18 @@ module Assembler =
                                         state {
                                             let! binding = AssemblerState.newBinding InputKind.StorageBuffer 1
                                             let prefix = uniformLayout false [] set binding
+                                            
+                                            match ct with
+                                                | CType.CPointer(_,ct) ->
+                                                    do! Interface.addStorageBuffer {
+                                                        ssbSet = set
+                                                        ssbBinding = binding
+                                                        ssbName = name
+                                                        ssbType = GLSLType.ofCType ct
+                                                    }
+                                                | _ ->
+                                                    failwithf "[GLSL] not a storage buffer type: %A" ct
 
-                                            do! State.modify (fun s ->
-                                                match ct with
-                                                    | CType.CPointer(_,ct) -> 
-                                                        let newBuffer =
-                                                            {
-                                                                ssbSet = set
-                                                                ssbBinding = binding
-                                                                ssbName = name
-                                                                ssbType = GLSLType.ofCType ct
-                                                            }
-                                                        { s with iface = { s.iface with storageBuffers = s.iface.storageBuffers @ [newBuffer] } }
-                                                    | _ ->
-                                                        failwithf "[GLSL] not a storage buffer type: %A" ct
-                                            )
 
                                             return sprintf "%sbuffer %sSSB { %s };" prefix name d
                                         }
@@ -950,17 +1282,14 @@ module Assembler =
                                 let fieldStr = fields |> List.map (fun (d,_,_,ct) -> d) |> String.concat "\r\n"
                                 let prefix = uniformLayout true [] set binding
                             
-                                do! State.modify (fun s ->
-                                    let newBuffer =
-                                        {
-                                            ubSet = set
-                                            ubBinding = binding
-                                            ubName = bufferName.Name
-                                            ubFields = fields |> List.map (fun (_,n,_,t) -> { ufName = n; ufType = GLSLType.ofCType t; ufOffset = -1 })
-                                            ubSize = -1
-                                        }
-                                    { s with iface = { s.iface with uniformBuffers = s.iface.uniformBuffers @ [newBuffer] } }
-                                )
+                                do! Interface.addUniformBuffer {
+                                    ubSet = set
+                                    ubBinding = binding
+                                    ubName = bufferName.Name
+                                    ubFields = fields |> List.map (fun (_,n,_,t) -> { ufName = n; ufType = GLSLType.ofCType t; ufOffset = -1 })
+                                    ubSize = -1
+                                }
+                             
 
                                 return sprintf "%suniform %s\r\n{\r\n%s\r\n};\r\n" prefix bufferName.Name (String.indent fieldStr)
 
@@ -981,35 +1310,29 @@ module Assembler =
                                             match textureType with   
                                                 | Some (t, cnt) ->
                                                     match t with
-                                                        | GLSLTextureType.GLSLSampler(o,a,b,c,d,e) -> 
+                                                        | GLSLTextureType.GLSLSampler samplerType -> 
                                                             let! binding = AssemblerState.newBinding InputKind.Sampler cnt
                                                             prefix <- uniformLayout false decorations set binding
 
-                                                            do! State.modify (fun s ->
-                                                                let newSampler =
-                                                                    { 
-                                                                        samplerSet = set
-                                                                        samplerBinding = binding
-                                                                        samplerName = name
-                                                                        samplerCount = cnt
-                                                                        samplerTextures = Map.tryFind name s.textureInfos |> Option.defaultValue []
-                                                                    }
-                                                                { s with iface = { s.iface with samplers = s.iface.samplers @ [newSampler] } }
-                                                            )
-                                                        | GLSLTextureType.GLSLImage(o,a,b,c,d,e) ->
+                                                            do! Interface.addSampler { 
+                                                                samplerSet = set
+                                                                samplerBinding = binding
+                                                                samplerName = name
+                                                                samplerCount = cnt
+                                                                samplerTextures = [] // filled in addSampler
+                                                                samplerType = samplerType
+                                                            }
+                                                           
+                                                        | GLSLTextureType.GLSLImage imageType ->
                                                             let! binding = AssemblerState.newBinding InputKind.Image cnt
                                                             prefix <- uniformLayout false decorations set binding
 
-                                                            do! State.modify (fun s ->
-                                                                let newImage =
-                                                                    { 
-                                                                        imageSet = set
-                                                                        imageBinding = binding
-                                                                        imageName = name
-                                                                    }
-                                                                { s with iface = { s.iface with images = s.iface.images @ [newImage] } }
-                                                            )
-   
+                                                            do! Interface.addImage { 
+                                                                imageSet = set
+                                                                imageBinding = binding
+                                                                imageName = name
+                                                                imageType = imageType
+                                                            }
                                                 | _ ->
                                                     ()
 
@@ -1036,7 +1359,7 @@ module Assembler =
 
             match builtIn with
                 | Some name -> 
-                    do! AssemblerState.useBuiltIn kind name
+                    do! Interface.useBuiltIn kind name p.cParamType
                     return None
 
                 | None ->
@@ -1171,43 +1494,25 @@ module Assembler =
                     
 
                     if isBuffer then
-                        do! State.modify (fun s ->
-                            match p.cParamType with
-                                | CType.CPointer(_,ct) -> 
-                                    let newBuffer =
-                                        {
-                                            ssbSet = bSet
-                                            ssbBinding = bBinding
-                                            ssbName = p.cParamName
-                                            ssbType = GLSLType.ofCType ct
-                                        }
-                                    { s with iface = { s.iface with storageBuffers = s.iface.storageBuffers @ [newBuffer] } }
-                                | _ ->
-                                    failwithf "[GLSL] not a storage buffer type: %A" p.cParamType
-                        )
-
-
-                    if Option.isNone prevStage && kind = ParameterKind.Input then
-                        do! State.modify (fun s ->
-                            let newInput =
-                                {        
-                                    paramType       = GLSLType.ofCType p.cParamType
-                                    paramName       = p.cParamName
-                                    paramLocation   = location
+                        match p.cParamType with
+                            | CType.CPointer(_,ct) -> 
+                                do! Interface.addStorageBuffer {
+                                    ssbSet = bSet
+                                    ssbBinding = bBinding
+                                    ssbName = p.cParamName
+                                    ssbType = GLSLType.ofCType ct
                                 }
-                            { s with iface = { s.iface with inputs = s.iface.inputs @ [newInput] }}
-                        )
+                            | _ ->
+                                failwithf "[GLSL] not a storage buffer type: %A" p.cParamType
+                       
 
-                    if Option.isNone nextStage && kind = ParameterKind.Output then
-                        do! State.modify (fun s ->
-                            let newOutput =
-                                {        
-                                    paramType       = GLSLType.ofCType p.cParamType
-                                    paramName       = p.cParamName
-                                    paramLocation   = location
-                                }
-                            { s with iface = { s.iface with outputs = s.iface.outputs @ [newOutput] }}
-                        )
+
+                    if kind = ParameterKind.Input then
+                        do! Interface.addInput location name.Name p
+
+
+                    if kind = ParameterKind.Output then
+                        do! Interface.addOutput location name.Name p
 
 
                     match p.cParamType with
@@ -1230,6 +1535,9 @@ module Assembler =
                         next = None
                     }
 
+
+            let entryName = checkName e.cEntryName
+
             do! State.modify (fun s ->
                 { s with
                     AssemblerState.stages = stages
@@ -1237,7 +1545,10 @@ module Assembler =
                     AssemblerState.currentOutputLocation = 0
                 }
             )
+            do! Interface.newShader entryName.Name 
+            do! Interface.addDecorations stages.self e.cDecorations
 
+            
             let prefix = 
                 match stages.self with
                     | ShaderStage.Geometry -> 
@@ -1316,8 +1627,7 @@ module Assembler =
             let! args = e.cArguments |> List.chooseS (assembleEntryParameterS ParameterKind.Argument)
             let! body = assembleStatementS false e.cBody
 
-            let entryName = checkName e.cEntryName
-
+            
             return 
                 String.concat "\r\n" [
                     yield! prefix
@@ -1340,8 +1650,10 @@ module Assembler =
                     return! assembleEntryS e
 
                 | CFunctionDef(signature, body) ->
+                    do! Interface.newFunction signature
                     let signature = assembleFunctionSignature signature
                     let! body = assembleStatementS false body
+                    do! Interface.endFunction
                     return sprintf "%s\r\n{\r\n%s\r\n}\r\n" signature (String.indent body)
 
                 | CConstant(t, n, init) ->
@@ -1365,6 +1677,25 @@ module Assembler =
             | CStructDef(name, fields) ->
                 let fields = fields |> List.map (fun (t, n) -> sprintf "%s %s;" (assembleType t).Name (glslName n).Name) |> String.concat "\r\n"
                 sprintf "struct %s\r\n{\r\n%s\r\n};" (glslName name).Name (String.indent fields)
+    
+    module private Reflection =
+        open System.Reflection
+        open Aardvark.Base.IL
+
+        let setShaderParent : GLSLShaderInterface -> GLSLProgramInterface -> unit =
+            let tShader = typeof<GLSLShaderInterface>
+            let fParent = tShader.GetField("program@", System.Reflection.BindingFlags.NonPublic ||| System.Reflection.BindingFlags.Instance)
+            if isNull fParent then
+                failwith "[FShade] internal error: cannot get parent field for GLSLShaderInterface"
+            cil {
+                do! IL.ldarg 0
+                do! IL.ldarg 1
+                do! IL.stfld fParent
+                do! IL.ret
+            }
+
+
+
 
     let assemble (backend : Backend) (m : CModule) =
         
@@ -1412,10 +1743,10 @@ module Assembler =
                 ()
 
         let code = definitions.Run(&state) |> String.concat "\r\n\r\n"
-        {
-            code        = code
-            iface       = 
-                { state.iface with 
-                    uniformBuffers = state.iface.uniformBuffers |> List.map LayoutStd140.applyLayout 
-                }
-        }
+        let iface = LayoutStd140.apply state.ifaceNew
+
+        // unsafely mutate the shader's parent
+        for (_,shader) in MapExt.toSeq iface.shaders do
+            Reflection.setShaderParent shader iface
+        
+        { code = code; iface = iface }

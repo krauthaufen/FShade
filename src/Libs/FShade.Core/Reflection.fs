@@ -256,3 +256,14 @@ module BasicQuotationPatterns =
                     | Some rv -> None
                     | None -> Some lv
             )
+
+    let private bootedLock = obj()
+    let mutable private booted = false
+
+    type Pickler.ExprPicklerFunctions with
+        static member Init() =
+            lock bootedLock (fun () ->
+                if not booted then
+                    Pickler.ExprPicklerFunctions.AddPattern ((|Uniform|_|) >> Option.map (fun v -> v :> obj))
+                    booted <- true
+            )

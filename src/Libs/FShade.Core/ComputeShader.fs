@@ -37,11 +37,8 @@ type ComputeImage =
     }
 
 
-type ComputeShader =
+type internal ComputeShaderData =
     {
-        csId            : string
-        csMethod        : MethodBase
-        csLocalSize     : V3i
         csBuffers       : Map<string, ComputeBuffer>
         csImages        : Map<string, ComputeImage>
         csSamplerStates : Map<string * int, SamplerState>
@@ -50,6 +47,19 @@ type ComputeShader =
         csShared        : Map<string, Type * int>
         csBody          : Expr
     }
+
+type ComputeShader internal(id : string, method : MethodBase, localSize : V3i, data : Lazy<ComputeShaderData>) =
+    
+    member x.csId = id
+    member x.csMethod = method
+    member x.csLocalSize = localSize
+    member x.csBuffers = data.Value.csBuffers
+    member x.csImages = data.Value.csImages
+    member x.csSamplerStates = data.Value.csSamplerStates
+    member x.csTextureNames = data.Value.csTextureNames
+    member x.csUniforms = data.Value.csUniforms
+    member x.csShared = data.Value.csShared
+    member x.csBody = data.Value.csBody
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module ComputeShader =
@@ -118,204 +128,119 @@ module ComputeShader =
                     try Invoker<'a, Expr>.Invoke f |> Some
                     with _ -> None
 
-        let rec preprocessCompute (localSize : V3i) (sizes : Dictionary<string, int>) (e : Expr) =
-            match e with
-                | GetArray(ValueWithName(v, t, name), i) ->
-                    let i = preprocessCompute localSize sizes i
-                    match t with
-                        | ArrOf(_,t) | ArrayOf t ->
-                            Expr.ReadInput(ParameterKind.Input, t, name, i)
-                        | _ ->
-                            e
-
-                | SetArray(ValueWithName(v, t, name), i, e) ->
-                    let i = preprocessCompute localSize sizes i
-                    let e = preprocessCompute localSize sizes e
-                    Expr.WriteOutputsRaw([name, Some i, e])
-
-                | PropertyGet(Some (ValueWithName(v, t, name)), prop, []) when t.IsArray && (prop.Name = "Length" || prop.Name = "LongLength") ->
-                    Expr.ReadInput(ParameterKind.Uniform, typeof<int>, "cs_" + name + "_length")
-                    
-                | ValueWithName(v,t,name) ->
-                    Expr.ReadInput(ParameterKind.Uniform, t, "cs_" + name)
-
-                | PropertyGet(None, pi, []) when pi.Name = "LocalSize" ->
-                    Expr.Value(localSize)
-
-                | FieldGet(None, pi) when pi.Name = "LocalSize" ->
-                    Expr.Value(localSize)
-
-                | Call(None, mi, [size]) when mi.Name = "allocateShared" ->
-                    failwith "[FShade] non-static call to allocateShared"
-
-                | Let(v, Call(None, mi, [size]),b) when mi.Name = "allocateShared" ->
-                    let size = preprocessCompute localSize sizes size
-                    match Expr.TryEval size with
-                        | Some (:? int as size) ->
-                            //sizes.[v.Name] <- size
-
-                            let et = mi.ReturnType.GetElementType()
-                            let t = Peano.getArrayType size et
-
-                            let rep = Expr.ReadInput(ParameterKind.Uniform, t, v.Name)
-                            let rec substitute (e : Expr) =
-                                match e with
-
-                                    | GetArray(Var vv, index) when vv = v ->
-                                        Peano.getItem rep index
-                                        //Expr.ReadInput(ParameterKind.Argument, et, v.Name, index)
-
-                                    | SetArray(Var vv, index, value) when vv = v ->
-                                        Peano.setItem rep index value
-                                        //Expr.WriteOutputs [v.Name, Some index, value]
-                                        //failwith ""
-
-                                    
-
-                                    | ShapeCombination(o, args) -> RebuildShapeCombination(o, List.map substitute args)
-                                    | ShapeLambda(v,b) -> Expr.Lambda(v, substitute b)
-                                    | ShapeVar vv -> 
-                                        if vv = v then failwith "[FShade] cannot use shared memory as value"
-                                        Expr.Var vv
-
-
-                            let b = substitute b
-//                                let e = Expr.ReadInput(ParameterKind.Argument, v.Type, v.Name)
-//                                b.Substitute(fun vi ->
-//                                    if vi = v then Some e
-//                                    else None
-//                                )
-
-                            preprocessCompute localSize sizes b
-
-                        | _ ->
-                            failwith "[FShade] could not evaluate size for allocateShared"
-
-                | ShapeLambda(v, b) ->
-                    Expr.Lambda(v, preprocessCompute localSize sizes b)
-
-                | ShapeVar(v) ->
-                    e
-
-                | ShapeCombination(o, args) ->
-                    RebuildShapeCombination(o, List.map (preprocessCompute localSize sizes) args)
-
-
-        
-
-
-
     let private ofExprInternal (meth : MethodBase) (hash : string) (localSize : V3i) (body0 : Expr) =
-        let body1, state = Preprocessor.preprocess localSize body0
-        let body2 = Optimizer.ConstantFolding.evaluateConstants'' (fun m -> m.DeclaringType.FullName = "FShade.Primitives") body1
-        let body2 = Optimizer.liftInputs body2
+        let data =
+            lazy (
+                let body1, state = Preprocessor.preprocess localSize body0
+                let body2 = Optimizer.ConstantFolding.evaluateConstants'' (fun m -> m.DeclaringType.FullName = "FShade.Primitives") body1
+                let body2 = Optimizer.liftInputs body2
 
-        let mutable buffers = Map.empty
-        let mutable images = Map.empty
-        let mutable uniforms = Map.empty
-        let mutable samplerStates = Map.empty
-        let mutable textureNames = Map.empty
+                let mutable buffers = Map.empty
+                let mutable images = Map.empty
+                let mutable uniforms = Map.empty
+                let mutable samplerStates = Map.empty
+                let mutable textureNames = Map.empty
 
-        let addImage (fmt : Type) (name : string) (t : Type) (dim : SamplerDimension) (isArray : bool) (isMS : bool) (contentType : Type) =
-            match Map.tryFind name images with
-                | Some oi ->
-                    ()
-                | None ->
-                    let img =
-                        {
-                            imageType = t
-                            formatType = fmt
-                            dimension = dim
-                            isArray = isArray
-                            isMS = isMS
-                            contentType = contentType
-                        }
-                    images <- Map.add name img images
+                let addImage (fmt : Type) (name : string) (t : Type) (dim : SamplerDimension) (isArray : bool) (isMS : bool) (contentType : Type) =
+                    match Map.tryFind name images with
+                        | Some oi ->
+                            ()
+                        | None ->
+                            let img =
+                                {
+                                    imageType = t
+                                    formatType = fmt
+                                    dimension = dim
+                                    isArray = isArray
+                                    isMS = isMS
+                                    contentType = contentType
+                                }
+                            images <- Map.add name img images
 
-        let addBuffer (name : string) (arrayType : Type) (read : bool) (write : bool) =
-            match Map.tryFind name buffers with
-                | Some b ->
-                    buffers <- Map.add name { b with ComputeBuffer.read = b.read || read } buffers
-                | None ->
-                    buffers <- Map.add name { ComputeBuffer.contentType = arrayType.GetElementType(); ComputeBuffer.read = read; ComputeBuffer.write = write } buffers
+                let addBuffer (name : string) (arrayType : Type) (read : bool) (write : bool) =
+                    match Map.tryFind name buffers with
+                        | Some b ->
+                            buffers <- Map.add name { b with ComputeBuffer.read = b.read || read } buffers
+                        | None ->
+                            buffers <- Map.add name { ComputeBuffer.contentType = arrayType.GetElementType(); ComputeBuffer.read = read; ComputeBuffer.write = write } buffers
             
-        let setSamplerState (name : string) (index : int) (state : SamplerState) =
-            match Map.tryFind (name, index) samplerStates with
-                | Some _ -> ()
-                | None ->
-                    samplerStates <- Map.add (name, index) state samplerStates
+                let setSamplerState (name : string) (index : int) (state : SamplerState) =
+                    match Map.tryFind (name, index) samplerStates with
+                        | Some _ -> ()
+                        | None ->
+                            samplerStates <- Map.add (name, index) state samplerStates
                     
-        let setTextureName (name : string) (index : int) (textureName : string) =
-            match Map.tryFind (name, index) textureNames with
-                | Some _ -> ()
-                | None ->
-                    textureNames <- Map.add (name, index) textureName textureNames
+                let setTextureName (name : string) (index : int) (textureName : string) =
+                    match Map.tryFind (name, index) textureNames with
+                        | Some _ -> ()
+                        | None ->
+                            textureNames <- Map.add (name, index) textureName textureNames
 
 
-        for (name, p) in Map.toSeq state.inputs do
-            match p.paramType with
-                | ImageType(fmt, dim, isArr, isMS, valueType) ->
-                    addImage fmt name p.paramType dim isArr isMS valueType
-                | t -> 
-                    addBuffer name t true false
+                for (name, p) in Map.toSeq state.inputs do
+                    match p.paramType with
+                        | ImageType(fmt, dim, isArr, isMS, valueType) ->
+                            addImage fmt name p.paramType dim isArr isMS valueType
+                        | t -> 
+                            addBuffer name t true false
 
-        for (name, p) in Map.toSeq state.outputs do
-            addBuffer name p.paramType false true
+                for (name, p) in Map.toSeq state.outputs do
+                    addBuffer name p.paramType false true
 
 
 
-        for (name, p) in Map.toSeq state.uniforms do
-            let isArgument, name = 
-                if name.StartsWith "cs_" then true, name
-                else false, name
+                for (name, p) in Map.toSeq state.uniforms do
+                    let isArgument, name = 
+                        if name.StartsWith "cs_" then true, name
+                        else false, name
 
-            match p.uniformType with
-                | ImageType(fmt, dim, isArr, isMS, valueType) ->
-                    addImage fmt name p.uniformType dim isArr isMS valueType
+                    match p.uniformType with
+                        | ImageType(fmt, dim, isArr, isMS, valueType) ->
+                            addImage fmt name p.uniformType dim isArr isMS valueType
 
-                | SamplerType(dim, isArray, isShadow, isMS, valueType) ->
-                    match p.uniformValue with
-                        | UniformValue.Sampler(texName, state) ->
-                            setSamplerState name 0 state
-                            setTextureName name 0 texName
+                        | SamplerType(dim, isArray, isShadow, isMS, valueType) ->
+                            match p.uniformValue with
+                                | UniformValue.Sampler(texName, state) ->
+                                    setSamplerState name 0 state
+                                    setTextureName name 0 texName
 
-                        | UniformValue.SamplerArray arr ->
-                            for i in 0 .. arr.Length - 1 do
-                                let (texName, state) = arr.[i]
-                                setSamplerState name i state
-                                setTextureName name i texName
+                                | UniformValue.SamplerArray arr ->
+                                    for i in 0 .. arr.Length - 1 do
+                                        let (texName, state) = arr.[i]
+                                        setSamplerState name i state
+                                        setTextureName name i texName
+
+                                | _ ->
+                                    ()
+
+                            uniforms <- Map.add name p uniforms
 
                         | _ ->
-                            ()
-
-                    uniforms <- Map.add name p uniforms
-
-                | _ ->
-                    if isArgument then
-                        uniforms <- Map.add name { p with uniformValue = UniformValue.Attribute(uniform?Arguments, name) } uniforms
-                    else
-                        uniforms <- Map.add name p uniforms
+                            if isArgument then
+                                uniforms <- Map.add name { p with uniformValue = UniformValue.Attribute(uniform?Arguments, name) } uniforms
+                            else
+                                uniforms <- Map.add name p uniforms
             
-            ()
-            
+                    ()
+
+                {
+                    csBuffers       = buffers
+                    csImages        = images
+                    csSamplerStates = samplerStates
+                    csTextureNames  = textureNames
+                    csUniforms      = uniforms
+                    csBody          = body2
+                    csShared        = Map.empty
+                }
+            )
         
 
-        {
-            csId            = hash
-            csMethod        = meth
-            csLocalSize     = localSize
-            csBuffers       = buffers
-            csImages        = images
-            csSamplerStates = samplerStates
-            csTextureNames  = textureNames
-            csUniforms      = uniforms
-            csBody          = body2
-            csShared        = Map.empty
-        }
+        ComputeShader(hash, meth, localSize, data)
 
     let private cache = System.Collections.Concurrent.ConcurrentDictionary<string * V3i, ComputeShader>()
     
     let ofExpr (localSize : V3i) (body : Expr) =
+        Pickler.ExprPicklerFunctions.Init()
         let body = Expr.InlineSplices body
         let hash = Expr.ComputeHash body
         cache.GetOrAdd((hash, localSize), fun (signature, localSize) ->
@@ -329,6 +254,7 @@ module ComputeShader =
     let ofFunction (maxLocalSize : V3i) (f : 'a -> 'b) : ComputeShader =
         match tryExtractExpr f with
             | Some body ->
+                Pickler.ExprPicklerFunctions.Init()
                 let body = Expr.InlineSplices body
                 let hash = Expr.ComputeHash body
 
@@ -358,29 +284,6 @@ module ComputeShader =
                 )
             | None ->
                 failwithf "[FShade] cannot create compute shader using function: %A" f
-//
-//
-//        let signature = FunctionSignature.ofFunction f
-//
-//        cache.GetOrAdd((signature, maxLocalSize), fun (signature, maxLocalSize) ->
-//            let localSize = 
-//                match FunctionSignature.tryGetAttribute<LocalSizeAttribute> signature with
-//                    | Some size -> V3i(size.X, size.Y, size.Z)
-//                    | _ -> V3i(0, 0, 0)
-//
-//            let localSize =
-//                V3i(
-//                    (if localSize.X = MaxLocalSize then maxLocalSize.X else localSize.X),
-//                    (if localSize.Y = MaxLocalSize then maxLocalSize.Y else localSize.Y),
-//                    (if localSize.Z = MaxLocalSize then maxLocalSize.Z else localSize.Z)
-//                )
-//
-//            match tryExtractExpr f with
-//                | Some body ->
-//                    ofExpr localSize body
-//                | _ ->
-//                    failwithf "[FShade] cannot create compute shader using function: %A" f
-//        )
 
     let toEntryPoint (s : ComputeShader) =
         let bufferArguments = 

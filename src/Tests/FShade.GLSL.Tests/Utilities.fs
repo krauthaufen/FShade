@@ -50,7 +50,7 @@ module GLSL =
 
     let compile (e : list<Effect>) =
         let e = Effect.compose e
-
+        Console.WriteLine("COMPILE {0}", e.Id)
         let outputs, lastStage = 
             e.LastShader 
                 |> Option.map (fun s -> (s.shaderOutputs |> Map.map (fun k v -> v.paramType) |> Map.toList), s.shaderStage) 
@@ -82,16 +82,8 @@ module GLSL =
         Console.WriteLine(glsl.code)
         Console.WriteLine("====================== CODE ======================")
         
-        let inOut = glsl.iface.usedBuiltIns
-        
         Console.WriteLine("======================= IO =======================")
-        for (stage, inOut) in MapExt.toSeq inOut do
-            Console.WriteLine("{0}", stage)
-            for (kind, set) in MapExt.toSeq inOut do
-                Console.WriteLine("  {0}", kind)
-                for s in set do
-                    Console.WriteLine("    {0}", s)
-                    
+        GLSLProgramInterface.print glsl.iface
         Console.WriteLine("======================= IO =======================")
 
         
