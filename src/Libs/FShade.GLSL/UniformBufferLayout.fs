@@ -560,7 +560,7 @@ module LayoutStd140 =
                     if offset % 16 = 0 then offset
                     else offset + 16 - (offset % 16)
                     
-                GLSLType.Struct(name, newFields, offset), 16, offset
+                GLSLType.Struct(name, newFields, offset), 16, size
                 
             | GLSLType.DynamicArray(e,_) ->
                 let (e,align,s) = layout e
