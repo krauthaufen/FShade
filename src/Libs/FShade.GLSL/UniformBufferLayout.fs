@@ -492,11 +492,62 @@ module GLSLType =
 
 
 module LayoutStd140 =
-    
+    // https://www.khronos.org/registry/OpenGL/extensions/ARB/ARB_uniform_buffer_object.txt
+    //
+    //(1) If the member is a scalar consuming <N> basic machine units, the
+    //    base alignment is <N>.
+    //
+    //(2) If the member is a two- or four-component vector with components
+    //    consuming <N> basic machine units, the base alignment is 2<N> or
+    //    4<N>, respectively.
+    //
+    //(3) If the member is a three-component vector with components consuming
+    //    <N> basic machine units, the base alignment is 4<N>.
+    //
+    //(4) If the member is an array of scalars or vectors, the base alignment
+    //    and array stride are set to match the base alignment of a single
+    //    array element, according to rules (1), (2), and (3), and rounded up
+    //    to the base alignment of a vec4. The array may have padding at the
+    //    end; the base offset of the member following the array is rounded up
+    //    to the next multiple of the base alignment.
+    //
+    //(5) If the member is a column-major matrix with <C> columns and <R>
+    //    rows, the matrix is stored identically to an array of <C> column
+    //    vectors with <R> components each, according to rule (4).
+    //
+    //(6) If the member is an array of <S> column-major matrices with <C>
+    //    columns and <R> rows, the matrix is stored identically to a row of
+    //    <S>*<C> column vectors with <R> components each, according to rule
+    //    (4).
+    //
+    //(7) If the member is a row-major matrix with <C> columns and <R> rows,
+    //    the matrix is stored identically to an array of <R> row vectors
+    //    with <C> components each, according to rule (4).
+    //
+    //(8) If the member is an array of <S> row-major matrices with <C> columns
+    //    and <R> rows, the matrix is stored identically to a row of <S>*<R>
+    //    row vectors with <C> components each, according to rule (4).
+    //
+    //(9) If the member is a structure, the base alignment of the structure is
+    //    <N>, where <N> is the largest base alignment value of any of its
+    //    members, and rounded up to the base alignment of a vec4. The
+    //    individual members of this sub-structure are then assigned offsets 
+    //    by applying this set of rules recursively, where the base offset of
+    //    the first member of the sub-structure is equal to the aligned offset
+    //    of the structure. The structure may have padding at the end; the 
+    //    base offset of the member following the sub-structure is rounded up
+    //    to the next multiple of the base alignment of the structure.
+    //
+    //(10) If the member is an array of <S> structures, the <S> elements of
+    //     the array are laid out in order, according to rule (9).
+    let private next (a : int) (v : int) =
+        if v % a = 0 then v
+        else v + (a - (v % a))
+
     let rec layout (t : GLSLType) =
         match t with
             | GLSLType.Void ->
-                t, 0, 0
+                t, 1, 0
 
             | GLSLType.Bool ->
                 t, 4, 4
@@ -523,11 +574,10 @@ module LayoutStd140 =
             | GLSLType.Array(len, bt, _) ->
                 let bt, a, s = layout bt
 
-                let s =
-                    if s % 16 = 0 then s
-                    else s + 16 - (s % 16)
-                    
-                GLSLType.Array(len, bt, s), 16, len * s
+                let s = next 16 s
+                let a = next 16 a
+
+                GLSLType.Array(len, bt, s), a, len * s
 
             | GLSLType.Mat(rows, cols, bt) ->
                 let narr, a, s = layout (GLSLType.Array(cols, GLSLType.Vec(rows, bt), -1))
@@ -539,7 +589,7 @@ module LayoutStd140 =
 
             | GLSLType.Struct(name, fields, _) ->
                 let mutable offset = 0
-                //let mutable largestAlign = 0
+                let mutable largestAlign = 0
 
                 let newFields =
                     fields |> List.map (fun (name, typ,_) ->
@@ -548,7 +598,7 @@ module LayoutStd140 =
                         if offset % align <> 0 then
                             offset <- offset + (align - offset % align)
 
-                        //largestAlign <- max largestAlign align
+                        largestAlign <- max largestAlign align
                         let res = name, typ, offset
                         offset <- offset + size
 
@@ -556,19 +606,16 @@ module LayoutStd140 =
 
                     )
 
-                let size =
-                    if offset % 16 = 0 then offset
-                    else offset + 16 - (offset % 16)
-                    
-                GLSLType.Struct(name, newFields, offset), 16, size
+                let align = next 16 largestAlign
+                let size = next 16 offset
+
+                GLSLType.Struct(name, newFields, offset), align, size
                 
             | GLSLType.DynamicArray(e,_) ->
                 let (e,align,s) = layout e
-                let s =
-                    if s % 16 = 0 then s
-                    else s + 16 - (s % 16)
+                let align = next 16 align
 
-                GLSLType.DynamicArray(e, s), 16, 0
+                GLSLType.DynamicArray(e, s), align, 0
 
             | GLSLType.Image i ->
                 GLSLType.Image i, 1, 0
