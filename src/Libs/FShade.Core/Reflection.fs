@@ -260,10 +260,15 @@ module BasicQuotationPatterns =
     let private bootedLock = obj()
     let mutable private booted = false
 
+    let private hashPattern (e : Expr) =
+        match e with
+            | Uniform u -> Some (u :> obj)
+            | _ -> None
+
     type Pickler.ExprPicklerFunctions with
         static member Init() =
             lock bootedLock (fun () ->
                 if not booted then
-                    Pickler.ExprPicklerFunctions.AddPattern ((|Uniform|_|) >> Option.map (fun v -> v :> obj))
+                    Pickler.ExprPicklerFunctions.AddPattern hashPattern
                     booted <- true
             )

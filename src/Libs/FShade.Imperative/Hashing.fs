@@ -181,12 +181,25 @@ module ExprHashExtensions =
                 let varPickler = r.Resolve<Var>()
                 let infoPickler = r.Resolve<obj>()
                 let intrinsicPickler = r.Resolve<list<CIntrinsic>>()
-
+                
+                let rec (|ExprValue|_|) (e : Expr) =
+                    match e with
+                        | Coerce(ExprValue v, _) -> Some v
+                        | Value((:? Expr as v),_) -> Some v
+                        | _ -> None
                 Pickler.fix (fun self ->
                     let selfList = Pickler.list self
 
                     let rec writer (ws : WriteState) (e : Expr) =
                         match Reflection.withAttributes e [] with    
+
+                            | Call(None, mi, [ExprValue v]) when mi.Name = "op_Splice" || mi.Name = "op_SpliceUntyped" ->
+                                if v.Type = e.Type then
+                                    Pickler.string.Write ws "Kind" "Splice"
+                                    self.Write ws "Expr" v
+                                else
+                                    Pickler.string.Write ws "Kind" "Splice"
+                                    self.Write ws "Expr" (Expr.Coerce(v, e.Type))
 
                             | IntrinsicCall(atts, args) when ws.IsHashComputation ->
                                 Pickler.string.Write ws "Kind" "IntrinsicCall"
