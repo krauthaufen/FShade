@@ -11,6 +11,8 @@
     <OutputPath>..\..\..\bin\Release\</OutputPath>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Reflector.fs" />
+    <Compile Include="Layout.fs" />
     <Compile Include="Utilities.fs" />
     <Compile Include="ConstantFolding.fs" />
     <Compile Include="SimpleTests.fs" />
@@ -19,6 +21,7 @@
     <ProjectReference Include="..\..\Libs\FShade.Core\FShade.Core.fsproj" />
     <ProjectReference Include="..\..\Libs\FShade.GLSL\FShade.GLSL.fsproj" />
     <ProjectReference Include="..\..\Libs\FShade.Imperative\FShade.Imperative.fsproj" />
+    <ProjectReference Include="..\..\Libs\FShade.SpirV\FShade.SpirV.fsproj" />
   </ItemGroup>
   <Import Project="..\..\..\.paket\Paket.Restore.targets" />
 </Project>

@@ -360,5 +360,7 @@ let ``Ref storage buffer modification``() =
 [<EntryPoint>]
 let main args =
     //``Helper with duplicate names``()
-    ``Bad Helpers``()
+    //``Bad Helpers``()
+
+    Layout.randomHate()
     0

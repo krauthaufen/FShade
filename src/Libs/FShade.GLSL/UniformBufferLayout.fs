@@ -565,7 +565,7 @@ module LayoutStd140 =
 
             | GLSLType.Vec(3, bt) ->
                 let bt, a, s = layout bt
-                GLSLType.Vec(3, bt), 4 * a, 4 * s
+                GLSLType.Vec(3, bt), 4 * a, 3 * s
                 
             | GLSLType.Vec(d, bt) ->
                 let bt, a, s = layout bt
@@ -638,10 +638,8 @@ module LayoutStd140 =
 
                 { uf with ufOffset = res; ufType = nufType }
             )
-
-        let size =
-            if offset % 16 = 0 then offset
-            else offset + 16 - (offset % 16)
+            
+        let size = next 16 offset
                     
         { ub with ubFields = newFields; ubSize = size }
     
