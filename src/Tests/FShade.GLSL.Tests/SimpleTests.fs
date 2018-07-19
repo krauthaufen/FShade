@@ -357,10 +357,49 @@ let ``Ref storage buffer modification``() =
     
 
 
+            
+type Shader private () =
+
+    static member Sampler =
+        sampler2d {
+            texture uniform?texture
+            filter Filter.MinMagMipLinear
+            addressU WrapMode.Wrap
+            addressV WrapMode.Wrap
+        }
+           
+    [<LocalSize(X = 8, Y = 8)>]
+    static member shader (v : V4d[]) =
+        compute {
+            let id = getGlobalId().XY
+            let a =  Shader.Sampler.Sample(V2d id)
+            v.[id.X] <- a
+        }
+
+[<Fact>]
+let ``[Compute] includes samplerInfo``() =
+    let shader = ComputeShader.ofFunction (V3i(128,128,128)) Shader.shader
+
+    let glsl = 
+        ComputeShader.toModule shader
+            |> ModuleCompiler.compileGLSLVulkan
+    
+    let sammy = 
+        glsl.iface.samplers.["Sampler"].samplerTextures
+
+    let state =
+        samplerState {
+            filter Filter.MinMagMipLinear
+            addressU WrapMode.Wrap
+            addressV WrapMode.Wrap
+        }
+
+    sammy |> FsUnit.Xunit.should FsUnit.Xunit.equal ["texture", state ]
+
+
 [<EntryPoint>]
 let main args =
     //``Helper with duplicate names``()
     //``Bad Helpers``()
-
-    Layout.randomHate()
+    ``[Compute] includes samplerInfo``()
     0
