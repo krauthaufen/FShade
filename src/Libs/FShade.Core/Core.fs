@@ -5,7 +5,7 @@ open Aardvark.Base
 open MBrace.FsPickler.Combinators
 open MBrace.FsPickler
 
-
+[<CustomPickler>]
 type UniformScope private(parent : Option<UniformScope>, name : string) = 
     static let mutable currentId = 0
 

@@ -4,5 +4,5 @@ open System
 
 [<EntryPoint>]
 let main argv =
-    Optimizer.``[Hoist] inline function``()
+    Hashes.``[ComputeHashing] including localSize``()
     0 // return an integer exit code

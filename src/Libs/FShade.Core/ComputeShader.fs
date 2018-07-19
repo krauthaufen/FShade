@@ -255,21 +255,24 @@ module ComputeShader =
         match tryExtractExpr f with
             | Some body ->
                 Pickler.ExprPicklerFunctions.Init()
-                let body = Expr.InlineSplices body
-                let hash = Expr.ComputeHash body
 
-                cache.GetOrAdd((hash, maxLocalSize), fun (signature, maxLocalSize) ->
-                    let localSize, meth =
-                        match body.Method with
-                            | Some mb -> 
-                                match mb.GetCustomAttributes<LocalSizeAttribute>() |> Seq.tryHead with
-                                    | Some att -> V3i(att.X, att.Y, att.Z), mb
-                                    | _ -> 
-                                        Log.warn "[FShade] compute shader without local-size"
-                                        V3i(1,1,1), mb
-                            | None ->
-                                Log.warn "[FShade] compute shader without local-size"
-                                V3i(1,1,1), null
+                let localSize, meth =
+                    match body.Method with
+                        | Some mb -> 
+                            match mb.GetCustomAttributes<LocalSizeAttribute>() |> Seq.tryHead with
+                                | Some att -> V3i(att.X, att.Y, att.Z), mb
+                                | _ -> 
+                                    Log.warn "[FShade] compute shader without local-size"
+                                    V3i(1,1,1), mb
+                        | None ->
+                            Log.warn "[FShade] compute shader without local-size"
+                            V3i(1,1,1), null
+
+                let hash = Pickler.pickler.ComputeHash ((body, localSize))
+                let hash = hash.Hash |> System.Convert.ToBase64String
+
+                cache.GetOrAdd((hash, localSize), fun (signature, localSize) ->
+                    let body = Expr.InlineSplices body
 
                     let localSize =
                         V3i(
@@ -279,8 +282,6 @@ module ComputeShader =
                         )
 
                     ofExprInternal meth hash localSize body
-
-
                 )
             | None ->
                 failwithf "[FShade] cannot create compute shader using function: %A" f

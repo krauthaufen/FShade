@@ -78,6 +78,13 @@ type Shader5 private() =
             return heinz v.tc
         }
 
+type Shader6 private () =
+
+    static member shader (v : Vertex) =
+        fragment {
+            let a : V4d = uniform?Blubber?Value
+            return a
+        }
 [<Fact>]
 let ``[Hashing] includes SamplerState``() =
 
@@ -110,3 +117,77 @@ let ``[Hashing] intrinsic hashes on target-function``() =
     let e2 = Effect.ofFunction Shader5.shader
 
     e1.Id |> should equal e2.Id
+
+
+[<Fact>]
+let ``[Hashing] deterministic uniforms``() =
+    let subScopes = [ "Bla"; "Blurg"; "Blubber" ].RandomOrder() |> Seq.toList
+    for s in subScopes do uniform.GetChildScope s |> ignore
+
+    let e1 = Effect.ofFunction Shader6.shader
+
+    e1.Id |> should equal "HTmhloBs1N68MNhFFtrSpQ=="
+    
+
+[<Fact>]
+let ``[ComputeHashing] equal => equal hash``() =
+    let s = V3i(128,128,128)
+    let a (dst : int[]) (src : int[]) =
+        compute {
+            let id = getGlobalId().X
+            dst.[id] <- src.[id] * 2
+        }
+
+    let b (dst : int[]) (src : int[]) =
+        compute {
+            let id = getGlobalId().X
+            dst.[id] <- src.[id] * 2
+        }
+    let sa = ComputeShader.ofFunction s a
+    let sb = ComputeShader.ofFunction s b
+
+    sa.csId |> should equal sb.csId
+    
+[<Fact>]
+let ``[ComputeHashing] different => different hash``() =
+    let s = V3i(128,128,128)
+    let a (dst : int[]) (src : int[]) =
+        compute {
+            let id = getGlobalId().X
+            let v : int = uniform?Bla
+            dst.[id] <- src.[id] * v
+        }
+
+    let b (dst : int[]) (src : int[]) =
+        compute {
+            let id = getGlobalId().X
+            let v : int = uniform?Bla
+            dst.[id] <- src.[id] * 3
+        }
+    let sa = ComputeShader.ofFunction s a
+    let sb = ComputeShader.ofFunction s b
+
+    sa.csId |> should not' (equal sb.csId)
+
+[<LocalSize(X = 16)>]
+let a (dst : int[]) (src : int[]) =
+    compute {
+        let id = getGlobalId().X
+        let v : int = uniform?Bla
+        dst.[id] <- src.[id] * v
+    }
+    
+[<LocalSize(X = 32)>]
+let b (dst : int[]) (src : int[]) =
+    compute {
+        let id = getGlobalId().X
+        let v : int = uniform?Bla
+        dst.[id] <- src.[id] * v
+    }
+[<Fact>]
+let ``[ComputeHashing] including localSize``() =
+    let s = V3i(128,128,128)
+    let sa = ComputeShader.ofFunction s a
+    let sb = ComputeShader.ofFunction s b
+
+    sa.csId |> should not' (equal sb.csId)
