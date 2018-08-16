@@ -380,3 +380,25 @@ module SplicingExtensions =
 
         member x.InlineSplices() =
             inlineSplices x
+
+
+type SamplerFunctionAttribute() = inherit Attribute()
+
+//module SamplerHelpers = 
+//    type SamplerParamSemantic =
+//        | Coord
+//        | Level
+//        | Offset
+//        | Sample
+//        | Slice
+//        | Composed of list<SamplerParamSemantic>
+
+//    type ParamSemanticAttribute(sem : SamplerParamSemantic) =
+//        inherit Attribute()
+//        member x.Semantic = sem
+
+//    type CoordAttribute() = inherit ParamSemanticAttribute(Coord)
+//    type LevelAttribute() = inherit ParamSemanticAttribute(Level)
+//    type OffsetAttribute() = inherit ParamSemanticAttribute(Offset)
+//    type SampleAttribute() = inherit ParamSemanticAttribute(Sample)
+//    type SliceAttribute() = inherit ParamSemanticAttribute(Slice)

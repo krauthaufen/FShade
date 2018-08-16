@@ -361,7 +361,7 @@ let ``Ref storage buffer modification``() =
 type Shader private () =
 
     static member Sampler =
-        sampler2d {
+        sampler3d {
             texture uniform?texture
             filter Filter.MinMagMipLinear
             addressU WrapMode.Wrap
@@ -371,8 +371,8 @@ type Shader private () =
     [<LocalSize(X = 8, Y = 8)>]
     static member shader (v : V4d[]) =
         compute {
-            let id = getGlobalId().XY
-            let a =  Shader.Sampler.[2 * id + V2i.IO]
+            let id = getGlobalId().XYZ
+            let a =  Shader.Sampler.[2 * id + V3i.IOO, 1]
             v.[id.X] <- a
         }
 

@@ -1,8 +1,9 @@
-﻿#r @"..\..\..\Bin\Debug\Aardvark.Base.dll"
-#r @"..\..\..\Bin\Debug\Aardvark.Base.TypeProviders.dll"
-#r @"..\..\..\Bin\Debug\Aardvark.Base.FSharp.dll"
-#r @"..\..\..\Bin\Debug\FShade.Imperative.dll"
-#r @"..\..\..\Bin\Debug\FShade.Core.dll"
+﻿#r "netstandard.dll"
+#r @"..\..\..\packages\Aardvark.Base\lib\netstandard2.0\Aardvark.Base.dll"
+#r @"..\..\..\packages\Aardvark.Base.TypeProviders\lib\netstandard2.0\Aardvark.Base.TypeProviders.dll"
+#r @"..\..\..\packages\Aardvark.Base.FSharp\lib\netstandard2.0\Aardvark.Base.FSharp.dll"
+#r @"..\..\..\Bin\Debug\netcoreapp2.0\FShade.Imperative.dll"
+#r @"..\..\..\Bin\Debug\netcoreapp2.0\FShade.Core.dll"
 
 open System
 open System.IO
@@ -70,11 +71,13 @@ type SampleVariants =
 let samplerFunction (comment : string) (variants : SampleVariants) (name : string) (args : list<string * string>) (ret : string) =
     let args = args |> List.map (fun (n,t) -> sprintf "%s : %s" n t) |> String.concat ", "
     line "/// %s" comment
+    line "[<SamplerFunction>]"
     line "member x.%s(%s) : %s = onlyInShaderCode \"%s\"" name args ret name
     line ""
 
     if (variants &&& SampleVariants.Bias) <> SampleVariants.None then
         line "/// %s with lod-bias" comment
+        line "[<SamplerFunction>]"
         line "member x.%s(%s, lodBias : float) : %s = onlyInShaderCode \"%s\"" name args ret name
         line ""
 
@@ -173,14 +176,17 @@ let run() =
 
 
         line  "/// the mipmap-levels for the sampler"
+        line "[<SamplerFunction>]"
         line  "member x.MipMapLevels : int = onlyInShaderCode \"MipMapLevels\""
         line  ""
 
         line  "/// the size for the sampler"
+        line "[<SamplerFunction>]"
         line  "member x.GetSize (level : int) : %s = onlyInShaderCode \"GetSize\"" sizeType
         line  ""
 
         line  "/// the size for the sampler"
+        line "[<SamplerFunction>]"
         line  "member x.Size : %s = onlyInShaderCode \"Size\"" sizeType
         line  ""
 
@@ -289,10 +295,10 @@ let run() =
 
             if not s && not a && not m then
                 line "member x.Item"
-                line "    with get (coord : %s) : %s = onlyInShaderCode \"Fetch\"" texelCoordType returnType 
+                line "    with [<SamplerFunction>] get (coord : %s) : %s = onlyInShaderCode \"Fetch\"" texelCoordType returnType 
                 line ""
                 line "member x.Item"
-                line "    with get(coord : %s, level : int) : %s = onlyInShaderCode \"Fetch\"" texelCoordType returnType 
+                line "    with [<SamplerFunction>] get(coord : %s, level : int) : %s = onlyInShaderCode \"Fetch\"" texelCoordType returnType 
                 
 //                if coordComponents > 1 then
 //                    let argNames = ["cx"; "cy"; "cz"; "cw"]
@@ -422,21 +428,29 @@ let run() =
             ]
 
         let itemArgs = args |> List.map (fun (n,t) -> sprintf "%s : %s" n t) |> String.concat ", "
-
+        
         start "member x.Item"
-        line "with get(%s) : %s = onlyInShaderCode \"fetch\"" itemArgs returnType
-        line "and set(%s) (v : %s) : unit = onlyInShaderCode \"write\"" itemArgs returnType
+        line "with [<SamplerFunction>] get(%s) : %s = onlyInShaderCode \"fetch\"" itemArgs returnType
+        line "and [<SamplerFunction>] set(%s) (v : %s) : unit = onlyInShaderCode \"write\"" itemArgs returnType
         stop()
 
 
         if t = SamplerType.Int then
+            line "[<SamplerFunction>]"
             line "member x.AtomicAdd(%s, data : int) : int = onlyInShaderCode \"AtomicAdd\"" itemArgs
+            line "[<SamplerFunction>]"
             line "member x.AtomicMin(%s, data : int) : int = onlyInShaderCode \"AtomicMin\"" itemArgs
+            line "[<SamplerFunction>]"
             line "member x.AtomicMax(%s, data : int) : int = onlyInShaderCode \"AtomicMax\"" itemArgs
+            line "[<SamplerFunction>]"
             line "member x.AtomicAnd(%s, data : int) : int = onlyInShaderCode \"AtomicAnd\"" itemArgs
+            line "[<SamplerFunction>]"
             line "member x.AtomicOr(%s, data : int) : int = onlyInShaderCode \"AtomicOr\"" itemArgs
+            line "[<SamplerFunction>]"
             line "member x.AtomicXor(%s, data : int) : int = onlyInShaderCode \"AtomicXor\"" itemArgs
+            line "[<SamplerFunction>]"
             line "member x.AtomicExchange(%s, data : int) : int = onlyInShaderCode \"AtomicExchange\"" itemArgs
+            line "[<SamplerFunction>]"
             line "member x.AtomicCompareExchange(%s, cmp : int, data : int) : int = onlyInShaderCode \"AtomicCompareExchange\"" itemArgs
 
 

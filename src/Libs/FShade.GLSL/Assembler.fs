@@ -52,8 +52,9 @@ type Backend private(config : Config) =
     override x.TryGetIntrinsicMethod (c : MethodInfo) =
         match c with
             | IntrinsicFunction f -> Some f
-            | TextureLookupNew config.flipVCoordinate ci -> Some { tag = c; intrinsicName = null; additional = null; arguments = None }
+            | SamplerFunction -> Some { tag = c; intrinsicName = null; additional = null; arguments = None }
             | _ -> c.Intrinsic<GLSLIntrinsicAttribute>()
+                    
 
     override x.TryGetIntrinsicCtor (c : ConstructorInfo) =
         None
@@ -761,7 +762,7 @@ module Assembler =
                     let arg = CVar { name = "coord"; ctype = coordType }
                     let typeName = assembleType coordType
                     let signature =
-                        { name = sprintf "fixup%s" typeName.Name; parameters = [|{ name = "coord"; ctype = coordType; modifier = CParameterModifier.In }|]; returnType = coordType}
+                        { name = sprintf "yflip%s" typeName.Name; parameters = [|{ name = "coord"; ctype = coordType; modifier = CParameterModifier.In }|]; returnType = coordType}
                 
                     let signature, components =
                         match et with
@@ -776,7 +777,7 @@ module Assembler =
                                 )
 
                             | CInt _ ->
-                                { signature with name = signature.name + "I"; parameters = Array.append signature.parameters [| { name = "size"; ctype = sizeType; modifier = CParameterModifier.In }|] },
+                                { signature with name = sprintf "%s_%d" signature.name dim; parameters = Array.append signature.parameters [| { name = "size"; ctype = sizeType; modifier = CParameterModifier.In }|] },
                                 List.init d (fun i ->
                                     let comp = CVecSwizzle(et, arg, [unbox i])
                                     if i = 1 then
@@ -798,11 +799,37 @@ module Assembler =
                 | _ ->
                     None
 
+        let invertCoordCode (coordType : CType) =
+            match coordType with
+            | CVector(et,d) ->
+                let typeName = assembleType coordType
+                let signature =
+                    { name = sprintf "yinv%s" typeName.Name; parameters = [|{ name = "d"; ctype = coordType; modifier = CParameterModifier.In }|]; returnType = coordType}
+                
+                let arg = CVar { name = "d"; ctype = coordType }
+                let components = 
+                    List.init d (fun i ->
+                        let comp = CVecSwizzle(et, arg, [unbox i])
+                        if i = 1 then
+                            CNeg(et, comp)
+                        else
+                            comp
+                    )
+                    
+
+                let body =
+                    CReturnValue (CNewVector(coordType, d, components))
+
+                Some (signature, body)
+            | _ ->
+                None
+            
+
         let flipYCoord (isMS : bool) (coordComponents : int) (pars : list<ParameterInfo>) (values : list<CExpr>) =
             let args = List.zip pars values 
             List.indexed args |> List.mapS (fun (ai, (p, v)) -> 
                 state {
-                    if coordComponents = 2 then
+                    if coordComponents >= 2 then
                         if p.Name = "coord" || p.Name = "offset" then
                             let et, dim = match v.ctype with | CVector(t, d) -> t, d | t -> t, 1
                     
@@ -841,70 +868,34 @@ module Assembler =
 
                                 | None ->
                                     return v
-
-                            //match et with
-                            //    | CFloat _ ->
-                            //        let one = CValue(et, CLiteral.CFractional 1.0)
-                            //        return CExpr.CNewVector(v.ctype, dim, [
-                            //            yield CVecSwizzle(et, v, [CVecComponent.X]) 
-                            //            yield CSub(et, one, CVecSwizzle(et, v, [CVecComponent.Y]))
-                            //            for d in 2 .. dim - 1 do
-                            //                yield CVecSwizzle(et, v, [unbox<CVecComponent> d])
-                            //        ])
-                            //    | CInt _ ->
-                            //        let self = 
-                            //            args |> List.head |> snd
-                                            
-                            //        let level = 
-                            //            args |> List.tryPick (fun (p,v) -> if p.Name = "level" then Some v else None) |> Option.defaultValue (CValue(CType.CInt(true, 32), CLiteral.CIntegral 0L))
-
-                            //        let size = 
-                            //            let getSize = 
-                            //                if isMS then
-                            //                    { 
-                            //                        intrinsicName = null
-                            //                        tag = "textureSize({0})"
-                            //                        arguments = None
-                            //                        additional = null
-                            //                    }
-                            //                else
-                            //                    { 
-                            //                        intrinsicName = null
-                            //                        tag = "textureSize({0}, {1})"
-                            //                        arguments = None
-                            //                        additional = null
-                            //                    }
-                            //            CCallIntrinsic(CVector(CInt(true, 32), 2), getSize, [| self; level |])
-
-                            //        let height =
-                            //            CVecSwizzle(et, size, [CVecComponent.Y])
-                                                
-                            //        let one =
-                            //            CValue(et, CIntegral 1L)
-
-                            //        return CExpr.CNewVector(v.ctype, dim, [
-                            //            yield CVecSwizzle(et, v, [CVecComponent.X]) 
-                            //            yield CSub(et, CSub(et, height, one), CVecSwizzle(et, v, [CVecComponent.Y]))
-                            //            for d in 2 .. dim - 1 do
-                            //                yield CVecSwizzle(et, v, [unbox<CVecComponent> d])
-                            //        ])
-                                | _ ->
-                                    return v
                                     
                         elif p.Name = "dTdx" || p.Name = "dTdy" then
-                            let et = match v.ctype with | CVector(t, d) -> t | _ -> failwith "not a vector"
-                                        
-                            return CExpr.CNewVector(v.ctype, 2, [
-                                CVecSwizzle(et, v, [CVecComponent.X]) 
-                                CNeg(et, CVecSwizzle(et, v, [CVecComponent.Y]))
-                            ])
+                            let et, dim = match v.ctype with | CVector(t, d) -> t, d | t -> t, 1
+                                
+                            match invertCoordCode v.ctype with
+                                | Some (s,b) ->
+                                    do! Interface.useHelper s b
+                                    return CCall(s, [|v|])
+
+                                | None ->
+                                    return v
+                                    
+                            //let neg =
+                            //    CNewVector(
+                            //        v.ctype,
+                            //        dim,
+                            //        List.init dim (fun i -> if i = 1 then CValue(et, CFractional -1.0) else CValue(et, CFractional 1.0))
+                            //    )
+
+                            //return CExpr.CMul(v.ctype, v, neg)
                         else
                             return v
                     else
                         return v
                 }
             )
-            
+
+
         let assembleTextureLookup (assembleExpr : CExpr -> State<AssemblerState, string>) (mi : MethodInfo) (args : list<CExpr>) =
             state {
                 let! cfg = AssemblerState.config
@@ -917,14 +908,36 @@ module Assembler =
                         let mapping = 
                             List.zip pars args
                                 |> List.map (fun (p,v) -> p.Name, v)
-                                |> Map.ofList
+                                |> MapExt.ofList
                                 
                         let functionName, argumentNames =
                             match name with
-                                | "get_Size" -> "imageSize", ["this"]
-                                | "get_Item" -> "imageLoad", ["this"; "coord"; "sample"]
-                                | "AtomicCompareExchange" -> "imageAtomicCompSwap", ["this"; "coord"; "sample"; "cmp"; "data"]
-                                | "AtomicAdd" -> "imageAtomicAdd", ["this"; "coord"; "sample"; "data"]
+                                | "get_Size" -> 
+                                    "imageSize", ["this"]
+
+                                | "get_Item" -> 
+                                    "imageLoad", ["this"; "coord"; "sample"]
+
+                                | "AtomicCompareExchange" -> 
+                                    "imageAtomicCompSwap", ["this"; "coord"; "sample"; "cmp"; "data"]
+
+                                | "AtomicAdd" -> 
+                                    "imageAtomicAdd", ["this"; "coord"; "sample"; "data"]
+                                    
+                                | "AtomicMin" -> 
+                                    "imageAtomicMin", ["this"; "coord"; "sample"; "data"]
+
+                                | "AtomicMax" -> 
+                                    "imageAtomicMax", ["this"; "coord"; "sample"; "data"]
+                                | "AtomicAnd" -> 
+                                    "imageAtomicAnd", ["this"; "coord"; "sample"; "data"]
+                                | "AtomicOr" -> 
+                                    "imageAtomicOr", ["this"; "coord"; "sample"; "data"]
+                                | "AtomicXor" -> 
+                                    "imageAtomicXor", ["this"; "coord"; "sample"; "data"]
+                                | "AtomicExchange" -> 
+                                    "imageAtomicExchange", ["this"; "coord"; "sample"; "data"]
+
                                 | _ -> failwith "not implemented"
                                 
                         let coordComponents =
@@ -940,20 +953,23 @@ module Assembler =
                             else State.value args
 
                         let mapping = 
-                            match Map.tryFind "slice" mapping, Map.tryFind "coord" mapping with
+                            match MapExt.tryFind "slice" mapping, MapExt.tryFind "coord" mapping with
                                 | Some slice, Some coord ->
                                     let coordDim = match coord.ctype with | CVector(_,d) -> d | _ -> 1
                                     let rType = CVector(CInt(true, 32), coordDim + 1)
                                 
                                     mapping
-                                    |> Map.remove "slice"
-                                    |> Map.remove "coord"
-                                    |> Map.add "coord" (CNewVector(rType, coordDim + 1, [coord;slice]))
+                                    |> MapExt.remove "slice"
+                                    |> MapExt.remove "coord"
+                                    |> MapExt.add "coord" (CNewVector(rType, coordDim + 1, [coord;slice]))
                                 | _ ->
                                     mapping
 
+
+                        let mapping =
+                            MapExt.alter "level" (function None -> Some (CValue(CType.CInt(true, 32), CIntegral 0L)) | Some v -> Some v) mapping
                         let! args = 
-                            argumentNames |> List.choose (fun n -> Map.tryFind n mapping) |> List.mapS assembleExpr
+                            argumentNames |> List.choose (fun n -> MapExt.tryFind n mapping) |> List.mapS assembleExpr
 
                         return sprintf "%s(%s)" functionName (String.concat ", " args)
                         
@@ -978,40 +994,43 @@ module Assembler =
                         let mapping = 
                             List.zip pars args
                                 |> List.map (fun (p,v) -> p.Name, v)
-                                |> Map.ofList
+                                |> MapExt.ofList
  
 
                         let mapping = 
-                            match Map.tryFind "slice" mapping, Map.tryFind "coord" mapping with
+                            match MapExt.tryFind "slice" mapping, MapExt.tryFind "coord" mapping with
                                 | Some slice, Some coord ->
                                     let coordDim, coordType = match coord.ctype with | CVector(t,d) -> d, t | t -> 1, t
                                     let rType = CVector(coordType, coordDim + 1)
                                 
                                     mapping
-                                    |> Map.remove "slice"
-                                    |> Map.remove "coord"
-                                    |> Map.add "coord" (CNewVector(rType, coordDim + 1, [coord;slice]))
+                                    |> MapExt.remove "slice"
+                                    |> MapExt.remove "coord"
+                                    |> MapExt.add "coord" (CNewVector(rType, coordDim + 1, [coord;slice]))
                                 | _ ->
                                     mapping
 
                         let mapping = 
                             if name <> "Gather" then
-                                match Map.tryFind "cmp" mapping, Map.tryFind "coord" mapping with
+                                match MapExt.tryFind "cmp" mapping, MapExt.tryFind "coord" mapping with
                                     | Some cmp, Some coord ->
                                         let coordDim, coordType = match coord.ctype with | CVector(t,d) -> d, t | t -> 1, t
                                         if coordDim < 4 then
                                             let rType = CVector(coordType, coordDim + 1)
                                 
                                             mapping
-                                            |> Map.remove "cmp"
-                                            |> Map.remove "coord"
-                                            |> Map.add "coord" (CNewVector(rType, coordDim + 1, [coord;cmp]))
+                                            |> MapExt.remove "cmp"
+                                            |> MapExt.remove "coord"
+                                            |> MapExt.add "coord" (CNewVector(rType, coordDim + 1, [coord;cmp]))
                                         else
                                             mapping
                                     | _ ->
                                         mapping
                             else
                                 mapping
+
+                        let mapping =
+                            MapExt.alter "level" (function None -> Some (CValue(CType.CInt(true, 32), CIntegral 0L)) | Some v -> Some v) mapping
 
                         let functionName, argumentNames =
                             match name with
@@ -1059,7 +1078,7 @@ module Assembler =
                                 | _ -> failwithf "unknown sampler dimension: %A" dim
 
                         let! args = 
-                            argumentNames |> List.choose (fun n -> Map.tryFind n mapping) |> List.mapS assembleExpr
+                            argumentNames |> List.choose (fun n -> MapExt.tryFind n mapping) |> List.mapS assembleExpr
 
                         match functionName with
                             | Left name ->
@@ -2057,10 +2076,19 @@ module Assembler =
                 let! s = State.get
                 let extensions = Set.union c.enabledExtensions s.requiredExtensions
 
+                
+                let! helpers =
+                    if s.usedHelpers.IsEmpty then
+                        State.value []
+                    else
+                        s.usedHelpers |> MapExt.toList |> List.map snd |> List.mapS (fun (s,b) -> assembleValueDefS (CFunctionDef(s,b)))
+
+
                 return 
                     List.concat [
                         [sprintf "#version %d%d0" c.version.Major c.version.Minor ]
                         [ extensions |> Seq.map (sprintf "#extension %s : enable") |> Seq.toList |> String.concat "\r\n" ]
+                        helpers
                         types
                         uniforms
                         values
@@ -2110,14 +2138,6 @@ module Assembler =
                 ()
 
         let code = definitions.Run(&state) |> String.concat "\r\n\r\n"
-
-        let code =
-            if state.usedHelpers.IsEmpty then
-                code
-            else
-                let res = state.usedHelpers |> MapExt.toList |> List.map snd |> List.mapS (fun (s,b) -> assembleValueDefS (CFunctionDef(s,b)))
-                let helpers = res.Run(&state) |> String.concat "\r\n"
-                helpers + "\r\n\r\n" + code
 
         let iface = LayoutStd140.apply state.ifaceNew
 
