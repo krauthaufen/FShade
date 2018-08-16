@@ -28,6 +28,7 @@ type Config =
         createInputLocations    : bool
         createPerStageUniforms  : bool
         reverseMatrixLogic      : bool
+        flipVCoordinate         : bool
     }
 
 type GLSLShader =
@@ -51,7 +52,7 @@ type Backend private(config : Config) =
     override x.TryGetIntrinsicMethod (c : MethodInfo) =
         match c with
             | IntrinsicFunction f -> Some f
-            | TextureLookup fmt -> Some (CIntrinsic.tagged fmt)
+            | TextureLookupNew config.flipVCoordinate ci -> Some { tag = c; intrinsicName = null; additional = null; arguments = None }
             | _ -> c.Intrinsic<GLSLIntrinsicAttribute>()
 
     override x.TryGetIntrinsicCtor (c : ConstructorInfo) =
@@ -144,6 +145,8 @@ type InputKind =
 
 type AssemblerState =
     {
+        usedHelpers             : MapExt<string, CFunctionSignature * CStatement>
+
         config                  : Config
         stages                  : ShaderStageDescription
 
@@ -169,6 +172,7 @@ type AssemblerState =
 module AssemblerState =
     let ofConfig (c : Config) =
         {
+            usedHelpers = MapExt.empty
             config = c
             stages = { prev = None; self = ShaderStage.Vertex; next = None }
             currentDescriptorSet = 0
@@ -565,6 +569,12 @@ module Interface =
                     iface
         )
      
+    let useHelper (signature : CFunctionSignature) (body : CStatement) =
+        State.modify (fun s ->
+            match s.usedHelpers.ContainsKey signature.name with
+                | true -> s
+                | _ -> { s with usedHelpers = MapExt.add signature.name (signature, body) s.usedHelpers }
+        )
 
     let useUniform (name : string) =
         updateShaderInterface (fun s shader ->
@@ -736,7 +746,338 @@ module Assembler =
             | CVecComponent.W :: rest -> "w" + assembleVecSwizzle rest
             | _ -> ""
 
-    let rec assembleExprS (e : CExpr) =
+    module Sampling =
+        
+        type private ThisParameter(tSelf : Type) =
+            inherit ParameterInfo()
+
+            override x.Name = "this"
+            override x.ParameterType = tSelf
+
+        let flipCoordCode (dim : int) (coordType : CType) (size : CExpr) =
+            let sizeType = CVector(CType.CInt(true,32), dim)
+            match coordType with
+                | CVector(et,d) ->
+                    let arg = CVar { name = "coord"; ctype = coordType }
+                    let typeName = assembleType coordType
+                    let signature =
+                        { name = sprintf "fixup%s" typeName.Name; parameters = [|{ name = "coord"; ctype = coordType; modifier = CParameterModifier.In }|]; returnType = coordType}
+                
+                    let signature, components =
+                        match et with
+                            | CFloat _ ->
+                                signature, 
+                                List.init d (fun i ->
+                                    let comp = CVecSwizzle(et, arg, [unbox i])
+                                    if i = 1 then
+                                        CSub(et, CValue(et, CFractional 1.0), comp)
+                                    else
+                                        comp
+                                )
+
+                            | CInt _ ->
+                                { signature with name = signature.name + "I"; parameters = Array.append signature.parameters [| { name = "size"; ctype = sizeType; modifier = CParameterModifier.In }|] },
+                                List.init d (fun i ->
+                                    let comp = CVecSwizzle(et, arg, [unbox i])
+                                    if i = 1 then
+                                        let h1 = CSub(et, CVecSwizzle(et, CVar { name = "size"; ctype = sizeType }, [unbox i]), CValue(et, CIntegral 1L))
+                                        CSub(et, h1, comp)
+                                    else
+                                        comp
+                                )
+
+                            | _ ->
+                                signature,
+                                List.init d (fun i -> CVecSwizzle(et, arg, [unbox i]))
+                                
+
+                    let body =
+                        CReturnValue (CNewVector(coordType, d, components))
+
+                    Some (signature, body)
+                | _ ->
+                    None
+
+        let flipYCoord (isMS : bool) (coordComponents : int) (pars : list<ParameterInfo>) (values : list<CExpr>) =
+            let args = List.zip pars values 
+            List.indexed args |> List.mapS (fun (ai, (p, v)) -> 
+                state {
+                    if coordComponents = 2 then
+                        if p.Name = "coord" || p.Name = "offset" then
+                            let et, dim = match v.ctype with | CVector(t, d) -> t, d | t -> t, 1
+                    
+                            let self = 
+                                args |> List.head |> snd
+                                            
+                            let level = 
+                                args |> List.tryPick (fun (p,v) -> if p.Name = "level" then Some v else None) |> Option.defaultValue (CValue(CType.CInt(true, 32), CLiteral.CIntegral 0L))
+
+                            let size = 
+                                let getSize = 
+                                    if isMS then
+                                        { 
+                                            intrinsicName = null
+                                            tag = "textureSize({0})"
+                                            arguments = None
+                                            additional = null
+                                        }
+                                    else
+                                        { 
+                                            intrinsicName = null
+                                            tag = "textureSize({0}, {1})"
+                                            arguments = None
+                                            additional = null
+                                        }
+                                CCallIntrinsic(CVector(CInt(true, 32), 2), getSize, [| self; level |])
+
+                            match flipCoordCode coordComponents v.ctype size with
+                                | Some (s,b) ->
+                                    do! Interface.useHelper s b
+                                    if s.parameters.Length > 1 then
+                                        return CCall(s, [|v; size|])
+
+                                    else
+                                        return CCall(s, [|v|])
+
+                                | None ->
+                                    return v
+
+                            //match et with
+                            //    | CFloat _ ->
+                            //        let one = CValue(et, CLiteral.CFractional 1.0)
+                            //        return CExpr.CNewVector(v.ctype, dim, [
+                            //            yield CVecSwizzle(et, v, [CVecComponent.X]) 
+                            //            yield CSub(et, one, CVecSwizzle(et, v, [CVecComponent.Y]))
+                            //            for d in 2 .. dim - 1 do
+                            //                yield CVecSwizzle(et, v, [unbox<CVecComponent> d])
+                            //        ])
+                            //    | CInt _ ->
+                            //        let self = 
+                            //            args |> List.head |> snd
+                                            
+                            //        let level = 
+                            //            args |> List.tryPick (fun (p,v) -> if p.Name = "level" then Some v else None) |> Option.defaultValue (CValue(CType.CInt(true, 32), CLiteral.CIntegral 0L))
+
+                            //        let size = 
+                            //            let getSize = 
+                            //                if isMS then
+                            //                    { 
+                            //                        intrinsicName = null
+                            //                        tag = "textureSize({0})"
+                            //                        arguments = None
+                            //                        additional = null
+                            //                    }
+                            //                else
+                            //                    { 
+                            //                        intrinsicName = null
+                            //                        tag = "textureSize({0}, {1})"
+                            //                        arguments = None
+                            //                        additional = null
+                            //                    }
+                            //            CCallIntrinsic(CVector(CInt(true, 32), 2), getSize, [| self; level |])
+
+                            //        let height =
+                            //            CVecSwizzle(et, size, [CVecComponent.Y])
+                                                
+                            //        let one =
+                            //            CValue(et, CIntegral 1L)
+
+                            //        return CExpr.CNewVector(v.ctype, dim, [
+                            //            yield CVecSwizzle(et, v, [CVecComponent.X]) 
+                            //            yield CSub(et, CSub(et, height, one), CVecSwizzle(et, v, [CVecComponent.Y]))
+                            //            for d in 2 .. dim - 1 do
+                            //                yield CVecSwizzle(et, v, [unbox<CVecComponent> d])
+                            //        ])
+                                | _ ->
+                                    return v
+                                    
+                        elif p.Name = "dTdx" || p.Name = "dTdy" then
+                            let et = match v.ctype with | CVector(t, d) -> t | _ -> failwith "not a vector"
+                                        
+                            return CExpr.CNewVector(v.ctype, 2, [
+                                CVecSwizzle(et, v, [CVecComponent.X]) 
+                                CNeg(et, CVecSwizzle(et, v, [CVecComponent.Y]))
+                            ])
+                        else
+                            return v
+                    else
+                        return v
+                }
+            )
+            
+        let assembleTextureLookup (assembleExpr : CExpr -> State<AssemblerState, string>) (mi : MethodInfo) (args : list<CExpr>) =
+            state {
+                let! cfg = AssemblerState.config
+                let flipY = cfg.flipVCoordinate
+
+                match mi with
+                    | Method(name, ((ImageType(_, dim, isArray, isMS, valueType)::_))) ->
+                
+                        let pars = (ThisParameter(mi.DeclaringType) :> ParameterInfo) :: (mi.GetParameters() |> Array.toList)
+                        let mapping = 
+                            List.zip pars args
+                                |> List.map (fun (p,v) -> p.Name, v)
+                                |> Map.ofList
+                                
+                        let functionName, argumentNames =
+                            match name with
+                                | "get_Size" -> "imageSize", ["this"]
+                                | "get_Item" -> "imageLoad", ["this"; "coord"; "sample"]
+                                | "AtomicCompareExchange" -> "imageAtomicCompSwap", ["this"; "coord"; "sample"; "cmp"; "data"]
+                                | "AtomicAdd" -> "imageAtomicAdd", ["this"; "coord"; "sample"; "data"]
+                                | _ -> failwith "not implemented"
+                                
+                        let coordComponents =
+                            match dim with
+                                | SamplerDimension.Sampler1d -> 1
+                                | SamplerDimension.Sampler2d -> 2
+                                | SamplerDimension.Sampler3d -> 3
+                                | SamplerDimension.SamplerCube -> 3
+                                | _ -> failwithf "unknown sampler dimension: %A" dim
+
+                        let! args =
+                            if flipY then flipYCoord false coordComponents pars args
+                            else State.value args
+
+                        let mapping = 
+                            match Map.tryFind "slice" mapping, Map.tryFind "coord" mapping with
+                                | Some slice, Some coord ->
+                                    let coordDim = match coord.ctype with | CVector(_,d) -> d | _ -> 1
+                                    let rType = CVector(CInt(true, 32), coordDim + 1)
+                                
+                                    mapping
+                                    |> Map.remove "slice"
+                                    |> Map.remove "coord"
+                                    |> Map.add "coord" (CNewVector(rType, coordDim + 1, [coord;slice]))
+                                | _ ->
+                                    mapping
+
+                        let! args = 
+                            argumentNames |> List.choose (fun n -> Map.tryFind n mapping) |> List.mapS assembleExpr
+
+                        return sprintf "%s(%s)" functionName (String.concat ", " args)
+                        
+
+
+                    | Method(name, ((SamplerType(dim, isArray, isShadow, isMS, valueType)::_))) ->
+                
+                        let pars = (ThisParameter(mi.DeclaringType) :> ParameterInfo) :: (mi.GetParameters() |> Array.toList)
+                        
+                        let coordComponents =
+                            match dim with
+                                | SamplerDimension.Sampler1d -> 1
+                                | SamplerDimension.Sampler2d -> 2
+                                | SamplerDimension.Sampler3d -> 3
+                                | SamplerDimension.SamplerCube -> 3
+                                | _ -> failwithf "unknown sampler dimension: %A" dim
+
+                        let! args =
+                            if flipY then flipYCoord isMS coordComponents pars args
+                            else State.value args   
+                            
+                        let mapping = 
+                            List.zip pars args
+                                |> List.map (fun (p,v) -> p.Name, v)
+                                |> Map.ofList
+ 
+
+                        let mapping = 
+                            match Map.tryFind "slice" mapping, Map.tryFind "coord" mapping with
+                                | Some slice, Some coord ->
+                                    let coordDim, coordType = match coord.ctype with | CVector(t,d) -> d, t | t -> 1, t
+                                    let rType = CVector(coordType, coordDim + 1)
+                                
+                                    mapping
+                                    |> Map.remove "slice"
+                                    |> Map.remove "coord"
+                                    |> Map.add "coord" (CNewVector(rType, coordDim + 1, [coord;slice]))
+                                | _ ->
+                                    mapping
+
+                        let mapping = 
+                            if name <> "Gather" then
+                                match Map.tryFind "cmp" mapping, Map.tryFind "coord" mapping with
+                                    | Some cmp, Some coord ->
+                                        let coordDim, coordType = match coord.ctype with | CVector(t,d) -> d, t | t -> 1, t
+                                        if coordDim < 4 then
+                                            let rType = CVector(coordType, coordDim + 1)
+                                
+                                            mapping
+                                            |> Map.remove "cmp"
+                                            |> Map.remove "coord"
+                                            |> Map.add "coord" (CNewVector(rType, coordDim + 1, [coord;cmp]))
+                                        else
+                                            mapping
+                                    | _ ->
+                                        mapping
+                            else
+                                mapping
+
+                        let functionName, argumentNames =
+                            match name with
+                                | "get_Size" | "GetSize" ->
+                                    if isMS then Left "textureSize", ["this" ]
+                                    else Left "textureSize", ["this"; "level"]
+         
+                                | "get_MipMapLevels"    -> 
+                                    if isMS then Right "1", []
+                                    else Left "textureQueryLevels", ["this"]
+                                    
+                                | "Sample" -> 
+                                    Left "texture", ["this"; "coord"; "lodBias"; "cmp"]
+
+                                | "SampleOffset" ->
+                                    Left "textureOffset", ["this"; "coord"; "offset"; "lodBias"]
+                                    
+                                | "SampleProj" ->
+                                    Left "textureProj", ["this"; "coord"; "lodBias"]
+                                    
+                                | "SampleLevel" ->
+                                    Left "textureLod", ["this"; "coord"; "level"]
+                                    
+                                | "SampleGrad" ->
+                                    Left "textureGrad", ["this"; "coord"; "dTdx"; "dTdy"]
+                                    
+                                | "Gather" ->
+                                    Left "textureGather", ["this"; "coord"; "cmp"; "comp"]
+                                    
+                                | "GatherOffset" ->
+                                    Left "textureGatherOffset", ["this"; "coord"; "cmp"; "offset"; "comp"]
+                                    
+                                | "Read" | "get_Item" ->
+                                    Left "texelFetch", ["this"; "coord"; "level"; "sample"]
+
+                                | _ -> 
+                                    failwith "not implemented"
+                                
+                        let coordComponents =
+                            match dim with
+                                | SamplerDimension.Sampler1d -> 1
+                                | SamplerDimension.Sampler2d -> 2
+                                | SamplerDimension.Sampler3d -> 3
+                                | SamplerDimension.SamplerCube -> 3
+                                | _ -> failwithf "unknown sampler dimension: %A" dim
+
+                        let! args = 
+                            argumentNames |> List.choose (fun n -> Map.tryFind n mapping) |> List.mapS assembleExpr
+
+                        match functionName with
+                            | Left name ->
+                                return sprintf "%s(%s)" name (String.concat ", " args)
+                            | Right value ->
+                                return value
+
+
+                    | _ ->
+                        return failwith ""
+
+            }
+    
+    
+    let rec assembleIntrinsicCall (mi : MethodInfo) (args : CExpr[]) =
+        Sampling.assembleTextureLookup assembleExprS mi (Array.toList args)
+
+    and assembleExprS (e : CExpr) =
         state {
             
             match e with
@@ -791,6 +1132,9 @@ module Assembler =
                                 try String.Format(format, args)
                                 with _ -> failwithf "[FShade] invalid string format: %A (%d args)" format args.Length
                             
+                        | :? MethodInfo as mi ->
+                            return! assembleIntrinsicCall mi args
+
                         | _ ->
                             return failwithf "[FShade] invalid GLSL intrinsic: %A" func
 
@@ -1766,6 +2110,15 @@ module Assembler =
                 ()
 
         let code = definitions.Run(&state) |> String.concat "\r\n\r\n"
+
+        let code =
+            if state.usedHelpers.IsEmpty then
+                code
+            else
+                let res = state.usedHelpers |> MapExt.toList |> List.map snd |> List.mapS (fun (s,b) -> assembleValueDefS (CFunctionDef(s,b)))
+                let helpers = res.Run(&state) |> String.concat "\r\n"
+                helpers + "\r\n\r\n" + code
+
         let iface = LayoutStd140.apply state.ifaceNew
 
         // unsafely mutate the shader's parent

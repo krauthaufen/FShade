@@ -294,40 +294,6 @@ module CVecComponent =
     let xyz = [CVecComponent.X; CVecComponent.Y; CVecComponent.Z]
     let yzw = [CVecComponent.Y; CVecComponent.Z; CVecComponent.W]
 
-type CIntrinsic =
-    {
-        intrinsicName   : string
-        tag             : obj
-        arguments       : Option<list<int>>
-        additional      : obj
-    }
-
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module CIntrinsic =
-    let simple (name : string) =
-        {
-            intrinsicName = name
-            tag = null
-            arguments = None
-            additional = null
-        }
-
-    let custom (name : string) (args : list<int>)=
-        {
-            intrinsicName = name
-            tag = null
-            arguments = Some args
-            additional = null
-        }
-
-    let tagged (tag : obj)=
-        {
-            intrinsicName = null
-            tag = tag
-            arguments = None
-            additional = null
-        }
-
 /// represents a c-style expression
 type CExpr =
     | CVar of CVar
@@ -443,6 +409,41 @@ type CExpr =
             | CAddressOf(t,_) -> t
             | CField(t,_,_) -> t
             | CItem(t,_,_) -> t
+
+and CIntrinsic =
+    {
+        intrinsicName   : string
+        tag             : obj
+        //arguments       : Option<list<int>>
+        arguments       : Option<list<CExpr> -> list<CExpr>>
+        additional      : obj
+    }
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module CIntrinsic =
+    let simple (name : string) =
+        {
+            intrinsicName = name
+            tag = null
+            arguments = None
+            additional = null
+        }
+
+    let custom (name : string) (args : list<int>)=
+        {
+            intrinsicName = name
+            tag = null
+            arguments = Some (fun (a : list<CExpr>) -> args |> List.map (fun i -> a.[i])) //args |> List.map (fun i -> (i, id)))
+            additional = null
+        }
+
+    let tagged (tag : obj)=
+        {
+            intrinsicName = null
+            tag = tag
+            arguments = None
+            additional = null
+        }
 
 
 type internal Used() =

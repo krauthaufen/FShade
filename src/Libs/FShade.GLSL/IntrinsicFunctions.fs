@@ -738,6 +738,350 @@ module IntrinsicFunctions =
 
         ]
 
+
+    let flipYCoord (isMS : bool) (coordComponents : int) (pars : list<ParameterInfo>) (values : list<CExpr>) =
+        let args = List.zip pars values 
+        args |> List.mapi (fun ai (p, v) -> 
+            if coordComponents = 2 then
+                if p.Name = "coord" || p.Name = "offset" then
+                    let et, dim = match v.ctype with | CVector(t, d) -> t, d | _ -> failwith "not a vector"
+                    
+                    match et with
+                        | CFloat _ ->
+                            let one = CValue(et, CLiteral.CFractional 1.0)
+                            CExpr.CNewVector(v.ctype, dim, [
+                                yield CVecSwizzle(et, v, [CVecComponent.X]) 
+                                yield CSub(et, one, CVecSwizzle(et, v, [CVecComponent.Y]))
+                                for d in 2 .. dim - 1 do
+                                    yield CVecSwizzle(et, v, [unbox<CVecComponent> d])
+                            ])
+                        | CInt _ ->
+                            let self = 
+                                args |> List.head |> snd
+                                            
+                            let level = 
+                                args |> List.tryPick (fun (p,v) -> if p.Name = "level" then Some v else None) |> Option.defaultValue (CValue(CType.CInt(true, 32), CLiteral.CIntegral 0L))
+
+                            let size = 
+                                let getSize = 
+                                    if isMS then
+                                        { 
+                                            intrinsicName = null
+                                            tag = "textureSize({0})"
+                                            arguments = None
+                                            additional = null
+                                        }
+                                    else
+                                        { 
+                                            intrinsicName = null
+                                            tag = "textureSize({0}, {1})"
+                                            arguments = None
+                                            additional = null
+                                        }
+                                CCallIntrinsic(CVector(CInt(true, 32), 2), getSize, [| self; level |])
+
+                            let height =
+                                CVecSwizzle(et, size, [CVecComponent.Y])
+                                                
+                            let one =
+                                CValue(et, CIntegral 1L)
+
+                            CExpr.CNewVector(v.ctype, dim, [
+                                yield CVecSwizzle(et, v, [CVecComponent.X]) 
+                                yield CSub(et, CSub(et, height, one), CVecSwizzle(et, v, [CVecComponent.Y]))
+                                for d in 2 .. dim - 1 do
+                                    yield CVecSwizzle(et, v, [unbox<CVecComponent> d])
+                            ])
+                        | _ ->
+                            v
+                                    
+                elif p.Name = "dTdx" || p.Name = "dTdy" then
+                    let et = match v.ctype with | CVector(t, d) -> t | _ -> failwith "not a vector"
+                                        
+                    CExpr.CNewVector(v.ctype, 2, [
+                        CVecSwizzle(et, v, [CVecComponent.X]) 
+                        CNeg(et, CVecSwizzle(et, v, [CVecComponent.Y]))
+                    ])
+                else
+                    v
+            else
+                v
+        )
+
+    type private ThisParameter(tSelf : Type) =
+        inherit ParameterInfo()
+
+        override x.Name = "this"
+        override x.ParameterType = tSelf
+
+    let (|TextureLookupNew|_|) (flipY : bool) (mi : MethodInfo) =
+        match mi with
+
+            | Method(name, ((ImageType(_, dim, isArray, isMS, valueType)::_) as args)) ->
+                
+                let pars = (ThisParameter(mi.DeclaringType) :> ParameterInfo) :: (mi.GetParameters() |> Array.toList)
+
+                let coordComponents =
+                    match dim with
+                        | SamplerDimension.Sampler1d -> 1
+                        | SamplerDimension.Sampler2d -> 2
+                        | SamplerDimension.Sampler3d -> 3
+                        | SamplerDimension.SamplerCube -> 3
+                        | _ -> failwithf "unknown sampler dimension: %A" dim
+
+                let plainArgs(skip : int) =
+                    args |> List.skip skip |> List.mapi (fun i _ -> sprintf "{%d}" (skip + i)) |> String.concat ", "
+                        
+                let argCount = List.length args - 1
+                
+                match name with
+                    | "get_Size" -> 
+                        Some { 
+                            intrinsicName = null
+                            tag = "imageSize({0})"
+                            arguments = None
+                            additional = null
+                        }
+                    | "get_Item" when argCount = 1 ->  
+                        Some { 
+                            intrinsicName = null
+                            tag = sprintf "imageLoad(%s)" (plainArgs 0)
+                            arguments = if flipY then Some (flipYCoord false coordComponents pars) else None
+                            additional = null
+                        } //sprintf "imageLoad(%s)" (plainArgs 0)
+                    | "set_Item" when argCount = 2 ->   
+                        Some { 
+                            intrinsicName = null
+                            tag = sprintf "imageStore(%s)" (plainArgs 0)
+                            arguments = if flipY then Some (flipYCoord false coordComponents pars) else None
+                            additional = null
+                        } //sprintf "imageStore(%s)" (plainArgs 0)
+                    | "get_Item" ->    
+                        Some { 
+                            intrinsicName = null
+                            tag = sprintf "imageLoad({0}, ivec%d(%s), 0)" argCount (plainArgs 1)
+                            arguments = if flipY then Some (flipYCoord false coordComponents pars) else None
+                            additional = null
+                        }
+                    | "AtomicCompareExchange" ->     
+                        Some { 
+                            intrinsicName = null
+                            tag = sprintf "imageAtomicCompSwap(%s)" (plainArgs 0)
+                            arguments = if flipY then Some (flipYCoord false coordComponents pars) else None
+                            additional = null
+                        } ///sprintf "imageAtomicCompSwap(%s)" (plainArgs 0)
+                    | "AtomicAdd" ->      
+                        Some { 
+                            intrinsicName = null
+                            tag = sprintf "imageAtomicAdd(%s)" (plainArgs 0)
+                            arguments = if flipY then Some (flipYCoord false coordComponents pars) else None
+                            additional = null
+                        } //sprintf "imageAtomicAdd(%s)" (plainArgs 0)
+
+
+
+                    | _ ->
+                        failwithf "unknown image function %A" name
+
+
+            | Method(name, ((SamplerType(dim, isArray, isShadow, isMS, valueType)::_) as args)) ->
+                
+                let pars = (ThisParameter(mi.DeclaringType) :> ParameterInfo) :: (mi.GetParameters() |> Array.toList)
+
+                let coordComponents =
+                    match dim with
+                        | SamplerDimension.Sampler1d -> 1
+                        | SamplerDimension.Sampler2d -> 2
+                        | SamplerDimension.Sampler3d -> 3
+                        | SamplerDimension.SamplerCube -> 3
+                        | _ -> failwithf "unknown sampler dimension: %A" dim
+
+                let sampleArgs() = 
+                    let consumedArgs, sampleArgs =
+                        match isArray, isShadow with
+                            | true, true -> 4, sprintf "{0}, vec%d({1}, {2}, {3})" (coordComponents + 2)
+                            | true, false -> 3, sprintf "{0}, vec%d({1}, {2})" (coordComponents + 1)
+                            | false, true -> 3, sprintf "{0}, vec%d({1}, {2})" (coordComponents + 1)
+                            | false, false -> 2, "{0}, {1}"
+
+                    let args = List.skip consumedArgs args
+
+                    let rest =
+                        match args with
+                            | [] -> ""
+                            | _ ->
+                                args |> List.mapi (fun i _ -> sprintf "{%d}" (i + consumedArgs)) |> String.concat ", " |> sprintf ", %s"
+
+
+                    sampleArgs + rest
+
+                let projArgs() =
+                    let consumedArgs, sampleArgs =
+                        match isArray, isShadow with
+                            | true, true -> 4, sprintf "{0}, vec%d({1}, {2}, {3})" (coordComponents + 3)
+                            | true, false -> 3, sprintf "{0}, vec%d({1}, {2})" (coordComponents + 2)
+                            | false, true -> 3, sprintf "{0}, vec%d({1}, {2})" (coordComponents + 2)
+                            | false, false -> 2, "{0}, {1}"
+
+                    let args = List.skip consumedArgs args
+
+                    let rest =
+                        match args with
+                            | [] -> ""
+                            | _ ->
+                                args |> List.mapi (fun i _ -> sprintf "{%d}" (i + consumedArgs)) |> String.concat ", " |> sprintf ", %s"
+
+
+                    sampleArgs + rest
+
+                let plainArgs(skip : int) =
+                    args |> List.skip skip |> List.mapi (fun i _ -> sprintf "{%d}" (skip + i)) |> String.concat ", "
+                        
+
+                let argCount = List.length args - 1
+
+                match name with
+                    | "get_Size" -> 
+                        if isMS then 
+                            Some { 
+                                intrinsicName = null
+                                tag = "textureSize({0})"
+                                arguments = None
+                                additional = null
+                            }
+                        else 
+                            Some { 
+                                intrinsicName = null
+                                tag = "textureSize({0}, 0)"
+                                arguments = None
+                                additional = null
+                            }
+
+                    | "get_MipMapLevels" -> 
+                        if isMS then
+                            Some { 
+                                intrinsicName = null
+                                tag = "1"
+                                arguments = Some (fun _ -> [])
+                                additional = null
+                            }
+
+                        else 
+                            Some { 
+                                intrinsicName = null
+                                tag = "textureQueryLevels({0})"
+                                arguments = None
+                                additional = null
+                            }
+
+                    | "GetSize" -> 
+                        if isMS then
+                            Some { 
+                                intrinsicName = null
+                                tag = "textureSize({0})"
+                                arguments = None
+                                additional = null
+                            }
+                        else 
+                            Some { 
+                                intrinsicName = null
+                                tag = "textureSize({0}, {1})"
+                                arguments = None
+                                additional = null
+                            }
+                            
+
+                    | "Sample" -> 
+                        Some { 
+                            intrinsicName = null
+                            tag = sprintf "texture(%s)" (sampleArgs())
+                            arguments = if flipY then Some (flipYCoord isMS coordComponents pars) else None
+                            additional = null
+                        }
+                        
+                        //sprintf "texture(%s)" (sampleArgs()) |> Some
+                    | "SampleOffset" ->  
+                        Some { 
+                            intrinsicName = null
+                            tag = sprintf "textureOffset(%s)" (sampleArgs())
+                            arguments = if flipY then Some (flipYCoord isMS coordComponents pars) else None
+                            additional = null
+                        }
+
+                    | "SampleProj" -> 
+                        Some { 
+                            intrinsicName = null
+                            tag = sprintf "textureProj(%s)" (projArgs())
+                            arguments = if flipY then Some (flipYCoord isMS coordComponents pars) else None
+                            additional = null
+                        }
+                    | "SampleLevel" ->  
+                        Some { 
+                            intrinsicName = null
+                            tag = sprintf "textureLod(%s)" (sampleArgs())
+                            arguments = if flipY then Some (flipYCoord isMS coordComponents pars) else None
+                            additional = null
+                        }
+
+                    | "SampleGrad" -> 
+                        Some { 
+                            intrinsicName = null
+                            tag = sprintf "textureGrad(%s)" (sampleArgs())
+                            arguments = if flipY then Some (flipYCoord isMS coordComponents pars) else None
+                            additional = null
+                        } 
+                    | "Gather" ->
+                        Some { 
+                            intrinsicName = null
+                            tag = sprintf "textureGather(%s)" (plainArgs 0)
+                            arguments = if flipY then Some (flipYCoord isMS coordComponents pars) else None
+                            additional = null
+                        } // sprintf "textureGather(%s)" (plainArgs 0) |> Some
+                    | "GatherOffset" ->
+                        Some { 
+                            intrinsicName = null
+                            tag = sprintf "textureGatherOffset(%s)" (plainArgs 0)
+                            arguments = if flipY then Some (flipYCoord isMS coordComponents pars) else None
+                            additional = null
+                        } // sprintf "textureGatherOffset(%s)" (plainArgs 0) |> Some
+                    | "Read" -> 
+                        Some { 
+                            intrinsicName = null
+                            tag = sprintf "texelFetch(%s)" (plainArgs 0)
+                            arguments = if flipY then Some (flipYCoord isMS coordComponents pars) else None
+                            additional = null
+                        } //sprintf "texelFetch(%s)" (plainArgs 0) |> Some
+
+                    | "get_Item" when argCount = 1 -> 
+                        Some { 
+                            intrinsicName = null
+                            tag = sprintf "texelFetch(%s, 0)" (plainArgs 0)
+                            arguments = if flipY then Some (flipYCoord isMS coordComponents pars) else None
+                            additional = null
+                        } //sprintf "texelFetch(%s, 0)" (plainArgs 0) |> Some
+
+                    | "get_Item" -> 
+                        Some { 
+                            intrinsicName = null
+                            tag = sprintf "texelFetch(%s)" (plainArgs 0)
+                            arguments = if flipY then Some (flipYCoord isMS coordComponents pars) else None
+                            additional = null
+                        } //sprintf "texelFetch(%s)" (plainArgs 0) |> Some
+
+                    | "QueryLod" ->  
+                        Some { 
+                            intrinsicName = null
+                            tag = sprintf "textureQueryLod(%s)" (plainArgs 0)
+                            arguments = if flipY then Some (flipYCoord isMS coordComponents pars) else None
+                            additional = null
+                        } //sprintf "textureQueryLod(%s)" (plainArgs 0) |> Some
+
+                    | name -> None
+
+
+            | _ ->
+                None
+
     let (|TextureLookup|_|) (mi : MethodInfo) =
         match mi with
             | Method(name, ((ImageType(_, dim, isArray, isMS, valueType)::_) as args)) ->

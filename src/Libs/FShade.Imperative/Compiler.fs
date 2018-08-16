@@ -1212,7 +1212,7 @@ module Compiler =
                                             let! ct = toCTypeS e.Type
                                             let args = 
                                                 match i.arguments with
-                                                    | Some order -> order |> List.map (fun i -> args.[i])
+                                                    | Some order -> order args
                                                     | None -> args
                                             return CCallIntrinsic(ct, i, List.toArray args)
                                         | _ ->
@@ -1238,7 +1238,7 @@ module Compiler =
                                     let! ct = toCTypeS e.Type
                                     let args = 
                                         match i.arguments with
-                                            | Some order -> order |> List.map (fun i -> args.[i])
+                                            | Some order -> order args
                                             | None -> args
                                     return CCallIntrinsic(ct, i, List.toArray args)
                                 | _ ->

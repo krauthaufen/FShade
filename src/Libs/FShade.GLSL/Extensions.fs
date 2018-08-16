@@ -18,6 +18,7 @@ module Backends =
             createInputLocations    = true
             createPerStageUniforms  = false
             reverseMatrixLogic      = true
+            flipVCoordinate         = false
         }
 
     let glsl430 =
@@ -31,6 +32,7 @@ module Backends =
             createInputLocations    = true
             createPerStageUniforms  = false
             reverseMatrixLogic      = true
+            flipVCoordinate         = false
         }
 
     let glsl120 =
@@ -44,6 +46,7 @@ module Backends =
             createInputLocations    = false
             createPerStageUniforms  = false
             reverseMatrixLogic      = true
+            flipVCoordinate         = false
         }
 
     let glslVulkan =
@@ -57,6 +60,7 @@ module Backends =
             createInputLocations    = true
             createPerStageUniforms  = true
             reverseMatrixLogic      = true
+            flipVCoordinate         = true
         }
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]

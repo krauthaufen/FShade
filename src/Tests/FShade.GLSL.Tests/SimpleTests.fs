@@ -372,7 +372,7 @@ type Shader private () =
     static member shader (v : V4d[]) =
         compute {
             let id = getGlobalId().XY
-            let a =  Shader.Sampler.Sample(V2d id)
+            let a =  Shader.Sampler.[2 * id + V2i.IO]
             v.[id.X] <- a
         }
 
@@ -384,6 +384,8 @@ let ``[Compute] includes samplerInfo``() =
         ComputeShader.toModule shader
             |> ModuleCompiler.compileGLSLVulkan
     
+    printfn "%s" glsl.code
+
     let sammy = 
         glsl.iface.samplers.["Sampler"].samplerTextures
 
