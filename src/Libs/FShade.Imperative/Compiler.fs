@@ -874,7 +874,41 @@ module Compiler =
             
             { s with moduleState = { s.moduleState with usedTypes = usedTypes } }, cType
         )
+      
+    let freshCVarOfTypeS (v : Var) (t : CType) =
+        State.custom (fun s ->
+            match Map.tryFind v.Name s.nameIndices with
+                | Some index ->
+                    let mutable index = index
+                    let mutable name = v.Name + string index
+
+                    let rec findName (index : int) (indices : Map<string, int>) =
+                        let n = v.Name + string index
+                        match Map.tryFind n indices with
+                            | Some i ->
+                                findName (index + 1) indices
+                            | None ->
+                                let indices = Map.add n 1 indices
+                                let indices = Map.add v.Name (index + 1) indices
+                                n, indices
+
+                    let name, indices = findName index s.nameIndices
+
+                    let res = { ctype = t; name = name }
+                    let state = { s with nameIndices = indices; variables = Map.add v res s.variables }
+                    state, res
+                | None ->
+                    let res = { ctype = t; name = v.Name }
+                    let state = { s with nameIndices = Map.add v.Name 1 s.nameIndices; variables = Map.add v res s.variables }
+                    state, res
+        )
         
+    let freshCVarS (v : Var) =
+        state {
+            let! t = toCTypeS v.Type
+            return! freshCVarOfTypeS v t
+        }
+
     /// converts a variable to a CVar using the cached name or by
     /// creating a fresh name for it (and caching it)
     let toCVarOfTypeS (v : Var) (t : CType) =
@@ -884,30 +918,9 @@ module Compiler =
                     s, v
 
                 | None ->
-                    match Map.tryFind v.Name s.nameIndices with
-                        | Some index ->
-                            let mutable index = index
-                            let mutable name = v.Name + string index
-
-                            let rec findName (index : int) (indices : Map<string, int>) =
-                                let n = v.Name + string index
-                                match Map.tryFind n indices with
-                                    | Some i ->
-                                        findName (index + 1) indices
-                                    | None ->
-                                        let indices = Map.add n 1 indices
-                                        let indices = Map.add v.Name (index + 1) indices
-                                        n, indices
-
-                            let name, indices = findName index s.nameIndices
-
-                            let res = { ctype = t; name = name }
-                            let state = { s with nameIndices = indices; variables = Map.add v res s.variables }
-                            state, res
-                        | None ->
-                            let res = { ctype = t; name = v.Name }
-                            let state = { s with nameIndices = Map.add v.Name 1 s.nameIndices; variables = Map.add v res s.variables }
-                            state, res
+                    let mutable s = s
+                    let res = (freshCVarOfTypeS v t).Run(&s)
+                    s, res
         )
 
     let toCVarS (v : Var) =
@@ -1469,8 +1482,8 @@ module Compiler =
 
                     match e.ctype with
                         | CArray(et, len) ->
-                            let! i = toCVarS (Var("i", typeof<int>, true))
-                            let! v = toCVarS v
+                            let! i = freshCVarS (Var("i", typeof<int>, true))
+                            let! v = freshCVarS v
                             let! cbody = toCStatementS false body
 
                             let tint32 = CType.CInt(true, 32)
@@ -1494,10 +1507,10 @@ module Compiler =
                 | ForInteger(v, first, step, last, b) ->
                     match step, last with
                         | Trivial, TrivialOp -> 
-                            let! v = toCVarS v
                             let! cfirst = toCRExprS first
                             let! cstep = toCExprS step
                             let! clast = toCExprS last
+                            let! v = freshCVarS v
                             let! cbody = toCStatementS false b
 
                             let increment =
@@ -1613,8 +1626,8 @@ module Compiler =
                     let! e = toCRExprS e
                     let! v = 
                         match e with
-                            | Some e -> toCVarOfTypeS v e.ctype
-                            | None -> toCVarS v
+                            | Some e -> freshCVarOfTypeS v e.ctype
+                            | None -> freshCVarS v
 
                     let! body = toCStatementS isLast b
                     return CSequential [
