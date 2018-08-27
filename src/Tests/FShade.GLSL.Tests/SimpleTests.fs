@@ -400,12 +400,14 @@ let ``[Compute] includes samplerInfo``() =
 
 type UniformScope with  
     member x.Count : int = uniform?Count
-    
+    member x.Trafo : M34d = uniform?Hugo
+
 [<Fact>]
 let ``Compose variables correct``() =
     let frag (v : Vertex) =
         fragment {
-            let mutable value = 1.0
+            let a = uniform.Trafo * v.pos
+            let mutable value = a.X
             for i in 0 .. uniform.Count do
                 value <- sin(float i) * cos(float i) * value
             return (1.0 + value) * v.c
@@ -417,5 +419,5 @@ let ``Compose variables correct``() =
 let main args =
     //``Helper with duplicate names``()
     //``Bad Helpers``()
-    ``[Compute] includes samplerInfo``()
+    ``Compose variables correct``()
     0
