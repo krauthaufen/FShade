@@ -88,7 +88,7 @@ type Backend private(config : Config) =
                             isShadow = shadow
                             isArray = arr
                             isMS = ms
-                            valueType = GLSLType.ofCType (CType.ofType x valueType)
+                            valueType = GLSLType.ofCType config.reverseMatrixLogic (CType.ofType x valueType)
                         }
                 }
 
@@ -125,7 +125,7 @@ type Backend private(config : Config) =
                             format = ImageFormat.ofFormatType tFmt
                             isArray = arr
                             isMS = ms
-                            valueType = GLSLType.ofCType (CType.ofType x valueType)
+                            valueType = GLSLType.ofCType config.reverseMatrixLogic (CType.ofType x valueType)
                         }
                 }
                 
@@ -256,21 +256,25 @@ module AssemblerState =
                 s, -1
         )
 
-    let rec private neededLocations (t : CType) =
+    let rec private neededLocations (rev : bool) (t : CType) =
         match t with
             | CPointer(_,et) -> 
-                neededLocations et
+                neededLocations rev et
 
             | CType.CBool _ | CType.CFloat _ | CType.CInt _ ->
                 1
 
             | CMatrix(et, rows, cols) ->
-                let l = CVector(et, rows) |> neededLocations
-                l * cols
+                if rev then
+                    let l = CVector(et, cols) |> neededLocations rev
+                    l * rows
+                else
+                    let l = CVector(et, rows) |> neededLocations rev
+                    l * cols
             | CVector(et,_) -> 
                 1
             | CArray(et, len) ->
-                let inner = neededLocations et
+                let inner = neededLocations rev et
                 inner * len
 
             | CStruct _ | CIntrinsic _ | CVoid ->
@@ -281,10 +285,10 @@ module AssemblerState =
             match kind with
                 | ParameterKind.Input ->
                     let free = s.currentInputLocation
-                    { s with currentInputLocation = free + neededLocations t }, free
+                    { s with currentInputLocation = free + neededLocations s.config.reverseMatrixLogic t }, free
                 | ParameterKind.Output ->
                     let free = s.currentOutputLocation
-                    { s with currentOutputLocation = free + neededLocations t }, free
+                    { s with currentOutputLocation = free + neededLocations s.config.reverseMatrixLogic t }, free
                 | _ ->
                     s, -1
                     
@@ -384,8 +388,8 @@ module Interface =
         )
 
     let useBuiltIn (kind : ParameterKind) (name : string) (ctype : CType) =
-        modify (fun s iface ->
-            let stage = s.stages.self
+        modify (fun state iface ->
+            let stage = state.stages.self
 
             let shaders = 
                 iface.shaders |> MapExt.alter stage (
@@ -396,7 +400,7 @@ module Interface =
                                 shaderBuiltIns =
                                     o.shaderBuiltIns |> MapExt.alter kind (fun s ->
                                         let s = s |> Option.defaultValue MapExt.empty
-                                        MapExt.add name (GLSLType.ofCType ctype) s |> Some
+                                        MapExt.add name (GLSLType.ofCType state.config.reverseMatrixLogic ctype) s |> Some
                                     )
                         }
                     | None ->
@@ -412,7 +416,7 @@ module Interface =
             
             let ip =
                 {
-                    paramType           = GLSLType.ofCType parameter.cParamType
+                    paramType           = GLSLType.ofCType s.config.reverseMatrixLogic parameter.cParamType
                     paramLocation       = location
                     paramName           = name
                     paramSemantic       = parameter.cParamSemantic
@@ -440,7 +444,7 @@ module Interface =
             
             let op =
                 {
-                    paramType           = GLSLType.ofCType parameter.cParamType
+                    paramType           = GLSLType.ofCType s.config.reverseMatrixLogic parameter.cParamType
                     paramLocation       = location
                     paramName           = name
                     paramSemantic       = parameter.cParamSemantic
@@ -544,8 +548,8 @@ module Interface =
             let f =
                 {
                     name = name
-                    args = args |> Array.map GLSLType.ofCType
-                    ret = ret |> GLSLType.ofCType
+                    args = args |> Array.map (GLSLType.ofCType s.config.reverseMatrixLogic)
+                    ret = ret |> GLSLType.ofCType s.config.reverseMatrixLogic
                 }
             { iface with shaderBuiltInFunctions = HSet.add f iface.shaderBuiltInFunctions}
         )
@@ -740,7 +744,7 @@ module Assembler =
 
     let rec assembleExprS (e : CExpr) =
         state {
-            let! s = State.get
+            let! config = AssemblerState.config
             match e with
                 | CVar v ->
                     let name = glslName v.name
@@ -856,7 +860,7 @@ module Assembler =
                     else return sprintf "%s[%d][%d]" m c r
 
                 | CConvertMatrix(t, m) ->
-                    let t = assembleType s.config.reverseMatrixLogic t
+                    let t = assembleType config.reverseMatrixLogic t
                     let! m = assembleExprS m
                     return sprintf "%s(%s)" t.Name m
 
@@ -888,7 +892,7 @@ module Assembler =
 
                 | CNewVector(r, _, args) ->
                     let! args = assembleExprsS ", " args
-                    let t = assembleType s.config.reverseMatrixLogic r
+                    let t = assembleType config.reverseMatrixLogic r
                     return sprintf "%s(%s)" t.Name args
 
                 | CVecLength(_, v) ->
@@ -896,7 +900,7 @@ module Assembler =
                     return sprintf "length(%s)" v
 
                 | CConvert(t, v) ->
-                    let t = assembleType s.config.reverseMatrixLogic t
+                    let t = assembleType config.reverseMatrixLogic t
                     let! v = assembleExprS v
                     return sprintf "%s(%s)" t.Name v
 
@@ -986,7 +990,7 @@ module Assembler =
                 | CMatrixFromCols(t,cols) ->
                     let! cols = cols |> List.mapS assembleExprS
                     let! rev = AssemblerState.reverseMatrixLogic
-                    let t = assembleType s.config.reverseMatrixLogic t
+                    let t = assembleType rev t
 
                     let code = sprintf "%s(%s)" t.Name (String.concat ", " cols)
                     if rev then return sprintf "transpose(%s)" code
@@ -995,7 +999,7 @@ module Assembler =
                 | CMatrixFromRows(t, rows) ->
                     let! rows = rows |> List.mapS assembleExprS
                     let! rev = AssemblerState.reverseMatrixLogic
-                    let t = assembleType s.config.reverseMatrixLogic t
+                    let t = assembleType rev t
 
                     let code = sprintf "%s(%s)" t.Name (String.concat ", " rows)
                     if rev then return code
@@ -1006,7 +1010,7 @@ module Assembler =
                         | CMatrix(_,rows,cols) ->
                             let! elems = elems |> List.mapS assembleExprS
                             let! rev = AssemblerState.reverseMatrixLogic
-                            let t = assembleType s.config.reverseMatrixLogic t
+                            let t = assembleType rev t
 
                             if rev then 
                                 return sprintf "%s(%s)" t.Name (String.concat ", " elems)
@@ -1033,7 +1037,7 @@ module Assembler =
                             if rev then 
                                 return sprintf "%s[%d]" m row
                             else 
-                                let t = assembleType s.config.reverseMatrixLogic t
+                                let t = assembleType rev t
                                 let args = List.init d (fun i -> sprintf "%s[%d][%d]" m i row)
                                 return sprintf "%s(%s)" t.Name (String.concat ", " args)
                         | _ ->
@@ -1045,7 +1049,7 @@ module Assembler =
                             let! m = assembleExprS m
                             let! rev = AssemblerState.reverseMatrixLogic
                             if rev then 
-                                let t = assembleType s.config.reverseMatrixLogic t
+                                let t = assembleType rev t
                                 let args = List.init d (fun i -> sprintf "%s[%d][%d]" m i col)
                                 return sprintf "%s(%s)" t.Name (String.concat ", " args)
                             else
@@ -1064,7 +1068,7 @@ module Assembler =
       
     let assembleRExprS (e : CRExpr) =
         state {
-            let! s = State.get
+            let! config = AssemblerState.config
             match e with
                 | CRExpr e -> 
                     return! assembleExprS e
@@ -1076,14 +1080,14 @@ module Assembler =
                             | CPointer(_,t) -> t
                             | _ -> t
 
-                    let ct = assembleType s.config.reverseMatrixLogic et
+                    let ct = assembleType config.reverseMatrixLogic et
                     let! args = args |> List.mapS assembleExprS |> State.map (String.concat ", ")
                     return sprintf "%s[]( %s )" ct.Name args
         }
 
     let rec assembleStatementS (singleLine : bool) (s : CStatement) =
         state {
-            let! state = State.get
+            let! config = AssemblerState.config
             let seq (s : seq<string>) =
                 if singleLine then s |> String.concat " "
                 else s |> String.concat "\r\n"
@@ -1099,7 +1103,7 @@ module Assembler =
                 | CDeclare(v, r) ->
                     let name = glslName v.name
                     let! r = r |> Option.mapS assembleRExprS
-                    let decl = assembleDeclaration state.config.reverseMatrixLogic v.ctype name
+                    let decl = assembleDeclaration config.reverseMatrixLogic v.ctype name
                     match r with
                         | Some r -> return sprintf "%s = %s;" decl r
                         | None -> return sprintf "%s;" decl
@@ -1267,7 +1271,7 @@ module Assembler =
                                                         ssbSet = set
                                                         ssbBinding = binding
                                                         ssbName = name
-                                                        ssbType = GLSLType.ofCType ct
+                                                        ssbType = GLSLType.ofCType config.reverseMatrixLogic ct
                                                     }
                                                 | _ ->
                                                     failwithf "[GLSL] not a storage buffer type: %A" ct
@@ -1290,7 +1294,7 @@ module Assembler =
                                     ubSet = set
                                     ubBinding = binding
                                     ubName = bufferName.Name
-                                    ubFields = fields |> List.map (fun (_,n,_,t) -> { ufName = n; ufType = GLSLType.ofCType t; ufOffset = -1 })
+                                    ubFields = fields |> List.map (fun (_,n,_,t) -> { ufName = n; ufType = GLSLType.ofCType config.reverseMatrixLogic t; ufOffset = -1 })
                                     ubSize = -1
                                 }
                              
@@ -1504,7 +1508,7 @@ module Assembler =
                                     ssbSet = bSet
                                     ssbBinding = bBinding
                                     ssbName = p.cParamName
-                                    ssbType = GLSLType.ofCType ct
+                                    ssbType = GLSLType.ofCType config.reverseMatrixLogic ct
                                 }
                             | _ ->
                                 failwithf "[GLSL] not a storage buffer type: %A" p.cParamType

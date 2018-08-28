@@ -402,11 +402,18 @@ type UniformScope with
     member x.Count : int = uniform?Count
     member x.Trafo : M34d = uniform?Hugo
 
+type MyVertex =
+    {
+        [<Position>] pos : V4d
+        [<Color>] c : V4d
+        [<Semantic("AAATrafo")>] trafo : M34d
+    }
+
 [<Fact>]
 let ``Compose variables correct``() =
-    let frag (v : Vertex) =
+    let frag (v : MyVertex) =
         fragment {
-            let a = uniform.Trafo * v.pos
+            let a = v.trafo * v.pos
             let mutable value = a.X
             for i in 0 .. uniform.Count do
                 value <- sin(float i) * cos(float i) * value
@@ -419,5 +426,5 @@ let ``Compose variables correct``() =
 let main args =
     //``Helper with duplicate names``()
     //``Bad Helpers``()
-    ``Compose variables correct``()
+    ``Helper with duplicate names``()
     0

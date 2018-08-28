@@ -12,7 +12,7 @@ type GLSLType =
     | Int of signed : bool * width : int
     | Float of width : int
     | Vec of dim : int * elem : GLSLType
-    | Mat of rows : int * cols : int * elem : GLSLType
+    | Mat of cols : int * rows : int * elem : GLSLType
     | Struct of name : string * fields : list<string * GLSLType * int> * size : int
     | Array of len : int * elem : GLSLType * stride : int
     | Image of GLSLImageType
@@ -304,7 +304,7 @@ module GLSLProgramInterface =
                 | GLSLType.Float b -> sprintf "float%d" b
 
                 | GLSLType.Vec(dim, elem) -> sprintf "%s%d" (toString elem) dim
-                | GLSLType.Mat(r, c, elem) -> sprintf "%s%dx%d" (toString elem) r c
+                | GLSLType.Mat(c, r, elem) -> sprintf "%s%dx%d" (toString elem) c r
 
                 | GLSLType.Struct(name,_,_) -> name
                 | GLSLType.Array(len, elem,_) -> sprintf "%s[%d]" (toString elem) len
@@ -465,7 +465,7 @@ module GLSLProgramInterface =
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module GLSLType =
     
-    let rec ofCType (t : CType) =
+    let rec ofCType (rev : bool) (t : CType) =
         match t with    
             | CType.CBool -> GLSLType.Bool
             | CType.CVoid -> GLSLType.Void
@@ -474,11 +474,13 @@ module GLSLType =
             | CType.CFloat 64 -> GLSLType.Float 32
             | CType.CFloat(width) -> GLSLType.Float(width)
 
-            | CType.CVector(elem, dim) -> GLSLType.Vec(dim, ofCType elem)
-            | CType.CMatrix(elem, r, c) -> GLSLType.Mat(r, c, ofCType elem)
+            | CType.CVector(elem, dim) -> GLSLType.Vec(dim, ofCType rev elem)
+            | CType.CMatrix(elem, r, c) -> 
+                if rev then GLSLType.Mat(r, c, ofCType rev elem)
+                else GLSLType.Mat(c, r, ofCType rev elem)
 
-            | CType.CArray(elem, len) -> GLSLType.Array(len, ofCType elem, -1)
-            | CType.CStruct(name, fields,_) -> GLSLType.Struct(name, fields |> List.map (fun (t, n) -> n, ofCType t, -1), -1)
+            | CType.CArray(elem, len) -> GLSLType.Array(len, ofCType rev elem, -1)
+            | CType.CStruct(name, fields,_) -> GLSLType.Struct(name, fields |> List.map (fun (t, n) -> n, ofCType rev t, -1), -1)
 
             | CType.CIntrinsic a ->
                 match a.tag with
@@ -488,7 +490,7 @@ module GLSLType =
                             | GLSLSampler t -> GLSLType.Sampler t
                     | _ -> failwithf "[GLSL] bad intrinsic type: %A" a
 
-            | CType.CPointer(_,e) -> GLSLType.DynamicArray (ofCType e, -1)
+            | CType.CPointer(_,e) -> GLSLType.DynamicArray (ofCType rev e, -1)
 
 
 module LayoutStd140 =
@@ -579,13 +581,13 @@ module LayoutStd140 =
 
                 GLSLType.Array(len, bt, s), a, len * s
 
-            | GLSLType.Mat(rows, cols, bt) ->
+            | GLSLType.Mat(cols, rows, bt) ->
                 let narr, a, s = layout (GLSLType.Array(cols, GLSLType.Vec(rows, bt), -1))
                 let bt = 
                     match narr with
                         | GLSLType.Array(_, GLSLType.Vec(_,bt), _) -> bt
                         | _ -> failwith "that was unexpected"
-                GLSLType.Mat(rows, cols, bt), a, s
+                GLSLType.Mat(cols, rows, bt), a, s
 
             | GLSLType.Struct(name, fields, _) ->
                 let mutable offset = 0
