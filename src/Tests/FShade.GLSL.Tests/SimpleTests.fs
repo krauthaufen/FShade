@@ -412,10 +412,49 @@ let ``Compose variables correct``() =
         }
         
     GLSL.shouldCompile [ Effect.ofFunction frag; Effect.ofFunction frag]
+
+
+[<ReflectedDefinition>] 
+let clampPointToPolygon (vc : int) (p : V3d) = 
+
+    if vc > 0 then
+        (p, vc, -1, -1)
+    else
+        (p * 2.0, vc + 1, -1, -1)
+
+[<Fact>]
+let ``Struct declaration`` () =
+
+    let frag1 (v : Vertex) =
+        fragment {
+
+            let (x, y, z, w) = clampPointToPolygon ((int)v.pos.X) (v.pos.XYZ)
+            return V4d(x, float (y + z + w))
+        }
+
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag1 ] [ "struct tup_Aardvark_Base_V3d_int32_int32_int32" ]
+
+    let frag2 (v : Vertex) =
+        fragment {
+
+            let (x, y, _, _) = clampPointToPolygon ((int)v.pos.X) (v.pos.XYZ)
+            return V4d(x, float y)
+        }
+
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag2 ] [ "struct tup_Aardvark_Base_V3d_int32_int32_int32" ]
+
+    let frag3 (v : Vertex) =
+        fragment {
+
+            let (x, _, _, _) = clampPointToPolygon ((int)v.pos.X) (v.pos.XYZ)
+            return V4d(x, 1.0)
+        }
+
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag3 ] [ "struct tup_Aardvark_Base_V3d_int32_int32_int32" ]
     
 [<EntryPoint>]
 let main args =
     //``Helper with duplicate names``()
     //``Bad Helpers``()
-    ``[Compute] includes samplerInfo``()
+    ``Struct declaration``()
     0
