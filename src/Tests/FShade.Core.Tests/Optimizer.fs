@@ -252,7 +252,8 @@ let ``[Hoist] inline function``() =
                 let mutable c = x + 2*y
                 for i in 0 .. 10 do
                     c <- c / 2
-                keep c
+                let a = c
+                keep a
         @>
     input |> Opt.run |> should exprEqual expected
 
