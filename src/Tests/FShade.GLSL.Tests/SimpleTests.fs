@@ -451,10 +451,45 @@ let ``Struct declaration`` () =
         }
 
     GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag3 ] [ "struct tup_Aardvark_Base_V3d_int32_int32_int32" ]
+
+
+type UniformScope with  
+    member x.SomeUniform : V3d = uniform?SomeUniform
+    member x.SomeUniformArr : Arr<N<3>,V3d> = uniform?SomeUniformArr
     
+
+[<ReflectedDefinition>] [<Inline>]
+let inlineFun1 (forward : V3d) (up : V3d) =   
+    V3d.Cross(up, -forward) + up - forward
+    
+
+[<ReflectedDefinition>] [<Inline>]
+let inlineFun2 (p : V3d) = 
+ 
+    let i = int p.X
+
+    let n = Vec.dot p uniform.SomeUniformArr.[i]
+
+    let irr = inlineFun1 uniform.SomeUniformArr.[i] (uniform.SomeUniform * n)
+    
+    irr * p.Z
+
+
+[<Fact>]
+let ``Inline Inline`` () =
+    
+    let frag (v : Vertex) =
+        fragment {
+            let x = inlineFun2 (v.pos.XYZ)
+            return V4d(x.X, x.Y, x.Z, 1.0)
+        }
+
+    GLSL.shouldCompile [ Effect.ofFunction frag ]
+
+
 [<EntryPoint>]
 let main args =
     //``Helper with duplicate names``()
     //``Bad Helpers``()
-    ``Struct declaration``()
+    ``Inline Inline``()
     0
