@@ -2006,10 +2006,11 @@ module Optimizer =
     module Inlining =
         type State =
             {
-                variables   : bool
-                trivial     : bool
-                inputs      : bool
-                functions   : UtilityFunction -> bool
+                variables       : bool
+                trivial         : bool
+                inputs          : bool
+                isSideEffect    : MethodInfo -> bool
+                functions       : UtilityFunction -> bool
             }
 
                  
@@ -2017,11 +2018,12 @@ module Optimizer =
         module State =
             open System.Diagnostics
 
-            let empty = 
+            let empty (isSideEffect : MethodInfo -> bool) = 
                 { 
                     variables = true
                     trivial = true
                     inputs = true
+                    isSideEffect = isSideEffect
                     functions = fun f -> f.functionIsInline
                 }
 
@@ -2214,6 +2216,7 @@ module Optimizer =
                         return Expr.Let(v, e, b)
 
                     | Let(v, e, b) ->
+                        let! state = State.get
                         let! pattern = State.letValuePattern
                         let! e = inlineS e
 
@@ -2222,13 +2225,31 @@ module Optimizer =
                                 let b = b.Substitute(fun vi -> if vi = v then Some e else None)
                                 return! inlineS b
                             | None ->
-                                let tryInline =
-                                    match e with
-                                        | Var v when v.IsMutable -> false
-                                        | _ when e.Type.IsRef || e.Type.IsArr || e.Type.IsArray -> false
-                                        | _ -> true
+                                let rec canInline (e : Expr) =
+                                    if e.Type.IsRef || e.Type.IsArr || e.Type.IsArray then
+                                        false
+                                    else
+                                        match e with
+                                            | RefOf _
+                                            | VarSet _ 
+                                            | SetArray _
+                                            | GetArray _
+                                            | AddressOf _ 
+                                            | AddressSet _
+                                            | FieldSet _
+                                            | PropertySet _
+                                            | WriteOutputs _ ->
+                                                false
 
-                                if tryInline then
+                                            | Call(None, mi, args) ->
+                                                if state.isSideEffect mi then false
+                                                else args |> List.forall canInline
+
+                                            | ShapeVar v -> not v.IsMutable
+                                            | ShapeCombination (_,args) -> args |> List.forall canInline
+                                            | ShapeLambda(_,b) -> canInline b
+
+                                if canInline e then
                                     let mutable cnt = 0
                                     let nb = b.Substitute(fun vi -> if vi = v then cnt <- cnt + 1; Some e else None)
                                     if cnt = 1 then
@@ -2339,15 +2360,15 @@ module Optimizer =
                         return failwithf "[FShade] unexpected expression %A" e
             }
 
-        let inlining (e : Expr) =
-            let run = inlineS(e)
-            let mutable state = State.empty
+        let inlining (isSideEffect : MethodInfo -> bool) (e : Expr) =
+            let run = inlineS e
+            let mutable state = State.empty isSideEffect
             run.Run(&state)
 
 
-        let inlining' (functions : UtilityFunction -> bool) (e : Expr) =
+        let inlining' (isSideEffect : MethodInfo -> bool) (functions : UtilityFunction -> bool) (e : Expr) =
             let run = inlineS(e)
-            let mutable state = { State.empty with functions = functions }
+            let mutable state = { State.empty isSideEffect with functions = functions }
             run.Run(&state)
 
     module StatementHoisting =
@@ -2838,13 +2859,13 @@ module Optimizer =
         InputLifting.liftInputs e
         
     /// inlines copy variables, trivial expressions, input-reads and functions annotated with the [<Inline>] attribute
-    let inlining (e : Expr) =
-        Inlining.inlining e
+    let inlining (isSideEffect : MethodInfo -> bool) (e : Expr) =
+        Inlining.inlining isSideEffect e
         
     /// inlines copy variables, trivial expressions, input-reads and functions annotated with the [<Inline>] attribute.
     /// Function inlining can be forced using the given callback.
-    let inlining' (f : UtilityFunction -> bool) (e : Expr) =
-        Inlining.inlining' f e
+    let inlining' (isSideEffect : MethodInfo -> bool) (f : UtilityFunction -> bool) (e : Expr) =
+        Inlining.inlining' isSideEffect f e
 
     /// hoists imperative constructs. For example `let a = let b = 10 in b * 199` translates to `let b = 10 in let a = b * 199`.
     /// this ensures that most imperative constructs occur on statement-level and can easily be compiled to C like languages.
