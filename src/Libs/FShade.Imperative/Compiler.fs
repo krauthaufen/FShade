@@ -759,16 +759,22 @@ module Compiler =
 
         let useLocalFunction (key : obj) (f : FunctionDefinition) =
             State.custom (fun s ->
-                { s with usedFunctions = HMap.add key f s.usedFunctions }, f.Signature s.moduleState.backend
+                let sign = f.Signature s.moduleState.backend
+                let s = { s with moduleState = { s.moduleState with usedTypes = HMap.add (sign.returnType :> obj) sign.returnType s.moduleState.usedTypes }}
+                { s with usedFunctions = HMap.add key f s.usedFunctions }, sign
             )
 
         let useGlobalFunction (key : obj) (f : FunctionDefinition) =
             State.custom (fun s ->
                 match HMap.tryFind key s.moduleState.globalFunctions with
                     | Some signature ->
-                        { s with usedGlobalFunctions = HSet.add signature s.usedGlobalFunctions }, signature.Signature s.moduleState.backend
+                        let sign = signature.Signature s.moduleState.backend
+                        // use the return type
+                        let s = { s with moduleState = { s.moduleState with usedTypes = HMap.add (sign.returnType :> obj) sign.returnType s.moduleState.usedTypes }}
+                        { s with usedGlobalFunctions = HSet.add signature s.usedGlobalFunctions }, sign
                     | _ -> 
                         let signature = f.Signature s.moduleState.backend
+                        let s = { s with moduleState = { s.moduleState with usedTypes = HMap.add (signature.returnType :> obj) signature.returnType s.moduleState.usedTypes }}
                         { s with 
                             usedGlobalFunctions = HSet.add f s.usedGlobalFunctions
                             moduleState = { s.moduleState with globalFunctions = HMap.add key f s.moduleState.globalFunctions } 
@@ -1078,7 +1084,8 @@ module Compiler =
 
     and toCExprS (e : Expr) : State<_, CExpr> =
         state {
-
+            //// ensure all types are used
+            //let! __ = toCTypeS e.Type
             match e with
                 | ReducibleExpression e ->
                     return! toCExprS e
@@ -1765,6 +1772,7 @@ module Compiler =
                     let! s = State.get
                     let signature = f.Signature s.moduleState.backend
                     let! body = toCStatementS true body
+
                     return CFunctionDef(signature, body)
 
                 | CompiledFunction(signature, body) ->
