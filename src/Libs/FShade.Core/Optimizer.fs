@@ -716,7 +716,8 @@ module Optimizer =
                                     let isMutable = a.IsMutable || a.Type.IsArr || a.Type.IsArray || a.Type.IsRef
                                     let isUsed =
                                         match v with
-                                            | Var v -> Set.contains v s.usedVariables
+                                            | LExpr v 
+                                            | RefOf (LExpr v) -> Set.contains v s.usedVariables
                                             | _ -> false
 
                                     if isMutable && isUsed then
