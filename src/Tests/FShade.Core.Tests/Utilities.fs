@@ -46,8 +46,8 @@ module Utilities =
             expression
                 |> Preprocessor.preprocess V3i.Zero
                 |> fst
-                |> Optimizer.inlining
+                |> Optimizer.inlining isSideEffect
                 |> Optimizer.evaluateConstants' isSideEffect
-                |> Optimizer.inlining
+                |> Optimizer.inlining isSideEffect
                 |> Optimizer.eliminateDeadCode' isSideEffect
                 |> Optimizer.hoistImperativeConstructs
