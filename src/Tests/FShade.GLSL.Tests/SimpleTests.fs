@@ -486,7 +486,8 @@ let inlineFun2 (p : V3d) =
 
 [<Fact>]
 let ``Inline Inline`` () =
-    
+    Setup.Run()
+
     let frag (v : Vertex) =
         fragment {
             let x = inlineFun2 (v.pos.XYZ)
@@ -495,11 +496,43 @@ let ``Inline Inline`` () =
 
     GLSL.shouldCompile [ Effect.ofFunction frag ]
 
+let private textureArraySampler = 
+    sampler2d {
+        textureArray uniform?TextureArray 12
+        filter Filter.MinMagLinear
+        addressU WrapMode.Clamp
+        addressV WrapMode.Clamp
+    }
+
+[<ReflectedDefinition>] [<Inline>]
+let GetSample(switch : int, lc : V2d, sam : Sampler2d) : V3d =
+    match switch with
+    | 1 -> sam.Sample(lc).XYZ
+    | 2 -> sam.Sample(lc * 2.0).XYZ
+    | _ -> V3d.OOO
+
+[<Fact>]
+let ``Sampler Loop Inline`` () =
+    Setup.Run()
+
+    let frag (switch : int) (v : Vertex) =
+        fragment {
+            let lc = v.pos.XY
+            let mutable sum = V3d.Zero
+            for i in 0..uniform?TextureCount-1 do
+                let layer = GetSample(switch, lc, textureArraySampler.[i])
+                sum <- sum + layer
+
+            return V4d(sum, 1.0)
+        }
+
+    GLSL.shouldCompile [ Effect.ofFunction (frag 1) ]
+
 
 [<EntryPoint>]
 let main args =
     //``Helper with duplicate names``()
     //``Bad Helpers``()
     //``Helper with duplicate names``()
-    ``Inline Inline``()
+    ``Sampler Loop Inline``()
     0
