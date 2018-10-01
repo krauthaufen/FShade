@@ -20,6 +20,8 @@ open FShade
 module Utilities = 
     let keep a = ()
 
+    let produce<'a>() : 'a = onlyInShaderCode "produce"
+
 
     let rec normalize (e : Expr) =
         match e with
@@ -51,8 +53,10 @@ module Utilities =
         open System.Reflection
 
         let private keepMeth = getMethodInfo <@ keep @>
+        let private produceMeth = getMethodInfo <@ produce @>
+
         let isSideEffect (mi : MethodInfo) =
-            mi.IsGenericMethod && mi.GetGenericMethodDefinition() = keepMeth
+            mi.IsGenericMethod && (mi.GetGenericMethodDefinition() = keepMeth || mi.GetGenericMethodDefinition() = produceMeth)
 
         let run (expression : Expr) =
             expression

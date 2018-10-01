@@ -236,6 +236,32 @@ let ``[Hoist] preserving order``() =
     res |> should exprEqual expected
 
 [<Fact>]
+let ``[Hoist] nested lets``() =
+    let input =
+        <@
+            let a =
+                let b = 
+                    let c = 
+                        let d = produce<float>()
+                        d * d
+                    c * c
+                b * b
+
+            keep (a * a)
+        @>
+
+    let expected =
+        <@
+            let d = produce<float>()
+            let c = d * d
+            let b = c * c
+            let a = b * b
+            keep (a * a)
+        @>
+    let res = input |> Opt.run 
+    res |> should exprEqual expected
+
+[<Fact>]
 let ``[Hoist] lifting for loops``() =
     let input =
         <@
