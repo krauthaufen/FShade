@@ -2078,26 +2078,48 @@ module Optimizer =
                         Some ()
                     | _ -> 
                         None
+
+            let rec (|SamplerOrImageType|_|) (t : Type) =
+                match t with
+                    | SamplerType _ 
+                    | ImageType _
+                    | ArrOf(_,SamplerOrImageType)
+                    | ArrayOf(SamplerOrImageType) ->
+                        Some ()
+                    | _ ->
+                        None
+
             let letValuePattern =
                 State.get |> State.map (fun s ->
-                    match s.variables, s.trivial, s.inputs with
-                        | (false | true), true, true ->
-                            (|TrivialOrInput|_|)
+                    let pat = 
+                        match s.variables, s.trivial, s.inputs with
+                            | (false | true), true, true ->
+                                (|TrivialOrInput|_|)
 
-                        | (false | true), true, false ->
-                            (|Trivial|_|)
+                            | (false | true), true, false ->
+                                (|Trivial|_|)
 
-                        | true, false, false ->
-                            (|OnlyVar|_|)
+                            | true, false, false ->
+                                (|OnlyVar|_|)
 
-                        | false, false, true ->
-                            (|OnlyInputs|_|)
+                            | false, false, true ->
+                                (|OnlyInputs|_|)
 
-                        | true, false, true ->
-                            (|InputOrVar|_|)
+                            | true, false, true ->
+                                (|InputOrVar|_|)
 
-                        | false, false, false ->
-                            fun _ -> None
+                            | false, false, false ->
+                                fun _ -> None
+
+                    let sam (e : Expr) =
+                        match e.Type with
+                            | SamplerOrImageType -> Some ()
+                            | _ -> None
+
+                    fun e -> 
+                        match sam e with
+                            | Some () -> Some ()
+                            | None -> pat e
                 )
 
 
@@ -2230,16 +2252,24 @@ module Optimizer =
                                         false
                                     else
                                         match e with
+                                            | ReadInput(_,_,None) -> true
+                                            | ReadInput(_,_,Some idx) -> canInline idx
+                                        
+                                            | GetArray(e,i) ->
+                                                let res = canInline e && canInline i
+                                                res
                                             | RefOf _
                                             | VarSet _ 
                                             | SetArray _
-                                            | GetArray _
                                             | AddressOf _ 
                                             | AddressSet _
                                             | FieldSet _
                                             | PropertySet _
                                             | WriteOutputs _ ->
                                                 false
+
+
+
 
                                             | Call(None, mi, args) ->
                                                 if state.isSideEffect mi then false
@@ -2420,7 +2450,7 @@ module Optimizer =
                 | Let(v,e,b) ->
                     let b, bh = processExpression b
                     let e, eh = processExpression e
-                    b, bh + eh + { finalize = Some (fun f -> Expr.Let(v, e, f)) } 
+                    b, bh + { finalize = Some (fun f -> Expr.Let(v, e, f)) } + eh
 
 
                 | TryFinally _ -> failwith ""
