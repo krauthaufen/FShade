@@ -20,13 +20,25 @@ open FShade
 module Utilities = 
     let keep a = ()
 
+
+    let rec normalize (e : Expr) =
+        match e with
+            | Sequential(Sequential(a,b), c) ->
+                normalize (Expr.Sequential(a, Expr.Sequential(b,c)))
+            | ShapeCombination(o, args) ->
+                RebuildShapeCombination(o, args |> List.map normalize)
+            | ShapeVar v ->
+                e
+            | ShapeLambda(v,b) ->
+                Expr.Lambda(v, normalize b)
+
     let exprComparer l = 
         { new NHamcrest.Core.IsEqualMatcher<obj>(l) with
         
             override x.Matches(r : obj) =
                 match r with
                     | :? Expr as r ->
-                        Expr.ComputeHash l = Expr.ComputeHash r
+                        Expr.ComputeHash (normalize l) = Expr.ComputeHash (normalize r)
                     | _ ->
                         false
                 //l.ToString() = r.ToString()

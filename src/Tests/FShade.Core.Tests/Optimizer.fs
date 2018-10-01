@@ -158,7 +158,6 @@ let ``[This] immutable this removed``() =
 
     input |> Opt.run |> should exprEqual expected
 
-
 [<Fact>]
 let ``[Let] immutable binding inlined``() =
     let input =
@@ -207,6 +206,34 @@ let ``[Hoist] lifting bindings``() =
             keep a
         @>
     input |> Opt.run |> should exprEqual expected
+    
+[<Fact>]
+let ``[Hoist] preserving order``() =
+    let input =
+        <@
+            let mutable b = 10.0
+            let a =
+                b <- b + 1.0
+                b <- b + 2.0
+                if b > 10.0 then keep b
+                b * b
+            keep a
+            keep b
+        @>
+
+    let expected =
+        <@
+            let mutable b = 10.0
+            b <- b + 1.0
+            b <- b + 2.0
+            if b > 10.0 then keep b
+            let a =
+                b * b
+            keep a
+            keep b
+        @>
+    let res = input |> Opt.run 
+    res |> should exprEqual expected
 
 [<Fact>]
 let ``[Hoist] lifting for loops``() =
