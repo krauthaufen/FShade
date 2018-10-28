@@ -528,11 +528,38 @@ let ``Sampler Loop Inline`` () =
 
     GLSL.shouldCompile [ Effect.ofFunction (frag 1) ]
 
+[<Fact>]
+let ``Unroll Match`` () =
+    Setup.Run()
+
+    let frag (switch : int) (v : Vertex) =
+        fragment {
+            let mutable res = V3d.OOO
+            Preprocessor.unroll()
+            for i in 0..5 do
+                let p = match i with 
+                        | 0 -> v.pos.XYZ
+                        | 1 -> v.pos.XZY
+                        | 2 -> v.pos.YZX
+                        | 3 -> v.pos.YXZ
+                        | 4 -> v.pos.ZYX
+                        | _ -> v.pos.ZXY
+                //let p = if i = 0 then v.pos.XYZ
+                //        else if i = 1 then v.pos.XZY
+                //        else if i = 2 then v.pos.YZX
+                //        else if i = 3 then v.pos.YXZ
+                //        else if i = 4 then v.pos.ZYX
+                //        else v.pos.ZXY
+                res <- res + p
+            return V4d(res, 1.0)
+        }
+
+    GLSL.shouldCompile [ Effect.ofFunction (frag 1) ] // should not contain "0 == 0", "0 == 1", "0 == 2", ...
 
 [<EntryPoint>]
 let main args =
     //``Helper with duplicate names``()
     //``Bad Helpers``()
     //``Helper with duplicate names``()
-    ``Sampler Loop Inline``()
+    ``Unroll Match``()
     0
