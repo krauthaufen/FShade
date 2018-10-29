@@ -146,6 +146,7 @@ let run() =
         let coordType = floatVec coordComponents
         let projCoordType = floatVec (coordComponents + 1)
         let texelCoordType = intVec coordComponents
+        let readCoordType = intVec (if a then coordComponents + 1 else coordComponents)
 
         let sizeType =
             match d with
@@ -276,14 +277,14 @@ let run() =
                     "non-sampled texture read"
                     SampleVariants.None
                     "Read"
-                    (["coord", texelCoordType; "sample", "int"])
+                    (["coord", readCoordType; "sample", "int"])
                     returnType
             else
                 samplerFunction 
                     "non-sampled texture read"
                     SampleVariants.None
                     "Read"
-                    (["coord", texelCoordType; "lod", "int"])
+                    (["coord", readCoordType; "lod", "int"])
                     returnType
 
 

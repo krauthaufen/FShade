@@ -556,10 +556,36 @@ let ``Unroll Match`` () =
 
     GLSL.shouldCompile [ Effect.ofFunction (frag 1) ] // should not contain "0 == 0", "0 == 1", "0 == 2", ...
 
+let private arraySampler = 
+    sampler2dArray {
+        texture uniform?TextureArray
+        filter Filter.MinMagLinear
+        addressU WrapMode.Clamp
+        addressV WrapMode.Clamp
+    }
+
+[<Fact>]
+let ``Array Samplers`` () =
+    Setup.Run()
+
+    let frag (v : Vertex) =
+        fragment {
+            let lc = v.pos.XY
+            let mutable sum = V4d.Zero
+            for i in 0..uniform?TextureCount-1 do
+                let layer = arraySampler.Read(V3i(int lc.X, int lc.Y, i), 0)
+                sum <- sum + layer
+
+            return sum
+        }
+
+    GLSL.shouldCompile [ Effect.ofFunction (frag) ]
+
 [<EntryPoint>]
 let main args =
     //``Helper with duplicate names``()
     //``Bad Helpers``()
     //``Helper with duplicate names``()
-    ``Unroll Match``()
+    //``Unroll Match``()
+    ``Array Samplers``()
     0
