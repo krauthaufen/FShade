@@ -1299,6 +1299,30 @@ module Optimizer =
 
             ]
 
+
+        let rec (|SeqCons|_|) (e : Expr) =
+            match e with
+                | Unit ->
+                    None
+
+                | Sequential(SeqCons(head, tail), r) ->
+                    let tail = 
+                        match tail with
+                            | Some t -> Expr.Sequential(t, r) |> Some
+                            | None -> Some r
+                    Some (head, tail)
+                    
+
+                | e -> 
+                    Some (e, None)
+  
+        let rec (|SeqCons2|_|) (e : Expr) =
+            match e with
+                | SeqCons(a, Some (SeqCons(b, c))) ->
+                    Some (a,b,c)
+                | _ ->
+                    None
+   
         let rec evaluateConstantsS (e : Expr) =
             state {
                 match e with
@@ -1340,6 +1364,40 @@ module Optimizer =
                                 return Expr.Value(mi.Invoke(lambda, [|arg|]), e.Type)
                             | _ ->
                                 return Expr.Application(lambda, arg)
+
+                    | SeqCons2((Unroll as u), ForInteger(v, first, step, last, body), rest) ->
+                        let! first = evaluateConstantsS first
+                        let! step = evaluateConstantsS step
+                        let! last = evaluateConstantsS last
+                        
+                        match first, step, last with
+                            | Int32 f, Int32 s, Int32 l ->
+                                let! unrolled = 
+                                    [f .. s .. l] |> List.mapS (fun i -> 
+                                        let value = Expr.Value(i)
+                                        let body = body.Substitute(fun vi -> if vi = v then Some value else None)
+                                        evaluateConstantsS body
+                                    )
+                                match rest with
+                                    | Some rest -> 
+                                        let! rest = evaluateConstantsS rest
+                                        return Expr.Seq [Expr.Seq unrolled; rest]
+                                    | None ->
+                                        return Expr.Seq unrolled
+                            | _ ->
+                                let! body = evaluateConstantsS body
+                                match rest with
+                                    | Some rest -> 
+                                        let! rest = evaluateConstantsS rest
+                                        match body with
+                                            | Value _ -> return rest
+                                            | _ -> 
+                                                return Expr.Seq [u; Expr.ForInteger(v, first, step, last, body); rest]
+                                    | None ->
+                                        return Expr.Seq [u; Expr.ForInteger(v, first, step, last, body)]
+
+
+                        
 
                     | ForInteger(v, first, step, last, body) ->
                         let! first = evaluateConstantsS first
@@ -1446,10 +1504,6 @@ module Optimizer =
 
                     | DefaultValue t ->
                         return Expr.DefaultValue t
-//                        if t.IsValueType then
-//                            return Expr.Value(Activator.CreateInstance t, t)
-//                        else
-//                            return Expr.Value(null, t)
 
                     | FieldGet(None, f) ->
                         let! n = State.needsField f
