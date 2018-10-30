@@ -771,6 +771,24 @@ module IntrinsicFunctions =
                         | SamplerDimension.SamplerCube -> 3
                         | _ -> failwithf "unknown sampler dimension: %A" dim
 
+                let fetchArgs() = 
+                    let consumedArgs, sampleArgs =
+                        match isArray with
+                            | true -> 3, sprintf "{0}, ivec%d({1}, {2})" (coordComponents + 1)
+                            | false -> 2, "{0}, {1}"
+
+                    let args = List.skip consumedArgs args
+
+                    let rest =
+                        match args with
+                            | [] -> 
+                                ", 0"
+                            | _ ->
+                                args |> List.mapi (fun i _ -> sprintf "{%d}" (i + consumedArgs)) |> String.concat ", " |> sprintf ", %s"
+
+
+                    sampleArgs + rest
+
                 let sampleArgs() = 
                     let consumedArgs, sampleArgs =
                         match isArray, isShadow with
@@ -789,7 +807,6 @@ module IntrinsicFunctions =
 
 
                     sampleArgs + rest
-
                 let projArgs() =
                     let consumedArgs, sampleArgs =
                         match isArray, isShadow with
@@ -836,10 +853,9 @@ module IntrinsicFunctions =
                     | "SampleGrad" -> sprintf "textureGrad(%s)" (sampleArgs()) |> Some
                     | "Gather" -> sprintf "textureGather(%s)" (plainArgs 0) |> Some
                     | "GatherOffset" -> sprintf "textureGatherOffset(%s)" (plainArgs 0) |> Some
-                    | "Read" -> sprintf "texelFetch(%s)" (plainArgs 0) |> Some
-
-                    | "get_Item" when argCount = 1 -> sprintf "texelFetch(%s, 0)" (plainArgs 0) |> Some
-                    | "get_Item" -> sprintf "texelFetch(%s)" (plainArgs 0) |> Some
+                    
+                    | "Read" -> sprintf "texelFetch(%s)" (fetchArgs()) |> Some
+                    | "get_Item" -> sprintf "texelFetch(%s)" (fetchArgs()) |> Some
 
                     | "QueryLod" -> sprintf "textureQueryLod(%s)" (plainArgs 0) |> Some
 

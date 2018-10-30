@@ -1,8 +1,9 @@
-﻿#r @"..\..\..\Bin\Debug\Aardvark.Base.dll"
-#r @"..\..\..\Bin\Debug\Aardvark.Base.TypeProviders.dll"
-#r @"..\..\..\Bin\Debug\Aardvark.Base.FSharp.dll"
-#r @"..\..\..\Bin\Debug\FShade.Imperative.dll"
-#r @"..\..\..\Bin\Debug\FShade.Core.dll"
+﻿#r "netstandard.dll"
+#r @"..\..\..\packages\Aardvark.Base\lib\netstandard2.0\Aardvark.Base.dll"
+#r @"..\..\..\packages\Aardvark.Base.TypeProviders\lib\netstandard2.0\Aardvark.Base.TypeProviders.dll"
+#r @"..\..\..\packages\Aardvark.Base.FSharp\lib\netstandard2.0\Aardvark.Base.FSharp.dll"
+#r @"..\..\..\bin\Debug\netstandard2.0\FShade.Imperative.dll"
+#r @"..\..\..\bin\Debug\netstandard2.0\FShade.Core.dll"
 
 open System
 open System.IO
@@ -146,7 +147,7 @@ let run() =
         let coordType = floatVec coordComponents
         let projCoordType = floatVec (coordComponents + 1)
         let texelCoordType = intVec coordComponents
-        let readCoordType = intVec (if a then coordComponents + 1 else coordComponents)
+        let readCoordType = intVec coordComponents //(if a then coordComponents + 1 else coordComponents)
 
         let sizeType =
             match d with
@@ -273,18 +274,26 @@ let run() =
 
         if d <> SamplerDimension.SamplerCube then
             if m then
+                let args = 
+                    if a then ["coord", readCoordType; "slice", "int"; "sample", "int"]
+                    else ["coord", readCoordType; "sample", "int"]
+
                 samplerFunction 
                     "non-sampled texture read"
                     SampleVariants.None
                     "Read"
-                    (["coord", readCoordType; "sample", "int"])
+                    args
                     returnType
             else
+                let args = 
+                    if a then ["coord", readCoordType; "slice", "int"; "lod", "int"]
+                    else ["coord", readCoordType; "lod", "int"]
+
                 samplerFunction 
                     "non-sampled texture read"
                     SampleVariants.None
                     "Read"
-                    (["coord", readCoordType; "lod", "int"])
+                    args
                     returnType
 
 

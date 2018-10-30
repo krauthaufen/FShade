@@ -563,6 +563,14 @@ let private arraySampler =
         addressU WrapMode.Clamp
         addressV WrapMode.Clamp
     }
+    
+let private simpleSampler = 
+    sampler2d {
+        texture uniform?Simple
+        filter Filter.MinMagLinear
+        addressU WrapMode.Clamp
+        addressV WrapMode.Clamp
+    }
 
 [<Fact>]
 let ``Array Samplers`` () =
@@ -573,7 +581,7 @@ let ``Array Samplers`` () =
             let lc = v.pos.XY
             let mutable sum = V4d.Zero
             for i in 0..uniform?TextureCount-1 do
-                let layer = arraySampler.Read(V3i(int lc.X, int lc.Y, i), 0)
+                let layer = arraySampler.Read(V2i(int lc.X, int lc.Y), i, 0)
                 sum <- sum + layer
 
             return sum
@@ -581,11 +589,27 @@ let ``Array Samplers`` () =
 
     GLSL.shouldCompile [ Effect.ofFunction (frag) ]
 
+[<Fact>]
+let ``Simple Fetch`` () =
+    Setup.Run()
+
+    let frag (v : Vertex) =
+        fragment {
+            let a = simpleSampler.[V2i.IO]
+            let b = simpleSampler.[V2i.OI, 1]
+            let c = simpleSampler.Read(V2i.II, 7)
+
+            return a + b + c
+        }
+
+    GLSL.shouldCompile [ Effect.ofFunction (frag) ]
+
 [<EntryPoint>]
 let main args =
+    ``Simple Fetch`` ()
     //``Helper with duplicate names``()
     //``Bad Helpers``()
     //``Helper with duplicate names``()
     //``Unroll Match``()
-    ``Array Samplers``()
+    //``Array Samplers``()
     0
