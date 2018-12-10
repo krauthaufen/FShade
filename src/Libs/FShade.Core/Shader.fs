@@ -2176,6 +2176,10 @@ module Shader =
             let needed  = Map.intersect l.shaderOutputs r.shaderInputs
             let passed  = Map.difference l.shaderOutputs r.shaderOutputs
 
+            let depthWrite =
+                if r.shaderDepthWriteMode <> DepthWriteMode.None then r.shaderDepthWriteMode
+                else l.shaderDepthWriteMode
+
             let lBody =
                 l.shaderBody.SubstituteWrites (fun values ->
                     // cannot compose to TessControl Shader
@@ -2229,6 +2233,7 @@ module Shader =
                     shaderUniforms = Map.union l.shaderUniforms r.shaderUniforms
                     shaderBody = lBody
                     shaderDebugRange = None
+                    shaderDepthWriteMode = depthWrite
                 }
 
         let gsvs (lShader : Shader) (rShader : Shader) =
