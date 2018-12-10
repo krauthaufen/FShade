@@ -74,15 +74,21 @@ type ISemanticValue =
     abstract member Semantic : string
     abstract member Scope : UniformScope
 
-[<AttributeUsage(AttributeTargets.Property ||| AttributeTargets.Field)>]
+[<AttributeUsage(AttributeTargets.Property ||| AttributeTargets.Field, AllowMultiple = false)>]
 type SemanticAttribute(s : string) =
     inherit Attribute()
     member x.Semantic = s
 
-[<AttributeUsage(AttributeTargets.Property ||| AttributeTargets.Field)>]
+[<AttributeUsage(AttributeTargets.Property ||| AttributeTargets.Field, AllowMultiple = false)>]
 type InterpolationAttribute(qualifier : InterpolationMode) =
     inherit Attribute()
     member x.Qualifier = qualifier
+    
+[<AttributeUsage(AttributeTargets.Property ||| AttributeTargets.Field, AllowMultiple = false)>]
+type DepthAttribute(mode : DepthWriteMode) =
+    inherit SemanticAttribute("Depth")
+    member x.Mode = mode
+    new() = DepthAttribute(DepthWriteMode.Any)
 
 [<AttributeUsage(AttributeTargets.Property ||| AttributeTargets.Field)>]
 type PrimitiveIndexAttribute(index : int) =

@@ -48,6 +48,7 @@ type ParameterDecoration =
     | Slot of int
     | StorageBuffer of read : bool * write : bool
     | Shared
+    | DepthWrite of DepthWriteMode
     
 [<RequireQualifiedAccess>]
 type UniformDecoration =

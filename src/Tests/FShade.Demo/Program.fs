@@ -130,13 +130,27 @@ let funny (v : Vertex) =
     }
 
 
+type Fragment = 
+    {
+        [<Color>] c : V4d
+        [<Depth(DepthWriteMode.OnlyLess)>] d : float
+    }
+
+let fraggy (v : Vertex) =
+    fragment {
+        return {
+            c = V4d.IIII
+            d = 0.5
+        }
+    }
+
 [<EntryPoint>]
 let main args =
     let hugo = 100
 
     //Examples.UtiliyFunctions.run()
 
-    let shader = Effect.ofFunction funny
+    let shader = Effect.ofFunction fraggy
     let glsl = compileEffect [ shader ]
 
     printfn "%s" glsl.code

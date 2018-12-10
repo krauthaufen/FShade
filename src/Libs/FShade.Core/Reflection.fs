@@ -31,6 +31,12 @@ module ReflectionPatterns =
             match att with
                 | x::_ -> x.Qualifier
                 | _ -> InterpolationMode.Default
+                
+        member x.DepthWriteMode =
+            let att = x.GetCustomAttributes<DepthAttribute>(true) |> Seq.toList
+            match att with
+                | x::_ -> x.Mode
+                | _ -> DepthWriteMode.Any
 
         member x.PrimitiveIndex =
             let att = x.GetCustomAttributes<PrimitiveIndexAttribute>(true) |> Seq.toList

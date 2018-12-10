@@ -243,7 +243,7 @@ module Effect =
     type private EffectKey =
         {
             inputSemantics : Map<string, InterpolationMode>
-            outputSemantics : Map<string, InterpolationMode>
+            outputSemantics : Map<string, InterpolationMode * DepthWriteMode>
             body : Expr
         }
     /// creates an effect from a shader-function
@@ -283,7 +283,7 @@ module Effect =
             
             {
                 inputSemantics = inputFields |> Seq.map (fun f -> f.Semantic, f.Interpolation) |> Map.ofSeq
-                outputSemantics = outputFields |> Seq.map (fun f -> f.Semantic, f.Interpolation) |> Map.ofSeq
+                outputSemantics = outputFields |> Seq.map (fun f -> f.Semantic, (f.Interpolation, f.DepthWriteMode)) |> Map.ofSeq
                 body = expression.WithAttributes []
             }
          

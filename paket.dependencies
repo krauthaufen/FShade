@@ -3,9 +3,9 @@ source https://api.nuget.org/v3/index.json
 
 nuget FSharp.Core               ~> 4.3.0
 
-nuget Aardvark.Base             ~> 4.3.0
-nuget Aardvark.Base.FSharp      ~> 4.3.0
-nuget Aardvark.Base.Incremental ~> 4.3.0
+nuget Aardvark.Base             ~> 4.3.3
+nuget Aardvark.Base.FSharp      ~> 4.3.3
+nuget Aardvark.Base.Incremental ~> 4.3.3
 
 nuget FSharp.Compiler.Service   ~> 22.0.3
 nuget FsPickler                 ~> 5.2.0

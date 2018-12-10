@@ -1,5 +1,11 @@
 ﻿namespace FShade
 
+type DepthWriteMode =
+    | None          = 0
+    | Any           = 1
+    | Equal         = 2
+    | OnlyGreater   = 3
+    | OnlyLess      = 4
 
 type InterpolationMode =
     | Default           = 0

@@ -1357,8 +1357,17 @@ module Assembler =
                 
         }
 
+    let assembleDepthWriteMode (mode : DepthWriteMode) =
+        match mode with
+            | DepthWriteMode.Equal -> "depth_unchanged"
+            | DepthWriteMode.OnlyLess -> "depth_less"
+            | DepthWriteMode.OnlyGreater -> "depth_greater"
+            | _ -> "depth_any"
+
+
     let assembleEntryParameterS (kind : ParameterKind) (p : CEntryParameter) =
         state {
+            let depthWrite = p.cParamDecorations |> Seq.tryPick (function ParameterDecoration.DepthWrite m -> Some m | _ -> None) |> Option.defaultValue DepthWriteMode.None
             let! stages = AssemblerState.stages
             let! builtIn = AssemblerState.tryGetParameterName kind p.cParamSemantic
             let prevStage = stages.prev
@@ -1368,7 +1377,12 @@ module Assembler =
             match builtIn with
                 | Some name -> 
                     do! Interface.useBuiltIn kind name p.cParamType
-                    return None
+
+                    if name = "gl_FragDepth" && depthWrite <> DepthWriteMode.None then
+                        let mode = assembleDepthWriteMode depthWrite
+                        return Some (sprintf "layout(%s) out float gl_FragDepth;" mode)
+                    else
+                        return None
 
                 | None ->
                     let! config = AssemblerState.config
@@ -1386,6 +1400,9 @@ module Assembler =
                         |> List.chooseS (fun d ->
                             state {
                                 match d with
+                                    | ParameterDecoration.DepthWrite _ ->
+                                        return None
+
                                     | ParameterDecoration.Const -> 
                                         return Some "const"
 

@@ -49,6 +49,8 @@ type Shader =
         shaderBody : Expr
         /// the shader's source info (if any)
         shaderDebugRange : Option<DebugRange>
+
+        shaderDepthWriteMode : DepthWriteMode
     }
 
 [<CompilerMessage("Preprocessor should not be used directly", 4321, IsHidden = true)>]
@@ -261,6 +263,7 @@ module Preprocessor =
 
     type State =
         {
+            depthWriteMode  : DepthWriteMode
             inputType       : Type
             inputTopology   : Option<InputTopology>
             vertexType      : Type
@@ -284,7 +287,8 @@ module Preprocessor =
         type private NoInput = { x : int }
 
         let empty =
-            {
+            {   
+                depthWriteMode  = DepthWriteMode.None
                 inputType       = typeof<NoInput>
                 inputTopology   = None
                 vertexType      = typeof<NoInput>
@@ -349,6 +353,11 @@ module Preprocessor =
         let writeOutput (name : string) (desc : ParameterDescription) = 
             State.modify (fun s ->
                 { s with State.outputs = Map.add name desc s.outputs }
+            )
+
+        let setDepthWriteMode (mode : DepthWriteMode) =
+            State.modify (fun s ->
+                { s with depthWriteMode = mode }
             )
 
         let setBuilder (b : Expr) =
@@ -886,6 +895,9 @@ module Preprocessor =
                                     let p = { paramType = f.PropertyType; paramInterpolation = i }
                                     do! State.writeOutput sem p
 
+                                    if sem = "Depth" then
+                                        do! State.setDepthWriteMode f.DepthWriteMode
+
                                     let! real = preprocessS v
                                     return sem, None, real
                                 }
@@ -982,6 +994,7 @@ module Preprocessor =
                 shaderInvocations       = 1
                 shaderBody              = body
                 shaderDebugRange        = None
+                shaderDepthWriteMode    = state.depthWriteMode
             }
 
         shader :: state.shaders
@@ -1997,13 +2010,21 @@ module Shader =
                     }
             )
 
+        let depthWriteMode =
+            if s.shaderStage = ShaderStage.Fragment && s.shaderDepthWriteMode <> DepthWriteMode.None then
+                Set.ofList [ ParameterDecoration.DepthWrite s.shaderDepthWriteMode ]
+            else
+                Set.empty
+
         let outputs = 
             s.shaderOutputs |> Map.toList |> List.map (fun (n, i) -> 
+                let dec = Set.ofList [ParameterDecoration.Interpolation i.paramInterpolation]
+                let dec = if n = "Depth" then Set.union depthWriteMode dec else dec
                 { 
                     paramName = n
                     paramSemantic = n
                     paramType = i.paramType
-                    paramDecorations = Set.ofList [ParameterDecoration.Interpolation i.paramInterpolation]
+                    paramDecorations = dec
                 }
             )
 
@@ -2099,6 +2120,7 @@ module Shader =
                             |> Map.map (fun n t -> None, Expr.ReadInput(ParameterKind.Input, t, n))
                             |> Expr.WriteOutputs
                     shaderDebugRange = None
+                    shaderDepthWriteMode = DepthWriteMode.None
                 }
             | _ ->
                 failwith "[FShade] not implemented"

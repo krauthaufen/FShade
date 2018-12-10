@@ -84,7 +84,6 @@ module InstrinsicAttributes =
     type PrimitiveIdAttribute() = inherit SemanticAttribute(Intrinsics.PrimitiveId)
     type InvocationIdAttribute() = inherit SemanticAttribute(Intrinsics.InvocationId)
     type TessCoordAttribute() = inherit SemanticAttribute(Intrinsics.TessCoord)
-    type DepthAttribute() = inherit SemanticAttribute(Intrinsics.Depth)
     type ColorAttribute() = inherit SemanticAttribute(Intrinsics.Color)
     type SecondaryColorAttribute() = inherit SemanticAttribute(Intrinsics.SecondaryColor)
     type TessLevelInnerAttribute() = inherit SemanticAttribute(Intrinsics.TessLevelInner)

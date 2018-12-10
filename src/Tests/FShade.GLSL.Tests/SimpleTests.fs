@@ -604,9 +604,30 @@ let ``Simple Fetch`` () =
 
     GLSL.shouldCompile [ Effect.ofFunction (frag) ]
 
+type Fragment = 
+    {
+        [<Color>] c : V4d
+        [<Depth(DepthWriteMode.OnlyLess)>] d : float
+    }
+
+let ``Depth Only Less``() =
+    Setup.Run()
+
+    let fraggy (v : Vertex) =
+        fragment {
+            return {
+                c = V4d.IIII
+                d = 0.5
+            }
+        }
+
+    GLSL.shouldCompile [ Effect.ofFunction (fraggy) ]
+
+
+
 [<EntryPoint>]
 let main args =
-    ``Simple Fetch`` ()
+    ``Depth Only Less``()
     //``Helper with duplicate names``()
     //``Bad Helpers``()
     //``Helper with duplicate names``()
