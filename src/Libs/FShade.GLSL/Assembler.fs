@@ -1373,20 +1373,43 @@ module Assembler =
             let prevStage = stages.prev
             let selfStage = stages.self
             let nextStage = stages.next
+            
+            let! config = AssemblerState.config
 
             match builtIn with
                 | Some name -> 
                     do! Interface.useBuiltIn kind name p.cParamType
 
+                    let interpolation = 
+                        if kind = ParameterKind.Input && stages.self = ShaderStage.Fragment then
+                            p.cParamDecorations |> Seq.tryPick (function ParameterDecoration.Interpolation i -> Some i | _ -> None)
+                        else
+                            None
+
                     if name = "gl_FragDepth" && depthWrite <> DepthWriteMode.None then
                         let mode = assembleDepthWriteMode depthWrite
                         return Some (sprintf "layout(%s) out float gl_FragDepth;" mode)
                     else
-                        return None
+                        match interpolation with
+                        | Some i ->
+                            let mode =
+                                match i with
+                                | InterpolationMode.Centroid -> Some "centroid"
+                                | InterpolationMode.Flat -> Some "flat"
+                                | InterpolationMode.NoPerspective -> Some "noperspective"
+                                | InterpolationMode.Perspective -> Some "perspective"
+                                | InterpolationMode.Sample -> Some "sample"
+                                | _ -> None
+                            match mode with
+                            | Some m ->
+                                let t = assembleType config.reverseMatrixLogic p.cParamType
+                                return Some (sprintf "%s in %s %s;" m t.Name name)
+                            | None ->
+                                return None
+                        | None -> 
+                            return None
 
                 | None ->
-                    let! config = AssemblerState.config
-
                     let! set = 
                         if config.createDescriptorSets then AssemblerState.newSet
                         else State.value -1
