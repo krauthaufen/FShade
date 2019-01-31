@@ -1629,13 +1629,22 @@ module Shader =
     ///    4) inline functions where possible
     let optimize (shader : Shader) =
         let sideEffects = sideEffects.[shader.shaderStage]
+
+        let isSideEffect (m : MethodInfo) =
+            if sideEffects.Contains m then
+                true
+            else
+                m.GetCustomAttributes<KeepCallAttribute>()
+                |> Seq.isEmpty
+                |> not
+
         let newBody, state = 
             shader.shaderBody
-                |> Optimizer.inlining sideEffects.Contains
+                |> Optimizer.inlining isSideEffect
                 |> Optimizer.hoistImperativeConstructs
-                |> Optimizer.evaluateConstants' sideEffects.Contains
-                |> Optimizer.eliminateDeadCode' sideEffects.Contains
-                |> Optimizer.evaluateConstants' sideEffects.Contains
+                |> Optimizer.evaluateConstants' isSideEffect
+                |> Optimizer.eliminateDeadCode' isSideEffect
+                |> Optimizer.evaluateConstants' isSideEffect
                 |> Optimizer.liftInputs
                 |> Preprocessor.preprocess V3i.Zero
 

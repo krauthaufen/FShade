@@ -104,9 +104,12 @@ type EntryPoint =
         body        : Expr
         decorations : list<EntryDecoration>
     }
-
+    
 [<AttributeUsage(AttributeTargets.Method ||| AttributeTargets.Property)>]
 type InlineAttribute() = inherit System.Attribute()
+
+[<AttributeUsage(AttributeTargets.Method)>]
+type KeepCallAttribute() = inherit System.Attribute()
 
 
 [<AutoOpen>]

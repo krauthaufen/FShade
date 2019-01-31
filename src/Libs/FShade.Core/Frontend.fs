@@ -8,6 +8,7 @@ open Aardvark.Base
 open FShade
 
 type InlineAttribute = FShade.Imperative.InlineAttribute
+type KeepCallAttribute = FShade.Imperative.KeepCallAttribute
 
 [<AutoOpen>]
 module Primitives =
