@@ -1006,7 +1006,7 @@ module Preprocessor =
 
     and preprocessMethod (localSize : V3i) (mi : MethodBase) =    
         shaderUtilityFunctions.GetOrAdd((localSize, mi), fun (localSize, mi) ->
-            match Expr.TryGetReflectedDefinition mi with
+            match ExprWorkardound.TryGetReflectedDefinition mi with
                 | Some expr ->
                     preprocess localSize expr |> Some
                 | None ->

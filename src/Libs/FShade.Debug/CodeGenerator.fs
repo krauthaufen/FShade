@@ -315,7 +315,7 @@ module CodeGenerator =
                 let set = args |> List.map getUsedUniformExtensions |> List.fold HSet.union set
 
                 let set = 
-                    match Expr.TryGetReflectedDefinition mi with
+                    match ExprWorkardound.TryGetReflectedDefinition mi with
                         | Some e -> 
                             let inner = getUsedUniformExtensions e
                             HSet.union set inner
@@ -361,7 +361,7 @@ module CodeGenerator =
                             t |> Option.iter visit
                             args |> List.iter visit
 
-                            match Expr.TryGetReflectedDefinition mi with
+                            match ExprWorkardound.TryGetReflectedDefinition mi with
                                 | Some e -> visit e
                                 | None -> ()
 

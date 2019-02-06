@@ -50,7 +50,7 @@ module UtilityFunction =
         if intrinsic then
             None
         else
-            match Expr.TryGetReflectedDefinition m with
+            match ExprWorkardound.TryGetReflectedDefinition m with
                 | Some e ->
                     let isInline = m.GetCustomAttributes(typeof<InlineAttribute>, true) |> Seq.isEmpty |> not
 

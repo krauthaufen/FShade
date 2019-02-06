@@ -92,7 +92,7 @@ module Compiler =
                     let args, body = handleThis mi.IsStatic args body
                     ManagedFunction(name, args, body)
                 | _ ->
-                    match Expr.TryGetReflectedDefinition mi with
+                    match ExprWorkardound.TryGetReflectedDefinition mi with
                         | Some (Lambdas(args, body)) ->
                             let args, body = handleThis mi.IsStatic args body
                             ManagedFunction(name, args, body)
@@ -259,7 +259,7 @@ module Compiler =
                         failwithf "[FShade] unexpected constructor definition %A" e
 
             ctorCache.GetOrAdd((b,ctor), fun (b, ctor) ->
-                match Expr.TryGetReflectedDefinition ctor with
+                match ExprWorkardound.TryGetReflectedDefinition ctor with
                     | Some e ->
                         let args, body = preprocessCtor e
                         let argTypeNames = args |> List.map (fun a -> typeName a.Type) |> String.concat "_"

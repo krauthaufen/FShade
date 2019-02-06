@@ -111,7 +111,7 @@ module ExprHashExtensions =
             match e with
                 | Call(t,mi,args) ->
                     let isInline = mi.GetCustomAttributes<InlineAttribute>() |> Seq.isEmpty |> not
-                    match Expr.TryGetReflectedDefinition mi with
+                    match ExprWorkardound.TryGetReflectedDefinition mi with
                         | Some def -> 
                             let args = 
                                 match t with

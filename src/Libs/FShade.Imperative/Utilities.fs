@@ -13,6 +13,14 @@ open Aardvark.Base
 
 #nowarn "8989"
 
+module ExprWorkardound = 
+    let lockObj = obj()
+
+    let TryGetReflectedDefinition (mb : MethodBase) =
+        lock lockObj (fun _ -> 
+            Expr.TryGetReflectedDefinition mb
+        )
+
 module Peano = 
     let getPeanoType (i : int) =
         Aardvark.Base.Peano.getPeanoType i
