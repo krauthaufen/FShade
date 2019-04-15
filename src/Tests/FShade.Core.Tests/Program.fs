@@ -4,5 +4,6 @@ open System
 
 [<EntryPoint>]
 let main argv =
-    Hashes.``[ComputeHashing] including localSize``()
+    Optimizer.Sepp()
+    //Hashes.``[ComputeHashing] including localSize``()
     0 // return an integer exit code

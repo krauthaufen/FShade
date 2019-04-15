@@ -622,12 +622,39 @@ let ``Depth Only Less``() =
         }
 
     GLSL.shouldCompile [ Effect.ofFunction (fraggy) ]
+[<ReflectedDefinition>] [<Inline>]
+let createTuple(x : V3d) : (Arr<N<5>,V3d> * int) =
+    let arr = Arr<N<5>, V3d>()
+    let mutable cnt = 0
+    for i in 0..4 do
+        if x.Length < float i * 0.4 then
+            arr.[cnt] <- x
+            cnt <- cnt + 1
+            
+    (arr, cnt)
 
+let ``Tuple Inline`` () =
+    Setup.Run()
 
+    let frag (v : Vertex) =
+
+        fragment {
+                
+            let (va, vc) = createTuple v.pos.XYZ
+
+            let mutable col = V3d.OOO
+            for i in 0..vc-1 do
+                col <- col + (va.[i]) * (float i)
+
+            return V4d(col, 1.0)
+        }
+
+    GLSL.shouldCompile [ Effect.ofFunction (frag) ]
 
 [<EntryPoint>]
 let main args =
-    ``Depth Only Less``()
+    ``Fill Array with Inline Function``()
+    //``Tuple Inline``()
     //``Helper with duplicate names``()
     //``Bad Helpers``()
     //``Helper with duplicate names``()

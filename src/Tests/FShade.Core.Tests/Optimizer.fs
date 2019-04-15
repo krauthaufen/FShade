@@ -401,3 +401,23 @@ let ``[Dead] keeping used array writes``() =
         @>
 
     input |> Opt.run |> should exprEqual input
+    
+
+[<Inline; ReflectedDefinition>]
+let funny (a : int) =
+    if a < 10 then
+        (a, a * 10)
+    else
+        (5,5)
+
+[<Fact>]
+let ``Sepp``() =
+    let input =
+        <@
+            fun (a : int) ->
+                let (x,y) = funny a
+                x + y
+        @>
+    
+    input |> Opt.run |> printfn "%A"
+    

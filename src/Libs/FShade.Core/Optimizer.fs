@@ -176,6 +176,57 @@ module Optimizer =
 
     module UtilityFunction =
 
+        let rec singleReturn (e : Expr) =
+            match e with
+            | Lambda(_, b) ->
+                singleReturn b
+            | Sequential(_, r) -> 
+                singleReturn r
+            | IfThenElse _ ->
+                false
+            | LetRecursive(_, b)
+            | Let(_, _, b) ->
+                singleReturn b
+
+
+            | e ->
+                true
+            
+
+        let rec subsituteValue (s : Expr -> Expr) (e : Expr) =
+            match e with
+            | Lambda(v, b) ->
+                Expr.Lambda(v, subsituteValue s b)
+            | Sequential(l, r) -> 
+                Expr.Sequential(l, subsituteValue s r)
+            | IfThenElse(c, i, e) ->
+                Expr.IfThenElse(c, subsituteValue s i, subsituteValue s e)
+            | Let(v, e, b) ->
+                Expr.Let(v, e, subsituteValue s b)
+            | e ->
+                s e
+
+        
+        let rec subsituteValueS (s : Expr -> State<'s, Expr>) (e : Expr) : State<'s, Expr> =
+            state {
+                match e with
+                | Lambda(v, b) ->
+                    let! b = subsituteValueS s b
+                    return Expr.Lambda(v, b)
+                | Sequential(l, r) -> 
+                    let! r = subsituteValueS s r
+                    return Expr.Sequential(l, r)
+                | IfThenElse(c, i, e) ->
+                    let! i = subsituteValueS s i
+                    let! e = subsituteValueS s e
+                    return Expr.IfThenElse(c, i, e)
+                | Let(v, e, b) ->
+                    let! b = subsituteValueS s b
+                    return Expr.Let(v, e, b)
+                | e ->
+                    return! s e
+            }
+
         let rec (|TrivialOrInput|_|) (e : Expr) =
             match e with
                 | Var _ 
@@ -2063,6 +2114,7 @@ module Optimizer =
                 variables       : bool
                 trivial         : bool
                 inputs          : bool
+                nonMutable      : Set<Var>
                 isSideEffect    : MethodInfo -> bool
                 functions       : UtilityFunction -> bool
             }
@@ -2070,13 +2122,12 @@ module Optimizer =
                  
         [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
         module State =
-            open System.Diagnostics
-
             let empty (isSideEffect : MethodInfo -> bool) = 
                 { 
                     variables = true
                     trivial = true
                     inputs = true
+                    nonMutable = Set.empty
                     isSideEffect = isSideEffect
                     functions = fun f -> f.functionIsInline
                 }
@@ -2088,28 +2139,42 @@ module Optimizer =
             let trivial = State.get |> State.map (fun s -> s.trivial)
             let inputs = State.get |> State.map (fun s -> s.inputs)
 
-            let rec (|TrivialOrInput|_|) (e : Expr) =
+            let swizzle = System.Text.RegularExpressions.Regex @"[xyzw]+"
+
+            let rec (|TrivialOrInput|_|) (nonMutable : Set<Var>) (e : Expr) =
                 match e with
                     | Var v when v.IsMutable -> 
-                        None
+                        if Set.contains v nonMutable then Some ()
+                        else None
 
                     | Var _ 
                     | Value _
                     | FieldGet(None, _)
                     | PropertyGet(None, _, [])
                     | TupleGet(Trivial, _)
-                    | PropertyGet(Some TrivialOrInput, (FSharpTypeProperty | ArrayLengthProperty), [])
-                    | FieldGet(Some TrivialOrInput, _) 
+                    | PropertyGet(Some (TrivialOrInput nonMutable), (FSharpTypeProperty | ArrayLengthProperty), [])
+                    | FieldGet(Some (TrivialOrInput nonMutable), _) 
                     | ReadInput(_, _, None) 
-                    | ReadInput(_, _, Some TrivialOrInput) -> 
+                    | ReadInput(_, _, Some (TrivialOrInput nonMutable)) -> 
                         Some()
+                    
+                    | PropertyGet(Some (TrivialOrInput nonMutable as t), prop, []) ->
+                        match t.Type with
+                        | Aardvark.Base.TypeInfo.Patterns.VectorOf _ -> 
+                            if swizzle.IsMatch (prop.Name.ToLower()) then Some ()
+                            else None
+                        | _ ->
+                            None
+
                     | _ ->
                         None
 
-            let rec (|OnlyVar|_|) (e : Expr) =
+            let rec (|OnlyVar|_|) (nonMutable : Set<Var>)  (e : Expr) =
                 match e with
                     | Var v when v.IsMutable -> 
-                        None
+                        if Set.contains v nonMutable then Some ()
+                        else None
+
                     | Var _ 
                     | Value _ ->
                         Some ()
@@ -2123,10 +2188,11 @@ module Optimizer =
                     | _ -> 
                         None
                         
-            let rec (|InputOrVar|_|) (e : Expr) =
+            let rec (|InputOrVar|_|)  (nonMutable : Set<Var>)   (e : Expr) =
                 match e with
                     | Var v when v.IsMutable -> 
-                        None
+                        if Set.contains v nonMutable then Some ()
+                        else None
                     | ReadInput _ 
                     | Var _ ->
                         Some ()
@@ -2148,20 +2214,20 @@ module Optimizer =
                     let pat = 
                         match s.variables, s.trivial, s.inputs with
                             | (false | true), true, true ->
-                                (|TrivialOrInput|_|)
+                                (|TrivialOrInput|_|) s.nonMutable
 
                             | (false | true), true, false ->
-                                (|Trivial|_|)
+                                (|Trivial|_|) 
 
                             | true, false, false ->
-                                (|OnlyVar|_|)
+                                (|OnlyVar|_|) s.nonMutable
 
                             | false, false, true ->
                                 (|OnlyInputs|_|)
 
                             | true, false, true ->
-                                (|InputOrVar|_|)
-
+                                (|InputOrVar|_|) s.nonMutable
+                                 
                             | false, false, false ->
                                 fun _ -> None
 
@@ -2175,6 +2241,13 @@ module Optimizer =
                             | Some () -> Some ()
                             | None -> pat e
                 )
+
+        let (|TupleBind|_|) (e : Expr) =
+            match e with
+            | Let(v, CallFunction(utility, args), body) when FSharpType.IsTuple v.Type ->
+                Some(v, utility, args, body)
+            | _ ->
+                None
 
 
         let rec inlineS (e : Expr) =
@@ -2227,6 +2300,85 @@ module Optimizer =
                         let! s = inlineS s
                         let! b = inlineS b
                         return Expr.ForEach(v, s, b)
+
+                    | TupleBind(v, utility, args, body) when utility.functionIsInline ->
+                        let code = UtilityFunction.inlineCode utility args
+
+                        let rec substitute (f : int -> Expr) (e : Expr) =
+                            match e with
+                            | TupleGet(Var vi, i) when vi = v -> f i
+                            | ShapeCombination(o, args) -> RebuildShapeCombination(o, args |> List.map (substitute f))
+                            | ShapeVar _ -> e
+                            | ShapeLambda(v,b) -> Expr.Lambda(v, substitute f b)
+                        
+
+                        if UtilityFunction.singleReturn code then
+                            let! code = inlineS code
+                            return!
+                                code |> UtilityFunction.subsituteValueS (fun ret ->
+                                    state {
+                                        match ret with
+                                        | NewTuple args ->
+                                            let! s = State.get
+                                            let mutable nonMutable = s.nonMutable
+                                            let elems =
+                                                args |> List.mapi (fun i a ->
+                                                    match a with
+                                                    | Var v -> 
+                                                        nonMutable <- Set.add v nonMutable
+                                                        None, a
+                                                    | Trivial -> None, a
+                                                    | e -> 
+                                                        let v = Var(sprintf "t%d" i, a.Type)
+                                                        Some (v,e), Expr.Var v
+                                                )
+                                                
+                                            do! State.modify (fun s -> { s with nonMutable = nonMutable })
+                                            let bindings = elems |> List.choose fst
+                                            let mapping = elems |> List.map snd |> List.toArray
+
+                                    
+                                            let rec bind (vs : list<Var * Expr>) (body : Expr) =
+                                                match vs with
+                                                | [] -> body
+                                                | (v, e) :: vs -> Expr.Let(v, e, bind vs body)
+                                            let res = body |> substitute (fun i -> mapping.[i]) |> bind bindings
+
+                                            return! inlineS res
+
+                                        | e ->
+                                            let res = body |> substitute (fun i -> Expr.TupleGet(e, i))
+                                            return! inlineS res
+                                    }
+                                )
+                        else 
+                            let vars = FSharpType.GetTupleElements v.Type |> Array.mapi (fun i t -> Var(sprintf "t%d" i, t, true))
+                            let body = substitute (fun i -> Expr.Var vars.[i]) body
+
+                            let vars = vars |> Array.toList
+                            let code = 
+                                code |> UtilityFunction.subsituteValue (fun v ->
+                                    match v with
+                                    | NewTuple args ->
+                                        List.zip vars args |> List.map (fun (v,e) ->
+                                            Expr.VarSet(v, e)
+                                        ) |> Expr.Seq
+                                    | e ->
+                                        vars |> List.mapi (fun i v ->
+                                            Expr.VarSet(v, Expr.TupleGet(e, i))
+                                        ) |> Expr.Seq
+                                )
+
+                            let fin =
+                                let rec bind (vs : list<Var>) =
+                                    match vs with
+                                    | [] -> Expr.Seq [code; body]
+                                    | v :: vs -> Expr.Let(v, Expr.DefaultValue v.Type, bind vs)
+                                bind vars
+                            return! inlineS fin
+
+                    //| Let(v, CallFunction(utility, args), Let(v0, TupleGet(Var va, i), body)) ->
+                    //    failwith ""
 
                     | CallFunction(utility, args) ->
                         let! inl = State.inlineFunction utility
@@ -2286,64 +2438,73 @@ module Optimizer =
                         let! b = inlineS b
                         return Expr.Lambda(v, b)
 
-                    | Let(v, e, b) when v.IsMutable || v.Type.IsArr || v.Type.IsArray || v.Type.IsRef ->
-                        let! e = inlineS e
-                        let! b = inlineS b
-                        return Expr.Let(v, e, b)
+                    //| Let(v, e, b) when v.IsMutable || v.Type.IsRef || v.Type.IsArr || v.Type.IsArray ->
+                    //    let! nonMutable = State.get |> State.map (fun s -> Set.contains v s.nonMutable)
+                    //    let! e = inlineS e
+                    //    let! b = inlineS b
+                    //    return Expr.Let(v, e, b)
 
                     | Let(v, e, b) ->
-                        let! state = State.get
-                        let! pattern = State.letValuePattern
-                        let! e = inlineS e
-
-                        match pattern e with
-                            | Some () ->
-                                let b = b.Substitute(fun vi -> if vi = v then Some e else None)
-                                return! inlineS b
-                            | None ->
-                                let rec canInline (e : Expr) =
-                                    if e.Type.IsRef || e.Type.IsArr || e.Type.IsArray then
-                                        false
-                                    else
-                                        match e with
-                                            | ReadInput(_,_,None) -> true
-                                            | ReadInput(_,_,Some idx) -> canInline idx
+                        //let! nonMutable = State.get |> State.map (fun s -> Set.contains v s.nonMutable)
+                        if v.IsMutable || v.Type.IsRef  then
+                            let! e = inlineS e
+                            let! b = inlineS b
+                            return Expr.Let(v, e, b)
+                        else
+                            let! e = inlineS e
+                            let! state = State.get
+                            let! pattern = State.letValuePattern
+                            match pattern e with
+                                | Some () ->
+                                    let b = b.Substitute(fun vi -> if vi = v then Some e else None)
+                                    return! inlineS b
+                                | None ->
+                                    let nonMutable = state.nonMutable
+                                    let rec canInline (e : Expr) =
+                                        if e.Type.IsRef || e.Type.IsArr || e.Type.IsArray then
+                                            match e with
+                                            | Var v -> Set.contains v nonMutable
+                                            | _ -> false
+                                        else
+                                            match e with
+                                                | ReadInput(_,_,None) -> true
+                                                | ReadInput(_,_,Some idx) -> canInline idx
                                         
-                                            | GetArray(e,i) ->
-                                                let res = canInline e && canInline i
-                                                res
-                                            | RefOf _
-                                            | VarSet _ 
-                                            | SetArray _
-                                            | AddressOf _ 
-                                            | AddressSet _
-                                            | FieldSet _
-                                            | PropertySet _
-                                            | WriteOutputs _ ->
-                                                false
+                                                | GetArray(e,i) ->
+                                                    let res = canInline e && canInline i
+                                                    res
+                                                | RefOf _
+                                                | VarSet _ 
+                                                | SetArray _
+                                                | AddressOf _ 
+                                                | AddressSet _
+                                                | FieldSet _
+                                                | PropertySet _
+                                                | WriteOutputs _ ->
+                                                    false
 
 
 
 
-                                            | Call(None, mi, args) ->
-                                                if state.isSideEffect mi then false
-                                                else args |> List.forall canInline
+                                                | Call(None, mi, args) ->
+                                                    if state.isSideEffect mi then false
+                                                    else args |> List.forall canInline
 
-                                            | ShapeVar v -> not v.IsMutable
-                                            | ShapeCombination (_,args) -> args |> List.forall canInline
-                                            | ShapeLambda(_,b) -> canInline b
+                                                | ShapeVar v -> Set.contains v nonMutable || not v.IsMutable
+                                                | ShapeCombination (_,args) -> args |> List.forall canInline
+                                                | ShapeLambda(_,b) -> canInline b
 
-                                if canInline e then
-                                    let mutable cnt = 0
-                                    let nb = b.Substitute(fun vi -> if vi = v then cnt <- cnt + 1; Some e else None)
-                                    if cnt = 1 then
-                                        return! inlineS nb
+                                    if canInline e then
+                                        let mutable cnt = 0
+                                        let nb = b.Substitute(fun vi -> if vi = v then cnt <- cnt + 1; Some e else None)
+                                        if cnt = 1 then
+                                            return! inlineS nb
+                                        else
+                                            let! b = inlineS b
+                                            return Expr.Let(v, e, b)
                                     else
                                         let! b = inlineS b
                                         return Expr.Let(v, e, b)
-                                else
-                                    let! b = inlineS b
-                                    return Expr.Let(v, e, b)
 
                     | NewArray(t, args) ->
                         let! args = args |> List.mapS inlineS
@@ -2441,7 +2602,7 @@ module Optimizer =
                         return Expr.WhileLoop(guard, body)
 
                     | _ -> 
-                        return failwithf "[FShade] unexpected expression %A" e
+                        return failwithf "[FShade] unexpected expression %A" (string e)
             }
 
         let inlining (isSideEffect : MethodInfo -> bool) (e : Expr) =
