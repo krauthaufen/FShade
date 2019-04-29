@@ -651,9 +651,38 @@ let ``Tuple Inline`` () =
 
     GLSL.shouldCompile [ Effect.ofFunction (frag) ]
 
+[<ReflectedDefinition>] [<Inline>]
+let computeSome va vb vc =
+    let e1 = vb - va
+    let e2 = vc - va
+    Vec.cross e1 e2 |> Vec.length
+
+
+[<Fact>]
+let ``Variable Declaration`` () =
+    Setup.Run()
+
+    let frag (v : Vertex) =
+
+        fragment {
+                
+            let va = Unchecked.defaultof<Arr<N<5>,V3d>>
+
+            let tmp = v.pos * 2.0
+            let mutable value = 0.0
+            for i in 0..3 do
+                let v = if v.pos.W > 0.0 then 1.0 else computeSome tmp.XYZ va.[i] va.[i+1]
+                value <- value + v
+
+            return V4d(value)
+        }
+
+    GLSL.shouldCompile [ Effect.ofFunction (frag) ]
+
 [<EntryPoint>]
 let main args =
-    ``Fill Array with Inline Function``()
+    ``Variable Declaration``()
+    //``Fill Array with Inline Function``()
     //``Tuple Inline``()
     //``Helper with duplicate names``()
     //``Bad Helpers``()
