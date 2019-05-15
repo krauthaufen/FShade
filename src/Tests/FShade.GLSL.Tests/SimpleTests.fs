@@ -679,9 +679,156 @@ let ``Variable Declaration`` () =
 
     GLSL.shouldCompile [ Effect.ofFunction (frag) ]
 
+type VertexClip =
+    {
+        [<Position>] pos : V4d
+        [<Color>] c : V4d
+        [<ClipDistance>] cd : float[]
+    } 
+
+[<Fact>]
+let ``ClipDistance Pass-Through`` () =
+    Setup.Run()
+
+    let vs (v : Vertex) =
+        vertex {
+
+            let plane : V4d = uniform?ClipPlane
+            let cd = Vec.dot v.pos plane
+
+            return { pos = v.pos; c = v.c ; cd = [| cd |] }
+        }
+
+    let gs (t : Triangle<VertexClip>) =
+
+        triangle {
+            yield t.P0
+            yield t.P1
+            yield t.P2
+        }
+
+    let frag (v : Vertex) =
+
+        fragment {
+            return V4d(1, 1, 1, 1)
+        }
+
+    GLSL.shouldCompile [ Effect.ofFunction vs; Effect.ofFunction gs; Effect.ofFunction frag ]
+
+
+type VertexWithPid =
+    {
+        [<Position>] pos : V4d
+        [<PrimitiveId>] pid : uint32
+    } 
+
+[<Fact>]
+let ``GS PrimitiveId`` () =
+    Setup.Run()
+    
+    let gs (t : Triangle<VertexWithPid>) =
+
+        triangle {
+            let pid = t.P0.pid
+            if pid &&& 1u = 0u then
+                yield t.P0
+                yield t.P1
+                yield t.P2
+        }
+
+    let frag (v : Vertex) =
+
+        fragment {
+            return V4d(1, 1, 1, 1)
+        }
+
+    GLSL.shouldCompile [ Effect.ofFunction gs; Effect.ofFunction frag ]
+
+type VertexLayer =
+    {
+        [<Position>] pos : V4d
+        [<Layer>] l : int
+    } 
+    
+[<Fact>]
+let ``GS Composition with Layer`` () =
+    Setup.Run()
+    
+    let gs1 (t : Triangle<VertexLayer>) =
+
+        triangle {
+            let layer = int t.P0.pos.X 
+            yield { t.P0 with l = layer }
+            yield { t.P1 with l = layer }
+            yield { t.P2 with l = layer }
+        }
+
+    let gs2 (t : Triangle<VertexLayer>) =
+
+        triangle {
+            yield t.P0
+            yield t.P1
+            yield t.P2
+
+            restartStrip()
+
+            yield t.P0
+            yield t.P2
+            yield t.P1
+        }
+
+    let frag (v : Vertex) =
+
+        fragment {
+            return V4d(1, 1, 1, 1)
+        }
+
+    GLSL.shouldCompile [ Effect.ofFunction gs1; Effect.ofFunction gs2; Effect.ofFunction frag ]
+    
+type VertexLayerSid =
+    {
+        [<Position>] pos : V4d
+        [<Layer>] l : int
+        [<SourceVertexIndex>] sid : int
+    } 
+    
+[<Fact>]
+let ``GS Composition with Layer2`` () =
+    Setup.Run()
+    
+    let gs1 (t : Triangle<VertexLayerSid>) =
+
+        triangle {
+            let layer = int t.P0.pos.X 
+            yield { t.P0 with l = layer; sid = 0 }
+            yield { t.P1 with l = layer; sid = 1 }
+            yield { t.P2 with l = layer; sid = 2 }
+        }
+
+    let gs2 (t : Triangle<Vertex>) =
+
+        triangle {
+            if t.P0.pos.X > 1.0 then
+                yield t.P0
+                yield t.P1
+                yield t.P2
+        }
+
+    let frag (v : Vertex) =
+
+        fragment {
+            return V4d(1, 1, 1, 1)
+        }
+
+    GLSL.shouldCompile [ Effect.ofFunction gs1; Effect.ofFunction gs2; Effect.ofFunction frag ]
+
 [<EntryPoint>]
 let main args =
-    ``Variable Declaration``()
+    //``GS Composition with Layer2``()
+    //``GS Composition with Layer``()
+    //``GS PrimitiveId``()
+    ``ClipDistance Pass-Through``()
+    //``Variable Declaration``()
     //``Fill Array with Inline Function``()
     //``Tuple Inline``()
     //``Helper with duplicate names``()
