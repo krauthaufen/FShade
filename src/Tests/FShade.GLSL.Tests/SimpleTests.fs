@@ -822,6 +822,23 @@ let ``GS Composition with Layer2`` () =
 
     GLSL.shouldCompile [ Effect.ofFunction gs1; Effect.ofFunction gs2; Effect.ofFunction frag ]
 
+let intergerSampler = 
+    intSampler2d {
+        texture uniform?IntTexture
+    }
+
+[<Fact>]
+let ``IntSampler`` () =
+    Setup.Run()
+    
+    let ps (v : Vertex) =
+        fragment {
+            let value = intergerSampler.Sample(v.pos.XY).X
+            return V4d(value, 1, 1, 1)
+        }
+
+    GLSL.shouldCompile [ Effect.ofFunction ps; ]
+
 [<EntryPoint>]
 let main args =
     //``GS Composition with Layer2``()
