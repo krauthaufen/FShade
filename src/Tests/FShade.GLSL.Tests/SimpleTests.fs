@@ -839,11 +839,37 @@ let ``IntSampler`` () =
 
     GLSL.shouldCompile [ Effect.ofFunction ps; ]
 
+[<Fact>]
+let ``GLSLTypesToString`` () =
+
+    Setup.Run()
+    
+    let ps (v : Vertex) =
+        fragment {
+            return v.c
+        }
+
+    let glsl, res = FShade.Tests.GLSL.compile [ Effect.ofFunction ps; ]
+
+    FShade.GLSL.GLSLProgramInterface.print glsl.iface
+
+    Console.WriteLine(glsl.iface.ToString())
+
+    Console.WriteLine(glsl.ToString())
+
+    glsl.iface.shaders |> MapExt.iter (fun k v ->
+        Console.WriteLine(v.ToString()))
+
+    FShade.GLSL.GLSLProgramInterface.log glsl.iface
+
+    ()
+
 [<EntryPoint>]
 let main args =
     //``GS Composition with Layer2``()
     //``GS Composition with Layer``()
     //``GS PrimitiveId``()
+    ``GLSLTypesToString``()
     ``ClipDistance Pass-Through``()
     //``Variable Declaration``()
     //``Fill Array with Inline Function``()
