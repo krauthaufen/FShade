@@ -36,6 +36,15 @@ type GLSLShader =
         iface       : GLSLProgramInterface
     }
 
+    override x.ToString() =
+        String.Join(Environment.NewLine,
+            "====================== CODE ======================",
+            x.code,
+            "====================== CODE ======================",
+            "======================= IO =======================",
+            x.iface.ToString(),
+            "======================= IO =======================")
+        
 
 type Backend private(config : Config) =
     inherit Compiler.Backend()
