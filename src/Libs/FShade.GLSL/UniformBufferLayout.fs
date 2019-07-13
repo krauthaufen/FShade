@@ -455,7 +455,10 @@ module GLSLProgramInterface =
                 GLSLShaderInterface.writesPointSize prev
             | _ ->
                 false
-                
+            
+    let toString(iface : GLSLProgramInterface) =
+        iface.ToString()
+
     let log (iface : GLSLProgramInterface) =
         let str = iface.ToString()
         for line in lines str do
