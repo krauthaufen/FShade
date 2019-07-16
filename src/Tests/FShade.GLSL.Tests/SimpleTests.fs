@@ -864,12 +864,64 @@ let ``GLSLTypesToString`` () =
 
     ()
 
+let sampler1 = 
+    sampler2d {
+        texture uniform?Texture
+    }
+
+let sampler2 = 
+    sampler2d {
+        texture uniform?Texture
+    }
+
+let sampler3 = 
+    sampler2d {
+        texture uniform?OtherTexture
+    }
+
+[<Fact>]
+let ``DuplicateId`` () =
+    Setup.Run()
+
+    let psOther (v : Vertex) =
+        fragment {
+            let value = sampler3.Sample(v.pos.XY).X
+            return V4d(value, 1.0, 1.0, 1.0)
+        }
+        
+    let fxOther = Effect.ofFunction psOther
+    
+    let ps1 (v : Vertex) =
+        fragment {
+            let value = sampler1.Sample(v.pos.XY).X
+            return V4d(value, 1.0, 1.0, 1.0)
+        }
+        
+    let fx1 = Effect.ofFunction ps1
+
+    // different texture name and sampler name -> passes
+    if fxOther.Id = fx1.Id then
+        failwith "FAIL"
+
+    let ps2 (v : Vertex) =
+        fragment {
+            let value = sampler2.Sample(v.pos.XY).X
+            return V4d(value, 1.0, 1.0, 1.0)
+        }
+        
+    let fx2 = Effect.ofFunction ps2
+
+    // same texture name, but different sampler name -> will have same Id
+    if fx1.Id = fx2.Id then
+        failwith "duplicate id"
+               
+
 [<EntryPoint>]
 let main args =
     //``GS Composition with Layer2``()
     //``GS Composition with Layer``()
     //``GS PrimitiveId``()
-    ``GLSLTypesToString``()
+    ``DuplicateId``()
     ``ClipDistance Pass-Through``()
     //``Variable Declaration``()
     //``Fill Array with Inline Function``()
