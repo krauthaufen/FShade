@@ -97,13 +97,13 @@ module ExprHashExtensions =
         let private (|SimpleValue|_|) (e : Expr) =
             try
                 match e with
-                    | FieldGet(None, f) -> Some (f.GetValue(null))
+                    | FieldGet(None, f) -> Some (f.Name, f.GetValue(null))
                     | PropertyGet(None, pi, []) -> 
                         System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(pi.DeclaringType.TypeHandle)
 
-                        Some (pi.GetValue(null))
-                    | Call(None, mi, []) -> Some (mi.Invoke(null, [||]))
-                    | NewObject(ctor, []) -> Some (ctor.Invoke([||]))
+                        Some (pi.Name, pi.GetValue(null))
+                    | Call(None, mi, []) -> Some (mi.Name, mi.Invoke(null, [||]))
+                    | NewObject(ctor, []) -> Some (ctor.DeclaringType.Name, ctor.Invoke([||]))
                     | _ -> None
             with _ ->
                 None
