@@ -1,28 +1,25 @@
 framework: netstandard2.0, netcoreapp2.0
 source https://api.nuget.org/v3/index.json
 
-nuget FSharp.Core ~> 4.6.2
+nuget FSharp.Core               ~> 4.6.2
 
-nuget Aardvark.Base ~> 4.5.8
-nuget Aardvark.Base.FSharp ~> 4.5.8
-nuget Aardvark.Base.Incremental ~> 4.5.8
+nuget Aardvark.Base             ~> 4.5.11
+nuget Aardvark.Base.FSharp      ~> 4.5.11
+nuget Aardvark.Base.Incremental ~> 4.5.11
 
-nuget FSharp.Compiler.Service   ~> 22.0.3
-nuget FsPickler                 ~> 5.2.0
+nuget FSharp.Compiler.Service   ~> 30.0.0
+nuget FsPickler                 ~> 5.2.2
 
 nuget xunit                     ~> 2.3.1
 nuget xunit.runner.visualstudio ~> 2.3.1
 nuget FsUnit.xUnit              ~> 3.1.0
 
-nuget GLSLangSharp ~> 0.4.4
+nuget GLSLangSharp              ~> 0.4.4
 nuget Microsoft.NET.Test.Sdk    ~> 15.7.2
 
 nuget SourceLink.Create.CommandLine copy_local: true ~> 2.8.2
 clitool dotnet-sourcelink
 
 group Build
-framework: net45
-content: none
 source https://api.nuget.org/v3/index.json
-
-github aardvark-platform/aardvark.fake:v4-temp
+github aardvark-platform/aardvark.fake:v5

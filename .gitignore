@@ -189,6 +189,6 @@ UpgradeLog*.htm
 
 # Microsoft Fakes
 
-/.paket/paket.exe
-/.paket/Paket.Restore.targets
-/paket-files/paket.restore.cached
+/.paket
+/paket-files
+/build.fsx.lock
