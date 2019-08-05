@@ -8,5 +8,5 @@ For real world examples see [Aardvark.Rendering](https://github.com/aardvark-pla
 
 Some compute shader examples and a GPGPU jpeg compressor written in FShade can also be found in the [Aardvark.GPGPU](https://github.com/aardvark-platform/aardvark.rendering/tree/master/src/Aardvark.GPGPU) project.
 
-[![Build status](https://ci.appveyor.com/api/projects/status/h24wxqq5leamoevr/branch/master?svg=true)](https://ci.appveyor.com/project/krauthaufen/fshade/branch/master) [![Build Status](https://travis-ci.org/krauthaufen/FShade.svg?branch=master)](https://travis-ci.org/krauthaufen/FShade)
+[![Build status](https://ci.appveyor.com/api/projects/status/74yycj2d99wtd428?svg=true)](https://ci.appveyor.com/project/haraldsteinlechner/fshade) [![Build Status](https://travis-ci.org/krauthaufen/FShade.svg?branch=master)](https://travis-ci.org/krauthaufen/FShade)
 
