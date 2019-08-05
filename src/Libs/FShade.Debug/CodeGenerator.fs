@@ -3,14 +3,14 @@
 open System.IO
 open System.Reflection
 
-open Microsoft.FSharp.Reflection
-open Microsoft.FSharp.Quotations
-open Microsoft.FSharp.Quotations.Patterns
-open Microsoft.FSharp.Quotations.ExprShape
-
-open Microsoft.FSharp.Compiler.SourceCodeServices
-open Microsoft.FSharp.Compiler.Ast
-open Microsoft.FSharp.Compiler.Range
+open FSharp.Reflection
+open FSharp.Quotations
+open FSharp.Quotations.Patterns
+open FSharp.Quotations.ExprShape
+     
+open FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler.Ast
+open FSharp.Compiler.Range
 
 open Aardvark.Base
 open Aardvark.Base.TypeInfo
@@ -194,7 +194,7 @@ module CodeGenerator =
             //        |> Async.RunSynchronously
 
             let parseFileResults = 
-                checker.ParseFile(file, code, FSharpParsingOptions.Default)  
+                checker.ParseFile(file, (FSharp.Compiler.Text.SourceText.ofString code), FSharpParsingOptions.Default)  
                     |> Async.RunSynchronously
 
             if parseFileResults.ParseHadErrors then
@@ -209,7 +209,7 @@ module CodeGenerator =
                                 let scope = lid |> List.map string |> String.concat " "
                                 let mutable opened = []
                                 for d in decls do 
-                                    let o, i = traverse (if isMod then [Module scope] else [Namespace scope]) opened file lines d
+                                    let o, i = traverse (if isMod.IsModule then [Module scope] else [Namespace scope]) opened file lines d
                                     opened <- o
                                     yield! i
                         ]

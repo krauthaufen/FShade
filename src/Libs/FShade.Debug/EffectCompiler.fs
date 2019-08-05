@@ -116,6 +116,8 @@ module internal GitHelpers =
 
 
 module EffectCompiler =
+
+    open FSharp.Compiler.Interactive.Shell
     
     let err = new StringBuilder()
     let inStream = new StringReader("")
