@@ -212,6 +212,34 @@ let test (state : RayHit<Payload, Result>) =
         }
     }
 
+module GLSL =
+    open GLSLang
+
+    let private toGLSLangStage =
+        LookupTable.lookupTable [
+            FShade.ShaderStage.Vertex, GLSLang.ShaderStage.Vertex
+            FShade.ShaderStage.TessControl, GLSLang.ShaderStage.TessControl
+            FShade.ShaderStage.TessEval, GLSLang.ShaderStage.TessEvaluation
+            FShade.ShaderStage.Geometry, GLSLang.ShaderStage.Geometry
+            FShade.ShaderStage.Fragment, GLSLang.ShaderStage.Fragment
+            FShade.ShaderStage.Compute, GLSLang.ShaderStage.Compute
+            FShade.ShaderStage.RayHitShader, GLSLang.ShaderStage.RayClosestHit
+            FShade.ShaderStage.RayGenShader, GLSLang.ShaderStage.RayGen
+            FShade.ShaderStage.RayMissShader, GLSLang.ShaderStage.RayMiss
+            FShade.ShaderStage.RayIntersectionShader, GLSLang.ShaderStage.RayIntersect
+        ]
+
+    let glslang (stage : FShade.ShaderStage) (code : string) =
+        let defines = [sprintf "%A" stage]
+        let res = 
+            match GLSLang.tryCompile (toGLSLangStage stage) "main" defines code with
+                | Some bin, warn -> 
+                    if String.IsNullOrWhiteSpace warn then Success bin
+                    else Error warn
+                | None, err ->
+                    Error err
+        res
+
 [<EntryPoint>]
 let main args =
     let res = 
@@ -219,8 +247,10 @@ let main args =
         |> RayHitShader.toModule
         |> ModuleCompiler.compileGLSLVulkan
 
+
     printfn "%A" res.code
     
-
+    let res = GLSL.glslang ShaderStage.RayHitShader res.code
+    printfn "%A" res
     0
 
