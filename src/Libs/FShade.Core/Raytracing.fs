@@ -39,6 +39,39 @@ type RayHit<'s, 'a> =
         hitPoint    : V3d
     }
 
+type SamplerInfo =
+    {
+        samplerType     : Type
+        textureName     : string
+        samplerState    : SamplerState
+        dimension       : SamplerDimension
+        isArray         : bool
+        isShadow        : bool
+        isMS            : bool
+        valueType       : Type
+    }
+
+type RayHitInfo =
+    {
+        neededUniforms : Map<string, Type>
+        neededSamplers : Map<string, SamplerInfo>
+        neededBuffers  : Map<string, int * Type>
+        payloadInType  : Type
+        payloadOutType : Type
+    }
+
+
+type RayHitInterface =
+    {
+        uniformBuffers      : Map<int * int, string * list<string * Type>>
+        samplers            : Map<int * int, string * SamplerInfo>
+        buffers             : Map<int * int, string * int * Type>
+        payloadInLocation   : int
+        payloadOutLocation  : int
+    }
+
+
+
 type RayHitShader =
     {
         rayHitHash              : string
@@ -249,6 +282,67 @@ module RayHitShader =
                     return Expr.Var v
             }
 
+    let private getInfo (s : RayHitShader) =
+
+        let buffers =
+            s.rayHitUniforms |> Map.choose (fun _ u ->
+                match u.uniformValue with
+                | UniformValue.Attribute(scope, _) when scope = uniform?StorageBuffer ->
+                    if u.uniformType.IsArray then
+                        let et = u.uniformType.GetElementType()
+                        if et.IsArray then
+                            Some (2, et.GetElementType())
+                        else
+                            Some (1, et)
+                    else
+                        None
+                | _ ->
+                    None
+            )
+
+        let uniforms =
+            s.rayHitUniforms |> Map.choose (fun _ u ->
+                match u.uniformValue with
+                | UniformValue.Sampler _
+                | UniformValue.SamplerArray _ -> 
+                    None
+                | UniformValue.Attribute(scope, _) when scope = uniform?StorageBuffer -> 
+                    None
+                | _ ->
+                    Some u.uniformType
+            )
+            
+        let samplers =
+            s.rayHitUniforms |> Map.choose (fun _ u ->
+                match u.uniformType with
+                | ArrayOf (SamplerType(dim, isArray, isShadow, isMS, valueType))
+                | SamplerType(dim, isArray, isShadow, isMS, valueType) ->
+                    match u.uniformValue with
+                    | UniformValue.Sampler(textureName, samplerState) ->
+                        Some {
+                            samplerType = u.uniformType
+                            textureName = textureName
+                            dimension = dim
+                            isArray = isArray
+                            isShadow = isShadow
+                            isMS = isMS
+                            valueType = valueType
+                            samplerState = samplerState
+                        }
+                    | _ ->
+                        None
+                | _ ->
+                    None
+            )
+
+        {
+            payloadInType = s.rayPayloadInType
+            payloadOutType = s.rayPayloadOutType
+            neededUniforms = uniforms
+            neededBuffers = buffers
+            neededSamplers = samplers
+        }
+
     let ofFunction (shader : RayHit<'s, 'a> -> Expr<'a>) =
         let rawExpr = shader Unchecked.defaultof<_>
         let hash = Expr.ComputeHash rawExpr
@@ -272,7 +366,57 @@ module RayHitShader =
             rayHitBody = expr
         }
 
-    let toModule (s : RayHitShader) =
+    let toModule (assign : RayHitInfo -> RayHitInterface) (s : RayHitShader) =
+        let info = getInfo s
+        let iface = assign info
+
+        let uniforms = 
+            iface.uniformBuffers
+            |> Map.toList
+            |> List.collect (fun ((set, binding), (bufferName, fields)) ->
+                fields |> List.mapi (fun i (n, t) ->
+                    { 
+                        uniformName = n
+                        uniformType = t
+                        uniformBuffer = Some bufferName
+                        uniformDecorations = [UniformDecoration.FieldIndex i; UniformDecoration.BufferBinding binding; UniformDecoration.BufferDescriptorSet set]
+                        uniformTextureInfo = []
+                    }
+                )
+            )
+            
+        let buffers = 
+            iface.buffers
+            |> Map.toList
+            |> List.map (fun ((set, binding), (bufferName, rank, typ)) ->
+                let rec mk (n : int) (t : Type) =
+                    if n <= 0 then t
+                    else mk (n - 1) (t.MakeArrayType())
+
+                { 
+                    uniformName = bufferName
+                    uniformType = mk rank typ
+                    uniformBuffer = Some "StorageBuffer"
+                    uniformDecorations = [UniformDecoration.BufferBinding binding; UniformDecoration.BufferDescriptorSet set]
+                    uniformTextureInfo = []
+                }
+            )
+
+
+
+        let samplers =
+            iface.samplers
+            |> Map.toList
+            |> List.map (fun ((set, binding), (name, info)) ->
+                { 
+                    uniformName = name
+                    uniformType = info.samplerType
+                    uniformBuffer = None
+                    uniformDecorations = [UniformDecoration.BufferBinding binding; UniformDecoration.BufferDescriptorSet set]
+                    uniformTextureInfo = [info.textureName, info.samplerState :> obj]
+                }
+            )
+            
 
         let inputs =
             s.rayHitInputs
@@ -282,31 +426,11 @@ module RayHitShader =
                     paramType = typ
                     paramName = name
                     paramSemantic = name
-                    paramDecorations = Set.empty 
-                }
-            )
-
-        let uniforms =
-            s.rayHitUniforms
-            |> Map.toList
-            |> List.map (fun (name, u) ->
-                let uniformBuffer = 
-                    match u.uniformValue with
-                        | Attribute(scope, name) -> Some scope.FullName
-                        | _ -> None
-
-                let textureInfos =
-                    match u.uniformValue with
-                        | UniformValue.Sampler (n,s) -> [n,s :> obj]
-                        | UniformValue.SamplerArray arr -> Array.toList arr |> List.map (fun (n,s) -> n, s :> obj)
-                        | _ -> []
-
-                { 
-                    uniformName = u.uniformName
-                    uniformType = u.uniformType
-                    uniformBuffer = uniformBuffer
-                    uniformDecorations = u.decorations
-                    uniformTextureInfo = textureInfos
+                    paramDecorations = 
+                        if typ = s.rayPayloadInType then 
+                            Set.ofList [ParameterDecoration.Slot iface.payloadInLocation]
+                        else 
+                            Set.empty 
                 }
             )
 
@@ -316,7 +440,7 @@ module RayHitShader =
                     paramType = s.rayPayloadOutType
                     paramName = Intrinsics.RayPayloadOut
                     paramSemantic = Intrinsics.RayPayloadOut
-                    paramDecorations = Set.ofList []
+                    paramDecorations = Set.ofList [ParameterDecoration.Slot iface.payloadOutLocation]
                 }
             ]
 
@@ -326,7 +450,7 @@ module RayHitShader =
                 entryName   = "main"
                 inputs      = inputs
                 outputs     = outputs
-                uniforms    = uniforms
+                uniforms    = uniforms @ buffers @ samplers
                 arguments   = []
                 body        = s.rayHitBody
                 decorations = [ EntryDecoration.Stages { prev = None; self = ShaderStage.RayHitShader; next = None } ]

@@ -151,7 +151,7 @@ type Payload =
 
 type Result =
     {
-        value : float
+        value : V4d
     }
 
 type Ray =
@@ -204,14 +204,6 @@ let compile (shader : System.Object) (f : Assign -> Binding) : string =
     failwith ""
 
 
-let test (state : RayHit<Payload, Result>) =
-    rayhit {
-        let i0 = buffers.Index.[state.instanceIndex].[3 * state.primitiveId + 0]
-        return { 
-            value = float state.query.payload.hitCount + float i0 
-        }
-    }
-
 module GLSL =
     open GLSLang
 
@@ -239,13 +231,62 @@ module GLSL =
                     Error err
         res
 
+let sammy =
+    sampler2d {
+        texture uniform?MyTexture
+        filter Filter.MinMagMipLinear
+        addressU WrapMode.Wrap
+        addressV WrapMode.Wrap
+
+    }
+
+let test (state : RayHit<Payload, Result>) =
+    rayhit {
+        let gi = state.instanceIndex
+        let i0 = buffers.Index.[gi].[3 * state.primitiveId + 0]
+        let i1 = buffers.Index.[gi].[3 * state.primitiveId + 1]
+        let i2 = buffers.Index.[gi].[3 * state.primitiveId + 2]
+
+        let c = V3d(state.coord.X, state.coord.Y, 1.0 - state.coord.X - state.coord.Y)
+        let tc = c.X * buffers.TexCoords.[gi].[i0] + c.Y * buffers.TexCoords.[gi].[i1] + c.Z * buffers.TexCoords.[gi].[i2]
+
+
+        return { 
+            value = sammy.Sample(tc)
+        }
+    }
+
 [<EntryPoint>]
 let main args =
     Aardvark.Init()
 
+    let assign (info : RayHitInfo) =
+        {
+            payloadInLocation = 5
+            payloadOutLocation = 7
+            uniformBuffers = 
+                info.neededUniforms 
+                |> Map.toSeq 
+                |> Seq.mapi (fun i (name, typ) -> (0,i), (sprintf "%sDummy" name, [(name, typ)]))
+                |> Map.ofSeq
+
+            samplers = 
+                info.neededSamplers
+                |> Map.toSeq
+                |> Seq.mapi (fun i (name, info) -> (2,i), (name, info))
+                |> Map.ofSeq
+
+            buffers = 
+                info.neededBuffers 
+                |> Map.toSeq
+                |> Seq.mapi (fun i (name, (rank, typ)) -> (1,i), (name, rank, typ))
+                |> Map.ofSeq
+
+        }
+
     let res = 
         RayHitShader.ofFunction test
-        |> RayHitShader.toModule
+        |> RayHitShader.toModule assign
         |> ModuleCompiler.compileGLSLVulkan
 
 

@@ -53,6 +53,9 @@ type ParameterDecoration =
 [<RequireQualifiedAccess>]
 type UniformDecoration =
     | Format of System.Type
+    | FieldIndex of int
+    | BufferDescriptorSet of int
+    | BufferBinding of int
 
 type Uniform =
     {
