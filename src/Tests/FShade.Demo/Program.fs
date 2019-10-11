@@ -234,23 +234,49 @@ module GLSL =
         let res = 
             match GLSLang.tryCompile (toGLSLangStage stage) "main" defines code with
                 | Some bin, warn -> 
-                    if String.IsNullOrWhiteSpace warn then Success bin
-                    else Error warn
+                    Success bin
                 | None, err ->
                     Error err
         res
 
 [<EntryPoint>]
 let main args =
+    Aardvark.Init()
+
     let res = 
         RayHitShader.ofFunction test
         |> RayHitShader.toModule
         |> ModuleCompiler.compileGLSLVulkan
 
 
-    printfn "%A" res.code
-    
+    Log.start "GLSL"
+    let lines = res.code.Split("\r\n") |> Array.indexed
+
+    let digits = log10 (float lines.Length) |> ceil |> int
+    for (i, l) in lines do
+        let i = 
+            let v = string (i + 1)
+            if v.Length < digits then System.String(' ', digits - v.Length) + v
+            else v
+        Log.line "%s: %s" i l
+    Log.stop()
+
     let res = GLSL.glslang ShaderStage.RayHitShader res.code
-    printfn "%A" res
+
+    match res with
+    | Success res -> 
+        let res = GLSLang.GLSLang.optimizeDefault res
+        let m = GLSLang.SpirV.Module.ofArray res
+
+        
+        Log.start "SpirV"
+        for i in m.instructions do
+            match GLSLang.SpirV.Instruction.tryGetId i with
+                | Some id -> Log.line "%d:\t%A" id i
+                | None -> Log.line "   \t%A" i
+        Log.stop()
+    | Error e ->
+        Log.warn "ERROR: %s" e
+
     0
 
