@@ -134,10 +134,12 @@ module ExpressionExtensions =
         static let readInput        = find "ReadInput" [| typeof<ParameterKind>; typeof<string> |]
         static let readInputIndex   = find "ReadInput" [| typeof<ParameterKind>; typeof<string>; typeof<int> |]
         static let writeOutputs     = find "WriteOutputs" [| typeof<array<string * int * obj>> |]
+        static let unsafeWrite      = allMethods |> Array.find (fun m -> m.Name = "UnsafeWrite")
 
         static member internal ReadInputMeth = readInput
         static member internal ReadInputIndexedMeth = readInputIndex
         static member internal WriteOutputsMeth = writeOutputs
+        static member internal UnsafeWriteMeth = unsafeWrite
 
         static member ReadInput<'a>(kind : ParameterKind, name : string) : 'a =
             raise <| FShadeOnlyInShaderCodeException "ReadInput"
@@ -148,7 +150,14 @@ module ExpressionExtensions =
         static member WriteOutputs(values : array<string * int * obj>) : unit =
             raise <| FShadeOnlyInShaderCodeException "WriteOutputs"
 
+        static member UnsafeWrite(dst : 'a, value : 'a) : unit =
+            raise <| FShadeOnlyInShaderCodeException "UnsafeWrite"
+
     type Expr with
+
+        static member UnsafePropertySet(target : Expr, prop : PropertyInfo, value : Expr) =
+            let mi = ShaderIO.UnsafeWriteMeth.MakeGenericMethod [| value.Type |]
+            Expr.Call(mi, [Expr.PropertyGet(target, prop); value])
 
         static member ReadInput<'a>(kind : ParameterKind, name : string) : Expr<'a> =
             let mi = ShaderIO.ReadInputMeth.MakeGenericMethod [| typeof<'a> |]
@@ -196,7 +205,12 @@ module ExpressionExtensions =
 
             Expr.WriteOutputs map
 
-
+    let (|UnsafePropertySet|_|) (e : Expr) =
+        match e with
+        | Call(None, mi, [PropertyGet(Some t, prop, []); value]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = ShaderIO.UnsafeWriteMeth ->
+            Some (t, prop, value)
+        | _ ->
+            None
 
     let (|ReadInput|_|) (e : Expr) =
         match e with

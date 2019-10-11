@@ -63,6 +63,30 @@ module IntrinsicParameters =
                 ]
 
             ShaderStage.Compute, Map.empty
+
+
+            ShaderStage.RayHitShader, 
+                Map.ofList [
+                    Intrinsics.LaunchId, "gl_LaunchIDNV"
+                    Intrinsics.LaunchSize, "gl_LaunchSizeNV"
+                    Intrinsics.PrimitiveId, "gl_PrimitiveID"
+                    Intrinsics.InstanceId, "gl_InstanceID"
+                    Intrinsics.InstanceCustomIndex, "gl_InstanceCustomIndexNV"
+                    Intrinsics.WorldRayOrigin, "gl_WorldRayOriginNV"
+                    Intrinsics.WorldRayDirection, "gl_WorldRayDirectionNV"
+                    Intrinsics.ObjectRayOrigin, "gl_ObjectRayOriginNV"
+                    Intrinsics.ObjectRayDirection, "gl_ObjectRayDirectionNV"
+                    Intrinsics.RayTmin, "gl_RayTminNV"
+                    Intrinsics.RayTmax, "gl_RayTmaxNV"
+                    Intrinsics.IncomingRayFlags, "gl_IncomingRayFlagsNV"
+                    Intrinsics.HitT, "gl_HitTNV"
+                    Intrinsics.HitKind, "gl_HitKindNV"
+                    Intrinsics.ObjectToWorld, "gl_ObjectToWorldNV"
+                    Intrinsics.WorldToObject, "gl_WorldToObjectNV"
+                ]
+            ShaderStage.RayMissShader, Map.empty
+            ShaderStage.RayGenShader, Map.empty
+            ShaderStage.RayIntersectionShader, Map.empty
         ]
 
 
@@ -104,7 +128,12 @@ module IntrinsicParameters =
 
             
             ShaderStage.Compute, Map.empty
+            
 
+            ShaderStage.RayHitShader, Map.empty
+            ShaderStage.RayMissShader, Map.empty
+            ShaderStage.RayGenShader, Map.empty
+            ShaderStage.RayIntersectionShader, Map.empty
         ]
 
     let prefixes =
@@ -115,4 +144,10 @@ module IntrinsicParameters =
             ShaderStage.Geometry,       "gs_"
             ShaderStage.Fragment,       "fs_"
             ShaderStage.Compute,        "cs_"
+
+            
+            ShaderStage.RayHitShader,           ""
+            ShaderStage.RayGenShader,           ""
+            ShaderStage.RayMissShader,          ""
+            ShaderStage.RayIntersectionShader,  ""
         ]  

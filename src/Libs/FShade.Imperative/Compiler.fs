@@ -1682,6 +1682,14 @@ module Compiler =
                             return CWrite(l, a)
                         | None ->
                             return! Expr.Call(t, pi.SetMethod, i @ [a]) |> toCStatementS isLast
+                | UnsafePropertySet(t, pi, a) ->
+                    let! lexpr = Expr.PropertyGet(t, pi) |> toCLExprS
+                    match lexpr with
+                    | Some l ->
+                        let! a = toCExprS a
+                        return CWrite(l, a)
+                    | None ->
+                        return! Expr.Call(t, pi.SetMethod, [a]) |> toCStatementS isLast
 
 
                 | WhileLoop(guard, body) ->

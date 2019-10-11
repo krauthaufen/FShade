@@ -1444,6 +1444,11 @@ module Shader =
                     Intrinsics.ViewportIndex, typeof<int>
                 ]
 
+            ShaderStage.RayHitShader, Map.empty
+            ShaderStage.RayMissShader, Map.empty
+            ShaderStage.RayIntersectionShader, Map.empty
+            ShaderStage.RayGenShader, Map.empty
+
         ]
 
     let private builtInOutputs =
@@ -1480,6 +1485,10 @@ module Shader =
                     Intrinsics.SampleMask, typeof<int[]>
                 ]
 
+            ShaderStage.RayHitShader, Map.empty
+            ShaderStage.RayMissShader, Map.empty
+            ShaderStage.RayIntersectionShader, Map.empty
+            ShaderStage.RayGenShader, Map.empty
         ]
 
     let private sideEffects =
@@ -1517,6 +1526,12 @@ module Shader =
                 HashSet.ofList [
                     getMethodInfo <@ barrier @>
                 ]
+
+            ShaderStage.RayHitShader, HashSet.ofList []
+            ShaderStage.RayMissShader, HashSet.ofList []
+            ShaderStage.RayIntersectionShader, HashSet.ofList []
+            ShaderStage.RayGenShader, HashSet.ofList []
+
         ]
 
     let private converter (inType : Type) (outType : Type) : Expr -> Expr =

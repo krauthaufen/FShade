@@ -21,6 +21,7 @@
     <Compile Include="Frontend.fs" />
     <Compile Include="Optimizer.fs" />
     <Compile Include="Shader.fs" />
+    <Compile Include="Raytracing.fs" />
     <Compile Include="EffectInputLayout.fs" />
     <Compile Include="Effect.fs" />
     <Compile Include="ComputeShader.fs" />

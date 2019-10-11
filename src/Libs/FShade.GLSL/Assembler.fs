@@ -287,7 +287,7 @@ module AssemblerState =
                 inner * len
 
             | CStruct _ | CIntrinsic _ | CVoid ->
-                failwith "[GLSL] no struct inputs allowed"
+                1 //failwith "[GLSL] no struct inputs allowed"
 
     let newLocation (kind : ParameterKind) (t : CType) =
         State.custom (fun s ->
@@ -670,8 +670,11 @@ module Assembler =
                         | ParameterKind.Input, { self = s }                 -> return prefixes.[s] + name |> glslName
                         | ParameterKind.Output, { next = Some n }           -> return prefixes.[n] + name |> glslName
                         | ParameterKind.Output, { next = None }             -> 
-                            let name = name + "Out"
-                            return checkName name
+                            if ShaderStage.isRayTracing stages.self then
+                                return checkName name
+                            else
+                                let name = name + "Out"
+                                return checkName name
 
                         | _                                                 -> 
                             return checkName name
@@ -698,6 +701,8 @@ module Assembler =
 
             | CType.CArray(t, l)                        -> (assembleType rev t).Name + "[" + string l + "]" |> Identifier
             | CType.CStruct(n,_,_)                      -> glslName n
+
+            | CType.CPointer(_, t)                      -> (assembleType rev t).Name |> sprintf "%s[]" |> Identifier
 
             | CType.CIntrinsic it                       -> it.intrinsicTypeName |> Identifier
 
@@ -991,6 +996,13 @@ module Assembler =
                     let f = glslName f
                     return sprintf "%s.%s" v f.Name
 
+                | CItem(_, CItem(_, (CReadInput _ as v), i), j) ->
+                    let! v = assembleExprS v
+                    let! i = assembleExprS i
+                    let! j = assembleExprS j
+                    return sprintf "%s[%s].data[%s]" v i j
+                    
+
                 | CItem(_, v, i) ->
                     let! v = assembleExprS v
                     let! i = assembleExprS i
@@ -1246,6 +1258,7 @@ module Assembler =
 
     let assembleUniformsS (uniforms : list<CUniform>) =
         state {
+            let! s = State.get
             let! config = AssemblerState.config
             let buffers =
                 uniforms 
@@ -1256,7 +1269,7 @@ module Assembler =
             let! definitions =
                 buffers |> List.mapS (fun (name, fields) ->
                     state {
-                        let fields = 
+                        let getFields() = 
                             fields |> List.map (fun u -> 
                                 let decl = assembleDeclaration config.reverseMatrixLogic u.cUniformType (checkName u.cUniformName)
                                 let decl = sprintf "%s;" decl 
@@ -1264,29 +1277,37 @@ module Assembler =
                             )
                         match name with
                             | Some "SharedMemory" ->
-                                let fields = fields |> List.map (fun (d,_,_,_) -> sprintf "shared %s" d) |> String.concat "\r\n"
+                                let fields = getFields() |> List.map (fun (d,_,_,_) -> sprintf "shared %s" d) |> String.concat "\r\n"
                                 return fields
 
                             | Some "StorageBuffer" ->
+                               
                                 let! buffers =
-                                    fields |> List.mapS (fun (d,name,_,ct) ->
+                                    fields |> List.mapS (fun field ->
                                         state {
                                             let! binding = AssemblerState.newBinding InputKind.StorageBuffer 1
                                             let prefix = uniformLayout false [] set binding
-                                            
-                                            match ct with
+                                            let name = checkName field.cUniformName
+
+                                            match field.cUniformType with
+                                            | CType.CPointer(_,ct) ->
+                                                do! Interface.addStorageBuffer {
+                                                    ssbSet = set
+                                                    ssbBinding = binding
+                                                    ssbName = name.Name
+                                                    ssbType = GLSLType.ofCType config.reverseMatrixLogic ct
+                                                }
+                                                match ct with
                                                 | CType.CPointer(_,ct) ->
-                                                    do! Interface.addStorageBuffer {
-                                                        ssbSet = set
-                                                        ssbBinding = binding
-                                                        ssbName = name
-                                                        ssbType = GLSLType.ofCType config.reverseMatrixLogic ct
-                                                    }
-                                                | _ ->
-                                                    failwithf "[GLSL] not a storage buffer type: %A" ct
+                                                    let typ = assembleType config.reverseMatrixLogic ct
+                                                    return sprintf "%sbuffer %sBuffer { %s[] data; } %s[];" prefix name.Name typ.Name name.Name
+                                                | ct ->
+                                                    let typ = assembleType config.reverseMatrixLogic ct
+                                                    return sprintf "%sbuffer %sBuffer { %s[] %s; };" prefix name.Name typ.Name name.Name
+                                            
+                                            | ct ->
+                                                return failwithf "[GLSL] not a storage buffer type: %A" ct
 
-
-                                            return sprintf "%sbuffer %sSSB { %s };" prefix name d
                                         }
                                     )
 
@@ -1296,6 +1317,7 @@ module Assembler =
                                 let bufferName = checkName bufferName
                                 let! binding = AssemblerState.newBinding InputKind.UniformBuffer 1
                                     
+                                let fields = getFields()
                                 let fieldStr = fields |> List.map (fun (d,_,_,ct) -> d) |> String.concat "\r\n"
                                 let prefix = uniformLayout true [] set binding
                             
@@ -1312,7 +1334,7 @@ module Assembler =
 
                             | _ ->
                                 let! definitions = 
-                                    fields |> List.mapS (fun (f, name, decorations, ct) ->
+                                    getFields() |> List.mapS (fun (f, name, decorations, ct) ->
                                         state {
                                             
 
@@ -1511,18 +1533,6 @@ module Assembler =
                             | _ ->
                                 []
 
-//                    let layoutParams =
-//                        match kind with
-//                            | ParameterKind.Input when Option.isNone prevStage ->
-//                                (sprintf "binding = %d" location) :: layoutParams
-//
-//                            | ParameterKind.Output when Option.isNone nextStage ->
-//                                (sprintf "binding = %d" location) :: layoutParams
-//
-//                            | _ ->
-//                                layoutParams
-//
-
                     let decorations =
                         match layoutParams with
                             | [] -> decorations
@@ -1536,7 +1546,17 @@ module Assembler =
                     let! name = parameterNameS kind p.cParamName
 
                     let prefix, suffix =
-                        if config.version > version120 then
+                        if stages.self = ShaderStage.RayHitShader && name.Name = Intrinsics.RayPayloadIn then
+                            match kind with
+                            | ParameterKind.Input -> "rayPayloadInNV ", ""
+                            | _ -> failwith "bad ray payload"
+                            
+                        elif stages.self = ShaderStage.RayHitShader && name.Name = Intrinsics.RayPayloadOut then
+                            match kind with
+                            | ParameterKind.Output -> "rayPayloadNV ", ""
+                            | _ -> failwith "bad ray payload"
+
+                        elif config.version > version120 then
                             match kind with
                                 | ParameterKind.Input -> "in ", ""
                                 | ParameterKind.Output -> "out ", ""
@@ -1772,9 +1792,24 @@ module Assembler =
                 let! s = State.get
                 let extensions = Set.union c.enabledExtensions s.requiredExtensions
 
+                let extensions =
+                    if ShaderStage.isRayTracing s.stages.self then 
+                        extensions
+                        |> Set.add "GL_NV_ray_tracing"
+                        |> Set.add "GL_EXT_nonuniform_qualifier"
+                        |> Set.remove "GL_ARB_tessellation_shader"
+                        |> Set.remove "GL_ARB_shading_language_420pack"
+                        |> Set.remove "GL_ARB_separate_shader_objects"
+                    else 
+                        extensions
+
+                let version =
+                    if ShaderStage.isRayTracing s.stages.self then "#version 460"
+                    else sprintf "#version %d%d0" c.version.Major c.version.Minor
+
                 return 
                     List.concat [
-                        [sprintf "#version %d%d0" c.version.Major c.version.Minor ]
+                        [ version ]
                         [ extensions |> Seq.map (sprintf "#extension %s : enable") |> Seq.toList |> String.concat "\r\n" ]
                         types
                         uniforms

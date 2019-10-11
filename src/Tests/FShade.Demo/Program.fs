@@ -144,17 +144,83 @@ let fraggy (v : Vertex) =
         }
     }
 
+type Payload =
+    {
+        hitCount : int
+    }
+
+type Result =
+    {
+        value : float
+    }
+
+type Ray =
+    { origin : V3d; direction : V3d }
+
+type Scene =
+    | Self
+    | Named of string
+
+[<AutoOpen>]
+module Intrinsics = 
+
+
+    type ShaderTable =
+        {
+            miss        : int
+            offset      : int
+            stride      : int
+        }
+
+        static member Default = { miss = 0; offset = 1; stride = 1 }
+
+    let trace<'a, 's> (table : ShaderTable) (state : RayQuery<'s, 'a>) : 'a = failwith ""
+
+    let buffers = UniformScope.Global
+
+    type UniformScope with
+        member x.Index : int[][] = uniform?StorageBuffer?Index
+        member x.Positions : V4d[][] = uniform?StorageBuffer?Positions
+        member x.Colors : V4d[][] = uniform?StorageBuffer?Colors
+        member x.TexCoords : V2d[][] = uniform?StorageBuffer?TexCoords
+
+
+
+type Assign =
+    {
+        uniforms : Map<string,Type>
+        buffers  : Map<string,Type> //contenttype
+        samplers : Map<string,SamplerDimension>
+    }
+
+type Binding =
+    {
+        uniforms : list<int * int * list<string * Type>>
+        buffers  : Map<string,int * int> //contenttype
+        samplers : Map<string,int * int>
+    }
+
+let compile (shader : System.Object) (f : Assign -> Binding) : string =
+    failwith ""
+
+
+let test (state : RayHit<Payload, Result>) =
+    rayhit {
+        let i0 = buffers.Index.[state.instanceIndex].[3 * state.primitiveId + 0]
+        return { 
+            value = float state.query.payload.hitCount + float i0 
+        }
+    }
+
 [<EntryPoint>]
 let main args =
-    let hugo = 100
+    let res = 
+        RayHitShader.ofFunction test
+        |> RayHitShader.toModule
+        |> ModuleCompiler.compileGLSLVulkan
 
-    //Examples.UtiliyFunctions.run()
-
-    let shader = Effect.ofFunction fraggy
-    let glsl = compileEffect [ shader ]
-
-    printfn "%s" glsl.code
-
+    printfn "%A" res.code
+    
 
     0
 

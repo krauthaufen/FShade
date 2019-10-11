@@ -72,6 +72,42 @@ module Intrinsics =
     let FragmentPosition = "Positions0"
 
 
+    [<Literal>] 
+    let LaunchId = "LaunchId"
+    [<Literal>] 
+    let LaunchSize = "LaunchSize"
+    [<Literal>] 
+    let InstanceCustomIndex = "InstanceCustomIndex"
+    [<Literal>] 
+    let WorldRayOrigin = "WorldRayOrigin"
+    [<Literal>] 
+    let WorldRayDirection = "WorldRayDirection"
+    [<Literal>] 
+    let ObjectRayOrigin = "ObjectRayOrigin"
+    [<Literal>] 
+    let ObjectRayDirection = "ObjectRayDirection"
+    [<Literal>] 
+    let RayTmin = "RayTmin"
+    [<Literal>] 
+    let RayTmax = "RayTmax"
+    [<Literal>] 
+    let IncomingRayFlags = "IncomingRayFlags"
+    [<Literal>] 
+    let HitT = "HitT"
+    [<Literal>] 
+    let HitKind = "HitKind"
+    [<Literal>] 
+    let ObjectToWorld = "ObjectToWorld"
+    [<Literal>] 
+    let WorldToObject = "WorldToObject"
+    [<Literal>] 
+    let HitCoord = "HitCoord"
+    
+    [<Literal>] 
+    let RayPayloadIn = "RayPayloadIn"
+    [<Literal>] 
+    let RayPayloadOut = "RayPayloadOut"
+
 [<AutoOpen>]
 module InstrinsicAttributes =
     type PositionAttribute() = inherit SemanticAttribute(Intrinsics.Position)
