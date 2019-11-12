@@ -49,6 +49,7 @@ type ParameterDecoration =
     | StorageBuffer of read : bool * write : bool
     | Shared
     | DepthWrite of DepthWriteMode
+    | Raypayload of isIn : bool
     
 [<RequireQualifiedAccess>]
 type UniformDecoration =

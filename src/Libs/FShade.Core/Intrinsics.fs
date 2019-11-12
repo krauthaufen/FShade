@@ -102,11 +102,16 @@ module Intrinsics =
     let WorldToObject = "WorldToObject"
     [<Literal>] 
     let HitCoord = "HitCoord"
+    [<Literal>] 
+    let HitPoint = "HitPoint"
     
     [<Literal>] 
     let RayPayloadIn = "RayPayloadIn"
     [<Literal>] 
     let RayPayloadOut = "RayPayloadOut"
+    
+    [<Literal>] 
+    let SelfScene = "SelfScene"
 
 [<AutoOpen>]
 module InstrinsicAttributes =

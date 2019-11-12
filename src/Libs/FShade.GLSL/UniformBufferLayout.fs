@@ -18,6 +18,7 @@ type GLSLType =
     | Image of GLSLImageType
     | Sampler of GLSLSamplerType
     | DynamicArray of elem : GLSLType * stride : int
+    | Intrinsic of string
 
 and GLSLImageType =
     {
@@ -182,6 +183,7 @@ module private Tools =
 
         let rec toString (t : GLSLType) =
             match t with
+                | GLSLType.Intrinsic n -> n
                 | GLSLType.Bool -> "bool"
                 | GLSLType.Void -> "void" 
 
@@ -494,7 +496,8 @@ module GLSLType =
                         match t with
                             | GLSLImage t -> GLSLType.Image t
                             | GLSLSampler t -> GLSLType.Sampler t
-                    | _ -> failwithf "[GLSL] bad intrinsic type: %A" a
+                    | _ ->
+                        GLSLType.Intrinsic a.intrinsicTypeName
 
             | CType.CPointer(_,e) -> GLSLType.DynamicArray (ofCType rev e, -1)
 
@@ -630,6 +633,9 @@ module LayoutStd140 =
                 
             | GLSLType.Sampler s ->
                 GLSLType.Sampler s, 1, 0
+                
+            | GLSLType.Intrinsic s ->
+                GLSLType.Intrinsic s, 1, 0
 
     let applyLayout (ub : GLSLUniformBuffer) : GLSLUniformBuffer =
         let mutable offset = 0

@@ -76,6 +76,13 @@ module ReflectionPatterns =
         else
             None
 
+
+    let (|AccelerationStructure|_|) (t : Type) =
+        if t = typeof<AccelerationStructure> then
+            Some ()
+        else
+            None
+
     type UniformParameter with
         member x.decorations =
             match x.uniformType with

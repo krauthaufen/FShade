@@ -18,25 +18,33 @@ open Aardvark.Base.ReflectionHelpers
 
 #nowarn "4321"
 
-type RayScene = RayScene of string
+type RayScene<'a> = 
+    | Self
+    | RayScene of string
 
 type RayQuery<'s, 'a> =
     {
-        scene       : RayScene
+        scene       : RayScene<'a>
         origin      : V3d
         direction   : V3d
+        tmin        : float
+        tmax        : float
         payload     : 's
     }
 
+module RayQuery =
+    let trace<'s, 'a> (query : RayQuery<'s, 'a>) : 'a = onlyInShaderCode "trace"
+
+
 type RayHit<'s, 'a> =
     {
+        scene       : RayScene<'a>
         query       : RayQuery<'s, 'a>
         rayT        : float
         coord       : V2d
         instanceId  : int
         instanceIndex : int
         primitiveId : int
-        hitPoint    : V3d
     }
 
 type SamplerInfo =
@@ -53,6 +61,8 @@ type SamplerInfo =
 
 type RayHitInfo =
     {
+        neededPayloads : hset<Type * Type>
+        neededScenes   : Set<string>
         neededUniforms : Map<string, Type>
         neededSamplers : Map<string, SamplerInfo>
         neededBuffers  : Map<string, int * Type>
@@ -66,11 +76,11 @@ type RayHitInterface =
         uniformBuffers      : Map<int * int, string * list<string * Type>>
         samplers            : Map<int * int, string * SamplerInfo>
         buffers             : Map<int * int, string * int * Type>
+        scenes              : Map<int * int, string>
+        payloadLocations    : hmap<Type * Type, int>
         payloadInLocation   : int
         payloadOutLocation  : int
     }
-
-
 
 type RayHitShader =
     {
@@ -80,9 +90,20 @@ type RayHitShader =
         rayHitUniforms          : Map<string, UniformParameter>
         rayHitInputs            : Map<string, Type>
         rayHitBody              : Expr
+        rayHitUseInOuts         : hmap<Type * Type, Var>
     }
 
 module RayHitShader =
+
+    [<KeepCall; GLSLIntrinsic("traceNV({0}, 0, 255, 1, 1, 0, {1}, {2}, {3}, {4}, {5})")>]
+    let realTrace (scene : AccelerationStructure) (origin : V3d) (tmin : float) (dir : V3d) (tmax : float)  (payload : int) : unit = onlyInShaderCode ""
+    
+    let realTraceMeth = getMethodInfo <@ realTrace @> 
+
+    [<GLSLIntrinsic("{0}")>]
+    let identity (v : 'a) : 'a = onlyInShaderCode "identity"
+    
+    let identityMeth = getMethodInfo <@ identity @> 
 
     module Preprocess =
         open Aardvark.Base.Monads.State
@@ -169,13 +190,41 @@ module RayHitShader =
             let (|RayDirection|_|) = propertyPath <@ fun (v : RayHit<_,_>) -> v.query.direction @>
             let (|RayOrigin|_|) = propertyPath <@ fun (v : RayHit<_,_>) -> v.query.origin @>
             let (|RayPayloadIn|_|) = propertyPath <@ fun (v : RayHit<_,_>) -> v.query.payload @>
+            let (|InputScene|_|) = propertyPath <@ fun (v : RayHit<_,_>) -> v.query.scene @>
       
+            let (|SceneValue|_|) (e : Expr) =
+                if e.Type.IsGenericType && e.Type.GetGenericTypeDefinition() = typedefof<RayScene<_>> then
+                    match e with
+                    | NewUnionCase(_, []) -> Some Intrinsics.SelfScene
+                    | NewUnionCase(_, [Value((:? string as v), _)]) -> Some v
+                    | NewUnionCase _ -> failwith "non-constant scene"
+                    | _ -> None
+                else
+                    None
+
+            let private traceMeth = getMethodInfo <@ RayQuery.trace @>
+            let (|Trace|_|) (e : Expr) =
+                match e with
+                | Call(None, mi, [query]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = traceMeth ->
+                    Some (query)
+                | _ ->   
+                    None
+
+            let (|NewQuery|_|) (e : Expr) = 
+                match e with
+                | NewRecord(t, [scene; origin; dir; tmin; tmax; payload]) when t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<RayQuery<_,_>> ->
+                    Some (scene, origin, dir, tmin, tmax, payload)
+                | _ ->
+                    None
+
+
         type State =
             {
                 inType  : Type
                 outType : Type
                 inputs  : Map<string, Type>
                 uniforms : Map<string, UniformParameter>
+                usedInOuts : hmap<Type * Type, Var * Expr * Expr>
             }
 
         let emptyState (inType : Type) (outType : Type) =
@@ -184,9 +233,30 @@ module RayHitShader =
                 outType = outType
                 inputs = Map.empty
                 uniforms = Map.empty
+                usedInOuts = HMap.empty
+
             }
 
         module State =
+
+            let useInOut (inType : Type) (outType : Type) =
+                State.custom (fun (s : State) ->
+                    match HMap.tryFind (inType, outType) s.usedInOuts with
+                    | Some v -> s, v
+                    | None ->
+                        let id = s.usedInOuts.Count
+                        let v = Var(sprintf "tempPayload%d" id, typeof<int>)
+                        let inName = sprintf "tempPayload%dIn" id
+                        let outName = sprintf "tempPayload%dOut" id
+                        let readIn = Expr.ReadInput(ParameterKind.Uniform, inType, inName)
+                        let readOut = Expr.ReadInput(ParameterKind.Uniform, outType, outName)
+                        let newState =
+                            { s with 
+                                usedInOuts = HMap.add (inType, outType) (v, readIn, readOut) s.usedInOuts 
+                            }
+                        newState, (v, readIn, readOut)
+                )
+
             let read (typ : Type) (name : string) =
                 State.custom (fun (s : State) ->
                     let s' = { s with inputs = Map.add name typ s.inputs }
@@ -194,10 +264,12 @@ module RayHitShader =
                 )
 
             let readUniform (p : UniformParameter) = 
-                State.modify (fun s ->
+                State.custom (fun s ->
                     match Map.tryFind p.uniformName s.uniforms with
-                        | Some u -> s
-                        | None -> { s with State.uniforms = Map.add p.uniformName p s.uniforms }
+                        | Some u -> s, Expr.ReadInput(ParameterKind.Uniform, u.uniformType, u.uniformName)
+                        | None -> 
+                            let s' = { s with State.uniforms = Map.add p.uniformName p s.uniforms }
+                            s', Expr.ReadInput(ParameterKind.Uniform, p.uniformType, p.uniformName)
                 )
 
         let private getFields (t : Type) =
@@ -212,9 +284,93 @@ module RayHitShader =
         
 
 
-        let rec preprocess (e : Expr) =
+
+
+        let rec preprocess (e : Expr) : State<_, Expr> =
             state {
                 match e with
+                      
+                | Let(v, Var o, b) when not v.IsMutable && not o.IsMutable ->
+                    let b = b.Substitute(fun vi -> if vi = v then Some (Expr.Var o) else None)
+                    return! preprocess b
+
+                //| Let(v, e, b) when not v.IsMutable ->
+                //    let mutable cnt = 0
+                //    let test = b.Substitute (fun vi -> if vi = v then cnt <- cnt + 1; Some e else None)
+                //    if cnt <= 1 then
+                //        return! preprocess test
+                //    else
+                //        let! e = preprocess e
+                //        let! b = preprocess b
+                //        return Expr.Let(v, e, b)
+
+                | Trace(query) ->
+                    let rec inlineAll (e : Expr) =
+                        match e with
+                        | Let (v, e, b) -> inlineAll (b.Substitute (fun vi -> if vi = v then Some e else None))
+                        | _ -> e
+                    let better = inlineAll query
+                    match better with
+                    | NewQuery(scene, origin, dir, tmin, tmax, payload) ->
+                        let! scene = preprocess scene
+                        let! origin = preprocess origin
+                        let! dir = preprocess dir
+                        let! tmin = preprocess tmin
+                        let! tmax = preprocess tmax
+                        let! payload = preprocess payload
+
+
+                        let! (v, input, output) = State.useInOut payload.Type e.Type
+
+                        //let input = Expr.ReadInput(ParameterKind.Uniform, payload.Type, "RayPayloadIn")
+                        //let output = Expr.ReadInput(ParameterKind.Uniform, e.Type, "RayPayloadOut")
+                        //let v = Var("result", output.Type, true)
+
+                        let outputVars = 
+                            FSharpType.GetRecordFields(output.Type, true)
+                            |> Array.toList
+                            |> List.map (fun prop ->
+                                Var(prop.Name, prop.PropertyType, true), 
+                                Var(prop.Name, prop.PropertyType, false), 
+                                Expr.Call(identityMeth.MakeGenericMethod [|prop.PropertyType|], [Expr.PropertyGet(output, prop)])
+                            )
+
+                        let rec wrap (bindings : list<Var * Var * Expr>) (body : Expr) =
+                            match bindings with
+                            | [] -> body
+                            | (vm, vi, e) :: rest -> Expr.Let(vm, e, Expr.Let(vi, Expr.Var vm, wrap rest body))
+
+
+                        return  
+                            Expr.Seq [
+                                for f in FSharpType.GetRecordFields(input.Type, true) do
+                                    Expr.UnsafePropertySet(input, f, Expr.PropertyGet(payload, f))
+
+                                Expr.Call(realTraceMeth, [scene; origin; tmin; dir; tmax; Expr.Var v ])
+                            
+                                wrap outputVars (
+                                    Expr.NewRecord(output.Type, 
+                                        outputVars
+                                        |> List.map (fun (_,v,_) -> Expr.Var v)
+                                    )
+                                )
+                            ]
+                        | _ ->
+                            return failwith "bad query"
+
+                 | InputScene _ ->
+                    return! State.readUniform { 
+                        uniformName = Intrinsics.SelfScene
+                        uniformType = typeof<AccelerationStructure>
+                        uniformValue = UniformValue.Attribute(UniformScope.Global, Intrinsics.SelfScene)
+                    }
+
+                | SceneValue name ->
+                    return! State.readUniform { 
+                        uniformName = name
+                        uniformType = typeof<AccelerationStructure>
+                        uniformValue = UniformValue.Attribute(UniformScope.Global, name)
+                    }
 
                 | RayT _ ->
                     return! State.read typeof<float> Intrinsics.HitT
@@ -243,8 +399,7 @@ module RayHitShader =
        
 
                 | Uniform u ->
-                    do! State.readUniform u
-                    return Expr.ReadInput(ParameterKind.Uniform, e.Type, u.uniformName)
+                    return! State.readUniform u
 
                 | BuilderReturn(_, _, e) ->
                     let! e = preprocess e
@@ -266,10 +421,12 @@ module RayHitShader =
                             ]
                     else 
                         return Expr.WriteOutputs([Intrinsics.RayPayloadOut, None, e])
+                        
 
                 | RemoveBuilder e ->
                     return! preprocess e
-                   
+             
+
                 | ShapeLambda(v, b) ->  
                     let! b1 = preprocess b
                     return Expr.Lambda(v, b1)
@@ -283,25 +440,42 @@ module RayHitShader =
             }
 
     let private getInfo (s : RayHitShader) =
+        
+        let scenes =
+            s.rayHitUniforms |> Map.toSeq |> Seq.choose (fun (_,u) ->
+                match u.uniformType with
+                | AccelerationStructure -> Some u.uniformName
+                | _ -> None
+            )
+            
+        let rayHitUniorms = 
+            s.rayHitUniforms |> Map.choose (fun _ u ->
+                match u.uniformType with
+                | AccelerationStructure -> None
+                | _ -> Some u
+            )
 
         let buffers =
-            s.rayHitUniforms |> Map.choose (fun _ u ->
-                match u.uniformValue with
-                | UniformValue.Attribute(scope, _) when scope = uniform?StorageBuffer ->
-                    if u.uniformType.IsArray then
-                        let et = u.uniformType.GetElementType()
-                        if et.IsArray then
-                            Some (2, et.GetElementType())
-                        else
-                            Some (1, et)
-                    else
-                        None
+            rayHitUniorms |> Map.choose (fun _ u ->
+                match u.uniformType with
+                | AccelerationStructure -> None
                 | _ ->
-                    None
+                    match u.uniformValue with
+                    | UniformValue.Attribute(scope, _) when scope = uniform?StorageBuffer ->
+                        if u.uniformType.IsArray then
+                            let et = u.uniformType.GetElementType()
+                            if et.IsArray then
+                                Some (2, et.GetElementType())
+                            else
+                                Some (1, et)
+                        else
+                            None
+                    | _ ->
+                        None
             )
 
         let uniforms =
-            s.rayHitUniforms |> Map.choose (fun _ u ->
+            rayHitUniorms |> Map.choose (fun _ u ->
                 match u.uniformValue with
                 | UniformValue.Sampler _
                 | UniformValue.SamplerArray _ -> 
@@ -313,7 +487,7 @@ module RayHitShader =
             )
             
         let samplers =
-            s.rayHitUniforms |> Map.choose (fun _ u ->
+            rayHitUniorms |> Map.choose (fun _ u ->
                 match u.uniformType with
                 | ArrayOf (SamplerType(dim, isArray, isShadow, isMS, valueType))
                 | SamplerType(dim, isArray, isShadow, isMS, valueType) ->
@@ -335,12 +509,17 @@ module RayHitShader =
                     None
             )
 
+        let free =
+            s.rayHitBody.GetFreeVars()
+
         {
             payloadInType = s.rayPayloadInType
             payloadOutType = s.rayPayloadOutType
             neededUniforms = uniforms
             neededBuffers = buffers
             neededSamplers = samplers
+            neededScenes = Set.ofSeq scenes
+            neededPayloads = HMap.keys s.rayHitUseInOuts
         }
 
     let ofFunction (shader : RayHit<'s, 'a> -> Expr<'a>) =
@@ -357,6 +536,19 @@ module RayHitShader =
             |> Preprocess.preprocess
             |> Aardvark.Base.Monads.State.State.run (Preprocess.emptyState inType outType)
 
+        let isSideEffect (m : MethodInfo) =
+            m.GetCustomAttributes<KeepCallAttribute>()
+            |> Seq.isEmpty
+            |> not
+
+        let expr =
+            expr
+            |> Optimizer.StatementHoisting.hoistImperative
+            |> Optimizer.inlining isSideEffect
+            |> Optimizer.evaluateConstants' isSideEffect
+            |> Optimizer.eliminateDeadCode' isSideEffect
+            |> Optimizer.evaluateConstants' isSideEffect
+            |> Optimizer.inlining isSideEffect
         {
             rayHitHash = hash
             rayPayloadInType = inType
@@ -364,6 +556,7 @@ module RayHitShader =
             rayHitUniforms = state.uniforms
             rayHitInputs = state.inputs
             rayHitBody = expr
+            rayHitUseInOuts = state.usedInOuts |> HMap.map (fun _ (v,_,_) -> v)
         }
 
     let toModule (assign : RayHitInfo -> RayHitInterface) (s : RayHitShader) =
@@ -402,7 +595,19 @@ module RayHitShader =
                 }
             )
 
-
+        let scenes =
+            iface.scenes
+            |> Map.toList
+            |> List.map (fun ((set, binding), name) ->
+                { 
+                    uniformName = name
+                    uniformType = typeof<AccelerationStructure>
+                    uniformBuffer = None
+                    uniformDecorations = [UniformDecoration.BufferBinding binding; UniformDecoration.BufferDescriptorSet set]
+                    uniformTextureInfo = []
+                }
+                
+            )
 
         let samplers =
             iface.samplers
@@ -416,7 +621,6 @@ module RayHitShader =
                     uniformTextureInfo = [info.textureName, info.samplerState :> obj]
                 }
             )
-            
 
         let inputs =
             s.rayHitInputs
@@ -444,15 +648,59 @@ module RayHitShader =
                 }
             ]
 
+        let mapping =
+            s.rayHitUseInOuts
+            |> HMap.toSeq
+            |> Seq.map (fun ((i,o), v) ->
+                match HMap.tryFind (i,o) iface.payloadLocations with
+                | Some loc -> v, loc
+                | None -> failwith "missing assignment for inout"
+            )
+            |> Map.ofSeq
+
+        let newBody = 
+            s.rayHitBody.Substitute(fun v ->
+                match Map.tryFind v mapping with
+                | Some loc -> Expr.Value loc |> Some
+                | None -> None
+            )
+
+        let tempPayloads =
+            s.rayHitUseInOuts
+            |> HMap.toList
+            |> List.collect (fun ((i,o), v) ->
+                match HMap.tryFind (i,o) iface.payloadLocations with
+                | Some loc ->   
+                    let inName = v.Name + "In"
+                    let outName =   v.Name + "Out"
+                    [
+                        {
+                            paramType = i
+                            paramName = inName
+                            paramSemantic = inName
+                            paramDecorations = Set.ofList [ParameterDecoration.Slot loc; ParameterDecoration.Raypayload true]
+                        }
+                        {
+                            paramType = o
+                            paramName = outName
+                            paramSemantic = outName
+                            paramDecorations = Set.ofList [ParameterDecoration.Slot loc; ParameterDecoration.Raypayload false]
+                        }
+                    ]
+                | None -> 
+                    []
+            )
+
+
         let entry = 
             { 
                 conditional = None
                 entryName   = "main"
-                inputs      = inputs
+                inputs      = inputs @ tempPayloads
                 outputs     = outputs
-                uniforms    = uniforms @ buffers @ samplers
+                uniforms    = uniforms @ buffers @ samplers @ scenes
                 arguments   = []
-                body        = s.rayHitBody
+                body        = newBody
                 decorations = [ EntryDecoration.Stages { prev = None; self = ShaderStage.RayHitShader; next = None } ]
             }
         {

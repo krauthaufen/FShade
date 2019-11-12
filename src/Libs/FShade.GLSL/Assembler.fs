@@ -137,8 +137,12 @@ type Backend private(config : Config) =
                             valueType = GLSLType.ofCType config.reverseMatrixLogic (CType.ofType x valueType)
                         }
                 }
-                
-
+              
+            | AccelerationStructure ->
+                Some {
+                    intrinsicTypeName = "accelerationStructureNV"
+                    tag = t
+                }
 
             | _ ->
                 None
@@ -1266,6 +1270,7 @@ module Assembler =
                 uniforms 
                     |> List.map (fun u -> match u.cUniformType with | CIntrinsic { tag = (:? GLSLTextureType) } -> { u with cUniformBuffer = None } | _ -> u)
                     |> List.groupBy (fun u -> u.cUniformBuffer)
+                    |> List.collect (function (Some a, f) -> [Some a, f] | (None, f) -> f |> List.map (fun f -> None, [f]))
 
             let allHaveSets =
                 buffers |> List.forall (fun (name, fields) ->
@@ -1349,14 +1354,13 @@ module Assembler =
                             | Some bufferName when config.createUniformBuffers ->
                                 let bufferName = checkName bufferName
                                 let! binding = getBinding InputKind.UniformBuffer 1 fields
-                                
+                                let prefix = uniformLayout true [] set binding
+                            
                                 let fieldStr = 
                                     fields |> List.map (fun u -> 
                                         let decl = assembleDeclaration config.reverseMatrixLogic u.cUniformType (checkName u.cUniformName)
                                         sprintf "%s;" decl
                                     ) |> String.concat "\r\n"
-                                let prefix = uniformLayout true [] set binding
-                            
                                 do! Interface.addUniformBuffer {
                                     ubSet = set
                                     ubBinding = binding
@@ -1407,6 +1411,9 @@ module Assembler =
                                                                 imageType = imageType
                                                             }
                                                 | _ ->
+                                                    let! binding = getBinding InputKind.UniformBuffer 1 [u]
+                                                    prefix <- uniformLayout false u.cUniformDecorations set binding
+
                                                     ()
 
                                             let decl = assembleDeclaration config.reverseMatrixLogic u.cUniformType (checkName u.cUniformName)
@@ -1545,7 +1552,7 @@ module Assembler =
                                     | ParameterDecoration.Shared -> 
                                         return Some "shared"
 
-                                    | ParameterDecoration.Memory _ | ParameterDecoration.Slot _ ->
+                                    | ParameterDecoration.Memory _ | ParameterDecoration.Slot _ | ParameterDecoration.Raypayload _ ->
                                         return None
                             }
 
@@ -1580,8 +1587,17 @@ module Assembler =
 
                     let! name = parameterNameS kind p.cParamName
 
+                    let payload =
+                        p.cParamDecorations |> Seq.tryPick (function 
+                            | ParameterDecoration.Raypayload true -> Some "rayPayloadInNV "
+                            | ParameterDecoration.Raypayload false -> Some "rayPayloadNV "
+                            | _ -> None
+                        )
+
                     let decorations, prefix, suffix =
-                        if stages.self = ShaderStage.RayHitShader && name.Name = Intrinsics.HitCoord then
+                        if Option.isSome payload then
+                            decorations, payload.Value, ""
+                        elif stages.self = ShaderStage.RayHitShader && name.Name = Intrinsics.HitCoord then
                             match kind with
                             | ParameterKind.Input -> "", "hitAttributeNV ", ""
                             | _ -> failwith "bad ray payload"

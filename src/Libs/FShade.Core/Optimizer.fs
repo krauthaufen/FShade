@@ -2569,8 +2569,21 @@ module Optimizer =
                     | PropertyGet(None, pi, indices) ->
                         let! indices = indices |> List.mapS inlineS
                         return Expr.PropertyGet(pi, indices)
+                        
+                    | PropertyGet(Some (NewRecord(t, fields)), pi, []) ->
+                        let decls = FSharpType.GetRecordFields(t, true) |> Array.toList 
 
+                        let value = 
+                            List.zip decls fields |> List.pick (fun (d,v) ->
+                                if d = pi then Some v
+                                else None
+                            )
+
+                        let! value = inlineS value
+                        return value
+                        
                     | PropertyGet(Some t, pi, indices) ->
+                        
                         let! t = inlineS t
                         let! indices = indices |> List.mapS inlineS
                         return Expr.PropertyGet(t, pi, indices)
