@@ -461,6 +461,13 @@ let main args =
     | Success res -> 
         File.writeAllBytes @"C:\Users\Schorsch\Desktop\test.spv" res
 
+
+        let all = 
+            Reflection.FSharpType.GetUnionCases(typeof<GLSLang.Optimization>)
+            |> Array.filter (fun c -> c.GetFields().Length = 0)
+            |> Array.map (fun c -> Reflection.FSharpValue.MakeUnion(c, [||]) |> unbox<GLSLang.Optimization>)
+            |> Array.toList
+        let res = GLSLang.GLSLang.optimize all res
         let m = GLSLang.SpirV.Module.ofArray res
         SpirVPrint.print m
         

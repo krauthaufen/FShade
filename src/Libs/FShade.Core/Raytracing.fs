@@ -20,7 +20,17 @@ open Aardvark.Base.ReflectionHelpers
 
 type RayScene<'a> = 
     | Self
-    | RayScene of string
+    | RayScene of name : string 
+
+type RayEffect =
+    {
+        rayFlags : int
+        cullMask : int
+        sbtRecordOffset : int
+        sbtRecordStride : int
+        missIndex : int
+    }
+
 
 type RayQuery<'s, 'a> =
     {
@@ -95,8 +105,8 @@ type RayHitShader =
 
 module RayHitShader =
 
-    [<KeepCall; GLSLIntrinsic("traceNV({0}, 0, 255, 1, 1, 0, {1}, {2}, {3}, {4}, {5})")>]
-    let realTrace (scene : AccelerationStructure) (origin : V3d) (tmin : float) (dir : V3d) (tmax : float)  (payload : int) : unit = onlyInShaderCode ""
+    [<KeepCall; GLSLIntrinsic("traceNV({0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {10})")>]
+    let realTrace (scene : AccelerationStructure) (rayFlags : int) (cullMask : int) (sbtRecordOffset : int) (sbtRecordStride : int) (missIndex : int) (origin : V3d) (tmin : float) (dir : V3d) (tmax : float)  (payload : int) : unit = onlyInShaderCode ""
     
     let realTraceMeth = getMethodInfo <@ realTrace @> 
 
@@ -320,6 +330,27 @@ module RayHitShader =
                         let! payload = preprocess payload
 
 
+                        let sceneName = 
+                            match scene with
+                            | ReadInput(ParameterKind.Uniform, name, None) ->
+                                name
+                            | _ ->
+                                failwith "explode"
+
+                        let! effect =  
+                            let name = sprintf "%sEffect" sceneName
+                            State.readUniform { 
+                                uniformType = typeof<RayEffect>
+                                uniformName = name
+                                uniformValue = UniformValue.Attribute(UniformScope.Global, name)
+                            }
+                            
+                        let cullMask = <@ (%%effect : RayEffect).cullMask @>
+                        let sbtRecordOffset = <@ (%%effect : RayEffect).sbtRecordOffset @>
+                        let sbtRecordStride = <@ (%%effect : RayEffect).sbtRecordStride @>
+                        let missIndex = <@ (%%effect : RayEffect).missIndex @>
+                        let rayFlags = <@ (%%effect : RayEffect).rayFlags @>
+
                         let! (v, input, output) = State.useInOut payload.Type e.Type
 
                         //let input = Expr.ReadInput(ParameterKind.Uniform, payload.Type, "RayPayloadIn")
@@ -346,7 +377,7 @@ module RayHitShader =
                                 for f in FSharpType.GetRecordFields(input.Type, true) do
                                     Expr.UnsafePropertySet(input, f, Expr.PropertyGet(payload, f))
 
-                                Expr.Call(realTraceMeth, [scene; origin; tmin; dir; tmax; Expr.Var v ])
+                                Expr.Call(realTraceMeth, [scene; rayFlags; cullMask; sbtRecordOffset; sbtRecordStride; missIndex; origin; tmin; dir; tmax; Expr.Var v])
                             
                                 wrap outputVars (
                                     Expr.NewRecord(output.Type, 
