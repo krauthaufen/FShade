@@ -6,16 +6,15 @@ open Microsoft.FSharp.Quotations.DerivedPatterns
 open Microsoft.FSharp.Quotations.ExprShape
 
 open FsUnit
-open Xunit
-open Xunit.Sdk
 
 open Aardvark.Base
 open Aardvark.Base.Monads.State
-
+open FsUnit
 open FShade
+open NUnit.Framework
 
 
-[<Fact>]
+[<Test>]
 let ``[For] long dependency chain for used variable``() =
     let input =
         <@
@@ -39,7 +38,7 @@ let ``[For] long dependency chain for used variable``() =
 
     input |> Opt.run |> should exprEqual expected
 
-[<Fact>]
+[<Test>]
 let ``[For] parallel increment``() =
     let input =
         <@
@@ -63,7 +62,7 @@ let ``[For] parallel increment``() =
 
 
 
-[<Fact>]
+[<Test>]
 let ``[While] changing unused value``() =
     let input =
         <@ 
@@ -77,7 +76,7 @@ let ``[While] changing unused value``() =
 
     input |> Opt.run |> should exprEqual expected
 
-[<Fact>]
+[<Test>]
 let ``[While] counting and changing value``() =
     let input =
         <@ 
@@ -94,7 +93,7 @@ let ``[While] counting and changing value``() =
 
     input |> Opt.run  |> should exprEqual expected
 
-[<Fact>]
+[<Test>]
 let ``[While] counting and changing used/unused values``() =
     let input =
         <@ 
@@ -121,7 +120,7 @@ let ``[While] counting and changing used/unused values``() =
 
 
 
-[<Fact>]
+[<Test>]
 let ``[This] mutable this preseved``() =
     let v = V2d(1.0, 1.0)
     let input =
@@ -140,7 +139,7 @@ let ``[This] mutable this preseved``() =
 
     input |> Opt.run |> should exprEqual expected
 
-[<Fact>]
+[<Test>]
 let ``[This] immutable this removed``() =
 
     let v = V2d(1.0, 1.0)
@@ -158,7 +157,7 @@ let ``[This] immutable this removed``() =
 
     input |> Opt.run |> should exprEqual expected
 
-[<Fact>]
+[<Test>]
 let ``[Let] immutable binding inlined``() =
     let input =
         <@
@@ -173,7 +172,7 @@ let ``[Let] immutable binding inlined``() =
 
     input |> Opt.run |> should exprEqual expected
 
-[<Fact>]
+[<Test>]
 let ``[Let] mutable binding preserved``() =
     let input =
         <@
@@ -189,7 +188,7 @@ let ``[Let] mutable binding preserved``() =
 
     input |> Opt.run |> should exprEqual expected
 
-[<Fact>]
+[<Test>]
 let ``[Hoist] lifting bindings``() =
     let input =
         <@
@@ -207,7 +206,7 @@ let ``[Hoist] lifting bindings``() =
         @>
     input |> Opt.run |> should exprEqual expected
     
-[<Fact>]
+[<Test>]
 let ``[Hoist] preserving order``() =
     let input =
         <@
@@ -235,7 +234,7 @@ let ``[Hoist] preserving order``() =
     let res = input |> Opt.run 
     res |> should exprEqual expected
 
-[<Fact>]
+[<Test>]
 let ``[Hoist] nested lets``() =
     let input =
         <@
@@ -261,7 +260,7 @@ let ``[Hoist] nested lets``() =
     let res = input |> Opt.run 
     res |> should exprEqual expected
 
-[<Fact>]
+[<Test>]
 let ``[Hoist] lifting for loops``() =
     let input =
         <@
@@ -290,7 +289,7 @@ let util (a : int) (b : int) =
         c <- c / 2
     c
 
-[<Fact>]
+[<Test>]
 let ``[Hoist] inline function``() =
     let input =
         <@
@@ -311,7 +310,7 @@ let ``[Hoist] inline function``() =
     input |> Opt.run |> should exprEqual expected
 
 
-[<Fact>]
+[<Test>]
 let ``[Hoist] if in expression``() =
     let input =
         <@
@@ -340,7 +339,7 @@ let test (e : Expr<int -> int>) (v : Expr<int>) =
         (%e) %v
     @>
 
-[<Fact>]
+[<Test>]
 let ``[Quote] inlining possible``() =
     let input =
         <@
@@ -356,7 +355,7 @@ let ``[Quote] inlining possible``() =
     input |> Opt.run |> should exprEqual expected
 
 
-[<Fact>]
+[<Test>]
 let ``[Ref] no constant folding``() =
     let input =
         <@
@@ -375,7 +374,7 @@ let ``[Ref] no constant folding``() =
 
 
 
-[<Fact>]
+[<Test>]
 let ``[Dead] removing unused array writes``() =
     let input =
         <@
@@ -391,7 +390,7 @@ let ``[Dead] removing unused array writes``() =
         @>
     input |> Opt.run |> should exprEqual expected
 
-[<Fact>]
+[<Test>]
 let ``[Dead] keeping used array writes``() =
     let input =
         <@
@@ -410,7 +409,7 @@ let funny (a : int) =
     else
         (5,5)
 
-[<Fact>]
+[<Test>]
 let ``Sepp``() =
     let input =
         <@

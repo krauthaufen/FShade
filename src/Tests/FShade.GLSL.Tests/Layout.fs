@@ -140,7 +140,7 @@ let layoutGLSLang (b : GLSLUniformBuffer) =
             | Struct(name, fields, _) ->
                 CStruct(name, fields |> List.map (fun (name,t,_) -> toCType t, name), None)
 
-            | DynamicArray _ | Image _ | Sampler _ | Void -> 
+            | DynamicArray _ | Image _ | Sampler _ | Void  | Intrinsic _ -> 
                 failwith ""
 
     let rec structs (t : GLSLType) =
@@ -155,7 +155,7 @@ let layoutGLSLang (b : GLSLUniformBuffer) =
                 (fields |> List.collect (fun (name,t,_) -> structs t)) @
                 [(name, fields)]
 
-            | DynamicArray _ | Image _ | Sampler _ | Void -> 
+            | DynamicArray _ | Image _ | Sampler _ | Void | Intrinsic _ -> 
                 []
 
     let firstField =

@@ -4,7 +4,7 @@
 open System
 open Aardvark.Base
 open FShade
-open Xunit
+open NUnit.Framework
 open FsUnit
 open FShade.Tests
 
@@ -16,7 +16,7 @@ type Vertex =
         
 type Computation = WantA=1 | WantB=2 | WantC=3
 
-[<Fact>]
+[<Test>]
 let ``Simple``() =
     Setup.Run()
         
@@ -52,7 +52,7 @@ let ``Simple``() =
     if (codeC.code.IndexOf "2.7182") >= 0 then failwith "does also contain computation B"
 
 
-[<Fact>]
+[<Test>]
 let ``Complex``() =
     Setup.Run()
         
@@ -111,7 +111,7 @@ let computer (comp : Computation, pos : V4d, c : V4d) =
         temp |> Vec.length
     | _ -> 0.0
 
-[<Fact>]
+[<Test>]
 let ``Subroutine``() =
     Setup.Run()
         
@@ -199,7 +199,7 @@ let computerXXX (color : V4d, comp : Computation, mb : bool) =
                 
         tmColor
 
-[<Fact>]
+[<Test>]
 let ``Hilite``() =
     Setup.Run()
         
@@ -268,7 +268,7 @@ let ``Hilite``() =
 let util (a : float) (b : float) (c : float) =
     a + b * c
 
-[<Fact>]
+[<Test>]
 let ``Broken``() =
     let frag2 (v : Vertex) =
         fragment {

@@ -3,7 +3,7 @@
 open System
 open Aardvark.Base
 open FShade
-open Xunit
+open NUnit.Framework
 open FsUnit
 open FShade.Tests
 
@@ -15,7 +15,7 @@ type Vertex =
         
 
     
-[<Fact>]
+[<Test>]
 let ``Broken GLSL Shader``() =
     Setup.Run()
 
@@ -36,7 +36,7 @@ let ``Broken GLSL Shader``() =
 
 
 
-[<Fact>]
+[<Test>]
 let ``Simple fragment shader``() =
     Setup.Run()
 
@@ -48,7 +48,7 @@ let ``Simple fragment shader``() =
     GLSL.shouldCompile [ Effect.ofFunction frag ]
         
 
-[<Fact>]
+[<Test>]
 let ``Helper with duplicate names``() =
     Setup.Run()
 
@@ -75,7 +75,7 @@ type PointSizeVertex =
     }
         
 
-[<Fact>]
+[<Test>]
 let ``PointSize shader``() =
     Setup.Run()
 
@@ -102,7 +102,7 @@ let fillArray (array : Arr<N<10>, V4d>) denom =
         array.[i] <- V4d(float i / denom)
         
 
-[<Fact>]
+[<Test>]
 let ``Fill Array with Function``() =
     Setup.Run()
 
@@ -143,7 +143,7 @@ let fillArrayReturn (array : Arr<N<10>, V4d>) denom =
     array
     
 
-[<Fact>]
+[<Test>]
 let ``Fill Array with Return Function``() =
     Setup.Run()
 
@@ -183,7 +183,7 @@ let fillArrayInline (array : Arr<N<10>, V4d>) denom =
         array.[i] <- V4d(float i / denom)
     
 
-[<Fact>]
+[<Test>]
 let ``Fill Array with Inline Function``() =
     Setup.Run()
 
@@ -222,7 +222,7 @@ let condTimesTwo (v : float) =
     else 
         valueIdentity v
         
-[<Fact>]
+[<Test>]
 let ``Nested Double Inline``() =
     Setup.Run()
 
@@ -287,7 +287,7 @@ module Helper =
             V3d(0.0,0.0,0.0)
         |]
 
-[<Fact>]
+[<Test>]
 let ``Bad Helpers``() =
     Setup.Run()
 
@@ -315,7 +315,7 @@ let ``Bad Helpers``() =
 let util (a : ref<float>) =
     a := !a + 1.0
 
-[<Fact>]
+[<Test>]
 let ``Ref translated to inout``() =
     Setup.Run()
     
@@ -343,7 +343,7 @@ let atomicAdd (r : ref<int>) (v : int) = onlyInShaderCode "atomicAdd"
 type UniformScope with
     member x.Test : int[] = uniform?StorageBuffer?Test
 
-[<Fact>]
+[<Test>]
 let ``Ref storage buffer modification``() =
     Setup.Run()
     
@@ -376,7 +376,7 @@ type Shader private () =
             v.[id.X] <- a
         }
 
-[<Fact>]
+[<Test>]
 let ``[Compute] includes samplerInfo``() =
     let shader = ComputeShader.ofFunction (V3i(128,128,128)) Shader.shader
 
@@ -394,7 +394,7 @@ let ``[Compute] includes samplerInfo``() =
             addressV WrapMode.Wrap
         }
 
-    sammy |> FsUnit.Xunit.should FsUnit.Xunit.equal ["texture", state ]
+    sammy |> should equal ["texture", state ]
 
 
 
@@ -409,7 +409,7 @@ type MyVertex =
         [<Semantic("AAATrafo")>] trafo : M34d
     }
 
-[<Fact>]
+[<Test>]
 let ``Compose variables correct``() =
     let frag (v : MyVertex) =
         fragment {
@@ -431,7 +431,7 @@ let clampPointToPolygon (vc : int) (p : V3d) =
     else
         (p * 2.0, vc + 1, -1, -1)
 
-[<Fact>]
+[<Test>]
 let ``Struct declaration`` () =
 
     let frag1 (v : Vertex) =
@@ -484,7 +484,7 @@ let inlineFun2 (p : V3d) =
     irr * p.Z
 
 
-[<Fact>]
+[<Test>]
 let ``Inline Inline`` () =
     Setup.Run()
 
@@ -511,7 +511,7 @@ let GetSample(switch : int, lc : V2d, sam : Sampler2d) : V3d =
     | 2 -> sam.Sample(lc * 2.0).XYZ
     | _ -> V3d.OOO
 
-[<Fact>]
+[<Test>]
 let ``Sampler Loop Inline`` () =
     Setup.Run()
 
@@ -528,7 +528,7 @@ let ``Sampler Loop Inline`` () =
 
     GLSL.shouldCompile [ Effect.ofFunction (frag 1) ]
 
-[<Fact>]
+[<Test>]
 let ``Unroll Match`` () =
     Setup.Run()
 
@@ -572,7 +572,7 @@ let private simpleSampler =
         addressV WrapMode.Clamp
     }
 
-[<Fact>]
+[<Test>]
 let ``Array Samplers`` () =
     Setup.Run()
 
@@ -589,7 +589,7 @@ let ``Array Samplers`` () =
 
     GLSL.shouldCompile [ Effect.ofFunction (frag) ]
 
-[<Fact>]
+[<Test>]
 let ``Simple Fetch`` () =
     Setup.Run()
 
@@ -658,7 +658,7 @@ let computeSome va vb vc =
     Vec.cross e1 e2 |> Vec.length
 
 
-[<Fact>]
+[<Test>]
 let ``Variable Declaration`` () =
     Setup.Run()
 
@@ -686,7 +686,7 @@ type VertexClip =
         [<ClipDistance>] cd : float[]
     } 
 
-[<Fact>]
+[<Test>]
 let ``ClipDistance Pass-Through`` () =
     Setup.Run()
 
@@ -722,7 +722,7 @@ type VertexWithPid =
         [<PrimitiveId>] pid : uint32
     } 
 
-[<Fact>]
+[<Test>]
 let ``GS PrimitiveId`` () =
     Setup.Run()
     
@@ -750,7 +750,7 @@ type VertexLayer =
         [<Layer>] l : int
     } 
     
-[<Fact>]
+[<Test>]
 let ``GS Composition with Layer`` () =
     Setup.Run()
     
@@ -792,7 +792,7 @@ type VertexLayerSid =
         [<SourceVertexIndex>] sid : int
     } 
     
-[<Fact>]
+[<Test>]
 let ``GS Composition with Layer2`` () =
     Setup.Run()
     
@@ -827,7 +827,7 @@ let intergerSampler =
         texture uniform?IntTexture
     }
 
-[<Fact>]
+[<Test>]
 let ``IntSampler`` () =
     Setup.Run()
     
@@ -839,7 +839,7 @@ let ``IntSampler`` () =
 
     GLSL.shouldCompile [ Effect.ofFunction ps; ]
 
-[<Fact>]
+[<Test>]
 let ``GLSLTypesToString`` () =
 
     Setup.Run()
@@ -879,7 +879,7 @@ let sampler3 =
         texture uniform?OtherTexture
     }
 
-[<Fact>]
+[<Test>]
 let ``DuplicateId`` () =
     Setup.Run()
 

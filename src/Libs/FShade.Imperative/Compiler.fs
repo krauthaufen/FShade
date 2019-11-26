@@ -1781,6 +1781,7 @@ module Compiler =
                     let signature = f.Signature s.moduleState.backend
                     let! body = toCStatementS true body
 
+
                     return CFunctionDef(signature, body)
 
                 | CompiledFunction(signature, body) ->
@@ -1792,8 +1793,8 @@ module Compiler =
 
                 | Utility u ->
                     let! s = State.get
-                    let! body = toCStatementS true u.functionBody
                     let signature = f.Signature s.moduleState.backend
+                    let! body = toCStatementS true u.functionBody
                     return CFunctionDef(signature, body)
 
 

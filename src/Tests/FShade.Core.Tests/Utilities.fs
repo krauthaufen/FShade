@@ -5,14 +5,14 @@ open Microsoft.FSharp.Quotations.Patterns
 open Microsoft.FSharp.Quotations.DerivedPatterns
 open Microsoft.FSharp.Quotations.ExprShape
 
-open Xunit
-open Xunit.Abstractions
+open NUnit.Framework
 open FsUnit
 
 open Aardvark.Base
 open Aardvark.Base.Monads.State
 
 open FShade
+open NUnit.Framework.Constraints
 
 #nowarn "4321"
 
@@ -35,19 +35,30 @@ module Utilities =
                 Expr.Lambda(v, normalize b)
 
     let exprComparer l = 
-        { new NHamcrest.Core.IsEqualMatcher<obj>(l) with
-        
-            override x.Matches(r : obj) =
-                match r with
-                    | :? Expr as r ->
-                        Expr.ComputeHash (normalize l) = Expr.ComputeHash (normalize r)
-                    | _ ->
-                        false
-                //l.ToString() = r.ToString()
+        { new Constraint() with
+            override x.ApplyTo<'B>(other : 'B) =    
+                match other :> obj with
+                | :? Expr as r -> 
+                    if Expr.ComputeHash (normalize l) = Expr.ComputeHash (normalize r) then
+                        ConstraintResult(x, other, true)
+                    else
+                        ConstraintResult(x, other, false)
+                | _ ->
+                    ConstraintResult(x, other, false)
         }
+        //{ new NHamcrest.Core.IsEqualMatcher<obj>(l) with
+        
+        //    override x.Matches(r : obj) =
+        //        match r with
+        //            | :? Expr as r ->
+        //                Expr.ComputeHash (normalize l) = Expr.ComputeHash (normalize r)
+        //            | _ ->
+        //                false
+        //        //l.ToString() = r.ToString()
+        //}
 
     let exprEqual (r : Expr) = 
-        exprComparer r :> NHamcrest.IMatcher<_>
+        exprComparer r
 
     module Opt =
         open System.Reflection

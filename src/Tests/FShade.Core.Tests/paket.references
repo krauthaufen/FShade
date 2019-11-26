@@ -1,11 +1,10 @@
 Aardvark.Base
 Aardvark.Base.FSharp
-xunit
-xunit.runner.visualstudio
-FsUnit.xUnit
+FsUnit
+NUnit
+NUnit3TestAdapter
+FsCheck.NUnit
 FSharp.Core
 Microsoft.NET.Test.Sdk
 SourceLink.Create.CommandLine
-
-
 dotnet-sourcelink

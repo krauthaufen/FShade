@@ -6,9 +6,7 @@ open Microsoft.FSharp.Quotations.DerivedPatterns
 open Microsoft.FSharp.Quotations.ExprShape
 
 open FsUnit
-open Xunit
-open Xunit.Sdk
-
+open NUnit.Framework
 open Aardvark.Base
 open Aardvark.Base.Monads.State
 
@@ -40,14 +38,14 @@ let shader3 (a : V4d) (b : V4d) (v : Vertex) =
 let setup() =
     Effect.clearCaches()
 
-[<Fact>]
+[<Test>]
 let ``[OfFunction] static``() =
     setup()
     let e0 = Effect.ofFunction shader0
     let e1 = Effect.ofFunction shader0
     e0 |> should equal e1
 
-[<Fact>]
+[<Test>]
 let ``[OfFunction] static with closure``() =
     setup()
     let e0 = Effect.ofFunction (shader1 V4d.OIOI)
@@ -56,7 +54,7 @@ let ``[OfFunction] static with closure``() =
     let e2 = Effect.ofFunction (shader1 V4d.IOIO)
     e2 |> should not' (equal e1)
 
-[<Fact>]
+[<Test>]
 let ``[OfFunction] local``() =
     setup()
     let shader2 (v : Vertex) =
@@ -67,7 +65,7 @@ let ``[OfFunction] local``() =
     let e1 = Effect.ofFunction shader2
     e0 |> should equal e1
 
-[<Fact>]
+[<Test>]
 let ``[OfFunction] local with closure value``() =
     setup()
     let aaaa = 2.0
@@ -82,7 +80,7 @@ let ``[OfFunction] local with closure value``() =
     let e2 = Effect.ofFunction (shader213 V4d.IOIO)
     e2 |> should not' (equal e1)
 
-[<Fact>] 
+[<Test>] 
 let ``[OfFunction] static curried closure``() =
     setup()
     let t0 = shader3 V4d.Zero
@@ -96,7 +94,7 @@ let ``[OfFunction] static curried closure``() =
     let e3 = Effect.ofFunction (fun a -> shader3 V4d.IIII V4d.Zero a)
     e3 |> should not' (equal e0)
 
-[<Fact>] 
+[<Test>] 
 let ``[OfFunction] local curried closure``() =
     setup()
     let shader2 (a : V4d) (b : V4d) (v : Vertex) =
@@ -119,7 +117,7 @@ let ``[OfFunction] local curried closure``() =
 
 
 
-[<Fact>]
+[<Test>]
 let ``[Compose] associativity``() =
     setup()
     let a = Effect.ofFunction shader0
@@ -131,7 +129,7 @@ let ``[Compose] associativity``() =
 
     l |> should equal r
 
-[<Fact>]
+[<Test>]
 let ``[Compose] neutral element``() =
     setup()
     let z = Effect.empty
@@ -140,7 +138,7 @@ let ``[Compose] neutral element``() =
     Effect.compose [ z; a ] |> should equal a
     Effect.compose [ a; z ] |> should equal a
 
-[<Fact>] 
+[<Test>] 
 let ``[Compose] caching``() =
     setup()
     let a = Effect.ofFunction shader0

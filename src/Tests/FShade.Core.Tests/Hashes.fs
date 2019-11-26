@@ -1,7 +1,7 @@
 ﻿module Hashes
 
 open FsUnit
-open Xunit
+open NUnit.Framework
 open Aardvark.Base
 open FShade
 
@@ -85,7 +85,7 @@ type Shader6 private () =
             let a : V4d = uniform?Blubber?Value
             return a
         }
-[<Fact>]
+[<Test>]
 let ``[Hashing] includes SamplerState``() =
 
     let e1 = Effect.ofFunction (Shader1.shader)
@@ -93,7 +93,7 @@ let ``[Hashing] includes SamplerState``() =
 
     e1.Id |> should not' (equal e2.Id)
         
-[<Fact>]
+[<Test>]
 let ``[Hashing] SamplerState hash works``() =
 
     let e1 = Effect.ofFunction (Shader1.shader)
@@ -101,7 +101,7 @@ let ``[Hashing] SamplerState hash works``() =
 
     e1.Id |> should equal e2.Id
 
-[<Fact>]
+[<Test>]
 let ``[Hashing] SamplerState hash is structural``() =
 
     let e1 = Effect.ofFunction (Shader1.shader)
@@ -110,7 +110,7 @@ let ``[Hashing] SamplerState hash is structural``() =
     e1.Id |> should equal e2.Id
 
 
-[<Fact>]
+[<Test>]
 let ``[Hashing] intrinsic hashes on target-function``() =
 
     let e1 = Effect.ofFunction Shader4.shader
@@ -119,17 +119,17 @@ let ``[Hashing] intrinsic hashes on target-function``() =
     e1.Id |> should equal e2.Id
 
 
-[<Fact>]
+[<Test>]
 let ``[Hashing] deterministic uniforms``() =
     let subScopes = [ "Bla"; "Blurg"; "Blubber" ].RandomOrder() |> Seq.toList
     for s in subScopes do uniform.GetChildScope s |> ignore
 
     let e1 = Effect.ofFunction Shader6.shader
 
-    e1.Id |> should equal "wDawxYOgFTdOke44rRCyrw=="
+    e1.Id |> should equal "SnALcQs9CORMWIXIAf6FdQ=="
     
 
-[<Fact>]
+[<Test>]
 let ``[ComputeHashing] equal => equal hash``() =
     let s = V3i(128,128,128)
     let a (dst : int[]) (src : int[]) =
@@ -148,7 +148,7 @@ let ``[ComputeHashing] equal => equal hash``() =
 
     sa.csId |> should equal sb.csId
     
-[<Fact>]
+[<Test>]
 let ``[ComputeHashing] different => different hash``() =
     let s = V3i(128,128,128)
     let a (dst : int[]) (src : int[]) =
@@ -184,7 +184,7 @@ let b (dst : int[]) (src : int[]) =
         let v : int = uniform?Bla
         dst.[id] <- src.[id] * v
     }
-[<Fact>]
+[<Test>]
 let ``[ComputeHashing] including localSize``() =
     let s = V3i(128,128,128)
     let sa = ComputeShader.ofFunction s a
