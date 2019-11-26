@@ -29,6 +29,22 @@ type ShaderStage =
     | Fragment = 4
     | Compute = -1
 
+    | RayHitShader = -2
+    | RayMissShader = -3
+    | RayGenShader = -4
+    | RayIntersectionShader = -5
+
+module ShaderStage =
+    let isRayTracing (stage : ShaderStage) =    
+        match stage with
+        | ShaderStage.RayHitShader
+        | ShaderStage.RayIntersectionShader
+        | ShaderStage.RayGenShader
+        | ShaderStage.RayMissShader ->
+            true
+        | _ ->
+            false
+
 [<RequireQualifiedAccess>]
 type OutputTopology = 
     | Points 

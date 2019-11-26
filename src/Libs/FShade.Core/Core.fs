@@ -238,6 +238,9 @@ type UniformParameter =
     }
 
 
+type RaypayloadIn<'a> = class end
+type RaypayloadOut<'a> = class end
+type AccelerationStructure = class end
 
 
 type ISampler =

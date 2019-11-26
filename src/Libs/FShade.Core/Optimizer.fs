@@ -158,6 +158,11 @@ module PrettyPrinter =
                     sprintf "%s.%s <- %s" t indexers value
                 else
                     sprintf "%s.%s%s <- %s" t p.Name indexers value
+                
+            | UnsafePropertySet(t, p, value) ->
+                let value = print value
+                let t = print t
+                sprintf "%s.%s <- %s" t p.Name value
 
             | Value(v,_) ->
                 sprintf "%A" v
@@ -625,6 +630,21 @@ module Optimizer =
                             let! t = withoutValueS target
                             return Expr.Seq [v;t]
 
+                    | UnsafePropertySet((LExpr v as target), pi, value) ->
+                        let! vUsed = EliminationState.isUsed v
+                        if vUsed then
+                            let! value = eliminateDeadCodeS value
+                            let! target = eliminateDeadCodeS target
+                            return Expr.UnsafePropertySet(target, pi, value)
+                        else 
+                            let! value = withoutValueS value
+                            let! target = withoutValueS target
+
+                            return Expr.Seq [
+                                yield target
+                                yield value
+                            ]
+
                     | PropertySet(Some (LExpr v as target), pi, idx, value) ->
                         let! vUsed = EliminationState.isUsed v
                         if vUsed then
@@ -666,6 +686,12 @@ module Optimizer =
                         let! value = eliminateDeadCodeS value
                         let! t = eliminateDeadCodeS t
                         return Expr.PropertySet(t, pi, value, idx)
+                        
+                    | UnsafePropertySet(t, pi, value) ->
+                        Log.warn "[FShade] found PropertySet on unknown expression: %A" t
+                        let! value = eliminateDeadCodeS value
+                        let! t = eliminateDeadCodeS t
+                        return Expr.UnsafePropertySet(t, pi, value)
 
 
                     // control-flow
@@ -1707,6 +1733,11 @@ module Optimizer =
                         let! value = evaluateConstantsS value
                         return Expr.PropertySet(t, pi, value, indices)
                         
+                    | UnsafePropertySet(t, pi, value) ->
+                        let! t = evaluateConstantsS t
+                        let! value = evaluateConstantsS value
+                        return Expr.UnsafePropertySet(t, pi, value)
+                        
                     | QuoteRaw e ->
                         //let! e = evaluateConstantsS e
                         return Expr.Value(e)
@@ -1988,6 +2019,11 @@ module Optimizer =
                         let! value = liftInputsS value
                         let! indices = indices |> List.mapS liftInputsS
                         return Expr.PropertySet(t, pi, value, indices)
+                        
+                    | UnsafePropertySet(t, pi, value) ->
+                        let! t = liftInputsS t
+                        let! value = liftInputsS value
+                        return Expr.UnsafePropertySet(t, pi, value)
                         
                     | QuoteRaw e ->
                         let! e = liftInputsS e
@@ -2533,8 +2569,21 @@ module Optimizer =
                     | PropertyGet(None, pi, indices) ->
                         let! indices = indices |> List.mapS inlineS
                         return Expr.PropertyGet(pi, indices)
+                        
+                    | PropertyGet(Some (NewRecord(t, fields)), pi, []) ->
+                        let decls = FSharpType.GetRecordFields(t, true) |> Array.toList 
 
+                        let value = 
+                            List.zip decls fields |> List.pick (fun (d,v) ->
+                                if d = pi then Some v
+                                else None
+                            )
+
+                        let! value = inlineS value
+                        return value
+                        
                     | PropertyGet(Some t, pi, indices) ->
+                        
                         let! t = inlineS t
                         let! indices = indices |> List.mapS inlineS
                         return Expr.PropertyGet(t, pi, indices)
@@ -2549,6 +2598,11 @@ module Optimizer =
                         let! value = inlineS value
                         let! indices = indices |> List.mapS inlineS
                         return Expr.PropertySet(t, pi, value, indices)
+                        
+                    | UnsafePropertySet(t, pi, value) ->
+                        let! t = inlineS t
+                        let! value = inlineS value
+                        return Expr.UnsafePropertySet(t, pi, value)
 
                     | QuoteRaw e ->
                         let! e = inlineS e
@@ -2837,7 +2891,6 @@ module Optimizer =
                     let t, th = processExpression t
                     let value, vh = processExpression value
                     Expr.FieldSet(t, f, value) |> apply (th + vh)
-
                 | PropertySet(None, pi, index, value) ->
                     let index, ih = processManyExpresions index
                     let value, vh = processExpression value
@@ -2848,6 +2901,12 @@ module Optimizer =
                     let index, ih = processManyExpresions index
                     let value, vh = processExpression value
                     Expr.PropertySet(t, pi, value, index) |> apply (th + ih + vh)
+
+                | UnsafePropertySet(t, pi, value) ->
+                    let t, th = processExpression t 
+                    let value, vh = processExpression value
+                    Expr.UnsafePropertySet(t, pi, value) |> apply (th + vh)
+
                      
                 | WhileLoop (guard, body) ->
                     let guard, gh = processExpression guard

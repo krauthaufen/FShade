@@ -5,3 +5,4 @@ FSharp.Core
 FsPickler
 FSharp.Compiler.Service
 SourceLink.Create.CommandLine
+GLSLangSharp

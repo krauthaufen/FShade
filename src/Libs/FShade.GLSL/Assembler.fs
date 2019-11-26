@@ -137,8 +137,12 @@ type Backend private(config : Config) =
                             valueType = GLSLType.ofCType config.reverseMatrixLogic (CType.ofType x valueType)
                         }
                 }
-                
-
+              
+            | AccelerationStructure ->
+                Some {
+                    intrinsicTypeName = "accelerationStructureNV"
+                    tag = t
+                }
 
             | _ ->
                 None
@@ -287,7 +291,7 @@ module AssemblerState =
                 inner * len
 
             | CStruct _ | CIntrinsic _ | CVoid ->
-                failwith "[GLSL] no struct inputs allowed"
+                1 //failwith "[GLSL] no struct inputs allowed"
 
     let newLocation (kind : ParameterKind) (t : CType) =
         State.custom (fun s ->
@@ -664,6 +668,8 @@ module Assembler =
 
                     match kind, stages with
                         | _, { self = ShaderStage.Compute }                 -> return checkName name
+                        
+                        | _, { self = ShaderStage.RayHitShader }            -> return checkName name
 
                         | ParameterKind.Input, { prev = None }              -> return checkName name
 
@@ -698,6 +704,8 @@ module Assembler =
 
             | CType.CArray(t, l)                        -> (assembleType rev t).Name + "[" + string l + "]" |> Identifier
             | CType.CStruct(n,_,_)                      -> glslName n
+
+            | CType.CPointer(_, t)                      -> (assembleType rev t).Name |> sprintf "%s[]" |> Identifier
 
             | CType.CIntrinsic it                       -> it.intrinsicTypeName |> Identifier
 
@@ -991,6 +999,13 @@ module Assembler =
                     let f = glslName f
                     return sprintf "%s.%s" v f.Name
 
+                | CItem(_, CItem(_, (CReadInput _ as v), i), j) ->
+                    let! v = assembleExprS v
+                    let! i = assembleExprS i
+                    let! j = assembleExprS j
+                    return sprintf "%s[%s].data[%s]" v i j
+                    
+
                 | CItem(_, v, i) ->
                     let! v = assembleExprS v
                     let! i = assembleExprS i
@@ -1224,6 +1239,9 @@ module Assembler =
             decorations |> List.choose (fun d ->
                 match d with
                     | UniformDecoration.Format t -> Some t.Name
+                    | UniformDecoration.BufferBinding _
+                    | UniformDecoration.BufferDescriptorSet _ 
+                    | UniformDecoration.FieldIndex _ -> None
             )
             
         let decorations =
@@ -1246,47 +1264,88 @@ module Assembler =
 
     let assembleUniformsS (uniforms : list<CUniform>) =
         state {
+            let! s = State.get
             let! config = AssemblerState.config
             let buffers =
                 uniforms 
                     |> List.map (fun u -> match u.cUniformType with | CIntrinsic { tag = (:? GLSLTextureType) } -> { u with cUniformBuffer = None } | _ -> u)
                     |> List.groupBy (fun u -> u.cUniformBuffer)
+                    |> List.collect (function (Some a, f) -> [Some a, f] | (None, f) -> f |> List.map (fun f -> None, [f]))
 
-            let! set = AssemblerState.newSet
+            let allHaveSets =
+                buffers |> List.forall (fun (name, fields) ->
+                    fields |> List.exists (fun u -> 
+                        u.cUniformDecorations |> List.exists (function 
+                            | UniformDecoration.BufferDescriptorSet s -> true
+                            | _ -> false
+                        )
+                    )
+                )
+            let! set = 
+                if allHaveSets then State.value 0
+                else AssemblerState.newSet
+
             let! definitions =
                 buffers |> List.mapS (fun (name, fields) ->
                     state {
-                        let fields = 
-                            fields |> List.map (fun u -> 
-                                let decl = assembleDeclaration config.reverseMatrixLogic u.cUniformType (checkName u.cUniformName)
-                                let decl = sprintf "%s;" decl 
-                                decl, u.cUniformName, u.cUniformDecorations, u.cUniformType
-                            )
+                        let set =
+                            let userSet = 
+                                fields |> List.tryPick (fun u -> 
+                                    u.cUniformDecorations |> List.tryPick (function 
+                                        | UniformDecoration.BufferDescriptorSet s -> Some s
+                                        | _ -> None
+                                    )
+                                )
+                            match userSet with
+                            | Some set -> set
+                            | None -> set
+
+                        let getBinding (kind : InputKind) (cnt : int) (fields : list<CUniform>) =
+                            let userGiven =     
+                                fields |> List.tryPick (fun f ->
+                                    f.cUniformDecorations |> List.tryPick (function UniformDecoration.BufferBinding b -> Some b | _ -> None)
+                                )
+                            match userGiven with
+                            | Some u -> State.value u
+                            | None -> AssemblerState.newBinding kind cnt
+                        
                         match name with
                             | Some "SharedMemory" ->
-                                let fields = fields |> List.map (fun (d,_,_,_) -> sprintf "shared %s" d) |> String.concat "\r\n"
-                                return fields
+                                let defs = 
+                                    fields |> List.map (fun u ->
+                                        let def = assembleDeclaration config.reverseMatrixLogic u.cUniformType (checkName u.cUniformName)
+                                        sprintf "shared %s;" def
+                                    )
+                                return String.concat "\r\n" defs
 
                             | Some "StorageBuffer" ->
+                               
                                 let! buffers =
-                                    fields |> List.mapS (fun (d,name,_,ct) ->
+                                    fields |> List.mapS (fun field ->
                                         state {
-                                            let! binding = AssemblerState.newBinding InputKind.StorageBuffer 1
+                                            let! binding = getBinding InputKind.StorageBuffer 1 [field]
                                             let prefix = uniformLayout false [] set binding
-                                            
-                                            match ct with
+                                            let name = checkName field.cUniformName
+
+                                            match field.cUniformType with
+                                            | CType.CPointer(_,ct) ->
+                                                do! Interface.addStorageBuffer {
+                                                    ssbSet = set
+                                                    ssbBinding = binding
+                                                    ssbName = name.Name
+                                                    ssbType = GLSLType.ofCType config.reverseMatrixLogic ct
+                                                }
+                                                match ct with
                                                 | CType.CPointer(_,ct) ->
-                                                    do! Interface.addStorageBuffer {
-                                                        ssbSet = set
-                                                        ssbBinding = binding
-                                                        ssbName = name
-                                                        ssbType = GLSLType.ofCType config.reverseMatrixLogic ct
-                                                    }
-                                                | _ ->
-                                                    failwithf "[GLSL] not a storage buffer type: %A" ct
+                                                    let typ = assembleType config.reverseMatrixLogic ct
+                                                    return sprintf "%sbuffer %sBuffer { %s[] data; } %s[];" prefix name.Name typ.Name name.Name
+                                                | ct ->
+                                                    let typ = assembleType config.reverseMatrixLogic ct
+                                                    return sprintf "%sbuffer %sBuffer { %s[] %s; };" prefix name.Name typ.Name name.Name
+                                            
+                                            | ct ->
+                                                return failwithf "[GLSL] not a storage buffer type: %A" ct
 
-
-                                            return sprintf "%sbuffer %sSSB { %s };" prefix name d
                                         }
                                     )
 
@@ -1294,16 +1353,19 @@ module Assembler =
                                 
                             | Some bufferName when config.createUniformBuffers ->
                                 let bufferName = checkName bufferName
-                                let! binding = AssemblerState.newBinding InputKind.UniformBuffer 1
-                                    
-                                let fieldStr = fields |> List.map (fun (d,_,_,ct) -> d) |> String.concat "\r\n"
+                                let! binding = getBinding InputKind.UniformBuffer 1 fields
                                 let prefix = uniformLayout true [] set binding
                             
+                                let fieldStr = 
+                                    fields |> List.map (fun u -> 
+                                        let decl = assembleDeclaration config.reverseMatrixLogic u.cUniformType (checkName u.cUniformName)
+                                        sprintf "%s;" decl
+                                    ) |> String.concat "\r\n"
                                 do! Interface.addUniformBuffer {
                                     ubSet = set
                                     ubBinding = binding
                                     ubName = bufferName.Name
-                                    ubFields = fields |> List.map (fun (_,n,_,t) -> { ufName = n; ufType = GLSLType.ofCType config.reverseMatrixLogic t; ufOffset = -1 })
+                                    ubFields = fields |> List.map (fun u -> { ufName = checkName(u.cUniformName).Name; ufType = GLSLType.ofCType config.reverseMatrixLogic u.cUniformType; ufOffset = -1 })
                                     ubSize = -1
                                 }
                              
@@ -1312,12 +1374,10 @@ module Assembler =
 
                             | _ ->
                                 let! definitions = 
-                                    fields |> List.mapS (fun (f, name, decorations, ct) ->
+                                    fields |> List.mapS (fun u ->
                                         state {
-                                            
-
                                             let textureType =
-                                                match ct with   
+                                                match u.cUniformType with   
                                                     | CIntrinsic { tag = (:? GLSLTextureType as t)} -> Some (t, 1)
                                                     | CArray(CIntrinsic { tag = (:? GLSLTextureType as t)}, len) -> Some (t, len)
                                                     | _ -> None
@@ -1328,32 +1388,36 @@ module Assembler =
                                                 | Some (t, cnt) ->
                                                     match t with
                                                         | GLSLTextureType.GLSLSampler samplerType -> 
-                                                            let! binding = AssemblerState.newBinding InputKind.Sampler cnt
-                                                            prefix <- uniformLayout false decorations set binding
+                                                            let! binding = getBinding InputKind.Sampler cnt [u]
+                                                            prefix <- uniformLayout false u.cUniformDecorations set binding
 
                                                             do! Interface.addSampler { 
                                                                 samplerSet = set
                                                                 samplerBinding = binding
-                                                                samplerName = name
+                                                                samplerName = checkName(u.cUniformName).Name
                                                                 samplerCount = cnt
                                                                 samplerTextures = [] // filled in addSampler
                                                                 samplerType = samplerType
                                                             }
                                                            
                                                         | GLSLTextureType.GLSLImage imageType ->
-                                                            let! binding = AssemblerState.newBinding InputKind.Image cnt
-                                                            prefix <- uniformLayout false decorations set binding
+                                                            let! binding = getBinding InputKind.Image cnt [u]
+                                                            prefix <- uniformLayout false u.cUniformDecorations set binding
 
                                                             do! Interface.addImage { 
                                                                 imageSet = set
                                                                 imageBinding = binding
-                                                                imageName = name
+                                                                imageName = checkName(u.cUniformName).Name
                                                                 imageType = imageType
                                                             }
                                                 | _ ->
+                                                    let! binding = getBinding InputKind.UniformBuffer 1 [u]
+                                                    prefix <- uniformLayout false u.cUniformDecorations set binding
+
                                                     ()
 
-                                            return sprintf "%suniform %s" prefix f
+                                            let decl = assembleDeclaration config.reverseMatrixLogic u.cUniformType (checkName u.cUniformName)
+                                            return sprintf "%suniform %s;" prefix decl
                                         }
                                     )
 
@@ -1488,7 +1552,7 @@ module Assembler =
                                     | ParameterDecoration.Shared -> 
                                         return Some "shared"
 
-                                    | ParameterDecoration.Memory _ | ParameterDecoration.Slot _ ->
+                                    | ParameterDecoration.Memory _ | ParameterDecoration.Slot _ | ParameterDecoration.Raypayload _ ->
                                         return None
                             }
 
@@ -1511,18 +1575,6 @@ module Assembler =
                             | _ ->
                                 []
 
-//                    let layoutParams =
-//                        match kind with
-//                            | ParameterKind.Input when Option.isNone prevStage ->
-//                                (sprintf "binding = %d" location) :: layoutParams
-//
-//                            | ParameterKind.Output when Option.isNone nextStage ->
-//                                (sprintf "binding = %d" location) :: layoutParams
-//
-//                            | _ ->
-//                                layoutParams
-//
-
                     let decorations =
                         match layoutParams with
                             | [] -> decorations
@@ -1535,19 +1587,42 @@ module Assembler =
 
                     let! name = parameterNameS kind p.cParamName
 
-                    let prefix, suffix =
-                        if config.version > version120 then
+                    let payload =
+                        p.cParamDecorations |> Seq.tryPick (function 
+                            | ParameterDecoration.Raypayload true -> Some "rayPayloadInNV "
+                            | ParameterDecoration.Raypayload false -> Some "rayPayloadNV "
+                            | _ -> None
+                        )
+
+                    let decorations, prefix, suffix =
+                        if Option.isSome payload then
+                            decorations, payload.Value, ""
+                        elif stages.self = ShaderStage.RayHitShader && name.Name = Intrinsics.HitCoord then
                             match kind with
-                                | ParameterKind.Input -> "in ", ""
-                                | ParameterKind.Output -> "out ", ""
+                            | ParameterKind.Input -> "", "hitAttributeNV ", ""
+                            | _ -> failwith "bad ray payload"
+                        elif stages.self = ShaderStage.RayHitShader && name.Name = Intrinsics.RayPayloadIn then
+                            match kind with
+                            | ParameterKind.Input -> decorations, "rayPayloadInNV ", ""
+                            | _ -> failwith "bad ray payload"
+                            
+                        elif stages.self = ShaderStage.RayHitShader && name.Name = Intrinsics.RayPayloadOut then
+                            match kind with
+                            | ParameterKind.Output -> decorations, "rayPayloadNV ", ""
+                            | _ -> failwith "bad ray payload"
+
+                        elif config.version > version120 then
+                            match kind with
+                                | ParameterKind.Input -> decorations, "in ", ""
+                                | ParameterKind.Output -> decorations, "out ", ""
                                 | _ -> 
-                                    if isBuffer then " { ", " };"
-                                    else "", ""
+                                    if isBuffer then decorations, " { ", " };"
+                                    else decorations, "", ""
                         else
                             match kind with
-                                | ParameterKind.Input -> "varying ", ""
-                                | ParameterKind.Output -> "varying ", ""
-                                | _ -> "", ""
+                                | ParameterKind.Input -> decorations, "varying ", ""
+                                | ParameterKind.Output -> decorations, "varying ", ""
+                                | _ -> decorations, "", ""
                     
 
                     if isBuffer then
@@ -1772,9 +1847,24 @@ module Assembler =
                 let! s = State.get
                 let extensions = Set.union c.enabledExtensions s.requiredExtensions
 
+                let extensions =
+                    if ShaderStage.isRayTracing s.stages.self then 
+                        extensions
+                        |> Set.add "GL_NV_ray_tracing"
+                        |> Set.add "GL_EXT_nonuniform_qualifier"
+                        |> Set.remove "GL_ARB_tessellation_shader"
+                        |> Set.remove "GL_ARB_shading_language_420pack"
+                        |> Set.remove "GL_ARB_separate_shader_objects"
+                    else 
+                        extensions
+
+                let version =
+                    if ShaderStage.isRayTracing s.stages.self then "#version 460"
+                    else sprintf "#version %d%d0" c.version.Major c.version.Minor
+
                 return 
                     List.concat [
-                        [sprintf "#version %d%d0" c.version.Major c.version.Minor ]
+                        [ version ]
                         [ extensions |> Seq.map (sprintf "#extension %s : enable") |> Seq.toList |> String.concat "\r\n" ]
                         types
                         uniforms
