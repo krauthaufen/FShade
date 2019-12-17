@@ -192,3 +192,6 @@ UpgradeLog*.htm
 /.paket
 /paket-files
 /build.fsx.lock
+
+# VS Code
+/src/.vs

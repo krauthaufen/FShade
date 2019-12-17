@@ -109,15 +109,42 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Pow : float * float -> float @>
                 exactly <@ Fun.Pow : float32 * float32 -> float32 @>
                 exactly <@ Math.Pow @>
+                exactly <@ VecFun.Pow : V2d * V2d -> V2d @>
+                exactly <@ VecFun.Pow : V2f * V2f -> V2f @>
+                exactly <@ VecFun.Pow : V3d * V3d -> V3d @>
+                exactly <@ VecFun.Pow : V3f * V3f -> V3f @>
+                exactly <@ VecFun.Pow : V4d * V4d -> V4d @>
+                exactly <@ VecFun.Pow : V4f * V4f -> V4f @>
                 generic <@ ( ** ) : float -> float -> float @>
                 generic <@ pow : float -> float -> float @>
                 generic <@ pown @>
+            ]
+
+            CIntrinsic.tagged "pow({0}, vec2({1}))", [
+                exactly <@ VecFun.Pow : V2f * float -> V2f @>
+                exactly <@ VecFun.Pow : V2d * float -> V2d @>
+            ]
+
+            CIntrinsic.tagged "pow({0}, vec3({1}))", [
+                exactly <@ VecFun.Pow : V3f * float -> V3f @>
+                exactly <@ VecFun.Pow : V3d * float -> V3d @>
+            ]
+
+            CIntrinsic.tagged "pow({0}, vec4({1}))", [
+                exactly <@ VecFun.Pow : V4f * float -> V4f @>
+                exactly <@ VecFun.Pow : V4d * float -> V4d @>
             ]
 
             CIntrinsic.simple "exp", [
                 exactly <@ Math.Exp @> 
                 exactly <@ Fun.Exp : float32 -> float32 @>
                 exactly <@ Fun.Exp : float -> float @>
+                exactly <@ VecFun.Exp : V2f -> V2f @>
+                exactly <@ VecFun.Exp : V2d -> V2d @>
+                exactly <@ VecFun.Exp : V3f -> V3f @>
+                exactly <@ VecFun.Exp : V3d -> V3d @>
+                exactly <@ VecFun.Exp : V4f -> V4f @>
+                exactly <@ VecFun.Exp : V4d -> V4d @>
                 generic <@ exp @>
             ]
 
@@ -125,6 +152,12 @@ module IntrinsicFunctions =
                 exactly <@ Math.Log @> 
                 exactly <@ Fun.Log : float32 -> float @>
                 exactly <@ Fun.Log : float -> float @>
+                exactly <@ VecFun.Log : V2f -> V2f @>
+                exactly <@ VecFun.Log : V2d -> V2d @>
+                exactly <@ VecFun.Log : V3f -> V3f @>
+                exactly <@ VecFun.Log : V3d -> V3d @>
+                exactly <@ VecFun.Log : V4f -> V4f @>
+                exactly <@ VecFun.Log : V4d -> V4d @>
                 generic <@ log @>
             ]
 
@@ -350,6 +383,18 @@ module IntrinsicFunctions =
             CIntrinsic.simple "mix", [
                 exactly <@ Fun.Lerp : float32 * float32 * float32 -> _ @>
                 exactly <@ Fun.Lerp : float * float * float -> _ @>
+            ]
+
+            CIntrinsic.custom "mix" [1; 2; 0], [
+                exactly <@ VecFun.Lerp : float * V2f * V2f -> V2f @>
+                exactly <@ VecFun.Lerp : float * V2d * V2d -> V2d @>
+                exactly <@ VecFun.Lerp : float32 * V2f * V2f -> V2f @>
+                exactly <@ VecFun.Lerp : float * V3f * V3f -> V3f @>
+                exactly <@ VecFun.Lerp : float * V3d * V3d -> V3d @>
+                exactly <@ VecFun.Lerp : float32 * V3f * V3f -> V3f @>
+                exactly <@ VecFun.Lerp : float * V4f * V4f -> V4f @>
+                exactly <@ VecFun.Lerp : float * V4d * V4d -> V4d @>
+                exactly <@ VecFun.Lerp : float32 * V4f * V4f -> V4f @>
             ]
 
             CIntrinsic.simple "isnan", [

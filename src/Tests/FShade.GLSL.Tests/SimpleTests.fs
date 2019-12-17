@@ -13,7 +13,50 @@ type Vertex =
         [<Color>] c : V4d
     }
         
+[<Test>]
+let ``New Intrinsics``() =
+    Setup.Run()
 
+    let shader (v : Vertex) =
+        vertex {
+            let _ = VecFun.Lerp(v.c.X, V2f.Zero, V2f.One)
+            let _ = VecFun.Lerp(v.c.X, V2d.Zero, V2d.One)
+            let _ = VecFun.Lerp(float32 v.c.X, V2f.Zero, V2f.One)
+            let _ = VecFun.Lerp(v.c.X, V3f.Zero, V3f.One)
+            let _ = VecFun.Lerp(v.c.X, V3d.Zero, V3d.One)
+            let _ = VecFun.Lerp(float32 v.c.X, V3f.Zero, V3f.One)
+            let _ = VecFun.Lerp(v.c.X, V4f.Zero, V4f.One)
+            let _ = VecFun.Lerp(v.c.X, V4d.Zero, V4d.One)
+            let _ = VecFun.Lerp(float32 v.c.X, V4f.Zero, V4f.One)
+            let _ = VecFun.Exp(v.c.XY)
+            let _ = VecFun.Exp(V2f(v.c.XY))
+            let _ = VecFun.Exp(v.c.XYZ)
+            let _ = VecFun.Exp(V3f(v.c.XYZ))
+            let _ = VecFun.Exp(v.c)
+            let _ = VecFun.Exp(V4f(v.c))
+            let _ = VecFun.Log(v.c.XY)
+            let _ = VecFun.Log(V2f(v.c.XY))
+            let _ = VecFun.Log(v.c.XYZ)
+            let _ = VecFun.Log(V3f(v.c.XYZ))
+            let _ = VecFun.Log(v.c)
+            let _ = VecFun.Log(V4f(v.c))
+            let _ = VecFun.Pow(v.c.XY, 1.0)
+            let _ = VecFun.Pow(V2f(v.c.XY), 1.0)
+            let _ = VecFun.Pow(v.c.XY, v.c.XY)
+            let _ = VecFun.Pow(V2f(v.c.XY), V2f(v.c.XY))
+            let _ = VecFun.Pow(v.c.XYZ, 1.0)
+            let _ = VecFun.Pow(V3f(v.c.XYZ), 1.0)
+            let _ = VecFun.Pow(v.c.XYZ, v.c.XYZ)
+            let _ = VecFun.Pow(V3f(v.c.XYZ), V3f(v.c.XYZ))
+            let _ = VecFun.Pow(v.c, 1.0)
+            let _ = VecFun.Pow(V4f(v.c), 1.0)
+            let _ = VecFun.Pow(v.c, v.c)
+            let _ = VecFun.Pow(V4f(v.c), V4f(v.c))
+
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["mix"; "exp"; "log"; "pow"]
     
 [<Test>]
 let ``Broken GLSL Shader``() =
@@ -918,11 +961,12 @@ let ``DuplicateId`` () =
 
 [<EntryPoint>]
 let main args =
+    ``New Intrinsics``()
     //``GS Composition with Layer2``()
     //``GS Composition with Layer``()
     //``GS PrimitiveId``()
-    ``DuplicateId``()
-    ``ClipDistance Pass-Through``()
+    //``DuplicateId``()
+    //``ClipDistance Pass-Through``()
     //``Variable Declaration``()
     //``Fill Array with Inline Function``()
     //``Tuple Inline``()
