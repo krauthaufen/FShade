@@ -3,13 +3,14 @@
 open Aardvark.Base
 open Aardvark.Base.Monads.State
 open FShade.Imperative
+open FSharp.Data.Adaptive
 
 type SpirVState =
     {
         currentId           : uint32
-        valueIds            : hmap<obj, uint32>
+        valueIds            : HashMap<obj, uint32>
         uniformIds          : Map<string, uint32 * list<uint32>>
-        fieldIds            : hmap<CType, hmap<string, int>>
+        fieldIds            : HashMap<CType, HashMap<string, int>>
         reversedInstuctions : list<Instruction>
         currentBinding      : uint32
         currentSet          : uint32
@@ -36,13 +37,13 @@ module ``SpirV Builders`` =
 
 module SpirV =
     let getId (a : 'a) : SpirV<uint32> =
-        State.get |> State.map (fun s -> HMap.find (a :> obj) s.valueIds)
+        State.get |> State.map (fun s -> HashMap.find (a :> obj) s.valueIds)
             
     let tryGetId (a : 'a) : SpirV<Option<uint32>> =
-        State.get |> State.map (fun s -> HMap.tryFind (a :> obj) s.valueIds)
+        State.get |> State.map (fun s -> HashMap.tryFind (a :> obj) s.valueIds)
             
     let setId (a : 'a) (id : uint32) : SpirV<unit> =
-        State.modify (fun s -> { s with valueIds = HMap.add (a :> obj) id  s.valueIds })
+        State.modify (fun s -> { s with valueIds = HashMap.add (a :> obj) id  s.valueIds })
 
             
     let setUniformId (name : string) (var : uint32) (fields : list<uint32>) : SpirV<unit> =
@@ -84,18 +85,18 @@ module SpirV =
 
     let setFieldId (t : CType) (name : string) (id : int) =
         State.modify (fun s ->
-            match HMap.tryFind t s.fieldIds with
+            match HashMap.tryFind t s.fieldIds with
                 | Some ids ->
-                    { s with fieldIds = HMap.add t (HMap.add name id ids) s.fieldIds }
+                    { s with fieldIds = HashMap.add t (HashMap.add name id ids) s.fieldIds }
                 | None ->
-                    { s with fieldIds = HMap.add t (HMap.ofList [name,id]) s.fieldIds }
+                    { s with fieldIds = HashMap.add t (HashMap.ofList [name,id]) s.fieldIds }
         )
 
     let tryGetFieldId (t : CType) (name : string) =
         State.get |> State.map (fun s ->
-            match HMap.tryFind t s.fieldIds with
+            match HashMap.tryFind t s.fieldIds with
                 | Some ids ->
-                    HMap.tryFind name ids
+                    HashMap.tryFind name ids
                 | None ->
                     None
         )

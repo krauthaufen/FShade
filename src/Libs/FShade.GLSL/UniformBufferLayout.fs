@@ -4,7 +4,7 @@ open Aardvark.Base
 open FShade.Imperative
 open FShade
 open System
-
+open FSharp.Data.Adaptive
 
 type GLSLType =
     | Bool
@@ -222,11 +222,11 @@ type GLSLShaderInterface =
 
         shaderInputs            : list<GLSLParameter>
         shaderOutputs           : list<GLSLParameter>
-        shaderSamplers          : hset<string>
-        shaderImages            : hset<string>
-        shaderStorageBuffers    : hset<string>
-        shaderUniformBuffers    : hset<string>
-        shaderBuiltInFunctions  : hset<GLSLIntrinsic>
+        shaderSamplers          : HashSet<string>
+        shaderImages            : HashSet<string>
+        shaderStorageBuffers    : HashSet<string>
+        shaderUniformBuffers    : HashSet<string>
+        shaderBuiltInFunctions  : HashSet<GLSLIntrinsic>
 
         shaderDecorations       : list<GLSLShaderDecoration>
 
@@ -300,7 +300,7 @@ type GLSLShaderInterface =
                 yield sprintf "uniform {%s}" (String.concat ", " usedUniforms) |> Some
 
                 let called = 
-                    x.shaderBuiltInFunctions |> HSet.toList |> List.map (fun f ->
+                    x.shaderBuiltInFunctions |> HashSet.toList |> List.map (fun f ->
                         let args = 
                             match f.args.Length with
                                 | 0 -> [| GLSLType.Void |]
@@ -427,7 +427,7 @@ module GLSLShaderInterface =
 
     let usesDiscard (iface : GLSLShaderInterface) =
         if iface.shaderStage = ShaderStage.Fragment then
-            HSet.contains discardFun iface.shaderBuiltInFunctions
+            HashSet.contains discardFun iface.shaderBuiltInFunctions
         else
             false
 

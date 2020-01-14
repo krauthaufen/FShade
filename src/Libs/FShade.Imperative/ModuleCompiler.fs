@@ -16,7 +16,7 @@ open Aardvark.Base.TypeInfo.Patterns
 
 open FShade
 open FShade.Imperative
-
+open FSharp.Data.Adaptive
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module ModuleCompiler =
@@ -27,7 +27,7 @@ module ModuleCompiler =
     module ValueCompiler =
         open SimpleOrder
 
-        type GraphNode(definition : CValueDef, dependencies : hset<GraphNode>) =
+        type GraphNode(definition : CValueDef, dependencies : HashSet<GraphNode>) =
             let mutable sortKey : Option<SortKey> = None
             let mutable dependencies = dependencies
 
@@ -86,19 +86,19 @@ module ModuleCompiler =
                             let def = compile(key).Run(&s)
                             do! State.modify (fun gs -> { gs with moduleState = s.moduleState })
 
-                            let difference (l : hmap<'k, 'v>) (r : hmap<'k, 'x>) =
-                                HMap.choose2 (fun _ l r ->
+                            let difference (l : HashMap<'k, 'v>) (r : HashMap<'k, 'x>) =
+                                HashMap.choose2 (fun _ l r ->
                                     match r with
                                         | Some _ -> None
                                         | _ -> l
                                 ) l r
 
-                            let localFunctions      = s.usedFunctions |> HMap.toSeq |> Seq.map snd |> Seq.toList
-                            let globalFunctions     = s.usedGlobalFunctions |> HSet.toList //difference s.moduleState.globalFunctions state.moduleState.globalFunctions |> HMap.toSeq |> Seq.map snd |> Seq.toList
-                            let globalConstants     = s.usedConstants |> HSet.toList //difference s.moduleState.globalConstants state.moduleState.globalConstants |> HMap.toSeq |> Seq.map snd |> Seq.toList
+                            let localFunctions      = s.usedFunctions |> HashMap.toSeq |> Seq.map snd |> Seq.toList
+                            let globalFunctions     = s.usedGlobalFunctions |> HashSet.toList //difference s.moduleState.globalFunctions state.moduleState.globalFunctions |> HashMap.toSeq |> Seq.map snd |> Seq.toList
+                            let globalConstants     = s.usedConstants |> HashSet.toList //difference s.moduleState.globalConstants state.moduleState.globalConstants |> HashMap.toSeq |> Seq.map snd |> Seq.toList
                             
                             
-                            let node = GraphNode(def, HSet.empty)
+                            let node = GraphNode(def, HashSet.empty)
                             cache.[key] <- node
 
                             let! localFunctions = localFunctions |> List.mapS (ofFunction globals)
@@ -107,13 +107,13 @@ module ModuleCompiler =
 
                             let dependencies = 
                                 List.concat [
-                                    (if HSet.isEmpty s.usedGlobals then [] else [globals])
+                                    (if HashSet.isEmpty s.usedGlobals then [] else [globals])
                                     localFunctions
                                     globalFunctions
                                     constants
                                 ]
 
-                            node.Dependencies <- HSet.ofList dependencies
+                            node.Dependencies <- HashSet.ofList dependencies
                             
 
                             do! State.modify (fun gs -> 
@@ -141,7 +141,7 @@ module ModuleCompiler =
                     do! State.modify (fun s -> { s with moduleState = { s.moduleState with ModuleState.globalParameters = globalNames } })
                     let! root = build globals e compileEntryS
 
-                    let root = GraphNode(root.Definition, HSet.add globals root.Dependencies)
+                    let root = GraphNode(root.Definition, HashSet.add globals root.Dependencies)
 
                     do! State.modify (fun s -> { s with moduleState = { s.moduleState with ModuleState.globalParameters = Set.empty } })
 
@@ -157,11 +157,11 @@ module ModuleCompiler =
                 let defines = Dictionary<SortKey, Meta>()
                 let mutable lastRootDef = order.Root
 
-                let rec flattenDependencies (stack : hset<GraphNode>) (g : GraphNode) =
-                    if HSet.contains g stack then
+                let rec flattenDependencies (stack : HashSet<GraphNode>) (g : GraphNode) =
+                    if HashSet.contains g stack then
                         failwithf "[FShade] found cyclic definition for %A" g.Definition
 
-                    let dependencies = HSet.toList g.Dependencies
+                    let dependencies = HashSet.toList g.Dependencies
                     match dependencies with
                         | [] -> 
                             match g.SortKey with
@@ -172,7 +172,7 @@ module ModuleCompiler =
                                     g.SortKey <- Some t
 
                         | deps ->
-                            for d in dependencies do flattenDependencies (HSet.add g stack) d
+                            for d in dependencies do flattenDependencies (HashSet.add g stack) d
                             let max = dependencies |> List.map (fun d -> d.SortKey.Value) |> List.max
                             match g.SortKey with
                                 | Some o when o < max -> g.SortKey <- Some (order.After max)
@@ -185,7 +185,7 @@ module ModuleCompiler =
                     let t0 = order.After afterLastEntry
       
                     globals.SortKey <- Some t0
-                    flattenDependencies HSet.empty definition
+                    flattenDependencies HashSet.empty definition
                     if definition.SortKey.Value < t0 then
                         definition.SortKey <- Some (order.After t0)
 
@@ -201,12 +201,12 @@ module ModuleCompiler =
 
                 let allDefinitions = 
                     let list = List()
-                    let rec visit (defs : HashSet<GraphNode>) (d : GraphNode) =
+                    let rec visit (defs : System.Collections.Generic.HashSet<GraphNode>) (d : GraphNode) =
                         if defs.Add d then
                             list.Add d
                             for dep in d.Dependencies do visit defs dep
 
-                    let set = HashSet()
+                    let set = System.Collections.Generic.HashSet()
                     for (_, g, d) in graphs do visit set g; visit set d
 
                     list |> CSharpList.toArray |> Array.sort
@@ -265,9 +265,9 @@ module ModuleCompiler =
                         {
                             backend             = backend
                             constantIndex       = 0
-                            usedTypes           = HMap.empty
-                            globalFunctions     = HMap.empty
-                            globalConstants     = HMap.empty
+                            usedTypes           = HashMap.empty
+                            globalFunctions     = HashMap.empty
+                            globalConstants     = HashMap.empty
                             globalParameters    = Set.empty
                             tryGetOverrideCode  = m.tryGetOverrideCode
                             globalNameIndices   = Map.empty
@@ -276,14 +276,14 @@ module ModuleCompiler =
                 }
 
             let nodes = compile.Run(&state)
-            let usedTypes = state.moduleState.usedTypes |> HMap.toSeq |> Seq.map snd |> Seq.toList
+            let usedTypes = state.moduleState.usedTypes |> HashMap.toSeq |> Seq.map snd |> Seq.toList
             flatten nodes, usedTypes
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module TypeCompiler =
         open SimpleOrder
 
-        type TypeGraphNode(definition : Option<CTypeDef>, dependencies : hset<TypeGraphNode>) =
+        type TypeGraphNode(definition : Option<CTypeDef>, dependencies : HashSet<TypeGraphNode>) =
             let mutable sortKey : SortKey = Unchecked.defaultof<SortKey>
 
             member x.Definition = definition
@@ -306,7 +306,7 @@ module ModuleCompiler =
       
 
             member x.AssignOrder(o : Order) =
-                match HSet.toList dependencies with
+                match HashSet.toList dependencies with
                     | [] -> 
                         sortKey <- o.After(o.Root)
 
@@ -326,16 +326,16 @@ module ModuleCompiler =
             let allDirectChildTypes (ctype : CType) =
                 match ctype with
                     | CStruct(_, fields, _) -> 
-                        fields |> List.map fst |> HSet.ofList
+                        fields |> List.map fst |> HashSet.ofList
 
                     | CVector(t,_) 
                     | CMatrix(t, _, _) 
                     | CPointer(_, t) 
                     | CArray(t,_) ->
-                        HSet.ofList [t]
+                        HashSet.ofList [t]
 
                     | _ ->
-                        HSet.empty
+                        HashSet.empty
 
             let rec ofType (t : CType) =
                 state {
@@ -344,7 +344,7 @@ module ModuleCompiler =
                         | (true, n) ->
                             return n
                         | _ ->
-                            let! used = t |> allDirectChildTypes |> HSet.toList |> List.chooseS ofType |>> HSet.ofList
+                            let! used = t |> allDirectChildTypes |> HashSet.toList |> List.chooseS ofType |>> HashSet.ofList
 
                             match t with
                                 | CStruct(name, fields, _) ->
@@ -354,7 +354,7 @@ module ModuleCompiler =
                                     return Some node
 
                                 | _ ->
-                                    if HSet.isEmpty used then
+                                    if HashSet.isEmpty used then
                                         return None
                                     else
                                         return Some <| TypeGraphNode(None, used)
@@ -366,14 +366,14 @@ module ModuleCompiler =
                 let order = SimpleOrder.create()
                 for t in graphs do t.AssignOrder order |> ignore
 
-                let rec visit (defs : HashSet<TypeGraphNode>) (d : TypeGraphNode) =
+                let rec visit (defs : System.Collections.Generic.HashSet<TypeGraphNode>) (d : TypeGraphNode) =
                     if defs.Add d then
                         for dep in d.Dependencies do visit defs dep
 
-                let set = HashSet()
+                let set = System.Collections.Generic.HashSet()
                 for t in graphs do visit set t
 
-                set |> HashSet.toArray |> Array.sort |> Array.toList |> List.choose (fun t -> t.Definition)
+                set |> Seq.toArray |> Array.sort |> Array.toList |> List.choose (fun t -> t.Definition)
 
         let ofTypes (types : list<CType>) =
             let compile =

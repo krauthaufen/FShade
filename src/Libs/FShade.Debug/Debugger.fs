@@ -1,7 +1,7 @@
 ﻿namespace FShade
 
 open Aardvark.Base
-open Aardvark.Base.Incremental
+open FSharp.Data.Adaptive
 open FShade.Debug
 open System.IO
 open System.Collections.Concurrent
@@ -58,7 +58,7 @@ module EffectDebugger =
                 | None ->
                     None
 
-    let private registered = Dict<string, Effect * ModRef<Effect>>()
+    let private registered = Dict<string, Effect * cval<Effect>>()
     let private lockObj = obj()
 
     let private sem = new System.Threading.SemaphoreSlim(0)
@@ -102,7 +102,7 @@ module EffectDebugger =
         )
 
     let unknownCache = Dict<string, Effect>()
-    let compositions = Dict<string, ModRef<list<string>> * IMod<Effect>>()
+    let compositions = Dict<string, cval<list<string>> * aval<Effect>>()
 
     let private compChanged (file : string) =
         let name = Path.GetFileNameWithoutExtension file
@@ -153,11 +153,11 @@ module EffectDebugger =
                     | Some name ->
                         match registered.TryGetValue name with
                             | (true, (o,evt)) -> 
-                                Some (name, evt :> IMod<_>)
+                                Some (name, evt :> aval<_>)
                             | _ -> 
                                 match CodeGenerator.tryGetCode e with
                                     | Some code ->
-                                        let evt = Mod.init e
+                                        let evt = cval e
                                         registered.[name] <- (e, evt)
 
                                         let fileName = name + ".fsx"
@@ -171,7 +171,7 @@ module EffectDebugger =
 
                                         changed filePath
 
-                                        Some (name, evt :> IMod<_>)
+                                        Some (name, evt :> aval<_>)
                         
                                     | None ->
                                         None
@@ -184,7 +184,7 @@ module EffectDebugger =
     let private register (e : Effect) =
         match tryRegister e with
             | Some (name, e) -> e
-            | None -> Mod.constant e
+            | None -> AVal.constant e
 
     let private printConfig = { EffectConfig.empty with outputs = Map.ofList ["Colors", (typeof<V4d>, 0) ] }
     let private glslNames = Dict<string, string>()
@@ -205,7 +205,7 @@ module EffectDebugger =
     let private registerPiecewise (e : Effect) =
         match registered.TryGetValue e.Id with
             | (true, (_,m)) -> 
-                m :> IMod<_>
+                m :> aval<_>
 
             | _ -> 
                 let mutable names = []
@@ -218,7 +218,7 @@ module EffectDebugger =
                             | None ->
                                 unknownCache.[c.Id] <- c
                                 names <- names @ [c.Id]
-                                Mod.constant c
+                                AVal.constant c
                     )
 
                 let mutable isNew = false
@@ -229,20 +229,22 @@ module EffectDebugger =
                     compositions.GetOrCreate(fileName, fun _ -> 
                         isNew <- true
 
-                        let names = Mod.init names
+                        let names = cval names
                         let result = 
-                            names |> Mod.bind (fun names ->
-                                names |> List.choose (fun name ->
-                                    match registered.TryGetValue name with
-                                        | (true, (_,e)) -> Some (e :> IMod<_>)
-                                        | _ -> 
-                                            match unknownCache.TryGetValue name with
-                                                | (true, e) -> Some (Mod.constant e)
-                                                | _ -> None
+                            names |> AVal.bind (fun names ->
+                                let effects = 
+                                    names |> List.choose (fun name ->
+                                        match registered.TryGetValue name with
+                                            | (true, (_,e)) -> Some (e :> aval<_>)
+                                            | _ -> 
+                                                match unknownCache.TryGetValue name with
+                                                    | (true, e) -> Some (AVal.constant e)
+                                                    | _ -> None
                                                 
+                                    )
+                                AVal.custom (fun t ->
+                                    effects |> List.map (fun e -> e.GetValue t) |> Effect.compose |> registerOutput fileName
                                 )
-                                |> Mod.mapN (Effect.compose >> registerOutput fileName)
-                                
                             )
 
                         names, result

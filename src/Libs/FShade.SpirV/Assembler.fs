@@ -7,6 +7,7 @@ open Aardvark.Base
 open Aardvark.Base.Monads.State
 open FShade
 open FShade.Imperative
+open FSharp.Data.Adaptive
 
 
 type SpirVIntrinsicType = { compileType : SpirV<uint32> }
@@ -1631,9 +1632,9 @@ module Assembler =
         let mutable state = 
             {
                 currentId           = 0u
-                valueIds            = HMap.empty
+                valueIds            = HashMap.empty
                 uniformIds          = Map.empty
-                fieldIds            = HMap.empty
+                fieldIds            = HashMap.empty
                 reversedInstuctions = []
                 currentBinding      = 0u
                 currentSet          = 0u

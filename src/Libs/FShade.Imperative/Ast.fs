@@ -13,6 +13,7 @@ open Aardvark.Base
 open Aardvark.Base.TypeInfo
 open Aardvark.Base.TypeInfo.Patterns
 open Aardvark.Base.Sorting
+open FSharp.Data.Adaptive
 
 open FShade
 
@@ -100,15 +101,15 @@ module CType =
                     dict.GetOrAdd((Some b,t), fun _ -> f b t)
 
 
-    let rec private ofTypeInternal (seen : hset<Type>) (b : IBackend) (t : Type) =
-        if HSet.contains t seen then
+    let rec private ofTypeInternal (seen : HashSet<Type>) (b : IBackend) (t : Type) =
+        if HashSet.contains t seen then
             failwithf "[FShade] encountered recursive type %A" t
         else
             typeCache b t (fun b t ->
                 match b.TryGetIntrinsic t with
                     | Some i -> CIntrinsic i
                     | None -> 
-                        let seen = HSet.add t seen 
+                        let seen = HashSet.add t seen 
                         match t with
                             | Enum              -> CInt(true, 32)
                             | VectorOf(d, t)    -> CVector(ofTypeInternal seen b t, d)
@@ -120,7 +121,7 @@ module CType =
             )
 
     /// creates a struct representation for a given system type
-    and private ofCustomType (seen : hset<Type>) (b : IBackend) (t : Type) =
+    and private ofCustomType (seen : HashSet<Type>) (b : IBackend) (t : Type) =
         let name = typeName t
         if FSharpType.IsRecord(t, true) then
             let fields = FSharpType.GetRecordFields(t, true) |> Array.toList |> List.map (fun pi -> ofTypeInternal seen b pi.PropertyType, pi.Name) 
@@ -154,7 +155,7 @@ module CType =
  
     /// creates a c representation for a given system type
     let ofType (b : IBackend) (t : Type) : CType =
-        ofTypeInternal HSet.empty b t
+        ofTypeInternal HashSet.empty b t
 
    
        
@@ -446,8 +447,8 @@ type CExpr =
 
 
 type internal Used() =
-    let types = HashSet<CType>()
-    let intrinsics = HashSet<CIntrinsic>()
+    let types = System.Collections.Generic.HashSet<CType>()
+    let intrinsics = System.Collections.Generic.HashSet<CIntrinsic>()
         
     member x.Types = types
     member x.Intrinsics = intrinsics
@@ -920,8 +921,8 @@ type CModule =
 
 type UsageInfo =
     {
-        usedTypes       : hset<CType>
-        usedntrinsics   : hset<CIntrinsic>
+        usedTypes       : HashSet<CType>
+        usedntrinsics   : HashSet<CIntrinsic>
     }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -935,8 +936,8 @@ module CModule =
         visit u m
 
         {
-            usedTypes = HSet.ofSeq u.Types
-            usedntrinsics = HSet.ofSeq u.Intrinsics
+            usedTypes = HashSet.ofSeq u.Types
+            usedntrinsics = HashSet.ofSeq u.Intrinsics
         }
 
         
