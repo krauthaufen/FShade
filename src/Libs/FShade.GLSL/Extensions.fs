@@ -70,7 +70,7 @@ module Backends =
                 if containsCompute module_ then
                     Backend.Create {
                         cfg.Config with
-                            version                 = max (Version(4,4,0)) cfg.Config.version
+                            version = Operators.max (Version(4,4,0)) cfg.Config.version
                     }
                 else
                     cfg
