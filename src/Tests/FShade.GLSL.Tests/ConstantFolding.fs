@@ -270,6 +270,7 @@ let util (a : float) (b : float) (c : float) =
 
 [<Test>]
 let ``Broken``() =
+    Setup.Run()
     let frag2 (v : Vertex) =
         fragment {
             return V4d(V3d.III, util (sin v.pos.X) (cos v.pos.Y) (tan v.pos.Z))
