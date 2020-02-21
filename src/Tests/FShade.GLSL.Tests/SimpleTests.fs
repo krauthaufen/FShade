@@ -512,7 +512,7 @@ type UniformScope with
 
 [<ReflectedDefinition>] [<Inline>]
 let inlineFun1 (forward : V3d) (up : V3d) =   
-    V3d.Cross(up, -forward) + up - forward
+    Vec.Cross(up, -forward) + up - forward
     
 
 [<ReflectedDefinition>] [<Inline>]

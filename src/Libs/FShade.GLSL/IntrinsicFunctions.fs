@@ -434,194 +434,194 @@ module IntrinsicFunctions =
             // ==========================================================================
             CIntrinsic.tagged "any(lessThan({0},{1}))", [
                 exactly <@ fun (u : V2d) (v : V2d) -> u.AnySmaller(v) @>
-                exactly <@ V2d.AnySmaller : V2d * V2d -> bool @>
+                exactly <@ Vec.AnySmaller : V2d * V2d -> bool @>
                 exactly <@ fun (u : V3d) (v : V3d) -> u.AnySmaller(v) @>
-                exactly <@ V3d.AnySmaller : V3d * V3d -> bool @>
+                exactly <@ Vec.AnySmaller : V3d * V3d -> bool @>
                 exactly <@ fun (u : V4d) (v : V4d) -> u.AnySmaller(v) @>
-                exactly <@ V4d.AnySmaller : V4d * V4d -> bool @>
+                exactly <@ Vec.AnySmaller : V4d * V4d -> bool @>
 
                 exactly <@ fun (u : V2i) (v : V2i) -> u.AnySmaller(v) @>
-                exactly <@ V2i.AnySmaller : V2i * V2i -> bool @>
+                exactly <@ Vec.AnySmaller : V2i * V2i -> bool @>
                 exactly <@ fun (u : V3i) (v : V3i) -> u.AnySmaller(v) @>
-                exactly <@ V3i.AnySmaller : V3i * V3i -> bool @>
+                exactly <@ Vec.AnySmaller : V3i * V3i -> bool @>
                 exactly <@ fun (u : V4i) (v : V4i) -> u.AnySmaller(v) @>
-                exactly <@ V4i.AnySmaller : V4i * V4i -> bool @>
+                exactly <@ Vec.AnySmaller : V4i * V4i -> bool @>
             ]
 
             CIntrinsic.tagged "all(lessThan({0},{1}))", [
                 exactly <@ fun (u : V2d) (v : V2d) -> u.AllSmaller(v) @>
-                exactly <@ V2d.AllSmaller : V2d * V2d -> bool @>
+                exactly <@ Vec.AllSmaller : V2d * V2d -> bool @>
                 exactly <@ fun (u : V3d) (v : V3d) -> u.AllSmaller(v) @>
-                exactly <@ V3d.AllSmaller : V3d * V3d -> bool @>
+                exactly <@ Vec.AllSmaller : V3d * V3d -> bool @>
                 exactly <@ fun (u : V4d) (v : V4d) -> u.AllSmaller(v) @>
-                exactly <@ V4d.AllSmaller : V4d * V4d -> bool @>
+                exactly <@ Vec.AllSmaller : V4d * V4d -> bool @>
 
                 exactly <@ fun (u : V2i) (v : V2i) -> u.AllSmaller(v) @>
-                exactly <@ V2i.AllSmaller : V2i * V2i -> bool @>
+                exactly <@ Vec.AllSmaller : V2i * V2i -> bool @>
                 exactly <@ fun (u : V3i) (v : V3i) -> u.AllSmaller(v) @>
-                exactly <@ V3i.AllSmaller : V3i * V3i -> bool @>
+                exactly <@ Vec.AllSmaller : V3i * V3i -> bool @>
                 exactly <@ fun (u : V4i) (v : V4i) -> u.AllSmaller(v) @>
-                exactly <@ V4i.AllSmaller : V4i * V4i -> bool @>
+                exactly <@ Vec.AllSmaller : V4i * V4i -> bool @>
             ]
 
             CIntrinsic.tagged "any(lessThanEqual({0},{1}))", [
                 exactly <@ fun (u : V2d) (v : V2d) -> u.AnySmallerOrEqual(v) @>
-                exactly <@ V2d.AnySmallerOrEqual : V2d * V2d -> bool @>
+                exactly <@ Vec.AnySmallerOrEqual : V2d * V2d -> bool @>
                 exactly <@ fun (u : V3d) (v : V3d) -> u.AnySmallerOrEqual(v) @>
-                exactly <@ V3d.AnySmallerOrEqual : V3d * V3d -> bool @>
+                exactly <@ Vec.AnySmallerOrEqual : V3d * V3d -> bool @>
                 exactly <@ fun (u : V4d) (v : V4d) -> u.AnySmallerOrEqual(v) @>
-                exactly <@ V4d.AnySmallerOrEqual : V4d * V4d -> bool @>
+                exactly <@ Vec.AnySmallerOrEqual : V4d * V4d -> bool @>
 
                 exactly <@ fun (u : V2i) (v : V2i) -> u.AnySmallerOrEqual(v) @>
-                exactly <@ V2i.AnySmallerOrEqual : V2i * V2i -> bool @>
+                exactly <@ Vec.AnySmallerOrEqual : V2i * V2i -> bool @>
                 exactly <@ fun (u : V3i) (v : V3i) -> u.AnySmallerOrEqual(v) @>
-                exactly <@ V3i.AnySmallerOrEqual : V3i * V3i -> bool @>
+                exactly <@ Vec.AnySmallerOrEqual : V3i * V3i -> bool @>
                 exactly <@ fun (u : V4i) (v : V4i) -> u.AnySmallerOrEqual(v) @>
-                exactly <@ V4i.AnySmallerOrEqual : V4i * V4i -> bool @>
+                exactly <@ Vec.AnySmallerOrEqual : V4i * V4i -> bool @>
             ]
 
             CIntrinsic.tagged "all(lessThanEqual({0},{1}))", [
                 exactly <@ fun (u : V2d) (v : V2d) -> u.AllSmallerOrEqual(v) @>
-                exactly <@ V2d.AllSmallerOrEqual : V2d * V2d -> bool @>
+                exactly <@ Vec.AllSmallerOrEqual : V2d * V2d -> bool @>
                 exactly <@ fun (u : V3d) (v : V3d) -> u.AllSmallerOrEqual(v) @>
-                exactly <@ V3d.AllSmallerOrEqual : V3d * V3d -> bool @>
+                exactly <@ Vec.AllSmallerOrEqual : V3d * V3d -> bool @>
                 exactly <@ fun (u : V4d) (v : V4d) -> u.AllSmallerOrEqual(v) @>
-                exactly <@ V4d.AllSmallerOrEqual : V4d * V4d -> bool @>
+                exactly <@ Vec.AllSmallerOrEqual : V4d * V4d -> bool @>
 
                 exactly <@ fun (u : V2i) (v : V2i) -> u.AllSmallerOrEqual(v) @>
-                exactly <@ V2i.AllSmallerOrEqual : V2i * V2i -> bool @>
+                exactly <@ Vec.AllSmallerOrEqual : V2i * V2i -> bool @>
                 exactly <@ fun (u : V3i) (v : V3i) -> u.AllSmallerOrEqual(v) @>
-                exactly <@ V3i.AllSmallerOrEqual : V3i * V3i -> bool @>
+                exactly <@ Vec.AllSmallerOrEqual : V3i * V3i -> bool @>
                 exactly <@ fun (u : V4i) (v : V4i) -> u.AllSmallerOrEqual(v) @>
-                exactly <@ V4i.AllSmallerOrEqual : V4i * V4i -> bool @>
+                exactly <@ Vec.AllSmallerOrEqual : V4i * V4i -> bool @>
             ]
 
             CIntrinsic.tagged "any(greaterThan({0},{1}))", [
                 exactly <@ fun (u : V2d) (v : V2d) -> u.AnyGreater(v) @>
-                exactly <@ V2d.AnyGreater : V2d * V2d -> bool @>
+                exactly <@ Vec.AnyGreater : V2d * V2d -> bool @>
                 exactly <@ fun (u : V3d) (v : V3d) -> u.AnyGreater(v) @>
-                exactly <@ V3d.AnyGreater : V3d * V3d -> bool @>
+                exactly <@ Vec.AnyGreater : V3d * V3d -> bool @>
                 exactly <@ fun (u : V4d) (v : V4d) -> u.AnyGreater(v) @>
-                exactly <@ V4d.AnyGreater : V4d * V4d -> bool @>
+                exactly <@ Vec.AnyGreater : V4d * V4d -> bool @>
 
                 exactly <@ fun (u : V2i) (v : V2i) -> u.AnyGreater(v) @>
-                exactly <@ V2i.AnyGreater : V2i * V2i -> bool @>
+                exactly <@ Vec.AnyGreater : V2i * V2i -> bool @>
                 exactly <@ fun (u : V3i) (v : V3i) -> u.AnyGreater(v) @>
-                exactly <@ V3i.AnyGreater : V3i * V3i -> bool @>
+                exactly <@ Vec.AnyGreater : V3i * V3i -> bool @>
                 exactly <@ fun (u : V4i) (v : V4i) -> u.AnyGreater(v) @>
-                exactly <@ V4i.AnyGreater : V4i * V4i -> bool @>
+                exactly <@ Vec.AnyGreater : V4i * V4i -> bool @>
             ]
 
             CIntrinsic.tagged "all(greaterThan({0},{1}))", [
                 exactly <@ fun (u : V2d) (v : V2d) -> u.AllGreater(v) @>
-                exactly <@ V2d.AllGreater : V2d * V2d -> bool @>
+                exactly <@ Vec.AllGreater : V2d * V2d -> bool @>
                 exactly <@ fun (u : V3d) (v : V3d) -> u.AllGreater(v) @>
-                exactly <@ V3d.AllGreater : V3d * V3d -> bool @>
+                exactly <@ Vec.AllGreater : V3d * V3d -> bool @>
                 exactly <@ fun (u : V4d) (v : V4d) -> u.AllGreater(v) @>
-                exactly <@ V4d.AllGreater : V4d * V4d -> bool @>
+                exactly <@ Vec.AllGreater : V4d * V4d -> bool @>
 
                 exactly <@ fun (u : V2i) (v : V2i) -> u.AllGreater(v) @>
-                exactly <@ V2i.AllGreater : V2i * V2i -> bool @>
+                exactly <@ Vec.AllGreater : V2i * V2i -> bool @>
                 exactly <@ fun (u : V3i) (v : V3i) -> u.AllGreater(v) @>
-                exactly <@ V3i.AllGreater : V3i * V3i -> bool @>
+                exactly <@ Vec.AllGreater : V3i * V3i -> bool @>
                 exactly <@ fun (u : V4i) (v : V4i) -> u.AllGreater(v) @>
-                exactly <@ V4i.AllGreater : V4i * V4i -> bool @>
+                exactly <@ Vec.AllGreater : V4i * V4i -> bool @>
             ]
 
             CIntrinsic.tagged "any(greaterThanEqual({0},{1}))", [
                 exactly <@ fun (u : V2d) (v : V2d) -> u.AnyGreaterOrEqual(v) @>
-                exactly <@ V2d.AnyGreaterOrEqual : V2d * V2d -> bool @>
+                exactly <@ Vec.AnyGreaterOrEqual : V2d * V2d -> bool @>
                 exactly <@ fun (u : V3d) (v : V3d) -> u.AnyGreaterOrEqual(v) @>
-                exactly <@ V3d.AnyGreaterOrEqual : V3d * V3d -> bool @>
+                exactly <@ Vec.AnyGreaterOrEqual : V3d * V3d -> bool @>
                 exactly <@ fun (u : V4d) (v : V4d) -> u.AnyGreaterOrEqual(v) @>
-                exactly <@ V4d.AnyGreaterOrEqual : V4d * V4d -> bool @>
+                exactly <@ Vec.AnyGreaterOrEqual : V4d * V4d -> bool @>
 
                 exactly <@ fun (u : V2i) (v : V2i) -> u.AnyGreaterOrEqual(v) @>
-                exactly <@ V2i.AnyGreaterOrEqual : V2i * V2i -> bool @>
+                exactly <@ Vec.AnyGreaterOrEqual : V2i * V2i -> bool @>
                 exactly <@ fun (u : V3i) (v : V3i) -> u.AnyGreaterOrEqual(v) @>
-                exactly <@ V3i.AnyGreaterOrEqual : V3i * V3i -> bool @>
+                exactly <@ Vec.AnyGreaterOrEqual : V3i * V3i -> bool @>
                 exactly <@ fun (u : V4i) (v : V4i) -> u.AnyGreaterOrEqual(v) @>
-                exactly <@ V4i.AnyGreaterOrEqual : V4i * V4i -> bool @>
+                exactly <@ Vec.AnyGreaterOrEqual : V4i * V4i -> bool @>
             ]
 
             CIntrinsic.tagged "all(greaterThanEqual({0},{1}))", [
                 exactly <@ fun (u : V2d) (v : V2d) -> u.AllGreaterOrEqual(v) @>
-                exactly <@ V2d.AllGreaterOrEqual : V2d * V2d -> bool @>
+                exactly <@ Vec.AllGreaterOrEqual : V2d * V2d -> bool @>
                 exactly <@ fun (u : V3d) (v : V3d) -> u.AllGreaterOrEqual(v) @>
-                exactly <@ V3d.AllGreaterOrEqual : V3d * V3d -> bool @>
+                exactly <@ Vec.AllGreaterOrEqual : V3d * V3d -> bool @>
                 exactly <@ fun (u : V4d) (v : V4d) -> u.AllGreaterOrEqual(v) @>
-                exactly <@ V4d.AllGreaterOrEqual : V4d * V4d -> bool @>
+                exactly <@ Vec.AllGreaterOrEqual : V4d * V4d -> bool @>
 
                 exactly <@ fun (u : V2i) (v : V2i) -> u.AllGreaterOrEqual(v) @>
-                exactly <@ V2i.AllGreaterOrEqual : V2i * V2i -> bool @>
+                exactly <@ Vec.AllGreaterOrEqual : V2i * V2i -> bool @>
                 exactly <@ fun (u : V3i) (v : V3i) -> u.AllGreaterOrEqual(v) @>
-                exactly <@ V3i.AllGreaterOrEqual : V3i * V3i -> bool @>
+                exactly <@ Vec.AllGreaterOrEqual : V3i * V3i -> bool @>
                 exactly <@ fun (u : V4i) (v : V4i) -> u.AllGreaterOrEqual(v) @>
-                exactly <@ V4i.AllGreaterOrEqual : V4i * V4i -> bool @>
+                exactly <@ Vec.AllGreaterOrEqual : V4i * V4i -> bool @>
             ]
 
             CIntrinsic.tagged "any(equal({0},{1}))", [
                 exactly <@ fun (u : V2d) (v : V2d) -> u.AnyEqual(v) @>
-                exactly <@ V2d.AnyEqual : V2d * V2d -> bool @>
+                exactly <@ Vec.AnyEqual : V2d * V2d -> bool @>
                 exactly <@ fun (u : V3d) (v : V3d) -> u.AnyEqual(v) @>
-                exactly <@ V3d.AnyEqual : V3d * V3d -> bool @>
+                exactly <@ Vec.AnyEqual : V3d * V3d -> bool @>
                 exactly <@ fun (u : V4d) (v : V4d) -> u.AnyEqual(v) @>
-                exactly <@ V4d.AnyEqual : V4d * V4d -> bool @>
+                exactly <@ Vec.AnyEqual : V4d * V4d -> bool @>
 
                 exactly <@ fun (u : V2i) (v : V2i) -> u.AnyEqual(v) @>
-                exactly <@ V2i.AnyEqual : V2i * V2i -> bool @>
+                exactly <@ Vec.AnyEqual : V2i * V2i -> bool @>
                 exactly <@ fun (u : V3i) (v : V3i) -> u.AnyEqual(v) @>
-                exactly <@ V3i.AnyEqual : V3i * V3i -> bool @>
+                exactly <@ Vec.AnyEqual : V3i * V3i -> bool @>
                 exactly <@ fun (u : V4i) (v : V4i) -> u.AnyEqual(v) @>
-                exactly <@ V4i.AnyEqual : V4i * V4i -> bool @>
+                exactly <@ Vec.AnyEqual : V4i * V4i -> bool @>
             ]
 
             CIntrinsic.tagged "all(equal({0},{1}))", [
                 exactly <@ fun (u : V2d) (v : V2d) -> u.AllEqual(v) @>
-                exactly <@ V2d.AllEqual : V2d * V2d -> bool @>
+                exactly <@ Vec.AllEqual : V2d * V2d -> bool @>
                 exactly <@ fun (u : V3d) (v : V3d) -> u.AllEqual(v) @>
-                exactly <@ V3d.AllEqual : V3d * V3d -> bool @>
+                exactly <@ Vec.AllEqual : V3d * V3d -> bool @>
                 exactly <@ fun (u : V4d) (v : V4d) -> u.AllEqual(v) @>
-                exactly <@ V4d.AllEqual : V4d * V4d -> bool @>
+                exactly <@ Vec.AllEqual : V4d * V4d -> bool @>
 
                 exactly <@ fun (u : V2i) (v : V2i) -> u.AllEqual(v) @>
-                exactly <@ V2i.AllEqual : V2i * V2i -> bool @>
+                exactly <@ Vec.AllEqual : V2i * V2i -> bool @>
                 exactly <@ fun (u : V3i) (v : V3i) -> u.AllEqual(v) @>
-                exactly <@ V3i.AllEqual : V3i * V3i -> bool @>
+                exactly <@ Vec.AllEqual : V3i * V3i -> bool @>
                 exactly <@ fun (u : V4i) (v : V4i) -> u.AllEqual(v) @>
-                exactly <@ V4i.AllEqual : V4i * V4i -> bool @>
+                exactly <@ Vec.AllEqual : V4i * V4i -> bool @>
             ]
 
             CIntrinsic.tagged "any(notEqual({0},{1}))", [
                 exactly <@ fun (u : V2d) (v : V2d) -> u.AnyDifferent(v) @>
-                exactly <@ V2d.AnyDifferent : V2d * V2d -> bool @>
+                exactly <@ Vec.AnyDifferent : V2d * V2d -> bool @>
                 exactly <@ fun (u : V3d) (v : V3d) -> u.AnyDifferent(v) @>
-                exactly <@ V3d.AnyDifferent : V3d * V3d -> bool @>
+                exactly <@ Vec.AnyDifferent : V3d * V3d -> bool @>
                 exactly <@ fun (u : V4d) (v : V4d) -> u.AnyDifferent(v) @>
-                exactly <@ V4d.AnyDifferent : V4d * V4d -> bool @>
+                exactly <@ Vec.AnyDifferent : V4d * V4d -> bool @>
 
                 exactly <@ fun (u : V2i) (v : V2i) -> u.AnyDifferent(v) @>
-                exactly <@ V2i.AnyDifferent : V2i * V2i -> bool @>
+                exactly <@ Vec.AnyDifferent : V2i * V2i -> bool @>
                 exactly <@ fun (u : V3i) (v : V3i) -> u.AnyDifferent(v) @>
-                exactly <@ V3i.AnyDifferent : V3i * V3i -> bool @>
+                exactly <@ Vec.AnyDifferent : V3i * V3i -> bool @>
                 exactly <@ fun (u : V4i) (v : V4i) -> u.AnyDifferent(v) @>
-                exactly <@ V4i.AnyDifferent : V4i * V4i -> bool @>
+                exactly <@ Vec.AnyDifferent : V4i * V4i -> bool @>
             ]
 
             CIntrinsic.tagged "all(notEqual({0},{1}))", [
                 exactly <@ fun (u : V2d) (v : V2d) -> u.AllDifferent(v) @>
-                exactly <@ V2d.AllDifferent : V2d * V2d -> bool @>
+                exactly <@ Vec.AllDifferent : V2d * V2d -> bool @>
                 exactly <@ fun (u : V3d) (v : V3d) -> u.AllDifferent(v) @>
-                exactly <@ V3d.AllDifferent : V3d * V3d -> bool @>
+                exactly <@ Vec.AllDifferent : V3d * V3d -> bool @>
                 exactly <@ fun (u : V4d) (v : V4d) -> u.AllDifferent(v) @>
-                exactly <@ V4d.AllDifferent : V4d * V4d -> bool @>
+                exactly <@ Vec.AllDifferent : V4d * V4d -> bool @>
 
                 exactly <@ fun (u : V2i) (v : V2i) -> u.AllDifferent(v) @>
-                exactly <@ V2i.AllDifferent : V2i * V2i -> bool @>
+                exactly <@ Vec.AllDifferent : V2i * V2i -> bool @>
                 exactly <@ fun (u : V3i) (v : V3i) -> u.AllDifferent(v) @>
-                exactly <@ V3i.AllDifferent : V3i * V3i -> bool @>
+                exactly <@ Vec.AllDifferent : V3i * V3i -> bool @>
                 exactly <@ fun (u : V4i) (v : V4i) -> u.AllDifferent(v) @>
-                exactly <@ V4i.AllDifferent : V4i * V4i -> bool @>
+                exactly <@ Vec.AllDifferent : V4i * V4i -> bool @>
             ]
 
             // ==========================================================================
@@ -629,18 +629,18 @@ module IntrinsicFunctions =
             // ==========================================================================
 
             CIntrinsic.simple "distance", [
-                exactly <@ V2i.Distance : _ * _ -> _ @>
-                exactly <@ V3i.Distance : _ * _ -> _ @>
-                exactly <@ V4i.Distance : _ * _ -> _ @>
-                exactly <@ V2l.Distance : _ * _ -> _ @>
-                exactly <@ V3l.Distance : _ * _ -> _ @>
-                exactly <@ V4l.Distance : _ * _ -> _ @>
-                exactly <@ V2f.Distance : _ * _ -> _ @>
-                exactly <@ V3f.Distance : _ * _ -> _ @>
-                exactly <@ V4f.Distance : _ * _ -> _ @>
-                exactly <@ V2d.Distance : _ * _ -> _ @>
-                exactly <@ V3d.Distance : _ * _ -> _ @>
-                exactly <@ V4d.Distance : _ * _ -> _ @>
+                exactly <@ Vec.Distance : V2i * V2i -> _ @>
+                exactly <@ Vec.Distance : V3i * V3i -> _ @>
+                exactly <@ Vec.Distance : V4i * V4i -> _ @>
+                exactly <@ Vec.Distance : V2l * V2l -> _ @>
+                exactly <@ Vec.Distance : V3l * V3l -> _ @>
+                exactly <@ Vec.Distance : V4l * V4l -> _ @>
+                exactly <@ Vec.Distance : V2f * V2f -> _ @>
+                exactly <@ Vec.Distance : V3f * V3f -> _ @>
+                exactly <@ Vec.Distance : V4f * V4f -> _ @>
+                exactly <@ Vec.Distance : V2d * V2d -> _ @>
+                exactly <@ Vec.Distance : V3d * V3d -> _ @>
+                exactly <@ Vec.Distance : V4d * V4d -> _ @>
             ]
 
             CIntrinsic.simple "normalize", [
@@ -657,8 +657,8 @@ module IntrinsicFunctions =
                 exactly <@ Vec.reflect : V3d -> V3d -> V3d @> 
             ]
 
-            CIntrinsic.simple "refract", [
-                exactly <@ Vec.refract : V3d -> V3d -> float -> V3d @> 
+            CIntrinsic.tagged "refract({1},{2},{0})", [
+                generic <@ Vec.refract : float -> V3d -> V3d -> V3d @> 
             ]
             
             // ==========================================================================

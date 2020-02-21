@@ -178,7 +178,7 @@ let computerXXX (color : V4d, comp : Computation, mb : bool) =
 
         let tmColor = 
             if mb then
-                let lum = V3d.Dot(exposedColor, Foo) 
+                let lum = Vec.Dot(exposedColor, Foo) 
                     
                 if lum > 1e-7 then
                     let lumTm = match comp with

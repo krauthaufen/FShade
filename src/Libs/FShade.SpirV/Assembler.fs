@@ -508,24 +508,24 @@ module private IntrinsicFunctions =
             
             // clamp(int)
             CIntrinsic.custom GLSLExtInstruction.SClamp [2; 0; 1], [
-                exactly <@ clamp : int8 -> _ -> _ @>
-                exactly <@ clamp : int16 -> _ -> _ @>
-                exactly <@ clamp : int32 -> _ -> _ @>
-                exactly <@ clamp : int64 -> _ -> _ @>
+                exactly <@ clamp : int8 -> int8 -> int8 -> _ @>
+                exactly <@ clamp : int16 -> int16 -> int16 -> _ @>
+                exactly <@ clamp : int32 -> int32 -> int32 -> _ @>
+                exactly <@ clamp : int64 -> int64 -> int64 -> _  @>
             ]
 
             // clamp(uint)
             CIntrinsic.custom GLSLExtInstruction.UClamp [2; 0; 1], [
-                exactly <@ clamp : uint8 -> _ -> _ @>
-                exactly <@ clamp : uint16 -> _ -> _ @>
-                exactly <@ clamp : uint32 -> _ -> _ @>
-                exactly <@ clamp : uint64 -> _ -> _ @>
+                exactly <@ clamp : uint8 -> uint8 -> uint8 -> _ @>
+                exactly <@ clamp : uint16 -> uint16 -> uint16 -> _ @>
+                exactly <@ clamp : uint32 -> uint32 -> uint32 -> _ @>
+                exactly <@ clamp : uint64 -> uint64 -> uint64 -> _ @>
             ]
 
             // clamp(float)
             CIntrinsic.custom GLSLExtInstruction.FClamp [2; 0; 1], [
-                exactly <@ clamp : float32 -> _ -> _ @>
-                exactly <@ clamp : float -> _ -> _ @>
+                exactly <@ clamp : float32 -> float32 -> float32 -> _ @>
+                exactly <@ clamp : float -> float -> float -> _ @>
             ]
 
             // mix
@@ -541,18 +541,18 @@ module private IntrinsicFunctions =
             
             // distance
             CIntrinsic.simple GLSLExtInstruction.Distance, [
-                exactly <@ V2i.Distance : _ * _ -> _ @>
-                exactly <@ V3i.Distance : _ * _ -> _ @>
-                exactly <@ V4i.Distance : _ * _ -> _ @>
-                exactly <@ V2l.Distance : _ * _ -> _ @>
-                exactly <@ V3l.Distance : _ * _ -> _ @>
-                exactly <@ V4l.Distance : _ * _ -> _ @>
-                exactly <@ V2f.Distance : _ * _ -> _ @>
-                exactly <@ V3f.Distance : _ * _ -> _ @>
-                exactly <@ V4f.Distance : _ * _ -> _ @>
-                exactly <@ V2d.Distance : _ * _ -> _ @>
-                exactly <@ V3d.Distance : _ * _ -> _ @>
-                exactly <@ V4d.Distance : _ * _ -> _ @>
+                exactly <@ Vec.Distance : V2i * V2i -> _ @>
+                exactly <@ Vec.Distance : V3i * V3i -> _ @>
+                exactly <@ Vec.Distance : V4i * V4i -> _ @>
+                exactly <@ Vec.Distance : V2l * V2l -> _ @>
+                exactly <@ Vec.Distance : V3l * V3l -> _ @>
+                exactly <@ Vec.Distance : V4l * V4l -> _ @>
+                exactly <@ Vec.Distance : V2f * V2f -> _ @>
+                exactly <@ Vec.Distance : V3f * V3f -> _ @>
+                exactly <@ Vec.Distance : V4f * V4f -> _ @>
+                exactly <@ Vec.Distance : V2d * V2d -> _ @>
+                exactly <@ Vec.Distance : V3d * V3d -> _ @>
+                exactly <@ Vec.Distance : V4d * V4d -> _ @>
             ]
 
             // normalize
@@ -573,7 +573,7 @@ module private IntrinsicFunctions =
 
             // refract
             CIntrinsic.simple GLSLExtInstruction.Refract, [
-                exactly <@ Vec.refract : V3d -> V3d -> float -> V3d @> 
+                exactly <@ Vec.refract : float -> V3d -> V3d -> V3d @> 
             ]
             
             // ==========================================================================
