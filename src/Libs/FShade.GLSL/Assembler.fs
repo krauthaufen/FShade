@@ -1461,8 +1461,11 @@ module Assembler =
                             None
 
                     if name = "gl_FragDepth" && depthWrite <> DepthWriteMode.None then
-                        let mode = assembleDepthWriteMode depthWrite
-                        return Some (sprintf "layout(%s) out float gl_FragDepth;" mode)
+                        if config.version >= Version(4,3) then
+                            let mode = assembleDepthWriteMode depthWrite
+                            return Some (sprintf "layout(%s) out float gl_FragDepth;" mode)
+                        else 
+                            return None
                     else
                         match interpolation with
                         | Some i ->
