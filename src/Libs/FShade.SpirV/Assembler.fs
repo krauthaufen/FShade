@@ -202,7 +202,7 @@ module private IntrinsicFunctions =
                 exactly <@ Math.Pow @>
                 generic <@ ( ** ) : float -> float -> float @>
                 generic <@ pow : float -> float -> float @>
-                generic <@ pown @>
+                generic <@ pown : float -> int -> float @>
             ]
 
             // exp
@@ -599,7 +599,7 @@ module private IntrinsicFunctions =
                 exactly <@ fun (v : M22d) -> v.Determinant @>
                 exactly <@ fun (v : M33d) -> v.Determinant @>
                 exactly <@ fun (v : M44d) -> v.Determinant @>
-                generic <@ Mat.det : M22d -> float @>
+                //generic <@ Mat.det : M22d -> float @>
             ]
 
             // inverse

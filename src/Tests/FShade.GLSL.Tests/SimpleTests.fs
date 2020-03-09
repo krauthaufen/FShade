@@ -959,9 +959,9 @@ let ``DuplicateId`` () =
         failwith "duplicate id"
                
 
-[<EntryPoint>]
-let main args =
-    ``New Intrinsics``()
+//[<EntryPoint>]
+//let main args =
+//    ``New Intrinsics``()
     //``GS Composition with Layer2``()
     //``GS Composition with Layer``()
     //``GS PrimitiveId``()
@@ -975,4 +975,3 @@ let main args =
     //``Helper with duplicate names``()
     //``Unroll Match``()
     //``Array Samplers``()
-    0

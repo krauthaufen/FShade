@@ -110,14 +110,27 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Pow : float32 * float32 -> float32 @>
                 exactly <@ Math.Pow @>
                 exactly <@ Fun.Pow : V2d * V2d -> V2d @>
+                exactly <@ Fun.Pow : V2d * float -> V2d @>
+                exactly <@ Fun.Pow : float * V2d -> V2d @>
                 exactly <@ Fun.Pow : V2f * V2f -> V2f @>
+                exactly <@ Fun.Pow : V2f * float32 -> V2f @>
+                exactly <@ Fun.Pow : float32 * V2f -> V2f @>
                 exactly <@ Fun.Pow : V3d * V3d -> V3d @>
+                exactly <@ Fun.Pow : V3d * float -> V3d @>
+                exactly <@ Fun.Pow : float * V3d -> V3d @>
                 exactly <@ Fun.Pow : V3f * V3f -> V3f @>
+                exactly <@ Fun.Pow : V3f * float32 -> V3f @>
+                exactly <@ Fun.Pow : float32 * V3f -> V3f @>
                 exactly <@ Fun.Pow : V4d * V4d -> V4d @>
+                exactly <@ Fun.Pow : V4d * float -> V4d @>
+                exactly <@ Fun.Pow : float * V4d -> V4d @>
                 exactly <@ Fun.Pow : V4f * V4f -> V4f @>
+                exactly <@ Fun.Pow : V4f * float32 -> V4f @>
+                exactly <@ Fun.Pow : float32 * V4f -> V4f @>
                 generic <@ ( ** ) : float -> float -> float @>
+                generic <@ Operators.( ** ) : float -> float -> float @>
                 generic <@ pow : float -> float -> float @>
-                generic <@ pown @>
+                generic <@ pown : float -> int -> float @>
             ]
 
             // TODO: still existing???
@@ -171,16 +184,94 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Log2 : V3d -> V3d @>
                 exactly <@ Fun.Log2 : V4f -> V4f @>
                 exactly <@ Fun.Log2 : V4d -> V4d @>
+                generic <@ log2 : float -> float @>
             ]
 
             CIntrinsic.simple "sqrt", [
                 exactly <@ Math.Sqrt @>
                 exactly <@ Fun.Sqrt : float32 -> float32 @>
                 exactly <@ Fun.Sqrt : float -> float @>
+                exactly <@ Fun.Sqrt : V2f -> V2f @>
+                exactly <@ Fun.Sqrt : V2d -> V2d @>
+                exactly <@ Fun.Sqrt : V3f -> V3f @>
+                exactly <@ Fun.Sqrt : V3d -> V3d @>
+                exactly <@ Fun.Sqrt : V4f -> V4f @>
+                exactly <@ Fun.Sqrt : V4d -> V4d @>
+                exactly <@ V2f.Sqrt : V2f -> V2f @>
+                exactly <@ V2d.Sqrt : V2d -> V2d @>
+                exactly <@ V3f.Sqrt : V3f -> V3f @>
+                exactly <@ V3d.Sqrt : V3d -> V3d @>
+                exactly <@ V4f.Sqrt : V4f -> V4f @>
+                exactly <@ V4d.Sqrt : V4d -> V4d @>
+                exactly <@ V4d.Sqrt : V4d -> V4d @>
                 generic <@ sqrt @>
             ]
 
-
+            CIntrinsic.tagged "sqrt({0})", [
+                exactly <@ Fun.Sqrt : int8 -> float @>
+                exactly <@ Fun.Sqrt : int16 -> float @>
+                exactly <@ Fun.Sqrt : int32 -> float @>
+                exactly <@ Fun.Sqrt : int64 -> float @>
+                exactly <@ Fun.Sqrt : uint8 -> float @>
+                exactly <@ Fun.Sqrt : uint16 -> float @>
+                exactly <@ Fun.Sqrt : uint32 -> float @>
+                exactly <@ Fun.Sqrt : uint64 -> float @>
+                exactly <@ Fun.Sqrt : V2i -> _ @>
+                exactly <@ Fun.Sqrt : V3i -> _ @>
+                exactly <@ Fun.Sqrt : V4i -> _ @>
+                exactly <@ Fun.Sqrt : V2l -> _ @>
+                exactly <@ Fun.Sqrt : V3l -> _ @>
+                exactly <@ Fun.Sqrt : V4l -> _ @>
+            ]
+            
+            CIntrinsic.tagged "pow({0}, 0.333333333333)", [
+                exactly <@ Fun.Cbrt : int8 -> float @>
+                exactly <@ Fun.Cbrt : int16 -> float @>
+                exactly <@ Fun.Cbrt : int32 -> float @>
+                exactly <@ Fun.Cbrt : int64 -> float @>
+                exactly <@ Fun.Cbrt : uint8 -> float @>
+                exactly <@ Fun.Cbrt : uint16 -> float @>
+                exactly <@ Fun.Cbrt : uint32 -> float @>
+                exactly <@ Fun.Cbrt : uint64 -> float @>
+                exactly <@ Fun.Cbrt : V2f -> _ @>
+                exactly <@ Fun.Cbrt : V3f -> _ @>
+                exactly <@ Fun.Cbrt : V4f -> _ @>
+                exactly <@ Fun.Cbrt : V2d -> _ @>
+                exactly <@ Fun.Cbrt : V3d -> _ @>
+                exactly <@ Fun.Cbrt : V4d -> _ @>
+                exactly <@ Fun.Cbrt : V2i -> _ @>
+                exactly <@ Fun.Cbrt : V3i -> _ @>
+                exactly <@ Fun.Cbrt : V4i -> _ @>
+                exactly <@ Fun.Cbrt : V2l -> _ @>
+                exactly <@ Fun.Cbrt : V3l -> _ @>
+                exactly <@ Fun.Cbrt : V4l -> _ @>
+                generic <@ cbrt : float -> _ @>
+            ]
+            
+            CIntrinsic.tagged "pow({0}, 2.0)", [
+                exactly <@ Fun.Square : int8 -> _ @>
+                exactly <@ Fun.Square : int16 -> _ @>
+                exactly <@ Fun.Square : int32 -> _ @>
+                exactly <@ Fun.Square : int64 -> _ @>
+                exactly <@ Fun.Square : uint8 -> _ @>
+                exactly <@ Fun.Square : uint16 -> _ @>
+                exactly <@ Fun.Square : uint32 -> _ @>
+                exactly <@ Fun.Square : uint64 -> _ @>
+                exactly <@ Fun.Square : V2f -> _ @>
+                exactly <@ Fun.Square : V3f -> _ @>
+                exactly <@ Fun.Square : V4f -> _ @>
+                exactly <@ Fun.Square : V2d -> _ @>
+                exactly <@ Fun.Square : V3d -> _ @>
+                exactly <@ Fun.Square : V4d -> _ @>
+                exactly <@ Fun.Square : V2i -> _ @>
+                exactly <@ Fun.Square : V3i -> _ @>
+                exactly <@ Fun.Square : V4i -> _ @>
+                exactly <@ Fun.Square : V2l -> _ @>
+                exactly <@ Fun.Square : V3l -> _ @>
+                exactly <@ Fun.Square : V4l -> _ @>
+                generic <@ sqr : float -> _ @>
+                
+            ]
             // ==========================================================================
             // COMMON
             // ==========================================================================
@@ -226,7 +317,7 @@ module IntrinsicFunctions =
                 generic <@ abs @>
             ]
 
-            CIntrinsic.simple "sign", [
+            CIntrinsic.tagged "int(sign({0}))", [
                 exactly <@ Math.Sign : int8 -> _ @>
                 exactly <@ Math.Sign : int16 -> _ @>
                 exactly <@ Math.Sign : int32 -> _ @>
@@ -253,6 +344,30 @@ module IntrinsicFunctions =
 
                 generic <@ sign @>
             ]
+            
+            CIntrinsic.simple "sign({0})", [
+                exactly <@ Fun.Signum : int8 -> _ @>
+                exactly <@ Fun.Signum : int16 -> _ @>
+                exactly <@ Fun.Signum : int32 -> _ @>
+                exactly <@ Fun.Signum : int64 -> _ @>
+                exactly <@ Fun.Signum : float32 -> _ @>
+                exactly <@ Fun.Signum : float -> _ @>
+                exactly <@ Fun.Signum : decimal -> _ @>
+                
+                exactly <@ Fun.Signum : V2f -> _ @>
+                exactly <@ Fun.Signum : V3f -> _ @>
+                exactly <@ Fun.Signum : V4f -> _ @>
+                exactly <@ Fun.Signum : V2d -> _ @>
+                exactly <@ Fun.Signum : V3d -> _ @>
+                exactly <@ Fun.Signum : V4d -> _ @>
+                exactly <@ Fun.Signum : V2i -> _ @>
+                exactly <@ Fun.Signum : V3i -> _ @>
+                exactly <@ Fun.Signum : V4i -> _ @>
+                exactly <@ Fun.Signum : V2l -> _ @>
+                exactly <@ Fun.Signum : V3l -> _ @>
+                exactly <@ Fun.Signum : V4l -> _ @>
+                generic <@ signum : V4d -> V4d @>
+            ]
 
             CIntrinsic.simple "floor", [
                 exactly <@ Math.Floor : float -> _ @>
@@ -265,6 +380,15 @@ module IntrinsicFunctions =
             CIntrinsic.simple "trunc", [
                 exactly <@ Math.Truncate : float -> _ @>
                 exactly <@ Math.Truncate : decimal -> _ @>
+                exactly <@ Fun.Truncate : float -> _ @>
+                exactly <@ Fun.Truncate : decimal -> _ @>
+                exactly <@ Fun.Truncate : float32 -> _ @>
+                exactly <@ Fun.Truncate : V2f -> _ @>
+                exactly <@ Fun.Truncate : V2d -> _ @>
+                exactly <@ Fun.Truncate : V3f -> _ @>
+                exactly <@ Fun.Truncate : V3d -> _ @>
+                exactly <@ Fun.Truncate : V4f -> _ @>
+                exactly <@ Fun.Truncate : V4d -> _ @>
                 generic <@ truncate @>
             ]
 
@@ -272,7 +396,14 @@ module IntrinsicFunctions =
                 exactly <@ Math.Round : float -> _ @>
                 exactly <@ Math.Round : decimal -> _ @>
                 exactly <@ Fun.Round : float -> _ @>
+                exactly <@ Fun.Round : decimal -> _ @>
                 exactly <@ Fun.Round : float32 -> _ @>
+                exactly <@ Fun.Round : V2f -> _ @>
+                exactly <@ Fun.Round : V2d -> _ @>
+                exactly <@ Fun.Round : V3f -> _ @>
+                exactly <@ Fun.Round : V3d -> _ @>
+                exactly <@ Fun.Round : V4f -> _ @>
+                exactly <@ Fun.Round : V4d -> _ @>
                 generic <@ round @>
             ]
 
@@ -393,7 +524,55 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Clamp : float * float * float -> _ @>
                 exactly <@ Fun.Clamp : decimal * decimal * decimal -> _ @>
             ]
-            
+            CIntrinsic.simple "clamp({0}, 0, 1)", [
+                exactly <@ Fun.Saturate : int8 -> _ @>
+                exactly <@ Fun.Saturate : int16 -> _ @>
+                exactly <@ Fun.Saturate : int32 -> _ @>
+                exactly <@ Fun.Saturate : int64 -> _ @>
+                exactly <@ Fun.Saturate : uint8  -> _ @>
+                exactly <@ Fun.Saturate : uint16 -> _ @>
+                exactly <@ Fun.Saturate : uint32 -> _ @>
+                exactly <@ Fun.Saturate : uint64 -> _ @>
+                exactly <@ Fun.Saturate : float32 -> _ @>
+                exactly <@ Fun.Saturate : float -> _ @>
+                exactly <@ Fun.Saturate : decimal -> _ @>
+                exactly <@ Fun.Saturate : V2i -> _ @>
+                exactly <@ Fun.Saturate : V3i -> _ @>
+                exactly <@ Fun.Saturate : V4i -> _ @>
+                exactly <@ Fun.Saturate : V2l -> _ @>
+                exactly <@ Fun.Saturate : V3l -> _ @>
+                exactly <@ Fun.Saturate : V4l -> _ @>
+                exactly <@ Fun.Saturate : V2f -> _ @>
+                exactly <@ Fun.Saturate : V3f -> _ @>
+                exactly <@ Fun.Saturate : V4f -> _ @>
+                exactly <@ Fun.Saturate : V2d -> _ @>
+                exactly <@ Fun.Saturate : V3d -> _ @>
+                exactly <@ Fun.Saturate : V4d -> _ @>
+                generic <@ saturate : V4d -> _ @>
+            ]
+
+
+            CIntrinsic.custom "smoothstep"[1; 2; 0], [
+                exactly <@ Fun.Smoothstep : float32 * float32 * float32 -> _ @>
+                exactly <@ Fun.Smoothstep : float * float * float -> _ @>
+                exactly <@ Fun.Smoothstep : V2f * V2f * V2f -> V2f @>
+                exactly <@ Fun.Smoothstep : V2f * float32 * float32 -> V2f @>
+                exactly <@ Fun.Smoothstep : V2d * V2d * V2d -> V2d @>
+                exactly <@ Fun.Smoothstep : V2d * float * float -> V2d @>
+                exactly <@ Fun.Smoothstep : V3f * V3f * V3f -> V3f @>
+                exactly <@ Fun.Smoothstep : V3f * float32 * float32 -> V3f @>
+                exactly <@ Fun.Smoothstep : V3d * V3d * V3d -> V3d @>
+                exactly <@ Fun.Smoothstep : V3d * float * float -> V3d @>
+                exactly <@ Fun.Smoothstep : V4f * V4f * V4f -> V4f @>
+                exactly <@ Fun.Smoothstep : V4f * float32 * float32 -> V4f @>
+                exactly <@ Fun.Smoothstep : V4d * V4d * V4d -> V4d @>
+                exactly <@ Fun.Smoothstep : V4d * float * float -> V4d @>
+            ]
+
+            CIntrinsic.simple "smoothstep", [
+                generic <@ smoothstep : float -> float -> V2d -> V2d @>
+            ]
+
             CIntrinsic.custom "mix" [1; 2; 0], [
                 exactly <@ Fun.Lerp : float32 * float32 * float32 -> _ @>
                 exactly <@ Fun.Lerp : float * float * float -> _ @>
@@ -406,6 +585,10 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Lerp : float32 * V4f * V4f -> V4f @>
                 exactly <@ Fun.Lerp : float * V4d * V4d -> V4d @>
                 exactly <@ Fun.Lerp : float32 * V4f * V4f -> V4f @>
+            ]
+            
+            CIntrinsic.simple "mix", [
+                generic <@ lerp : V3d -> V3d -> float -> V3d @>
             ]
 
             CIntrinsic.simple "isnan", [
@@ -446,6 +629,7 @@ module IntrinsicFunctions =
                 exactly <@ Vec.AnySmaller : V3i * V3i -> bool @>
                 exactly <@ fun (u : V4i) (v : V4i) -> u.AnySmaller(v) @>
                 exactly <@ Vec.AnySmaller : V4i * V4i -> bool @>
+                generic <@ Vec.anySmaller : V4i -> V4i -> bool @>
             ]
 
             CIntrinsic.tagged "all(lessThan({0},{1}))", [
@@ -462,6 +646,7 @@ module IntrinsicFunctions =
                 exactly <@ Vec.AllSmaller : V3i * V3i -> bool @>
                 exactly <@ fun (u : V4i) (v : V4i) -> u.AllSmaller(v) @>
                 exactly <@ Vec.AllSmaller : V4i * V4i -> bool @>
+                generic <@ Vec.allSmaller : V4i -> V4i -> bool @>
             ]
 
             CIntrinsic.tagged "any(lessThanEqual({0},{1}))", [
@@ -478,6 +663,7 @@ module IntrinsicFunctions =
                 exactly <@ Vec.AnySmallerOrEqual : V3i * V3i -> bool @>
                 exactly <@ fun (u : V4i) (v : V4i) -> u.AnySmallerOrEqual(v) @>
                 exactly <@ Vec.AnySmallerOrEqual : V4i * V4i -> bool @>
+                generic <@ Vec.anySmallerOrEqual : V4i -> V4i -> bool @>
             ]
 
             CIntrinsic.tagged "all(lessThanEqual({0},{1}))", [
@@ -494,6 +680,7 @@ module IntrinsicFunctions =
                 exactly <@ Vec.AllSmallerOrEqual : V3i * V3i -> bool @>
                 exactly <@ fun (u : V4i) (v : V4i) -> u.AllSmallerOrEqual(v) @>
                 exactly <@ Vec.AllSmallerOrEqual : V4i * V4i -> bool @>
+                generic <@ Vec.allSmallerOrEqual : V4i -> V4i -> bool @>
             ]
 
             CIntrinsic.tagged "any(greaterThan({0},{1}))", [
@@ -510,6 +697,7 @@ module IntrinsicFunctions =
                 exactly <@ Vec.AnyGreater : V3i * V3i -> bool @>
                 exactly <@ fun (u : V4i) (v : V4i) -> u.AnyGreater(v) @>
                 exactly <@ Vec.AnyGreater : V4i * V4i -> bool @>
+                generic <@ Vec.anyGreater : V4i -> V4i -> bool @>
             ]
 
             CIntrinsic.tagged "all(greaterThan({0},{1}))", [
@@ -526,6 +714,7 @@ module IntrinsicFunctions =
                 exactly <@ Vec.AllGreater : V3i * V3i -> bool @>
                 exactly <@ fun (u : V4i) (v : V4i) -> u.AllGreater(v) @>
                 exactly <@ Vec.AllGreater : V4i * V4i -> bool @>
+                generic <@ Vec.allGreater : V4i -> V4i -> bool @>
             ]
 
             CIntrinsic.tagged "any(greaterThanEqual({0},{1}))", [
@@ -542,6 +731,7 @@ module IntrinsicFunctions =
                 exactly <@ Vec.AnyGreaterOrEqual : V3i * V3i -> bool @>
                 exactly <@ fun (u : V4i) (v : V4i) -> u.AnyGreaterOrEqual(v) @>
                 exactly <@ Vec.AnyGreaterOrEqual : V4i * V4i -> bool @>
+                generic <@ Vec.anyGreaterOrEqual : V4i -> V4i -> bool @>
             ]
 
             CIntrinsic.tagged "all(greaterThanEqual({0},{1}))", [
@@ -558,6 +748,7 @@ module IntrinsicFunctions =
                 exactly <@ Vec.AllGreaterOrEqual : V3i * V3i -> bool @>
                 exactly <@ fun (u : V4i) (v : V4i) -> u.AllGreaterOrEqual(v) @>
                 exactly <@ Vec.AllGreaterOrEqual : V4i * V4i -> bool @>
+                generic <@ Vec.allGreaterOrEqual : V4i -> V4i -> bool @>
             ]
 
             CIntrinsic.tagged "any(equal({0},{1}))", [
@@ -641,6 +832,7 @@ module IntrinsicFunctions =
                 exactly <@ Vec.Distance : V2d * V2d -> _ @>
                 exactly <@ Vec.Distance : V3d * V3d -> _ @>
                 exactly <@ Vec.Distance : V4d * V4d -> _ @>
+                generic <@ Vec.distance : V4d -> V4d -> _ @>
             ]
 
             CIntrinsic.simple "normalize", [
@@ -654,10 +846,27 @@ module IntrinsicFunctions =
             ]
 
             CIntrinsic.simple "reflect", [
-                exactly <@ Vec.reflect : V3d -> V3d -> V3d @> 
+                exactly <@ Vec.Reflect : V2f * V2f -> _ @> 
+                exactly <@ Vec.Reflect : V3f * V3f -> _ @> 
+                exactly <@ Vec.Reflect : V4f * V4f -> _ @> 
+                exactly <@ Vec.Reflect : V2d * V2d -> _ @> 
+                exactly <@ Vec.Reflect : V3d * V3d -> _ @> 
+                exactly <@ Vec.Reflect : V4d * V4d -> _ @> 
+            ]
+            CIntrinsic.tagged "reflect({1}, {0})", [
+                generic <@ Vec.reflect : V3d -> V3d -> V3d @> 
+            ]
+            
+            CIntrinsic.simple "refract", [
+                exactly <@ Vec.Refract : V2f * V2f * _ -> _ @> 
+                exactly <@ Vec.Refract : V3f * V3f * _ -> _ @> 
+                exactly <@ Vec.Refract : V4f * V4f * _ -> _ @> 
+                exactly <@ Vec.Refract : V2d * V2d * _ -> _ @> 
+                exactly <@ Vec.Refract : V3d * V3d * _ -> _ @> 
+                exactly <@ Vec.Refract : V4d * V4d * _ -> _ @> 
             ]
 
-            CIntrinsic.tagged "refract({1},{2},{0})", [
+            CIntrinsic.tagged "refract({2},{1},{0})", [
                 generic <@ Vec.refract : float -> V3d -> V3d -> V3d @> 
             ]
             
@@ -682,7 +891,7 @@ module IntrinsicFunctions =
                 exactly <@ fun (v : M22d) -> v.Determinant @>
                 exactly <@ fun (v : M33d) -> v.Determinant @>
                 exactly <@ fun (v : M44d) -> v.Determinant @>
-                generic <@ Mat.det : M22d -> float @>
+                //generic <@ Mat.det : M22d -> float @>
             ]
 
             CIntrinsic.simple "inverse", [

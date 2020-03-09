@@ -273,7 +273,8 @@ let ``Broken``() =
     Setup.Run()
     let frag2 (v : Vertex) =
         fragment {
-            return V4d(V3d.III, util (sin v.pos.X) (cos v.pos.Y) (tan v.pos.Z))
+            let z : V3d = Fun.Sqrt (V3i v.c.XYZ)
+            return V4d(z, util (sin v.pos.X) (cos v.pos.Y) (tan v.pos.Z))
         }
 
     GLSL.shouldCompile [Effect.ofFunction frag2]
