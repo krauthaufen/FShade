@@ -345,7 +345,7 @@ module IntrinsicFunctions =
                 generic <@ sign @>
             ]
             
-            CIntrinsic.simple "sign({0})", [
+            CIntrinsic.tagged "sign({0})", [
                 exactly <@ Fun.Signum : int8 -> _ @>
                 exactly <@ Fun.Signum : int16 -> _ @>
                 exactly <@ Fun.Signum : int32 -> _ @>
@@ -524,7 +524,7 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Clamp : float * float * float -> _ @>
                 exactly <@ Fun.Clamp : decimal * decimal * decimal -> _ @>
             ]
-            CIntrinsic.simple "clamp({0}, 0, 1)", [
+            CIntrinsic.tagged "clamp({0}, 0, 1)", [
                 exactly <@ Fun.Saturate : int8 -> _ @>
                 exactly <@ Fun.Saturate : int16 -> _ @>
                 exactly <@ Fun.Saturate : int32 -> _ @>
