@@ -11,6 +11,7 @@ type Vertex =
     {
         [<Position>] pos : V4d
         [<Color>] c : V4d
+        [<SampleId>] m : M44d
     }
         
 [<Test>]
@@ -52,11 +53,66 @@ let ``New Intrinsics``() =
             let _ = Fun.Pow(V4f(v.c), V4f.IIII)
             let _ = Fun.Pow(v.c, v.c)
             let _ = Fun.Pow(V4f(v.c), V4f(v.c))
+            let _ = Fun.Pow(v.c, 1.0);
+            let _ = Fun.Pow(1.0, v.c);
+            let _ = Fun.Pown(v.c.X, int32 v.c.Y);
+            let _ = Fun.Pown(1, V4i(v.c));
+            let _ = Fun.Pown(V2f(v.c.XY), 1);
+            let _ = Fun.Pown(V2i(v.c.XY), 1);
+            let _ = Fun.Pow(V2i(v.c.XY), V2f(v.c.XY))
+            let _ = pow v.c 2.0
+            let _ = pow v.c v.c
+            let _ = v.c ** 2.0
+            let _ = v.c ** v.c
+            let _ = pown v.c 2
+            let _ = pown v.c (V4i(v.c))
+            let _ = sqrt v.c
+            let _ = Fun.Sqrt (V2i(v.c.XY))
+            let _ = signum v.c
+            let _ = signumi v.c
+            let _ = v.c |> floor |> truncate |> ceil |> round
+            let _ = sqr v.c
+            let _ = cbrt v.c
+            let _ = v.c.Abs()
+            let _ = Fun.Min(v.c, 1.0)
+            let _ = Fun.Min(1.0, v.c)
+            let _ = v.c |> min 1.0
+            let _ = v.c |> min v.c
+            let _ = v.c |> clamp 1.0 v.c
+            let _ = v.c.XYZ |> clamp v.c.XYZ 1.0
+            let _ = Fun.Clamp(v.c.XY, 0.0, 1.0)
+            let _ = v.c |> smoothstep v.c v.c
+            let _ = v.c |> smoothstep 0.0 1.0
+            let _ = Fun.Smoothstep(v.c, 0.0, 1.0)
+            let _ = Fun.Smoothstep(v.c, v.c, v.c)
+            let _ = lerp V2i.Zero V2i.One v.c.XY
+            let _ = Fun.Lerp(v.c.X, 0, 1)
+            let _ = Fun.Lerp(v.c, V4i(v.c), V4i(v.c))
+            // TODO: Uncomment for >= 5.0.6
+            //let _ = asinh (V4f(v.c))
+            //let _ = madd v.c v.c v.c
+            //let _ = madd v.c v.c.X v.c
+            //let _ = madd v.c.X v.c.X v.c.X
+            //let _ = madd (V4i(v.c)) 2 (V4i(v.c))
+            //let _ = Fun.MultiplyAdd(v.c.X, v.c, v.c)
+            //let _ = Fun.MultiplyAdd(v.c, v.c.X, v.c)
+            //let _ = Fun.MultiplyAdd(v.c, v.c, v.c)
+            //let _ = Fun.MultiplyAdd(v.c.X, v.c.Y, v.c.Z)
+            //let _ = degrees v.c
+            //let _ = degrees v.c.X
+            //let _ = v.c.DegreesFromRadians()
+            //let _ = isInfinity v.c
+            let _ = isInfinity v.c.X
+            let _ = Vec.reflect v.c v.c
+            let _ = Vec.refract 0.5 v.c v.c
+            let _ = v.c.X.DegreesFromRadians()
+            let normalized = Vec.Normalized (V4i(v.c))
+            let added = normalized + (Vec.normalize V4d.Half)
 
-            return v
+            return added
         }
 
-    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["mix"; "exp"; "log"; "pow"]
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["mix"; "exp"; "log"; "pow"; "sign"; "sqrt"]
     
 [<Test>]
 let ``Broken GLSL Shader``() =
