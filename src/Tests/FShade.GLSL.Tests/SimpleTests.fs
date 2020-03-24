@@ -11,7 +11,6 @@ type Vertex =
     {
         [<Position>] pos : V4d
         [<Color>] c : V4d
-        [<SampleId>] m : M44d
     }
         
 [<Test>]
@@ -72,6 +71,7 @@ let ``New Intrinsics``() =
             let _ = signumi v.c
             let _ = v.c |> floor |> truncate |> ceil |> round
             let _ = sqr v.c
+            let _ = sqr (V4i v.c)
             let _ = cbrt v.c
             let _ = v.c.Abs()
             let _ = Fun.Min(v.c, 1.0)

@@ -588,6 +588,8 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Square : V2l -> _ @>
                 exactly <@ sqr        : V2f -> _ @>
                 exactly <@ sqr        : V2d -> _ @>
+                exactly <@ sqr        : V2i -> _ @>
+                exactly <@ sqr        : V2l -> _ @>
             ]
 
             CIntrinsic.tagged "pow({0}, vec3(2))", [
@@ -597,6 +599,8 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Square : V3l -> _ @>
                 exactly <@ sqr        : V3f -> _ @>
                 exactly <@ sqr        : V3d -> _ @>
+                exactly <@ sqr        : V3i -> _ @>
+                exactly <@ sqr        : V3l -> _ @>
             ]
 
             CIntrinsic.tagged "pow({0}, vec4(2))", [
@@ -606,6 +610,8 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Square : V4l -> _ @>
                 exactly <@ sqr        : V4f -> _ @>
                 exactly <@ sqr        : V4d -> _ @>
+                exactly <@ sqr        : V4i -> _ @>
+                exactly <@ sqr        : V4l -> _ @>
             ]
 
             // ==========================================================================
