@@ -1013,6 +1013,44 @@ let ``DuplicateId`` () =
     // same texture name, but different sampler name -> will have same Id
     if fx1.Id = fx2.Id then
         failwith "duplicate id"
+
+
+[<ReflectedDefinition>]
+let helper (v : V4d) =
+    // without this uniform query (e.g. replacing it by a constant) the helper will be generated in the global block
+    match uniform?CRASH with
+    | 1 -> v * 2.0
+    | _ -> v
+
+[<Test>]
+let ``VS/TS shared helper`` () =
+    Setup.Run()
+    
+    let vs(v : Vertex) = 
+        vertex {
+            let pp = helper v.pos
+            return { v with pos = pp }
+        }
+
+    let ts (t : Patch<3 N, Vertex>) =
+
+        tessellation {
+        
+            let! coord = tessellateTriangle 2.0 (2.0, 2.0, 2.0)
+
+            let v = t.[0].pos * coord.X + t.[1].pos * coord.Y + t.[2].pos * coord.Z
+
+            let pp = helper v
+
+            return { t.[0] with pos = pp }
+        }
+
+    let frag (v : Vertex) =
+        fragment {
+            return V4d(1, 1, 1, 1)
+        }
+
+    GLSL.shouldCompile [ Effect.ofFunction vs; Effect.ofFunction ts; Effect.ofFunction frag ]
                
 
 //[<EntryPoint>]
