@@ -6,5 +6,3 @@ NUnit3TestAdapter
 FsCheck.NUnit
 FSharp.Core
 Microsoft.NET.Test.Sdk
-SourceLink.Create.CommandLine
-dotnet-sourcelink

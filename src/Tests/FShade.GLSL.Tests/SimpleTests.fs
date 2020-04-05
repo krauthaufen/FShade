@@ -19,44 +19,100 @@ let ``New Intrinsics``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = VecFun.Lerp(v.c.X, V2f.Zero, V2f.One)
-            let _ = VecFun.Lerp(v.c.X, V2d.Zero, V2d.One)
-            let _ = VecFun.Lerp(float32 v.c.X, V2f.Zero, V2f.One)
-            let _ = VecFun.Lerp(v.c.X, V3f.Zero, V3f.One)
-            let _ = VecFun.Lerp(v.c.X, V3d.Zero, V3d.One)
-            let _ = VecFun.Lerp(float32 v.c.X, V3f.Zero, V3f.One)
-            let _ = VecFun.Lerp(v.c.X, V4f.Zero, V4f.One)
-            let _ = VecFun.Lerp(v.c.X, V4d.Zero, V4d.One)
-            let _ = VecFun.Lerp(float32 v.c.X, V4f.Zero, V4f.One)
-            let _ = VecFun.Exp(v.c.XY)
-            let _ = VecFun.Exp(V2f(v.c.XY))
-            let _ = VecFun.Exp(v.c.XYZ)
-            let _ = VecFun.Exp(V3f(v.c.XYZ))
-            let _ = VecFun.Exp(v.c)
-            let _ = VecFun.Exp(V4f(v.c))
-            let _ = VecFun.Log(v.c.XY)
-            let _ = VecFun.Log(V2f(v.c.XY))
-            let _ = VecFun.Log(v.c.XYZ)
-            let _ = VecFun.Log(V3f(v.c.XYZ))
-            let _ = VecFun.Log(v.c)
-            let _ = VecFun.Log(V4f(v.c))
-            let _ = VecFun.Pow(v.c.XY, 1.0)
-            let _ = VecFun.Pow(V2f(v.c.XY), 1.0)
-            let _ = VecFun.Pow(v.c.XY, v.c.XY)
-            let _ = VecFun.Pow(V2f(v.c.XY), V2f(v.c.XY))
-            let _ = VecFun.Pow(v.c.XYZ, 1.0)
-            let _ = VecFun.Pow(V3f(v.c.XYZ), 1.0)
-            let _ = VecFun.Pow(v.c.XYZ, v.c.XYZ)
-            let _ = VecFun.Pow(V3f(v.c.XYZ), V3f(v.c.XYZ))
-            let _ = VecFun.Pow(v.c, 1.0)
-            let _ = VecFun.Pow(V4f(v.c), 1.0)
-            let _ = VecFun.Pow(v.c, v.c)
-            let _ = VecFun.Pow(V4f(v.c), V4f(v.c))
+            let _ = Fun.Lerp(float32 v.c.X, V2f.Zero, V2f.One)
+            let _ = Fun.Lerp(v.c.X, V2d.Zero, V2d.One)
+            let _ = Fun.Lerp(float32 v.c.X, V2f.Zero, V2f.One)
+            let _ = Fun.Lerp(float32 v.c.X, V3f.Zero, V3f.One)
+            let _ = Fun.Lerp(v.c.X, V3d.Zero, V3d.One)
+            let _ = Fun.Lerp(float32 v.c.X, V3f.Zero, V3f.One)
+            let _ = Fun.Lerp(float32 v.c.X, V4f.Zero, V4f.One)
+            let _ = Fun.Lerp(v.c.X, V4d.Zero, V4d.One)
+            let _ = Fun.Lerp(float32 v.c.X, V4f.Zero, V4f.One)
+            let _ = Fun.Exp(v.c.XY)
+            let _ = Fun.Exp(V2f(v.c.XY))
+            let _ = Fun.Exp(v.c.XYZ)
+            let _ = Fun.Exp(V3f(v.c.XYZ))
+            let _ = Fun.Exp(v.c)
+            let _ = Fun.Exp(V4f(v.c))
+            let _ = Fun.Log(v.c.XY)
+            let _ = Fun.Log(V2f(v.c.XY))
+            let _ = Fun.Log(v.c.XYZ)
+            let _ = Fun.Log(V3f(v.c.XYZ))
+            let _ = Fun.Log(v.c)
+            let _ = Fun.Log(V4f(v.c))
+            let _ = Fun.Pow(v.c.XY, V2d.II)
+            let _ = Fun.Pow(V2f(v.c.XY), V2f.II)
+            let _ = Fun.Pow(v.c.XY, v.c.XY)
+            let _ = Fun.Pow(V2f(v.c.XY), V2f(v.c.XY))
+            let _ = Fun.Pow(v.c.XYZ, V3d.III)
+            let _ = Fun.Pow(V3f(v.c.XYZ), V3f.III)
+            let _ = Fun.Pow(v.c.XYZ, v.c.XYZ)
+            let _ = Fun.Pow(V3f(v.c.XYZ), V3f(v.c.XYZ))
+            let _ = Fun.Pow(v.c, V4d.IIII)
+            let _ = Fun.Pow(V4f(v.c), V4f.IIII)
+            let _ = Fun.Pow(v.c, v.c)
+            let _ = Fun.Pow(V4f(v.c), V4f(v.c))
+            let _ = Fun.Pow(v.c, 1.0);
+            let _ = Fun.Pow(1.0, v.c);
+            let _ = Fun.Pown(v.c.X, int32 v.c.Y);
+            let _ = Fun.Pown(1, V4i(v.c));
+            let _ = Fun.Pown(V2f(v.c.XY), 1);
+            let _ = Fun.Pown(V2i(v.c.XY), 1);
+            let _ = Fun.Pow(V2i(v.c.XY), V2f(v.c.XY))
+            let _ = pow v.c 2.0
+            let _ = pow v.c v.c
+            let _ = v.c ** 2.0
+            let _ = v.c ** v.c
+            let _ = pown v.c 2
+            let _ = pown v.c (V4i(v.c))
+            let _ = sqrt v.c
+            let _ = Fun.Sqrt (V2i(v.c.XY))
+            let _ = signum v.c
+            let _ = signumi v.c
+            let _ = v.c |> floor |> truncate |> ceil |> round
+            let _ = sqr v.c
+            let _ = sqr (V4i v.c)
+            let _ = cbrt v.c
+            let _ = v.c.Abs()
+            let _ = Fun.Min(v.c, 1.0)
+            let _ = Fun.Min(1.0, v.c)
+            let _ = v.c |> min 1.0
+            let _ = v.c |> min v.c
+            let _ = v.c |> clamp 1.0 v.c
+            let _ = v.c.XYZ |> clamp v.c.XYZ 1.0
+            let _ = Fun.Clamp(v.c.XY, 0.0, 1.0)
+            let _ = v.c |> smoothstep v.c v.c
+            let _ = v.c |> smoothstep 0.0 1.0
+            let _ = Fun.Smoothstep(v.c, 0.0, 1.0)
+            let _ = Fun.Smoothstep(v.c, v.c, v.c)
+            let _ = lerp V2i.Zero V2i.One v.c.XY
+            let _ = Fun.Lerp(v.c.X, 0, 1)
+            let _ = Fun.Lerp(v.c, V4i(v.c), V4i(v.c))
+            // TODO: Uncomment for >= 5.0.6
+            //let _ = asinh (V4f(v.c))
+            //let _ = madd v.c v.c v.c
+            //let _ = madd v.c v.c.X v.c
+            //let _ = madd v.c.X v.c.X v.c.X
+            //let _ = madd (V4i(v.c)) 2 (V4i(v.c))
+            //let _ = Fun.MultiplyAdd(v.c.X, v.c, v.c)
+            //let _ = Fun.MultiplyAdd(v.c, v.c.X, v.c)
+            //let _ = Fun.MultiplyAdd(v.c, v.c, v.c)
+            //let _ = Fun.MultiplyAdd(v.c.X, v.c.Y, v.c.Z)
+            //let _ = degrees v.c
+            //let _ = degrees v.c.X
+            //let _ = v.c.DegreesFromRadians()
+            //let _ = isInfinity v.c
+            let _ = isInfinity v.c.X
+            let _ = Vec.reflect v.c v.c
+            let _ = Vec.refract 0.5 v.c v.c
+            let _ = v.c.X.DegreesFromRadians()
+            let normalized = Vec.Normalized (V4i(v.c))
+            let added = normalized + (Vec.normalize V4d.Half)
 
-            return v
+            return added
         }
 
-    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["mix"; "exp"; "log"; "pow"]
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["mix"; "exp"; "log"; "pow"; "sign"; "sqrt"]
     
 [<Test>]
 let ``Broken GLSL Shader``() =
@@ -512,7 +568,7 @@ type UniformScope with
 
 [<ReflectedDefinition>] [<Inline>]
 let inlineFun1 (forward : V3d) (up : V3d) =   
-    V3d.Cross(up, -forward) + up - forward
+    Vec.Cross(up, -forward) + up - forward
     
 
 [<ReflectedDefinition>] [<Inline>]
@@ -957,11 +1013,49 @@ let ``DuplicateId`` () =
     // same texture name, but different sampler name -> will have same Id
     if fx1.Id = fx2.Id then
         failwith "duplicate id"
+
+
+[<ReflectedDefinition>]
+let helper (v : V4d) =
+    // without this uniform query (e.g. replacing it by a constant) the helper will be generated in the global block
+    match uniform?CRASH with
+    | 1 -> v * 2.0
+    | _ -> v
+
+[<Test>]
+let ``VS/TS shared helper`` () =
+    Setup.Run()
+    
+    let vs(v : Vertex) = 
+        vertex {
+            let pp = helper v.pos
+            return { v with pos = pp }
+        }
+
+    let ts (t : Patch<3 N, Vertex>) =
+
+        tessellation {
+        
+            let! coord = tessellateTriangle 2.0 (2.0, 2.0, 2.0)
+
+            let v = t.[0].pos * coord.X + t.[1].pos * coord.Y + t.[2].pos * coord.Z
+
+            let pp = helper v
+
+            return { t.[0] with pos = pp }
+        }
+
+    let frag (v : Vertex) =
+        fragment {
+            return V4d(1, 1, 1, 1)
+        }
+
+    GLSL.shouldCompile [ Effect.ofFunction vs; Effect.ofFunction ts; Effect.ofFunction frag ]
                
 
-[<EntryPoint>]
-let main args =
-    ``New Intrinsics``()
+//[<EntryPoint>]
+//let main args =
+//    ``New Intrinsics``()
     //``GS Composition with Layer2``()
     //``GS Composition with Layer``()
     //``GS PrimitiveId``()
@@ -975,4 +1069,3 @@ let main args =
     //``Helper with duplicate names``()
     //``Unroll Match``()
     //``Array Samplers``()
-    0

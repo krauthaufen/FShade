@@ -126,8 +126,11 @@ type Setup() =
     static member Run() =
         lock initialized (fun () ->
             if not !initialized then
-                Environment.CurrentDirectory <- Path.GetDirectoryName(typeof<Setup>.Assembly.Location)
                 Aardvark.Init()
+                let glslang = typeof<GLSLang.Optimization>.Assembly
+                let ptr = Aardvark.LoadLibrary(glslang, "GLSLangNative")
+                if ptr = 0n then failwith "could not load glslangnative"
+                //Environment.CurrentDirectory <- Path.GetDirectoryName(typeof<Setup>.Assembly.Location)
                 initialized := true
             Effect.clearCaches()
         )

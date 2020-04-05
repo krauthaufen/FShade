@@ -178,7 +178,7 @@ let computerXXX (color : V4d, comp : Computation, mb : bool) =
 
         let tmColor = 
             if mb then
-                let lum = V3d.Dot(exposedColor, Foo) 
+                let lum = Vec.Dot(exposedColor, Foo) 
                     
                 if lum > 1e-7 then
                     let lumTm = match comp with
@@ -270,9 +270,11 @@ let util (a : float) (b : float) (c : float) =
 
 [<Test>]
 let ``Broken``() =
+    Setup.Run()
     let frag2 (v : Vertex) =
         fragment {
-            return V4d(V3d.III, util (sin v.pos.X) (cos v.pos.Y) (tan v.pos.Z))
+            let z : V3d = Fun.Sqrt (V3i v.c.XYZ)
+            return V4d(z, util (sin v.pos.X) (cos v.pos.Y) (tan v.pos.Z))
         }
 
     GLSL.shouldCompile [Effect.ofFunction frag2]

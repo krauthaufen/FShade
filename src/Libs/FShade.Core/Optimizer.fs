@@ -11,6 +11,7 @@ open Microsoft.FSharp.Reflection
 
 open Aardvark.Base
 open FShade.Imperative
+open FSharp.Data.Adaptive
 
 module PrettyPrinter =
     open Aardvark.Base.Monads.State
@@ -3050,7 +3051,7 @@ module Optimizer =
 
 
             let mutable before = Map.empty
-            let mutable replacements = HMap.empty
+            let mutable replacements = HashMap.empty
 
             for (v, ptrs) in MapExt.toSeq pointers do
                 let mutable last = None
@@ -3087,9 +3088,9 @@ module Optimizer =
 
                                 let inputName = names |> String.concat ""
                                 e, Expr.ReadInput(ParameterKind.Input, e.Type, inputName, index)
-                            ) |> HMap.ofList
+                            ) |> HashMap.ofList
 
-                        replacements <- HMap.union replacements repl
+                        replacements <- HashMap.union replacements repl
                         let inputName = names |> String.concat ""
                         before <- Map.add inputName h before    
                         
@@ -3102,7 +3103,7 @@ module Optimizer =
                 ()
 
             let rec apply (e : Expr) =
-                match HMap.tryFind e replacements with
+                match HashMap.tryFind e replacements with
                     | Some r -> 
                         r
                     | None ->

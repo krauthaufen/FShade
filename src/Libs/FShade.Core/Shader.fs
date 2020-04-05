@@ -1166,7 +1166,8 @@ module private GeometryInfo =
             | Int32 v -> 
                 Some v
 
-            | SpecificCall <@ min @> (_,_,[l;r]) ->
+            | SpecificCall <@ min : int -> int -> int @> (_,_,[l;r]) 
+            | SpecificCall <@ Operators.min : int -> int -> int @> (_,_,[l;r]) ->
                 match tryGetUpperBound l, tryGetUpperBound r with
                     | Some l, Some r -> Some (min l r)
                     | l, None -> l
@@ -1210,7 +1211,8 @@ module private GeometryInfo =
             | Int32 v -> 
                 Some v
 
-            | SpecificCall <@ max @> (_,_,[l;r]) ->
+            | SpecificCall <@ max : int -> int -> int @> (_,_,[l;r])
+            | SpecificCall <@ Operators.max : int -> int -> int @> (_,_,[l;r]) ->
                 match tryGetUpperBound l, tryGetUpperBound r with
                     | Some l, Some r -> Some (max l r)
                     | l, None -> l

@@ -7,6 +7,7 @@ open Aardvark.Base
 open Aardvark.Base.Monads.State
 open FShade
 open FShade.Imperative
+open FSharp.Data.Adaptive
 
 
 type SpirVIntrinsicType = { compileType : SpirV<uint32> }
@@ -201,7 +202,7 @@ module private IntrinsicFunctions =
                 exactly <@ Math.Pow @>
                 generic <@ ( ** ) : float -> float -> float @>
                 generic <@ pow : float -> float -> float @>
-                generic <@ pown @>
+                generic <@ pown : float -> int -> float @>
             ]
 
             // exp
@@ -215,14 +216,14 @@ module private IntrinsicFunctions =
             // log
             CIntrinsic.simple GLSLExtInstruction.Log, [
                 exactly <@ Math.Log @> 
-                exactly <@ Fun.Log : float32 -> float @>
+                exactly <@ Fun.Log : float32 -> float32 @>
                 exactly <@ Fun.Log : float -> float @>
                 generic <@ log @>
             ]
 
             // log2
             CIntrinsic.simple GLSLExtInstruction.Log2, [
-                exactly <@ Fun.Log2 : float32 -> float @>
+                exactly <@ Fun.Log2 : float32 -> float32 @>
                 exactly <@ Fun.Log2 : float -> float @>
             ]
 
@@ -256,12 +257,12 @@ module private IntrinsicFunctions =
                 exactly <@ fun (v : int32) -> v.Abs() @>
                 exactly <@ fun (v : int64) -> v.Abs() @>
 
-                exactly <@ fun (v : V2i) -> v.Abs @>
-                exactly <@ fun (v : V3i) -> v.Abs @>
-                exactly <@ fun (v : V4i) -> v.Abs @>
-                exactly <@ fun (v : V2l) -> v.Abs @>
-                exactly <@ fun (v : V3l) -> v.Abs @>
-                exactly <@ fun (v : V4l) -> v.Abs @>
+                exactly <@ fun (v : V2i) -> v.Abs() @>
+                exactly <@ fun (v : V3i) -> v.Abs() @>
+                exactly <@ fun (v : V4i) -> v.Abs() @>
+                exactly <@ fun (v : V2l) -> v.Abs() @>
+                exactly <@ fun (v : V3l) -> v.Abs() @>
+                exactly <@ fun (v : V4l) -> v.Abs() @>
                 
                 exactly <@ abs : int8 -> int8 @>
                 exactly <@ abs : int16 -> int16 @>
@@ -284,12 +285,12 @@ module private IntrinsicFunctions =
                 exactly <@ fun (v : float) -> v.Abs() @>
                 exactly <@ fun (v : decimal) -> v.Abs() @>
 
-                exactly <@ fun (v : V2f) -> v.Abs @>
-                exactly <@ fun (v : V3f) -> v.Abs @>
-                exactly <@ fun (v : V4f) -> v.Abs @>
-                exactly <@ fun (v : V2d) -> v.Abs @>
-                exactly <@ fun (v : V3d) -> v.Abs @>
-                exactly <@ fun (v : V4d) -> v.Abs @>
+                exactly <@ fun (v : V2f) -> v.Abs() @>
+                exactly <@ fun (v : V3f) -> v.Abs() @>
+                exactly <@ fun (v : V4f) -> v.Abs() @>
+                exactly <@ fun (v : V2d) -> v.Abs() @>
+                exactly <@ fun (v : V3d) -> v.Abs() @>
+                exactly <@ fun (v : V4d) -> v.Abs() @>
 
                 exactly <@ abs : float32 -> float32 @>
                 exactly <@ abs : float -> float @>
@@ -374,7 +375,6 @@ module private IntrinsicFunctions =
             CIntrinsic.simple GLSLExtInstruction.Fract, [
                 exactly <@ Fun.Frac : float -> _ @>
                 exactly <@ Fun.Frac : float32 -> _ @>
-                exactly <@ Fun.Frac : decimal -> _ @>
             ]
 
             // min(int)
@@ -389,12 +389,12 @@ module private IntrinsicFunctions =
                 exactly <@ Fun.Min : int32 * int32 -> _ @>
                 exactly <@ Fun.Min : int64 * int64 -> _ @>
                 
-                exactly <@ V2i.Min @>
-                exactly <@ V3i.Min @>
-                exactly <@ V4i.Min @>
-                exactly <@ V2l.Min @>
-                exactly <@ V3l.Min @>
-                exactly <@ V4l.Min @>
+                exactly <@ V2i.Min : V2i * V2i -> V2i @>
+                exactly <@ V3i.Min : V3i * V3i -> V3i @>
+                exactly <@ V4i.Min : V4i * V4i -> V4i @>
+                exactly <@ V2l.Min : V2l * V2l -> V2l @>
+                exactly <@ V3l.Min : V3l * V3l -> V3l @>
+                exactly <@ V4l.Min : V4l * V4l -> V4l @>
 
                 
                 exactly <@ min : int8 -> int8 -> int8 @>
@@ -429,12 +429,12 @@ module private IntrinsicFunctions =
                 exactly <@ Fun.Min : float32 * float32 -> _ @>
                 exactly <@ Fun.Min : float * float -> _ @>
 
-                exactly <@ V2f.Min @>
-                exactly <@ V3f.Min @>
-                exactly <@ V4f.Min @>
-                exactly <@ V2d.Min @>
-                exactly <@ V3d.Min @>
-                exactly <@ V4d.Min @>
+                exactly <@ V2f.Min : V2f * V2f -> V2f @>
+                exactly <@ V3f.Min : V3f * V3f -> V3f @>
+                exactly <@ V4f.Min : V4f * V4f -> V4f @>
+                exactly <@ V2d.Min : V2d * V2d -> V2d @>
+                exactly <@ V3d.Min : V3d * V3d -> V3d @>
+                exactly <@ V4d.Min : V4d * V4d -> V4d @>
 
                 exactly <@ min : float32 -> float32 -> float32 @> 
                 exactly <@ min : float -> float -> float @> 
@@ -455,12 +455,12 @@ module private IntrinsicFunctions =
                 exactly <@ Fun.Max : int32 * int32 -> _ @>
                 exactly <@ Fun.Max : int64 * int64 -> _ @>
                 
-                exactly <@ V2i.Max @>
-                exactly <@ V3i.Max @>
-                exactly <@ V4i.Max @>
-                exactly <@ V2l.Max @>
-                exactly <@ V3l.Max @>
-                exactly <@ V4l.Max @>
+                exactly <@ V2i.Max : V2i * V2i -> V2i @>
+                exactly <@ V3i.Max : V3i * V3i -> V3i @>
+                exactly <@ V4i.Max : V4i * V4i -> V4i @>
+                exactly <@ V2l.Max : V2l * V2l -> V2l @>
+                exactly <@ V3l.Max : V3l * V3l -> V3l @>
+                exactly <@ V4l.Max : V4l * V4l -> V4l @>
 
                 
                 exactly <@ max : int8 -> int8 -> int8 @>
@@ -495,12 +495,12 @@ module private IntrinsicFunctions =
                 exactly <@ Fun.Max : float32 * float32 -> _ @>
                 exactly <@ Fun.Max : float * float -> _ @>
 
-                exactly <@ V2f.Max @>
-                exactly <@ V3f.Max @>
-                exactly <@ V4f.Max @>
-                exactly <@ V2d.Max @>
-                exactly <@ V3d.Max @>
-                exactly <@ V4d.Max @>
+                exactly <@ V2f.Max : V2f * V2f -> V2f @>
+                exactly <@ V3f.Max : V3f * V3f -> V3f @>
+                exactly <@ V4f.Max : V4f * V4f -> V4f @>
+                exactly <@ V2d.Max : V2d * V2d -> V2d @>
+                exactly <@ V3d.Max : V3d * V3d -> V3d @>
+                exactly <@ V4d.Max : V4d * V4d -> V4d @>
 
                 exactly <@ max : float32 -> float32 -> float32 @> 
                 exactly <@ max : float -> float -> float @> 
@@ -508,24 +508,24 @@ module private IntrinsicFunctions =
             
             // clamp(int)
             CIntrinsic.custom GLSLExtInstruction.SClamp [2; 0; 1], [
-                exactly <@ clamp : int8 -> _ -> _ @>
-                exactly <@ clamp : int16 -> _ -> _ @>
-                exactly <@ clamp : int32 -> _ -> _ @>
-                exactly <@ clamp : int64 -> _ -> _ @>
+                exactly <@ clamp : int8 -> int8 -> int8 -> _ @>
+                exactly <@ clamp : int16 -> int16 -> int16 -> _ @>
+                exactly <@ clamp : int32 -> int32 -> int32 -> _ @>
+                exactly <@ clamp : int64 -> int64 -> int64 -> _  @>
             ]
 
             // clamp(uint)
             CIntrinsic.custom GLSLExtInstruction.UClamp [2; 0; 1], [
-                exactly <@ clamp : uint8 -> _ -> _ @>
-                exactly <@ clamp : uint16 -> _ -> _ @>
-                exactly <@ clamp : uint32 -> _ -> _ @>
-                exactly <@ clamp : uint64 -> _ -> _ @>
+                exactly <@ clamp : uint8 -> uint8 -> uint8 -> _ @>
+                exactly <@ clamp : uint16 -> uint16 -> uint16 -> _ @>
+                exactly <@ clamp : uint32 -> uint32 -> uint32 -> _ @>
+                exactly <@ clamp : uint64 -> uint64 -> uint64 -> _ @>
             ]
 
             // clamp(float)
             CIntrinsic.custom GLSLExtInstruction.FClamp [2; 0; 1], [
-                exactly <@ clamp : float32 -> _ -> _ @>
-                exactly <@ clamp : float -> _ -> _ @>
+                exactly <@ clamp : float32 -> float32 -> float32 -> _ @>
+                exactly <@ clamp : float -> float -> float -> _ @>
             ]
 
             // mix
@@ -541,18 +541,18 @@ module private IntrinsicFunctions =
             
             // distance
             CIntrinsic.simple GLSLExtInstruction.Distance, [
-                exactly <@ V2i.Distance : _ * _ -> _ @>
-                exactly <@ V3i.Distance : _ * _ -> _ @>
-                exactly <@ V4i.Distance : _ * _ -> _ @>
-                exactly <@ V2l.Distance : _ * _ -> _ @>
-                exactly <@ V3l.Distance : _ * _ -> _ @>
-                exactly <@ V4l.Distance : _ * _ -> _ @>
-                exactly <@ V2f.Distance : _ * _ -> _ @>
-                exactly <@ V3f.Distance : _ * _ -> _ @>
-                exactly <@ V4f.Distance : _ * _ -> _ @>
-                exactly <@ V2d.Distance : _ * _ -> _ @>
-                exactly <@ V3d.Distance : _ * _ -> _ @>
-                exactly <@ V4d.Distance : _ * _ -> _ @>
+                exactly <@ Vec.Distance : V2i * V2i -> _ @>
+                exactly <@ Vec.Distance : V3i * V3i -> _ @>
+                exactly <@ Vec.Distance : V4i * V4i -> _ @>
+                exactly <@ Vec.Distance : V2l * V2l -> _ @>
+                exactly <@ Vec.Distance : V3l * V3l -> _ @>
+                exactly <@ Vec.Distance : V4l * V4l -> _ @>
+                exactly <@ Vec.Distance : V2f * V2f -> _ @>
+                exactly <@ Vec.Distance : V3f * V3f -> _ @>
+                exactly <@ Vec.Distance : V4f * V4f -> _ @>
+                exactly <@ Vec.Distance : V2d * V2d -> _ @>
+                exactly <@ Vec.Distance : V3d * V3d -> _ @>
+                exactly <@ Vec.Distance : V4d * V4d -> _ @>
             ]
 
             // normalize
@@ -573,7 +573,7 @@ module private IntrinsicFunctions =
 
             // refract
             CIntrinsic.simple GLSLExtInstruction.Refract, [
-                exactly <@ Vec.refract : V3d -> V3d -> float -> V3d @> 
+                exactly <@ Vec.refract : float -> V3d -> V3d -> V3d @> 
             ]
             
             // ==========================================================================
@@ -599,7 +599,7 @@ module private IntrinsicFunctions =
                 exactly <@ fun (v : M22d) -> v.Determinant @>
                 exactly <@ fun (v : M33d) -> v.Determinant @>
                 exactly <@ fun (v : M44d) -> v.Determinant @>
-                generic <@ Mat.det : M22d -> float @>
+                //generic <@ Mat.det : M22d -> float @>
             ]
 
             // inverse
@@ -1631,9 +1631,9 @@ module Assembler =
         let mutable state = 
             {
                 currentId           = 0u
-                valueIds            = HMap.empty
+                valueIds            = HashMap.empty
                 uniformIds          = Map.empty
-                fieldIds            = HMap.empty
+                fieldIds            = HashMap.empty
                 reversedInstuctions = []
                 currentBinding      = 0u
                 currentSet          = 0u

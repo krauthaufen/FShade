@@ -9,6 +9,7 @@ open Microsoft.FSharp.Quotations.ExprShape
 open Microsoft.FSharp.Reflection
 open Aardvark.Base
 open FShade.Imperative
+open FSharp.Data.Adaptive
 
 #nowarn "8989"
 
@@ -323,7 +324,7 @@ module ExprHashExtensions =
 
 
             if recurse decl real then
-                Some (assignment |> Dictionary.toSeq |> HMap.ofSeq)
+                Some (assignment |> Dictionary.toSeq |> HashMap.ofSeq)
             else
                 None
 

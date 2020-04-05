@@ -9,6 +9,7 @@ open Aardvark.Base.Monads.State
 open FShade
 open FShade.Imperative
 open FShade.GLSL.Utilities
+open FSharp.Data.Adaptive
 
 type BindingMode =
     | None = 0
@@ -168,7 +169,7 @@ type AssemblerState =
         ifaceNew                : GLSLProgramInterface
         
         currentFunction         : Option<CFunctionSignature>
-        functionInfo            : hmap<CFunctionSignature, GLSLShaderInterface>
+        functionInfo            : HashMap<CFunctionSignature, GLSLShaderInterface>
 
         uniformBuffers          : MapExt<string, GLSLUniformBuffer>
         samplers                : MapExt<string, GLSLSampler>
@@ -201,7 +202,7 @@ module AssemblerState =
                 }
                 
             currentFunction = None
-            functionInfo = HMap.empty
+            functionInfo = HashMap.empty
 
             uniformBuffers = MapExt.empty
             samplers       = MapExt.empty
@@ -322,11 +323,11 @@ module Interface =
 
             shaderInputs            = []
             shaderOutputs           = []
-            shaderSamplers          = HSet.empty
-            shaderImages            = HSet.empty
-            shaderStorageBuffers    = HSet.empty
-            shaderUniformBuffers    = HSet.empty
-            shaderBuiltInFunctions  = HSet.empty
+            shaderSamplers          = HashSet.empty
+            shaderImages            = HashSet.empty
+            shaderStorageBuffers    = HashSet.empty
+            shaderUniformBuffers    = HashSet.empty
+            shaderBuiltInFunctions  = HashSet.empty
             shaderDecorations       = []
             shaderBuiltIns          = MapExt.empty
         }
@@ -336,11 +337,11 @@ module Interface =
             match s.currentFunction with
                 | Some f ->
                     let info =
-                        match HMap.tryFind f s.functionInfo with
+                        match HashMap.tryFind f s.functionInfo with
                             | Some i -> i
                             | None -> emptyShader
                     let newInfo  = action s info
-                    { s with functionInfo = HMap.add f newInfo s.functionInfo }
+                    { s with functionInfo = HashMap.add f newInfo s.functionInfo }
                 | None ->
                     { s with
                         ifaceNew =
@@ -489,7 +490,7 @@ module Interface =
                         s.ifaceNew.shaders 
                         |> MapExt.alter s.stages.self (
                             function 
-                            | Some s -> Some { s with shaderStorageBuffers = HSet.add ssb.ssbName s.shaderStorageBuffers } 
+                            | Some s -> Some { s with shaderStorageBuffers = HashSet.add ssb.ssbName s.shaderStorageBuffers } 
                             | None -> None
                         )
                 }
@@ -506,7 +507,7 @@ module Interface =
                         s.ifaceNew.shaders 
                         |> MapExt.alter s.stages.self (
                             function 
-                            | Some s -> Some { s with shaderUniformBuffers = HSet.add ub.ubName s.shaderUniformBuffers } 
+                            | Some s -> Some { s with shaderUniformBuffers = HashSet.add ub.ubName s.shaderUniformBuffers } 
                             | None -> None
                         )
                 }
@@ -525,7 +526,7 @@ module Interface =
                         s.ifaceNew.shaders 
                         |> MapExt.alter s.stages.self (
                             function 
-                            | Some s -> Some { s with shaderSamplers = HSet.add sampler.samplerName s.shaderSamplers } 
+                            | Some s -> Some { s with shaderSamplers = HashSet.add sampler.samplerName s.shaderSamplers } 
                             | None -> None
                         )
                 }
@@ -542,7 +543,7 @@ module Interface =
                         s.ifaceNew.shaders 
                         |> MapExt.alter s.stages.self (
                             function 
-                            | Some s -> Some { s with shaderImages = HSet.add image.imageName s.shaderImages } 
+                            | Some s -> Some { s with shaderImages = HashSet.add image.imageName s.shaderImages } 
                             | None -> None
                         )
                 }
@@ -564,19 +565,19 @@ module Interface =
                     args = args |> Array.map (GLSLType.ofCType s.config.reverseMatrixLogic)
                     ret = ret |> GLSLType.ofCType s.config.reverseMatrixLogic
                 }
-            { iface with shaderBuiltInFunctions = HSet.add f iface.shaderBuiltInFunctions}
+            { iface with shaderBuiltInFunctions = HashSet.add f iface.shaderBuiltInFunctions}
         )
 
     let callFunction (f : CFunctionSignature) =
         updateShaderInterface (fun s iface ->
-            match HMap.tryFind f s.functionInfo with
+            match HashMap.tryFind f s.functionInfo with
                 | Some info ->
                     { iface with
-                        shaderUniformBuffers = HSet.union iface.shaderUniformBuffers info.shaderUniformBuffers
-                        shaderStorageBuffers = HSet.union iface.shaderStorageBuffers info.shaderStorageBuffers
-                        shaderSamplers = HSet.union iface.shaderSamplers info.shaderSamplers
-                        shaderImages = HSet.union iface.shaderImages info.shaderImages
-                        shaderBuiltInFunctions = HSet.union iface.shaderBuiltInFunctions info.shaderBuiltInFunctions
+                        shaderUniformBuffers = HashSet.union iface.shaderUniformBuffers info.shaderUniformBuffers
+                        shaderStorageBuffers = HashSet.union iface.shaderStorageBuffers info.shaderStorageBuffers
+                        shaderSamplers = HashSet.union iface.shaderSamplers info.shaderSamplers
+                        shaderImages = HashSet.union iface.shaderImages info.shaderImages
+                        shaderBuiltInFunctions = HashSet.union iface.shaderBuiltInFunctions info.shaderBuiltInFunctions
                     }
                 | None ->
                     iface
@@ -587,19 +588,19 @@ module Interface =
         updateShaderInterface (fun s shader ->
             let uniform = 
                 MapExt.tryFind name s.uniformBuffers 
-                |> Option.map (fun v s -> { s with shaderUniformBuffers = HSet.add v.ubName s.shaderUniformBuffers })
+                |> Option.map (fun v s -> { s with shaderUniformBuffers = HashSet.add v.ubName s.shaderUniformBuffers })
 
             let storage =
                 MapExt.tryFind name s.storageBuffers 
-                |> Option.map (fun v s -> { s with shaderStorageBuffers = HSet.add v.ssbName s.shaderStorageBuffers })
+                |> Option.map (fun v s -> { s with shaderStorageBuffers = HashSet.add v.ssbName s.shaderStorageBuffers })
 
             let sampler = 
                 MapExt.tryFind name s.samplers 
-                |> Option.map (fun v s -> { s with shaderSamplers = HSet.add v.samplerName s.shaderSamplers })
+                |> Option.map (fun v s -> { s with shaderSamplers = HashSet.add v.samplerName s.shaderSamplers })
 
             let image =
                 MapExt.tryFind name s.images 
-                |> Option.map (fun v s -> { s with shaderImages = HSet.add v.imageName s.shaderImages })
+                |> Option.map (fun v s -> { s with shaderImages = HashSet.add v.imageName s.shaderImages })
                 
             let all =
                 [
@@ -1460,8 +1461,11 @@ module Assembler =
                             None
 
                     if name = "gl_FragDepth" && depthWrite <> DepthWriteMode.None then
-                        let mode = assembleDepthWriteMode depthWrite
-                        return Some (sprintf "layout(%s) out float gl_FragDepth;" mode)
+                        if config.version >= Version(4,3) then
+                            let mode = assembleDepthWriteMode depthWrite
+                            return Some (sprintf "layout(%s) out float gl_FragDepth;" mode)
+                        else 
+                            return None
                     else
                         match interpolation with
                         | Some i ->

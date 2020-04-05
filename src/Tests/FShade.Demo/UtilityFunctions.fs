@@ -200,7 +200,6 @@ module UtiliyFunctions =
             | None ->
                 ()
 
-    open Aardvark.Base.Incremental
 
     let logLines (code : string) =
         let lineCount = String.lineCount code

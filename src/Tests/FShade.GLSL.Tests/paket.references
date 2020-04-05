@@ -7,4 +7,3 @@ FsCheck.NUnit
 FSharp.Core
 GLSLangSharp
 Microsoft.NET.Test.Sdk
-SourceLink.Create.CommandLine

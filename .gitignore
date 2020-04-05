@@ -195,3 +195,4 @@ UpgradeLog*.htm
 
 # VS Code
 /src/.vs
+**/.ionide

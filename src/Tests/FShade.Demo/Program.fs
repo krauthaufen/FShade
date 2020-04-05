@@ -13,6 +13,7 @@ open Microsoft.FSharp.Quotations.DerivedPatterns
 open Microsoft.FSharp.Quotations.ExprShape
 open System
 open System.Runtime.InteropServices
+open FSharp.Data.Adaptive
 
 #nowarn "9"
 
@@ -408,7 +409,7 @@ let main args =
                 info.neededPayloads |> Seq.mapi (fun i k ->
                     k, 5 + i
                 )
-                |> HMap.ofSeq
+                |> HashMap.ofSeq
 
             scenes =
                 info.neededScenes 

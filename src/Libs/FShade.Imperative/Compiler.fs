@@ -14,6 +14,7 @@ open Microsoft.FSharp.Quotations.DerivedPatterns
 open Aardvark.Base
 open Aardvark.Base.TypeInfo
 open Aardvark.Base.TypeInfo.Patterns
+open FSharp.Data.Adaptive
 
 open FShade
 open FShade.Imperative
@@ -103,7 +104,7 @@ module Compiler =
     module Constructors =
         
         let cache = System.Collections.Concurrent.ConcurrentDictionary<IBackend * Type, FunctionDefinition>()
-        let unionCache = System.Collections.Concurrent.ConcurrentDictionary<IBackend * Type, hmap<UnionCaseInfo, FunctionDefinition>>()
+        let unionCache = System.Collections.Concurrent.ConcurrentDictionary<IBackend * Type, HashMap<UnionCaseInfo, FunctionDefinition>>()
         let ctorCache = System.Collections.Concurrent.ConcurrentDictionary<IBackend * ConstructorInfo, FunctionDefinition>()
 
         let tuple (b : IBackend) (t : Type) =
@@ -230,7 +231,7 @@ module Compiler =
                         let cDefinition = CompiledFunction(cSignature, cBody)
                         (ci, cDefinition)
                     )
-                    |> HMap.ofSeq
+                    |> HashMap.ofSeq
             )
 
         let custom (b : IBackend) (ctor : ConstructorInfo) =
@@ -673,10 +674,10 @@ module Compiler =
             globalNameIndices   : Map<string, int>
             backend             : Backend
             constantIndex       : int
-            usedTypes           : hmap<obj, CType>
+            usedTypes           : HashMap<obj, CType>
 
-            globalFunctions     : hmap<obj, FunctionDefinition>
-            globalConstants     : hmap<obj, ConstantDefinition>
+            globalFunctions     : HashMap<obj, FunctionDefinition>
+            globalConstants     : HashMap<obj, ConstantDefinition>
 
             globalParameters    : Set<string>
             tryGetOverrideCode  : MethodBase -> Option<Expr>
@@ -688,10 +689,10 @@ module Compiler =
             variables           : Map<Var, CVar>
             reservedNames       : Set<string>
 
-            usedFunctions       : hmap<obj, FunctionDefinition>
-            usedGlobalFunctions : hset<FunctionDefinition>
-            usedConstants       : hset<ConstantDefinition>
-            usedGlobals         : hset<string>
+            usedFunctions       : HashMap<obj, FunctionDefinition>
+            usedGlobalFunctions : HashSet<FunctionDefinition>
+            usedConstants       : HashSet<ConstantDefinition>
+            usedGlobals         : HashSet<string>
             moduleState         : ModuleState
         }
 
@@ -760,24 +761,24 @@ module Compiler =
         let useLocalFunction (key : obj) (f : FunctionDefinition) =
             State.custom (fun s ->
                 let sign = f.Signature s.moduleState.backend
-                let s = { s with moduleState = { s.moduleState with usedTypes = HMap.add (sign.returnType :> obj) sign.returnType s.moduleState.usedTypes }}
-                { s with usedFunctions = HMap.add key f s.usedFunctions }, sign
+                let s = { s with moduleState = { s.moduleState with usedTypes = HashMap.add (sign.returnType :> obj) sign.returnType s.moduleState.usedTypes }}
+                { s with usedFunctions = HashMap.add key f s.usedFunctions }, sign
             )
 
         let useGlobalFunction (key : obj) (f : FunctionDefinition) =
             State.custom (fun s ->
-                match HMap.tryFind key s.moduleState.globalFunctions with
+                match HashMap.tryFind key s.moduleState.globalFunctions with
                     | Some signature ->
                         let sign = signature.Signature s.moduleState.backend
                         // use the return type
-                        let s = { s with moduleState = { s.moduleState with usedTypes = HMap.add (sign.returnType :> obj) sign.returnType s.moduleState.usedTypes }}
-                        { s with usedGlobalFunctions = HSet.add signature s.usedGlobalFunctions }, sign
+                        let s = { s with moduleState = { s.moduleState with usedTypes = HashMap.add (sign.returnType :> obj) sign.returnType s.moduleState.usedTypes }}
+                        { s with usedGlobalFunctions = HashSet.add signature s.usedGlobalFunctions }, sign
                     | _ -> 
                         let signature = f.Signature s.moduleState.backend
-                        let s = { s with moduleState = { s.moduleState with usedTypes = HMap.add (signature.returnType :> obj) signature.returnType s.moduleState.usedTypes }}
+                        let s = { s with moduleState = { s.moduleState with usedTypes = HashMap.add (signature.returnType :> obj) signature.returnType s.moduleState.usedTypes }}
                         { s with 
-                            usedGlobalFunctions = HSet.add f s.usedGlobalFunctions
-                            moduleState = { s.moduleState with globalFunctions = HMap.add key f s.moduleState.globalFunctions } 
+                            usedGlobalFunctions = HashSet.add f s.usedGlobalFunctions
+                            moduleState = { s.moduleState with globalFunctions = HashMap.add key f s.moduleState.globalFunctions } 
                         }, signature 
             )
 
@@ -788,19 +789,19 @@ module Compiler =
             state {
                 let! s = State.get
                 let ct = CType.ofType s.moduleState.backend e.Type
-                match HMap.tryFind key s.moduleState.globalConstants with
+                match HashMap.tryFind key s.moduleState.globalConstants with
                     | None -> 
                         let name = sprintf "_constant%d" s.moduleState.constantIndex
                         let c = { cName = name; cType = e.Type; cValue = e }
                         do! State.put { 
                                 s with 
-                                    moduleState = { s.moduleState with globalConstants = HMap.add key c s.moduleState.globalConstants; constantIndex = s.moduleState.constantIndex + 1 } 
-                                    usedConstants = HSet.add c s.usedConstants
+                                    moduleState = { s.moduleState with globalConstants = HashMap.add key c s.moduleState.globalConstants; constantIndex = s.moduleState.constantIndex + 1 } 
+                                    usedConstants = HashSet.add c s.usedConstants
                             }
                     
                         return CVar { name = name; ctype = ct }
                     | Some c ->
-                        do! State.put { s with usedConstants = HSet.add c s.usedConstants }
+                        do! State.put { s with usedConstants = HashSet.add c s.usedConstants }
                         return CVar { name = c.cName; ctype = ct }
 
             }
@@ -815,46 +816,46 @@ module Compiler =
             | Variable of Var
             | Global of kind : ParameterKind * name : string * _type : Type * index : Option<Expr>
 
-        let rec free (e : Expr) : hset<Free> =
+        let rec free (e : Expr) : HashSet<Free> =
             match e with
                 | Let(v,e,b) ->
                     let fe = free e
                     let fb = free b
-                    HSet.union fe (HSet.remove (Variable v) fb)
+                    HashSet.union fe (HashSet.remove (Variable v) fb)
 
                 | ReadInput(kind,name,idx) ->
                     match idx with
-                        | Some idx -> free idx |> HSet.add (Global(kind, name, e.Type, Some idx))
-                        | None -> HSet.ofList [ Global(kind, name, e.Type, None) ]
+                        | Some idx -> free idx |> HashSet.add (Global(kind, name, e.Type, Some idx))
+                        | None -> HashSet.ofList [ Global(kind, name, e.Type, None) ]
 
                 | WriteOutputs values ->
-                    let mutable res = HSet.empty
+                    let mutable res = HashSet.empty
                     for (name, (index, value)) in Map.toSeq values do
                         match index with
-                            | Some index -> res <- HSet.union res (free index)
+                            | Some index -> res <- HashSet.union res (free index)
                             | _ -> ()
-                        res <- res |> HSet.union (free value) |> HSet.add (Global(ParameterKind.Output, name, value.Type, index))
+                        res <- res |> HashSet.union (free value) |> HashSet.add (Global(ParameterKind.Output, name, value.Type, index))
 
                     res
 
                 | ExprShape.ShapeCombination(o, args) ->
-                    args |> List.fold (fun m e -> HSet.union m (free e)) HSet.empty
+                    args |> List.fold (fun m e -> HashSet.union m (free e)) HashSet.empty
 
                 | ExprShape.ShapeLambda(v, b) ->
-                    free b |> HSet.remove (Variable v)
+                    free b |> HashSet.remove (Variable v)
 
                 | ExprShape.ShapeVar v ->
-                    HSet.ofList [ Variable v ]
+                    HashSet.ofList [ Variable v ]
 
     let emptyState (m : ModuleState) =
         {
             nameIndices         = Map.empty
             variables           = Map.empty
             reservedNames       = Set.empty
-            usedFunctions       = HMap.empty
-            usedGlobalFunctions = HSet.empty
-            usedConstants       = HSet.empty
-            usedGlobals         = HSet.empty
+            usedFunctions       = HashMap.empty
+            usedGlobalFunctions = HashSet.empty
+            usedConstants       = HashSet.empty
+            usedGlobals         = HashSet.empty
             moduleState         = m
         }
 
@@ -870,7 +871,7 @@ module Compiler =
                         visit i
 
                     | CStruct(_, fields, _) ->
-                        usedTypes <- HMap.add (t :> obj) cType usedTypes
+                        usedTypes <- HashMap.add (t :> obj) cType usedTypes
                         for (f,_) in fields do
                             visit f
 
@@ -963,15 +964,15 @@ module Compiler =
 
     let rec asExternalS (e : Expr) =
         state {
-            let mutable variables = HMap.empty
-            let mutable inputValues = HMap.empty
+            let mutable variables = HashMap.empty
+            let mutable inputValues = HashMap.empty
             let! globals = State.get |> State.map (fun s -> s.moduleState.globalParameters)
 
 
 
             let getVar (kind : ParameterKind) (name : string) (typ : Type) (idx : Option<Expr>) =
                 let key = (kind, name, typ, idx)
-                match HMap.tryFind key variables with
+                match HashMap.tryFind key variables with
                     | Some v -> v
                     | None ->
                         let suffix =
@@ -979,8 +980,8 @@ module Compiler =
                                 | Some idx -> Expr.ComputeHash idx
                                 | None -> ""
                         let v = Var(name + suffix, typ)
-                        variables <- HMap.add key v variables
-                        inputValues <- HMap.add v key inputValues
+                        variables <- HashMap.add key v variables
+                        inputValues <- HashMap.add v key inputValues
                         v
 
             let mutable usesUniform = false
@@ -994,17 +995,17 @@ module Compiler =
                         Some (Expr.Var v)
                 )
 
-            let free = e.GetFreeVars() |> HSet.ofSeq
-            if not usesUniform && HSet.isEmpty free then
+            let free = e.GetFreeVars() |> HashSet.ofSeq
+            if not usesUniform && HashSet.isEmpty free then
                 let hash = Expr.ComputeHash e
                 return! CompilerState.useConstant hash e
             else
                 let! globals = State.get |> State.map (fun s -> s.moduleState.globalParameters)
                 let free = 
                     free
-                        |> HSet.toArray
+                        |> HashSet.toArray
                         |> Array.sortBy (fun v -> 
-                            match HMap.tryFind v inputValues with
+                            match HashMap.tryFind v inputValues with
                                 | Some (_,n,_,_) -> 0, n
                                 | None -> 1, v.Name
                             )
@@ -1026,10 +1027,10 @@ module Compiler =
                             nameIndices         = Map.empty
                             variables           = Map.empty
                             reservedNames       = oldState.reservedNames
-                            usedGlobalFunctions = HSet.empty
-                            usedFunctions       = HMap.empty
-                            usedConstants       = HSet.empty
-                            usedGlobals         = HSet.empty
+                            usedGlobalFunctions = HashSet.empty
+                            usedFunctions       = HashMap.empty
+                            usedConstants       = HashSet.empty
+                            usedGlobals         = HashSet.empty
                             moduleState         = oldState.moduleState
                         }
                     parameters.Run(&oldState), oldState.moduleState 
@@ -1039,7 +1040,7 @@ module Compiler =
                 let! args = 
                     free |> Array.mapS (fun f ->
                         state {
-                            match HMap.tryFind f inputValues with
+                            match HashMap.tryFind f inputValues with
                                 | Some (kind, n, t, idx) ->
                                     match kind with
                                         | ParameterKind.Input | ParameterKind.Uniform ->
@@ -1075,7 +1076,7 @@ module Compiler =
                 let definition = ManagedFunctionWithSignature(signature, e)
 
                 let! signature = 
-                    if HMap.isEmpty inputValues then CompilerState.useGlobalFunction (e :> obj) definition
+                    if HashMap.isEmpty inputValues then CompilerState.useGlobalFunction (e :> obj) definition
                     else CompilerState.useLocalFunction (e :> obj) definition
 
 
@@ -1111,7 +1112,7 @@ module Compiler =
                     let! ct = toCTypeS e.Type
                     let! s = State.get
                     if Set.contains name s.moduleState.globalParameters then
-                        do! State.put { s with usedGlobals = HSet.add name s.usedGlobals }
+                        do! State.put { s with usedGlobals = HashSet.add name s.usedGlobals }
 
                     match index with
                         | Some idx -> 
@@ -1173,7 +1174,7 @@ module Compiler =
                 | NewUnionCase(ci, fields) ->
                     let! s = State.get
                     let ctors = ci.DeclaringType |> Constructors.union s.moduleState.backend
-                    let! ctor = ctors |> HMap.find ci |> CompilerState.useGlobalFunction ci
+                    let! ctor = ctors |> HashMap.find ci |> CompilerState.useGlobalFunction ci
                     let! fields = fields |> List.mapS toCExprS |>> List.toArray
                     return CCall(ctor, fields)
 

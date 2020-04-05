@@ -14,7 +14,7 @@ open FSharp.Compiler.Range
 
 open Aardvark.Base
 open Aardvark.Base.TypeInfo
-
+open FSharp.Data.Adaptive
 open FShade
 
 
@@ -303,31 +303,31 @@ module CodeGenerator =
             | Uniform(u) ->
                 match e with
                     | PropertyGet(_, prop, _) ->
-                        HSet.ofList [ prop :> MemberInfo, u ]
+                        HashSet.ofList [ prop :> MemberInfo, u ]
                         
                     | Call(_,mi,_) ->
-                        HSet.ofList [ mi :> MemberInfo, u ]
+                        HashSet.ofList [ mi :> MemberInfo, u ]
                     | _ ->
-                        HSet.empty
+                        HashSet.empty
 
             | Call(t, mi, args) ->
-                let set = t |> Option.map getUsedUniformExtensions |> Option.defaultValue HSet.empty
-                let set = args |> List.map getUsedUniformExtensions |> List.fold HSet.union set
+                let set = t |> Option.map getUsedUniformExtensions |> Option.defaultValue HashSet.empty
+                let set = args |> List.map getUsedUniformExtensions |> List.fold HashSet.union set
 
                 let set = 
                     match ExprWorkardound.TryGetReflectedDefinition mi with
                         | Some e -> 
                             let inner = getUsedUniformExtensions e
-                            HSet.union set inner
+                            HashSet.union set inner
                         | None -> set
 
                 set
             
 
             | ShapeCombination(o, args) ->
-                args |> List.map getUsedUniformExtensions |> HSet.unionMany
+                args |> List.map getUsedUniformExtensions |> List.fold HashSet.union HashSet.empty
             | ShapeVar _ ->
-                HSet.empty
+                HashSet.empty
             | ShapeLambda(_,b) ->
                 getUsedUniformExtensions b
 
@@ -391,8 +391,8 @@ module CodeGenerator =
                 let allUniforms =
                     definitions
                         |> List.map (fun (_,e,_) -> getUsedUniformExtensions e) 
-                        |> HSet.unionMany
-                        |> HSet.map (fun (mem, u) ->
+                        |> List.fold HashSet.union HashSet.empty
+                        |> HashSet.map (fun (mem, u) ->
                             
                             let name = mem.Name
 

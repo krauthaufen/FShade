@@ -12,9 +12,9 @@ open Microsoft.FSharp.Reflection
 open Aardvark.Base
 open FShade.Imperative
 
-
 open System.Collections.Generic
 open Aardvark.Base.ReflectionHelpers
+open FSharp.Data.Adaptive
 
 #nowarn "4321"
 
@@ -71,7 +71,7 @@ type SamplerInfo =
 
 type RayHitInfo =
     {
-        neededPayloads : hset<Type * Type>
+        neededPayloads : HashSet<Type * Type>
         neededScenes   : Set<string>
         neededUniforms : Map<string, Type>
         neededSamplers : Map<string, SamplerInfo>
@@ -87,7 +87,7 @@ type RayHitInterface =
         samplers            : Map<int * int, string * SamplerInfo>
         buffers             : Map<int * int, string * int * Type>
         scenes              : Map<int * int, string>
-        payloadLocations    : hmap<Type * Type, int>
+        payloadLocations    : HashMap<Type * Type, int>
         payloadInLocation   : int
         payloadOutLocation  : int
     }
@@ -100,7 +100,7 @@ type RayHitShader =
         rayHitUniforms          : Map<string, UniformParameter>
         rayHitInputs            : Map<string, Type>
         rayHitBody              : Expr
-        rayHitUseInOuts         : hmap<Type * Type, Var>
+        rayHitUseInOuts         : HashMap<Type * Type, Var>
     }
 
 module RayHitShader =
@@ -234,7 +234,7 @@ module RayHitShader =
                 outType : Type
                 inputs  : Map<string, Type>
                 uniforms : Map<string, UniformParameter>
-                usedInOuts : hmap<Type * Type, Var * Expr * Expr>
+                usedInOuts : HashMap<Type * Type, Var * Expr * Expr>
             }
 
         let emptyState (inType : Type) (outType : Type) =
@@ -243,7 +243,7 @@ module RayHitShader =
                 outType = outType
                 inputs = Map.empty
                 uniforms = Map.empty
-                usedInOuts = HMap.empty
+                usedInOuts = HashMap.empty
 
             }
 
@@ -251,7 +251,7 @@ module RayHitShader =
 
             let useInOut (inType : Type) (outType : Type) =
                 State.custom (fun (s : State) ->
-                    match HMap.tryFind (inType, outType) s.usedInOuts with
+                    match HashMap.tryFind (inType, outType) s.usedInOuts with
                     | Some v -> s, v
                     | None ->
                         let id = s.usedInOuts.Count
@@ -262,7 +262,7 @@ module RayHitShader =
                         let readOut = Expr.ReadInput(ParameterKind.Uniform, outType, outName)
                         let newState =
                             { s with 
-                                usedInOuts = HMap.add (inType, outType) (v, readIn, readOut) s.usedInOuts 
+                                usedInOuts = HashMap.add (inType, outType) (v, readIn, readOut) s.usedInOuts 
                             }
                         newState, (v, readIn, readOut)
                 )
@@ -550,7 +550,7 @@ module RayHitShader =
             neededBuffers = buffers
             neededSamplers = samplers
             neededScenes = Set.ofSeq scenes
-            neededPayloads = HMap.keys s.rayHitUseInOuts
+            neededPayloads = HashMap.keys s.rayHitUseInOuts
         }
 
     let ofFunction (shader : RayHit<'s, 'a> -> Expr<'a>) =
@@ -587,7 +587,7 @@ module RayHitShader =
             rayHitUniforms = state.uniforms
             rayHitInputs = state.inputs
             rayHitBody = expr
-            rayHitUseInOuts = state.usedInOuts |> HMap.map (fun _ (v,_,_) -> v)
+            rayHitUseInOuts = state.usedInOuts |> HashMap.map (fun _ (v,_,_) -> v)
         }
 
     let toModule (assign : RayHitInfo -> RayHitInterface) (s : RayHitShader) =
@@ -681,9 +681,9 @@ module RayHitShader =
 
         let mapping =
             s.rayHitUseInOuts
-            |> HMap.toSeq
+            |> HashMap.toSeq
             |> Seq.map (fun ((i,o), v) ->
-                match HMap.tryFind (i,o) iface.payloadLocations with
+                match HashMap.tryFind (i,o) iface.payloadLocations with
                 | Some loc -> v, loc
                 | None -> failwith "missing assignment for inout"
             )
@@ -698,9 +698,9 @@ module RayHitShader =
 
         let tempPayloads =
             s.rayHitUseInOuts
-            |> HMap.toList
+            |> HashMap.toList
             |> List.collect (fun ((i,o), v) ->
-                match HMap.tryFind (i,o) iface.payloadLocations with
+                match HashMap.tryFind (i,o) iface.payloadLocations with
                 | Some loc ->   
                     let inName = v.Name + "In"
                     let outName =   v.Name + "Out"
