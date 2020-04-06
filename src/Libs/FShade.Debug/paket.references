@@ -1,5 +1,9 @@
 Aardvark.Base
 Aardvark.Base.FSharp
 FSharp.Core
+FSharp.Data.Adaptive
+
+Dotnet.ProjInfo
+Dotnet.ProjInfo.Workspace
 FSharp.Compiler.Service
-Aardvark.Base.Incremental
+BlackFox.VsWhere

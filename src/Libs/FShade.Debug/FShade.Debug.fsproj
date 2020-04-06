@@ -13,8 +13,7 @@
     <OutputPath>..\..\..\bin\Release</OutputPath>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="EffectCompiler.fs" />
-    <Compile Include="CodeGenerator.fs" />
+    <Compile Include="ProjectInfo.fs" />
     <Compile Include="Debugger.fs" />
   </ItemGroup>
   <ItemGroup>

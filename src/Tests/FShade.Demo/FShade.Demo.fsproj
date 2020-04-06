@@ -21,6 +21,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Libs\FShade.Core\FShade.Core.fsproj" />
+    <ProjectReference Include="..\..\Libs\FShade.Debug\FShade.Debug.fsproj" />
     <ProjectReference Include="..\..\Libs\FShade.GLSL\FShade.GLSL.fsproj" />
     <ProjectReference Include="..\..\Libs\FShade.Imperative\FShade.Imperative.fsproj" />
   </ItemGroup>

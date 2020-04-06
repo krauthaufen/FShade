@@ -1,283 +1,532 @@
 ﻿namespace FShade
 
-open Aardvark.Base
-open FSharp.Data.Adaptive
-open FShade.Debug
 open System.IO
-open System.Collections.Concurrent
-open Microsoft.FSharp.Quotations
-open FShade.Imperative
+open Aardvark.Base
+open FSharp.Compiler.SourceCodeServices
+open FSharp.Data.Adaptive
+open FShade.Debug.ProjectInfo
 
 module EffectDebugger =
-    
+    open System
+    open System.Collections.Generic
+    open System.IO
+    open FSharp.Data.Adaptive
+
+    open System.Reflection
+    open System.Reflection.PortableExecutable
+    open System.Reflection.Metadata
+    open FSharp.Compiler.SourceCodeServices
+    open FSharp.Compiler.Range
+    open FSharp.Compiler.Ast
+    open FSharp.Compiler.Text
+    open FShade
+    open System.Threading
+
     [<AutoOpen>]
-    module private Helpers =
-        
-        module List =
-            let rec mapOption (f : 'a -> Option<'b>) (l : list<'a>) =
-                match l with
-                    | [] -> Some []
-                    | h :: t ->
-                        match f h with
-                            | Some h ->
-                                match mapOption f t with
-                                    | Some t -> Some (h :: t)
-                                    | None -> None
-                            | None ->
+    module private Helpers = 
+        let projectFileExtensions =
+            Set.ofList [
+                ".fsproj"
+                ".csproj"
+                ".vbproj"
+            ]
+            
+        let assemblyRedirects = ConcurrentDict<string, string>(Dict())
+        let projectAssemblies = ConcurrentDict<string, Assembly>(Dict())
+        let checker = FSharpChecker.Create()
+        let assemblyProjects = System.Collections.Concurrent.ConcurrentDictionary<string, option<ProjectInfo>>()
+        let parsedFile = System.Collections.Concurrent.ConcurrentDictionary<string, System.Threading.Tasks.Task<FSharpParseFileResults>>()
+
+        let rec tryFindProject (dir : string) =
+            let projects = Directory.GetFiles(dir) |> Array.filter (fun f -> Set.contains (Path.GetExtension(f).ToLower()) projectFileExtensions)
+            if projects.Length > 0 then
+                Some projects.[0]
+            else
+                let parent = Path.GetDirectoryName dir
+                if not (isNull parent) then
+                    tryFindProject parent
+                else
+                    None
+            
+
+        let tryGetProjectLocation(location : string) : option<string> =
+            try
+                let loc = Path.ChangeExtension(location, ".pdb")
+                if File.Exists loc then
+                    use s = File.OpenRead loc
+                    use r = MetadataReaderProvider.FromPortablePdbStream(s, MetadataStreamOptions.PrefetchMetadata)
+                    let reader = r.GetMetadataReader()
+
+                    reader.MethodDebugInformation |> Seq.tryPick (fun m ->
+                        try
+                            let info = reader.GetMethodDebugInformation(m)
+                            let doc = reader.GetDocument(info.Document)
+                            let str = reader.GetString doc.Name
+                            if File.Exists str then
+                                tryFindProject (Path.GetDirectoryName str)
+                            else
                                 None
-
-        let rec getLeafs (e : Effect) =
-            match e.ComposedOf with
-                | [] -> [e]
-                | l -> l |> List.collect getLeafs
-
-        let tryGetName (e : Effect) =
-            let leafs = getLeafs e
-
-            let names = 
-                leafs |> List.mapOption (fun e ->
-                    match e.SourceDefintion with
-                        | Some (e,t) ->
-                            match CodeGenerator.Code.TryGetReflectedDefinition e with
-                                | Some def -> Some def.name
-                                | None -> None
-                        | None ->
+                        with _ ->
                             None
+                    )
+                else
+                    None
+            with _ ->
+                None
+
+       
+        let tryGetMethod(location : string) (file : string) (startLine : int) (startCol : int) =
+            //let task =
+            //    parsedFile.GetOrAdd(file, fun file ->
+            //        checker.ParseFile(file, SourceText.ofString (File.readAllText file), FSharpParsingOptions.Default) |> Async.StartAsTask
+            //    )
+            //let result = task.Result
+
+            //let contains (r : range) =
+            //    (r.StartLine = startLine && (r.StartColumn <= startCol) || r.StartLine < startLine) &&
+            //    r.EndLine >= startLine
+
+            //let rec find (path : string) (decls : SynModuleDecls) =
+            //    decls |> List.tryPick (fun d ->
+            //        match d with
+            //        | SynModuleDecl.NestedModule(ComponentInfo(_,_,_,id,_,_,_,_),_,decls, _, _) ->
+            //            let name = path :: (id |> List.map (fun i -> i.idText)) |> String.concat "+"
+            //            find name decls
+            //        | SynModuleDecl.Types(types, _) ->
+            //            types |> List.tryPick (fun (TypeDefn(_,_,members,_)) ->
+            //                members |> List.tryPick (fun m ->
+            //                    Log.warn "todo"
+            //                    None
+            //                )
+            //            )
+            //        | SynModuleDecl.Let(_, bindings, range) ->
+            //            bindings |> List.tryPick (fun (Binding(_,k,_,_,_,_,v,pat,_,_,range,_))->
+            //                match k with
+            //                | SynBindingKind.NormalBinding ->
+            //                    if contains range then
+            //                        SynPat.
+                                
+            //                    None
+            //                | _ ->
+            //                    None
+            //            )
+
+            //        | _ -> 
+            //            None
+                        
+            //        )
+
+            //let foobar = 
+            //    match result.ParseTree with
+            //    | Some (ParsedInput.ImplFile(ParsedImplFileInput(fileName, isScript, _, _, _, modules, _))) ->
+            //        modules |> List.tryPick (fun (SynModuleOrNamespace(id, _, kind, decls, _, _, _, _)) ->
+            //            decls |> List.tryPick (fun d ->
+            //                match d with
+            //                | SynModuleDecl.Types(types, _) ->
+            //                    types |> List.tryPick (fun (TypeDefn(_,_,members,_)) ->
+            //                        members |> List.tryPick (fun m ->
+            //                            m.Range
+            //                        )
+            //                        None
+            //                    )
+            //                | _ -> 
+            //                    None
+                        
+            //            )
+            //        )
+            //    | _ ->
+            //        None
+            let loc = Path.ChangeExtension(location, ".pdb")
+            if File.Exists loc then
+                use s = File.OpenRead loc
+                use r = MetadataReaderProvider.FromPortablePdbStream(s, MetadataStreamOptions.PrefetchMetadata)
+                let pdb = r.GetMetadataReader()
+
+                use rd = new PEReader(File.OpenRead location, PEStreamOptions.PrefetchMetadata)
+                let dll = 
+                    let m = rd.GetMetadata()
+                    new MetadataReader(m.Pointer, m.Length)
+
+                pdb.MethodDebugInformation |> Seq.tryPick (fun m ->
+                    try
+                        let info = pdb.GetMethodDebugInformation(m)
+                        let doc = pdb.GetDocument(info.Document)
+                        let str = pdb.GetString doc.Name
+                        if str = file then
+                            info.GetSequencePoints() |> Seq.tryPick (fun p ->
+                                let dy = abs (p.StartLine - startLine)
+                                let dx = abs (p.StartColumn - startCol)
+                                if dx <= 3 && dy = 0 then
+                                    let def = dll.GetMethodDefinition(m.ToDefinitionHandle())
+                                    let name = dll.GetString def.Name
+                                    let parent = dll.GetTypeDefinition(def.GetDeclaringType())
+
+                                    let rec getFullName (t : TypeDefinition) =
+                                        let name = dll.GetString t.Name
+                                        
+                                        if t.IsNested then
+                                            let p = dll.GetTypeDefinition(t.GetDeclaringType())
+                                            sprintf "%s+%s" (getFullName p) name
+                                        else
+                                            let ns = dll.GetString t.Namespace
+                                            if String.IsNullOrWhiteSpace ns then name
+                                            else sprintf "%s.%s" ns name
+                                            
+
+                                    let tname = getFullName parent
+
+                                    Some(tname, name)
+
+                                else
+                                    None
+                            )
+                        else
+                            None
+                    with _ ->
+                        None
+                )
+            else
+                None
+
+        let compile (info : ProjectInfo) =
+
+            let references =
+                info.references |> List.map (fun r ->
+                    match assemblyRedirects.TryGetValue r with
+                    | (true, n) -> 
+                        Log.line "override %s: %s" (Path.GetFileName r) n
+                        n
+                    | _ -> r
                 )
 
+            let ninfo = { info with references = references }
+
+            let args = List.toArray ("fsc.exe" :: ProjectInfo.toFscArgs ninfo)
+            checker.Compile(args)   
+
+        let tryGetProjectForAssembly (a : Assembly) =
+            let location =
+                try Path.GetFullPath a.Location |> Some
+                with _ -> None
+
+            match location with
+            | Some location ->
+                assemblyProjects.GetOrAdd(location, fun location ->
+                    match tryGetProjectLocation location with
+                    | Some file -> 
+                        match ProjectInfo.tryOfProject ["Configuration", "Debug"] file with
+                        | Result.Ok info ->
+                            Some info
+                        | Result.Error err ->
+                            None
+                    | None ->
+                        None
+                )
+            | None ->
+                None
+
+        let installWatcher (callback : string -> unit) (info : ProjectInfo) =
+            let dir =
+                Path.GetDirectoryName(info.project)
+
+            let filesToWatch =
+                info.files
+                |> Seq.groupBy Path.GetDirectoryName
+                |> Seq.map (fun (dir, files) -> dir, Set.ofSeq files)
+                |> HashMap.ofSeq
+                |> HashMap.alter dir (Option.defaultValue Set.empty >> Set.add info.project >> Some)
+
+            let watchers = List<FileSystemWatcher>()
+
+            for (dir, files) in filesToWatch do
+                let w = new FileSystemWatcher(dir)
+                w.Changed.Add (fun e -> if Set.contains e.FullPath files then callback e.FullPath)
+                w.Renamed.Add (fun e -> if Set.contains e.FullPath files then callback e.FullPath)
+                w.Created.Add (fun e -> if Set.contains e.FullPath files then callback e.FullPath)
+                w.EnableRaisingEvents <- true
+                watchers.Add w
+
+            { new IDisposable with
+                member x.Dispose() =
+                    for w in watchers do w.Dispose()
+            }
 
 
-            match names with
-                | Some names ->
-//                    let idHash = md5.ComputeHash(System.Text.Encoding.UTF8.GetBytes e.Id) |> System.Convert.ToBase64String
-//                    let idHash = idHash.Replace("=", "").Replace("/", "_").Replace("+", "_")
-//
-//                    let names = names @ [idHash]
-                    let name = String.concat "_" names
-                    Some name
+
+
+        let start () =  
+        
+            let coreLib = typeof<FShade.Effect>.Assembly.GetName().Name
+            let allAssemblies = 
+                Introspection.AllAssemblies 
+                |> Seq.filter (fun a -> a.GetReferencedAssemblies() |> Array.exists (fun r -> r.Name = coreLib))
+                |> Seq.toArray
+
+            Log.startTimed "resolving referenced projects"
+        
+            let assemblyLocations = Dict<Assembly, string>()
+            let projectForAssembly = Dict<string, ProjectInfo>()
+            let projectForProj = Dict<string, ProjectInfo>()
+
+            for a in allAssemblies do
+                match tryGetProjectForAssembly a with
+                | Some info -> 
+                    projectAssemblies.[info.project] <- a
+                    match info.output with
+                    | Some o -> 
+                        projectForAssembly.[o] <- info
+                        assemblyLocations.[a] <- o
+                    | None -> 
+                        projectForAssembly.[a.Location] <- info
+                        assemblyLocations.[a] <- a.Location
+
+                    projectForProj.[info.project] <- info
+                    Log.line "found %s" (Path.GetFileName info.project)
+                | None -> 
+                    ()
+
+            Log.stop()
+
+            let dependent, buildOrder = 
+                let mutable dependent = HashMap.empty
+                let mutable dependencies = HashMap.empty
+                for KeyValue(path, project) in projectForAssembly do
+                    for r in project.projects do
+                        match projectForProj.TryGetValue r with
+                        | (true, otherProject) ->
+                            dependent <- 
+                                dependent |> HashMap.alter otherProject.project (Option.defaultValue Set.empty >> Set.add project.project >> Some)
+
+                            dependencies <-
+                                dependencies |> HashMap.alter project.project (Option.defaultValue Set.empty >> Set.add otherProject.project >> Some)
+
+                        | _ ->
+                            ()
+                let dependencies = dependencies
+                let dependent = dependent
+
+                let buildOrder =
+                    let res = List<Set<string>>()
+            
+                    let mutable all = Set.ofSeq projectForProj.Keys
+                    let mutable dependencies = dependencies
+                    let nodependencies () =
+                        all |> Set.filter (fun p -> not (HashMap.containsKey p dependencies))
+
+                    while not (Set.isEmpty all) do
+                        let current = nodependencies()
+                        res.Add current
+                        dependencies <- 
+                            dependencies |> HashMap.choose (fun _ d ->
+                                let n = Set.difference d current
+                                if Set.isEmpty n then None
+                                else Some n
+                            )
+                        all <- Set.difference all current
+
+                    Seq.toArray res
+
+                dependent, buildOrder
+
+            let getAffected(projs : #seq<string>) =
+                let rec all (p : string) =  
+                    match HashMap.tryFind p dependent with
+                    | Some d ->
+                        d |> Seq.map all |> Set.unionMany |> Set.add p
+                    | None ->
+                        Set.singleton p
+
+                let all = projs |> Seq.collect all |>  Set.ofSeq
+                buildOrder |> Array.choose (fun s -> 
+                    let r = Set.intersect s all
+                    if Set.isEmpty r then None
+                    else Some r
+                )
+
+            let tryGetEffectProject (e : FShade.Effect) =
+                match e.SourceDefintion with
+                | Some (d, _) ->
+                    match d.DebugRange with
+                    | Some (srcFile, startLine, startCol, endLine, endCol) -> 
+                        projectForProj |> Seq.tryPick (fun (KeyValue(file, info)) ->
+                            if List.exists (fun f -> f = srcFile) info.files then 
+                            
+                                match tryGetMethod info.output.Value srcFile startLine startCol with
+                                | Some (typeName, methName) ->
+                                
+                                    let resolve (ass : Assembly) =
+                                        let typ = ass.GetType typeName
+                                        if isNull typ then None
+                                        else
+                                            let m = typ.GetMethod(methName, BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Static)
+                                            if isNull m then None
+                                            else Some m
+                                
+                                    Some(file, resolve)
+
+                                
+                                | None ->
+                                    None
+                            else 
+                                None
+                        )
+                    | None -> 
+                        None
                 | None ->
                     None
 
-    let private registered = Dict<string, Effect * cval<Effect>>()
-    let private lockObj = obj()
+            let leafCache = ConcurrentDict<string, cval<Effect> * (Assembly -> unit)>(Dict())
+            let registered = ConcurrentDict<string, List<Assembly -> unit>>(Dict())
 
-    let private sem = new System.Threading.SemaphoreSlim(0)
-    let private queue = ConcurrentHashQueue<string>()
-    let private compiledContent = Dict<string, string>()
+            let tryRegister (effect : FShade.Effect) =
+                let rec getLeaves (e : FShade.Effect) =
+                    match e.ComposedOf with
+                    | [] -> [e]
+                    | [e] -> getLeaves e
+                    | many -> List.collect getLeaves many
 
-    
-    let private md5 = System.Security.Cryptography.MD5.Create()
+                let leaves = getLeaves effect
 
-    let private getCompositionName (e : Effect) =
-        md5.ComputeHash(System.Text.Encoding.UTF8.GetBytes e.Id) |> System.Guid |> string
+                let result = 
+                    leaves |> List.map (fun effect ->
+                        match tryGetEffectProject effect with
+                        | Some(projFile, resolve) ->
+                            let effect =
+                                match resolve projectAssemblies.[projFile] with
+                                | Some mi ->
+                                    try
+                                        let p = mi.GetParameters().[0].ParameterType
+                                        let test = mi.Invoke(null, [| null |]) |> unbox<_>
+                                        let effect = Effect.ofExpr p test
+                                        effect
+                                    with e ->
+                                        Log.warn "failed: %A" e
+                                        effect
+                                | None -> 
+                                    effect
+                            
 
+                            let cell, change =
+                                leafCache.GetOrCreate(effect.Id, fun _ ->
+                                    let c = cval effect
+                                    let change (a : Assembly) =
+                                        match resolve a with
+                                        | Some mi -> 
+                                            try
+                                                let p = mi.GetParameters().[0].ParameterType
+                                                let test = mi.Invoke(null, [| null |]) |> unbox<_>
+                                                let effect = Effect.ofExpr p test
+                                                c.Value <- effect
+                                            with e ->
+                                                Log.warn "failed: %A" e
+                                        | None ->
+                                            Log.warn "effect %s missing" effect.Id
 
-    let private updateCompiled (file : string) (code : string) (f : unit -> unit) =
-        lock compiledContent (fun () ->
-            match compiledContent.TryGetValue file with 
-                | (true, compiled) when code = compiled -> 
-                    ()
-                | _ ->
-                    try 
-                        f()
-                        compiledContent.[file] <- code
-                    with _ ->
-                        ()
-        )
-
-    let private compileFile (path : string) =
-        lock lockObj (fun () ->
-            let name = Path.GetFileNameWithoutExtension path
-            match registered.TryGetValue name with
-                | (true, (_,evt)) ->
-                    Log.startTimed "[FShade] compile %s" name
-                    match EffectCompiler.tryCompile path with
-                        | Choice1Of2 e -> 
-                            transact (fun () -> evt.Value <- e)
-                        | Choice2Of2 errors -> 
-                            for e in errors do Log.warn "%A" e
-                    Log.stop()
-                | _ ->
-                    ()
-        )
-
-    let unknownCache = Dict<string, Effect>()
-    let compositions = Dict<string, cval<list<string>> * aval<Effect>>()
-
-    let private compChanged (file : string) =
-        let name = Path.GetFileNameWithoutExtension file
-        match compositions.TryGetValue name with
-            | (true, (r,_)) ->
-                let lines = File.ReadAllLines(file) |> Array.toList |> List.filter (System.String.IsNullOrWhiteSpace >> not)
-                transact (fun () -> r.Value <- lines)
-            | _ ->
-                ()
-
-
-    let private run(o : obj) =
-        while true do
-            sem.Wait()
-            // swallow duplicate changes
-            System.Threading.Thread.Sleep(30)
-            match queue.TryDequeue() with
-                | (true, file) ->
-                    let code = 
-                        try File.ReadAllText file
-                        with _ -> 
-                            Log.warn "[FShade] could not read %A" (Path.GetFileName file)
-                            System.Guid.NewGuid() |> string
-
-                    try
-                        if Path.GetExtension file = ".comp" then
-                            compChanged file
-                        else
-                            updateCompiled file code (fun () ->
-                                compileFile file
-                            )
-                    with _ -> 
-                        Log.warn "[FShade] updating %A failed" (Path.GetFileName file)
-                | _ ->
-                    ()
-
-    let private thread = new System.Threading.Thread(System.Threading.ThreadStart(run), IsBackground = true)
-
-    let private changed (f : string) =
-        if queue.Enqueue f then
-            Log.line "[FShade] changed %A" (Path.GetFileName f)
-            sem.Release() |> ignore
-
-    let private tryRegister (e : Effect) =
-        lock lockObj (fun () ->
-            if EffectDebugger.isAttached then
-                match tryGetName e with
-                    | Some name ->
-                        match registered.TryGetValue name with
-                            | (true, (o,evt)) -> 
-                                Some (name, evt :> aval<_>)
-                            | _ -> 
-                                match CodeGenerator.tryGetCode e with
-                                    | Some code ->
-                                        let evt = cval e
-                                        registered.[name] <- (e, evt)
-
-                                        let fileName = name + ".fsx"
-                                        let filePath = Path.Combine(EffectCompiler.debugDir, fileName)
-                                        updateCompiled filePath code id
-
-                                        File.WriteAllText(filePath, code)
-                                        Git.add EffectCompiler.debugDir fileName
-                                        Git.amend EffectCompiler.debugDir
-
-
-                                        changed filePath
-
-                                        Some (name, evt :> aval<_>)
-                        
-                                    | None ->
-                                        None
-                    | None ->
-                        None
-            else
-                None
-        )
-
-    let private register (e : Effect) =
-        match tryRegister e with
-            | Some (name, e) -> e
-            | None -> AVal.constant e
-
-    let private printConfig = { EffectConfig.empty with outputs = Map.ofList ["Colors", (typeof<V4d>, 0) ] }
-    let private glslNames = Dict<string, string>()
-    let private registerOutput (name : string) (effect : Effect) =
-        glslNames.[effect.Id] <- name
-        effect
-
-    let private printOutput (effect : Effect) (code : string) =
-        match glslNames.TryGetValue effect.Id with
-            | (true, name) ->
-                let file = Path.Combine(EffectCompiler.outDir, name + ".glsl")
-                File.WriteAllText(file, code)
-            | _ ->
-                ()
-
-
-
-    let private registerPiecewise (e : Effect) =
-        match registered.TryGetValue e.Id with
-            | (true, (_,m)) -> 
-                m :> aval<_>
-
-            | _ -> 
-                let mutable names = []
-                let leafs = 
-                    e |> getLeafs |> List.map (fun c ->
-                        match tryRegister c with
-                            | Some (n, cc) ->
-                                names <- names @ [n]
-                                cc
-                            | None ->
-                                unknownCache.[c.Id] <- c
-                                names <- names @ [c.Id]
-                                AVal.constant c
-                    )
-
-                let mutable isNew = false
-
-                let fileName = getCompositionName e
-
-                let _, result = 
-                    compositions.GetOrCreate(fileName, fun _ -> 
-                        isNew <- true
-
-                        let names = cval names
-                        let result = 
-                            names |> AVal.bind (fun names ->
-                                let effects = 
-                                    names |> List.choose (fun name ->
-                                        match registered.TryGetValue name with
-                                            | (true, (_,e)) -> Some (e :> aval<_>)
-                                            | _ -> 
-                                                match unknownCache.TryGetValue name with
-                                                    | (true, e) -> Some (AVal.constant e)
-                                                    | _ -> None
-                                                
-                                    )
-                                AVal.custom (fun t ->
-                                    effects |> List.map (fun e -> e.GetValue t) |> Effect.compose |> registerOutput fileName
+                                    c, change
                                 )
-                            )
 
-                        names, result
+                            lock registered (fun () ->
+                                let l = registered.GetOrCreate(projFile, fun _ -> List())
+                                l.Add change
+                            )
+                            cell :> aval<_>
+                        | None ->
+                            AVal.constant effect
                     )
 
-                if isNew then
-                    let file = Path.Combine(EffectCompiler.compDir, fileName + ".comp")
-                    File.WriteAllLines(file, names)
+                AVal.custom (fun t ->
+                    try
+                        result |> List.map (fun r -> r.GetValue t) |> Effect.compose
+                    with _ ->
+                        effect
+                )
 
-                result
+
+            let lockObj = obj()
+            let mutable dirty = Set.empty
+            let thread =    
+                let tick () = 
+                    lock lockObj (fun () ->
+                        while Set.isEmpty dirty do
+                            Monitor.Wait lockObj |> ignore
+                    )
+                    Thread.Sleep(500)
+                    let dirty =
+                        lock lockObj (fun () ->
+                            let d = dirty
+                            dirty <- Set.empty
+                            d
+                        )
+
+                    if not (Set.isEmpty dirty) then
+                        let affected = dirty |> getAffected
+                        Log.startTimed "rebuild [%s]" (affected |> Seq.collect (Seq.map Path.GetFileName) |> String.concat ", ")
+                        for par in affected do
+                            for a in par do
+                                match projectForProj.TryGetValue a with
+                                | (true, info) ->
+                                    let outFile =
+                                        match info.output with
+                                        | Some o -> o
+                                        | _ -> failwithf "no output file for %A" info.project
+
+                                    Log.startTimed "rebuild %s" (Path.GetFileName a)
+                                    let tmp = Path.ChangeExtension(Path.GetTempFileName(), Path.GetExtension info.output.Value)
+                                    let info = { info with output = Some tmp }
+                                    let (errors, _ret) = compile info |> Async.RunSynchronously
+
+                                    let critical = errors |> Array.filter (fun e -> e.Severity = FSharpErrorSeverity.Error)
+
+                                    if critical.Length = 0 && File.Exists tmp then 
+                                        Report.End(": success") |> ignore
+
+                                        assemblyRedirects.[outFile] <- tmp
+                                        match registered.TryGetValue info.project with
+                                        | (true, reg) when reg.Count > 0 ->
+                                            let ass = Assembly.LoadFile tmp
+                                            transact (fun () ->
+                                                for r in reg do r ass
+                                            )
+                                        | _ ->  
+                                            ()
+                                    else
+                                        for e in critical do 
+                                            Report.ErrorNoPrefix(sprintf "%A" e)
+                                        Log.stop()
+                                | _ ->
+                                    ()
+
+                        Log.stop()
+
+                startThread <| fun () ->
+                    while true do
+                        tick()
+                    
 
 
+            let callback  (project : ProjectInfo) (file : string) =
+                Log.line "%s/%s changed" (Path.GetFileName project.project) (Path.GetFileName file)
+
+                lock lockObj (fun () ->
+                    dirty <- Set.add project.project dirty
+                    Monitor.PulseAll lockObj
+                )
+
+            let subscriptions =
+                projectForAssembly
+                |> Seq.map (fun (KeyValue(a, p)) -> installWatcher (fun f -> callback p f) p)
+                |> Seq.toArray
+
+            tryRegister
+            
     let attach() =
-        lock lockObj (fun () ->
-            if not EffectDebugger.isAttached then
-                EffectCompiler.init()
-                EffectDebugger.isAttached <- true
-                EffectDebugger.saveCode <- printOutput
+        match EffectDebugger.registerFun with
+        | Some _ -> ()
+        | None ->
+            let register = start()
+            EffectDebugger.registerFun <- Some (fun e -> register e :> obj)
+            EffectDebugger.isAttached <- true
+            EffectDebugger.saveCode <- fun _ _ -> ()
 
-                let compWatch = new FileSystemWatcher(EffectCompiler.compDir, "*.comp")
-                compWatch.Changed.Add (fun e -> changed e.FullPath)
-                compWatch.Renamed.Add (fun e -> changed e.FullPath)
-                compWatch.EnableRaisingEvents <- true
 
-                thread.Start()
-
-                let w = new FileSystemWatcher(EffectCompiler.debugDir, "*.fsx")
-                w.Created.Add (fun e -> changed e.FullPath)
-                w.Changed.Add (fun e -> changed e.FullPath)
-                w.Renamed.Add (fun e -> changed e.FullPath)
-                w.EnableRaisingEvents <- true
-
-                EffectDebugger.registerFun <- Some (fun e -> registerPiecewise e :> obj)
-
-        )
 
