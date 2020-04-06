@@ -501,7 +501,7 @@ module ProjectInfo =
                     let res = ofFscArgs netcore file projects args
                     match outputPath with
                     | Some path ->
-                        let file =
+                        let dllName =
                             match res.output with
                             | Some o -> Path.GetFileName o
                             | None -> 
@@ -512,7 +512,7 @@ module ProjectInfo =
                                     | Target.Module -> ".dll"
 
                                 Path.ChangeExtension(Path.GetFileName(file), ext)
-                        let realPath = Path.Combine(Path.GetDirectoryName file, path, file) |> Path.GetFullPath
+                        let realPath = Path.Combine(Path.GetDirectoryName file, path, dllName) |> Path.GetFullPath
                         Result.Ok { res with output = Some realPath }
                     | None -> 
                         Result.Ok res
