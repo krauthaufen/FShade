@@ -12,7 +12,7 @@ type Vertex =
         [<Position>] pos : V4d
         [<Color>] c : V4d
     }
-        
+
 [<Test>]
 let ``New Intrinsics``() =
     Setup.Run()
@@ -88,20 +88,19 @@ let ``New Intrinsics``() =
             let _ = lerp V2i.Zero V2i.One v.c.XY
             let _ = Fun.Lerp(v.c.X, 0, 1)
             let _ = Fun.Lerp(v.c, V4i(v.c), V4i(v.c))
-            // TODO: Uncomment for >= 5.0.6
-            //let _ = asinh (V4f(v.c))
-            //let _ = madd v.c v.c v.c
-            //let _ = madd v.c v.c.X v.c
-            //let _ = madd v.c.X v.c.X v.c.X
-            //let _ = madd (V4i(v.c)) 2 (V4i(v.c))
-            //let _ = Fun.MultiplyAdd(v.c.X, v.c, v.c)
-            //let _ = Fun.MultiplyAdd(v.c, v.c.X, v.c)
-            //let _ = Fun.MultiplyAdd(v.c, v.c, v.c)
-            //let _ = Fun.MultiplyAdd(v.c.X, v.c.Y, v.c.Z)
-            //let _ = degrees v.c
-            //let _ = degrees v.c.X
-            //let _ = v.c.DegreesFromRadians()
-            //let _ = isInfinity v.c
+            let _ = asinh (V4f(v.c))
+            let _ = madd v.c v.c v.c
+            let _ = madd v.c v.c.X v.c
+            let _ = madd v.c.X v.c.X v.c.X
+            let _ = madd (V4i(v.c)) 2 (V4i(v.c))
+            let _ = Fun.MultiplyAdd(v.c.X, v.c, v.c)
+            let _ = Fun.MultiplyAdd(v.c, v.c.X, v.c)
+            let _ = Fun.MultiplyAdd(v.c, v.c, v.c)
+            let _ = Fun.MultiplyAdd(v.c.X, v.c.Y, v.c.Z)
+            let _ = degrees v.c
+            let _ = degrees v.c.X
+            let _ = v.c.DegreesFromRadians()
+            let _ = isInfinity v.c
             let _ = isInfinity v.c.X
             let _ = Vec.reflect v.c v.c
             let _ = Vec.refract 0.5 v.c v.c
@@ -113,12 +112,12 @@ let ``New Intrinsics``() =
         }
 
     GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["mix"; "exp"; "log"; "pow"; "sign"; "sqrt"]
-    
+
 [<Test>]
 let ``Broken GLSL Shader``() =
     Setup.Run()
 
-    let code = 
+    let code =
         String.concat "\r\n" [
             "#version 430"
             "layout(location = 0) in vec4 Position;"
@@ -143,9 +142,9 @@ let ``Simple fragment shader``() =
         fragment {
             return v.c
         }
-            
+
     GLSL.shouldCompile [ Effect.ofFunction frag ]
-        
+
 
 [<Test>]
 let ``Helper with duplicate names``() =
@@ -155,24 +154,24 @@ let ``Helper with duplicate names``() =
         vertex {
             if v.pos.X > 0.0 then
                 let Positions = v.pos.W + v.pos.X
-                let (a,b) = 
+                let (a,b) =
                     let v = 2.0 * v.pos
                     (v.X, v.Y + 1.0 + Positions)
                 return { v with pos = V4d(a,b,b,a) }
             else
                 return { v with pos = V4d.Zero }
         }
-            
+
     GLSL.shouldCompile [ Effect.ofFunction vert ]
 
-  
+
 type PointSizeVertex =
     {
         [<Position>] pos : V4d
         [<Color>] c : V4d
         [<PointSize>] s : float
     }
-        
+
 
 [<Test>]
 let ``PointSize shader``() =
@@ -182,24 +181,24 @@ let ``PointSize shader``() =
         vertex {
             if v.pos.X > 0.0 then
                 let Positions = v.pos.W + v.pos.X
-                let (a,b) = 
+                let (a,b) =
                     let v = 2.0 * v.pos
                     (v.X, v.Y + 1.0 + Positions)
                 return { v with pos = V4d(a,b,b,a); s = 10.0 }
             else
                 return { v with pos = V4d.Zero; s = 5.0 }
         }
-            
+
     GLSL.shouldCompile [ Effect.ofFunction vert ]
 
 
 
 
 [<ReflectedDefinition>]
-let fillArray (array : Arr<N<10>, V4d>) denom = 
+let fillArray (array : Arr<N<10>, V4d>) denom =
     for i in 0 .. 9 do
         array.[i] <- V4d(float i / denom)
-        
+
 
 [<Test>]
 let ``Fill Array with Function``() =
@@ -213,7 +212,7 @@ let ``Fill Array with Function``() =
 
             return array.[uniform?color]
         }
-        
+
     let expectedFillArrayGLSL =
         sprintf "
 void .*_fillArray_.*\(vec4 array\[10], float denom\)
@@ -230,17 +229,17 @@ void .*_fillArray_.*\(vec4 array\[10], float denom\)
     .*_fillArray_.*\(array, 10\.0\);
     ColorsOut = array\[color\]"
 
-                
+
     GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [ expectedFillArrayGLSL; expectedMainGLSL ]
 
 
 [<ReflectedDefinition>]
-let fillArrayReturn (array : Arr<N<10>, V4d>) denom = 
+let fillArrayReturn (array : Arr<N<10>, V4d>) denom =
     for i in 0 .. 9 do
         array.[i] <- V4d(float i / denom)
 
     array
-    
+
 
 [<Test>]
 let ``Fill Array with Return Function``() =
@@ -255,7 +254,7 @@ let ``Fill Array with Return Function``() =
 
             return array1.[uniform?color]
         }
-                
+
     let expectedFillArrayGLSL =
         sprintf "
 vec4\[10\] .*_fillArrayReturn_.*\(vec4 array\[10], float denom\)
@@ -273,14 +272,14 @@ vec4\[10\] .*_fillArrayReturn_.*\(vec4 array\[10], float denom\)
     vec4 array1\[10\] = .*_fillArrayReturn_.*\(array, 10\.0\);
     ColorsOut = array1\[color\]"
 
-                
+
     GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [ expectedFillArrayGLSL; expectedMainGLSL ]
 
 [<ReflectedDefinition>][<Inline>]
-let fillArrayInline (array : Arr<N<10>, V4d>) denom = 
+let fillArrayInline (array : Arr<N<10>, V4d>) denom =
     for i in 0 .. 9 do
         array.[i] <- V4d(float i / denom)
-    
+
 
 [<Test>]
 let ``Fill Array with Inline Function``() =
@@ -290,14 +289,14 @@ let ``Fill Array with Inline Function``() =
         fragment {
             let array = Arr<N<10>, V4d>()
 
-            10.0 |> fillArrayInline array 
+            10.0 |> fillArrayInline array
 
             // using this instead works
             // fillArrayInline array 10.0
 
             return array.[uniform?color]
         }
-        
+
     let expectedGLSL =
         sprintf "
     vec4 array\[10];
@@ -306,7 +305,7 @@ let ``Fill Array with Inline Function``() =
         array\[i\] = vec4\(\(float\(i\) \/ 10\.0\)\);
     }
     ColorsOut = array\[color\];"
-                
+
     GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [ expectedGLSL ]
 
 
@@ -318,22 +317,22 @@ let valueIdentity v = v
 let condTimesTwo (v : float) =
     if v > 0.5 then
         valueIdentity (v * 2.0)
-    else 
+    else
         valueIdentity v
-        
+
 [<Test>]
 let ``Nested Double Inline``() =
     Setup.Run()
 
     let frag (v : Vertex) =
         fragment {
-            
+
             let v = condTimesTwo (uniform?value)
 
             return V4d(v)
         }
-        
-    GLSL.shouldCompile [ Effect.ofFunction frag ] 
+
+    GLSL.shouldCompile [ Effect.ofFunction frag ]
 
 [<ReflectedDefinition;AutoOpen>]
 module Helper =
@@ -362,27 +361,27 @@ module Helper =
 
     let hsv2rgb (h : float) (s : float) (v : float)  =
         a h s v
-    
-    type UniformScope with 
+
+    type UniformScope with
         member x.RegionBuffer : array<int> = uniform?StorageBuffer?RegionBuffer
-       
+
     let sampleOffsets16 =
         [|
-            V3d(0.0,0.0,0.0) 
-            V3d(0.0,0.0,0.0) 
             V3d(0.0,0.0,0.0)
             V3d(0.0,0.0,0.0)
             V3d(0.0,0.0,0.0)
             V3d(0.0,0.0,0.0)
             V3d(0.0,0.0,0.0)
-            V3d(0.0,0.0,0.0) 
-            V3d(0.0,0.0,0.0)
-            V3d(0.0,0.0,0.0) 
             V3d(0.0,0.0,0.0)
             V3d(0.0,0.0,0.0)
-            V3d(0.0,0.0,0.0) 
             V3d(0.0,0.0,0.0)
-            V3d(0.0,0.0,0.0) 
+            V3d(0.0,0.0,0.0)
+            V3d(0.0,0.0,0.0)
+            V3d(0.0,0.0,0.0)
+            V3d(0.0,0.0,0.0)
+            V3d(0.0,0.0,0.0)
+            V3d(0.0,0.0,0.0)
+            V3d(0.0,0.0,0.0)
             V3d(0.0,0.0,0.0)
         |]
 
@@ -395,21 +394,21 @@ let ``Bad Helpers``() =
             let id : V3i = uniform?Bla
             let urdar =
                 match id.X with
-                    | 0 -> 
+                    | 0 ->
                         let a = uniform.RegionBuffer.[id.X]
                         hsv2rgb (float a) 1.0 1.0
-                    | _ -> 
+                    | _ ->
                         let b = uniform.RegionBuffer.[0]
                         V3d.III
-            uniform.RegionBuffer.[id.X] <- int sampleOffsets16.[int urdar.X].X 
+            uniform.RegionBuffer.[id.X] <- int sampleOffsets16.[int urdar.X].X
             return V4d(sampleOffsets16.[int urdar.X], 1.0)
         }
-    
+
     //let a = ComputeShader.ofFunction V3i.III c |> ComputeShader.toModule
     //let s = ModuleCompiler.compileGLSLVulkan a
     //printfn "%A" s.code
     GLSL.shouldCompile [ Effect.ofFunction c ]
-    
+
 [<ReflectedDefinition>]
 let util (a : ref<float>) =
     a := !a + 1.0
@@ -417,12 +416,12 @@ let util (a : ref<float>) =
 [<Test>]
 let ``Ref translated to inout``() =
     Setup.Run()
-    
+
     let frag (v : Vertex) =
         fragment {
             let a = ref v.pos.X
             util a
-            return !a * v.c 
+            return !a * v.c
         }
 
     let rx =
@@ -445,18 +444,18 @@ type UniformScope with
 [<Test>]
 let ``Ref storage buffer modification``() =
     Setup.Run()
-    
+
     let frag (v : Vertex) =
         fragment {
             atomicAdd &&uniform.Test.[0] 19
-            return float uniform.Test.[0] * v.c 
+            return float uniform.Test.[0] * v.c
         }
 
     GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [ "atomicAdd" ]
-    
 
 
-            
+
+
 type Shader private () =
 
     static member Sampler =
@@ -466,7 +465,7 @@ type Shader private () =
             addressU WrapMode.Wrap
             addressV WrapMode.Wrap
         }
-           
+
     [<LocalSize(X = 8, Y = 8)>]
     static member shader (v : V4d[]) =
         compute {
@@ -479,11 +478,11 @@ type Shader private () =
 let ``[Compute] includes samplerInfo``() =
     let shader = ComputeShader.ofFunction (V3i(128,128,128)) Shader.shader
 
-    let glsl = 
+    let glsl =
         ComputeShader.toModule shader
             |> ModuleCompiler.compileGLSLVulkan
-    
-    let sammy = 
+
+    let sammy =
         glsl.iface.samplers.["Sampler"].samplerTextures
 
     let state =
@@ -497,7 +496,7 @@ let ``[Compute] includes samplerInfo``() =
 
 
 
-type UniformScope with  
+type UniformScope with
     member x.Count : int = uniform?Count
     member x.Trafo : M34d = uniform?Hugo
 
@@ -518,12 +517,12 @@ let ``Compose variables correct``() =
                 value <- sin(float i) * cos(float i) * value
             return (1.0 + value) * v.c
         }
-        
+
     GLSL.shouldCompile [ Effect.ofFunction frag; Effect.ofFunction frag]
 
 
-[<ReflectedDefinition>] 
-let clampPointToPolygon (vc : int) (p : V3d) = 
+[<ReflectedDefinition>]
+let clampPointToPolygon (vc : int) (p : V3d) =
 
     if vc > 0 then
         (p, vc, -1, -1)
@@ -561,25 +560,25 @@ let ``Struct declaration`` () =
     GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag3 ] [ "struct tup_Aardvark_Base_V3d_int32_int32_int32" ]
 
 
-type UniformScope with  
+type UniformScope with
     member x.SomeUniform : V3d = uniform?SomeUniform
     member x.SomeUniformArr : Arr<N<3>,V3d> = uniform?SomeUniformArr
-    
+
 
 [<ReflectedDefinition>] [<Inline>]
-let inlineFun1 (forward : V3d) (up : V3d) =   
+let inlineFun1 (forward : V3d) (up : V3d) =
     Vec.Cross(up, -forward) + up - forward
-    
+
 
 [<ReflectedDefinition>] [<Inline>]
-let inlineFun2 (p : V3d) = 
- 
+let inlineFun2 (p : V3d) =
+
     let i = int p.X
 
     let n = Vec.dot p uniform.SomeUniformArr.[i]
 
     let irr = inlineFun1 uniform.SomeUniformArr.[i] (uniform.SomeUniform * n)
-    
+
     irr * p.Z
 
 
@@ -595,7 +594,7 @@ let ``Inline Inline`` () =
 
     GLSL.shouldCompile [ Effect.ofFunction frag ]
 
-let private textureArraySampler = 
+let private textureArraySampler =
     sampler2d {
         textureArray uniform?TextureArray 12
         filter Filter.MinMagLinear
@@ -636,7 +635,7 @@ let ``Unroll Match`` () =
             let mutable res = V3d.OOO
             Preprocessor.unroll()
             for i in 0..5 do
-                let p = match i with 
+                let p = match i with
                         | 0 -> v.pos.XYZ
                         | 1 -> v.pos.XZY
                         | 2 -> v.pos.YZX
@@ -655,15 +654,15 @@ let ``Unroll Match`` () =
 
     GLSL.shouldCompile [ Effect.ofFunction (frag 1) ] // should not contain "0 == 0", "0 == 1", "0 == 2", ...
 
-let private arraySampler = 
+let private arraySampler =
     sampler2dArray {
         texture uniform?TextureArray
         filter Filter.MinMagLinear
         addressU WrapMode.Clamp
         addressV WrapMode.Clamp
     }
-    
-let private simpleSampler = 
+
+let private simpleSampler =
     sampler2d {
         texture uniform?Simple
         filter Filter.MinMagLinear
@@ -703,7 +702,7 @@ let ``Simple Fetch`` () =
 
     GLSL.shouldCompile [ Effect.ofFunction (frag) ]
 
-type Fragment = 
+type Fragment =
     {
         [<Color>] c : V4d
         [<Depth(DepthWriteMode.OnlyLess)>] d : float
@@ -729,7 +728,7 @@ let createTuple(x : V3d) : (Arr<N<5>,V3d> * int) =
         if x.Length < float i * 0.4 then
             arr.[cnt] <- x
             cnt <- cnt + 1
-            
+
     (arr, cnt)
 
 let ``Tuple Inline`` () =
@@ -738,7 +737,7 @@ let ``Tuple Inline`` () =
     let frag (v : Vertex) =
 
         fragment {
-                
+
             let (va, vc) = createTuple v.pos.XYZ
 
             let mutable col = V3d.OOO
@@ -764,7 +763,7 @@ let ``Variable Declaration`` () =
     let frag (v : Vertex) =
 
         fragment {
-                
+
             let va = Unchecked.defaultof<Arr<N<5>,V3d>>
 
             let tmp = v.pos * 2.0
@@ -783,7 +782,7 @@ type VertexClip =
         [<Position>] pos : V4d
         [<Color>] c : V4d
         [<ClipDistance>] cd : float[]
-    } 
+    }
 
 [<Test>]
 let ``ClipDistance Pass-Through`` () =
@@ -819,12 +818,12 @@ type VertexWithPid =
     {
         [<Position>] pos : V4d
         [<PrimitiveId>] pid : uint32
-    } 
+    }
 
 [<Test>]
 let ``GS PrimitiveId`` () =
     Setup.Run()
-    
+
     let gs (t : Triangle<VertexWithPid>) =
 
         triangle {
@@ -847,16 +846,16 @@ type VertexLayer =
     {
         [<Position>] pos : V4d
         [<Layer>] l : int
-    } 
-    
+    }
+
 [<Test>]
 let ``GS Composition with Layer`` () =
     Setup.Run()
-    
+
     let gs1 (t : Triangle<VertexLayer>) =
 
         triangle {
-            let layer = int t.P0.pos.X 
+            let layer = int t.P0.pos.X
             yield { t.P0 with l = layer }
             yield { t.P1 with l = layer }
             yield { t.P2 with l = layer }
@@ -883,22 +882,22 @@ let ``GS Composition with Layer`` () =
         }
 
     GLSL.shouldCompile [ Effect.ofFunction gs1; Effect.ofFunction gs2; Effect.ofFunction frag ]
-    
+
 type VertexLayerSid =
     {
         [<Position>] pos : V4d
         [<Layer>] l : int
         [<SourceVertexIndex>] sid : int
-    } 
-    
+    }
+
 [<Test>]
 let ``GS Composition with Layer2`` () =
     Setup.Run()
-    
+
     let gs1 (t : Triangle<VertexLayerSid>) =
 
         triangle {
-            let layer = int t.P0.pos.X 
+            let layer = int t.P0.pos.X
             yield { t.P0 with l = layer; sid = 0 }
             yield { t.P1 with l = layer; sid = 1 }
             yield { t.P2 with l = layer; sid = 2 }
@@ -921,7 +920,7 @@ let ``GS Composition with Layer2`` () =
 
     GLSL.shouldCompile [ Effect.ofFunction gs1; Effect.ofFunction gs2; Effect.ofFunction frag ]
 
-let intergerSampler = 
+let intergerSampler =
     intSampler2d {
         texture uniform?IntTexture
     }
@@ -929,7 +928,7 @@ let intergerSampler =
 [<Test>]
 let ``IntSampler`` () =
     Setup.Run()
-    
+
     let ps (v : Vertex) =
         fragment {
             let value = intergerSampler.Sample(v.pos.XY).X
@@ -942,7 +941,7 @@ let ``IntSampler`` () =
 let ``GLSLTypesToString`` () =
 
     Setup.Run()
-    
+
     let ps (v : Vertex) =
         fragment {
             return v.c
@@ -963,17 +962,17 @@ let ``GLSLTypesToString`` () =
 
     ()
 
-let sampler1 = 
+let sampler1 =
     sampler2d {
         texture uniform?Texture
     }
 
-let sampler2 = 
+let sampler2 =
     sampler2d {
         texture uniform?Texture
     }
 
-let sampler3 = 
+let sampler3 =
     sampler2d {
         texture uniform?OtherTexture
     }
@@ -987,15 +986,15 @@ let ``DuplicateId`` () =
             let value = sampler3.Sample(v.pos.XY).X
             return V4d(value, 1.0, 1.0, 1.0)
         }
-        
+
     let fxOther = Effect.ofFunction psOther
-    
+
     let ps1 (v : Vertex) =
         fragment {
             let value = sampler1.Sample(v.pos.XY).X
             return V4d(value, 1.0, 1.0, 1.0)
         }
-        
+
     let fx1 = Effect.ofFunction ps1
 
     // different texture name and sampler name -> passes
@@ -1007,7 +1006,7 @@ let ``DuplicateId`` () =
             let value = sampler2.Sample(v.pos.XY).X
             return V4d(value, 1.0, 1.0, 1.0)
         }
-        
+
     let fx2 = Effect.ofFunction ps2
 
     // same texture name, but different sampler name -> will have same Id
@@ -1025,8 +1024,8 @@ let helper (v : V4d) =
 [<Test>]
 let ``VS/TS shared helper`` () =
     Setup.Run()
-    
-    let vs(v : Vertex) = 
+
+    let vs(v : Vertex) =
         vertex {
             let pp = helper v.pos
             return { v with pos = pp }
@@ -1035,7 +1034,7 @@ let ``VS/TS shared helper`` () =
     let ts (t : Patch<3 N, Vertex>) =
 
         tessellation {
-        
+
             let! coord = tessellateTriangle 2.0 (2.0, 2.0, 2.0)
 
             let v = t.[0].pos * coord.X + t.[1].pos * coord.Y + t.[2].pos * coord.Z
@@ -1051,7 +1050,7 @@ let ``VS/TS shared helper`` () =
         }
 
     GLSL.shouldCompile [ Effect.ofFunction vs; Effect.ofFunction ts; Effect.ofFunction frag ]
-               
+
 
 //[<EntryPoint>]
 //let main args =

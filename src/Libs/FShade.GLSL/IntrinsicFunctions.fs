@@ -12,7 +12,7 @@ open FShade.Imperative
 
 [<AutoOpen>]
 module IntrinsicFunctions =
-    let (|IntrinsicFunction|_|) : MethodInfo -> Option<CIntrinsic> = 
+    let (|IntrinsicFunction|_|) : MethodInfo -> Option<CIntrinsic> =
         MethodTable.ofList [
             // ==========================================================================
             // ANGLES & TRIGONOMETRIC
@@ -21,27 +21,25 @@ module IntrinsicFunctions =
             CIntrinsic.simple "degrees", [
                 exactly <@ Conversion.DegreesFromRadians : float -> _ @>
                 exactly <@ Conversion.DegreesFromRadians : float32 -> _ @>
-                // TODO: Uncomment for >= 5.0.6
-                //exactly <@ Conversion.DegreesFromRadians : V2f -> _ @>
-                //exactly <@ Conversion.DegreesFromRadians : V3f -> _ @>
-                //exactly <@ Conversion.DegreesFromRadians : V4f -> _ @>
-                //exactly <@ Conversion.DegreesFromRadians : V2d -> _ @>
-                //exactly <@ Conversion.DegreesFromRadians : V3d -> _ @>
-                //exactly <@ Conversion.DegreesFromRadians : V4d -> _ @>
-                //generic <@ degrees : float -> _ @>
+                exactly <@ Conversion.DegreesFromRadians : V2f -> _ @>
+                exactly <@ Conversion.DegreesFromRadians : V3f -> _ @>
+                exactly <@ Conversion.DegreesFromRadians : V4f -> _ @>
+                exactly <@ Conversion.DegreesFromRadians : V2d -> _ @>
+                exactly <@ Conversion.DegreesFromRadians : V3d -> _ @>
+                exactly <@ Conversion.DegreesFromRadians : V4d -> _ @>
+                generic <@ degrees : float -> _ @>
             ]
 
             CIntrinsic.simple "radians", [
                 exactly <@ Conversion.RadiansFromDegrees : float -> _ @>
                 exactly <@ Conversion.RadiansFromDegrees : float32 -> _ @>
-                // TODO: Uncomment for >= 5.0.6
-                //exactly <@ Conversion.RadiansFromDegrees : V2f -> _ @>
-                //exactly <@ Conversion.RadiansFromDegrees : V3f -> _ @>
-                //exactly <@ Conversion.RadiansFromDegrees : V4f -> _ @>
-                //exactly <@ Conversion.RadiansFromDegrees : V2d -> _ @>
-                //exactly <@ Conversion.RadiansFromDegrees : V3d -> _ @>
-                //exactly <@ Conversion.RadiansFromDegrees : V4d -> _ @>
-                //generic <@ radians : float -> _ @>
+                exactly <@ Conversion.RadiansFromDegrees : V2f -> _ @>
+                exactly <@ Conversion.RadiansFromDegrees : V3f -> _ @>
+                exactly <@ Conversion.RadiansFromDegrees : V4f -> _ @>
+                exactly <@ Conversion.RadiansFromDegrees : V2d -> _ @>
+                exactly <@ Conversion.RadiansFromDegrees : V3d -> _ @>
+                exactly <@ Conversion.RadiansFromDegrees : V4d -> _ @>
+                generic <@ radians : float -> _ @>
             ]
 
             CIntrinsic.simple "sin", [
@@ -54,7 +52,7 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Sin : V2d -> V2d @>
                 exactly <@ Fun.Sin : V3d -> V3d @>
                 exactly <@ Fun.Sin : V4d -> V4d @>
-                generic <@ sin @> 
+                generic <@ sin @>
             ]
 
             CIntrinsic.simple "cos", [
@@ -67,7 +65,7 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Cos : V2d -> V2d @>
                 exactly <@ Fun.Cos : V3d -> V3d @>
                 exactly <@ Fun.Cos : V4d -> V4d @>
-                generic <@ cos @> 
+                generic <@ cos @>
             ]
 
             CIntrinsic.simple "tan", [
@@ -80,7 +78,7 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Tan : V2d -> V2d @>
                 exactly <@ Fun.Tan : V3d -> V3d @>
                 exactly <@ Fun.Tan : V4d -> V4d @>
-                generic <@ tan @> 
+                generic <@ tan @>
             ]
 
             CIntrinsic.simple "asin", [
@@ -93,7 +91,7 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Asin : V2d -> V2d @>
                 exactly <@ Fun.Asin : V3d -> V3d @>
                 exactly <@ Fun.Asin : V4d -> V4d @>
-                generic <@ asin @> 
+                generic <@ asin @>
             ]
 
             CIntrinsic.simple "acos", [
@@ -106,7 +104,7 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Acos : V2d -> V2d @>
                 exactly <@ Fun.Acos : V3d -> V3d @>
                 exactly <@ Fun.Acos : V4d -> V4d @>
-                generic <@ acos @> 
+                generic <@ acos @>
             ]
 
             CIntrinsic.simple "atan", [
@@ -119,7 +117,7 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Atan : V2d -> V2d @>
                 exactly <@ Fun.Atan : V3d -> V3d @>
                 exactly <@ Fun.Atan : V4d -> V4d @>
-                generic <@ atan @> 
+                generic <@ atan @>
 
                 exactly <@ Math.Atan2 @>
                 exactly <@ Fun.Atan2 : float * float -> float @>
@@ -130,7 +128,7 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Atan2 : V2d * V2d -> V2d @>
                 exactly <@ Fun.Atan2 : V3d * V3d -> V3d @>
                 exactly <@ Fun.Atan2 : V4d * V4d -> V4d @>
-                generic <@ atan2 @> 
+                generic <@ atan2 @>
             ]
 
             CIntrinsic.simple "sinh", [
@@ -143,7 +141,7 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Sinh : V2d -> V2d @>
                 exactly <@ Fun.Sinh : V3d -> V3d @>
                 exactly <@ Fun.Sinh : V4d -> V4d @>
-                generic <@ sinh @> 
+                generic <@ sinh @>
             ]
 
             CIntrinsic.simple "cosh", [
@@ -156,7 +154,7 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Cosh : V2d -> V2d @>
                 exactly <@ Fun.Cosh : V3d -> V3d @>
                 exactly <@ Fun.Cosh : V4d -> V4d @>
-                generic <@ cosh @> 
+                generic <@ cosh @>
             ]
 
             CIntrinsic.simple "tanh", [
@@ -169,7 +167,7 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Tanh : V2d -> V2d @>
                 exactly <@ Fun.Tanh : V3d -> V3d @>
                 exactly <@ Fun.Tanh : V4d -> V4d @>
-                generic <@ tanh @> 
+                generic <@ tanh @>
             ]
 
             CIntrinsic.simple "asinh", [
@@ -181,8 +179,7 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Asinh : V2d -> V2d @>
                 exactly <@ Fun.Asinh : V3d -> V3d @>
                 exactly <@ Fun.Asinh : V4d -> V4d @>
-                // TODO: Uncomment for >= 5.0.6
-                //generic <@ asinh : float -> float @>
+                generic <@ asinh : float -> float @>
             ]
 
             CIntrinsic.simple "acosh", [
@@ -194,8 +191,7 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Acosh : V2d -> V2d @>
                 exactly <@ Fun.Acosh : V3d -> V3d @>
                 exactly <@ Fun.Acosh : V4d -> V4d @>
-                // TODO: Uncomment for >= 5.0.6
-                //generic <@ acosh : float -> float @>
+                generic <@ acosh : float -> float @>
             ]
 
             CIntrinsic.simple "atanh", [
@@ -207,8 +203,7 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Atanh : V2d -> V2d @>
                 exactly <@ Fun.Atanh : V3d -> V3d @>
                 exactly <@ Fun.Atanh : V4d -> V4d @>
-                // TODO: Uncomment for >= 5.0.6
-                //generic <@ atanh : float -> float @>
+                generic <@ atanh : float -> float @>
             ]
 
             // ==========================================================================
@@ -414,7 +409,7 @@ module IntrinsicFunctions =
             ]
 
             CIntrinsic.simple "exp", [
-                exactly <@ Math.Exp @> 
+                exactly <@ Math.Exp @>
                 exactly <@ Fun.Exp : float32 -> float32 @>
                 exactly <@ Fun.Exp : float   -> float @>
                 exactly <@ Fun.Exp : int8    -> float @>
@@ -441,7 +436,7 @@ module IntrinsicFunctions =
             ]
 
             CIntrinsic.simple "log", [
-                exactly <@ Math.Log @> 
+                exactly <@ Math.Log @>
                 exactly <@ Fun.Log : float32 -> float32 @>
                 exactly <@ Fun.Log : float   -> float @>
                 exactly <@ Fun.Log : int8    -> float @>
@@ -525,7 +520,7 @@ module IntrinsicFunctions =
                 exactly <@ V4d.Sqrt : V4d -> V4d @>
                 generic <@ sqrt @>
             ]
-            
+
             CIntrinsic.tagged "pow({0}, 0.333333333333)", [
                 exactly <@ Fun.Cbrt : float32 -> _ @>
                 exactly <@ Fun.Cbrt : float   -> _ @>
@@ -566,7 +561,7 @@ module IntrinsicFunctions =
                 exactly <@ cbrt     : V4f -> _ @>
                 exactly <@ cbrt     : V4d -> _ @>
             ]
-            
+
             CIntrinsic.tagged "pow({0}, 2)", [
                 exactly <@ Fun.Square : float32 -> _ @>
                 exactly <@ Fun.Square : float   -> _ @>
@@ -634,7 +629,7 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Abs : float32 -> _ @>
                 exactly <@ Fun.Abs : float -> _ @>
                 exactly <@ Fun.Abs : decimal -> _ @>
-                
+
                 exactly <@ fun (v : int8) -> v.Abs() @>
                 exactly <@ fun (v : int16) -> v.Abs() @>
                 exactly <@ fun (v : int32) -> v.Abs() @>
@@ -683,7 +678,7 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Signumi : float32 -> _ @>
                 exactly <@ Fun.Signumi : float -> _ @>
                 exactly <@ Fun.Signumi : decimal -> _ @>
-                
+
                 exactly <@ fun (v : int8) -> v.Sign() @>
                 exactly <@ fun (v : int16) -> v.Sign() @>
                 exactly <@ fun (v : int32) -> v.Sign() @>
@@ -746,7 +741,7 @@ module IntrinsicFunctions =
                 exactly <@ signumi      : V4i -> _ @>
                 exactly <@ signumi      : V4l -> _ @>
             ]
-            
+
             CIntrinsic.simple "sign", [
                 exactly <@ Fun.Signum : int8 -> _ @>
                 exactly <@ Fun.Signum : int16 -> _ @>
@@ -755,7 +750,7 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Signum : float32 -> _ @>
                 exactly <@ Fun.Signum : float -> _ @>
                 exactly <@ Fun.Signum : decimal -> _ @>
-                
+
                 exactly <@ Fun.Signum : V2f -> _ @>
                 exactly <@ Fun.Signum : V3f -> _ @>
                 exactly <@ Fun.Signum : V4f -> _ @>
@@ -852,7 +847,7 @@ module IntrinsicFunctions =
                 exactly <@ Math.Min : float32 * float32 -> _ @>
                 exactly <@ Math.Min : float * float -> _ @>
                 exactly <@ Math.Min : decimal * decimal -> _ @>
-                
+
                 exactly <@ Fun.Min : int8    * int8 -> _ @>
                 exactly <@ Fun.Min : int16   * int16 -> _ @>
                 exactly <@ Fun.Min : int32   * int32 -> _ @>
@@ -887,7 +882,7 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Min : V2d * float -> V2d @>
                 exactly <@ Fun.Min : V3d * float -> V3d @>
                 exactly <@ Fun.Min : V4d * float -> V4d @>
-                
+
                 exactly <@ V2i.Min : V2i * V2i -> V2i @>
                 exactly <@ V3i.Min : V3i * V3i -> V3i @>
                 exactly <@ V4i.Min : V4i * V4i -> V4i @>
@@ -900,7 +895,7 @@ module IntrinsicFunctions =
                 exactly <@ V2d.Min : V2d * V2d -> V2d @>
                 exactly <@ V3d.Min : V3d * V3d -> V3d @>
                 exactly <@ V4d.Min : V4d * V4d -> V4d @>
-                
+
                 generic <@ Operators.min : int -> int -> int @>
                 generic <@ min : int -> int -> int @>
             ]
@@ -944,7 +939,7 @@ module IntrinsicFunctions =
                 exactly <@ Math.Max : float32 * float32 -> _ @>
                 exactly <@ Math.Max : float * float -> _ @>
                 exactly <@ Math.Max : decimal * decimal -> _ @>
-                
+
                 exactly <@ Fun.Max : int8    * int8 -> _ @>
                 exactly <@ Fun.Max : int16   * int16 -> _ @>
                 exactly <@ Fun.Max : int32   * int32 -> _ @>
@@ -979,7 +974,7 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Max : V2d * float -> V2d @>
                 exactly <@ Fun.Max : V3d * float -> V3d @>
                 exactly <@ Fun.Max : V4d * float -> V4d @>
-  
+
                 exactly <@ V2i.Max : V2i * V2i -> V2i @>
                 exactly <@ V3i.Max : V3i * V3i -> V3i @>
                 exactly <@ V4i.Max : V4i * V4i -> V4i @>
@@ -992,7 +987,7 @@ module IntrinsicFunctions =
                 exactly <@ V2d.Max : V2d * V2d -> V2d @>
                 exactly <@ V3d.Max : V3d * V3d -> V3d @>
                 exactly <@ V4d.Max : V4d * V4d -> V4d @>
-                
+
                 generic <@ Operators.max : int -> int -> int @>
                 generic <@ max : float -> float -> _ @>
             ]
@@ -1219,72 +1214,71 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Lerp : V3d * V3l * V3l -> _ @>
                 exactly <@ Fun.Lerp : V4d * V4l * V4l -> _ @>
             ]
-            
+
             CIntrinsic.simple "mix", [
                 generic <@ lerp : V3d -> V3d -> float -> V3d @>
             ]
 
-            // TODO: Uncomment for >= 5.0.6
-            //CIntrinsic.simple "fma", [
-            //    exactly <@ Fun.MultiplyAdd : float   * float   * float -> _ @>
-            //    exactly <@ Fun.MultiplyAdd : float32 * float32 * float32 -> _ @>
-            //    exactly <@ Fun.MultiplyAdd : V2f     * V2f     * V2f -> _ @>
-            //    exactly <@ Fun.MultiplyAdd : V3f     * V3f     * V3f -> _ @>
-            //    exactly <@ Fun.MultiplyAdd : V4f     * V4f     * V4f -> _ @>
-            //    exactly <@ Fun.MultiplyAdd : V2d     * V2d     * V2d -> _ @>
-            //    exactly <@ Fun.MultiplyAdd : V3d     * V3d     * V3d -> _ @>
-            //    exactly <@ Fun.MultiplyAdd : V4d     * V4d     * V4d -> _ @>
-                
-            //    generic <@ madd @>
-            //]
+            CIntrinsic.simple "fma", [
+                exactly <@ Fun.MultiplyAdd : float   * float   * float -> _ @>
+                exactly <@ Fun.MultiplyAdd : float32 * float32 * float32 -> _ @>
+                exactly <@ Fun.MultiplyAdd : V2f     * V2f     * V2f -> _ @>
+                exactly <@ Fun.MultiplyAdd : V3f     * V3f     * V3f -> _ @>
+                exactly <@ Fun.MultiplyAdd : V4f     * V4f     * V4f -> _ @>
+                exactly <@ Fun.MultiplyAdd : V2d     * V2d     * V2d -> _ @>
+                exactly <@ Fun.MultiplyAdd : V3d     * V3d     * V3d -> _ @>
+                exactly <@ Fun.MultiplyAdd : V4d     * V4d     * V4d -> _ @>
 
-            //CIntrinsic.tagged "fma({0}, ivec2({1}), {2})", [
-            //    exactly <@ madd : V2i -> int32 -> V2i -> _ @>
-            //]
+                generic <@ madd @>
+            ]
 
-            //CIntrinsic.tagged "fma({0}, ivec3({1}), {2})", [
-            //    exactly <@ madd : V3i -> int32 -> V3i -> _ @>
-            //]
+            CIntrinsic.tagged "fma({0}, ivec2({1}), {2})", [
+                exactly <@ madd : V2i -> int32 -> V2i -> _ @>
+            ]
 
-            //CIntrinsic.tagged "fma({0}, ivec4({1}), {2})", [
-            //    exactly <@ madd : V4i -> int32 -> V4i -> _ @>
-            //]
+            CIntrinsic.tagged "fma({0}, ivec3({1}), {2})", [
+                exactly <@ madd : V3i -> int32 -> V3i -> _ @>
+            ]
 
-            //CIntrinsic.tagged "fma({0}, vec2({1}), {2})", [
-            //    exactly <@ Fun.MultiplyAdd : V2f * float32 * V2f -> _ @>
-            //    exactly <@ Fun.MultiplyAdd : V2d * float   * V2d -> _ @>
-            //    exactly <@ madd : V2f -> float32 -> V2f -> _ @>
-            //    exactly <@ madd : V2d -> float   -> V2d -> _ @>
-            //]
+            CIntrinsic.tagged "fma({0}, ivec4({1}), {2})", [
+                exactly <@ madd : V4i -> int32 -> V4i -> _ @>
+            ]
 
-            //CIntrinsic.tagged "fma({0}, vec3({1}), {2})", [
-            //    exactly <@ Fun.MultiplyAdd : V3f * float32 * V3f -> _ @>
-            //    exactly <@ Fun.MultiplyAdd : V3d * float   * V3d -> _ @>
-            //    exactly <@ madd : V3f -> float32 -> V3f -> _ @>
-            //    exactly <@ madd : V3d -> float   -> V3d -> _ @>
-            //]
+            CIntrinsic.tagged "fma({0}, vec2({1}), {2})", [
+                exactly <@ Fun.MultiplyAdd : V2f * float32 * V2f -> _ @>
+                exactly <@ Fun.MultiplyAdd : V2d * float   * V2d -> _ @>
+                exactly <@ madd : V2f -> float32 -> V2f -> _ @>
+                exactly <@ madd : V2d -> float   -> V2d -> _ @>
+            ]
 
-            //CIntrinsic.tagged "fma({0}, vec4({1}), {2})", [
-            //    exactly <@ Fun.MultiplyAdd : V4f * float32 * V4f -> _ @>
-            //    exactly <@ Fun.MultiplyAdd : V4d * float   * V4d -> _ @>
-            //    exactly <@ madd : V4f -> float32 -> V4f -> _ @>
-            //    exactly <@ madd : V4d -> float   -> V4d -> _ @>
-            //]
+            CIntrinsic.tagged "fma({0}, vec3({1}), {2})", [
+                exactly <@ Fun.MultiplyAdd : V3f * float32 * V3f -> _ @>
+                exactly <@ Fun.MultiplyAdd : V3d * float   * V3d -> _ @>
+                exactly <@ madd : V3f -> float32 -> V3f -> _ @>
+                exactly <@ madd : V3d -> float   -> V3d -> _ @>
+            ]
 
-            //CIntrinsic.tagged "fma(vec2({0}), {1}, {2})", [
-            //    exactly <@ Fun.MultiplyAdd : float32 * V2f * V2f -> _ @>
-            //    exactly <@ Fun.MultiplyAdd : float   * V2d * V2d -> _ @>
-            //]
+            CIntrinsic.tagged "fma({0}, vec4({1}), {2})", [
+                exactly <@ Fun.MultiplyAdd : V4f * float32 * V4f -> _ @>
+                exactly <@ Fun.MultiplyAdd : V4d * float   * V4d -> _ @>
+                exactly <@ madd : V4f -> float32 -> V4f -> _ @>
+                exactly <@ madd : V4d -> float   -> V4d -> _ @>
+            ]
 
-            //CIntrinsic.tagged "fma(vec3({0}), {1}, {2})", [
-            //    exactly <@ Fun.MultiplyAdd : float32 * V3f * V3f -> _ @>
-            //    exactly <@ Fun.MultiplyAdd : float   * V3d * V3d -> _ @>
-            //]
+            CIntrinsic.tagged "fma(vec2({0}), {1}, {2})", [
+                exactly <@ Fun.MultiplyAdd : float32 * V2f * V2f -> _ @>
+                exactly <@ Fun.MultiplyAdd : float   * V2d * V2d -> _ @>
+            ]
 
-            //CIntrinsic.tagged "fma(vec4({0}), {1}, {2})", [
-            //    exactly <@ Fun.MultiplyAdd : float32 * V4f * V4f -> _ @>
-            //    exactly <@ Fun.MultiplyAdd : float   * V4d * V4d -> _ @>
-            //]
+            CIntrinsic.tagged "fma(vec3({0}), {1}, {2})", [
+                exactly <@ Fun.MultiplyAdd : float32 * V3f * V3f -> _ @>
+                exactly <@ Fun.MultiplyAdd : float   * V3d * V3d -> _ @>
+            ]
+
+            CIntrinsic.tagged "fma(vec4({0}), {1}, {2})", [
+                exactly <@ Fun.MultiplyAdd : float32 * V4f * V4f -> _ @>
+                exactly <@ Fun.MultiplyAdd : float   * V4d * V4d -> _ @>
+            ]
 
             CIntrinsic.simple "isnan", [
                 exactly <@ Fun.IsNaN : float32 -> bool @>
@@ -1296,13 +1290,12 @@ module IntrinsicFunctions =
             ]
 
             CIntrinsic.tagged "any(isnan({0}))", [
-                // TODO: Uncomment for >= 5.0.6
-                //exactly <@ Fun.IsNaN : V2f -> bool @>
-                //exactly <@ Fun.IsNaN : V3f -> bool @>
-                //exactly <@ Fun.IsNaN : V4f -> bool @>
-                //exactly <@ Fun.IsNaN : V2d -> bool @>
-                //exactly <@ Fun.IsNaN : V3d -> bool @>
-                //exactly <@ Fun.IsNaN : V4d -> bool @>
+                exactly <@ Fun.IsNaN : V2f -> bool @>
+                exactly <@ Fun.IsNaN : V3f -> bool @>
+                exactly <@ Fun.IsNaN : V4f -> bool @>
+                exactly <@ Fun.IsNaN : V2d -> bool @>
+                exactly <@ Fun.IsNaN : V3d -> bool @>
+                exactly <@ Fun.IsNaN : V4d -> bool @>
                 exactly <@ fun (v : V2f) -> v.IsNaN @>
                 exactly <@ fun (v : V3f) -> v.IsNaN @>
                 exactly <@ fun (v : V4f) -> v.IsNaN @>
@@ -1322,19 +1315,18 @@ module IntrinsicFunctions =
             ]
 
             CIntrinsic.tagged "any(isinf({0}))", [
-                // TODO: Uncomment for >= 5.0.6
-                //exactly <@ Fun.IsInfinity : V2f -> bool @>
-                //exactly <@ Fun.IsInfinity : V3f -> bool @>
-                //exactly <@ Fun.IsInfinity : V4f -> bool @>
-                //exactly <@ Fun.IsInfinity : V2d -> bool @>
-                //exactly <@ Fun.IsInfinity : V3d -> bool @>
-                //exactly <@ Fun.IsInfinity : V4d -> bool @>
-                //exactly <@ fun (v : V2f) -> v.IsInfinity @>
-                //exactly <@ fun (v : V3f) -> v.IsInfinity @>
-                //exactly <@ fun (v : V4f) -> v.IsInfinity @>
-                //exactly <@ fun (v : V2d) -> v.IsInfinity @>
-                //exactly <@ fun (v : V3d) -> v.IsInfinity @>
-                //exactly <@ fun (v : V4d) -> v.IsInfinity @>
+                exactly <@ Fun.IsInfinity : V2f -> bool @>
+                exactly <@ Fun.IsInfinity : V3f -> bool @>
+                exactly <@ Fun.IsInfinity : V4f -> bool @>
+                exactly <@ Fun.IsInfinity : V2d -> bool @>
+                exactly <@ Fun.IsInfinity : V3d -> bool @>
+                exactly <@ Fun.IsInfinity : V4d -> bool @>
+                exactly <@ fun (v : V2f) -> v.IsInfinity @>
+                exactly <@ fun (v : V3f) -> v.IsInfinity @>
+                exactly <@ fun (v : V4f) -> v.IsInfinity @>
+                exactly <@ fun (v : V2d) -> v.IsInfinity @>
+                exactly <@ fun (v : V3d) -> v.IsInfinity @>
+                exactly <@ fun (v : V4d) -> v.IsInfinity @>
                 generic <@ isInfinity : float -> _ @>
             ]
 
@@ -1590,30 +1582,30 @@ module IntrinsicFunctions =
             ]
 
             CIntrinsic.simple "reflect", [
-                exactly <@ Vec.Reflect : V2f * V2f -> _ @> 
-                exactly <@ Vec.Reflect : V3f * V3f -> _ @> 
-                exactly <@ Vec.Reflect : V4f * V4f -> _ @> 
-                exactly <@ Vec.Reflect : V2d * V2d -> _ @> 
-                exactly <@ Vec.Reflect : V3d * V3d -> _ @> 
-                exactly <@ Vec.Reflect : V4d * V4d -> _ @> 
+                exactly <@ Vec.Reflect : V2f * V2f -> _ @>
+                exactly <@ Vec.Reflect : V3f * V3f -> _ @>
+                exactly <@ Vec.Reflect : V4f * V4f -> _ @>
+                exactly <@ Vec.Reflect : V2d * V2d -> _ @>
+                exactly <@ Vec.Reflect : V3d * V3d -> _ @>
+                exactly <@ Vec.Reflect : V4d * V4d -> _ @>
             ]
             CIntrinsic.tagged "reflect({1}, {0})", [
-                generic <@ Vec.reflect : V3d -> V3d -> V3d @> 
+                generic <@ Vec.reflect : V3d -> V3d -> V3d @>
             ]
-            
+
             CIntrinsic.simple "refract", [
-                exactly <@ Vec.Refract : V2f * V2f * _ -> _ @> 
-                exactly <@ Vec.Refract : V3f * V3f * _ -> _ @> 
-                exactly <@ Vec.Refract : V4f * V4f * _ -> _ @> 
-                exactly <@ Vec.Refract : V2d * V2d * _ -> _ @> 
-                exactly <@ Vec.Refract : V3d * V3d * _ -> _ @> 
-                exactly <@ Vec.Refract : V4d * V4d * _ -> _ @> 
+                exactly <@ Vec.Refract : V2f * V2f * _ -> _ @>
+                exactly <@ Vec.Refract : V3f * V3f * _ -> _ @>
+                exactly <@ Vec.Refract : V4f * V4f * _ -> _ @>
+                exactly <@ Vec.Refract : V2d * V2d * _ -> _ @>
+                exactly <@ Vec.Refract : V3d * V3d * _ -> _ @>
+                exactly <@ Vec.Refract : V4d * V4d * _ -> _ @>
             ]
 
             CIntrinsic.tagged "refract({2},{1},{0})", [
-                generic <@ Vec.refract : float -> V3d -> V3d -> V3d @> 
+                generic <@ Vec.refract : float -> V3d -> V3d -> V3d @>
             ]
-            
+
             // ==========================================================================
             // MATRIX
             // ==========================================================================
@@ -1665,55 +1657,54 @@ module IntrinsicFunctions =
                 exactly <@ fun (v : M44d) -> v.Inverse @>
                 generic <@ Mat.inverse : M22d -> M22d @>
             ]
-            
+
             // ==========================================================================
             // BITWISE stuff
             // ==========================================================================
-            CIntrinsic.simple "bitfieldExtract", [ 
-                exactly <@ Bitwise.BitFieldExtract : uint32 * _ * _ -> _ @> 
-                exactly <@ Bitwise.BitFieldExtract : int * _ * _ -> _ @> 
-                exactly <@ Bitwise.BitFieldExtract : uint64 * _ * _ -> _ @> 
-                exactly <@ Bitwise.BitFieldExtract : int64 * _ * _ -> _ @> 
+            CIntrinsic.simple "bitfieldExtract", [
+                exactly <@ Bitwise.BitFieldExtract : uint32 * _ * _ -> _ @>
+                exactly <@ Bitwise.BitFieldExtract : int * _ * _ -> _ @>
+                exactly <@ Bitwise.BitFieldExtract : uint64 * _ * _ -> _ @>
+                exactly <@ Bitwise.BitFieldExtract : int64 * _ * _ -> _ @>
             ]
 
-            CIntrinsic.simple "bitfieldInsert", [ 
-                exactly <@ Bitwise.BitFieldInsert : uint32 * _ * _ * _ -> _ @> 
-                exactly <@ Bitwise.BitFieldInsert : int * _ * _ * _ -> _ @> 
-                exactly <@ Bitwise.BitFieldInsert : uint64 * _ * _ * _ -> _ @> 
-                exactly <@ Bitwise.BitFieldInsert : int64 * _ * _ * _ -> _ @> 
+            CIntrinsic.simple "bitfieldInsert", [
+                exactly <@ Bitwise.BitFieldInsert : uint32 * _ * _ * _ -> _ @>
+                exactly <@ Bitwise.BitFieldInsert : int * _ * _ * _ -> _ @>
+                exactly <@ Bitwise.BitFieldInsert : uint64 * _ * _ * _ -> _ @>
+                exactly <@ Bitwise.BitFieldInsert : int64 * _ * _ * _ -> _ @>
             ]
 
-            CIntrinsic.simple "bitfieldReverse", [ 
-                exactly <@ Bitwise.BitFieldReverse : uint32 -> _ @> 
-                exactly <@ Bitwise.BitFieldReverse : int -> _ @> 
-                exactly <@ Bitwise.BitFieldReverse : uint64 -> _ @> 
-                exactly <@ Bitwise.BitFieldReverse : int64 -> _ @> 
+            CIntrinsic.simple "bitfieldReverse", [
+                exactly <@ Bitwise.BitFieldReverse : uint32 -> _ @>
+                exactly <@ Bitwise.BitFieldReverse : int -> _ @>
+                exactly <@ Bitwise.BitFieldReverse : uint64 -> _ @>
+                exactly <@ Bitwise.BitFieldReverse : int64 -> _ @>
             ]
 
-            CIntrinsic.simple "bitCount", [ 
-                exactly <@ Bitwise.BitCount : uint32 -> _ @> 
-                exactly <@ Bitwise.BitCount : int -> _ @> 
-                exactly <@ Bitwise.BitCount : uint64 -> _ @> 
-                exactly <@ Bitwise.BitCount : int64 -> _ @> 
+            CIntrinsic.simple "bitCount", [
+                exactly <@ Bitwise.BitCount : uint32 -> _ @>
+                exactly <@ Bitwise.BitCount : int -> _ @>
+                exactly <@ Bitwise.BitCount : uint64 -> _ @>
+                exactly <@ Bitwise.BitCount : int64 -> _ @>
             ]
 
-            CIntrinsic.simple "findMSB", [ 
-                exactly <@ Bitwise.MSB : uint32 -> _ @> 
-                exactly <@ Bitwise.MSB : int -> _ @> 
-                exactly <@ Bitwise.MSB : uint64 -> _ @> 
-                exactly <@ Bitwise.MSB : int64 -> _ @> 
+            CIntrinsic.simple "findMSB", [
+                exactly <@ Bitwise.MSB : uint32 -> _ @>
+                exactly <@ Bitwise.MSB : int -> _ @>
+                exactly <@ Bitwise.MSB : uint64 -> _ @>
+                exactly <@ Bitwise.MSB : int64 -> _ @>
             ]
 
-            CIntrinsic.simple "findLSB", [ 
-                exactly <@ Bitwise.LSB : uint32 -> _ @> 
-                exactly <@ Bitwise.LSB : int -> _ @> 
-                exactly <@ Bitwise.LSB : uint64 -> _ @> 
-                exactly <@ Bitwise.LSB : int64 -> _ @> 
+            CIntrinsic.simple "findLSB", [
+                exactly <@ Bitwise.LSB : uint32 -> _ @>
+                exactly <@ Bitwise.LSB : int -> _ @>
+                exactly <@ Bitwise.LSB : uint64 -> _ @>
+                exactly <@ Bitwise.LSB : int64 -> _ @>
             ]
 
             CIntrinsic.simple "floatBitsToInt", [
-                // TODO: Uncomment for >= 5.0.6
-                //exactly <@ Fun.FloatToBits : float32 -> _ @>
+                exactly <@ Fun.FloatToBits : float32 -> _ @>
                 exactly <@ Bitwise.FloatBitsToInt @>
             ]
 
@@ -1722,8 +1713,7 @@ module IntrinsicFunctions =
             ]
 
             CIntrinsic.simple "intBitsToFloat", [
-                // TODO: Uncomment for >= 5.0.6
-                //exactly <@ Fun.FloatFromBits : int32 -> _ @>
+                exactly <@ Fun.FloatFromBits : int32 -> _ @>
                 exactly <@ Bitwise.IntBitsToFloat @>
             ]
 
@@ -1753,7 +1743,7 @@ module IntrinsicFunctions =
             CIntrinsic.simple "dFdyCoarse", [ generic <@ ddyCoarse : float -> _ @> ]
             CIntrinsic.tagged "discard", [ exactly <@ discard @> ]
             CIntrinsic.simple "EmitVertex", [ exactly <@ emitVertex @> ]
-            CIntrinsic.simple "EndPrimitive", [ 
+            CIntrinsic.simple "EndPrimitive", [
                 exactly <@ restartStrip @>
                 exactly <@ endPrimitive @>
             ]
@@ -1772,13 +1762,13 @@ module IntrinsicFunctions =
     let (|TextureLookup|_|) (mi : MethodInfo) =
         match mi with
             | Method(name, ((ImageType(_, dim, isArray, isMS, valueType)::_) as args)) ->
-                
+
                 let plainArgs(skip : int) =
                     args |> List.skip skip |> List.mapi (fun i _ -> sprintf "{%d}" (skip + i)) |> String.concat ", "
-                        
+
                 let argCount = List.length args - 1
 
-                let functionName = 
+                let functionName =
                     match name with
                         | "get_Size" -> "imageSize({0})"
                         | "get_Item" when argCount = 1 -> sprintf "imageLoad(%s)" (plainArgs 0)
@@ -1790,7 +1780,7 @@ module IntrinsicFunctions =
 
 
                         | _ ->failwithf "unknown image function %A" name
-                        
+
                 Some functionName
 
             | Method(name, ((SamplerType(dim, isArray, isShadow, isMS, valueType)::_) as args)) ->
@@ -1802,7 +1792,7 @@ module IntrinsicFunctions =
                         | SamplerDimension.SamplerCube -> 3
                         | _ -> failwithf "unknown sampler dimension: %A" dim
 
-                let fetchArgs() = 
+                let fetchArgs() =
                     let consumedArgs, sampleArgs =
                         match isArray with
                             | true -> 3, sprintf "{0}, ivec%d({1}, {2})" (coordComponents + 1)
@@ -1812,7 +1802,7 @@ module IntrinsicFunctions =
 
                     let rest =
                         match args with
-                            | [] -> 
+                            | [] ->
                                 ", 0"
                             | _ ->
                                 args |> List.mapi (fun i _ -> sprintf "{%d}" (i + consumedArgs)) |> String.concat ", " |> sprintf ", %s"
@@ -1820,7 +1810,7 @@ module IntrinsicFunctions =
 
                     sampleArgs + rest
 
-                let sampleArgs() = 
+                let sampleArgs() =
                     let consumedArgs, sampleArgs =
                         match isArray, isShadow with
                             | true, true -> 4, sprintf "{0}, vec%d({1}, {2}, {3})" (coordComponents + 2)
@@ -1859,20 +1849,20 @@ module IntrinsicFunctions =
 
                 let plainArgs(skip : int) =
                     args |> List.skip skip |> List.mapi (fun i _ -> sprintf "{%d}" (skip + i)) |> String.concat ", "
-                        
+
 
                 let argCount = List.length args - 1
 
                 match name with
-                    | "get_Size" -> 
+                    | "get_Size" ->
                         if isMS then Some "textureSize({0})"
                         else Some "textureSize({0}, 0)"
 
-                    | "get_MipMapLevels" -> 
+                    | "get_MipMapLevels" ->
                         if isMS then Some "1"
                         else Some "textureQueryLevels({0})"
 
-                    | "GetSize" -> 
+                    | "GetSize" ->
                         if isMS then Some "textureSize({0})"
                         else Some "textureSize({0}, {1})"
 
@@ -1884,7 +1874,7 @@ module IntrinsicFunctions =
                     | "SampleGrad" -> sprintf "textureGrad(%s)" (sampleArgs()) |> Some
                     | "Gather" -> sprintf "textureGather(%s)" (plainArgs 0) |> Some
                     | "GatherOffset" -> sprintf "textureGatherOffset(%s)" (plainArgs 0) |> Some
-                    
+
                     | "Read" -> sprintf "texelFetch(%s)" (fetchArgs()) |> Some
                     | "get_Item" -> sprintf "texelFetch(%s)" (fetchArgs()) |> Some
 
