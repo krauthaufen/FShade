@@ -312,7 +312,13 @@ module Primitives =
     let tessellateTriangle (li : float) (l01 : float, l12 : float, l20 : float) : TessCoord<V3d> =
         onlyInShaderCode "tessellateTriangle"
         
-    let tessellateQuad (lx : float, ly : float) (l01 : float, l12 : float, l23 : float, l30 : float) : TessCoord<V2d> =
+    /// lu:  Inner tessellation level in horizontal (u) direction
+    /// li:  Inner tessellation level in vertical (v) direction
+    /// l01: Outer tessellation level for edge defined by u=0 (i.e. edge 0-1)
+    /// l03: Outer tessellation level for edge defined by v=0 (i.e. edge 3-0)
+    /// l23: Outer tessellation level for edge defined by u=1 (i.e. edge 2-3)
+    /// l30: Outer tessellation level for edge defined by v=1 (i.e. edge 1-2)
+    let tessellateQuad (lu : float, lv : float) (l01 : float, l30 : float, l23 : float, l12 : float) : TessCoord<V2d> =
         onlyInShaderCode "tessellateQuad"
 
 

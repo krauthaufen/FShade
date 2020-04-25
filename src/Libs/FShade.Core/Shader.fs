@@ -202,8 +202,8 @@ module Preprocessor =
             match e with
                 | Call(None, MethodQuote <@ tessellateTriangle @> _, [li; l01;l12;l20]) ->
                     Some(3, [li], [l01;l12;l20])
-                | Call(None, MethodQuote <@ tessellateQuad @> _, [lx;ly; l01;l12;l23;l30]) ->
-                    Some(4, [lx; ly], [l01;l12;l23;l30])
+                | Call(None, MethodQuote <@ tessellateQuad @> _, [lu;lv; l01;l30;l23;l12]) ->
+                    Some(4, [lu; lv], [l01;l30;l23;l12])
 
                 | _ ->
                     None
