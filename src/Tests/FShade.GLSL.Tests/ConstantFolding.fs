@@ -250,19 +250,23 @@ let ``Hilite``() =
     let codeB = shaderBUni |> ModuleCompiler.compileGLSL430
     let codeC = shaderCUni |> ModuleCompiler.compileGLSL430
 
-    if (codeA.code.IndexOf "sin") < 0 then failwith "does not contain computation A"
-    if (codeA.code.IndexOf "log") >= 0 then failwith "does also contain computation B"
-    if (codeA.code.IndexOf "length") >= 0 then failwith "does also contain computation C"
+    printfn "%s" codeA.code
 
-    if (codeB.code.IndexOf "log") < 0 then failwith "does not contain computation B"
-    if (codeB.code.IndexOf "sin") >= 0 then failwith "does also contain computation A"
-    if (codeB.code.IndexOf "length") >= 0 then failwith "does also contain computation C"
+    if (codeA.code.IndexOf "sin") < 0 then failwith "codeA does not contain computation A"
+    if (codeA.code.IndexOf "abs") >= 0 then failwith "codeA does also contain computation B"
+    if (codeA.code.IndexOf "length") >= 0 then failwith "codeA does also contain computation C"
 
-    if (codeC.code.IndexOf "length") < 0 then failwith "does not contain computation C"
-    if (codeC.code.IndexOf "sin") >= 0 then failwith "does also contain computation A"
-    if (codeC.code.IndexOf "log") >= 0 then failwith "does also contain computation B"
-    
+    printfn "%s" codeB.code
+
+    if (codeB.code.IndexOf "abs") < 0 then failwith "codeB does not contain computation B"
+    if (codeB.code.IndexOf "sin") >= 0 then failwith "codeB does also contain computation A"
+    if (codeB.code.IndexOf "length") >= 0 then failwith "codeB does also contain computation C"
+
     printfn "%s" codeC.code
+
+    if (codeC.code.IndexOf "length") < 0 then failwith "codeC does not contain computation C"
+    if (codeC.code.IndexOf "sin") >= 0 then failwith "codeC does also contain computation A"
+    if (codeC.code.IndexOf "abs") >= 0 then failwith "codeC does also contain computation B"
 
 [<ReflectedDefinition; Inline>]
 let util (a : float) (b : float) (c : float) =
