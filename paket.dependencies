@@ -3,16 +3,16 @@ source https://api.nuget.org/v3/index.json
 
 nuget FSharp.Core                           >= 4.6.2 lowest_matching: true
 
-nuget Aardvark.Base                         ~> 5.0.6
-nuget Aardvark.Base.FSharp                  ~> 5.0.6
-nuget Aardvark.Base.Incremental             ~> 5.0.6
+nuget Aardvark.Base                         ~> 5.0.11
+nuget Aardvark.Base.FSharp                  ~> 5.0.11
+nuget Aardvark.Base.Incremental             ~> 5.0.11
 
 nuget BlackFox.VsWhere                      ~> 1.0.0
 nuget Dotnet.ProjInfo                       ~> 0.36.0
 nuget Dotnet.ProjInfo.Workspace             ~> 0.36.0
 nuget FSharp.Compiler.Service               ~> 34.1.1
 
-nuget FsPickler                             ~> 5.2.2
+nuget FsPickler                             ~> 5.3.2
 
 nuget FsUnit                                ~> 3.4.1
 nuget FsCheck                               ~> 2.14.0
