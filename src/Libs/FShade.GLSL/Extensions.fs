@@ -9,54 +9,70 @@ open FShade.GLSL
 module Backends =
     let glsl410 =
         Backend.Create {
-            version                 = Version(4,1)
+            version                 = GLSLVersion(4,1,0)
             enabledExtensions       = Set.ofList [ ]
             createUniformBuffers    = true
             bindingMode             = BindingMode.PerKind
             createDescriptorSets    = false
             stepDescriptorSets      = false
             createInputLocations    = true
+            createOutputLocations   = true
+            createPassingLocations  = true
             createPerStageUniforms  = false
             reverseMatrixLogic      = true
+            depthWriteMode          = false
+            useInOut                = true
         }
 
     let glsl430 =
         Backend.Create {
-            version                 = Version(4,3)
+            version                 = GLSLVersion(4,3,0)
             enabledExtensions       = Set.ofList [ ]
             createUniformBuffers    = true
             bindingMode             = BindingMode.PerKind
             createDescriptorSets    = false
             stepDescriptorSets      = false
             createInputLocations    = true
+            createOutputLocations   = true
+            createPassingLocations  = true
             createPerStageUniforms  = false
             reverseMatrixLogic      = true
+            depthWriteMode          = true
+            useInOut                = true
         }
 
     let glsl120 =
         Backend.Create {
-            version                 = Version(1,2)
+            version                 = GLSLVersion(1,2,0)
             enabledExtensions       = Set.empty
             createUniformBuffers    = false
             bindingMode             = BindingMode.None
             createDescriptorSets    = false
             stepDescriptorSets      = false
             createInputLocations    = false
+            createOutputLocations   = false
+            createPassingLocations  = false
             createPerStageUniforms  = false
             reverseMatrixLogic      = true
+            depthWriteMode          = false
+            useInOut                = false
         }
 
     let glslVulkan =
         Backend.Create {
-            version                 = Version(4,5)
+            version                 = GLSLVersion(4,5,0)
             enabledExtensions       = Set.ofList [ "GL_ARB_tessellation_shader"; "GL_ARB_separate_shader_objects"; "GL_ARB_shading_language_420pack" ]
             createUniformBuffers    = true
             bindingMode             = BindingMode.Global
             createDescriptorSets    = true
             stepDescriptorSets      = false
             createInputLocations    = true
+            createOutputLocations   = true
+            createPassingLocations  = true
             createPerStageUniforms  = true
             reverseMatrixLogic      = true
+            depthWriteMode          = true
+            useInOut                = true
         }
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -68,10 +84,7 @@ module Backends =
         let compileGLSL (cfg : Backend) (module_ : Module) =
             let cfg =
                 if containsCompute module_ then
-                    Backend.Create {
-                        cfg.Config with
-                            version = Operators.max (Version(4,4,0)) cfg.Config.version
-                    }
+                    Backend.Create cfg.Config
                 else
                     cfg
 

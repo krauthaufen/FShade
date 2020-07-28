@@ -16,9 +16,45 @@ type BindingMode =
     | Global = 1
     | PerKind = 2
 
+[<Struct; NoComparison; StructuralEquality>]
+type GLSLVersion(major : int, minor : int, patch : int, suffix : string) =
+    member x.Major = major
+    member x.Minor = minor
+    member x.Patch = patch
+    member x.Suffix = suffix
+
+    //override x.GetHashCode() =
+    //    HashCode.Combine(major, minor, patch, suffix.GetHashCode())
+
+    //override x.Equals o =
+    //    match o with
+    //    | :? GLSLVersion as o -> major = o.Major && minor = o.Minor && patch = o.Patch && suffix = o.Suffix
+    //    | _ -> false
+
+    //interface System.IComparable with
+    //    member x.CompareTo(o : obj) =
+    //        match o with
+    //        | :? GLSLVersion as o -> 
+    //            let c = compare major o.Major
+    //            if c = 0 then
+    //                let c = compare minor o.Minor
+    //                if c = 0 then
+    //                    compare patch o.Patch
+    //                else
+    //                    c
+    //            else
+    //                c
+    //        | _ ->
+    //            failwith ""
+
+    new(major : int, minor : int, patch : int) = GLSLVersion(major, minor, patch, "")
+        
+
+
+
 type Config =
     {
-        version                 : Version
+        version                 : GLSLVersion
         enabledExtensions       : Set<string>
         createUniformBuffers    : bool
 
@@ -27,8 +63,13 @@ type Config =
         createDescriptorSets    : bool
         stepDescriptorSets      : bool
         createInputLocations    : bool
+        createOutputLocations   : bool
+        createPassingLocations  : bool
         createPerStageUniforms  : bool
         reverseMatrixLogic      : bool
+
+        depthWriteMode          : bool
+        useInOut                : bool
     }
 
 type GLSLShader =
@@ -615,7 +656,7 @@ module Interface =
          
 
 module Assembler =
-    let version120 = Version(1,2)
+    let version120 = GLSLVersion(1,2,0)
 
     [<Struct>]
     type Identifier(str : string) = 
@@ -1461,7 +1502,7 @@ module Assembler =
                             None
 
                     if name = "gl_FragDepth" && depthWrite <> DepthWriteMode.None then
-                        if config.version >= Version(4,3) then
+                        if config.depthWriteMode then
                             let mode = assembleDepthWriteMode depthWrite
                             return Some (sprintf "layout(%s) out float gl_FragDepth;" mode)
                         else 
@@ -1574,7 +1615,11 @@ module Assembler =
 
                     let layoutParams = 
                         match kind with
-                            | ParameterKind.Input | ParameterKind.Output when config.createInputLocations && config.version > version120 ->
+                            | ParameterKind.Input when config.createInputLocations && prevStage = None ->
+                                [ sprintf "location = %d" location]
+                            | ParameterKind.Output when config.createOutputLocations && nextStage = None ->
+                                [ sprintf "location = %d" location]
+                            | ParameterKind.Input | ParameterKind.Output when config.createPassingLocations ->
                                 [ sprintf "location = %d" location]
                             | _ ->
                                 []
@@ -1615,7 +1660,7 @@ module Assembler =
                             | ParameterKind.Output -> decorations, "rayPayloadNV ", ""
                             | _ -> failwith "bad ray payload"
 
-                        elif config.version > version120 then
+                        elif config.useInOut then
                             match kind with
                                 | ParameterKind.Input -> decorations, "in ", ""
                                 | ParameterKind.Output -> decorations, "out ", ""
@@ -1624,6 +1669,7 @@ module Assembler =
                                     else decorations, "", ""
                         else
                             match kind with
+                                | ParameterKind.Input when selfStage = ShaderStage.Vertex -> decorations, "attribute", ""
                                 | ParameterKind.Input -> decorations, "varying ", ""
                                 | ParameterKind.Output -> decorations, "varying ", ""
                                 | _ -> decorations, "", ""

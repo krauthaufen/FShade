@@ -178,15 +178,19 @@ module UtiliyFunctions =
 
                 let glsl410 =
                     GLSL.Backend.Create {
-                        version                 = System.Version(4,1)
+                        version                 = GLSL.GLSLVersion(4,1,0)
                         enabledExtensions       = Set.ofList [ ]
                         createUniformBuffers    = true
                         bindingMode             = GLSL.BindingMode.PerKind
                         createDescriptorSets    = true
                         stepDescriptorSets      = false
                         createInputLocations    = true
+                        createOutputLocations   = true
+                        createPassingLocations  = true
                         createPerStageUniforms  = false
                         reverseMatrixLogic      = true
+                        depthWriteMode          = false
+                        useInOut                = true
                     }
 
                 let glsl = 
