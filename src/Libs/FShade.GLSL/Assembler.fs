@@ -1669,7 +1669,7 @@ module Assembler =
                                     else decorations, "", ""
                         else
                             match kind with
-                                | ParameterKind.Input when selfStage = ShaderStage.Vertex -> decorations, "attribute", ""
+                                | ParameterKind.Input when selfStage = ShaderStage.Vertex -> decorations, "attribute ", ""
                                 | ParameterKind.Input -> decorations, "varying ", ""
                                 | ParameterKind.Output -> decorations, "varying ", ""
                                 | _ -> decorations, "", ""
@@ -1910,7 +1910,9 @@ module Assembler =
 
                 let version =
                     if ShaderStage.isRayTracing s.stages.self then "#version 460"
-                    else sprintf "#version %d%d0" c.version.Major c.version.Minor
+                    else
+                        if c.version.Suffix <> "" then sprintf "%d%d%d %s" c.version.Major c.version.Minor c.version.Patch c.version.Suffix
+                        else sprintf "#version %d%d%d" c.version.Major c.version.Minor c.version.Patch
 
                 return 
                     List.concat [
