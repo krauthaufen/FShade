@@ -13,6 +13,39 @@ type Vertex =
         [<Color>] c : V4d
     }
 
+
+[<Test>]
+let ``Constructors Matrix``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let m33 = M33d(v.pos.X)
+            let m44 = M44d(m33)
+            let _ = M33d(m44)
+            return v.pos
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction shader]
+
+
+[<Test>]
+let ``Constructors Vector``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = V3d(v.pos.X)
+            let _ = V4d(v.pos.XY, v.pos.ZW)
+            let _ = V4d(v.pos.X, v.pos.YZW)
+            let _ = V4d(v.pos.XYZ)
+            let _ = V4d(v.pos.XY)
+            let _ = V2d(v.pos.XYZ)
+            return v.pos
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction shader]
+
 [<Test>]
 let ``New Intrinsics``() =
     Setup.Run()
