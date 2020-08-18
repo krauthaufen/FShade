@@ -222,6 +222,20 @@ module ExprExtensions =
 
         let unroll = getMethodInfo <@ Preprocessor.unroll : unit -> unit @>
 
+    // Temporary work around for
+    // https://github.com/dotnet/fsharp/issues/9903
+    let rec private namedValues = function
+        | ValueWithName(v, t, name) ->
+            if name.Contains "@" then Map.empty
+            else Map.ofList [name, (v,t)]
+        | ShapeVar _ -> Map.empty
+        | ShapeLambda(_,b) -> namedValues b
+        | ShapeCombination(_,args) ->
+            let mutable res = Map.empty
+            for a in args do
+                res <- Map.union res (namedValues a)
+            res
+
     type Expr with
     
         member x.DebugRange =
@@ -242,19 +256,8 @@ module ExprExtensions =
                         None
             )
             
-
         member x.NamedValues =
-            match x with
-                | ValueWithName(v, t, name) ->
-                    if name.Contains "@" then Map.empty
-                    else Map.ofList [name, (v,t)]
-                | ShapeVar _ -> Map.empty
-                | ShapeLambda(_,b) -> b.NamedValues
-                | ShapeCombination(_,args) ->
-                    let mutable res = Map.empty
-                    for a in args do
-                        res <- Map.union res a.NamedValues
-                    res
+            namedValues x
 
         static member Ignore(e : Expr) =
             if e.Type = typeof<unit> then 
