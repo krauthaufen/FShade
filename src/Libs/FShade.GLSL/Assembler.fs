@@ -1911,7 +1911,7 @@ module Assembler =
                 let version =
                     if ShaderStage.isRayTracing s.stages.self then "#version 460"
                     else
-                        if c.version.Suffix <> "" then sprintf "%d%d%d %s" c.version.Major c.version.Minor c.version.Patch c.version.Suffix
+                        if c.version.Suffix <> "" then sprintf "#version %d%d%d %s" c.version.Major c.version.Minor c.version.Patch c.version.Suffix
                         else sprintf "#version %d%d%d" c.version.Major c.version.Minor c.version.Patch
 
                 return 
