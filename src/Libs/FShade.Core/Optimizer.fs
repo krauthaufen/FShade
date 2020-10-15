@@ -1144,6 +1144,21 @@ module Optimizer =
                 "op_Modulus", ((%) : float -> float -> float) :> obj
                 "op_Modulus", ((%) : decimal -> decimal -> decimal) :> obj
 
+                "op_Exponentiation", (( ** ) : float -> float -> float) :> obj
+                "op_Exponentiation", (( ** ) : float32 -> float32 -> float32) :> obj
+                "op_Exponentiation", (( ** ) : V2d -> float -> V2d) :> obj
+                "op_Exponentiation", (( ** ) : V3d -> float -> V3d) :> obj
+                "op_Exponentiation", (( ** ) : V4d -> float -> V4d) :> obj
+                "op_Exponentiation", (( ** ) : V2f -> float32 -> V2f) :> obj
+                "op_Exponentiation", (( ** ) : V3f -> float32 -> V3f) :> obj
+                "op_Exponentiation", (( ** ) : V4f -> float32 -> V4f) :> obj
+                "op_Exponentiation", (( ** ) : V2d -> V2d -> V2d) :> obj
+                "op_Exponentiation", (( ** ) : V3d -> V3d -> V3d) :> obj
+                "op_Exponentiation", (( ** ) : V4d -> V4d -> V4d) :> obj
+                "op_Exponentiation", (( ** ) : V2f -> V2f -> V2f) :> obj
+                "op_Exponentiation", (( ** ) : V3f -> V3f -> V3f) :> obj
+                "op_Exponentiation", (( ** ) : V4f -> V4f -> V4f) :> obj
+
                 
                 "op_BitwiseOr", ((|||) : int8 -> int8 -> int8) :> obj
                 "op_BitwiseOr", ((|||) : int16 -> int16 -> int16) :> obj
@@ -1173,6 +1188,24 @@ module Optimizer =
                 "op_ExclusiveOr", ((^^^) : uint16 -> uint16 -> uint16) :> obj
                 "op_ExclusiveOr", ((^^^) : uint32 -> uint32 -> uint32) :> obj
                 "op_ExclusiveOr", ((^^^) : uint64 -> uint64 -> uint64) :> obj
+
+                "op_LeftShift", ((<<<) : int8 -> int -> int8) :> obj
+                "op_LeftShift", ((<<<) : int16 -> int -> int16) :> obj
+                "op_LeftShift", ((<<<) : int32 -> int -> int32) :> obj
+                "op_LeftShift", ((<<<) : int64 -> int -> int64) :> obj
+                "op_LeftShift", ((<<<) : uint8 -> int -> uint8) :> obj
+                "op_LeftShift", ((<<<) : uint16 -> int -> uint16) :> obj
+                "op_LeftShift", ((<<<) : uint32 -> int -> uint32) :> obj
+                "op_LeftShift", ((<<<) : uint64 -> int -> uint64) :> obj
+
+                "op_RightShift", ((>>>) : int8 -> int -> int8) :> obj
+                "op_RightShift", ((>>>) : int16 -> int -> int16) :> obj
+                "op_RightShift", ((>>>) : int32 -> int -> int32) :> obj
+                "op_RightShift", ((>>>) : int64 -> int -> int64) :> obj
+                "op_RightShift", ((>>>) : uint8 -> int -> uint8) :> obj
+                "op_RightShift", ((>>>) : uint16 -> int -> uint16) :> obj
+                "op_RightShift", ((>>>) : uint32 -> int -> uint32) :> obj
+                "op_RightShift", ((>>>) : uint64 -> int -> uint64) :> obj
 
                 
                 "op_LessThan", ((<) : int8 -> int8 -> bool) :> obj
