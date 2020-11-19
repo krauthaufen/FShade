@@ -3,9 +3,9 @@ source https://api.nuget.org/v3/index.json
 
 nuget FSharp.Core                           >= 4.6.2 lowest_matching: true
 
-nuget Aardvark.Base                         ~> 5.1.0-prerelease0007
-nuget Aardvark.Base.FSharp                  ~> 5.1.0-prerelease0007
-nuget Aardvark.Base.Incremental             ~> 5.1.0-prerelease0007
+nuget Aardvark.Base                         ~> 5.1.0-prerelease0008
+nuget Aardvark.Base.FSharp                  ~> 5.1.0-prerelease0008
+nuget Aardvark.Base.Incremental             ~> 5.1.0-prerelease0008
 
 nuget BlackFox.VsWhere                      ~> 1.0.0
 nuget Dotnet.ProjInfo                       ~> 0.36.0
