@@ -1,6 +1,8 @@
 framework: netstandard2.0, netcoreapp3.1
-source https://nuget.pkg.github.com/aardvark-platform/index.json
 source https://api.nuget.org/v3/index.json
+
+// for dev packages not yet published to nuget
+source https://vrvis.myget.org/F/aardvark_public/api/v2
 
 nuget FSharp.Core                           >= 4.6.2 lowest_matching: true
 
