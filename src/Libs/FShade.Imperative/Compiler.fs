@@ -426,6 +426,7 @@ module Compiler =
 
                 // transpose
                 | MethodQuote <@ Mat.transpose : M44d -> M44d @> _, [m]    
+                | MethodQuote <@ Mat.Transposed : M44d -> M44d @> _, [m]    
                 | Method("Transpose", [MatrixOf _]) , [m]
                 | Method("get_Transposed", _), [m] -> 
                     match ct with
@@ -434,11 +435,13 @@ module Compiler =
                    
                 // dot         
                 | MethodQuote <@ Vec.dot : V4d -> V4d -> float @> _, [l;r]
+                | MethodQuote <@ Vec.Dot : V4d * V4d -> float @> _, [l;r]
                 | Method("Dot", [VectorOf _; VectorOf _]), [l;r] ->
                     CDot(ct, l, r) |> Some
               
                 // length         
                 | MethodQuote <@ Vec.length : V4d -> float @> _, [v]
+                | MethodQuote <@ Vec.Length : V4d -> float @> _, [v]
                 | Method("get_Length", [VectorOf _]), [v] ->
                     CVecLength(ct, v) |> Some
 
@@ -447,17 +450,20 @@ module Compiler =
 
                  // lengthSquared     
                 | MethodQuote <@ Vec.lengthSquared : V4d -> float @> _, [v]
+                | MethodQuote <@ Vec.LengthSquared : V4d -> float @> _, [v]
                 | Method("get_LengthSquared", [VectorOf _]), [v] ->
                     CDot(ct, v, v) |> Some
                                
 
                 // cross              
                 | MethodQuote <@ Vec.cross : V3d -> V3d -> V3d @> _, [l;r]
+                | MethodQuote <@ Vec.Cross : V3d * V3d -> V3d @> _, [l;r]
                 | Method("Cross", [VectorOf _; VectorOf _]), [l;r] ->
                     CCross(ct, l, r) |> Some
 
                 // transformDir
-                | MethodQuote <@ Mat.transformDir : M44d -> V3d -> V3d @> _, [m;v] 
+                | MethodQuote <@ Mat.transformDir : M44d -> V3d -> V3d @> _, [m;v]
+                | MethodQuote <@ Mat.TransformDir : M44d * V3d -> V3d @> _, [m;v]
                 | Method("TransformDir", [MatrixOf _; VectorOf _]), [m;v] ->
                     match ct, v.ctype with
                         | CVector(rt, rd), CVector(t, d) ->
@@ -468,6 +474,7 @@ module Compiler =
 
                 // transformPos
                 | MethodQuote <@ Mat.transformPos : M44d -> V3d -> V3d @> _, [m;v] 
+                | MethodQuote <@ Mat.TransformPos : M44d * V3d -> V3d @> _, [m;v] 
                 | Method("TransformPos", [MatrixOf _; VectorOf _]), [m;v] ->
                     match ct, v.ctype with
                         | CVector(rt, rd), CVector(t, d) ->
@@ -477,6 +484,7 @@ module Compiler =
                             None
 
                 // transposedTransformDir
+                | MethodQuote <@ Mat.TransposedTransformDir : M44d * V3d -> V3d @> _, [m; v]
                 | Method("TransposedTransformDir", [MatrixOf _; VectorOf _]), [m;v] ->
                     match ct, v.ctype with
                         | CVector(rt, rd), CVector(t, d) ->
@@ -486,6 +494,7 @@ module Compiler =
                             None
 
                 // transposedTransformDir
+                | MethodQuote <@ Mat.TransposedTransformPos : M44d * V3d -> V3d @> _, [m; v]
                 | Method("TransposedTransformPos", [MatrixOf _; VectorOf _]), [m;v] ->
                     match ct, v.ctype with
                         | CVector(rt, rd), CVector(t, d) ->

@@ -67,6 +67,7 @@ let ``New Intrinsics``() =
             let _ = Fun.Exp(V3f(v.c.XYZ))
             let _ = Fun.Exp(v.c)
             let _ = Fun.Exp(V4f(v.c))
+            let _ = exp v.c
             let _ = Fun.Log(v.c.XY)
             let _ = Fun.Log(V2f(v.c.XY))
             let _ = Fun.Log(v.c.XYZ)
@@ -138,13 +139,43 @@ let ``New Intrinsics``() =
             let _ = Vec.reflect v.c v.c
             let _ = Vec.refract 0.5 v.c v.c
             let _ = v.c.X.DegreesFromRadians()
+            let _ = Vec.length v.c
+            let _ = Vec.Length v.c
+            let _ = Vec.lengthSquared v.c
+            let _ = Vec.LengthSquared v.c
+            let _ = Vec.dot v.c v.c
+            let _ = Vec.Dot(v.c, v.c)
+            let _ = Vec.cross v.c.XYZ v.c.XYZ
+            let _ = Vec.Cross(v.c.XYZ, v.c.XYZ)
+            let _ = Mat.transpose <| M33d(v.c.X)
+            let _ = Mat.Transposed(M33d(v.c.X))
+            let _ = Mat.transformDir (M44d(v.c.X)) v.c.XYZ
+            let _ = Mat.TransformDir(M44d(v.c.X), v.c.XYZ)
+            let _ = Mat.transformPos (M44d(v.c.X)) v.c.XYZ
+            let _ = Mat.TransformPos(M44d(v.c.X), v.c.XYZ)
+            let _ = Mat.TransposedTransformDir(M44d(v.c.X), v.c.XYZ)
+            let _ = Mat.TransposedTransformPos(M44d(v.c.X), v.c.XYZ)
+            let _ = Mat.det <| M44d(v.c.X)
+            let _ = Mat.Determinant(M44d(v.c.X))
+            let _ = Vec.MinElement(v.c.XY)
+            let _ = Vec.MinElement(v.c.XYZ)
+            let _ = Vec.MinElement(v.c)
+            let _ = v.c.XY.MinElement
+            let _ = v.c.XYZ.MinElement
+            let _ = v.c.MinElement
+            let _ = Vec.MaxElement(v.c.XY)
+            let _ = Vec.MaxElement(v.c.XYZ)
+            let _ = Vec.MaxElement(v.c)
+            let _ = v.c.XY.MaxElement
+            let _ = v.c.XYZ.MaxElement
+            let _ = v.c.MaxElement
             let normalized = Vec.Normalized (V4i(v.c))
             let added = normalized + (Vec.normalize V4d.Half)
 
             return added
         }
 
-    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["mix"; "exp"; "log"; "pow"; "sign"; "sqrt"]
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["mix"; "exp"; "log"; "pow"; "sign"; "sqrt"; "length"]
 
 [<Test>]
 let ``Broken GLSL Shader``() =

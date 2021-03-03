@@ -1019,6 +1019,72 @@ module IntrinsicFunctions =
                 exactly <@ max : float   -> V4d -> V4d @>
             ]
 
+            CIntrinsic.tagged "min({0}.x, {0}.y)", [
+                exactly <@ Vec.MinElement : V2i -> int32 @>
+                exactly <@ Vec.MinElement : V2l -> int64 @>
+                exactly <@ Vec.MinElement : V2f -> float32 @>
+                exactly <@ Vec.MinElement : V2d -> float @>
+                exactly <@ fun (v : V2i) -> v.MinElement @>
+                exactly <@ fun (v : V2l) -> v.MinElement @>
+                exactly <@ fun (v : V2f) -> v.MinElement @>
+                exactly <@ fun (v : V2d) -> v.MinElement @>
+            ]
+
+            CIntrinsic.tagged "min(min({0}.x, {0}.y), {0}.z)", [
+                exactly <@ Vec.MinElement : V3i -> int32 @>
+                exactly <@ Vec.MinElement : V3l -> int64 @>
+                exactly <@ Vec.MinElement : V3f -> float32 @>
+                exactly <@ Vec.MinElement : V3d -> float @>
+                exactly <@ fun (v : V3i) -> v.MinElement @>
+                exactly <@ fun (v : V3l) -> v.MinElement @>
+                exactly <@ fun (v : V3f) -> v.MinElement @>
+                exactly <@ fun (v : V3d) -> v.MinElement @>
+            ]
+
+            CIntrinsic.tagged "min(min(min({0}.x, {0}.y), {0}.z), {0}.w)", [
+                exactly <@ Vec.MinElement : V4i -> int32 @>
+                exactly <@ Vec.MinElement : V4l -> int64 @>
+                exactly <@ Vec.MinElement : V4f -> float32 @>
+                exactly <@ Vec.MinElement : V4d -> float @>
+                exactly <@ fun (v : V4i) -> v.MinElement @>
+                exactly <@ fun (v : V4l) -> v.MinElement @>
+                exactly <@ fun (v : V4f) -> v.MinElement @>
+                exactly <@ fun (v : V4d) -> v.MinElement @>
+            ]
+
+            CIntrinsic.tagged "max({0}.x, {0}.y)", [
+                exactly <@ Vec.MaxElement : V2i -> int32 @>
+                exactly <@ Vec.MaxElement : V2l -> int64 @>
+                exactly <@ Vec.MaxElement : V2f -> float32 @>
+                exactly <@ Vec.MaxElement : V2d -> float @>
+                exactly <@ fun (v : V2i) -> v.MaxElement @>
+                exactly <@ fun (v : V2l) -> v.MaxElement @>
+                exactly <@ fun (v : V2f) -> v.MaxElement @>
+                exactly <@ fun (v : V2d) -> v.MaxElement @>
+            ]
+
+            CIntrinsic.tagged "max(max({0}.x, {0}.y), {0}.z)", [
+                exactly <@ Vec.MaxElement : V3i -> int32 @>
+                exactly <@ Vec.MaxElement : V3l -> int64 @>
+                exactly <@ Vec.MaxElement : V3f -> float32 @>
+                exactly <@ Vec.MaxElement : V3d -> float @>
+                exactly <@ fun (v : V3i) -> v.MaxElement @>
+                exactly <@ fun (v : V3l) -> v.MaxElement @>
+                exactly <@ fun (v : V3f) -> v.MaxElement @>
+                exactly <@ fun (v : V3d) -> v.MaxElement @>
+            ]
+
+            CIntrinsic.tagged "max(max(max({0}.x, {0}.y), {0}.z), {0}.w)", [
+                exactly <@ Vec.MaxElement : V4i -> int32 @>
+                exactly <@ Vec.MaxElement : V4l -> int64 @>
+                exactly <@ Vec.MaxElement : V4f -> float32 @>
+                exactly <@ Vec.MaxElement : V4d -> float @>
+                exactly <@ fun (v : V4i) -> v.MaxElement @>
+                exactly <@ fun (v : V4l) -> v.MaxElement @>
+                exactly <@ fun (v : V4f) -> v.MaxElement @>
+                exactly <@ fun (v : V4d) -> v.MaxElement @>
+            ]
+
             CIntrinsic.custom "clamp" [2; 0; 1], [
                 generic <@ clamp : float -> float -> float -> _ @>
             ]
