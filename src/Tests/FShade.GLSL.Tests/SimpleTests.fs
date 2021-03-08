@@ -47,7 +47,56 @@ let ``Constructors Vector``() =
     GLSL.shouldCompile [Effect.ofFunction shader]
 
 [<Test>]
+let ``Inverse lerp``() =
+    Setup.Run()
 
+    let shader (v : Vertex) =
+        vertex {
+            let mutable a = 0.0
+            a <- a + Fun.InvLerp(int8 v.c.X, int8 v.c.X, int8 v.c.X)
+            a <- a + Fun.InvLerp(int16 v.c.X, int16 v.c.X, int16 v.c.X)
+            a <- a + Fun.InvLerp(int32 v.c.X, int32 v.c.X, int32 v.c.X)
+            a <- a + Fun.InvLerp(v.c.X - v.c.Y, v.c.X, v.c.X)
+            let _ = a
+
+            let mutable a = V2d.Zero
+            a <- a + Fun.InvLerp(V2i v.c.XY, V2i v.c.XY, V2i v.c.XY)
+            a <- a + Fun.InvLerp(V2d v.c.XY, V2d v.c.XY, V2d v.c.XY)
+            let _ = a
+
+            let mutable a = V3d.Zero
+            a <- a + Fun.InvLerp(V3i v.c.XYZ, V3i v.c.XYZ, V3i v.c.XYZ)
+            a <- a + Fun.InvLerp(V3d v.c.XYZ, V3d v.c.XYZ, V3d v.c.XYZ)
+            let _ = a
+
+            let mutable a = V4d.Zero
+            a <- a + Fun.InvLerp(V4i v.c, V4i v.c, V4i v.c)
+            a <- a + Fun.InvLerp(v.c, v.c, v.c)
+            let _ = a
+
+            let mutable a = 0.0f
+            a <- a + Fun.InvLerp(float32 v.c.X, float32 v.c.X, float32 v.c.X)
+            let _ = a
+
+            let mutable a = V2f.Zero
+            a <- a + Fun.InvLerp(V2f v.c.XY, V2f v.c.XY, V2f v.c.XY)
+            let _ = a
+
+            let mutable a = V3f.Zero
+            a <- a + Fun.InvLerp(V3f v.c.XYZ, V3f v.c.XYZ, V3f v.c.XYZ)
+            let _ = a
+
+            let mutable a = V4f.Zero
+            a <- a + Fun.InvLerp(V4f v.c, V4f v.c, V4f v.c)
+            let _ = a
+
+            return v.pos
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction shader]
+
+
+[<Test>]
 let ``Lerp integer overloads``() =
     Setup.Run()
 

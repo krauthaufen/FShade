@@ -1220,6 +1220,43 @@ module IntrinsicFunctions =
                 generic <@ smoothstep : float -> float -> V2d -> V2d @>
             ]
 
+            CIntrinsic.tagged "(float({1}) - float({0})) / (float({1}) - float({2}))", [
+                exactly <@ Fun.InvLerp : int8  * int8  * int8 ->  float @>
+                exactly <@ Fun.InvLerp : int16 * int16 * int16 -> float @>
+                exactly <@ Fun.InvLerp : int32 * int32 * int32 -> float @>
+                exactly <@ Fun.InvLerp : int64 * int64 * int64 -> float @>
+                exactly <@ Fun.InvLerp : uint8  * uint8  * uint8 ->  float @>
+                exactly <@ Fun.InvLerp : uint16 * uint16 * uint16 -> float @>
+                exactly <@ Fun.InvLerp : uint32 * uint32 * uint32 -> float @>
+                exactly <@ Fun.InvLerp : uint64 * uint64 * uint64 -> float @>
+            ]
+
+            CIntrinsic.tagged "({1} - {0}) / ({1} - {2})", [
+                exactly <@ Fun.InvLerp : float32 * float32 * float32 -> float32 @>
+                exactly <@ Fun.InvLerp : float * float * float -> float @>
+                exactly <@ Fun.InvLerp : V2f * V2f * V2f -> V2f @>
+                exactly <@ Fun.InvLerp : V2d * V2d * V2d -> V2d @>
+                exactly <@ Fun.InvLerp : V3f * V3f * V3f -> V3f @>
+                exactly <@ Fun.InvLerp : V3d * V3d * V3d -> V3d @>
+                exactly <@ Fun.InvLerp : V4f * V4f * V4f -> V4f @>
+                exactly <@ Fun.InvLerp : V4d * V4d * V4d -> V4d @>
+            ]
+
+            CIntrinsic.tagged "(vec2({1}) - vec2({0})) / (vec2({1}) - vec2({2}))", [
+                exactly <@ Fun.InvLerp : V2i * V2i * V2i -> V2d @>
+                exactly <@ Fun.InvLerp : V2l * V2l * V2l -> V2d @>
+            ]
+
+            CIntrinsic.tagged "(vec3({1}) - vec3({0})) / (vec3({1}) - vec3({2}))", [
+                exactly <@ Fun.InvLerp : V3i * V3i * V3i -> V3d @>
+                exactly <@ Fun.InvLerp : V3l * V3l * V3l -> V3d @>
+            ]
+
+            CIntrinsic.tagged "(vec4({1}) - vec4({0})) / (vec4({1}) - vec4({2}))", [
+                exactly <@ Fun.InvLerp : V4i * V4i * V4i -> V4d @>
+                exactly <@ Fun.InvLerp : V4l * V4l * V4l -> V4d @>
+            ]
+
             CIntrinsic.tagged "int(round(mix({1}, {2}, {0})))", [
                 exactly <@ Fun.Lerp : float32 * int8    * int8 -> _ @>
                 exactly <@ Fun.Lerp : float32 * int16   * int16 -> _ @>
