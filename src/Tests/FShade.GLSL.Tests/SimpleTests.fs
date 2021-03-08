@@ -47,6 +47,93 @@ let ``Constructors Vector``() =
     GLSL.shouldCompile [Effect.ofFunction shader]
 
 [<Test>]
+
+let ``Lerp integer overloads``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let mutable a = int8 0
+            a <- a + Fun.Lerp(v.c.X, int8 v.c.X, int8 v.c.X)
+            a <- a + Fun.Lerp(float32 v.c.X, int8 v.c.X, int8 v.c.X)
+            a <- a + lerp (int8 v.c.X) (int8 v.c.X) v.c.X
+            a <- a + lerp (int8 v.c.X) (int8 v.c.X) (float32 v.c.X)
+            let _ = a
+
+            let mutable a = int16 0
+            a <- a + Fun.Lerp(v.c.X, int16 v.c.X, int16 v.c.X)
+            a <- a + Fun.Lerp(float32 v.c.X, int16 v.c.X, int16 v.c.X)
+            a <- a + lerp (int16 v.c.X) (int16 v.c.X) v.c.X
+            a <- a + lerp (int16 v.c.X) (int16 v.c.X) (float32 v.c.X)
+            let _ = a
+
+            let mutable a = int32 0
+            a <- a + Fun.Lerp(v.c.X, int32 v.c.X, int32 v.c.X)
+            a <- a + Fun.Lerp(float32 v.c.X, int32 v.c.X, int32 v.c.X)
+            a <- a + lerp (int32 v.c.X) (int32 v.c.X) v.c.X
+            a <- a + lerp (int32 v.c.X) (int32 v.c.X) (float32 v.c.X)
+            let _ = a
+
+            let mutable a = uint8 0
+            a <- a + Fun.Lerp(v.c.X, uint8 v.c.X, uint8 v.c.X)
+            a <- a + Fun.Lerp(float32 v.c.X, uint8 v.c.X, uint8 v.c.X)
+            a <- a + lerp (uint8 v.c.X) (uint8 v.c.X) v.c.X
+            a <- a + lerp (uint8 v.c.X) (uint8 v.c.X) (float32 v.c.X)
+            let _ = a
+
+            let mutable a = uint16 0
+            a <- a + Fun.Lerp(v.c.X, uint16 v.c.X, uint16 v.c.X)
+            a <- a + Fun.Lerp(float32 v.c.X, uint16 v.c.X, uint16 v.c.X)
+            a <- a + lerp (uint16 v.c.X) (uint16 v.c.X) v.c.X
+            a <- a + lerp (uint16 v.c.X) (uint16 v.c.X) (float32 v.c.X)
+            let _ = a
+
+            let mutable a = uint32 0
+            a <- a + Fun.Lerp(v.c.X, uint32 v.c.X, uint32 v.c.X)
+            a <- a + Fun.Lerp(float32 v.c.X, uint32 v.c.X, uint32 v.c.X)
+            a <- a + lerp (uint32 v.c.X) (uint32 v.c.X) v.c.X
+            a <- a + lerp (uint32 v.c.X) (uint32 v.c.X) (float32 v.c.X)
+            let _ = a
+
+            let mutable a = V2i.Zero
+            a <- a + Fun.Lerp(v.c.X, V2i(v.c.XY), V2i(v.c.XY))
+            a <- a + Fun.Lerp(float32 v.c.X, V2i(v.c.XY), V2i(v.c.XY))
+            a <- a + Fun.Lerp(v.c.XY, V2i(v.c.XY), V2i(v.c.XY))
+            a <- a + Fun.Lerp(V2f(v.c.XY), V2i(v.c.XY), V2i(v.c.XY))
+            a <- a + lerp (V2i(v.c.XY)) (V2i(v.c.XY)) v.c.X
+            a <- a + lerp (V2i(v.c.XY)) (V2i(v.c.XY)) (float32 v.c.X)
+            a <- a + lerp (V2i(v.c.XY)) (V2i(v.c.XY)) v.c.XY
+            a <- a + lerp (V2i(v.c.XY)) (V2i(v.c.XY)) (V2f(v.c.XY))
+            let _ = a
+
+            let mutable a = V3i.Zero
+            a <- a + Fun.Lerp(v.c.X, V3i(v.c.XYZ), V3i(v.c.XYZ))
+            a <- a + Fun.Lerp(float32 v.c.X, V3i(v.c.XYZ), V3i(v.c.XYZ))
+            a <- a + Fun.Lerp(v.c.XYZ, V3i(v.c.XYZ), V3i(v.c.XYZ))
+            a <- a + Fun.Lerp(V3f(v.c.XYZ), V3i(v.c.XYZ), V3i(v.c.XYZ))
+            a <- a + lerp (V3i(v.c.XYZ)) (V3i(v.c.XYZ)) v.c.X
+            a <- a + lerp (V3i(v.c.XYZ)) (V3i(v.c.XYZ)) (float32 v.c.X)
+            a <- a + lerp (V3i(v.c.XYZ)) (V3i(v.c.XYZ)) v.c.XYZ
+            a <- a + lerp (V3i(v.c.XYZ)) (V3i(v.c.XYZ)) (V3f(v.c.XYZ))
+            let _ = a
+
+            let mutable a = V4i.Zero
+            a <- a + Fun.Lerp(v.c.X, V4i(v.c), V4i(v.c))
+            a <- a + Fun.Lerp(float32 v.c.X, V4i(v.c), V4i(v.c))
+            a <- a + Fun.Lerp(v.c, V4i(v.c), V4i(v.c))
+            a <- a + Fun.Lerp(V4f(v.c), V4i(v.c), V4i(v.c))
+            a <- a + lerp (V4i(v.c)) (V4i(v.c)) v.c.X
+            a <- a + lerp (V4i(v.c)) (V4i(v.c)) (float32 v.c.X)
+            a <- a + lerp (V4i(v.c)) (V4i(v.c)) v.c
+            a <- a + lerp (V4i(v.c)) (V4i(v.c)) (V4f(v.c))
+            let _ = a
+
+            return v.pos
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["mix"; "round"; "\+ 0\.5"]
+
+[<Test>]
 let ``New Intrinsics``() =
     Setup.Run()
 
