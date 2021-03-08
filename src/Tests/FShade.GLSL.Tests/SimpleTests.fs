@@ -11,6 +11,7 @@ type Vertex =
     {
         [<Position>] pos : V4d
         [<Color>] c : V4d
+        foo : V4d
     }
 
 
@@ -53,41 +54,55 @@ let ``Inverse lerp``() =
     let shader (v : Vertex) =
         vertex {
             let mutable a = 0.0
-            a <- a + Fun.InvLerp(int8 v.c.X, int8 v.c.X, int8 v.c.X)
-            a <- a + Fun.InvLerp(int16 v.c.X, int16 v.c.X, int16 v.c.X)
-            a <- a + Fun.InvLerp(int32 v.c.X, int32 v.c.X, int32 v.c.X)
-            a <- a + Fun.InvLerp(v.c.X - v.c.Y, v.c.X, v.c.X)
+            a <- a + Fun.InvLerp(int8  v.c.X, int8  v.c.Y, int8  v.c.Z)
+            a <- a + Fun.InvLerp(int16 v.c.X, int16 v.c.Y, int16 v.c.Z)
+            a <- a + Fun.InvLerp(int32 v.c.X, int32 v.c.Y, int32 v.c.Z)
+            a <- a + Fun.InvLerp(v.c.X - v.c.Y, v.c.Y, v.c.Z)
+            a <- a + invLerp (int8  v.c.Y) (int8  v.c.Z) (int8  v.c.X)
+            a <- a + invLerp (int16 v.c.Y) (int16 v.c.Z) (int16 v.c.X)
+            a <- a + invLerp (int32 v.c.Y) (int32 v.c.Z) (int32 v.c.X)
+            a <- a + invLerp v.c.Y v.c.Z (v.c.X - v.c.Y)
             let _ = a
 
             let mutable a = V2d.Zero
-            a <- a + Fun.InvLerp(V2i v.c.XY, V2i v.c.XY, V2i v.c.XY)
-            a <- a + Fun.InvLerp(V2d v.c.XY, V2d v.c.XY, V2d v.c.XY)
+            a <- a + Fun.InvLerp(V2i v.c.XY, V2i v.c.YZ, V2i v.c.XZ)
+            a <- a + Fun.InvLerp(V2d v.c.XY, V2d v.c.YZ, V2d v.c.XZ)
+            a <- a + invLerp (V2i v.c.YZ) (V2i v.c.XZ) (V2i v.c.XY)
+            a <- a + invLerp (V2d v.c.YZ) (V2d v.c.XZ) (V2d v.c.XY)
             let _ = a
 
             let mutable a = V3d.Zero
-            a <- a + Fun.InvLerp(V3i v.c.XYZ, V3i v.c.XYZ, V3i v.c.XYZ)
-            a <- a + Fun.InvLerp(V3d v.c.XYZ, V3d v.c.XYZ, V3d v.c.XYZ)
+            a <- a + Fun.InvLerp(V3i v.c.XYZ, V3i v.pos.XYZ, V3i v.foo.XYZ)
+            a <- a + Fun.InvLerp(V3d v.c.XYZ, V3d v.pos.XYZ, V3d v.foo.XYZ)
+            a <- a + invLerp (V3i v.pos.XYZ) (V3i v.foo.XYZ) (V3i v.c.XYZ)
+            a <- a + invLerp (V3d v.pos.XYZ) (V3d v.foo.XYZ) (V3d v.c.XYZ)
             let _ = a
 
             let mutable a = V4d.Zero
-            a <- a + Fun.InvLerp(V4i v.c, V4i v.c, V4i v.c)
-            a <- a + Fun.InvLerp(v.c, v.c, v.c)
+            a <- a + Fun.InvLerp(V4i v.c, V4i v.pos, V4i v.foo)
+            a <- a + Fun.InvLerp(v.c, v.pos, v.foo)
+            a <- a + invLerp (V4i v.pos) (V4i v.foo) (V4i v.c)
+            a <- a + invLerp v.pos v.foo v.c
             let _ = a
 
             let mutable a = 0.0f
-            a <- a + Fun.InvLerp(float32 v.c.X, float32 v.c.X, float32 v.c.X)
+            a <- a + Fun.InvLerp(float32 v.c.X, float32 v.c.Y, float32 v.c.Z)
+            a <- a + invLerp (float32 v.c.Y) (float32 v.c.Z) (float32 v.c.X)
             let _ = a
 
             let mutable a = V2f.Zero
-            a <- a + Fun.InvLerp(V2f v.c.XY, V2f v.c.XY, V2f v.c.XY)
+            a <- a + Fun.InvLerp(V2f v.c.XY, V2f v.pos.XY, V2f v.foo.XY)
+            a <- a + invLerp (V2f v.pos.XY) (V2f v.foo.XY) (V2f v.c.XY)
             let _ = a
 
             let mutable a = V3f.Zero
-            a <- a + Fun.InvLerp(V3f v.c.XYZ, V3f v.c.XYZ, V3f v.c.XYZ)
+            a <- a + Fun.InvLerp(V3f v.c.XYZ, V3f v.pos.XYZ, V3f v.foo.XYZ)
+            a <- a + invLerp (V3f v.pos.XYZ) (V3f v.foo.XYZ) (V3f v.c.XYZ)
             let _ = a
 
             let mutable a = V4f.Zero
-            a <- a + Fun.InvLerp(V4f v.c, V4f v.c, V4f v.c)
+            a <- a + Fun.InvLerp(V4f v.c, V4f v.pos, V4f v.foo)
+            a <- a + invLerp (V4f v.pos) (V4f v.foo) (V4f v.c)
             let _ = a
 
             return v.pos

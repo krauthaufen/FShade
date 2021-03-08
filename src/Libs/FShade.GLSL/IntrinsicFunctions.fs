@@ -1231,6 +1231,17 @@ module IntrinsicFunctions =
                 exactly <@ Fun.InvLerp : uint64 * uint64 * uint64 -> float @>
             ]
 
+            CIntrinsic.tagged "(float({0}) - float({2})) / (float({0}) - float({1}))", [
+                exactly <@ invLerp : int8  -> int8  -> int8 ->  float @>
+                exactly <@ invLerp : int16 -> int16 -> int16 -> float @>
+                exactly <@ invLerp : int32 -> int32 -> int32 -> float @>
+                exactly <@ invLerp : int64 -> int64 -> int64 -> float @>
+                exactly <@ invLerp : uint8  -> uint8  -> uint8 ->  float @>
+                exactly <@ invLerp : uint16 -> uint16 -> uint16 -> float @>
+                exactly <@ invLerp : uint32 -> uint32 -> uint32 -> float @>
+                exactly <@ invLerp : uint64 -> uint64 -> uint64 -> float @>
+            ]
+
             CIntrinsic.tagged "({1} - {0}) / ({1} - {2})", [
                 exactly <@ Fun.InvLerp : float32 * float32 * float32 -> float32 @>
                 exactly <@ Fun.InvLerp : float * float * float -> float @>
@@ -1242,9 +1253,25 @@ module IntrinsicFunctions =
                 exactly <@ Fun.InvLerp : V4d * V4d * V4d -> V4d @>
             ]
 
+            CIntrinsic.tagged "({0} - {2}) / ({0} - {1})", [
+                exactly <@ invLerp : float32 -> float32 -> float32 -> float32 @>
+                exactly <@ invLerp : float -> float -> float -> float @>
+                exactly <@ invLerp : V2f -> V2f -> V2f -> V2f @>
+                exactly <@ invLerp : V2d -> V2d -> V2d -> V2d @>
+                exactly <@ invLerp : V3f -> V3f -> V3f -> V3f @>
+                exactly <@ invLerp : V3d -> V3d -> V3d -> V3d @>
+                exactly <@ invLerp : V4f -> V4f -> V4f -> V4f @>
+                exactly <@ invLerp : V4d -> V4d -> V4d -> V4d @>
+            ]
+
             CIntrinsic.tagged "(vec2({1}) - vec2({0})) / (vec2({1}) - vec2({2}))", [
                 exactly <@ Fun.InvLerp : V2i * V2i * V2i -> V2d @>
                 exactly <@ Fun.InvLerp : V2l * V2l * V2l -> V2d @>
+            ]
+
+            CIntrinsic.tagged "(vec2({0}) - vec2({2})) / (vec2({0}) - vec2({1}))", [
+                exactly <@ invLerp : V2i -> V2i -> V2i -> V2d @>
+                exactly <@ invLerp : V2l -> V2l -> V2l -> V2d @>
             ]
 
             CIntrinsic.tagged "(vec3({1}) - vec3({0})) / (vec3({1}) - vec3({2}))", [
@@ -1252,9 +1279,19 @@ module IntrinsicFunctions =
                 exactly <@ Fun.InvLerp : V3l * V3l * V3l -> V3d @>
             ]
 
+            CIntrinsic.tagged "(vec3({0}) - vec3({2})) / (vec3({0}) - vec3({1}))", [
+                exactly <@ invLerp : V3i -> V3i -> V3i -> V3d @>
+                exactly <@ invLerp : V3l -> V3l -> V3l -> V3d @>
+            ]
+
             CIntrinsic.tagged "(vec4({1}) - vec4({0})) / (vec4({1}) - vec4({2}))", [
                 exactly <@ Fun.InvLerp : V4i * V4i * V4i -> V4d @>
                 exactly <@ Fun.InvLerp : V4l * V4l * V4l -> V4d @>
+            ]
+
+            CIntrinsic.tagged "(vec4({0}) - vec4({2})) / (vec4({0}) - vec4({1}))", [
+                exactly <@ invLerp : V4i -> V4i -> V4i -> V4d @>
+                exactly <@ invLerp : V4l -> V4l -> V4l -> V4d @>
             ]
 
             CIntrinsic.tagged "int(round(mix({1}, {2}, {0})))", [
