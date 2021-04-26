@@ -16,6 +16,29 @@ type Vertex =
 
 
 [<Test>]
+let ``Reserved Names``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let mutable input = v.pos
+            input <- V4d.Zero
+
+            let mutable output = input
+            output <- V4d.Zero
+
+            let mutable this = output
+            this <- V4d.Zero
+
+            let mutable union = this
+            union <- V4d.Zero
+
+            return union
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction shader]
+
+[<Test>]
 let ``Constructors Matrix``() =
     Setup.Run()
 
