@@ -145,124 +145,96 @@ let fraggy (v : Vertex) =
         }
     }
 
-type Payload =
-    {
-        hitCount : int
-    }
+//type Payload =
+//    {
+//        hitCount : int
+//    }
 
-type Result =
-    {
-        value : V4d
-    }
+//type Result =
+//    {
+//        value : V4d
+//    }
 
-type Ray =
-    { origin : V3d; direction : V3d }
+//type Ray =
+//    { origin : V3d; direction : V3d }
 
-//type Scene =
-//    | Self
-//    | Named of string
+////type Scene =
+////    | Self
+////    | Named of string
 
-[<AutoOpen>]
-module Intrinsics = 
-
-
-    type ShaderTable =
-        {
-            miss        : int
-            offset      : int
-            stride      : int
-        }
-
-        static member Default = { miss = 0; offset = 1; stride = 1 }
-
-    let trace<'a, 's> (table : ShaderTable) (state : RayQuery<'s, 'a>) : 'a = failwith ""
-
-    let buffers = UniformScope.Global
-
-    type UniformScope with
-        member x.Index : int[][] = uniform?StorageBuffer?Index
-        member x.Positions : V4d[][] = uniform?StorageBuffer?Positions
-        member x.Colors : V4d[][] = uniform?StorageBuffer?Colors
-        member x.TexCoords : V2d[][] = uniform?StorageBuffer?TexCoords
+//[<AutoOpen>]
+//module Intrinsics = 
 
 
-module GLSL =
-    open GLSLang
+//    type ShaderTable =
+//        {
+//            miss        : int
+//            offset      : int
+//            stride      : int
+//        }
 
-    let private toGLSLangStage =
-        LookupTable.lookupTable [
-            FShade.ShaderStage.Vertex, GLSLang.ShaderStage.Vertex
-            FShade.ShaderStage.TessControl, GLSLang.ShaderStage.TessControl
-            FShade.ShaderStage.TessEval, GLSLang.ShaderStage.TessEvaluation
-            FShade.ShaderStage.Geometry, GLSLang.ShaderStage.Geometry
-            FShade.ShaderStage.Fragment, GLSLang.ShaderStage.Fragment
-            FShade.ShaderStage.Compute, GLSLang.ShaderStage.Compute
-            FShade.ShaderStage.RayHitShader, GLSLang.ShaderStage.RayClosestHit
-            FShade.ShaderStage.RayGenShader, GLSLang.ShaderStage.RayGen
-            FShade.ShaderStage.RayMissShader, GLSLang.ShaderStage.RayMiss
-            FShade.ShaderStage.RayIntersectionShader, GLSLang.ShaderStage.RayIntersect
-        ]
+//        static member Default = { miss = 0; offset = 1; stride = 1 }
 
-    let glslang (stage : FShade.ShaderStage) (code : string) =
-        let defines = [sprintf "%A" stage]
-        let res = 
-            match GLSLang.tryCompile (toGLSLangStage stage) "main" defines code with
-                | Some bin, warn -> 
-                    Success bin
-                | None, err ->
-                    Error err
-        res
+//    let trace<'a, 's> (table : ShaderTable) (state : RayQuery<'s, 'a>) : 'a = failwith ""
 
-let sammy =
-    sampler2d {
-        texture uniform?MyTexture
-        filter Filter.MinMagMipLinear
-        addressU WrapMode.Wrap
-        addressV WrapMode.Wrap
+//    let buffers = UniformScope.Global
 
-    }
+//    type UniformScope with
+//        member x.Index : int[][] = uniform?StorageBuffer?Index
+//        member x.Positions : V4d[][] = uniform?StorageBuffer?Positions
+//        member x.Colors : V4d[][] = uniform?StorageBuffer?Colors
+//        member x.TexCoords : V2d[][] = uniform?StorageBuffer?TexCoords
 
-type Other =
-    { ishit : bool }
+//let sammy =
+//    sampler2d {
+//        texture uniform?MyTexture
+//        filter Filter.MinMagMipLinear
+//        addressU WrapMode.Wrap
+//        addressV WrapMode.Wrap
 
-let test (state : RayHit<Payload, Result>) =
-    rayhit {
-        let gi = state.instanceIndex
-        let i0 = buffers.Index.[gi].[3 * state.primitiveId + 0]
-        let i1 = buffers.Index.[gi].[3 * state.primitiveId + 1]
-        let i2 = buffers.Index.[gi].[3 * state.primitiveId + 2]
+//    }
 
-        let c = V3d(state.coord.X, state.coord.Y, 1.0 - state.coord.X - state.coord.Y)
-        let tc = c.X * buffers.TexCoords.[gi].[i0] + c.Y * buffers.TexCoords.[gi].[i1] + c.Z * buffers.TexCoords.[gi].[i2]
+//type Other =
+//    { ishit : bool }
 
-        let hitty = state.query.origin + state.rayT * state.query.direction
+//let test (state : RayHit<Payload, Result>) =
+//    rayhit {
+//        let gi = state.instanceIndex
+//        let i0 = buffers.Index.[gi].[3 * state.primitiveId + 0]
+//        let i1 = buffers.Index.[gi].[3 * state.primitiveId + 1]
+//        let i2 = buffers.Index.[gi].[3 * state.primitiveId + 2]
 
-        let res = 
-            RayQuery.trace {
-                tmin = 666.0
-                scene = state.query.scene
-                origin = hitty
-                direction = V3d.OOI
-                payload = state.query.payload
-                tmax = 1337.0
-            }
+//        let c = V3d(state.coord.X, state.coord.Y, 1.0 - state.coord.X - state.coord.Y)
+//        let tc = c.X * buffers.TexCoords.[gi].[i0] + c.Y * buffers.TexCoords.[gi].[i1] + c.Z * buffers.TexCoords.[gi].[i2]
+
+//        let hitty = state.query.origin + state.rayT * state.query.direction
+
+//        let res = 
+//            RayQuery.trace {
+//                tmin = 666.0
+//                scene = state.query.scene
+//                origin = hitty
+//                direction = V3d.OOI
+//                payload = state.query.payload
+//                tmax = 1337.0
+//            }
             
-        let res2 : Other = 
-            RayQuery.trace {
-                tmin = 666.0
-                scene = RayScene.RayScene "Hugo"
-                origin = hitty
-                direction = V3d.OOI
-                payload = state.query.payload
-                tmax = 1337.0
-            }
+//        let res2 : Other = 
+//            RayQuery.trace {
+//                tmin = 666.0
+//                scene = RayScene.RayScene "Hugo"
+//                origin = hitty
+//                direction = V3d.OOI
+//                payload = state.query.payload
+//                tmax = 1337.0
+//            }
 
-        return { 
-            value = 
-                if res2.ishit then sammy.Sample(tc) * res.value
-                else V4d.IIII
-        }
-    }
+//        return { 
+//            value = 
+//                if res2.ishit then sammy.Sample(tc) * res.value
+//                else V4d.IIII
+//        }
+//    }
 
 module SpirVPrint =
     open GLSLang.SpirV
@@ -395,91 +367,136 @@ module SpirVPrint =
         ()
 
 
+[<AutoOpen>]
+module RaytracingTest =
+
+    type Payload =
+        {
+            foo : float
+        }
+
+    type WorkDimensions =
+        {
+            [<LaunchId>] id : V3i
+            [<LaunchSize>] size : V3i
+        }
+
+    let scene =
+        scene { accelerationStructure uniform?RaytracingScene }
+
+    let raygenShader (work : WorkDimensions) (buffer : Image2d<Formats.rgba32f>) =
+        let secondaryRayFlags = RayFlags.Opaque ||| RayFlags.SkipClosestHitShader
+
+        raygen {
+            let result = scene.TraceRay<Payload>(scene.TraceRay<V3d>(V3d.Zero, V3d.ZAxis, V3d.One), V3d.YAxis, ray = "Secondary", flags = secondaryRayFlags)
+            buffer.[work.id.XY] <- V4d(result.foo)
+        }
 
 [<EntryPoint>]
 let main args =
     Aardvark.Init()
 
-    let assign (info : RayHitInfo) =
-        {
-            payloadInLocation = 0
-            payloadOutLocation = 0
-
-            payloadLocations =
-                info.neededPayloads |> Seq.mapi (fun i k ->
-                    k, 5 + i
-                )
-                |> HashMap.ofSeq
-
-            scenes =
-                info.neededScenes 
-                |> Seq.mapi (fun i s -> (0, i), s) 
-                |> Map.ofSeq
-
-            uniformBuffers = 
-                Map.ofList [
-                    (1, 0), ("GlobalBuffer", Map.toList info.neededUniforms)
-                ]
-                
-                //|> Seq.mapi (fun i (name, typ) -> (1,i), (sprintf "%sDummy" name, [(name, typ)]))
-                //|> Map.ofSeq
-
-            samplers = 
-                info.neededSamplers
-                |> Map.toSeq
-                |> Seq.mapi (fun i (name, info) -> (3,i), (name, info))
-                |> Map.ofSeq
-
-            buffers = 
-                info.neededBuffers 
-                |> Map.toSeq
-                |> Seq.mapi (fun i (name, (rank, typ)) -> (2,i), (name, rank, typ))
-                |> Map.ofSeq
-
+    let effect =
+        raytracing {
+            raygen "Default" raygenShader
         }
 
-    let res = 
-        RayHitShader.ofFunction test
-        |> RayHitShader.toModule assign
-        |> ModuleCompiler.compileGLSLVulkan
+    let module_ =
+        effect |> RaytracingEffect.toModule
+
+    let compiled = ModuleCompiler.compileGLSLRaytracing module_
+
+    printfn "%A" compiled.code
+
+    //let computeShader =
+    //    ComputeShader.ofFunction V3i.One someCompute
+
+    //let module_ =
+    //    ComputeShader.toModule computeShader
+
+    //printfn "%A" computeShader.csBody
 
 
-    Log.start "GLSL"
-    let lines = res.code.Split("\r\n") |> Array.indexed
+    //let assign (info : RayHitInfo) =
+    //    {
+    //        payloadInLocation = 0
+    //        payloadOutLocation = 0
 
-    let digits = log10 (float lines.Length) |> ceil |> int
-    for (i, l) in lines do
-        let i = 
-            let v = string (i + 1)
-            if v.Length < digits then System.String(' ', digits - v.Length) + v
-            else v
-        Log.line "%s: %s" i l
-    Log.stop()
+    //        payloadLocations =
+    //            info.neededPayloads |> Seq.mapi (fun i k ->
+    //                k, 5 + i
+    //            )
+    //            |> HashMap.ofSeq
 
-    let res = GLSL.glslang ShaderStage.RayHitShader res.code
+    //        scenes =
+    //            info.neededScenes 
+    //            |> Seq.mapi (fun i s -> (0, i), s) 
+    //            |> Map.ofSeq
 
-    match res with
-    | Success res -> 
-        File.writeAllBytes @"C:\Users\Schorsch\Desktop\test.spv" res
+    //        uniformBuffers = 
+    //            Map.ofList [
+    //                (1, 0), ("GlobalBuffer", Map.toList info.neededUniforms)
+    //            ]
+                
+    //            //|> Seq.mapi (fun i (name, typ) -> (1,i), (sprintf "%sDummy" name, [(name, typ)]))
+    //            //|> Map.ofSeq
+
+    //        samplers = 
+    //            info.neededSamplers
+    //            |> Map.toSeq
+    //            |> Seq.mapi (fun i (name, info) -> (3,i), (name, info))
+    //            |> Map.ofSeq
+
+    //        buffers = 
+    //            info.neededBuffers 
+    //            |> Map.toSeq
+    //            |> Seq.mapi (fun i (name, (rank, typ)) -> (2,i), (name, rank, typ))
+    //            |> Map.ofSeq
+
+    //    }
+
+    //let res = 
+    //    RayHitShader.ofFunction test
+    //    |> RayHitShader.toModule assign
+    //    |> ModuleCompiler.compileGLSLVulkan
 
 
-        let all = 
-            Reflection.FSharpType.GetUnionCases(typeof<GLSLang.Optimization>)
-            |> Array.filter (fun c -> c.GetFields().Length = 0)
-            |> Array.map (fun c -> Reflection.FSharpValue.MakeUnion(c, [||]) |> unbox<GLSLang.Optimization>)
-            |> Array.toList
-        let res = GLSLang.GLSLang.optimize all res
-        let m = GLSLang.SpirV.Module.ofArray res
-        SpirVPrint.print m
+    //Log.start "GLSL"
+    //let lines = res.code.Split("\r\n") |> Array.indexed
+
+    //let digits = log10 (float lines.Length) |> ceil |> int
+    //for (i, l) in lines do
+    //    let i = 
+    //        let v = string (i + 1)
+    //        if v.Length < digits then System.String(' ', digits - v.Length) + v
+    //        else v
+    //    Log.line "%s: %s" i l
+    //Log.stop()
+
+    //let res = GLSL.glslang ShaderStage.RayHitShader res.code
+
+    //match res with
+    //| Success res -> 
+    //    //File.writeAllBytes @"D:\Users\Martin\Desktop\test.spv" res
+
+
+    //    let all = 
+    //        Reflection.FSharpType.GetUnionCases(typeof<GLSLang.Optimization>)
+    //        |> Array.filter (fun c -> c.GetFields().Length = 0)
+    //        |> Array.map (fun c -> Reflection.FSharpValue.MakeUnion(c, [||]) |> unbox<GLSLang.Optimization>)
+    //        |> Array.toList
+    //    let res = GLSLang.GLSLang.optimize all res
+    //    let m = GLSLang.SpirV.Module.ofArray res
+    //    SpirVPrint.print m
         
-        //Log.start "SpirV"
-        //for i in m.instructions do
-        //    match GLSLang.SpirV.Instruction.tryGetId i with
-        //        | Some id -> Log.line "%d:\t%A" id i
-        //        | None -> Log.line "   \t%A" i
-        //Log.stop()
-    | Error e ->
-        Log.warn "ERROR: %s" e
+    //    //Log.start "SpirV"
+    //    //for i in m.instructions do
+    //    //    match GLSLang.SpirV.Instruction.tryGetId i with
+    //    //        | Some id -> Log.line "%d:\t%A" id i
+    //    //        | None -> Log.line "   \t%A" i
+    //    //Log.stop()
+    //| Error e ->
+    //    Log.warn "ERROR: %s" e
 
     0
 

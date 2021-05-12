@@ -55,7 +55,7 @@ module PrettyPrinter =
                 let body = print body
                 sprintf "fun %s ->\r\n%s" args (String.indent 1 body)
                   
-            | ReadInput(kind, name, index) ->
+            | ReadInput(kind, name, index, _) ->
                 let indexer = 
                     match index with
                         | Some idx -> print idx |> sprintf ".[%s]"
@@ -159,11 +159,11 @@ module PrettyPrinter =
                     sprintf "%s.%s <- %s" t indexers value
                 else
                     sprintf "%s.%s%s <- %s" t p.Name indexers value
-                
-            | UnsafePropertySet(t, p, value) ->
-                let value = print value
+
+            | UnsafeWrite(t, v) ->
                 let t = print t
-                sprintf "%s.%s <- %s" t p.Name value
+                let v = print v
+                sprintf "%s <- %s" t v
 
             | Value(v,_) ->
                 sprintf "%A" v
@@ -242,8 +242,8 @@ module Optimizer =
                 | TupleGet(Trivial, _)
                 | PropertyGet(Some TrivialOrInput, (FSharpTypeProperty | ArrayLengthProperty), [])
                 | FieldGet(Some TrivialOrInput, _) 
-                | ReadInput(_, _, None) 
-                | ReadInput(_, _, Some TrivialOrInput) -> 
+                | ReadInput(_, _, None, false) 
+                | ReadInput(_, _, Some TrivialOrInput, false) -> 
                     Some()
                 | _ ->
                     None
@@ -313,7 +313,7 @@ module Optimizer =
 
         let rec (|StorageArgument|_|) (e : Expr) =
             match e with
-                | RefOf (GetArray(ReadInput(ParameterKind.Uniform, _, _), _)) ->
+                | RefOf (GetArray(ReadInput(ParameterKind.Uniform, _, _, _), _)) ->
                     Some ()
                 | _ ->
                     None
@@ -631,12 +631,12 @@ module Optimizer =
                             let! t = withoutValueS target
                             return Expr.Seq [v;t]
 
-                    | UnsafePropertySet((LExpr v as target), pi, value) ->
+                    | UnsafeWrite((LExpr v as target), value) ->
                         let! vUsed = EliminationState.isUsed v
                         if vUsed then
                             let! value = eliminateDeadCodeS value
                             let! target = eliminateDeadCodeS target
-                            return Expr.UnsafePropertySet(target, pi, value)
+                            return Expr.UnsafeWrite(target, value)
                         else 
                             let! value = withoutValueS value
                             let! target = withoutValueS target
@@ -687,12 +687,12 @@ module Optimizer =
                         let! value = eliminateDeadCodeS value
                         let! t = eliminateDeadCodeS t
                         return Expr.PropertySet(t, pi, value, idx)
-                        
-                    | UnsafePropertySet(t, pi, value) ->
-                        Log.warn "[FShade] found PropertySet on unknown expression: %A" t
+
+                    | UnsafeWrite(t, value) ->
+                        Log.warn "[FShade] found UnsafeWrite on unknown expression: %A" t
                         let! value = eliminateDeadCodeS value
                         let! t = eliminateDeadCodeS t
-                        return Expr.UnsafePropertySet(t, pi, value)
+                        return Expr.UnsafeWrite(t, value)
 
 
                     // control-flow
@@ -1766,11 +1766,11 @@ module Optimizer =
                         let! indices = indices |> List.mapS evaluateConstantsS
                         let! value = evaluateConstantsS value
                         return Expr.PropertySet(t, pi, value, indices)
-                        
-                    | UnsafePropertySet(t, pi, value) ->
+
+                    | UnsafeWrite(t, value) ->
                         let! t = evaluateConstantsS t
                         let! value = evaluateConstantsS value
-                        return Expr.UnsafePropertySet(t, pi, value)
+                        return Expr.UnsafeWrite(t, value)
                         
                     | QuoteRaw e ->
                         //let! e = evaluateConstantsS e
@@ -1885,7 +1885,7 @@ module Optimizer =
             state {
                 match e with
 
-                    | ReadInput(ParameterKind.Input, name, idx) ->
+                    | ReadInput(ParameterKind.Input, name, idx, _) ->
                         do! State.modify (fun s ->
                             if Map.containsKey name s.usedInputs then
                                 s
@@ -1898,7 +1898,7 @@ module Optimizer =
                         )
                         return e
 
-                    | ReadInput(kind, name, idx) ->
+                    | ReadInput(kind, name, idx, _) ->
                         match idx with
                             | Some idx ->
                                 let! idx = liftInputsS idx
@@ -2053,11 +2053,11 @@ module Optimizer =
                         let! value = liftInputsS value
                         let! indices = indices |> List.mapS liftInputsS
                         return Expr.PropertySet(t, pi, value, indices)
-                        
-                    | UnsafePropertySet(t, pi, value) ->
+
+                    | UnsafeWrite(t, value) ->
                         let! t = liftInputsS t
                         let! value = liftInputsS value
-                        return Expr.UnsafePropertySet(t, pi, value)
+                        return Expr.UnsafeWrite(t, value)
                         
                     | QuoteRaw e ->
                         let! e = liftInputsS e
@@ -2118,7 +2118,7 @@ module Optimizer =
         and liftFunctionInputsS (e : Expr) : State<Map<_,_>, Expr> =
             state {
                 match e with
-                    | ReadInput(ParameterKind.Input, name, idx) ->
+                    | ReadInput(ParameterKind.Input, name, idx, false) ->
                         let! (s : Map<string, Var * Expr>) = State.get
 
                         let idxHash = idx |> Option.map Expr.ComputeHash |> Option.defaultValue ""
@@ -2132,13 +2132,13 @@ module Optimizer =
                                 do! State.put (Map.add key (v,e) s)
                                 return Expr.Var v
 
-                    | ReadInput(kind, name, idx) ->
+                    | ReadInput(kind, name, idx, volatile) ->
                         match idx with
                             | Some idx ->
                                 let! idx = liftFunctionInputsS idx
-                                return Expr.ReadInput(kind, e.Type, name, idx)
+                                return Expr.ReadInput(kind, e.Type, name, idx, volatile)
                             | None ->
-                                return Expr.ReadInput(kind, e.Type, name)
+                                return Expr.ReadInput(kind, e.Type, name, volatile)
 
                     | CallFunction(utility, args) ->
                         let! args = args |> List.mapS liftFunctionInputsS
@@ -2224,8 +2224,8 @@ module Optimizer =
                     | TupleGet(Trivial, _)
                     | PropertyGet(Some (TrivialOrInput nonMutable), (FSharpTypeProperty | ArrayLengthProperty), [])
                     | FieldGet(Some (TrivialOrInput nonMutable), _) 
-                    | ReadInput(_, _, None) 
-                    | ReadInput(_, _, Some (TrivialOrInput nonMutable)) -> 
+                    | ReadInput(_, _, None, false) 
+                    | ReadInput(_, _, Some (TrivialOrInput nonMutable), false) -> 
                         Some()
                     
                     | PropertyGet(Some (TrivialOrInput nonMutable as t), prop, []) ->
@@ -2333,11 +2333,11 @@ module Optimizer =
                         )
                         return Expr.WriteOutputs map
 
-                    | ReadInput(kind, name, idx) ->
+                    | ReadInput(kind, name, idx, volatile) ->
                         match idx with
                             | Some idx ->
                                 let! idx = inlineS idx
-                                return Expr.ReadInput(kind, e.Type, name, idx)
+                                return Expr.ReadInput(kind, e.Type, name, idx, volatile)
                             | None ->
                                 return e
 
@@ -2537,8 +2537,8 @@ module Optimizer =
                                             | _ -> false
                                         else
                                             match e with
-                                                | ReadInput(_,_,None) -> true
-                                                | ReadInput(_,_,Some idx) -> canInline idx
+                                                | ReadInput(_, _, None, volatile) -> not volatile
+                                                | ReadInput(_, _, Some idx, volatile) -> not volatile && canInline idx
                                         
                                                 | GetArray(e,i) ->
                                                     let res = canInline e && canInline i
@@ -2632,11 +2632,11 @@ module Optimizer =
                         let! value = inlineS value
                         let! indices = indices |> List.mapS inlineS
                         return Expr.PropertySet(t, pi, value, indices)
-                        
-                    | UnsafePropertySet(t, pi, value) ->
+
+                    | UnsafeWrite(t, value) ->
                         let! t = inlineS t
                         let! value = inlineS value
-                        return Expr.UnsafePropertySet(t, pi, value)
+                        return Expr.UnsafeWrite(t, value)
 
                     | QuoteRaw e ->
                         let! e = inlineS e
@@ -2936,10 +2936,10 @@ module Optimizer =
                     let value, vh = processExpression value
                     Expr.PropertySet(t, pi, value, index) |> apply (th + ih + vh)
 
-                | UnsafePropertySet(t, pi, value) ->
+                | UnsafeWrite(t, value) ->
                     let t, th = processExpression t 
                     let value, vh = processExpression value
-                    Expr.UnsafePropertySet(t, pi, value) |> apply (th + vh)
+                    Expr.UnsafeWrite(t, value) |> apply (th + vh)
 
                      
                 | WhileLoop (guard, body) ->
@@ -2998,7 +2998,7 @@ module Optimizer =
         let rec getInputPointers (parent : Option<ExprPointer>) (e : Expr) =
             state {
                 match e with
-                    | ReadInput(ParameterKind.Input,name,index) ->
+                    | ReadInput(ParameterKind.Input,name,index,false) ->
                         return MapExt.ofList [name, [(index, parent)]]
                            
                     | WriteOutputs outputs ->

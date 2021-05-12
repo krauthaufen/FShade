@@ -432,31 +432,50 @@ module ShaderBuilders =
             member x.ShaderStage = ShaderStage.Compute
             member x.OutputTopology = None
 
-    type RayHitBuilder() =
-        member x.For(a : Arr<'d, 'a>, f : 'a -> unit) : unit =
-            for i in a do f i
-
-        member x.For(a : seq<'a>, f : 'a -> unit) : unit =
-            for i in a do f i
-
-        member x.While(guard : unit -> bool, b : unit) =
-            ()
-
-        member x.Combine(l : unit, r : 'a) = r
-
-        member x.Zero() = ()
-        member x.Delay f = f()
+    type RayGenerationBuilder() =
+        inherit BaseBuilder()
 
         member x.Quote() = ()
 
-        member inline x.Run(e : Expr<'a>) : Expr<'a> =
-            e
+        interface IShaderBuilder with
+            member x.ShaderStage = ShaderStage.RayGeneration
+            member x.OutputTopology = None
 
-        member x.Return(value) = value
+    type RayMissBuilder() =
+        inherit BaseBuilder()
+
+        member x.Return(v) = v
+        member x.Quote() = ()
 
         interface IShaderBuilder with
-            member x.ShaderStage = ShaderStage.RayHitShader
+            member x.ShaderStage = ShaderStage.Miss
             member x.OutputTopology = None
+
+    //type RayHitBuilder() =
+    //    member x.For(a : Arr<'d, 'a>, f : 'a -> unit) : unit =
+    //        for i in a do f i
+
+    //    member x.For(a : seq<'a>, f : 'a -> unit) : unit =
+    //        for i in a do f i
+
+    //    member x.While(guard : unit -> bool, b : unit) =
+    //        ()
+
+    //    member x.Combine(l : unit, r : 'a) = r
+
+    //    member x.Zero() = ()
+    //    member x.Delay f = f()
+
+    //    member x.Quote() = ()
+
+    //    member inline x.Run(e : Expr<'a>) : Expr<'a> =
+    //        e
+
+    //    member x.Return(value) = value
+
+    //    interface IShaderBuilder with
+    //        member x.ShaderStage = ShaderStage.RayHitShader
+    //        member x.OutputTopology = None
 
 
     let compute = ComputeBuilder()
@@ -464,7 +483,31 @@ module ShaderBuilders =
     let tessellation = TessBuilder()
     let fragment = FragmentBuilder()
 
-    let rayhit = RayHitBuilder()
+    let raygen = RayGenerationBuilder()
+    let miss = RayMissBuilder()
+
+    //let scene =
+    //    scene {
+    //        accelerationStructure Unchecked.defaultof<_>
+    //    }
+
+    //let defaultRay =
+    //    raytype {
+    //        hitGroup "DefaultHitGroup"
+    //        miss "DefaultMissShader"
+    //        flags RayFlags.CullOpaque
+    //    }
+
+    //let foo =
+    //    raygen {
+    //        let result : float = scene.TraceRay(V3d.Zero, V3d.ZAxis, ray = defaultRay, cullMask = 0xFE)
+    //        ()
+    //    }
+
+    //let oof =
+    //    intersection {
+    //        return (0.0, 0, 0)
+    //    }
 
     let triangle = GeometryBuilder(None, OutputTopology.TriangleStrip)
     let line = GeometryBuilder(None, OutputTopology.LineStrip)

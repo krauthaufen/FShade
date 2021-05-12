@@ -34,6 +34,12 @@ module GLSL =
             ShaderStage.Geometry, GLSLang.ShaderStage.Geometry
             ShaderStage.Fragment, GLSLang.ShaderStage.Fragment
             ShaderStage.Compute, GLSLang.ShaderStage.Compute
+            ShaderStage.RayGeneration, GLSLang.ShaderStage.RayGen
+            ShaderStage.Intersection, GLSLang.ShaderStage.RayIntersect
+            ShaderStage.AnyHit, GLSLang.ShaderStage.RayAnyHit
+            ShaderStage.ClosestHit, GLSLang.ShaderStage.RayClosestHit
+            ShaderStage.Miss, GLSLang.ShaderStage.RayMiss
+            ShaderStage.Callable, GLSLang.ShaderStage.Callable
         ]
 
 

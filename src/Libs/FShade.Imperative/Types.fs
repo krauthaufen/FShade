@@ -1,5 +1,7 @@
 ﻿namespace FShade
 
+open Aardvark.Base
+
 type DepthWriteMode =
     | None          = 0
     | Any           = 1
@@ -21,29 +23,62 @@ type MemoryType =
     | Global = 1
     | Local = 2
 
-type ShaderStage = 
-    | Vertex  = 0
-    | TessControl = 1
-    | TessEval = 2
-    | Geometry = 3 
-    | Fragment = 4
-    | Compute = -1
+type RayFlags =
+    | None                     = 0
+    | Opaque                   = 1
+    | NoOpaque                 = 2
+    | TerminateOnFirstHit      = 4
+    | SkipClosestHitShader     = 8
+    | CullBackFacingTriangles  = 16
+    | CullFrontFacingTriangles = 32
+    | CullOpaque               = 64
+    | CullNoOpaque             = 128
 
-    | RayHitShader = -2
-    | RayMissShader = -3
-    | RayGenShader = -4
-    | RayIntersectionShader = -5
+type ShaderStage =
+    | Vertex        = 0
+    | TessControl   = 1
+    | TessEval      = 2
+    | Geometry      = 3
+    | Fragment      = 4
+    | Compute       = -1
+    | RayGeneration = -2
+    | Intersection  = -3
+    | AnyHit        = -4
+    | ClosestHit    = -5
+    | Miss          = -6
+    | Callable      = -7
 
 module ShaderStage =
-    let isRayTracing (stage : ShaderStage) =    
+    let isCompute (stage : ShaderStage) =
+        stage = ShaderStage.Compute
+
+    let isRaytracing (stage : ShaderStage) =
         match stage with
-        | ShaderStage.RayHitShader
-        | ShaderStage.RayIntersectionShader
-        | ShaderStage.RayGenShader
-        | ShaderStage.RayMissShader ->
+        | ShaderStage.RayGeneration
+        | ShaderStage.Intersection
+        | ShaderStage.AnyHit
+        | ShaderStage.ClosestHit
+        | ShaderStage.Miss
+        | ShaderStage.Callable ->
             true
         | _ ->
             false
+
+    let prefix =
+        LookupTable.lookupTable [
+            ShaderStage.Vertex,         "vs"
+            ShaderStage.TessControl,    "tc"
+            ShaderStage.TessEval,       "te"
+            ShaderStage.Geometry,       "gs"
+            ShaderStage.Fragment,       "fs"
+            ShaderStage.Compute,        "cs"
+            ShaderStage.RayGeneration,  "rgen"
+            ShaderStage.Intersection,   "rint"
+            ShaderStage.AnyHit,         "rahit"
+            ShaderStage.ClosestHit,     "rchit"
+            ShaderStage.Miss,           "rmiss"
+            ShaderStage.Callable,       "rcall"
+        ]
 
 [<RequireQualifiedAccess>]
 type OutputTopology = 
