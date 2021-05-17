@@ -212,81 +212,81 @@ module RaytracingBuilders =
             { s with PerRayType = s.PerRayType |> Map.add rayId (f entry)}
 
         [<CustomOperation("anyhit")>]
-        member x.AnyHit(s : HitGroup, rayId : string, shader : Shader) =
+        member x.AnyHit(s : HitGroup, (rayId, shader) : string * Shader) =
             match shader.shaderStage with
             | ShaderStage.AnyHit ->
                 x.UpdateEntry(s, rayId, fun e -> { e with AnyHit = Some shader })
             | _ ->
                 failwithf "[FShade] Expected any hit shader but got %A" shader.shaderStage
 
-        member x.AnyHit(s : HitGroup, rayId : string, e : Expr<'a>) =
+        member x.AnyHit(s : HitGroup, (rayId, e) : string * Expr<'a>) =
             let shaders = Shader.ofExpr [] e
-            x.AnyHit(s, rayId, shaders.Head)
+            x.AnyHit(s, (rayId, shaders.Head))
 
-        member x.AnyHit(s : HitGroup, rayId : string, f : 'a -> 'b) =
+        member x.AnyHit(s : HitGroup, (rayId, f) : string * ('a -> 'b)) =
             let shaders = Shader.ofRaytracingFunction f
-            x.AnyHit(s, rayId, shaders.Head)
+            x.AnyHit(s, (rayId, shaders.Head))
 
         member x.AnyHit(s : HitGroup, shader : Shader) =
-            x.AnyHit(s, TraceDefaults.Ray, shader)
+            x.AnyHit(s, (Identifier.Default, shader))
 
         member x.AnyHit(s : HitGroup, e : Expr<'a>) =
-            x.AnyHit(s, TraceDefaults.Ray, e)
+            x.AnyHit(s, (Identifier.Default, e))
 
         member x.AnyHit(s : HitGroup, f : 'a -> 'b) =
-            x.AnyHit(s, TraceDefaults.Ray, f)
+            x.AnyHit(s, (Identifier.Default, f))
 
 
         [<CustomOperation("closesthit")>]
-        member x.ClosestHit(s : HitGroup, rayId : string, shader : Shader) =
+        member x.ClosestHit(s : HitGroup, (rayId, shader) : string * Shader) =
             match shader.shaderStage with
             | ShaderStage.ClosestHit ->
                 x.UpdateEntry(s, rayId, fun e -> { e with ClosestHit = Some shader })
             | _ ->
                 failwithf "[FShade] Expected closest hit shader but got %A" shader.shaderStage
 
-        member x.ClosestHit(s : HitGroup, rayId : string, e : Expr<'a>) =
+        member x.ClosestHit(s : HitGroup, (rayId, e) : string * Expr<'a>) =
             let shaders = Shader.ofExpr [] e
-            x.ClosestHit(s, rayId, shaders.Head)
+            x.ClosestHit(s, (rayId, shaders.Head))
 
-        member x.ClosestHit(s : HitGroup, rayId : string, f : 'a -> 'b) =
+        member x.ClosestHit(s : HitGroup, (rayId, f) : string * ('a -> 'b)) =
             let shaders = Shader.ofRaytracingFunction f
-            x.ClosestHit(s, rayId, shaders.Head)
+            x.ClosestHit(s, (rayId, shaders.Head))
 
         member x.ClosestHit(s : HitGroup, shader : Shader) =
-            x.ClosestHit(s, TraceDefaults.Ray, shader)
+            x.ClosestHit(s, (Identifier.Default, shader))
 
         member x.ClosestHit(s : HitGroup, e : Expr<'a>) =
-            x.ClosestHit(s, TraceDefaults.Ray, e)
+            x.ClosestHit(s, (Identifier.Default, e))
 
         member x.ClosestHit(s : HitGroup, f : 'a -> 'b) =
-            x.ClosestHit(s, TraceDefaults.Ray, f)
+            x.ClosestHit(s, (Identifier.Default, f))
 
 
         [<CustomOperation("intersection")>]
-        member x.Intersection(s : HitGroup, rayId : string, shader : Shader) =
+        member x.Intersection(s : HitGroup, (rayId, shader) : string * Shader) =
             match shader.shaderStage with
             | ShaderStage.Intersection ->
                 x.UpdateEntry(s, rayId, fun e -> { e with Intersection = Some shader })
             | _ ->
                 failwithf "[FShade] Expected intersection shader but got %A" shader.shaderStage
 
-        member x.Intersection(s : HitGroup, rayId : string, e : Expr<'a>) =
+        member x.Intersection(s : HitGroup, (rayId, e) : string * Expr<'a>) =
             let shaders = Shader.ofExpr [] e
-            x.Intersection(s, rayId, shaders.Head)
+            x.Intersection(s, (rayId, shaders.Head))
 
-        member x.Intersection(s : HitGroup, rayId : string, f : 'a -> 'b) =
+        member x.Intersection(s : HitGroup, (rayId, f) : string * ('a -> 'b)) =
             let shaders = Shader.ofRaytracingFunction f
-            x.Intersection(s, rayId, shaders.Head)
+            x.Intersection(s, (rayId, shaders.Head))
 
         member x.Intersection(s : HitGroup, shader : Shader) =
-            x.Intersection(s, TraceDefaults.Ray, shader)
+            x.Intersection(s, (Identifier.Default, shader))
 
         member x.Intersection(s : HitGroup, e : Expr<'a>) =
-            x.Intersection(s, TraceDefaults.Ray, e)
+            x.Intersection(s, (Identifier.Default, e))
 
         member x.Intersection(s : HitGroup, f : 'a -> 'b) =
-            x.Intersection(s, TraceDefaults.Ray, f)
+            x.Intersection(s, (Identifier.Default, f))
 
 
     type RaytracingBuilder() =
@@ -298,59 +298,89 @@ module RaytracingBuilders =
             RaytracingEffect(s)
 
         [<CustomOperation("raygen")>]
-        member x.Raygen(s : RaytracingEffectState, name : string, shader : Shader) =
+        member x.Raygen(s : RaytracingEffectState, (name, shader) : string * Shader) =
             match shader.shaderStage with
             | ShaderStage.RayGeneration ->
                 { s with RaygenShaders = s.RaygenShaders |> Map.add name shader }
             | _ ->
                 failwithf "[FShade] Expected ray generation shader but got %A" shader.shaderStage
 
-        member x.Raygen(s : RaytracingEffectState, name : string, e : Expr<'a>) =
+        member x.Raygen(s : RaytracingEffectState, (name, e) : string * Expr<'a>) =
             let shaders = Shader.ofExpr [] e
-            x.Raygen(s, name, shaders.Head)
+            x.Raygen(s, (name, shaders.Head))
 
-        member x.Raygen(s : RaytracingEffectState, name : string, f : 'a -> 'b) =
+        member x.Raygen(s : RaytracingEffectState, (name, f) : string * ('a -> 'b)) =
             let shaders = Shader.ofRaytracingFunction f
-            x.Raygen(s, name, shaders.Head)
+            x.Raygen(s, (name, shaders.Head))
+
+        member x.Raygen(s : RaytracingEffectState, shader : Shader) =
+            x.Raygen(s, (Identifier.Default, shader))
+
+        member x.Raygen(s : RaytracingEffectState, e : Expr<'a>) =
+            x.Raygen(s, (Identifier.Default, e))
+
+        member x.Raygen(s : RaytracingEffectState, f : 'a -> 'b) =
+            x.Raygen(s, (Identifier.Default, f))
 
 
         [<CustomOperation("miss")>]
-        member x.Miss(s : RaytracingEffectState, name : string, shader : Shader) =
+        member x.Miss(s : RaytracingEffectState, (name, shader) : string * Shader) =
             match shader.shaderStage with
             | ShaderStage.Miss ->
                 { s with MissShaders = s.MissShaders |> Map.add name shader }
             | _ ->
                 failwithf "[FShade] Expected miss shader but got %A" shader.shaderStage
 
-        member x.Miss(s : RaytracingEffectState, name : string, e : Expr<'a>) =
+        member x.Miss(s : RaytracingEffectState, (name, e) : string * Expr<'a>) =
             let shaders = Shader.ofExpr [] e
-            x.Miss(s, name, shaders.Head)
+            x.Miss(s, (name, shaders.Head))
 
-        member x.Miss(s : RaytracingEffectState, name : string, f : 'a -> 'b) =
+        member x.Miss(s : RaytracingEffectState, (name, f) : string * ('a -> 'b)) =
             let shaders = Shader.ofRaytracingFunction f
-            x.Miss(s, name, shaders.Head)
+            x.Miss(s, (name, shaders.Head))
+
+        member x.Miss(s : RaytracingEffectState, shader : Shader) =
+            x.Miss(s, (Identifier.Default, shader))
+
+        member x.Miss(s : RaytracingEffectState, e : Expr<'a>) =
+            x.Miss(s, (Identifier.Default, e))
+
+        member x.Miss(s : RaytracingEffectState, f : 'a -> 'b) =
+            x.Miss(s, (Identifier.Default, f))
 
 
         [<CustomOperation("callable")>]
-        member x.Callable(s : RaytracingEffectState, name : string, shader : Shader) =
+        member x.Callable(s : RaytracingEffectState, (name, shader) : string * Shader) =
             match shader.shaderStage with
             | ShaderStage.Callable ->
                 { s with CallableShaders = s.CallableShaders |> Map.add name shader }
             | _ ->
                 failwithf "[FShade] Expected callable shader but got %A" shader.shaderStage
 
-        member x.Callable(s : RaytracingEffectState, name : string, e : Expr<'a>) =
+        member x.Callable(s : RaytracingEffectState, (name, e) : string * Expr<'a>) =
             let shaders = Shader.ofExpr [] e
-            x.Callable(s, name, shaders.Head)
+            x.Callable(s, (name, shaders.Head))
 
-        member x.Callable(s : RaytracingEffectState, name : string, f : 'a -> 'b) =
+        member x.Callable(s : RaytracingEffectState, (name, f) : string * ('a -> 'b)) =
             let shaders = Shader.ofRaytracingFunction f
-            x.Callable(s, name, shaders.Head)
+            x.Callable(s, (name, shaders.Head))
+
+        member x.Callable(s : RaytracingEffectState, shader : Shader) =
+            x.Callable(s, (Identifier.Default, shader))
+
+        member x.Callable(s : RaytracingEffectState, e : Expr<'a>) =
+            x.Callable(s, (Identifier.Default, e))
+
+        member x.Callable(s : RaytracingEffectState, f : 'a -> 'b) =
+            x.Callable(s, (Identifier.Default, f))
 
 
         [<CustomOperation("hitgroup")>]
-        member x.HitGroup(s : RaytracingEffectState, name : string, hitGroup : HitGroup) =
+        member x.HitGroup(s : RaytracingEffectState, (name, hitGroup) : string * HitGroup) =
             { s with HitGroups = s.HitGroups |> Map.add name hitGroup}
+
+        member x.HitGroup(s : RaytracingEffectState, hitGroup : HitGroup) =
+            { s with HitGroups = s.HitGroups |> Map.add Identifier.Default hitGroup}
 
 
     let hitgroup = HitGroupBuilder()

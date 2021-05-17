@@ -5,6 +5,7 @@ open Aardvark.Base
 open Aardvark.Base.Monads.State
 open FShade
 open FShade.Imperative
+open FShade.Tests
 open System.Reflection
 open System.Threading
 open Microsoft.FSharp.Quotations
@@ -373,23 +374,31 @@ module RaytracingTest =
     type Payload =
         {
             foo : float
-        }
-
-    type WorkDimensions =
-        {
-            [<LaunchId>] id : V3i
-            [<LaunchSize>] size : V3i
+            flag : bool
         }
 
     let scene =
         scene { accelerationStructure uniform?RaytracingScene }
 
-    let raygenShader (work : WorkDimensions) (buffer : Image2d<Formats.rgba32f>) =
+    let missShader (input : RayMissInput<Payload>) =
+        miss {
+            if input.payload.flag then
+                return { foo = 1.0; flag = false }
+            else
+                return { foo = 0.0; flag = false }
+        }
+
+    let closestHitShader (input : RayHitInput<Payload>) =
+        closesthit {
+            return { foo = input.hit.attribute.X; flag = false }
+        }
+
+    let raygenShader (input : RayGenerationInput) (buffer : Image2d<Formats.rgba32f>) =
         let secondaryRayFlags = RayFlags.Opaque ||| RayFlags.SkipClosestHitShader
 
         raygen {
             let result = scene.TraceRay<Payload>(scene.TraceRay<V3d>(V3d.Zero, V3d.ZAxis, V3d.One), V3d.YAxis, ray = "Secondary", flags = secondaryRayFlags)
-            buffer.[work.id.XY] <- V4d(result.foo)
+            buffer.[input.work.id.XY] <- V4d(result.foo)
         }
 
 [<EntryPoint>]
@@ -397,106 +406,61 @@ let main args =
     Aardvark.Init()
 
     let effect =
+        let defaultHitGroup =
+            hitgroup {
+                closesthit closestHitShader
+            }
+
         raytracing {
-            raygen "Default" raygenShader
+            raygen raygenShader
+            hitgroup defaultHitGroup
+            miss missShader
         }
 
-    let module_ =
-        effect |> RaytracingEffect.toModule
+    let glsl =
+        effect
+        |> RaytracingEffect.toModule
+        |> ModuleCompiler.compileGLSLRaytracing
 
-    let compiled = ModuleCompiler.compileGLSLRaytracing module_
+    Log.start "GLSL"
+    let lines = glsl.code.Split("\r\n") |> Array.indexed
 
-    printfn "%A" compiled.code
+    let digits = log10 (float lines.Length) |> ceil |> int
+    for (i, l) in lines do
+        let i = 
+            let v = string (i + 1)
+            if v.Length < digits then System.String(' ', digits - v.Length) + v
+            else v
+        Log.line "%s: %s" i l
+    Log.stop()
 
-    //let computeShader =
-    //    ComputeShader.ofFunction V3i.One someCompute
+    for (KeyValue(name, _)) in effect.RayGenerationShaders do
+        let def = sprintf "%A_%s" ShaderStage.RayGeneration name
 
-    //let module_ =
-    //    ComputeShader.toModule computeShader
+        Log.start "Compiling %s"def
+        let res = GLSL.glslang' ShaderStage.RayGeneration [def] glsl.code
 
-    //printfn "%A" computeShader.csBody
+        match res with
+        | Success ->
+            Log.stop()
+        | Warning w ->
+            Log.warn "%s" w
+        | Error e ->
+            Log.error "%s" e
 
+    for (KeyValue(name, _)) in effect.MissShaders do
+        let def = sprintf "%A_%s" ShaderStage.Miss name
 
-    //let assign (info : RayHitInfo) =
-    //    {
-    //        payloadInLocation = 0
-    //        payloadOutLocation = 0
+        Log.start "Compiling %s"def
+        let res = GLSL.glslang' ShaderStage.Miss [def] glsl.code
 
-    //        payloadLocations =
-    //            info.neededPayloads |> Seq.mapi (fun i k ->
-    //                k, 5 + i
-    //            )
-    //            |> HashMap.ofSeq
-
-    //        scenes =
-    //            info.neededScenes 
-    //            |> Seq.mapi (fun i s -> (0, i), s) 
-    //            |> Map.ofSeq
-
-    //        uniformBuffers = 
-    //            Map.ofList [
-    //                (1, 0), ("GlobalBuffer", Map.toList info.neededUniforms)
-    //            ]
-                
-    //            //|> Seq.mapi (fun i (name, typ) -> (1,i), (sprintf "%sDummy" name, [(name, typ)]))
-    //            //|> Map.ofSeq
-
-    //        samplers = 
-    //            info.neededSamplers
-    //            |> Map.toSeq
-    //            |> Seq.mapi (fun i (name, info) -> (3,i), (name, info))
-    //            |> Map.ofSeq
-
-    //        buffers = 
-    //            info.neededBuffers 
-    //            |> Map.toSeq
-    //            |> Seq.mapi (fun i (name, (rank, typ)) -> (2,i), (name, rank, typ))
-    //            |> Map.ofSeq
-
-    //    }
-
-    //let res = 
-    //    RayHitShader.ofFunction test
-    //    |> RayHitShader.toModule assign
-    //    |> ModuleCompiler.compileGLSLVulkan
-
-
-    //Log.start "GLSL"
-    //let lines = res.code.Split("\r\n") |> Array.indexed
-
-    //let digits = log10 (float lines.Length) |> ceil |> int
-    //for (i, l) in lines do
-    //    let i = 
-    //        let v = string (i + 1)
-    //        if v.Length < digits then System.String(' ', digits - v.Length) + v
-    //        else v
-    //    Log.line "%s: %s" i l
-    //Log.stop()
-
-    //let res = GLSL.glslang ShaderStage.RayHitShader res.code
-
-    //match res with
-    //| Success res -> 
-    //    //File.writeAllBytes @"D:\Users\Martin\Desktop\test.spv" res
-
-
-    //    let all = 
-    //        Reflection.FSharpType.GetUnionCases(typeof<GLSLang.Optimization>)
-    //        |> Array.filter (fun c -> c.GetFields().Length = 0)
-    //        |> Array.map (fun c -> Reflection.FSharpValue.MakeUnion(c, [||]) |> unbox<GLSLang.Optimization>)
-    //        |> Array.toList
-    //    let res = GLSLang.GLSLang.optimize all res
-    //    let m = GLSLang.SpirV.Module.ofArray res
-    //    SpirVPrint.print m
-        
-    //    //Log.start "SpirV"
-    //    //for i in m.instructions do
-    //    //    match GLSLang.SpirV.Instruction.tryGetId i with
-    //    //        | Some id -> Log.line "%d:\t%A" id i
-    //    //        | None -> Log.line "   \t%A" i
-    //    //Log.stop()
-    //| Error e ->
-    //    Log.warn "ERROR: %s" e
+        match res with
+        | Success ->
+            Log.stop()
+        | Warning w ->
+            Log.warn "%s" w
+        | Error e ->
+            Log.error "%s" e
 
     0
 

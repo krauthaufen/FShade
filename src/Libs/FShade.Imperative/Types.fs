@@ -64,6 +64,18 @@ module ShaderStage =
         | _ ->
             false
 
+    let supportsTraceRay = function
+        | ShaderStage.RayGeneration | ShaderStage.ClosestHit | ShaderStage.Miss -> true
+        | _ -> false
+
+    let supportsPayloadIn = function
+        | ShaderStage.AnyHit | ShaderStage.ClosestHit | ShaderStage.Miss -> true
+        | _ -> false
+        
+    let supportsHitAttributes = function
+        | ShaderStage.Intersection | ShaderStage.AnyHit | ShaderStage.ClosestHit -> true
+        | _ -> false
+
     let prefix =
         LookupTable.lookupTable [
             ShaderStage.Vertex,         "vs"

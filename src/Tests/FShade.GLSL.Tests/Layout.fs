@@ -198,6 +198,7 @@ let layoutGLSLang (b : GLSLUniformBuffer) =
                 cInputs = []
                 cOutputs = []
                 cArguments = []
+                cRaytracingData = []
                 cReturnType = CType.CVoid
                 cBody =
                     CStatement.CWriteOutput(

@@ -451,32 +451,25 @@ module ShaderBuilders =
             member x.ShaderStage = ShaderStage.Miss
             member x.OutputTopology = None
 
-    //type RayHitBuilder() =
-    //    member x.For(a : Arr<'d, 'a>, f : 'a -> unit) : unit =
-    //        for i in a do f i
+    type RayAnyHitBuilder() =
+        inherit BaseBuilder()
 
-    //    member x.For(a : seq<'a>, f : 'a -> unit) : unit =
-    //        for i in a do f i
+        member x.Return(v) = v
+        member x.Quote() = ()
 
-    //    member x.While(guard : unit -> bool, b : unit) =
-    //        ()
+        interface IShaderBuilder with
+            member x.ShaderStage = ShaderStage.AnyHit
+            member x.OutputTopology = None
 
-    //    member x.Combine(l : unit, r : 'a) = r
+    type RayClosestHitBuilder() =
+        inherit BaseBuilder()
 
-    //    member x.Zero() = ()
-    //    member x.Delay f = f()
+        member x.Return(v) = v
+        member x.Quote() = ()
 
-    //    member x.Quote() = ()
-
-    //    member inline x.Run(e : Expr<'a>) : Expr<'a> =
-    //        e
-
-    //    member x.Return(value) = value
-
-    //    interface IShaderBuilder with
-    //        member x.ShaderStage = ShaderStage.RayHitShader
-    //        member x.OutputTopology = None
-
+        interface IShaderBuilder with
+            member x.ShaderStage = ShaderStage.ClosestHit
+            member x.OutputTopology = None
 
     let compute = ComputeBuilder()
     let vertex = VertexBuilder()
@@ -485,29 +478,8 @@ module ShaderBuilders =
 
     let raygen = RayGenerationBuilder()
     let miss = RayMissBuilder()
-
-    //let scene =
-    //    scene {
-    //        accelerationStructure Unchecked.defaultof<_>
-    //    }
-
-    //let defaultRay =
-    //    raytype {
-    //        hitGroup "DefaultHitGroup"
-    //        miss "DefaultMissShader"
-    //        flags RayFlags.CullOpaque
-    //    }
-
-    //let foo =
-    //    raygen {
-    //        let result : float = scene.TraceRay(V3d.Zero, V3d.ZAxis, ray = defaultRay, cullMask = 0xFE)
-    //        ()
-    //    }
-
-    //let oof =
-    //    intersection {
-    //        return (0.0, 0, 0)
-    //    }
+    let anyhit = RayAnyHitBuilder()
+    let closesthit = RayClosestHitBuilder()
 
     let triangle = GeometryBuilder(None, OutputTopology.TriangleStrip)
     let line = GeometryBuilder(None, OutputTopology.LineStrip)

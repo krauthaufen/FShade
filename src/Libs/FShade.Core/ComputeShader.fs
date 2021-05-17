@@ -283,13 +283,14 @@ module ComputeShader =
             )
 
         {
-            conditional = None
-            entryName   = "main"
-            inputs      = []
-            outputs     = []
-            uniforms    = imageArguments @ uniforms
-            arguments   = bufferArguments @ sharedArguments
-            body        = s.csBody
+            conditional    = None
+            entryName      = "main"
+            inputs         = []
+            outputs        = []
+            uniforms       = imageArguments @ uniforms
+            arguments      = bufferArguments @ sharedArguments
+            raytracingData = []
+            body           = s.csBody
             decorations = 
                 [
                     EntryDecoration.Stages { 

@@ -1788,6 +1788,7 @@ module Compiler =
             let! inputs     = f.inputs |> List.mapS toCEntryParameterS
             let! outputs    = f.outputs |> List.mapS toCEntryParameterS
             let! args       = f.arguments |> List.mapS toCEntryParameterS
+            let! rtdata     = f.raytracingData |> List.mapS toCEntryParameterS
 
 
             // compile the body
@@ -1796,13 +1797,14 @@ module Compiler =
 
             return
                 CEntryDef {
-                    cEntryName   = f.entryName
-                    cInputs      = inputs
-                    cOutputs     = outputs
-                    cArguments   = args
-                    cReturnType  = ret
-                    cBody        = body
-                    cDecorations = f.decorations
+                    cEntryName      = f.entryName
+                    cInputs         = inputs
+                    cOutputs        = outputs
+                    cArguments      = args
+                    cRaytracingData = rtdata
+                    cReturnType     = ret
+                    cBody           = body
+                    cDecorations    = f.decorations
                 }
         }
 

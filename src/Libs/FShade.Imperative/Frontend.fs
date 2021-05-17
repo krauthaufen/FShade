@@ -72,10 +72,11 @@ type Uniform =
     }
 
 type ParameterKind =
-    | Input         = 0
-    | Output        = 1
-    | Uniform       = 2
-    | Argument      = 3
+    | Input          = 0
+    | Output         = 1
+    | Uniform        = 2
+    | Argument       = 3
+    | RaytracingData = 4
 
 type EntryParameter =
     {
@@ -103,14 +104,15 @@ type EntryDecoration =
 
 type EntryPoint =
     {
-        conditional : Option<string>
-        entryName   : string
-        inputs      : list<EntryParameter>
-        outputs     : list<EntryParameter>
-        uniforms    : list<Uniform>
-        arguments   : list<EntryParameter>
-        body        : Expr
-        decorations : list<EntryDecoration>
+        conditional    : Option<string>
+        entryName      : string
+        inputs         : list<EntryParameter>
+        outputs        : list<EntryParameter>
+        uniforms       : list<Uniform>
+        arguments      : list<EntryParameter>
+        raytracingData : list<EntryParameter>
+        body           : Expr
+        decorations    : list<EntryDecoration>
     }
     
 [<AttributeUsage(AttributeTargets.Method ||| AttributeTargets.Property)>]
@@ -163,9 +165,12 @@ module ExpressionExtensions =
 
     type Expr with
 
-        static member UnsafePropertySet(target : Expr, prop : PropertyInfo, value : Expr) =
+        static member UnsafePropertySet(target : Expr, prop : PropertyInfo, indices : Expr list, value : Expr) =
             let mi = ShaderIO.UnsafeWriteMeth.MakeGenericMethod [| value.Type |]
-            Expr.Call(mi, [Expr.PropertyGet(target, prop); value])
+            Expr.Call(mi, [Expr.PropertyGet(target, prop, indices); value])
+
+        static member UnsafePropertySet(target : Expr, prop : PropertyInfo, value : Expr) =
+            Expr.UnsafePropertySet(target, prop, [], value)
 
         static member UnsafeWrite(target : Expr, value : Expr) =
             let mi = ShaderIO.UnsafeWriteMeth.MakeGenericMethod [| value.Type |]
@@ -453,6 +458,7 @@ module EntryPoint =
             outputs = []
             uniforms = []
             arguments = args
+            raytracingData = []
             body = body
             decorations = []
         }

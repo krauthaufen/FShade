@@ -48,6 +48,10 @@ type Shader =
         shaderDebugRange : Option<DebugRange>
         /// the shader's payloads (only useful in some raytracing shaders)
         shaderPayloads : Map<string, PayloadDescription>
+        /// the shader's incoming payload (only useful in some raytracing shaders)
+        shaderPayloadIn : Option<string * Type>
+        /// the shader's hit attribute (only useful in some raytracing shaders)
+        shaderHitAttribute : Option<string * Type>
         /// the shader's referenced ray types (only useful in some raytracing shaders)
         shaderRayTypes : Set<string>
         /// the shader's referenced miss shaders (only useful in some raytracing shaders)
@@ -289,6 +293,19 @@ module Preprocessor =
                 | _ ->
                     None
 
+        let (|RemoveBuilder|_|) (e : Expr) =
+            match e with
+            | BuilderCombine(_, l, r) -> Expr.Seq [l;r] |> Some
+            | BuilderReturn(_, _, e) -> e |> Some
+            | BuilderReturnFrom(_, _, e) -> e |> Some
+            | BuilderRun(_, e) -> e |> Some
+            | BuilderDelay(_, e) -> e |> Some
+            | BuilderZero _ -> Expr.Unit |> Some
+            | BuilderFor(_, var, RangeSequence(first, step, last), body) -> Expr.ForInteger(var, first, step, last, body) |> Some
+            | BuilderFor(_, var, sequence, body) -> Expr.ForEach(var, sequence, body) |> Some
+            | BuilderWhile(_, Lambda(_, guard), body) -> Expr.WhileLoop(guard, body) |> Some
+            | _ -> None
+
         let (|Scene|_|) (e : Expr) =
             if e.Type = typeof<Scene> then
                 match Expr.TryEval e with
@@ -340,10 +357,15 @@ module Preprocessor =
             | _ ->
                 None
 
-        //let (|RayPayloadIn|_|) (e : Expr) =
-        //    match e with
-        //    | FieldGet(_, fi) when fi.Semantic = Intrinsics.RayPayloadIn -> Some ()
-        //    | _ -> None
+        let (|RayPayloadIn|_|) (e : Expr) =
+            match e with
+            | SemanticInput(semantic, _) when semantic = Intrinsics.RayPayloadIn -> Some e.Type
+            | _ -> None
+
+        let (|HitAttribute|_|) (e : Expr) =
+            match e with
+            | SemanticInput(semantic, _) when semantic = Intrinsics.HitAttribute -> Some e.Type
+            | _ -> None
 
     type State =
         {
@@ -359,6 +381,8 @@ module Preprocessor =
             variableValues  : Map<Var, Expr>
             shaders         : list<Shader>
             payloads        : HashMap<Type, string * int>
+            payloadIn       : Option<string * Type>
+            hitAttribute    : Option<string * Type>
             rayTypes        : Set<string>
             missShaders     : Set<string>
             localSize       : V3i
@@ -386,6 +410,8 @@ module Preprocessor =
                 variableValues  = Map.empty
                 shaders         = []
                 payloads        = HashMap.empty
+                payloadIn       = None
+                hitAttribute    = None
                 rayTypes        = Set.empty
                 missShaders     = Set.empty
                 localSize       = V3i.Zero
@@ -483,7 +509,7 @@ module Preprocessor =
                 return Expr.ReadInput(ParameterKind.Uniform, typeof<Scene>, uniform.uniformName)
             }
 
-        let traceRay (payload : Type) =
+        let usePayload (payload : Type) =
             State.custom (fun (s : State) ->
                 match s.payloads |> HashMap.tryFind payload with
                 | Some (var, index) -> s, (var, index)
@@ -492,6 +518,24 @@ module Preprocessor =
                     let name = sprintf "rayPayload%d" index
                     let s = { s with payloads = s.payloads |> HashMap.add payload (name, index) }
                     s, (name, index)
+            )
+
+        let usePayloadIn (payload : Type) =
+            State.custom (fun (s : State) ->
+                match s.payloadIn with
+                | Some (_, p) when payload <> p -> failwith "[FShade] Can only use one type of incoming payload"
+                | _ ->
+                    let name = "rayPayloadIn"
+                    { s with payloadIn = Some (name, payload) }, name
+            )
+
+        let useHitAttribute (hitAttribute : Type) =
+            State.custom (fun (s : State) ->
+                match s.hitAttribute with
+                | Some (_, h) when hitAttribute <> h -> failwith "[FShade] Can only use one type of hit attribute"
+                | _ ->
+                    let name = "rayHitAttribute"
+                    { s with hitAttribute = Some (name, hitAttribute) }, name
             )
 
         let useRayTypes (e : Expr) =
@@ -528,7 +572,7 @@ module Preprocessor =
             let! inputTypes = State.inputTypes
 
             match e with
-            | TraceRay _ when not (Scene.IsAvailable stage) ->
+            | TraceRay _ when not (ShaderStage.supportsTraceRay stage) ->
                 return failwithf "[FShade] Cannot invoke TraceRay in %A shaders" stage
 
             | TraceRay args ->
@@ -546,7 +590,7 @@ module Preprocessor =
                     | None ->
                         State.value None
 
-                let! payloadName, payloadIndex = State.traceRay e.Type
+                let! payloadName, payloadIndex = State.usePayload e.Type
                 let! ray = State.useRayTypes args.ray
                 let! miss = State.useMissShaders args.miss
                 let! accel = State.readAccelerationStructure args.accelerationStructure
@@ -554,7 +598,7 @@ module Preprocessor =
                 let rayId = Expr.Value(ray)
                 let missId = Expr.Value(miss)
                 let payloadIndex = Expr.Value(payloadIndex)
-                let payloadOut = Expr.ReadInput(ParameterKind.Input, e.Type, payloadName, volatile = true)
+                let payloadOut = Expr.ReadInput(ParameterKind.RaytracingData, e.Type, payloadName, volatile = true)
 
                 return Expr.Seq [
                     match payloadIn with
@@ -573,6 +617,27 @@ module Preprocessor =
                     payloadOut
                 ]
 
+            | RayPayloadIn _ when not (ShaderStage.supportsPayloadIn stage) ->
+                return failwithf "[FShade] Cannot use incoming payloads in %A shaders" stage
+                
+            | RayPayloadIn payload ->
+                let! name = State.usePayloadIn payload
+                return Expr.ReadInput(ParameterKind.RaytracingData, payload, name)
+
+            | HitAttribute _ when not (ShaderStage.supportsHitAttributes stage) ->
+                return failwithf "[FShade] Cannot use hit attributes in %A shaders" stage
+
+            | HitAttribute attr ->
+                let! name = State.useHitAttribute attr
+                return Expr.ReadInput(ParameterKind.RaytracingData, attr, name)
+
+            | BuilderReturn(_, _, value) when ShaderStage.supportsPayloadIn stage ->
+                let! name = State.usePayloadIn value.Type
+                let! value = preprocessRaytracingS stage value
+
+                let payloadOut = Expr.ReadInput(ParameterKind.RaytracingData, e.Type, name)
+                return Expr.UnsafeWrite(payloadOut, value);
+
             | SemanticInput(semantic, parameter) ->
                 do! State.readInput semantic parameter
                 return Expr.ReadInput(ParameterKind.Input, e.Type, semantic)
@@ -581,6 +646,9 @@ module Preprocessor =
                 let prefix = ShaderStage.prefix stage
                 let name = sprintf "%s_input_%s" prefix name
                 return Expr.ReadInput(ParameterKind.Uniform, t, name)
+
+            | RemoveBuilder e ->
+                return! preprocessRaytracingS stage e
 
             | ShapeLambda(v, b) ->
                 let! b = preprocessRaytracingS stage b
@@ -717,10 +785,12 @@ module Preprocessor =
                             | _ -> e.Type
 
                     match kind with
-                        | ParameterKind.Input -> 
-                            do! State.readInput name { paramType = paramType; paramInterpolation = InterpolationMode.Default }
-                        | _ ->
-                            do! State.readUniform { uniformType = paramType; uniformName = name; uniformValue = UniformValue.Attribute(uniform, name) }
+                    | ParameterKind.Input -> 
+                        do! State.readInput name { paramType = paramType; paramInterpolation = InterpolationMode.Default }
+                    | ParameterKind.Uniform ->
+                        do! State.readUniform { uniformType = paramType; uniformName = name; uniformValue = UniformValue.Attribute(uniform, name) }
+                    | _ ->
+                        ()
 
                     match idx with
                         | Some idx -> return Expr.ReadInput(kind, e.Type, name, idx, volatile)
@@ -1220,6 +1290,8 @@ module Preprocessor =
                 shaderDebugRange        = None
                 shaderDepthWriteMode    = state.depthWriteMode
                 shaderPayloads          = Map.ofSeq payloads
+                shaderPayloadIn         = state.payloadIn
+                shaderHitAttribute      = state.hitAttribute
                 shaderRayTypes          = state.rayTypes
                 shaderMissShaders       = state.missShaders
             }
@@ -2455,17 +2527,42 @@ module Shader =
                     hasSourceVertexIndex <- true
                     None
                 else
-                    let decorations =
-                        match s.shaderPayloads |> Map.tryFind n with
-                        | Some desc -> [ParameterDecoration.RayPayload desc.payloadLocation]
-                        | _ -> [ParameterDecoration.Interpolation i.paramInterpolation]
-
                     Some { 
                         paramName = n
                         paramSemantic = n
                         paramType = i.paramType
-                        paramDecorations = Set.ofList decorations
+                        paramDecorations = Set.ofList [ParameterDecoration.Interpolation i.paramInterpolation]
                     }
+            )
+
+        let payloads =
+            s.shaderPayloads |> Map.toList |> List.map (fun (name, desc) ->
+                {
+                    paramName = name
+                    paramSemantic = name
+                    paramType = desc.payloadType
+                    paramDecorations = Set.ofList [ParameterDecoration.RayPayload desc.payloadLocation]
+                }
+            )
+
+        let payloadIn =
+            s.shaderPayloadIn |> Option.toList |> List.map (fun (name, typ) ->
+                {
+                    paramName = name
+                    paramSemantic = name
+                    paramType = typ
+                    paramDecorations = Set.ofList [ParameterDecoration.RayPayloadIn]
+                }
+            )
+
+        let hitAttribute =
+            s.shaderHitAttribute |> Option.toList |> List.map (fun (name, typ) ->
+                {
+                    paramName = name
+                    paramSemantic = name
+                    paramType = typ
+                    paramDecorations = Set.ofList [ParameterDecoration.HitAttribute]
+                }
             )
 
         let depthWriteMode =
@@ -2532,13 +2629,14 @@ module Shader =
             | Some c -> sprintf "%s_%s" stage c
   
         {
-            conditional = Some conditional
-            entryName   = "main"
-            inputs      = inputs
-            outputs     = outputs
-            uniforms    = uniforms
-            arguments   = []
-            body        = body
+            conditional    = Some conditional
+            entryName      = "main"
+            inputs         = inputs
+            outputs        = outputs
+            uniforms       = uniforms
+            arguments      = []
+            raytracingData = payloads @ payloadIn @ hitAttribute
+            body           = body
             decorations = 
                 [
                     yield EntryDecoration.Stages { 
@@ -2588,11 +2686,13 @@ module Shader =
                         attributes
                             |> Map.map (fun n t -> None, Expr.ReadInput(ParameterKind.Input, t, n))
                             |> Expr.WriteOutputs
-                    shaderDebugRange = None
-                    shaderDepthWriteMode = DepthWriteMode.None
-                    shaderPayloads = Map.empty
-                    shaderRayTypes = Set.empty
-                    shaderMissShaders = Set.empty
+                    shaderDebugRange        = None
+                    shaderDepthWriteMode    = DepthWriteMode.None
+                    shaderPayloads          = Map.empty
+                    shaderPayloadIn         = None
+                    shaderHitAttribute      = None
+                    shaderRayTypes          = Set.empty
+                    shaderMissShaders       = Set.empty
                 }
             | _ ->
                 failwith "[FShade] not implemented"

@@ -42,17 +42,18 @@ module GLSL =
             ShaderStage.Callable, GLSLang.ShaderStage.Callable
         ]
 
-
-    let glslang (stage : ShaderStage) (code : string) =
-        let defines = [sprintf "%A" stage]
+    let glslang' (stage : ShaderStage) (defines : List<string>) (code : string) =
         let res = 
             match GLSLang.tryCompile (toGLSLangStage stage) "main" defines code with
-                | Some _, warn -> 
-                    if String.IsNullOrWhiteSpace warn then Success
-                    else Warning warn
-                | None, err ->
-                    Error err
+            | Some _, warn -> 
+                if String.IsNullOrWhiteSpace warn then Success
+                else Warning warn
+            | None, err ->
+                Error err
         res
+
+    let glslang (stage : ShaderStage) (code : string) =
+        glslang' stage [sprintf "%A" stage] code     
 
     let compile (e : list<Effect>) =
         let e = Effect.compose e

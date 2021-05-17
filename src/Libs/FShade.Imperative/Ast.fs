@@ -809,13 +809,14 @@ module CEntryParameter =
 
 type CEntryDef =
     {
-        cEntryName   : string
-        cInputs      : list<CEntryParameter>
-        cOutputs     : list<CEntryParameter>
-        cArguments   : list<CEntryParameter>
-        cReturnType  : CType
-        cBody        : CStatement
-        cDecorations : list<EntryDecoration>
+        cEntryName      : string
+        cInputs         : list<CEntryParameter>
+        cOutputs        : list<CEntryParameter>
+        cArguments      : list<CEntryParameter>
+        cRaytracingData : list<CEntryParameter>
+        cReturnType     : CType
+        cBody           : CStatement
+        cDecorations    : list<EntryDecoration>
     }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]

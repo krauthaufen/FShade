@@ -115,6 +115,10 @@ module Intrinsics =
     [<Literal>]
     let WorldToObject = "WorldToObject"
 
+    // Callable
+    [<Literal>]
+    let CallableDataIn = "CallableDataIn"
+
 [<AutoOpen>]
 module InstrinsicAttributes =
     type PositionAttribute() = inherit SemanticAttribute(Intrinsics.Position)
@@ -158,10 +162,97 @@ module InstrinsicAttributes =
     type RayPayloadInAttribute() =        inherit SemanticAttribute(Intrinsics.RayPayloadIn)
     type ObjectToWorldAttribute() =       inherit SemanticAttribute(Intrinsics.ObjectToWorld)
     type WorldToObjectAttribute() =       inherit SemanticAttribute(Intrinsics.WorldToObject)
+    type CallableDataInAttribute() =      inherit SemanticAttribute(Intrinsics.CallableDataIn)
 
 
 type TessLevels =
     {
         [<TessLevelInner>] innerLevel : float[]
         [<TessLevelOuter>] outerLevel : float[]
+    }
+
+module RaytracingInputTypes =
+
+    type WorkDimensions =
+        {
+            [<LaunchId>]   id   : V3i
+            [<LaunchSize>] size : V3i
+        }
+
+    type GeometryInstance =
+        {
+            [<PrimitiveId>]         primitiveId         : int
+            [<InstanceId>]          instanceId          : int
+            [<InstanceCustomIndex>] instanceCustomIndex : int
+            [<GeometryIndex>]       geometryIndex       : int
+        }
+
+    type RayParameters =
+        {
+            [<WorldRayOrigin>]    origin    : V3d
+            [<WorldRayDirection>] direction : V3d
+            [<RayTmin>]           minT      : float
+            [<RayTmax>]           maxT      : float
+            [<IncomingRayFlags>]  flags     : uint32
+        }
+
+    type ObjectSpace =
+        {
+            [<ObjectRayOrigin>]    rayOrigin     : V3d
+            [<ObjectRayDirection>] rayDirection  : V3d
+            [<ObjectToWorld>]      objectToWorld : M44d
+            [<WorldToObject>]      worldToObject : M44d
+        }
+
+    type RayHit<'T> =
+        {
+            [<HitT>]         t          : float
+            [<HitKind>]      kind       : uint32
+            [<HitAttribute>] attribute  : 'T
+        }
+
+/// Type containing input available in ray generation shaders.
+type RayGenerationInput =
+    {
+        work : RaytracingInputTypes.WorkDimensions
+    }
+
+/// Type containing input available in ray intersection shaders.
+type RayIntersectionInput =
+    {
+        work        : RaytracingInputTypes.WorkDimensions
+        geometry    : RaytracingInputTypes.GeometryInstance
+        ray         : RaytracingInputTypes.RayParameters
+        objectSpace : RaytracingInputTypes.ObjectSpace
+    }
+
+/// Type containing input available in ray any hit and closest hit shaders.
+type RayHitInput<'Payload, 'HitAttribute> =
+    {
+        work        : RaytracingInputTypes.WorkDimensions
+        geometry    : RaytracingInputTypes.GeometryInstance
+        ray         : RaytracingInputTypes.RayParameters
+        hit         : RaytracingInputTypes.RayHit<'HitAttribute>
+        objectSpace : RaytracingInputTypes.ObjectSpace
+        [<RayPayloadIn>] payload : 'Payload
+    }
+
+type RayHitInput           = RayHitInput<unit, V2d>
+type RayHitInput<'Payload> = RayHitInput<'Payload, V2d>
+
+/// Type containing input available in ray miss shaders.
+type RayMissInput<'Payload> =
+    {
+        work : RaytracingInputTypes.WorkDimensions
+        ray  : RaytracingInputTypes.RayParameters
+        [<RayPayloadIn>] payload : 'Payload
+    }
+
+type RayMissInput = RayMissInput<unit>
+
+/// Type containing input available in ray callable shaders.
+type RayCallableInput<'T> =
+    {
+        work : RaytracingInputTypes.WorkDimensions
+        [<CallableDataIn>] data : 'T
     }

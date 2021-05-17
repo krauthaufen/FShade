@@ -3,13 +3,11 @@
 open Aardvark.Base
 open System.Runtime.InteropServices
 
+module private Identifier =
+    [<Literal>]
+    let Default = "__Default__"
+
 module private TraceDefaults =
-    [<Literal>]
-    let Ray = "__DefaultRay__"
-
-    [<Literal>]
-    let Miss = "__DefaultMiss__"
-
     [<Literal>]
     let MinT = 0.001
 
@@ -31,24 +29,20 @@ type Scene(accelerationStructure : ISemanticValue) =
     member x.AccelerationStructure = accelerationStructure
 
     member x.TraceRay<'T>(origin : V3d, direction : V3d,
-                          [<Optional; DefaultParameterValue(TraceDefaults.Ray)>]      ray : string,
-                          [<Optional; DefaultParameterValue(TraceDefaults.Miss)>]     miss : string,
+                          [<Optional; DefaultParameterValue(Identifier.Default)>]     ray : string,
+                          [<Optional; DefaultParameterValue(Identifier.Default)>]     miss : string,
                           [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT : float,
                           [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT : float,
                           [<Optional; DefaultParameterValue(TraceDefaults.Flags)>]    flags : RayFlags,
                           [<Optional; DefaultParameterValue(TraceDefaults.CullMask)>] cullMask : int) : 'T = onlyInShaderCode "TraceRay"
 
     member x.TraceRay<'T>(origin : V3d, direction : V3d, payload : 'T,
-                          [<Optional; DefaultParameterValue(TraceDefaults.Ray)>]      ray : string,
-                          [<Optional; DefaultParameterValue(TraceDefaults.Miss)>]     miss : string,
+                          [<Optional; DefaultParameterValue(Identifier.Default)>]     ray : string,
+                          [<Optional; DefaultParameterValue(Identifier.Default)>]     miss : string,
                           [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT : float,
                           [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT : float,
                           [<Optional; DefaultParameterValue(TraceDefaults.Flags)>]    flags : RayFlags,
                           [<Optional; DefaultParameterValue(TraceDefaults.CullMask)>] cullMask : int) : 'T = onlyInShaderCode "TraceRay"
-
-    static member IsAvailable = function
-        | ShaderStage.RayGeneration | ShaderStage.ClosestHit | ShaderStage.Miss -> true
-        | _ -> false
 
 
 [<AutoOpen>]
