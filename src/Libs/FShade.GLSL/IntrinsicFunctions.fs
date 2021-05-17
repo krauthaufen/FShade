@@ -1967,6 +1967,7 @@ module IntrinsicFunctions =
             CIntrinsic.tagged "barrier()", [ exactly <@ barrier @> ]
 
             CIntrinsic.simple "traceRayEXT", [ RaytracingIntrinsics.traceRayMeth ]
+            CIntrinsic.simple "executeCallableEXT", [ RaytracingIntrinsics.executeCallableMeth ]
         ]
 
     let (|TextureLookup|_|) (mi : MethodInfo) =

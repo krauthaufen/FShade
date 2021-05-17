@@ -18,6 +18,7 @@
     <Compile Include="Uniforms.fs" />
     <Compile Include="SamplerState.fs" />
     <Compile Include="Scene.fs" />
+    <Compile Include="Callable.fs" />
     <Compile Include="Core.fs" />
     <Compile Include="Samplers.fs" />
     <Compile Include="Reflection.fs" />

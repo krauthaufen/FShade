@@ -68,6 +68,10 @@ module ShaderStage =
         | ShaderStage.RayGeneration | ShaderStage.ClosestHit | ShaderStage.Miss -> true
         | _ -> false
 
+    let supportsExecuteCallable = function
+        | ShaderStage.RayGeneration | ShaderStage.ClosestHit | ShaderStage.Miss | ShaderStage.Callable -> true
+        | _ -> false
+
     let supportsPayloadIn = function
         | ShaderStage.AnyHit | ShaderStage.ClosestHit | ShaderStage.Miss -> true
         | _ -> false

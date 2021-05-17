@@ -377,8 +377,22 @@ module RaytracingTest =
             flag : bool
         }
 
+    type CallableData =
+        {
+            flag : bool
+            value : float
+        }
+
     let scene =
         scene { accelerationStructure uniform?RaytracingScene }
+
+    let callableShader (input : RayCallableInput<CallableData>) =
+        callable {
+            if input.data.flag then
+                return { value = 0.5; flag = false }
+            else
+                return { value = 1.0; flag = false }
+        }
 
     let missShader (input : RayMissInput<Payload>) =
         miss {
@@ -397,8 +411,9 @@ module RaytracingTest =
         let secondaryRayFlags = RayFlags.Opaque ||| RayFlags.SkipClosestHitShader
 
         raygen {
+            let whatever = Callable.Execute({ flag = true; value = 0.0 })
             let result = scene.TraceRay<Payload>(scene.TraceRay<V3d>(V3d.Zero, V3d.ZAxis, V3d.One), V3d.YAxis, ray = "Secondary", flags = secondaryRayFlags)
-            buffer.[input.work.id.XY] <- V4d(result.foo)
+            buffer.[input.work.id.XY] <- V4d(result.foo + whatever.value)
         }
 
 [<EntryPoint>]
@@ -415,6 +430,7 @@ let main args =
             raygen raygenShader
             hitgroup defaultHitGroup
             miss missShader
+            callable callableShader
         }
 
     let glsl =

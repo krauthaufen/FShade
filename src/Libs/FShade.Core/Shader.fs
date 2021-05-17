@@ -50,12 +50,18 @@ type Shader =
         shaderPayloads : Map<string, PayloadDescription>
         /// the shader's incoming payload (only useful in some raytracing shaders)
         shaderPayloadIn : Option<string * Type>
+        /// the shader's callable data types (only useful in some raytracing shaders)
+        shaderCallableData : Map<string, Type * int>
+        /// the shader's incoming callable data (only useful in some callable shaders)
+        shaderCallableDataIn : Option<string * Type>
         /// the shader's hit attribute (only useful in some raytracing shaders)
         shaderHitAttribute : Option<string * Type>
         /// the shader's referenced ray types (only useful in some raytracing shaders)
         shaderRayTypes : Set<string>
         /// the shader's referenced miss shaders (only useful in some raytracing shaders)
         shaderMissShaders : Set<string>
+        /// the shader's referenced callable shaders (only useful in some raytracing shaders)
+        shaderCallableShaders : Set<string>
         shaderDepthWriteMode : DepthWriteMode
     }
 
@@ -341,6 +347,17 @@ module Preprocessor =
             | _ ->
                 None
 
+        let (|ExecuteCallable|_|) (e : Expr) =
+            match e with
+            | Call(None, mi, args) when mi.DeclaringType = typeof<Callable> && mi.Name = "Execute" ->
+                match args with
+                | [id] -> Some (id, None)
+                | [data; id] -> Some (id, Some data)
+                | _ ->
+                    failwithf "[FShade] Illformed call to Callable.Execute with %d arguments" args.Length
+            | _ ->
+                None
+
         let private (|SemanticProperty|_|) (pi : PropertyInfo) =
             let attributes = pi.GetCustomAttributes<SemanticAttribute>(true) |> Seq.toList
             attributes |> List.tryHead |> Option.map (fun att -> att.Semantic)
@@ -360,6 +377,11 @@ module Preprocessor =
         let (|RayPayloadIn|_|) (e : Expr) =
             match e with
             | SemanticInput(semantic, _) when semantic = Intrinsics.RayPayloadIn -> Some e.Type
+            | _ -> None
+
+        let (|CallableDataIn|_|) (e : Expr) =
+            match e with
+            | SemanticInput(semantic, _) when semantic = Intrinsics.CallableDataIn -> Some e.Type
             | _ -> None
 
         let (|HitAttribute|_|) (e : Expr) =
@@ -382,9 +404,12 @@ module Preprocessor =
             shaders         : list<Shader>
             payloads        : HashMap<Type, string * int>
             payloadIn       : Option<string * Type>
+            callableData    : HashMap<Type, string * int>
+            callableDataIn  : Option<string * Type>
             hitAttribute    : Option<string * Type>
             rayTypes        : Set<string>
             missShaders     : Set<string>
+            callableShaders : Set<string>
             localSize       : V3i
         }
         
@@ -411,9 +436,12 @@ module Preprocessor =
                 shaders         = []
                 payloads        = HashMap.empty
                 payloadIn       = None
+                callableData    = HashMap.empty
+                callableDataIn  = None
                 hitAttribute    = None
                 rayTypes        = Set.empty
                 missShaders     = Set.empty
+                callableShaders = Set.empty
                 localSize       = V3i.Zero
             }
 
@@ -529,6 +557,26 @@ module Preprocessor =
                     { s with payloadIn = Some (name, payload) }, name
             )
 
+        let useCallableData (data : Type) =
+            State.custom (fun (s : State) ->
+                match s.callableData |> HashMap.tryFind data with
+                | Some (var, index) -> s, (var, index)
+                | None ->
+                    let index = s.payloads.Count
+                    let name = sprintf "callableData%d" index
+                    let s = { s with callableData = s.callableData |> HashMap.add data (name, index) }
+                    s, (name, index)
+            )
+
+        let useCallableDataIn (data : Type) =
+            State.custom (fun (s : State) ->
+                match s.callableDataIn with
+                | Some (_, d) when data <> d -> failwith "[FShade] Can only use one type of incoming callable data"
+                | _ ->
+                    let name = "callableDataIn"
+                    { s with callableDataIn = Some (name, data) }, name
+            )
+
         let useHitAttribute (hitAttribute : Type) =
             State.custom (fun (s : State) ->
                 match s.hitAttribute with
@@ -538,7 +586,7 @@ module Preprocessor =
                     { s with hitAttribute = Some (name, hitAttribute) }, name
             )
 
-        let useRayTypes (e : Expr) =
+        let useRayType (e : Expr) =
             State.custom (fun (s : State) ->
                 match Expr.TryEval e with
                 | (Some (:? string as name)) ->
@@ -547,7 +595,7 @@ module Preprocessor =
                     failwithf "[FShade] Ray type name must be constant"
             )
 
-        let useMissShaders (e : Expr) =
+        let useMissShader (e : Expr) =
             State.custom (fun (s : State) ->
                 match Expr.TryEval e with
                 | (Some (:? string as name)) ->
@@ -556,16 +604,34 @@ module Preprocessor =
                     failwithf "[FShade] Miss shader name must be constant"
             )
 
-    [<KeepCall>]
-    let private traceRayStub (scene : IAccelerationStructure)
+        let useCallableShader (e : Expr) =
+            State.custom (fun (s : State) ->
+                match Expr.TryEval e with
+                | (Some (:? string as name)) ->
+                    { s with callableShaders = s.callableShaders |> Set.add name }, name
+                | _ ->
+                    failwithf "[FShade] Callable shader name must be constant"
+            )
+
+    module Stubs =
+        [<KeepCall>]
+        let private traceRay (scene : IAccelerationStructure)
                              (cullMask : int) (flags : RayFlags)
                              (rayId : string) (missId : string)
                              (origin : V3d) (minT : float)
                              (direction : V3d) (maxT : float)
                              (payload : int) : unit =
-        onlyInShaderCode "traceRayStub"
+            onlyInShaderCode "traceRayStub"
 
-    let traceRayStubMeth = getMethodInfo <@ traceRayStub @>
+        let traceRayMeth = getMethodInfo <@ traceRay @>
+
+
+        [<KeepCall>]
+        let private executeCallable (id : string) (callable : int) : unit =
+            onlyInShaderCode "executeCallableStub"
+
+        let executeCallableMeth = getMethodInfo <@ executeCallable @>
+
 
     let rec preprocessRaytracingS (stage : ShaderStage) (e : Expr) : Preprocess<Expr> =
         state {
@@ -591,8 +657,8 @@ module Preprocessor =
                         State.value None
 
                 let! payloadName, payloadIndex = State.usePayload e.Type
-                let! ray = State.useRayTypes args.ray
-                let! miss = State.useMissShaders args.miss
+                let! ray = State.useRayType args.ray
+                let! miss = State.useMissShader args.miss
                 let! accel = State.readAccelerationStructure args.accelerationStructure
 
                 let rayId = Expr.Value(ray)
@@ -606,7 +672,7 @@ module Preprocessor =
                     | _ -> ()
 
                     Expr.Call(
-                        traceRayStubMeth,
+                        Stubs.traceRayMeth,
                         [accel; cullMask;
                         flags; rayId; missId;
                         origin; minT;
@@ -624,6 +690,37 @@ module Preprocessor =
                 let! name = State.usePayloadIn payload
                 return Expr.ReadInput(ParameterKind.RaytracingData, payload, name)
 
+            | ExecuteCallable(id, data) ->
+                let! id = State.useCallableShader id
+
+                let! callableDataIn =
+                    match data with
+                    | Some d ->
+                        preprocessRaytracingS stage d |> State.map Some
+                    | None ->
+                        State.value None
+
+                let! callableDataName, callableDataIndex = State.useCallableData e.Type
+                let callableDataIndex = Expr.Value(callableDataIndex)
+                let callableDataOut = Expr.ReadInput(ParameterKind.RaytracingData, e.Type, callableDataName, volatile = true)
+
+                return Expr.Seq [
+                    match callableDataIn with
+                    | Some d -> Expr.UnsafeWrite(callableDataOut, d)
+                    | _ -> ()
+
+                    Expr.Call(Stubs.executeCallableMeth, [Expr.Value id; callableDataIndex])
+
+                    callableDataOut
+                ]
+
+            | CallableDataIn _ when stage <> ShaderStage.Callable ->
+                return failwith "[FShade] Incmoing callable data can only be used in callable shaders"
+
+            | CallableDataIn data ->
+                let! name = State.useCallableDataIn data
+                return Expr.ReadInput(ParameterKind.RaytracingData, data, name)
+
             | HitAttribute _ when not (ShaderStage.supportsHitAttributes stage) ->
                 return failwithf "[FShade] Cannot use hit attributes in %A shaders" stage
 
@@ -637,6 +734,13 @@ module Preprocessor =
 
                 let payloadOut = Expr.ReadInput(ParameterKind.RaytracingData, e.Type, name)
                 return Expr.UnsafeWrite(payloadOut, value);
+
+            | BuilderReturn(_, _, value) when stage = ShaderStage.Callable ->
+                let! name = State.useCallableDataIn value.Type
+                let! value = preprocessRaytracingS stage value
+
+                let callableDataOut = Expr.ReadInput(ParameterKind.RaytracingData, e.Type, name)
+                return Expr.UnsafeWrite(callableDataOut, value);
 
             | SemanticInput(semantic, parameter) ->
                 do! State.readInput semantic parameter
@@ -1275,6 +1379,11 @@ module Preprocessor =
                 name, { payloadType = typ; payloadLocation = location }
             )
 
+        let callableData =
+            state.callableData |> Seq.map (fun (typ, (name, location)) ->
+                name, (typ, location)
+            )
+
         let shader = 
             { 
                 shaderStage             = builder.ShaderStage
@@ -1291,9 +1400,12 @@ module Preprocessor =
                 shaderDepthWriteMode    = state.depthWriteMode
                 shaderPayloads          = Map.ofSeq payloads
                 shaderPayloadIn         = state.payloadIn
+                shaderCallableData      = Map.ofSeq callableData
+                shaderCallableDataIn    = state.callableDataIn
                 shaderHitAttribute      = state.hitAttribute
                 shaderRayTypes          = state.rayTypes
                 shaderMissShaders       = state.missShaders
+                shaderCallableShaders   = state.callableShaders
             }
 
         shader :: state.shaders
@@ -2555,6 +2667,26 @@ module Shader =
                 }
             )
 
+        let callableData =
+            s.shaderCallableData |> Map.toList |> List.map (fun (name, (typ, location)) ->
+                {
+                    paramName = name
+                    paramSemantic = name
+                    paramType = typ
+                    paramDecorations = Set.ofList [ParameterDecoration.CallableData location]
+                }
+            )
+
+        let callableDataIn =
+            s.shaderCallableDataIn |> Option.toList |> List.map (fun (name, typ) ->
+                {
+                    paramName = name
+                    paramSemantic = name
+                    paramType = typ
+                    paramDecorations = Set.ofList [ParameterDecoration.CallableDataIn]
+                }
+            )
+
         let hitAttribute =
             s.shaderHitAttribute |> Option.toList |> List.map (fun (name, typ) ->
                 {
@@ -2635,7 +2767,7 @@ module Shader =
             outputs        = outputs
             uniforms       = uniforms
             arguments      = []
-            raytracingData = payloads @ payloadIn @ hitAttribute
+            raytracingData = payloads @ payloadIn @ callableData @ callableDataIn @ hitAttribute
             body           = body
             decorations = 
                 [
@@ -2690,9 +2822,12 @@ module Shader =
                     shaderDepthWriteMode    = DepthWriteMode.None
                     shaderPayloads          = Map.empty
                     shaderPayloadIn         = None
+                    shaderCallableData      = Map.empty
+                    shaderCallableDataIn    = None
                     shaderHitAttribute      = None
                     shaderRayTypes          = Set.empty
                     shaderMissShaders       = Set.empty
+                    shaderCallableShaders   = Set.empty
                 }
             | _ ->
                 failwith "[FShade] not implemented"

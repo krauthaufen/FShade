@@ -2,14 +2,10 @@
 
 #nowarn "4321"
 
-open System
-open System.Runtime.CompilerServices
-
 open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Quotations.Patterns
 open Microsoft.FSharp.Quotations.DerivedPatterns
 open Microsoft.FSharp.Quotations.ExprShape
-open Microsoft.FSharp.Reflection
 
 open Aardvark.Base
 open FShade.Imperative
@@ -28,38 +24,54 @@ module RaytracingIntrinsics =
     let traceRayMeth = getMethodInfo <@ traceRay @>
 
 
+    [<KeepCall>]
+    let executeCallable (index : int) (callable : int) : unit =
+        onlyInShaderCode "executeCallable"
+
+    let executeCallableMeth = getMethodInfo <@ executeCallable @>
+
+
 [<AutoOpen>]
 module private RaytracingUtilities =
 
-    let rec private substituteStub (sbt : ShaderBindingTableLayout) (e : Expr) =
+    let rec private substituteStubs (sbt : ShaderBindingTableLayout) (e : Expr) =
         match e with
-        | Call(None, mi, args) when mi = Preprocessor.traceRayStubMeth ->
+        | Call(None, mi, args) when mi = Preprocessor.Stubs.traceRayMeth ->
             match args with
             | [accel; cullMask; flags;
                String rayId; String missId;
                origin; minT; direction; maxT; payload] ->
-                    let sbtRecordOffset = Expr.Value <| sbt.GetRayOffset(rayId)
-                    let sbtRecordStride = Expr.Value sbt.RayStride
-                    let missIndex = Expr.Value <| sbt.GetMissIndex(missId)
+                let sbtRecordOffset = Expr.Value <| sbt.GetRayOffset(rayId)
+                let sbtRecordStride = Expr.Value sbt.RayStride
+                let missIndex = Expr.Value <| sbt.GetMissIndex(missId)
 
-                    Expr.Call(
-                        RaytracingIntrinsics.traceRayMeth,
-                        [accel; flags; cullMask;
-                        sbtRecordOffset; sbtRecordStride; missIndex;
-                        origin; minT; direction; maxT; payload]
-                    )
+                Expr.Call(
+                    RaytracingIntrinsics.traceRayMeth,
+                    [accel; flags; cullMask;
+                    sbtRecordOffset; sbtRecordStride; missIndex;
+                    origin; minT; direction; maxT; payload]
+                )
 
             | _ ->
                 failwithf "[FShade] Unexpected arguments when substituting traceRay stub: %A" args
 
-        | ShapeLambda(v, b) -> Expr.Lambda(v, substituteStub sbt b)
+        | Call(None, mi, args) when mi = Preprocessor.Stubs.executeCallableMeth ->
+            match args with
+            | [String id; callable] ->
+                let callableIndex = Expr.Value <| sbt.GetCallableIndex(id)
+                Expr.Call(RaytracingIntrinsics.executeCallableMeth, [callableIndex; callable])
+
+            | _ ->
+                failwithf "[FShade] Unexpected arguments when substituting executeCallable stub: %A" args
+
+        | ShapeLambda(v, b) -> Expr.Lambda(v, substituteStubs sbt b)
         | ShapeVar(_) -> e
         | ShapeCombination(o, args) ->
-            let args = args |> List.map (substituteStub sbt)
+            let args = args |> List.map (substituteStubs sbt)
             RebuildShapeCombination(o, args)
 
     let resolveIndices (sbt : ShaderBindingTableLayout) (shader : Shader) =
-        { shader with  shaderBody = substituteStub sbt shader.shaderBody }
+        { shader with  shaderBody = substituteStubs sbt shader.shaderBody }
 
 
 type HitGroupEntry =

@@ -52,7 +52,8 @@ type ParameterDecoration =
     | DepthWrite of DepthWriteMode
     | RayPayload of location: int
     | RayPayloadIn
-    | CallableData of incoming : bool
+    | CallableData of location : int
+    | CallableDataIn
     | HitAttribute
 
 [<RequireQualifiedAccess>]

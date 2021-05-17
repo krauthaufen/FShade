@@ -1605,8 +1605,11 @@ module Assembler =
                                 | ParameterDecoration.HitAttribute ->
                                     return Some "hitAttributeEXT"
 
-                                | ParameterDecoration.CallableData incoming ->
-                                    return Some (if incoming then "callableDataInEXT" else "callableDataEXT")
+                                | ParameterDecoration.CallableData slot ->
+                                    return Some (sprintf "layout(location = %d) callableDataEXT" slot)
+
+                                | ParameterDecoration.CallableDataIn ->
+                                    return Some "callableDataInEXT"
 
                                 | ParameterDecoration.Memory _ | ParameterDecoration.Slot _ ->
                                     return None

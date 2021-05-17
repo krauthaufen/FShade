@@ -471,6 +471,16 @@ module ShaderBuilders =
             member x.ShaderStage = ShaderStage.ClosestHit
             member x.OutputTopology = None
 
+    type RayCallableBuilder() =
+        inherit BaseBuilder()
+
+        member x.Return(v) = v
+        member x.Quote() = ()
+
+        interface IShaderBuilder with
+            member x.ShaderStage = ShaderStage.Callable
+            member x.OutputTopology = None
+
     let compute = ComputeBuilder()
     let vertex = VertexBuilder()
     let tessellation = TessBuilder()
@@ -480,6 +490,7 @@ module ShaderBuilders =
     let miss = RayMissBuilder()
     let anyhit = RayAnyHitBuilder()
     let closesthit = RayClosestHitBuilder()
+    let callable = RayCallableBuilder()
 
     let triangle = GeometryBuilder(None, OutputTopology.TriangleStrip)
     let line = GeometryBuilder(None, OutputTopology.LineStrip)

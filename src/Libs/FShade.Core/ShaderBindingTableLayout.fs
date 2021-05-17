@@ -7,6 +7,7 @@ type ShaderBindingTableLayout =
     {
         RayOffsets : Map<string, int>
         MissIndices : Map<string, int>
+        CallableIndices : Map<string, int>
         HitGroupIndices : Map<string, Map<string, int>>
     }
 
@@ -18,8 +19,12 @@ type ShaderBindingTableLayout =
     member x.GetMissIndex(id : string) =
         x.MissIndices |> Map.find id
 
+    member x.GetCallableIndex(id : string) =
+        x.CallableIndices |> Map.find id
+
     member x.GetHitGroupIndex(groupId : string, rayId : string) =
         x.HitGroupIndices |> Map.find  groupId |> Map.find rayId
+
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module internal ShaderBindingTableLayout =
@@ -28,11 +33,13 @@ module internal ShaderBindingTableLayout =
 
         let rayOffsets = Dict<string, int>()
         let missIndices = Dict<string, int>()
+        let callableIndices = Dict<string, int>()
         let groupIndices = Dict<string, Dict<string, int>>()
 
         for shader in shaders do
             shader.shaderRayTypes |> Set.iter (fun id -> rayOffsets.Add(id, rayOffsets.Count))
             shader.shaderMissShaders |> Set.iter (fun id -> missIndices.Add(id, missIndices.Count))
+            shader.shaderCallableShaders |> Set.iter (fun id -> callableIndices.Add(id, callableIndices.Count))
 
         for group in hitGroups do
             let perRayOffsets = Dict<string, int>()
@@ -46,5 +53,6 @@ module internal ShaderBindingTableLayout =
         {
             RayOffsets = Dict.toMap rayOffsets
             MissIndices = Dict.toMap missIndices
+            CallableIndices = Dict.toMap callableIndices
             HitGroupIndices = Map.empty
         }
