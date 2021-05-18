@@ -4,11 +4,11 @@ source https://api.nuget.org/v3/index.json
 // for dev packages not yet published to nuget
 source https://vrvis.myget.org/F/aardvark_public/api/v2
 
-nuget FSharp.Core                           >= 4.6.2 lowest_matching: true
+nuget FSharp.Core                           >= 4.7.0 lowest_matching: true
 
-nuget Aardvark.Base                         ~> 5.1.6
-nuget Aardvark.Base.FSharp                  ~> 5.1.6
-nuget Aardvark.Base.Incremental             ~> 5.1.6
+nuget Aardvark.Base                         ~> 5.1.9
+nuget Aardvark.Base.FSharp                  ~> 5.1.9
+nuget Aardvark.Base.Incremental             ~> 5.1.9
 
 nuget BlackFox.VsWhere                      ~> 1.0.0
 nuget Dotnet.ProjInfo                       ~> 0.36.0
