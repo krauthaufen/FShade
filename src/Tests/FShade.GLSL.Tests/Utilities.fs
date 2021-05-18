@@ -35,14 +35,24 @@ module GLSL =
             ShaderStage.Fragment, GLSLang.ShaderStage.Fragment
             ShaderStage.Compute, GLSLang.ShaderStage.Compute
             ShaderStage.RayGeneration, GLSLang.ShaderStage.RayGen
-            ShaderStage.Intersection, GLSLang.ShaderStage.RayIntersect
-            ShaderStage.AnyHit, GLSLang.ShaderStage.RayAnyHit
-            ShaderStage.ClosestHit, GLSLang.ShaderStage.RayClosestHit
-            ShaderStage.Miss, GLSLang.ShaderStage.RayMiss
+            ShaderStage.Intersection, GLSLang.ShaderStage.Intersect
+            ShaderStage.AnyHit, GLSLang.ShaderStage.AnyHit
+            ShaderStage.ClosestHit, GLSLang.ShaderStage.ClosestHit
+            ShaderStage.Miss, GLSLang.ShaderStage.Miss
             ShaderStage.Callable, GLSLang.ShaderStage.Callable
         ]
 
-    let glslang' (stage : ShaderStage) (defines : List<string>) (code : string) =
+    let glslangWithTarget (target : GLSLang.Target) (stage : ShaderStage) (defines : List<string>) (code : string) =
+        let res = 
+            match GLSLang.tryCompileWithTarget target (toGLSLangStage stage) "main" defines code with
+            | Some _, warn -> 
+                if String.IsNullOrWhiteSpace warn then Success
+                else Warning warn
+            | None, err ->
+                Error err
+        res
+
+    let glslangWithDefines (stage : ShaderStage) (defines : List<string>) (code : string) =
         let res = 
             match GLSLang.tryCompile (toGLSLangStage stage) "main" defines code with
             | Some _, warn -> 
@@ -53,7 +63,7 @@ module GLSL =
         res
 
     let glslang (stage : ShaderStage) (code : string) =
-        glslang' stage [sprintf "%A" stage] code     
+        glslangWithDefines stage [sprintf "%A" stage] code     
 
     let compile (e : list<Effect>) =
         let e = Effect.compose e

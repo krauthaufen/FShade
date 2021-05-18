@@ -179,8 +179,8 @@ module RaytracingEffect =
 
     let toModule (effect : RaytracingEffect) =
 
-        let toEntryPoints (shaders : Map<string, Shader>) =
-            shaders |> Map.toList |> List.map (fun (name, shader) ->
+        let toEntryPoints (shaders : List<string * Shader>) =
+            shaders |> List.map (fun (name, shader) ->
                 let cond = Some (sprintf "%A_%s" shader.shaderStage name)
                 Shader.toEntryPointWithConditional cond None shader None
             )
@@ -197,12 +197,11 @@ module RaytracingEffect =
                     |> List.choose id
                 )
             )
-            |> Map.ofList
 
         let entryPoints =
-            [ toEntryPoints effect.RayGenerationShaders
-              toEntryPoints effect.MissShaders
-              toEntryPoints effect.CallableShaders
+            [ toEntryPoints (Map.toList effect.RayGenerationShaders)
+              toEntryPoints (Map.toList effect.MissShaders)
+              toEntryPoints (Map.toList effect.CallableShaders)
               toEntryPoints hitGroups ]
             |> List.concat
 

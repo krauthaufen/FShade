@@ -407,6 +407,14 @@ module RaytracingTest =
                 return { foo = 0.0; flag = false }
         }
 
+    let anyHitShader (input : RayHitInput<Payload>) =
+        anyhit {
+            if input.ray.direction = V3d.Zero then
+                ignoreIntersection()
+            elif input.hit.attribute.X = 0.0 then
+                terminateRay()
+        }
+
     let closestHitShader (input : RayHitInput<Payload>) =
         closesthit {
             return { foo = input.hit.attribute.X; flag = false }
@@ -428,6 +436,7 @@ let main args =
     let effect =
         let defaultHitGroup =
             hitgroup {
+                anyhit anyHitShader
                 closesthit closestHitShader
                 intersection intersectionShader
             }
@@ -456,33 +465,37 @@ let main args =
         Log.line "%s: %s" i l
     Log.stop()
 
-    for (KeyValue(name, _)) in effect.RayGenerationShaders do
-        let def = sprintf "%A_%s" ShaderStage.RayGeneration name
+
+    let compile (name : string) (shader : Shader) =
+        let def = sprintf "%A_%s" shader.shaderStage name
 
         Log.start "Compiling %s"def
-        let res = GLSL.glslang' ShaderStage.RayGeneration [def] glsl.code
+        let res = GLSL.glslangWithTarget GLSLang.Target.SPIRV_1_4 shader.shaderStage [def] glsl.code
 
         match res with
-        | Success ->
-            Log.stop()
         | Warning w ->
             Log.warn "%s" w
         | Error e ->
             Log.error "%s" e
+        | _ -> ()
 
-    for (KeyValue(name, _)) in effect.MissShaders do
-        let def = sprintf "%A_%s" ShaderStage.Miss name
+        Log.stop()
 
-        Log.start "Compiling %s"def
-        let res = GLSL.glslang' ShaderStage.Miss [def] glsl.code
+    for (KeyValue(name, shader)) in effect.RayGenerationShaders do
+        compile name shader
 
-        match res with
-        | Success ->
-            Log.stop()
-        | Warning w ->
-            Log.warn "%s" w
-        | Error e ->
-            Log.error "%s" e
+    for (KeyValue(name, shader)) in effect.MissShaders do
+        compile name shader
+
+    for (KeyValue(name, shader)) in effect.CallableShaders do
+        compile name shader
+
+    for (KeyValue(groupName, hitgroup)) in effect.HitGroups do
+        for (KeyValue(rayName, entry)) in hitgroup.PerRayType do
+            let name = sprintf "%s_%s" groupName rayName
+            entry.AnyHit |> Option.iter (compile name)
+            entry.ClosestHit |> Option.iter (compile name)
+            entry.Intersection |> Option.iter (compile name)
 
     0
 
