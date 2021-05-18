@@ -17,8 +17,7 @@
     <None Include="SamplerCodeGen.fsx" />
     <Compile Include="Uniforms.fs" />
     <Compile Include="SamplerState.fs" />
-    <Compile Include="Scene.fs" />
-    <Compile Include="Callable.fs" />
+    <Compile Include="Raytracing.fs" />
     <Compile Include="Core.fs" />
     <Compile Include="Samplers.fs" />
     <Compile Include="Reflection.fs" />
@@ -28,7 +27,6 @@
     <Compile Include="Shader.fs" />
     <Compile Include="ShaderBindingTableLayout.fs" />
     <Compile Include="RaytracingEffect.fs" />
-    <Compile Include="Raytracing.fs" />
     <Compile Include="EffectInputLayout.fs" />
     <Compile Include="Effect.fs" />
     <Compile Include="ComputeShader.fs" />

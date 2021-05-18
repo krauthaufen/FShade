@@ -49,13 +49,6 @@ module ParameterDescription =
         }
 
 
-type PayloadDescription =
-    {
-        payloadType     : Type
-        payloadLocation : int
-    }
-
-
 module Formats =
     type IFormat = interface end 
     type IFloatingFormat = inherit IFormat

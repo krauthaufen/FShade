@@ -47,7 +47,7 @@ type Shader =
         /// the shader's source info (if any)
         shaderDebugRange : Option<DebugRange>
         /// the shader's payloads (only useful in some raytracing shaders)
-        shaderPayloads : Map<string, PayloadDescription>
+        shaderPayloads : Map<string, Type * int>
         /// the shader's incoming payload (only useful in some raytracing shaders)
         shaderPayloadIn : Option<string * Type>
         /// the shader's callable data types (only useful in some raytracing shaders)
@@ -347,14 +347,30 @@ module Preprocessor =
             | _ ->
                 None
 
+        let private (|StaticMethod|_|) (e : Expr) =
+            match e with
+            | Call(None, mi, args) -> Some (mi.DeclaringType, mi.Name, args)
+            | _ -> None
+            
         let (|ExecuteCallable|_|) (e : Expr) =
             match e with
-            | Call(None, mi, args) when mi.DeclaringType = typeof<Callable> && mi.Name = "Execute" ->
+            | StaticMethod(t, "Execute", args) when t = typeof<Callable> ->
                 match args with
                 | [id] -> Some (id, None)
                 | [data; id] -> Some (id, Some data)
                 | _ ->
                     failwithf "[FShade] Illformed call to Callable.Execute with %d arguments" args.Length
+            | _ ->
+                None
+
+        let (|ReportIntersection|_|) (e : Expr) =
+            match e with
+            | StaticMethod(t, "Report", args) when t = typeof<Intersection> ->
+                match args with
+                | [t; kind] -> Some (t, kind, None)
+                | [t; attribute; kind] -> Some (t, kind, Some attribute)
+                | _ ->
+                    failwithf "[FShade] Illformed call to Intersection.Report with %d arguments" args.Length
             | _ ->
                 None
 
@@ -632,6 +648,7 @@ module Preprocessor =
 
         let executeCallableMeth = getMethodInfo <@ executeCallable @>
 
+    let private reportIntersectionMeth = getMethodInfo <@ reportIntersection @>
 
     let rec preprocessRaytracingS (stage : ShaderStage) (e : Expr) : Preprocess<Expr> =
         state {
@@ -720,6 +737,34 @@ module Preprocessor =
             | CallableDataIn data ->
                 let! name = State.useCallableDataIn data
                 return Expr.ReadInput(ParameterKind.RaytracingData, data, name)
+
+            | ReportIntersection _ when stage <> ShaderStage.Intersection ->
+                return failwith "[FShade] Report.Intersection can only be invoked in intersection shaders"
+
+            | ReportIntersection (t, kind, attribute) ->
+                let! t = preprocessRaytracingS stage t
+                let! kind = preprocessRaytracingS stage kind
+
+                let! attribute =
+                    match attribute with
+                    | Some attr ->   
+                        preprocessRaytracingS stage attr
+                        |> State.bind (fun value ->
+                            State.useHitAttribute value.Type |> State.map (fun name -> Some (name, value))
+                        )
+                    | None ->
+                        State.value None
+
+                return Expr.Seq [
+                    match attribute with
+                    | Some (name, value) ->
+                        let out = Expr.ReadInput(ParameterKind.RaytracingData, value.Type, name, volatile = true)
+                        Expr.UnsafeWrite(out, value)
+
+                    | _ -> ()
+
+                    Expr.Call(reportIntersectionMeth, [t; kind])
+                ]
 
             | HitAttribute _ when not (ShaderStage.supportsHitAttributes stage) ->
                 return failwithf "[FShade] Cannot use hit attributes in %A shaders" stage
@@ -1374,15 +1419,10 @@ module Preprocessor =
                 | _ ->
                     ShaderOutputVertices.Unknown
 
-        let payloads =
-            state.payloads |> Seq.map (fun (typ, (name, location)) ->
-                name, { payloadType = typ; payloadLocation = location }
-            )
-
-        let callableData =
-            state.callableData |> Seq.map (fun (typ, (name, location)) ->
+        let inverseMap =
+            Seq.map (fun (typ, (name, location)) ->
                 name, (typ, location)
-            )
+            ) >> Map.ofSeq
 
         let shader = 
             { 
@@ -1398,9 +1438,9 @@ module Preprocessor =
                 shaderBody              = body
                 shaderDebugRange        = None
                 shaderDepthWriteMode    = state.depthWriteMode
-                shaderPayloads          = Map.ofSeq payloads
+                shaderPayloads          = inverseMap state.payloads
                 shaderPayloadIn         = state.payloadIn
-                shaderCallableData      = Map.ofSeq callableData
+                shaderCallableData      = inverseMap state.callableData
                 shaderCallableDataIn    = state.callableDataIn
                 shaderHitAttribute      = state.hitAttribute
                 shaderRayTypes          = state.rayTypes
@@ -2110,7 +2150,7 @@ module Shader =
                     getMethodInfo <@ barrier @>
                 ]
 
-            ShaderStage.Compute, 
+            ShaderStage.Compute,
                 HashSet.ofList [
                     getMethodInfo <@ barrier @>
                 ]
@@ -2121,10 +2161,13 @@ module Shader =
 
             ShaderStage.Intersection,
                 HashSet.ofList [
+                    getMethodInfo <@ reportIntersection @>
                 ]
 
             ShaderStage.AnyHit,
                 HashSet.ofList [
+                    getMethodInfo <@ ignoreIntersection @>
+                    getMethodInfo <@ terminateRay @>
                 ]
 
             ShaderStage.ClosestHit,
@@ -2631,7 +2674,7 @@ module Shader =
 
     /// translates a shader to an EntryPoint which can be used for compiling
     /// the shader to a CAst
-    let toEntryPoint' (conditional : Option<string>) (prev : Option<Shader>) (s : Shader) (next : Option<Shader>) =
+    let toEntryPointWithConditional (conditional : Option<string>) (prev : Option<Shader>) (s : Shader) (next : Option<Shader>) =
         let mutable hasSourceVertexIndex = false
         let inputs = 
             s.shaderInputs |> Map.toList |> List.choose (fun (n,i) -> 
@@ -2647,55 +2690,32 @@ module Shader =
                     }
             )
 
-        let payloads =
-            s.shaderPayloads |> Map.toList |> List.map (fun (name, desc) ->
-                {
-                    paramName = name
-                    paramSemantic = name
-                    paramType = desc.payloadType
-                    paramDecorations = Set.ofList [ParameterDecoration.RayPayload desc.payloadLocation]
-                }
-            )
 
-        let payloadIn =
-            s.shaderPayloadIn |> Option.toList |> List.map (fun (name, typ) ->
+        let ofMap decoration =
+            Map.toList >> List.map (fun (name, (typ, location)) ->
                 {
                     paramName = name
                     paramSemantic = name
                     paramType = typ
-                    paramDecorations = Set.ofList [ParameterDecoration.RayPayloadIn]
+                    paramDecorations = Set.ofList [decoration location]
                 }
             )
 
-        let callableData =
-            s.shaderCallableData |> Map.toList |> List.map (fun (name, (typ, location)) ->
+        let ofOption decoration =
+            Option.toList >> List.map (fun (name, typ) ->
                 {
                     paramName = name
                     paramSemantic = name
                     paramType = typ
-                    paramDecorations = Set.ofList [ParameterDecoration.CallableData location]
+                    paramDecorations = Set.ofList [decoration]
                 }
             )
 
-        let callableDataIn =
-            s.shaderCallableDataIn |> Option.toList |> List.map (fun (name, typ) ->
-                {
-                    paramName = name
-                    paramSemantic = name
-                    paramType = typ
-                    paramDecorations = Set.ofList [ParameterDecoration.CallableDataIn]
-                }
-            )
-
-        let hitAttribute =
-            s.shaderHitAttribute |> Option.toList |> List.map (fun (name, typ) ->
-                {
-                    paramName = name
-                    paramSemantic = name
-                    paramType = typ
-                    paramDecorations = Set.ofList [ParameterDecoration.HitAttribute]
-                }
-            )
+        let payloads       = s.shaderPayloads |> ofMap ParameterDecoration.RayPayload
+        let payloadIn      = s.shaderPayloadIn |> ofOption ParameterDecoration.RayPayloadIn
+        let callableData   = s.shaderCallableData |> ofMap ParameterDecoration.CallableData
+        let callableDataIn = s.shaderCallableDataIn |> ofOption ParameterDecoration.CallableDataIn
+        let hitAttribute   = s.shaderHitAttribute |> ofOption ParameterDecoration.HitAttribute
 
         let depthWriteMode =
             if s.shaderStage = ShaderStage.Fragment && s.shaderDepthWriteMode <> DepthWriteMode.None then
@@ -2752,16 +2772,9 @@ module Shader =
                 )
             else
                 s.shaderBody
-
-        let conditional =
-            let stage = s.shaderStage |> string
-
-            match conditional with
-            | None -> stage
-            | Some c -> sprintf "%s_%s" stage c
   
         {
-            conditional    = Some conditional
+            conditional    = conditional
             entryName      = "main"
             inputs         = inputs
             outputs        = outputs
@@ -2797,7 +2810,8 @@ module Shader =
     /// translates a shader to an EntryPoint which can be used for compiling
     /// the shader to a CAst
     let toEntryPoint (prev : Option<Shader>) (s : Shader) (next : Option<Shader>) =
-        toEntryPoint' None prev s next
+        let conditional = Some (string s.shaderStage)
+        toEntryPointWithConditional conditional prev s next
 
     /// creates a shader "passing-thru" all supplied attributes
     let passing (attributes : Map<string, Type>) (stage : ShaderStage) =

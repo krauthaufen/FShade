@@ -280,6 +280,10 @@ module Primitives =
     let barrier() : unit = onlyInShaderCode "barrier"
     let allocateShared<'a when 'a : unmanaged> (size : int) : 'a[] =  onlyInShaderCode "allocateShared"
 
+    let reportIntersection(t : float, hitKind : int32) : bool = onlyInShaderCode "reportIntersection"
+    let ignoreIntersection() : unit = onlyInShaderCode "ignoreIntersection"
+    let terminateRay() : unit = onlyInShaderCode "terminateRay"
+
     [<Literal>]
     let MaxLocalSize = 2147483647
 
@@ -481,6 +485,15 @@ module ShaderBuilders =
             member x.ShaderStage = ShaderStage.Callable
             member x.OutputTopology = None
 
+    type RayIntersectionBuilder() =
+        inherit BaseBuilder()
+
+        member x.Quote() = ()
+
+        interface IShaderBuilder with
+            member x.ShaderStage = ShaderStage.Intersection
+            member x.OutputTopology = None
+
     let compute = ComputeBuilder()
     let vertex = VertexBuilder()
     let tessellation = TessBuilder()
@@ -491,6 +504,7 @@ module ShaderBuilders =
     let anyhit = RayAnyHitBuilder()
     let closesthit = RayClosestHitBuilder()
     let callable = RayCallableBuilder()
+    let intersection = RayIntersectionBuilder()
 
     let triangle = GeometryBuilder(None, OutputTopology.TriangleStrip)
     let line = GeometryBuilder(None, OutputTopology.LineStrip)

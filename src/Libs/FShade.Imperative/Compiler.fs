@@ -1467,6 +1467,9 @@ module Compiler =
     let rec toCStatementS (isLast : bool) (e : Expr) =
         state {
             match e with
+                | Ignore e ->
+                    return! toCStatementS false e
+
                 | ReducibleExpression e ->
                     return! toCStatementS isLast e
 

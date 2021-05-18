@@ -394,6 +394,11 @@ module RaytracingTest =
                 return { value = 1.0; flag = false }
         }
 
+    let intersectionShader (input : RayIntersectionInput) =
+        intersection {
+            Intersection.Report(0.5, true, HitKind.FrontFacingTriangle) |> ignore
+        }
+
     let missShader (input : RayMissInput<Payload>) =
         miss {
             if input.payload.flag then
@@ -424,6 +429,7 @@ let main args =
         let defaultHitGroup =
             hitgroup {
                 closesthit closestHitShader
+                intersection intersectionShader
             }
 
         raytracing {
