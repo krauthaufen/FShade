@@ -1966,7 +1966,11 @@ module IntrinsicFunctions =
             CIntrinsic.tagged "ivec3(gl_WorkGroupSize)", [ exactly <@ getWorkGroupSize @> ]
             CIntrinsic.tagged "barrier()", [ exactly <@ barrier @> ]
 
-
+            CIntrinsic.simple "traceRayEXT", [ RaytracingIntrinsics.traceRayMeth ]
+            CIntrinsic.simple "executeCallableEXT", [ RaytracingIntrinsics.executeCallableMeth ]
+            CIntrinsic.simple "reportIntersectionEXT", [ exactly <@ reportIntersection @> ]
+            CIntrinsic.tagged "ignoreIntersectionEXT", [ exactly <@ ignoreIntersection @> ]
+            CIntrinsic.tagged "terminateRayEXT", [ exactly <@ terminateRay @> ]
         ]
 
     let (|TextureLookup|_|) (mi : MethodInfo) =

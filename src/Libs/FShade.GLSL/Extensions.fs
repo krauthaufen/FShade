@@ -75,6 +75,23 @@ module Backends =
             useInOut                = true
         }
 
+    let glslRaytracing =
+        Backend.Create {
+            version                 = GLSLVersion(4,6,0)
+            enabledExtensions       = Set.ofList [ "GL_EXT_ray_tracing"; "GL_EXT_nonuniform_qualifier"]
+            createUniformBuffers    = true
+            bindingMode             = BindingMode.Global
+            createDescriptorSets    = true
+            stepDescriptorSets      = false
+            createInputLocations    = true
+            createOutputLocations   = true
+            createPassingLocations  = true
+            createPerStageUniforms  = true
+            reverseMatrixLogic      = true
+            depthWriteMode          = true
+            useInOut                = true
+        }
+
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module ModuleCompiler =
 
@@ -103,3 +120,6 @@ module Backends =
 
         let compileGLSLVulkan (module_ : Module) =
             compileGLSL glslVulkan module_
+
+        let compileGLSLRaytracing (module_ : Module) =
+            compileGLSL glslRaytracing module_

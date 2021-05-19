@@ -15,7 +15,9 @@
   </PropertyGroup>
   <ItemGroup>
     <None Include="SamplerCodeGen.fsx" />
+    <Compile Include="Uniforms.fs" />
     <Compile Include="SamplerState.fs" />
+    <Compile Include="Raytracing.fs" />
     <Compile Include="Core.fs" />
     <Compile Include="Samplers.fs" />
     <Compile Include="Reflection.fs" />
@@ -23,7 +25,8 @@
     <Compile Include="Frontend.fs" />
     <Compile Include="Optimizer.fs" />
     <Compile Include="Shader.fs" />
-    <Compile Include="Raytracing.fs" />
+    <Compile Include="ShaderBindingTableLayout.fs" />
+    <Compile Include="RaytracingEffect.fs" />
     <Compile Include="EffectInputLayout.fs" />
     <Compile Include="Effect.fs" />
     <Compile Include="ComputeShader.fs" />

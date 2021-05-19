@@ -392,6 +392,7 @@ module ExprExtensions =
                                 | None -> None
                         | None -> 
                             f.GetValue(null) |> Some
+
                 | Patterns.Call(t, mi, args) ->
                     match t with
                         | Some(t) -> 
@@ -415,8 +416,16 @@ module ExprExtensions =
                             Expr.TryEval body
                         | None -> None
 
+                | Patterns.IfThenElse (condition, a, b) ->
+                    match Expr.TryEval condition with
+                    | Some (:? bool as flag) -> Expr.TryEval (if flag then a else b)
+                    | _ -> None
+
                 | Patterns.Value(v,_) ->
                     v |> Some
+
+                | Patterns.DefaultValue t ->
+                    Activator.CreateInstance(t) |> Some
 
                 | _ -> None
 
@@ -787,6 +796,9 @@ module ExprExtensions =
         match e with
             | Call(None, mi, []) when mi = Methods.unroll -> Some ()
             | _ -> None
+
+    let (|Constant|_|) (e : Expr) =
+        Expr.TryEval e
 
 [<AutoOpen>]
 module StateExtensions =

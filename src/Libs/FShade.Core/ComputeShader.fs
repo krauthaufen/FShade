@@ -63,70 +63,6 @@ type ComputeShader internal(id : string, method : MethodBase, localSize : V3i, d
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module ComputeShader =
-    
-    [<AutoOpen>]
-    module private Utils =
-        open System.Reflection.Emit
-
-        type Invoker<'a, 'b>() =
-            static let invoke =
-                let t = typeof<'a>
-
-                let rec decompose (t : Type) =
-                    if FSharpType.IsFunction t then
-                        let (a, r) = FSharpType.GetFunctionElements t
-
-                        match decompose r with
-                            | Some (args, ret) ->
-                                Some ((a, t) :: args, ret)
-                            | None ->
-                                None
-                    elif typeof<'b>.IsAssignableFrom t then
-                        Some ([], t)
-                    else
-                        None
-
-                match decompose t with
-                    | Some (args, ret) ->
-                        match args with
-                            | [] -> 
-                                fun (v : 'a) -> unbox<'b> v
-                            | _ ->
-                                let dyn = DynamicMethod("invoker", MethodAttributes.Static ||| MethodAttributes.Public, CallingConventions.Standard, typeof<'b>, [| t |], t, true)
-
-                                let il = dyn.GetILGenerator()
-
-                                il.Emit(OpCodes.Ldarg_0)
-                                for a, fType in args do
-                                    if a.IsValueType then 
-                                        let l = il.DeclareLocal(a)
-                                        il.Emit(OpCodes.Ldloc, l)
-                                    else 
-                                        il.Emit(OpCodes.Ldnull)
-
-                                    let m = fType.GetMethod("Invoke", [| a |])
-                                    il.EmitCall(OpCodes.Callvirt, m, null)
-
-                                il.Emit(OpCodes.Ret)
-
-
-                                let d = dyn.CreateDelegate(typeof<Func<'a, 'b>>) |> unbox<Func<'a, 'b>>
-
-
-                                d.Invoke
-                    | None ->
-                        fun (v : 'a) -> failwithf "[FShade] cannot invoke type %A" t
-                        
-            static member Invoke(f : 'a) =
-                invoke f 
-
-        let rec tryExtractExpr (f : 'a) =
-            match f :> obj with
-                | null -> None
-                | :? Expr as e -> Some e
-                | _ ->
-                    try Invoker<'a, Expr>.Invoke f |> Some
-                    with _ -> None
 
     let private ofExprInternal (meth : MethodBase) (hash : string) (localSize : V3i) (body0 : Expr) =
         let data =
@@ -252,8 +188,8 @@ module ComputeShader =
         )
 
     let ofFunction (maxLocalSize : V3i) (f : 'a -> 'b) : ComputeShader =
-        match tryExtractExpr f with
-            | Some body ->
+        match Shader.Utils.tryExtractExpr f with
+            | Some (body, _) ->
                 Pickler.ExprPicklerFunctions.Init()
 
                 let localSize, meth =
@@ -347,13 +283,14 @@ module ComputeShader =
             )
 
         {
-            conditional = None
-            entryName   = "main"
-            inputs      = []
-            outputs     = []
-            uniforms    = imageArguments @ uniforms
-            arguments   = bufferArguments @ sharedArguments
-            body        = s.csBody
+            conditional    = None
+            entryName      = "main"
+            inputs         = []
+            outputs        = []
+            uniforms       = imageArguments @ uniforms
+            arguments      = bufferArguments @ sharedArguments
+            raytracingData = []
+            body           = s.csBody
             decorations = 
                 [
                     EntryDecoration.Stages { 

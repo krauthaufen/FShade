@@ -1,20 +1,14 @@
 ﻿namespace FShade.GLSL.Utilities
 
-open System
-open System.Reflection
-
 open Aardvark.Base
-open Aardvark.Base.Monads.State
-
 open FShade
-open FShade.Imperative
 
 [<AutoOpen>]
 module IntrinsicParameters =
 
     let builtInInputs =
         Dictionary.ofList [
-            ShaderStage.Vertex, 
+            ShaderStage.Vertex,
                 Map.ofList [
                     Intrinsics.VertexId, "gl_VertexID"
                     Intrinsics.InstanceId, "gl_InstanceID"
@@ -39,7 +33,7 @@ module IntrinsicParameters =
                     Intrinsics.TessLevelInner, "gl_TessLevelInner"
                     Intrinsics.TessLevelOuter, "gl_TessLevelOuter"
                 ]
-                
+
             ShaderStage.Geometry,
                 Map.ofList [
                     Intrinsics.PointSize, "gl_PointSize"
@@ -64,32 +58,106 @@ module IntrinsicParameters =
 
             ShaderStage.Compute, Map.empty
 
-
-            ShaderStage.RayHitShader, 
+            ShaderStage.RayGeneration,
                 Map.ofList [
-                    Intrinsics.LaunchId, "gl_LaunchIDNV"
-                    Intrinsics.LaunchSize, "gl_LaunchSizeNV"
+                    Intrinsics.LaunchId, "ivec3(gl_LaunchIDEXT)"
+                    Intrinsics.LaunchSize, "ivec3(gl_LaunchSizeEXT)"
+                ]
+
+            ShaderStage.Intersection,
+                Map.ofList [
+                    Intrinsics.LaunchId, "ivec3(gl_LaunchIDEXT)"
+                    Intrinsics.LaunchSize, "ivec3(gl_LaunchSizeEXT)"
+
                     Intrinsics.PrimitiveId, "gl_PrimitiveID"
                     Intrinsics.InstanceId, "gl_InstanceID"
-                    Intrinsics.InstanceCustomIndex, "gl_InstanceCustomIndexNV"
-                    Intrinsics.WorldRayOrigin, "gl_WorldRayOriginNV"
-                    Intrinsics.WorldRayDirection, "gl_WorldRayDirectionNV"
-                    Intrinsics.ObjectRayOrigin, "gl_ObjectRayOriginNV"
-                    Intrinsics.ObjectRayDirection, "gl_ObjectRayDirectionNV"
-                    Intrinsics.RayTmin, "gl_RayTminNV"
-                    Intrinsics.RayTmax, "gl_RayTmaxNV"
-                    Intrinsics.IncomingRayFlags, "gl_IncomingRayFlagsNV"
-                    Intrinsics.HitT, "gl_HitTNV"
-                    Intrinsics.HitKind, "gl_HitKindNV"
-                    Intrinsics.ObjectToWorld, "gl_ObjectToWorldNV"
-                    Intrinsics.WorldToObject, "gl_WorldToObjectNV"
+                    Intrinsics.InstanceCustomIndex, "gl_InstanceCustomIndexEXT"
+                    Intrinsics.GeometryIndex, "gl_GeometryIndexEXT"
+
+                    Intrinsics.WorldRayOrigin, "gl_WorldRayOriginEXT"
+                    Intrinsics.WorldRayDirection, "gl_WorldRayDirectionEXT"
+                    Intrinsics.ObjectRayOrigin, "gl_ObjectRayOriginEXT"
+                    Intrinsics.ObjectRayDirection, "gl_ObjectRayDirectionEXT "
+
+                    Intrinsics.RayTmin, "gl_RayTminEXT"
+                    Intrinsics.RayTmax, "gl_RayTmaxEXT"
+                    Intrinsics.IncomingRayFlags, "gl_IncomingRayFlagsEXT"
+
+                    Intrinsics.ObjectToWorld, "gl_ObjectToWorldEXT"
+                    Intrinsics.WorldToObject, "gl_WorldToObjectEXT"
                 ]
-            ShaderStage.RayMissShader, Map.empty
-            ShaderStage.RayGenShader, Map.empty
-            ShaderStage.RayIntersectionShader, Map.empty
+
+            ShaderStage.AnyHit,
+                Map.ofList [
+                    Intrinsics.LaunchId, "ivec3(gl_LaunchIDEXT)"
+                    Intrinsics.LaunchSize, "ivec3(gl_LaunchSizeEXT)"
+
+                    Intrinsics.PrimitiveId, "gl_PrimitiveID"
+                    Intrinsics.InstanceId, "gl_InstanceID"
+                    Intrinsics.InstanceCustomIndex, "gl_InstanceCustomIndexEXT"
+                    Intrinsics.GeometryIndex, "gl_GeometryIndexEXT"
+
+                    Intrinsics.WorldRayOrigin, "gl_WorldRayOriginEXT"
+                    Intrinsics.WorldRayDirection, "gl_WorldRayDirectionEXT"
+                    Intrinsics.ObjectRayOrigin, "gl_ObjectRayOriginEXT"
+                    Intrinsics.ObjectRayDirection, "gl_ObjectRayDirectionEXT "
+
+                    Intrinsics.RayTmin, "gl_RayTminEXT"
+                    Intrinsics.RayTmax, "gl_RayTmaxEXT"
+                    Intrinsics.IncomingRayFlags, "gl_IncomingRayFlagsEXT"
+
+                    Intrinsics.HitT, "gl_HitTEXT"
+                    Intrinsics.HitKind, "gl_HitKindEXT"
+
+                    Intrinsics.ObjectToWorld, "gl_ObjectToWorldEXT"
+                    Intrinsics.WorldToObject, "gl_WorldToObjectEXT"
+                ]
+
+            ShaderStage.ClosestHit,
+                Map.ofList [
+                    Intrinsics.LaunchId, "ivec3(gl_LaunchIDEXT)"
+                    Intrinsics.LaunchSize, "ivec3(gl_LaunchSizeEXT)"
+
+                    Intrinsics.PrimitiveId, "gl_PrimitiveID"
+                    Intrinsics.InstanceId, "gl_InstanceID"
+                    Intrinsics.InstanceCustomIndex, "gl_InstanceCustomIndexEXT"
+                    Intrinsics.GeometryIndex, "gl_GeometryIndexEXT"
+
+                    Intrinsics.WorldRayOrigin, "gl_WorldRayOriginEXT"
+                    Intrinsics.WorldRayDirection, "gl_WorldRayDirectionEXT"
+                    Intrinsics.ObjectRayOrigin, "gl_ObjectRayOriginEXT"
+                    Intrinsics.ObjectRayDirection, "gl_ObjectRayDirectionEXT "
+
+                    Intrinsics.RayTmin, "gl_RayTminEXT"
+                    Intrinsics.RayTmax, "gl_RayTmaxEXT"
+                    Intrinsics.IncomingRayFlags, "gl_IncomingRayFlagsEXT"
+
+                    Intrinsics.HitT, "gl_HitTEXT"
+                    Intrinsics.HitKind, "gl_HitKindEXT"
+
+                    Intrinsics.ObjectToWorld, "mat4(gl_ObjectToWorldEXT)"
+                    Intrinsics.WorldToObject, "mat4(gl_WorldToObjectEXT)"
+                ]
+
+            ShaderStage.Miss,
+                Map.ofList [
+                    Intrinsics.LaunchId, "ivec3(gl_LaunchIDEXT)"
+                    Intrinsics.LaunchSize, "ivec3(gl_LaunchSizeEXT)"
+
+                    Intrinsics.WorldRayOrigin, "gl_WorldRayOriginEXT"
+                    Intrinsics.WorldRayDirection, "gl_WorldRayDirectionEXT"
+
+                    Intrinsics.RayTmin, "gl_RayTminEXT"
+                    Intrinsics.RayTmax, "gl_RayTmaxEXT"
+                    Intrinsics.IncomingRayFlags, "gl_IncomingRayFlagsEXT"
+                ]
+
+            ShaderStage.Callable,
+                Map.ofList [
+                    Intrinsics.LaunchId, "ivec3(gl_LaunchIDEXT)"
+                    Intrinsics.LaunchSize, "ivec3(gl_LaunchSizeEXT)"
+                ]
         ]
-
-
 
 
     let builtInOutputs =
@@ -126,28 +194,11 @@ module IntrinsicParameters =
                     Intrinsics.SampleMask, "gl_SampleMask"
                 ]
 
-            
             ShaderStage.Compute, Map.empty
-            
-
-            ShaderStage.RayHitShader, Map.empty
-            ShaderStage.RayMissShader, Map.empty
-            ShaderStage.RayGenShader, Map.empty
-            ShaderStage.RayIntersectionShader, Map.empty
+            ShaderStage.RayGeneration, Map.empty
+            ShaderStage.Intersection, Map.empty
+            ShaderStage.AnyHit, Map.empty
+            ShaderStage.ClosestHit, Map.empty
+            ShaderStage.Miss, Map.empty
+            ShaderStage.Callable, Map.empty
         ]
-
-    let prefixes =
-        Dictionary.ofList [
-            ShaderStage.Vertex,         "vs_"
-            ShaderStage.TessControl,    "tc_"
-            ShaderStage.TessEval,       "te_"
-            ShaderStage.Geometry,       "gs_"
-            ShaderStage.Fragment,       "fs_"
-            ShaderStage.Compute,        "cs_"
-
-            
-            ShaderStage.RayHitShader,           ""
-            ShaderStage.RayGenShader,           ""
-            ShaderStage.RayMissShader,          ""
-            ShaderStage.RayIntersectionShader,  ""
-        ]  

@@ -179,10 +179,10 @@ type Backend private(config : Config) =
                             valueType = GLSLType.ofCType config.reverseMatrixLogic (CType.ofType x valueType)
                         }
                 }
-              
+
             | AccelerationStructure ->
                 Some {
-                    intrinsicTypeName = "accelerationStructureNV"
+                    intrinsicTypeName = "accelerationStructureEXT"
                     tag = t
                 }
 
@@ -712,12 +712,10 @@ module Assembler =
                     match kind, stages with
                         | _, { self = ShaderStage.Compute }                 -> return checkName name
                         
-                        | _, { self = ShaderStage.RayHitShader }            -> return checkName name
-
                         | ParameterKind.Input, { prev = None }              -> return checkName name
 
-                        | ParameterKind.Input, { self = s }                 -> return prefixes.[s] + name |> glslName
-                        | ParameterKind.Output, { next = Some n }           -> return prefixes.[n] + name |> glslName
+                        | ParameterKind.Input, { self = s }                 -> return ShaderStage.prefix s + "_" + name |> glslName
+                        | ParameterKind.Output, { next = Some n }           -> return ShaderStage.prefix n + "_" + name |> glslName
                         | ParameterKind.Output, { next = None }             -> 
                             let name = name + "Out"
                             return checkName name
@@ -1542,64 +1540,79 @@ module Assembler =
                         |> List.chooseS (fun d ->
                             state {
                                 match d with
-                                    | ParameterDecoration.DepthWrite _ ->
-                                        return None
+                                | ParameterDecoration.DepthWrite _ ->
+                                    return None
 
-                                    | ParameterDecoration.Const -> 
-                                        return Some "const"
+                                | ParameterDecoration.Const -> 
+                                    return Some "const"
 
-                                    | ParameterDecoration.Interpolation m ->
+                                | ParameterDecoration.Interpolation m ->
                                         
-                                        let isFragmentInput =
-                                            (selfStage = ShaderStage.Fragment && kind = ParameterKind.Input) ||
-                                            (nextStage = Some ShaderStage.Fragment && kind = ParameterKind.Output)
+                                    let isFragmentInput =
+                                        (selfStage = ShaderStage.Fragment && kind = ParameterKind.Input) ||
+                                        (nextStage = Some ShaderStage.Fragment && kind = ParameterKind.Output)
                             
-                                        let isTessPatch =
-                                            (selfStage = ShaderStage.TessEval && kind = ParameterKind.Input) ||
-                                            (selfStage = ShaderStage.TessControl && kind = ParameterKind.Output)
+                                    let isTessPatch =
+                                        (selfStage = ShaderStage.TessEval && kind = ParameterKind.Input) ||
+                                        (selfStage = ShaderStage.TessControl && kind = ParameterKind.Output)
 
-                                        match isTessPatch, isFragmentInput, m with
-                                            | _, true, InterpolationMode.Centroid -> return Some "centroid"
-                                            | _, true, InterpolationMode.Flat -> return Some "flat"
-                                            | _, true, InterpolationMode.NoPerspective -> return Some "noperspective"
-                                            | _, true, InterpolationMode.Perspective -> return Some "perspective"
-                                            | _, true, InterpolationMode.Sample -> return Some "sample"
+                                    match isTessPatch, isFragmentInput, m with
+                                        | _, true, InterpolationMode.Centroid -> return Some "centroid"
+                                        | _, true, InterpolationMode.Flat -> return Some "flat"
+                                        | _, true, InterpolationMode.NoPerspective -> return Some "noperspective"
+                                        | _, true, InterpolationMode.Perspective -> return Some "perspective"
+                                        | _, true, InterpolationMode.Sample -> return Some "sample"
 
-                                            | true, _, InterpolationMode.PerPatch -> return Some "patch"
+                                        | true, _, InterpolationMode.PerPatch -> return Some "patch"
 
-                                            | _ -> return None
+                                        | _ -> return None
 
-                                    | ParameterDecoration.StorageBuffer(read, write) ->
-                                        let! binding = AssemblerState.newBinding InputKind.StorageBuffer 1
+                                | ParameterDecoration.StorageBuffer(read, write) ->
+                                    let! binding = AssemblerState.newBinding InputKind.StorageBuffer 1
 
-                                        let args = []
+                                    let args = []
 
-                                        let args =
-                                            if set >= 0 then sprintf "set=%d" set :: args
-                                            else args
+                                    let args =
+                                        if set >= 0 then sprintf "set=%d" set :: args
+                                        else args
 
-                                        let args =
-                                            if binding >= 0 then sprintf "binding=%d" binding :: args
-                                            else args
+                                    let args =
+                                        if binding >= 0 then sprintf "binding=%d" binding :: args
+                                        else args
 
-                                        bSet <- set
-                                        bBinding <- binding
+                                    bSet <- set
+                                    bBinding <- binding
 
-                                        let args = "std430" :: args |> String.concat ","
+                                    let args = "std430" :: args |> String.concat ","
 
-                                        let rw = ""
+                                    let rw = ""
 //                                            match read, write with
 //                                                | false, true -> " writeonly"
 //                                                | true, false -> " readonly"
 //                                                | _ -> ""
 
-                                        return Some (sprintf "layout(%s) buffer%s " args rw + (p.cParamSemantic + "_ssb"))
+                                    return Some (sprintf "layout(%s) buffer%s " args rw + (p.cParamSemantic + "_ssb"))
 
-                                    | ParameterDecoration.Shared -> 
-                                        return Some "shared"
+                                | ParameterDecoration.Shared -> 
+                                    return Some "shared"
 
-                                    | ParameterDecoration.Memory _ | ParameterDecoration.Slot _ | ParameterDecoration.Raypayload _ ->
-                                        return None
+                                | ParameterDecoration.RayPayload slot ->
+                                    return Some (sprintf "layout(location = %d) rayPayloadEXT" slot)
+
+                                | ParameterDecoration.RayPayloadIn ->
+                                    return Some "rayPayloadInEXT"
+
+                                | ParameterDecoration.HitAttribute ->
+                                    return Some "hitAttributeEXT"
+
+                                | ParameterDecoration.CallableData slot ->
+                                    return Some (sprintf "layout(location = %d) callableDataEXT" slot)
+
+                                | ParameterDecoration.CallableDataIn ->
+                                    return Some "callableDataInEXT"
+
+                                | ParameterDecoration.Memory _ | ParameterDecoration.Slot _ ->
+                                    return None
                             }
 
                         )
@@ -1607,73 +1620,54 @@ module Assembler =
 
                     let isBuffer = p.cParamDecorations |> Seq.exists (function ParameterDecoration.StorageBuffer  _-> true | _ -> false)
 
-                    let slot = p.cParamDecorations |> Seq.tryPick (function ParameterDecoration.Slot s -> Some s | _ -> None)
-
-                    let! location = 
-                        match slot with
-                            | Some slot -> State.value slot
-                            | _ -> AssemblerState.newLocation kind p.cParamType
-
-                    let layoutParams = 
-                        match kind with
-                            | ParameterKind.Input when config.createInputLocations && prevStage = None ->
-                                [ sprintf "location = %d" location]
-                            | ParameterKind.Output when config.createOutputLocations && nextStage = None ->
-                                [ sprintf "location = %d" location]
-                            | ParameterKind.Input | ParameterKind.Output when config.createPassingLocations ->
-                                [ sprintf "location = %d" location]
-                            | _ ->
-                                []
-
-                    let decorations =
-                        match layoutParams with
-                            | [] -> decorations
-                            | _ -> sprintf "layout(%s)" (String.concat ", " layoutParams) :: decorations
-                
-                    let decorations = 
-                        match decorations with
-                            | [] -> ""
-                            | _ -> String.concat " " decorations + " "
-
-                    let! name = parameterNameS kind p.cParamName
-
-                    let payload =
-                        p.cParamDecorations |> Seq.tryPick (function 
-                            | ParameterDecoration.Raypayload true -> Some "rayPayloadInNV "
-                            | ParameterDecoration.Raypayload false -> Some "rayPayloadNV "
+                    let slot =
+                        p.cParamDecorations |> Seq.tryPick (function
+                            | ParameterDecoration.Slot s -> Some s
                             | _ -> None
                         )
 
-                    let decorations, prefix, suffix =
-                        if Option.isSome payload then
-                            decorations, payload.Value, ""
-                        elif stages.self = ShaderStage.RayHitShader && name.Name = Intrinsics.HitCoord then
-                            match kind with
-                            | ParameterKind.Input -> "", "hitAttributeNV ", ""
-                            | _ -> failwith "bad ray payload"
-                        elif stages.self = ShaderStage.RayHitShader && name.Name = Intrinsics.RayPayloadIn then
-                            match kind with
-                            | ParameterKind.Input -> decorations, "rayPayloadInNV ", ""
-                            | _ -> failwith "bad ray payload"
-                            
-                        elif stages.self = ShaderStage.RayHitShader && name.Name = Intrinsics.RayPayloadOut then
-                            match kind with
-                            | ParameterKind.Output -> decorations, "rayPayloadNV ", ""
-                            | _ -> failwith "bad ray payload"
+                    let! location =
+                        match slot with
+                        | Some slot -> State.value slot
+                        | _ -> AssemblerState.newLocation kind p.cParamType
 
-                        elif config.useInOut then
+                    let layoutParams =
+                        match kind with
+                        | ParameterKind.Input when config.createInputLocations && prevStage = None ->
+                            [ sprintf "location = %d" location]
+                        | ParameterKind.Output when config.createOutputLocations && nextStage = None ->
+                            [ sprintf "location = %d" location]
+                        | ParameterKind.Input | ParameterKind.Output when config.createPassingLocations ->
+                            [ sprintf "location = %d" location]
+                        | _ ->
+                            []
+
+                    let decorations =
+                        match layoutParams with
+                        | [] -> decorations
+                        | _ -> sprintf "layout(%s)" (String.concat ", " layoutParams) :: decorations
+                
+                    let decorations = 
+                        match decorations with
+                        | [] -> ""
+                        | _ -> String.concat " " decorations + " "
+
+                    let! name = parameterNameS kind p.cParamName
+
+                    let decorations, prefix, suffix =
+                        if config.useInOut then
                             match kind with
-                                | ParameterKind.Input -> decorations, "in ", ""
-                                | ParameterKind.Output -> decorations, "out ", ""
-                                | _ -> 
-                                    if isBuffer then decorations, " { ", " };"
-                                    else decorations, "", ""
+                            | ParameterKind.Input -> decorations, "in ", ""
+                            | ParameterKind.Output -> decorations, "out ", ""
+                            | _ -> 
+                                if isBuffer then decorations, " { ", " };"
+                                else decorations, "", ""
                         else
                             match kind with
-                                | ParameterKind.Input when selfStage = ShaderStage.Vertex -> decorations, "attribute ", ""
-                                | ParameterKind.Input -> decorations, "varying ", ""
-                                | ParameterKind.Output -> decorations, "varying ", ""
-                                | _ -> decorations, "", ""
+                            | ParameterKind.Input when selfStage = ShaderStage.Vertex -> decorations, "attribute ", ""
+                            | ParameterKind.Input -> decorations, "varying ", ""
+                            | ParameterKind.Output -> decorations, "varying ", ""
+                            | _ -> decorations, "", ""
                     
 
                     if isBuffer then
@@ -1808,6 +1802,7 @@ module Assembler =
             let! inputs = e.cInputs |> List.chooseS (assembleEntryParameterS ParameterKind.Input)
             let! outputs = e.cOutputs |> List.chooseS (assembleEntryParameterS ParameterKind.Output)
             let! args = e.cArguments |> List.chooseS (assembleEntryParameterS ParameterKind.Argument)
+            let! rtdata = e.cRaytracingData |> List.chooseS (assembleEntryParameterS ParameterKind.RaytracingData)
             let! body = assembleStatementS false e.cBody
             let! config = AssemblerState.config
             
@@ -1817,6 +1812,7 @@ module Assembler =
                     yield! inputs
                     yield! outputs
                     yield! args
+                    yield! rtdata
                     yield sprintf "%s %s()\r\n{\r\n%s\r\n}" (assembleType config.reverseMatrixLogic e.cReturnType).Name entryName.Name (String.indent body)
                 ]
         }
@@ -1898,22 +1894,9 @@ module Assembler =
                 let! s = State.get
                 let extensions = Set.union c.enabledExtensions s.requiredExtensions
 
-                let extensions =
-                    if ShaderStage.isRayTracing s.stages.self then 
-                        extensions
-                        |> Set.add "GL_NV_ray_tracing"
-                        |> Set.add "GL_EXT_nonuniform_qualifier"
-                        |> Set.remove "GL_ARB_tessellation_shader"
-                        |> Set.remove "GL_ARB_shading_language_420pack"
-                        |> Set.remove "GL_ARB_separate_shader_objects"
-                    else 
-                        extensions
-
                 let version =
-                    if ShaderStage.isRayTracing s.stages.self then "#version 460"
-                    else
-                        if c.version.Suffix <> "" then sprintf "#version %d%d%d %s" c.version.Major c.version.Minor c.version.Patch c.version.Suffix
-                        else sprintf "#version %d%d%d" c.version.Major c.version.Minor c.version.Patch
+                    if c.version.Suffix <> "" then sprintf "#version %d%d%d %s" c.version.Major c.version.Minor c.version.Patch c.version.Suffix
+                    else sprintf "#version %d%d%d" c.version.Major c.version.Minor c.version.Patch
 
                 return 
                     List.concat [

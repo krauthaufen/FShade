@@ -235,7 +235,7 @@ module Effect =
         
     /// creates an effect from an expression (assuming expressions as returned by shader-functions)
     let ofExpr (inputType : Type) (e : Expr) =
-        let effect = Shader.ofExpr inputType e |> ofList
+        let effect = Shader.ofExpr [inputType] e |> ofList
         effect.SourceDefintion <- Some (e, inputType)
         effect
 
@@ -295,7 +295,7 @@ module Effect =
             let map =
                 lazy (
                     let range = expression.DebugRange
-                    let shader = Shader.ofExpr typeof<'a> expression
+                    let shader = Shader.ofExpr [typeof<'a>] expression
                     shader |> List.map (fun s -> s.shaderStage, s) |> Map.ofList
                 )
 

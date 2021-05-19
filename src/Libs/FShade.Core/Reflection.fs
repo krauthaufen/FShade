@@ -76,9 +76,8 @@ module ReflectionPatterns =
         else
             None
 
-
     let (|AccelerationStructure|_|) (t : Type) =
-        if t = typeof<AccelerationStructure> then
+        if typeof<IAccelerationStructure>.IsAssignableFrom(t) then
             Some ()
         else
             None
@@ -120,42 +119,42 @@ module BasicQuotationPatterns =
 
             | PropertyGet(None, pi, []) ->
                 match pi.Type with
-                    | SamplerType(_) ->
-                        match Expr.TryEval e with
-                            | Some sam ->
-                                let sam = sam |> unbox<ISampler>
-                                let tex = sam.Texture
-                                Some { 
-                                    uniformName = pi.Name
-                                    uniformType = sam.GetType()
-                                    uniformValue = Sampler(tex.Semantic, sam.State) 
-                                } 
+                | SamplerType(_) ->
+                    match Expr.TryEval e with
+                        | Some sam ->
+                            let sam = sam |> unbox<ISampler>
+                            let tex = sam.Texture
+                            Some { 
+                                uniformName = pi.Name
+                                uniformType = sam.GetType()
+                                uniformValue = Sampler(tex.Semantic, sam.State) 
+                            } 
 
-                            | None ->
-                                None
+                        | None ->
+                            None
 
-                    | ArrayOf((SamplerType _ as t)) ->
-                        match Expr.TryEval e with
-                            | Some sam ->
-                                let arr = sam |> unbox<Array>
-                                let samplers = 
-                                    List.init arr.Length (fun i -> 
-                                        let sam1 = arr.GetValue i |> unbox<ISampler>
-                                        let tex = sam1.Texture
-                                        tex.Semantic, sam1.State
-                                    )
+                | ArrayOf((SamplerType _ as t)) ->
+                    match Expr.TryEval e with
+                        | Some sam ->
+                            let arr = sam |> unbox<Array>
+                            let samplers = 
+                                List.init arr.Length (fun i -> 
+                                    let sam1 = arr.GetValue i |> unbox<ISampler>
+                                    let tex = sam1.Texture
+                                    tex.Semantic, sam1.State
+                                )
 
-                                let t = Peano.getArrayType arr.Length t
-                                Some {
-                                    uniformName = pi.Name
-                                    uniformType = t
-                                    uniformValue = SamplerArray(List.toArray samplers)
-                                } 
+                            let t = Peano.getArrayType arr.Length t
+                            Some {
+                                uniformName = pi.Name
+                                uniformType = t
+                                uniformValue = SamplerArray(List.toArray samplers)
+                            } 
 
-                            | None -> 
-                                None
+                        | None -> 
+                            None
 
-                    | _ -> None
+                | _ -> None
 
             | Call(None, Method("op_Dynamic", [UniformScopeType; _]), [scope; Value(s,_)]) ->
                 match Expr.TryEval scope with

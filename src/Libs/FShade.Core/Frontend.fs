@@ -280,6 +280,10 @@ module Primitives =
     let barrier() : unit = onlyInShaderCode "barrier"
     let allocateShared<'a when 'a : unmanaged> (size : int) : 'a[] =  onlyInShaderCode "allocateShared"
 
+    let reportIntersection(t : float, hitKind : int32) : bool = onlyInShaderCode "reportIntersection"
+    let ignoreIntersection() : unit = onlyInShaderCode "ignoreIntersection"
+    let terminateRay() : unit = onlyInShaderCode "terminateRay"
+
     [<Literal>]
     let MaxLocalSize = 2147483647
 
@@ -432,39 +436,75 @@ module ShaderBuilders =
             member x.ShaderStage = ShaderStage.Compute
             member x.OutputTopology = None
 
-    type RayHitBuilder() =
-        member x.For(a : Arr<'d, 'a>, f : 'a -> unit) : unit =
-            for i in a do f i
-
-        member x.For(a : seq<'a>, f : 'a -> unit) : unit =
-            for i in a do f i
-
-        member x.While(guard : unit -> bool, b : unit) =
-            ()
-
-        member x.Combine(l : unit, r : 'a) = r
-
-        member x.Zero() = ()
-        member x.Delay f = f()
+    type RayGenerationBuilder() =
+        inherit BaseBuilder()
 
         member x.Quote() = ()
 
-        member inline x.Run(e : Expr<'a>) : Expr<'a> =
-            e
-
-        member x.Return(value) = value
-
         interface IShaderBuilder with
-            member x.ShaderStage = ShaderStage.RayHitShader
+            member x.ShaderStage = ShaderStage.RayGeneration
             member x.OutputTopology = None
 
+    type RayMissBuilder() =
+        inherit BaseBuilder()
+
+        member x.Return(v) = v
+        member x.Quote() = ()
+
+        interface IShaderBuilder with
+            member x.ShaderStage = ShaderStage.Miss
+            member x.OutputTopology = None
+
+    type RayAnyHitBuilder() =
+        inherit BaseBuilder()
+
+        member x.Return(v) = v
+        member x.Quote() = ()
+
+        interface IShaderBuilder with
+            member x.ShaderStage = ShaderStage.AnyHit
+            member x.OutputTopology = None
+
+    type RayClosestHitBuilder() =
+        inherit BaseBuilder()
+
+        member x.Return(v) = v
+        member x.Quote() = ()
+
+        interface IShaderBuilder with
+            member x.ShaderStage = ShaderStage.ClosestHit
+            member x.OutputTopology = None
+
+    type RayCallableBuilder() =
+        inherit BaseBuilder()
+
+        member x.Return(v) = v
+        member x.Quote() = ()
+
+        interface IShaderBuilder with
+            member x.ShaderStage = ShaderStage.Callable
+            member x.OutputTopology = None
+
+    type RayIntersectionBuilder() =
+        inherit BaseBuilder()
+
+        member x.Quote() = ()
+
+        interface IShaderBuilder with
+            member x.ShaderStage = ShaderStage.Intersection
+            member x.OutputTopology = None
 
     let compute = ComputeBuilder()
     let vertex = VertexBuilder()
     let tessellation = TessBuilder()
     let fragment = FragmentBuilder()
 
-    let rayhit = RayHitBuilder()
+    let raygen = RayGenerationBuilder()
+    let miss = RayMissBuilder()
+    let anyhit = RayAnyHitBuilder()
+    let closesthit = RayClosestHitBuilder()
+    let callable = RayCallableBuilder()
+    let intersection = RayIntersectionBuilder()
 
     let triangle = GeometryBuilder(None, OutputTopology.TriangleStrip)
     let line = GeometryBuilder(None, OutputTopology.LineStrip)

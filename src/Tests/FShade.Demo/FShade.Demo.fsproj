@@ -5,6 +5,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
+    <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -24,6 +25,7 @@
     <ProjectReference Include="..\..\Libs\FShade.Debug\FShade.Debug.fsproj" />
     <ProjectReference Include="..\..\Libs\FShade.GLSL\FShade.GLSL.fsproj" />
     <ProjectReference Include="..\..\Libs\FShade.Imperative\FShade.Imperative.fsproj" />
+    <ProjectReference Include="..\FShade.GLSL.Tests\FShade.GLSL.Tests.fsproj" />
   </ItemGroup>
   <Import Project="..\..\..\.paket\Paket.Restore.targets" />
 

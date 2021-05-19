@@ -55,7 +55,7 @@ module UtiliyFunctions =
 
         [<Inline>]
         let f (a : float) (b : float) =
-            let x = 10.0 * FShade.Imperative.ExpressionExtensions.ShaderIO.ReadInput<float>(FShade.Imperative.ParameterKind.Input, "SomeInput")
+            let x = 10.0 * FShade.Imperative.ExpressionExtensions.ShaderIO.ReadInput<float>(FShade.Imperative.ParameterKind.Input, "SomeInput", false)
             a + b * uniform.A + x
   
         //[<Inline>]

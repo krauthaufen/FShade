@@ -4,6 +4,7 @@ open System
 open System.Reflection
 open System.Collections.Generic
 open System.Runtime.CompilerServices
+open System.Runtime.InteropServices
 
 open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Quotations.Patterns
@@ -49,8 +50,12 @@ type ParameterDecoration =
     | StorageBuffer of read : bool * write : bool
     | Shared
     | DepthWrite of DepthWriteMode
-    | Raypayload of isIn : bool
-    
+    | RayPayload of location: int
+    | RayPayloadIn
+    | CallableData of location : int
+    | CallableDataIn
+    | HitAttribute
+
 [<RequireQualifiedAccess>]
 type UniformDecoration =
     | Format of System.Type
@@ -68,10 +73,11 @@ type Uniform =
     }
 
 type ParameterKind =
-    | Input         = 0
-    | Output        = 1
-    | Uniform       = 2
-    | Argument      = 3
+    | Input          = 0
+    | Output         = 1
+    | Uniform        = 2
+    | Argument       = 3
+    | RaytracingData = 4
 
 type EntryParameter =
     {
@@ -99,14 +105,15 @@ type EntryDecoration =
 
 type EntryPoint =
     {
-        conditional : Option<string>
-        entryName   : string
-        inputs      : list<EntryParameter>
-        outputs     : list<EntryParameter>
-        uniforms    : list<Uniform>
-        arguments   : list<EntryParameter>
-        body        : Expr
-        decorations : list<EntryDecoration>
+        conditional    : Option<string>
+        entryName      : string
+        inputs         : list<EntryParameter>
+        outputs        : list<EntryParameter>
+        uniforms       : list<Uniform>
+        arguments      : list<EntryParameter>
+        raytracingData : list<EntryParameter>
+        body           : Expr
+        decorations    : list<EntryDecoration>
     }
     
 [<AttributeUsage(AttributeTargets.Method ||| AttributeTargets.Property)>]
@@ -135,8 +142,8 @@ module ExpressionExtensions =
                     false
             )
 
-        static let readInput        = find "ReadInput" [| typeof<ParameterKind>; typeof<string> |]
-        static let readInputIndex   = find "ReadInput" [| typeof<ParameterKind>; typeof<string>; typeof<int> |]
+        static let readInput        = find "ReadInput" [| typeof<ParameterKind>; typeof<string>; typeof<bool> |]
+        static let readInputIndex   = find "ReadInput" [| typeof<ParameterKind>; typeof<string>; typeof<int>; typeof<bool> |]
         static let writeOutputs     = find "WriteOutputs" [| typeof<array<string * int * obj>> |]
         static let unsafeWrite      = allMethods |> Array.find (fun m -> m.Name = "UnsafeWrite")
 
@@ -145,10 +152,10 @@ module ExpressionExtensions =
         static member internal WriteOutputsMeth = writeOutputs
         static member internal UnsafeWriteMeth = unsafeWrite
 
-        static member ReadInput<'a>(kind : ParameterKind, name : string) : 'a =
+        static member ReadInput<'a>(kind : ParameterKind, name : string, volatile : bool) : 'a =
             raise <| FShadeOnlyInShaderCodeException "ReadInput"
 
-        static member ReadInput<'a>(kind : ParameterKind, name : string, index : int) : 'a =
+        static member ReadInput<'a>(kind : ParameterKind, name : string, index : int, volatile : bool) : 'a =
             raise <| FShadeOnlyInShaderCodeException "ReadInput"
 
         static member WriteOutputs(values : array<string * int * obj>) : unit =
@@ -159,25 +166,32 @@ module ExpressionExtensions =
 
     type Expr with
 
-        static member UnsafePropertySet(target : Expr, prop : PropertyInfo, value : Expr) =
+        static member UnsafePropertySet(target : Expr, prop : PropertyInfo, indices : Expr list, value : Expr) =
             let mi = ShaderIO.UnsafeWriteMeth.MakeGenericMethod [| value.Type |]
-            Expr.Call(mi, [Expr.PropertyGet(target, prop); value])
+            Expr.Call(mi, [Expr.PropertyGet(target, prop, indices); value])
 
-        static member ReadInput<'a>(kind : ParameterKind, name : string) : Expr<'a> =
+        static member UnsafePropertySet(target : Expr, prop : PropertyInfo, value : Expr) =
+            Expr.UnsafePropertySet(target, prop, [], value)
+
+        static member UnsafeWrite(target : Expr, value : Expr) =
+            let mi = ShaderIO.UnsafeWriteMeth.MakeGenericMethod [| value.Type |]
+            Expr.Call(mi, [target; value])
+
+        static member ReadInput<'a>(kind : ParameterKind, name : string, [<Optional; DefaultParameterValue(false)>] volatile : bool) : Expr<'a> =
             let mi = ShaderIO.ReadInputMeth.MakeGenericMethod [| typeof<'a> |]
-            Expr.Call(mi, [ Expr.Value(kind); Expr.Value(name) ]) |> Expr.Cast
+            Expr.Call(mi, [ Expr.Value(kind); Expr.Value(name); Expr.Value(volatile) ]) |> Expr.Cast
 
-        static member ReadInput<'a>(kind : ParameterKind, name : string, index : Expr) : Expr<'a> =
+        static member ReadInput<'a>(kind : ParameterKind, name : string, index : Expr, [<Optional; DefaultParameterValue(false)>] volatile : bool) : Expr<'a> =
             let mi = ShaderIO.ReadInputIndexedMeth.MakeGenericMethod [| typeof<'a> |]
-            Expr.Call(mi, [ Expr.Value(kind); Expr.Value(name); index ]) |> Expr.Cast
+            Expr.Call(mi, [ Expr.Value(kind); Expr.Value(name); index; Expr.Value(volatile) ]) |> Expr.Cast
 
-        static member ReadInput(kind : ParameterKind, t : Type, name : string) =
+        static member ReadInput(kind : ParameterKind, t : Type, name : string, [<Optional; DefaultParameterValue(false)>] volatile : bool) =
             let mi = ShaderIO.ReadInputMeth.MakeGenericMethod [| t |]
-            Expr.Call(mi, [ Expr.Value(kind); Expr.Value(name) ])
+            Expr.Call(mi, [ Expr.Value(kind); Expr.Value(name); Expr.Value(volatile) ])
 
-        static member ReadInput(kind : ParameterKind, t : Type, name : string, index : Expr) =
+        static member ReadInput(kind : ParameterKind, t : Type, name : string, index : Expr, [<Optional; DefaultParameterValue(false)>] volatile : bool) =
             let mi = ShaderIO.ReadInputIndexedMeth.MakeGenericMethod [| t |]
-            Expr.Call(mi, [ Expr.Value(kind); Expr.Value(name); index ])
+            Expr.Call(mi, [ Expr.Value(kind); Expr.Value(name); index; Expr.Value(volatile) ])
             
         static member WriteOutputsRaw(values : list<string * Option<Expr> * Expr>) =
             let values =
@@ -209,20 +223,20 @@ module ExpressionExtensions =
 
             Expr.WriteOutputs map
 
-    let (|UnsafePropertySet|_|) (e : Expr) =
+    let (|UnsafeWrite|_|) (e : Expr) =
         match e with
-        | Call(None, mi, [PropertyGet(Some t, prop, []); value]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = ShaderIO.UnsafeWriteMeth ->
-            Some (t, prop, value)
+        | Call(None, mi, [target; value]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = ShaderIO.UnsafeWriteMeth ->
+            Some (target, value)
         | _ ->
             None
 
     let (|ReadInput|_|) (e : Expr) =
         match e with
-            | Call(None, mi, [ Value((:? ParameterKind as kind),_); Value((:? string as name),_) ]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = ShaderIO.ReadInputMeth ->
-                Some(kind, name, None)
+            | Call(None, mi, [ Value((:? ParameterKind as kind),_); Value((:? string as name),_); Constant(:? bool as volatile)]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = ShaderIO.ReadInputMeth ->
+                Some(kind, name, None, volatile)
 
-            | Call(None, mi, [ Value((:? ParameterKind as kind),_); Value((:? string as name),_); index ]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = ShaderIO.ReadInputIndexedMeth ->
-                Some(kind, name, Some index)
+            | Call(None, mi, [ Value((:? ParameterKind as kind),_); Value((:? string as name),_); index; Constant(:? bool as volatile)]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = ShaderIO.ReadInputIndexedMeth ->
+                Some(kind, name, Some index, volatile)
 
             | _ ->
                 None
@@ -328,7 +342,7 @@ module private Affected =
     let rec usedInputsS (e : Expr) : State<State, Set<string>> =
         state {
             match e with
-                | ReadInput(ParameterKind.Input, name, idx) ->
+                | ReadInput(ParameterKind.Input, name, idx, _) ->
                     match idx with
                         | Some idx -> 
                             let! used = usedInputsS idx
@@ -445,6 +459,7 @@ module EntryPoint =
             outputs = []
             uniforms = []
             arguments = args
+            raytracingData = []
             body = body
             decorations = []
         }
