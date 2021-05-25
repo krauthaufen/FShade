@@ -57,11 +57,11 @@ type Shader =
         /// the shader's hit attribute (only useful in some raytracing shaders)
         shaderHitAttribute : Option<string * Type>
         /// the shader's referenced ray types (only useful in some raytracing shaders)
-        shaderRayTypes : Set<string>
+        shaderRayTypes : Set<Symbol>
         /// the shader's referenced miss shaders (only useful in some raytracing shaders)
-        shaderMissShaders : Set<string>
+        shaderMissShaders : Set<Symbol>
         /// the shader's referenced callable shaders (only useful in some raytracing shaders)
-        shaderCallableShaders : Set<string>
+        shaderCallableShaders : Set<Symbol>
         shaderDepthWriteMode : DepthWriteMode
     }
 
@@ -1443,9 +1443,9 @@ module Preprocessor =
                 shaderCallableData      = inverseMap state.callableData
                 shaderCallableDataIn    = state.callableDataIn
                 shaderHitAttribute      = state.hitAttribute
-                shaderRayTypes          = state.rayTypes
-                shaderMissShaders       = state.missShaders
-                shaderCallableShaders   = state.callableShaders
+                shaderRayTypes          = state.rayTypes |> Set.map Sym.ofString
+                shaderMissShaders       = state.missShaders |> Set.map Sym.ofString
+                shaderCallableShaders   = state.callableShaders |> Set.map Sym.ofString
             }
 
         shader :: state.shaders

@@ -482,17 +482,17 @@ let main args =
         Log.stop()
 
     for (KeyValue(name, shader)) in effect.RayGenerationShaders do
-        compile name shader
+        compile (string name) shader
 
     for (KeyValue(name, shader)) in effect.MissShaders do
-        compile name shader
+        compile (string name) shader
 
     for (KeyValue(name, shader)) in effect.CallableShaders do
-        compile name shader
+        compile (string name) shader
 
     for (KeyValue(groupName, hitgroup)) in effect.HitGroups do
         for (KeyValue(rayName, entry)) in hitgroup.PerRayType do
-            let name = sprintf "%s_%s" groupName rayName
+            let name = sprintf "%A_%A" groupName rayName
             entry.AnyHit |> Option.iter (compile name)
             entry.ClosestHit |> Option.iter (compile name)
             entry.Intersection |> Option.iter (compile name)
