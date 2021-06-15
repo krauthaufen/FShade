@@ -149,8 +149,7 @@ type RaytracingEffect internal(state : RaytracingEffectState) =
     let shaderBindingTableLayout =
         lazy (
             let shaders = RaytracingEffectState.shaders state
-            let hitGroups = state.HitGroups |> Map.keys |> Set.ofSeq
-            ShaderBindingTableLayout.generate shaders hitGroups
+            ShaderBindingTableLayout.generate shaders
         )
 
     let state =

@@ -103,6 +103,13 @@ type GLSLUniformBuffer =
         ubSize          : int
     }
 
+type GLSLAccelerationStructure =
+    {
+        accelSet        : int
+        accelBinding    : int
+        accelName       : string
+    }
+
 type GLSLWinding =
     | CCW
     | CW
@@ -210,27 +217,28 @@ module private Tools =
                 | GLSLType.Array(len, elem,_) -> sprintf "%s[%d]" (toString elem) len
                 | GLSLType.Image img -> imageName img
                 | GLSLType.Sampler sam -> samplerName sam
-                | GLSLType.DynamicArray(elem,_) -> sprintf "%s[]" (toString elem) 
+                | GLSLType.DynamicArray(elem,_) -> sprintf "%s[]" (toString elem)
 
 [<CustomEquality; NoComparison>]
 type GLSLShaderInterface =
     {
-        program                 : GLSLProgramInterface
-
-        shaderStage             : ShaderStage
-        shaderEntry             : string
-
-        shaderInputs            : list<GLSLParameter>
-        shaderOutputs           : list<GLSLParameter>
-        shaderSamplers          : HashSet<string>
-        shaderImages            : HashSet<string>
-        shaderStorageBuffers    : HashSet<string>
-        shaderUniformBuffers    : HashSet<string>
-        shaderBuiltInFunctions  : HashSet<GLSLIntrinsic>
-
-        shaderDecorations       : list<GLSLShaderDecoration>
-
-        shaderBuiltIns          : MapExt<ParameterKind, MapExt<string, GLSLType>>
+        program                      : GLSLProgramInterface
+                                     
+        shaderStage                  : ShaderStage
+        shaderEntry                  : string
+                                     
+        shaderInputs                 : list<GLSLParameter>
+        shaderOutputs                : list<GLSLParameter>
+        shaderSamplers               : HashSet<string>
+        shaderImages                 : HashSet<string>
+        shaderStorageBuffers         : HashSet<string>
+        shaderUniformBuffers         : HashSet<string>
+        shaderAccelerationStructures : HashSet<string>
+        shaderBuiltInFunctions       : HashSet<GLSLIntrinsic>
+                                     
+        shaderDecorations            : list<GLSLShaderDecoration>
+                                     
+        shaderBuiltIns               : MapExt<ParameterKind, MapExt<string, GLSLType>>
     }
 
     override x.GetHashCode() =
@@ -243,6 +251,7 @@ type GLSLShaderInterface =
             x.shaderImages.GetHashCode(),
             x.shaderStorageBuffers.GetHashCode(),
             x.shaderUniformBuffers.GetHashCode(),
+            x.shaderAccelerationStructures.GetHashCode(),
             x.shaderBuiltInFunctions.GetHashCode(),
             x.shaderDecorations.GetHashCode(),
             x.shaderBuiltIns.GetHashCode()
@@ -258,6 +267,7 @@ type GLSLShaderInterface =
                 x.shaderImages = o.shaderImages &&
                 x.shaderStorageBuffers = o.shaderStorageBuffers &&
                 x.shaderUniformBuffers = o.shaderUniformBuffers &&
+                x.shaderAccelerationStructures = o.shaderAccelerationStructures &&
                 x.shaderBuiltInFunctions = o.shaderBuiltInFunctions &&
                 x.shaderDecorations = o.shaderDecorations &&
                 x.shaderBuiltIns = o.shaderBuiltIns
@@ -291,6 +301,7 @@ type GLSLShaderInterface =
 
                 let usedUniforms =
                     Seq.concat [
+                        x.shaderAccelerationStructures |> Seq.map (sprintf "acc::%s")
                         x.shaderUniformBuffers |> Seq.map (sprintf "ub::%s")
                         x.shaderStorageBuffers |> Seq.map (sprintf "ssb::%s")
                         x.shaderSamplers |> Seq.map (sprintf "sam::%s")
@@ -336,13 +347,14 @@ type GLSLShaderInterface =
 
 and GLSLProgramInterface =
     {
-        inputs          : list<GLSLParameter>
-        outputs         : list<GLSLParameter>
-        samplers        : MapExt<string, GLSLSampler>
-        images          : MapExt<string, GLSLImage>
-        storageBuffers  : MapExt<string, GLSLStorageBuffer>
-        uniformBuffers  : MapExt<string, GLSLUniformBuffer>
-        shaders         : MapExt<ShaderStage, GLSLShaderInterface>
+        inputs                  : list<GLSLParameter>
+        outputs                 : list<GLSLParameter>
+        samplers                : MapExt<string, GLSLSampler>
+        images                  : MapExt<string, GLSLImage>
+        storageBuffers          : MapExt<string, GLSLStorageBuffer>
+        uniformBuffers          : MapExt<string, GLSLUniformBuffer>
+        accelerationStructures  : MapExt<string, GLSLAccelerationStructure>
+        shaders                 : MapExt<ShaderStage, GLSLShaderInterface>
     }
 
     [<Obsolete("use shaders.[stage].shaderBuiltIns instead")>]
@@ -385,6 +397,9 @@ and GLSLProgramInterface =
             for (_,s) in MapExt.toSeq x.images do
                 yield sprintf "img %s : %s // set: %d binding: %d" s.imageName (GLSLType.toString (GLSLType.Image s.imageType)) s.imageSet s.imageBinding |> Some
 
+            for (_,s) in MapExt.toSeq x.accelerationStructures do
+                yield sprintf "accel %s // set: %d binding: %d" s.accelName s.accelSet s.accelBinding |> Some
+
             yield section "shaders" [
                 for (_, shader) in MapExt.toSeq x.shaders do
 
@@ -414,6 +429,7 @@ module GLSLShaderInterface =
     let inline images (i : GLSLShaderInterface) = i.shaderImages
     let inline storageBuffers (i : GLSLShaderInterface) = i.shaderStorageBuffers
     let inline uniformBuffers (i : GLSLShaderInterface) = i.shaderUniformBuffers
+    let inline accelerationStructures (i : GLSLShaderInterface) = i.shaderAccelerationStructures
     let inline builtInFunctions (i : GLSLShaderInterface) = i.shaderBuiltInFunctions
     let inline decorations (i : GLSLShaderInterface) = i.shaderDecorations
     let inline builtIns (i : GLSLShaderInterface) = i.shaderBuiltIns
@@ -443,6 +459,7 @@ module GLSLProgramInterface =
     let inline images (i : GLSLProgramInterface) = i.images
     let inline storageBuffers (i : GLSLProgramInterface) = i.storageBuffers
     let inline uniformBuffers (i : GLSLProgramInterface) = i.uniformBuffers
+    let inline accelerationStructures (i : GLSLProgramInterface) = i.accelerationStructures
     let inline shaders (i : GLSLProgramInterface) = i.shaders
 
     let usesDiscard (iface : GLSLProgramInterface) =

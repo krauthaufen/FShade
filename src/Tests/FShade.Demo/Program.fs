@@ -417,7 +417,8 @@ module RaytracingTest =
 
     let closestHitShader (input : RayHitInput<Payload>) =
         closesthit {
-            return { foo = input.hit.attribute.X; flag = false }
+            let whatever = scene.TraceRay(V3d.Zero, V3d.XAxis)
+            return { foo = input.hit.attribute.X; flag = whatever }
         }
 
     let raygenShader (input : RayGenerationInput) (buffer : Image2d<Formats.rgba32f>) =

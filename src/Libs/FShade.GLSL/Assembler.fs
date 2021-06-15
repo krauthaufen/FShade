@@ -196,6 +196,7 @@ type InputKind =
     | StorageBuffer = 2
     | Sampler = 3
     | Image = 4
+    | AccelerationStructure = 5
 
 type AssemblerState =
     {
@@ -216,6 +217,7 @@ type AssemblerState =
         samplers                : MapExt<string, GLSLSampler>
         images                  : MapExt<string, GLSLImage>
         storageBuffers          : MapExt<string, GLSLStorageBuffer>
+        accelerationStructures  : MapExt<string, GLSLAccelerationStructure>
 
         textureInfos            : Map<string, list<string * SamplerState>>
     }
@@ -233,23 +235,24 @@ module AssemblerState =
             requiredExtensions = Set.empty
             ifaceNew =
                 {
-                    inputs          = []
-                    outputs         = []
-                    samplers        = MapExt.empty
-                    images          = MapExt.empty
-                    storageBuffers  = MapExt.empty
-                    uniformBuffers  = MapExt.empty
-                    shaders         = MapExt.empty
+                    inputs                  = []
+                    outputs                 = []
+                    samplers                = MapExt.empty
+                    images                  = MapExt.empty
+                    storageBuffers          = MapExt.empty
+                    uniformBuffers          = MapExt.empty
+                    accelerationStructures  = MapExt.empty
+                    shaders                 = MapExt.empty
                 }
                 
             currentFunction = None
             functionInfo = HashMap.empty
 
-            uniformBuffers = MapExt.empty
-            samplers       = MapExt.empty
-            images         = MapExt.empty
-            storageBuffers = MapExt.empty
-
+            uniformBuffers          = MapExt.empty
+            samplers                = MapExt.empty
+            images                  = MapExt.empty
+            storageBuffers          = MapExt.empty
+            accelerationStructures  = MapExt.empty
 
             textureInfos = Map.empty
         }
@@ -358,19 +361,20 @@ module Interface =
 
     let private emptyShader =
         {
-            program                 = Unchecked.defaultof<_>
-            shaderStage             = ShaderStage.Compute
-            shaderEntry             = ""
+            program                         = Unchecked.defaultof<_>
+            shaderStage                     = ShaderStage.Compute
+            shaderEntry                     = ""
 
-            shaderInputs            = []
-            shaderOutputs           = []
-            shaderSamplers          = HashSet.empty
-            shaderImages            = HashSet.empty
-            shaderStorageBuffers    = HashSet.empty
-            shaderUniformBuffers    = HashSet.empty
-            shaderBuiltInFunctions  = HashSet.empty
-            shaderDecorations       = []
-            shaderBuiltIns          = MapExt.empty
+            shaderInputs                    = []
+            shaderOutputs                   = []
+            shaderSamplers                  = HashSet.empty
+            shaderImages                    = HashSet.empty
+            shaderStorageBuffers            = HashSet.empty
+            shaderUniformBuffers            = HashSet.empty
+            shaderAccelerationStructures    = HashSet.empty
+            shaderBuiltInFunctions          = HashSet.empty
+            shaderDecorations               = []
+            shaderBuiltIns                  = MapExt.empty
         }
 
     let private updateShaderInterface (action : AssemblerState -> GLSLShaderInterface -> GLSLShaderInterface) =
@@ -591,6 +595,23 @@ module Interface =
                 
             { s with ifaceNew = iface; images = MapExt.add image.imageName image s.images }
         )
+
+    let addAccelerationStructure (accel : GLSLAccelerationStructure) =
+        State.modify (fun (s : AssemblerState) ->
+            let iface = 
+                { s.ifaceNew with
+                    accelerationStructures = MapExt.add accel.accelName accel s.ifaceNew.accelerationStructures
+                    shaders = 
+                        s.ifaceNew.shaders 
+                        |> MapExt.alter s.stages.self (
+                            function 
+                            | Some s -> Some { s with shaderAccelerationStructures = HashSet.add accel.accelName s.shaderAccelerationStructures } 
+                            | None -> None
+                        )
+                }
+                
+            { s with ifaceNew = iface; accelerationStructures = MapExt.add accel.accelName accel s.accelerationStructures }
+        )
        
     let newFunction (f : CFunctionSignature) =
         State.modify (fun s -> { s with currentFunction = Some f })
@@ -618,6 +639,7 @@ module Interface =
                         shaderStorageBuffers = HashSet.union iface.shaderStorageBuffers info.shaderStorageBuffers
                         shaderSamplers = HashSet.union iface.shaderSamplers info.shaderSamplers
                         shaderImages = HashSet.union iface.shaderImages info.shaderImages
+                        shaderAccelerationStructures = HashSet.union iface.shaderAccelerationStructures info.shaderAccelerationStructures
                         shaderBuiltInFunctions = HashSet.union iface.shaderBuiltInFunctions info.shaderBuiltInFunctions
                     }
                 | None ->
@@ -642,6 +664,10 @@ module Interface =
             let image =
                 MapExt.tryFind name s.images 
                 |> Option.map (fun v s -> { s with shaderImages = HashSet.add v.imageName s.shaderImages })
+     
+            let accel =
+                MapExt.tryFind name s.accelerationStructures 
+                |> Option.map (fun v s -> { s with shaderAccelerationStructures = HashSet.add v.accelName s.shaderAccelerationStructures })
                 
             let all =
                 [
@@ -649,6 +675,7 @@ module Interface =
                     match storage with | Some u -> yield u | None -> ()
                     match sampler with | Some u -> yield u | None -> ()
                     match image with | Some u -> yield u | None -> ()
+                    match accel with | Some u -> yield u | None -> ()
                 ]
             all |> List.fold (fun s v -> v s) shader
         )
@@ -663,6 +690,21 @@ module Assembler =
         member x.Name = str
 
     open System.Text.RegularExpressions
+
+    [<AutoOpen>] 
+    module Patterns =
+
+        let (|CTexture|_|) (t : CType) =
+            match t with   
+            | CIntrinsic { tag = (:? GLSLTextureType as t)} -> Some (t, 1)
+            | CArray(CIntrinsic { tag = (:? GLSLTextureType as t)}, len) -> Some (t, len)
+            | _ -> None
+
+        let (|CAccelerationStructure|_|) (t : CType) =
+            match t with
+            | CIntrinsic { tag = (:? Type as t) } when t = typeof<Scene> -> Some ()
+            | _ -> None
+
 
     let reservedNames =
         let str = 
@@ -1417,45 +1459,50 @@ module Assembler =
                                 let! definitions = 
                                     fields |> List.mapS (fun u ->
                                         state {
-                                            let textureType =
-                                                match u.cUniformType with   
-                                                    | CIntrinsic { tag = (:? GLSLTextureType as t)} -> Some (t, 1)
-                                                    | CArray(CIntrinsic { tag = (:? GLSLTextureType as t)}, len) -> Some (t, len)
-                                                    | _ -> None
-
                                             let mutable prefix = ""
 
-                                            match textureType with   
-                                                | Some (t, cnt) ->
-                                                    match t with
-                                                        | GLSLTextureType.GLSLSampler samplerType -> 
-                                                            let! binding = getBinding InputKind.Sampler cnt [u]
-                                                            prefix <- uniformLayout false u.cUniformDecorations set binding
+                                            match u.cUniformType with   
+                                            | CTexture (t, cnt) ->
+                                                match t with
+                                                    | GLSLTextureType.GLSLSampler samplerType -> 
+                                                        let! binding = getBinding InputKind.Sampler cnt [u]
+                                                        prefix <- uniformLayout false u.cUniformDecorations set binding
 
-                                                            do! Interface.addSampler { 
-                                                                samplerSet = set
-                                                                samplerBinding = binding
-                                                                samplerName = checkName(u.cUniformName).Name
-                                                                samplerCount = cnt
-                                                                samplerTextures = [] // filled in addSampler
-                                                                samplerType = samplerType
-                                                            }
+                                                        do! Interface.addSampler { 
+                                                            samplerSet = set
+                                                            samplerBinding = binding
+                                                            samplerName = checkName(u.cUniformName).Name
+                                                            samplerCount = cnt
+                                                            samplerTextures = [] // filled in addSampler
+                                                            samplerType = samplerType
+                                                        }
                                                            
-                                                        | GLSLTextureType.GLSLImage imageType ->
-                                                            let! binding = getBinding InputKind.Image cnt [u]
-                                                            prefix <- uniformLayout false u.cUniformDecorations set binding
+                                                    | GLSLTextureType.GLSLImage imageType ->
+                                                        let! binding = getBinding InputKind.Image cnt [u]
+                                                        prefix <- uniformLayout false u.cUniformDecorations set binding
 
-                                                            do! Interface.addImage { 
-                                                                imageSet = set
-                                                                imageBinding = binding
-                                                                imageName = checkName(u.cUniformName).Name
-                                                                imageType = imageType
-                                                            }
-                                                | _ ->
-                                                    let! binding = getBinding InputKind.UniformBuffer 1 [u]
-                                                    prefix <- uniformLayout false u.cUniformDecorations set binding
+                                                        do! Interface.addImage { 
+                                                            imageSet = set
+                                                            imageBinding = binding
+                                                            imageName = checkName(u.cUniformName).Name
+                                                            imageType = imageType
+                                                        }
 
-                                                    ()
+                                            | CAccelerationStructure ->
+                                                let! binding = getBinding InputKind.AccelerationStructure 1 [u]
+                                                prefix <- uniformLayout false u.cUniformDecorations set binding
+
+                                                do! Interface.addAccelerationStructure {
+                                                    accelSet = set
+                                                    accelBinding = binding
+                                                    accelName = checkName(u.cUniformName).Name
+                                                }
+
+                                            | _ ->
+                                                let! binding = getBinding InputKind.UniformBuffer 1 [u]
+                                                prefix <- uniformLayout false u.cUniformDecorations set binding
+
+                                                ()
 
                                             let decl = assembleDeclaration config.reverseMatrixLogic u.cUniformType (checkName u.cUniformName)
                                             return sprintf "%suniform %s;" prefix decl
