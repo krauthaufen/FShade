@@ -371,6 +371,9 @@ module SpirVPrint =
 [<AutoOpen>]
 module RaytracingTest =
 
+    type UniformScope with
+        member x.OutputBuffer : Image2d<Formats.rgba32f> = uniform?OutputBuffer
+
     type Payload =
         {
             foo : float
@@ -421,13 +424,13 @@ module RaytracingTest =
             return { foo = input.hit.attribute.X; flag = whatever }
         }
 
-    let raygenShader (input : RayGenerationInput) (buffer : Image2d<Formats.rgba32f>) =
+    let raygenShader (input : RayGenerationInput) =
         let secondaryRayFlags = RayFlags.Opaque ||| RayFlags.SkipClosestHitShader
 
         raygen {
             let whatever = Callable.Execute({ flag = true; value = 0.0 })
             let result = scene.TraceRay<Payload>(scene.TraceRay<V3d>(V3d.Zero, V3d.ZAxis, V3d.One), V3d.YAxis, ray = "Secondary", flags = secondaryRayFlags)
-            buffer.[input.work.id.XY] <- V4d(result.foo + whatever.value)
+            uniform.OutputBuffer.[input.work.id.XY] <- V4d(result.foo + whatever.value)
         }
 
 [<EntryPoint>]

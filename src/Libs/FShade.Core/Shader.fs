@@ -791,11 +791,6 @@ module Preprocessor =
                 do! State.readInput semantic parameter
                 return Expr.ReadInput(ParameterKind.Input, e.Type, semantic)
 
-            | ValueWithName(_, t, name) when inputTypes |> List.contains t ->
-                let prefix = ShaderStage.prefix stage
-                let name = sprintf "%s_input_%s" prefix name
-                return Expr.ReadInput(ParameterKind.Uniform, t, name)
-
             | RemoveBuilder e ->
                 return! preprocessRaytracingS stage e
 
