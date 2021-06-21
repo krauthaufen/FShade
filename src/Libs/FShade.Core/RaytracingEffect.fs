@@ -110,7 +110,7 @@ module internal HitGroup =
 
 type RaytracingEffectState =
     {
-        RaygenShaders   : Map<Symbol, Shader>
+        RaygenShader    : Shader
         MissShaders     : Map<Symbol, Shader>
         CallableShaders : Map<Symbol, Shader>
         HitGroups       : Map<Symbol, HitGroup>
@@ -119,9 +119,9 @@ type RaytracingEffectState =
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module internal RaytracingEffectState =
 
-    let empty =
+    let empty (raygen : Shader) =
         {
-            RaygenShaders   = Map.empty
+            RaygenShader    = raygen
             MissShaders     = Map.empty
             CallableShaders = Map.empty
             HitGroups       = Map.empty
@@ -129,7 +129,7 @@ module internal RaytracingEffectState =
 
     let shaders (s : RaytracingEffectState) = 
         [|
-            yield! s.RaygenShaders |> Map.values
+            yield s.RaygenShader
             yield! s.MissShaders |> Map.values
             yield! s.CallableShaders |> Map.values
 
@@ -139,7 +139,7 @@ module internal RaytracingEffectState =
         |]
 
     let map (mapping : Shader -> Shader) (s : RaytracingEffectState) =
-        { RaygenShaders   = s.RaygenShaders |> Map.map (fun _ -> mapping)
+        { RaygenShader    = s.RaygenShader |> mapping
           MissShaders     = s.MissShaders |> Map.map (fun _ -> mapping)
           CallableShaders = s.CallableShaders |> Map.map (fun _ -> mapping)
           HitGroups       = s.HitGroups |> Map.map (fun _ -> HitGroup.map mapping) }
@@ -160,8 +160,8 @@ type RaytracingEffect internal(state : RaytracingEffectState) =
     member x.ShaderBindingTableLayout =
         shaderBindingTableLayout.Value
 
-    member x.RayGenerationShaders =
-        state.Value.RaygenShaders
+    member x.RayGenerationShader =
+        state.Value.RaygenShader
 
     member x.HitGroups =
         state.Value.HitGroups
@@ -178,17 +178,21 @@ module RaytracingEffect =
 
     let toModule (effect : RaytracingEffect) =
 
-        let toEntryPoints (shaders : List<string * Shader>) =
+        let toEntryPoints (shaders : List<Option<string> * Shader>) =
             shaders |> List.map (fun (name, shader) ->
-                let cond = Some (sprintf "%A_%s" shader.shaderStage name)
-                Shader.toEntryPointWithConditional cond None shader None
+                let cond = 
+                    match name with
+                    | Some n -> sprintf "%A_%s" shader.shaderStage n
+                    | _ -> sprintf "%A" shader.shaderStage
+
+                Shader.toEntryPointWithConditional (Some cond) None shader None
             )
 
         let hitGroups =
             effect.HitGroups |> Map.toList |> List.collect (fun (name, group) ->
                 group.PerRayType |> Map.toList |> List.collect (fun (ray, entry) ->
                     let cond = sprintf "%A_%A" name ray
-                    let select = Option.map (fun s -> cond, s)
+                    let select = Option.map (fun s -> Some cond, s)
 
                     [ select entry.AnyHit
                       select entry.ClosestHit
@@ -199,11 +203,12 @@ module RaytracingEffect =
 
         let toStringList (map : Map<Symbol, Shader>) =
             map |> Map.toList |> List.map (fun (name, shader) ->
-                Sym.toString name, shader
+                let n = Sym.toString name
+                Some n, shader
             )
 
         let entryPoints =
-            [ toEntryPoints (toStringList effect.RayGenerationShaders)
+            [ toEntryPoints [None, effect.RayGenerationShader]
               toEntryPoints (toStringList effect.MissShaders)
               toEntryPoints (toStringList effect.CallableShaders)
               toEntryPoints hitGroups ]
@@ -331,9 +336,10 @@ module RaytracingBuilders =
         member x.Intersection(s : HitGroup, f : 'a -> 'b) =
             x.Intersection(s, (Identifier.Default, f))
 
+    type RayGenerationShaderMustBeSpecified = RayGenerationShaderMustBeSpecified
 
     type RaytracingBuilder() =
-        member x.Yield(_) = RaytracingEffectState.empty
+        member x.Yield(_) = RayGenerationShaderMustBeSpecified
 
         member x.Delay f = f()
 
@@ -341,38 +347,20 @@ module RaytracingBuilders =
             RaytracingEffect(s)
 
         [<CustomOperation("raygen")>]
-        member x.Raygen(s : RaytracingEffectState, (name, shader) : Symbol * Shader) =
+        member x.Raygen(_ : RayGenerationShaderMustBeSpecified, shader : Shader) =
             match shader.shaderStage with
             | ShaderStage.RayGeneration ->
-                { s with RaygenShaders = s.RaygenShaders |> Map.add name shader }
+                RaytracingEffectState.empty shader
             | _ ->
                 failwithf "[FShade] Expected ray generation shader but got %A" shader.shaderStage
 
-        member x.Raygen(s : RaytracingEffectState, (name, e) : Symbol * Expr<'a>) =
+        member x.Raygen(s : RayGenerationShaderMustBeSpecified, e : Expr<'a>) =
             let shaders = Shader.ofExpr [] e
-            x.Raygen(s, (name, shaders.Head))
+            x.Raygen(s, shaders.Head)
 
-        member x.Raygen(s : RaytracingEffectState, (name, f) : Symbol * ('a -> 'b)) =
+        member x.Raygen(s : RayGenerationShaderMustBeSpecified, f : ('a -> 'b)) =
             let shaders = Shader.ofRaytracingFunction f
-            x.Raygen(s, (name, shaders.Head))
-
-        member x.Raygen(s : RaytracingEffectState, (name, shader) : string * Shader) =
-            x.Raygen(s, (Sym.ofString name, shader))
-
-        member x.Raygen(s : RaytracingEffectState, (name, e) : string * Expr<'a>) =
-            x.Raygen(s, (Sym.ofString name, e))
-
-        member x.Raygen(s : RaytracingEffectState, (name, f) : string * ('a -> 'b)) =
-            x.Raygen(s, (Sym.ofString name, f))
-
-        member x.Raygen(s : RaytracingEffectState, shader : Shader) =
-            x.Raygen(s, (Identifier.Default, shader))
-
-        member x.Raygen(s : RaytracingEffectState, e : Expr<'a>) =
-            x.Raygen(s, (Identifier.Default, e))
-
-        member x.Raygen(s : RaytracingEffectState, f : 'a -> 'b) =
-            x.Raygen(s, (Identifier.Default, f))
+            x.Raygen(s, shaders.Head)
 
 
         [<CustomOperation("miss")>]
