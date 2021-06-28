@@ -152,6 +152,13 @@ type RaytracingEffect internal(state : RaytracingEffectState) =
             ShaderBindingTableLayout.generate shaders
         )
 
+    let uniforms =
+        lazy (
+            RaytracingEffectState.shaders state
+            |> Array.map Shader.uniforms
+            |> Array.fold Map.union Map.empty
+        )
+
     let state =
         lazy (
             state |> RaytracingEffectState.map (resolveIndices shaderBindingTableLayout.Value)
@@ -171,6 +178,9 @@ type RaytracingEffect internal(state : RaytracingEffectState) =
 
     member x.CallableShaders =
         state.Value.CallableShaders
+
+    member x.Uniforms =
+        uniforms.Value
 
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]

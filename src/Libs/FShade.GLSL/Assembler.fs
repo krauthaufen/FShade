@@ -1972,6 +1972,18 @@ module Assembler =
                             )
                     }
 
+            | :? RaytracingEffect as e ->
+                state <-
+                    { state with
+                        textureInfos =
+                            e.Uniforms |> Map.choose (fun name p ->
+                                match p.uniformValue with
+                                    | UniformValue.Sampler(name, s) -> Some [name, s]
+                                    | UniformValue.SamplerArray arr -> Some (Array.toList arr)
+                                    | _ -> None
+                            )
+                    }
+
             | :? ComputeShader as c ->
                 let res = 
                     c.csSamplerStates |> Map.toList |> List.map (fun ((samName,index), state) ->
