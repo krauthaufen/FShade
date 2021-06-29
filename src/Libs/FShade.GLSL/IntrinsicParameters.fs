@@ -6,6 +6,12 @@ open FShade
 [<AutoOpen>]
 module IntrinsicParameters =
 
+    let nonIndexedGSInputs =
+        Set.ofList [
+            "gl_InvocationID"
+            "gl_PrimitiveID"
+        ]
+
     let builtInInputs =
         Dictionary.ofList [
             ShaderStage.Vertex,

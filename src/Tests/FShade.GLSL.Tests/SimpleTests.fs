@@ -769,6 +769,7 @@ let clampPointToPolygon (vc : int) (p : V3d) =
 
 [<Test>]
 let ``Struct declaration`` () =
+    Setup.Run()
 
     let frag1 (v : Vertex) =
         fragment {
@@ -1289,6 +1290,25 @@ let ``VS/TS shared helper`` () =
 
     GLSL.shouldCompile [ Effect.ofFunction vs; Effect.ofFunction ts; Effect.ofFunction frag ]
 
+[<ReflectedDefinition>]
+let foo () =
+    V3d.Zero
+
+[<Test>]
+let ``Reflected Function``() =
+    Setup.Run()
+
+    let vs (v : Vertex) =
+        vertex {
+            return foo()
+        }
+
+    let fs (v : Vertex) =
+        fragment {
+            return V4d(foo(), 1.0)
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction vs; Effect.ofFunction fs]
 
 //[<EntryPoint>]
 //let main args =

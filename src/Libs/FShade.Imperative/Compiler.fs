@@ -1818,20 +1818,47 @@ module Compiler =
                     let! s = State.get
                     let signature = f.Signature s.moduleState.backend
                     let! body = toCStatementS true body
-
-
+                   
+                    do! State.modify (fun s -> 
+                            let mutable ni = s.nameIndices
+                            let mutable vs = s.variables
+                            for a in args do
+                                ni <- Map.add a.Name 1 ni
+                                vs <- Map.add a { name = a.Name; ctype = CType.ofType s.moduleState.backend a.Type } vs
+                            { s with nameIndices = ni; variables = vs }
+                        )
                     return CFunctionDef(signature, body)
 
                 | CompiledFunction(signature, body) ->
                     return CFunctionDef(signature, body)
                     
                 | ManagedFunctionWithSignature(signature, body) ->
+                    let pars = body.GetFreeVars()
+                    do! State.modify (fun s -> 
+                        let mutable ni = s.nameIndices
+                        let mutable vs = s.variables
+                        for a in pars do
+                            ni <- Map.add a.Name 1 ni
+                            vs <- Map.add a { name = a.Name; ctype = CType.ofType s.moduleState.backend a.Type } vs
+                        { s with nameIndices = ni; variables = vs }
+                    )
                     let! body = toCStatementS true body
                     return CFunctionDef(signature, body)
 
                 | Utility u ->
                     let! s = State.get
                     let signature = f.Signature s.moduleState.backend
+
+                    
+                    do! State.modify (fun s -> 
+                        let mutable ni = s.nameIndices
+                        let mutable vs = s.variables
+                        for a in u.functionArguments do
+                            ni <- Map.add a.Name 1 ni
+                            vs <- Map.add a { name = a.Name; ctype = CType.ofType s.moduleState.backend a.Type } vs
+                        { s with nameIndices = ni; variables = vs }
+                    )
+
                     let! body = toCStatementS true u.functionBody
                     return CFunctionDef(signature, body)
 

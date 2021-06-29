@@ -133,7 +133,6 @@ let ``[This] mutable this preseved``() =
     let expected =
         <@
             let mutable a = v
-            ignore(a.Dot(a))
             keep a
         @>
 

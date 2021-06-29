@@ -399,14 +399,18 @@ module ExprExtensions =
                             let args = args |> List.map Expr.TryEval |> List.toArray
                             let t = Expr.TryEval t
                             match t, args |> reduce with
-                                | Some t, Some args -> mi.Invoke(t, args) |> Some
+                                | Some t, Some args -> 
+                                    try mi.Invoke(t, args) |> Some
+                                    with _ -> None
                                 | _ -> None
 
                         | None -> 
                             let args = args |> List.map Expr.TryEval |> List.toArray
                             match args |> reduce with
-                                | Some args -> mi.Invoke(null, args) |> Some
-                                | _ -> None
+                            | Some args -> 
+                                try mi.Invoke(null, args) |> Some
+                                with _ -> None
+                            | _ -> None
 
                 | Patterns.Let(var,value,body) ->
                     let value = Expr.TryEval value

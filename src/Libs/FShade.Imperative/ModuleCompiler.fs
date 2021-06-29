@@ -27,10 +27,10 @@ module ModuleCompiler =
     module ValueCompiler =
         open SimpleOrder
 
-        type GraphNode(definition : CValueDef, dependencies : HashSet<GraphNode>) =
+        type GraphNode(definition : CValueDef, conditional : option<string>, dependencies : HashSet<GraphNode>) =
             let mutable sortKey : Option<SortKey> = None
             let mutable dependencies = dependencies
-
+            member x.Conditional = conditional
             member x.Definition = definition
             member x.Dependencies 
                 with get() = dependencies
@@ -73,7 +73,7 @@ module ModuleCompiler =
 
         [<AutoOpen>]
         module private Helpers = 
-            let rec build (globals : GraphNode) (key : 'a) (compile : 'a -> State<CompilerState, CValueDef>) : State<GraphState, GraphNode> =
+            let rec build (globals : GraphNode) (key : 'a) (conditional : option<string>) (compile : 'a -> State<CompilerState, CValueDef>) : State<GraphState, GraphNode> =
                 state {
                     let! (state : GraphState) = State.get
                     let cache : Dictionary<obj, GraphNode> = state.cache
@@ -98,7 +98,7 @@ module ModuleCompiler =
                             let globalConstants     = s.usedConstants |> HashSet.toList //difference s.moduleState.globalConstants state.moduleState.globalConstants |> HashMap.toSeq |> Seq.map snd |> Seq.toList
                             
                             
-                            let node = GraphNode(def, HashSet.empty)
+                            let node = GraphNode(def, conditional, HashSet.empty)
                             cache.[key] <- node
 
                             let! localFunctions = localFunctions |> List.mapS (ofFunction globals)
@@ -125,23 +125,23 @@ module ModuleCompiler =
                 }
 
             and ofFunction (globals : GraphNode) (f : FunctionDefinition) =
-                build globals f compileFunctionS
+                build globals f None compileFunctionS
 
             and ofConstant (globals : GraphNode) (f : ConstantDefinition) =
-                build globals f compileConstantS
+                build globals f None compileConstantS
 
 
             let ofEntry (e : EntryPoint) =
                 state {
                     let! (s : GraphState) = State.get
-                    let! globals = build Unchecked.defaultof<_> (e,e.uniforms) (snd >> compileUniformsS)
+                    let! globals = build Unchecked.defaultof<_> (e,e.uniforms) None (snd >> compileUniformsS)
 
                     let globalNames = e.uniforms |> List.map (fun u -> u.uniformName) |> Set.ofList
 
                     do! State.modify (fun s -> { s with moduleState = { s.moduleState with ModuleState.globalParameters = globalNames } })
-                    let! root = build globals e compileEntryS
+                    let! root = build globals e e.conditional compileEntryS
 
-                    let root = GraphNode(root.Definition, HashSet.add globals root.Dependencies)
+                    let root = GraphNode(root.Definition, e.conditional, HashSet.add globals root.Dependencies)
 
                     do! State.modify (fun s -> { s with moduleState = { s.moduleState with ModuleState.globalParameters = Set.empty } })
 
@@ -152,105 +152,255 @@ module ModuleCompiler =
                 | Ifdef of string
                 | Endif of string
 
+
             let flatten (graphs : list<EntryPoint * GraphNode * GraphNode>) =
-                let order = SimpleOrder.create()
-                let defines = Dictionary<SortKey, Meta>()
-                let mutable lastRootDef = order.Root
+                
+                let outEdges = 
+                    let outEdges = Dict()
+                    let rec run (g : GraphNode) =
+                        for d in g.Dependencies do
+                            let set = outEdges.GetOrCreate(d, fun _ -> System.Collections.Generic.HashSet())
+                            set.Add g |> ignore
+                    for (_,_,d) in graphs do run d
+                    outEdges
+                    |> Seq.map (fun (KeyValue(a, b)) ->
+                        (a, HashSet.ofSeq b)
+                    )
+                    |> HashMap.ofSeq
 
-                let rec flattenDependencies (stack : HashSet<GraphNode>) (g : GraphNode) =
-                    if HashSet.contains g stack then
-                        failwithf "[FShade] found cyclic definition for %A" g.Definition
+                let terminals =
+                    graphs |> List.filter (fun (_,_,d) -> not (outEdges.ContainsKey d))
 
-                    let dependencies = HashSet.toList g.Dependencies
-                    match dependencies with
-                        | [] -> 
-                            match g.SortKey with
-                                | Some _ -> ()
-                                | None ->
-                                    let t = order.After lastRootDef
-                                    lastRootDef <- t
-                                    g.SortKey <- Some t
+                let mutable groups =
+                    terminals |> List.map (fun (_,_,d) ->
+                        HashSet.single d
+                    )
 
-                        | deps ->
-                            for d in dependencies do flattenDependencies (HashSet.add g stack) d
-                            let max = dependencies |> List.map (fun d -> d.SortKey.Value) |> List.max
-                            match g.SortKey with
-                                | Some o when o < max -> g.SortKey <- Some (order.After max)
-                                | None -> g.SortKey <- Some (order.After max)
-                                | _ -> ()
+                let allNodes =
+                    let rec run (acc : HashSet<GraphNode>) (g : GraphNode) =
+                        if HashSet.contains g acc then
+                            acc
+                        else
+                            let mutable res = HashSet.add g acc
+                            for d in g.Dependencies do
+                                res <- run res d
+                            res
+                    let mutable result = HashSet.empty
+                    for (_,_,d) in graphs do
+                        result <- run result d
+                    result
 
-                let mutable afterLastEntry = order.Root
-                for (entry, globals, definition) in graphs do
-                    
-                    let t0 = order.After afterLastEntry
-      
-                    globals.SortKey <- Some t0
-                    flattenDependencies HashSet.empty definition
-                    if definition.SortKey.Value < t0 then
-                        definition.SortKey <- Some (order.After t0)
+                let growGroups (gs : list<HashSet<GraphNode>>) =
+                    gs
+                    |> List.map (fun set ->
+                        set |> HashSet.collect (fun d -> 
+                            let additional =
+                                d.Dependencies |> HashSet.filter (fun dep ->
+                                    match HashMap.tryFind dep outEdges with
+                                    | Some oe -> 
+                                        HashSet.difference oe set
+                                        |> HashSet.isEmpty
+                                    | _ -> 
+                                        true
+                                )
+                            HashSet.add d additional
+                        )
+                    )
 
-                    afterLastEntry <- order.After definition.SortKey.Value
+                let mutable lastGroups = []
+                while lastGroups <> groups do
+                    lastGroups <- groups
+                    groups <- growGroups groups
 
-                    match entry.conditional with
-                        | Some d -> 
-                            defines.[globals.SortKey.Value] <- Ifdef d
-                            defines.[definition.SortKey.Value] <- Endif d
-                        | _ ->
-                            ()
+                let noGroup = 
+                    allNodes |> HashSet.filter (fun n ->
+                        groups |> List.forall (fun s -> not (HashSet.contains n s))
+                    )
+
+                let toposort (elements : HashSet<GraphNode>) =
+                    let mutable dependents = HashMap.empty
+                    let mutable dependencies = HashMap.empty
+
+                    for e in elements do    
+                        let deps = HashSet.intersect elements e.Dependencies
+                        dependencies <- HashMap.add e deps dependencies
+                        for d in HashSet.intersect elements e.Dependencies do
+                            dependents <-   
+                                dependents |> HashMap.alter d (function
+                                    | Some o -> Some (HashSet.add e o)
+                                    | None -> Some (HashSet.single e)
+                                )
+
+                    let mutable result = []
+
+                    while dependencies.Count > 0 do
+                        let noDep = dependencies |> HashMap.filter (fun e ds -> ds.IsEmpty) |> HashMap.keys
+                        
+                        result <- HashSet.toList noDep :: result
+                        for d in noDep do dependencies <- HashMap.remove d dependencies
+                        dependencies <-
+                            dependencies |> HashMap.map (fun _ vs ->
+                                HashSet.difference vs noDep
+                            )
+
+                    List.rev result
+                    |> List.concat
 
 
-                let allDefinitions = 
-                    let list = List()
-                    let rec visit (defs : System.Collections.Generic.HashSet<GraphNode>) (d : GraphNode) =
-                        if defs.Add d then
-                            list.Add d
-                            for dep in d.Dependencies do visit defs dep
+                let all = 
+                    [
+                        yield! 
+                            toposort noGroup
+                            |> List.map (fun d -> d.Definition)
 
-                    let set = System.Collections.Generic.HashSet()
-                    for (_, g, d) in graphs do visit set g; visit set d
+                        for g in groups do
+                            let g = toposort g
+                            let conditionals =
+                                g |> Seq.choose (fun g -> g.Conditional) |> HashSet.ofSeq
+                            if conditionals.Count = 1 then
+                                let c = conditionals |> Seq.head
+                                yield CConditionalDef(c, g |> List.map (fun d -> d.Definition))
+                            else
+                                yield! g |> List.map (fun d -> d.Definition)
+                    ]
+                all
 
-                    list |> CSharpList.toArray |> Array.sort
+                //let dependencies = Dict<GraphNode, System.Collections.Generic.HashSet<GraphNode>>()
+
+                //let rec run (node : GraphNode) =
+                //    let dep = dependencies.GetOrCreate(node, fun _ -> System.Collections.Generic.HashSet())
+                //    for d in node.Dependencies do
+                //        dep.Add d |> ignore
+                //        run d
+
+                //for (_, _, def) in graphs do
+                //    run def
+
+
+                //let mutable result = []
+
+                //while dependencies.Count > 0 do
+                //    let noDep = 
+                //        dependencies |> Seq.choose (fun (KeyValue(k, v)) ->
+                //            if v.Count = 0 then
+                //                Some k
+                //            else
+                //                None
+                //        )
+                //        |> System.Collections.Generic.HashSet
+
+                //    result <- result @ Seq.toList noDep
+
+                //    for n in noDep do dependencies.Remove n |> ignore
+                //    for (KeyValue(_, v)) in Seq.toArray dependencies do 
+                //        for n in noDep do v.Remove n |> ignore
+
+                //printfn "%A" result
                 
 
-                let tryGetEvent (t : SortKey) =
-                    match defines.TryGetValue t with
-                        | (true, v) -> Some v
-                        | _ -> None
 
-                let res = List()
-                let mutable currentIfDef = None
-                let current = List()
-                for n in allDefinitions do
-                    match tryGetEvent n.SortKey.Value with
-                        | Some (Ifdef d) -> 
-                            if current.Count > 0 then res.AddRange current
-                            currentIfDef <- Some d
-                            current.Clear()
-                            match n.Definition with
-                                | CUniformDef [] -> ()
-                                | def -> current.Add def
 
-                        | Some (Endif d) ->
-                            match n.Definition with
-                                | CUniformDef [] -> ()
-                                | def -> current.Add def
-                            currentIfDef <- None
-                            res.Add (CConditionalDef(d, CSharpList.toList current))
-                            current.Clear()
 
-                        | None ->
-                            match n.Definition with
-                                | CUniformDef [] -> ()
-                                | def -> current.Add def
+                //let order = SimpleOrder.create()
+                //let defines = Dictionary<SortKey, Meta>()
+                //let mutable lastRootDef = order.Root
+
+
+
+                //let rec flattenDependencies (stack : HashSet<GraphNode>) (globals : GraphNode) (g : GraphNode) =
+                //    if HashSet.contains g stack then
+                //        failwithf "[FShade] found cyclic definition for %A" g.Definition
+
+                //    let dependencies = HashSet.toList g.Dependencies
+                //    match dependencies with
+                //        | [] -> 
+                //            match g.SortKey with
+                //            | Some _ -> ()
+                //            | None ->
+                //                let t = order.After lastRootDef
+                //                lastRootDef <- t
+                //                g.SortKey <- Some t
+
+                //        | deps ->
+                //            for d in dependencies do flattenDependencies (HashSet.add g stack) globals d
+                //            let max = dependencies |> List.map (fun d -> d.SortKey.Value) |> List.max
+                //            match g.SortKey with
+                //            | Some o when o < max -> g.SortKey <- Some (order.After max)
+                //            | None -> g.SortKey <- Some (order.After max)
+                //            | _ -> ()
+
+                //let mutable afterLastEntry = order.Root
+                //for (entry, globals, definition) in graphs do
+                    
+                //    let t0 = order.After afterLastEntry
+      
+                //    globals.SortKey <- Some t0
+                //    flattenDependencies HashSet.empty globals definition
+                //    if definition.SortKey.Value < t0 then
+                //        definition.SortKey <- Some (order.After t0)
+
+                //    afterLastEntry <- order.After definition.SortKey.Value
+
+                //    match entry.conditional with
+                //    | Some d -> 
+                //        defines.[globals.SortKey.Value] <- Ifdef d
+                //        defines.[definition.SortKey.Value] <- Endif d
+                //    | _ ->
+                //        ()
+
+
+                //let allDefinitions = 
+                //    let list = List()
+                //    let rec visit (defs : System.Collections.Generic.HashSet<GraphNode>) (d : GraphNode) =
+                //        if defs.Add d then
+                //            list.Add d
+                //            for dep in d.Dependencies do visit defs dep
+
+                //    let set = System.Collections.Generic.HashSet()
+                //    for (_, g, d) in graphs do visit set g; visit set d
+
+                //    list |> CSharpList.toArray |> Array.sort
+                
+
+                //let tryGetEvent (t : SortKey) =
+                //    match defines.TryGetValue t with
+                //        | (true, v) -> Some v
+                //        | _ -> None
+
+                //let res = List()
+                //let mutable currentIfDef = None
+                //let current = List()
+                //for n in allDefinitions do
+                //    match tryGetEvent n.SortKey.Value with
+                //        | Some (Ifdef d) -> 
+                //            if current.Count > 0 then res.AddRange current
+                //            currentIfDef <- Some d
+                //            current.Clear()
+                //            match n.Definition with
+                //                | CUniformDef [] -> ()
+                //                | def -> current.Add def
+
+                //        | Some (Endif d) ->
+                //            match n.Definition with
+                //                | CUniformDef [] -> ()
+                //                | def -> current.Add def
+                //            currentIfDef <- None
+                //            res.Add (CConditionalDef(d, CSharpList.toList current))
+                //            current.Clear()
+
+                //        | None ->
+                //            match n.Definition with
+                //                | CUniformDef [] -> ()
+                //                | def -> current.Add def
                         
-                if current.Count > 0 then
-                    match currentIfDef with   
-                        | Some d -> res.Add(CConditionalDef(d, CSharpList.toList current))
-                        | None -> res.AddRange(current)
+                //if current.Count > 0 then
+                //    match currentIfDef with   
+                //        | Some d -> res.Add(CConditionalDef(d, CSharpList.toList current))
+                //        | None -> res.AddRange(current)
 
 
 
-                CSharpList.toList res
+                //CSharpList.toList res
 
         let ofModule (backend : Backend) (m : Module) =
             let compile =

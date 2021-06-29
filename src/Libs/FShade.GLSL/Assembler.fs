@@ -867,8 +867,12 @@ module Assembler =
 
                     match index with
                         | Some index ->
-                            let! index = assembleExprS index
-                            return sprintf "%s[%s]" name.Name index
+                            let! s = State.get
+                            if Set.contains name.Name nonIndexedGSInputs && s.stages.self = ShaderStage.Geometry then
+                                return name.Name
+                            else
+                                let! index = assembleExprS index
+                                return sprintf "%s[%s]" name.Name index
                         | None ->
                             return name.Name
 
