@@ -1310,6 +1310,25 @@ let ``Reflected Function``() =
 
     GLSL.shouldCompile [Effect.ofFunction vs; Effect.ofFunction fs]
 
+[<Test>]
+let ``Non-static sampler``() =
+    Setup.Run()
+
+    let textureDiffuse =
+        sampler2d {
+            texture uniform?DiffuseTexture
+            filter Filter.MinMagMipLinear
+            addressU WrapMode.Wrap
+            addressV WrapMode.Wrap
+        }
+
+    let fs (v : Vertex) =
+        fragment {
+            return textureDiffuse.Sample(V2d.Zero)
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs]
+
 //[<EntryPoint>]
 //let main args =
 //    ``New Intrinsics``()
