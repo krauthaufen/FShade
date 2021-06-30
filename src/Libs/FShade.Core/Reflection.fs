@@ -117,6 +117,35 @@ module BasicQuotationPatterns =
     let (|Uniform|_|) (e : Expr) =
         match e with
 
+            | ValueWithName(sam,t,name) ->
+                match sam with
+                | :? ISampler as sam ->
+                    let tex = sam.Texture
+                    Some { 
+                        uniformName = name
+                        uniformType = sam.GetType()
+                        uniformValue = Sampler(tex.Semantic, sam.State) 
+                    } 
+                | _ ->
+                    match t with
+                    | ArrayOf(SamplerType _) ->
+                        let arr = sam |> unbox<Array>
+                        let samplers = 
+                            List.init arr.Length (fun i -> 
+                                let sam1 = arr.GetValue i |> unbox<ISampler>
+                                let tex = sam1.Texture
+                                tex.Semantic, sam1.State
+                            )
+
+                        let t = Peano.getArrayType arr.Length t
+                        Some {
+                            uniformName = name
+                            uniformType = t
+                            uniformValue = SamplerArray(List.toArray samplers)
+                        } 
+                    | _ ->
+                        None
+
             | PropertyGet(None, pi, []) ->
                 match pi.Type with
                 | SamplerType(_) ->
