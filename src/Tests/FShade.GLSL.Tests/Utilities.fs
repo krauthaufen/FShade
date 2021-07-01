@@ -65,6 +65,42 @@ module GLSL =
     let glslang (stage : ShaderStage) (code : string) =
         glslangWithDefines stage [sprintf "%A" stage] code     
 
+    let compileRaytracing (effect : RaytracingEffect) =
+        let module_ = effect |> RaytracingEffect.toModule
+        let glsl = module_ |> ModuleCompiler.compileGLSLRaytracing
+
+        let compile (name : Option<string>) (shader : Shader) =
+            let def =
+                match name with
+                | Some n -> sprintf "%A_%s" shader.shaderStage n
+                | _ -> sprintf "%A" shader.shaderStage
+
+            shader.shaderStage,
+            glslangWithTarget GLSLang.Target.SPIRV_1_4 shader.shaderStage [def] glsl.code
+
+        let compileOpt (name : Option<string>) (shader : Option<Shader>) =
+            shader |> Option.map (compile name) |> Option.toList
+
+        let results =
+            [
+                compile None effect.RayGenerationShader
+
+                for (KeyValue(name, shader)) in effect.MissShaders do
+                    compile (name |> string |> Some) shader
+
+                for (KeyValue(name, shader)) in effect.CallableShaders do
+                    compile (name |> string |> Some) shader
+
+                for (KeyValue(groupName, hitgroup)) in effect.HitGroups do
+                    for (KeyValue(rayName, entry)) in hitgroup.PerRayType do
+                        let name = Some <| sprintf "%A_%A" groupName rayName
+                        yield! entry.AnyHit |> compileOpt name
+                        yield! entry.ClosestHit |> compileOpt name
+                        yield! entry.Intersection |> compileOpt name
+            ]
+
+        glsl, results
+
     let compile (e : list<Effect>) =
         let e = Effect.compose e
         Console.WriteLine("COMPILE {0}", e.Id)
@@ -92,25 +128,29 @@ module GLSL =
             stage, res
         )
 
-    let shouldCompile (e : list<Effect>) =
-        let glsl, res = compile e
-
+    let private printResults (res : List<ShaderStage * CompilerResult>) (glsl : GLSLShader) =
         Console.WriteLine("====================== CODE ======================")
         Console.WriteLine(glsl.code)
         Console.WriteLine("====================== CODE ======================")
-        
+
         Console.WriteLine("======================= IO =======================")
         GLSLProgramInterface.print glsl.iface
         Console.WriteLine("======================= IO =======================")
 
-        
         for (stage, r) in res do
             Console.WriteLine("{0}: {1}", stage, sprintf "%A" r)
             match r with
                 | Success -> ()
                 | Warning w -> ()
                 | Error e -> failwithf "ERROR: %A" e
-                
+
+    let shouldCompile (e : list<Effect>) =
+        let glsl, res = compile e
+        printResults res glsl
+
+    let shouldCompileRaytracing (e : RaytracingEffect) =
+        let glsl, res = compileRaytracing e
+        printResults res glsl
 
     let shouldContainRegex (shader : GLSLShader) (regexList : list<string>) = 
 

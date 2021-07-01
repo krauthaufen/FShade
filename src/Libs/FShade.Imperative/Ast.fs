@@ -813,7 +813,6 @@ type CEntryDef =
         cInputs         : list<CEntryParameter>
         cOutputs        : list<CEntryParameter>
         cArguments      : list<CEntryParameter>
-        cRaytracingData : list<CEntryParameter>
         cReturnType     : CType
         cBody           : CStatement
         cDecorations    : list<EntryDecoration>
@@ -859,34 +858,45 @@ module CUniform =
     let internal visit (used : Used) (u : CUniform) =
         used.AddType u.cUniformType
 
+type CRaytracingData =
+    {
+        cRaytracingDataType : CType
+        cRaytracingDataName : string
+        cRaytracingDataKind : RaytracingDataKind
+    }
+
 type CValueDef =
     | CConstant of ctype : CType * name : string * init : CRExpr
     | CFunctionDef of signature : CFunctionSignature * body : CStatement
     | CEntryDef of CEntryDef
     | CConditionalDef of string * list<CValueDef>
     | CUniformDef of list<CUniform>
+    | CRaytracingDataDef of list<CRaytracingData>
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module CValueDef =
     let rec internal visit (used : Used) (d : CValueDef) =
         match d with
-            | CConstant(t, _, e) ->
-                used.AddType t
-                CRExpr.visit used e
-            | CFunctionDef(s, b) ->
-                used.AddType s.returnType
-                for p in s.parameters do
-                    used.AddType p.ctype
-                CStatement.visit used b
+        | CConstant(t, _, e) ->
+            used.AddType t
+            CRExpr.visit used e
+        | CFunctionDef(s, b) ->
+            used.AddType s.returnType
+            for p in s.parameters do
+                used.AddType p.ctype
+            CStatement.visit used b
 
-            | CEntryDef e ->
-                CEntryDef.visit used e
+        | CEntryDef e ->
+            CEntryDef.visit used e
 
-            | CConditionalDef(_,d) ->
-                for d in d do visit used d
+        | CConditionalDef(_,d) ->
+            for d in d do visit used d
 
-            | CUniformDef d ->
-                for d in d do CUniform.visit used d
+        | CUniformDef d ->
+            for d in d do CUniform.visit used d
+
+        | CRaytracingDataDef d ->
+            for d in d do used.AddType d.cRaytracingDataType
 
 type CTypeDef =
     | CStructDef of name : string * fields : list<CType * string>

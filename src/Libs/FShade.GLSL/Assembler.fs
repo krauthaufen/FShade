@@ -1457,7 +1457,7 @@ module Assembler =
                                 }
                              
 
-                                return sprintf "%suniform %s\r\n{\r\n%s\r\n};\r\n" prefix bufferName.Name (String.indent fieldStr)
+                                return sprintf "%suniform %s\r\n{\r\n%s\r\n};" prefix bufferName.Name (String.indent fieldStr)
 
                             | _ ->
                                 let! definitions = 
@@ -1520,6 +1520,36 @@ module Assembler =
             return String.concat "\r\n\r\n" definitions
 
                 
+        }
+
+    let assembleRaytracingDataS (data : List<CRaytracingData>) =
+        state {
+            let! config = AssemblerState.config
+
+            let definitions =
+                data |> List.map (fun r ->
+                    let prefix =
+                        match r.cRaytracingDataKind with
+                        | RaytracingDataKind.RayPayload slot ->
+                            sprintf "layout(location = %d) rayPayloadEXT" slot
+
+                        | RaytracingDataKind.RayPayloadIn ->
+                            "rayPayloadInEXT"
+
+                        | RaytracingDataKind.HitAttribute ->
+                            "hitAttributeEXT"
+
+                        | RaytracingDataKind.CallableData slot ->
+                            sprintf "layout(location = %d) callableDataEXT" slot
+
+                        | RaytracingDataKind.CallableDataIn ->
+                            "callableDataInEXT"
+
+                    let decl = assembleDeclaration config.reverseMatrixLogic r.cRaytracingDataType (checkName r.cRaytracingDataName)
+                    sprintf "%s %s;" prefix decl
+                )
+
+            return String.concat "\r\n\r\n" definitions
         }
 
     let assembleDepthWriteMode (mode : DepthWriteMode) =
@@ -1646,21 +1676,6 @@ module Assembler =
 
                                 | ParameterDecoration.Shared -> 
                                     return Some "shared"
-
-                                | ParameterDecoration.RayPayload slot ->
-                                    return Some (sprintf "layout(location = %d) rayPayloadEXT" slot)
-
-                                | ParameterDecoration.RayPayloadIn ->
-                                    return Some "rayPayloadInEXT"
-
-                                | ParameterDecoration.HitAttribute ->
-                                    return Some "hitAttributeEXT"
-
-                                | ParameterDecoration.CallableData slot ->
-                                    return Some (sprintf "layout(location = %d) callableDataEXT" slot)
-
-                                | ParameterDecoration.CallableDataIn ->
-                                    return Some "callableDataInEXT"
 
                                 | ParameterDecoration.Memory _ | ParameterDecoration.Slot _ ->
                                     return None
@@ -1853,7 +1868,6 @@ module Assembler =
             let! inputs = e.cInputs |> List.chooseS (assembleEntryParameterS ParameterKind.Input)
             let! outputs = e.cOutputs |> List.chooseS (assembleEntryParameterS ParameterKind.Output)
             let! args = e.cArguments |> List.chooseS (assembleEntryParameterS ParameterKind.Argument)
-            let! rtdata = e.cRaytracingData |> List.chooseS (assembleEntryParameterS ParameterKind.RaytracingData)
             let! body = assembleStatementS false e.cBody
             let! config = AssemblerState.config
             
@@ -1863,7 +1877,6 @@ module Assembler =
                     yield! inputs
                     yield! outputs
                     yield! args
-                    yield! rtdata
                     yield sprintf "%s %s()\r\n{\r\n%s\r\n}" (assembleType config.reverseMatrixLogic e.cReturnType).Name entryName.Name (String.indent body)
                 ]
         }
@@ -1872,35 +1885,38 @@ module Assembler =
         state {
             let! config = AssemblerState.config
             match d with
-                | CConditionalDef(d, inner) ->
-                    let! inner = inner |> List.mapS assembleValueDefS
-                    let inner = inner |> String.concat "\r\n"
-                    return sprintf "\r\n#ifdef %s\r\n%s\r\n\r\n#endif\r\n" d inner
+            | CConditionalDef(d, inner) ->
+                let! inner = inner |> List.mapS assembleValueDefS
+                let inner = inner |> List.filter (String.IsNullOrEmpty >> not) |> String.concat "\r\n\r\n"
+                return sprintf "\r\n#ifdef %s\r\n\r\n%s\r\n\r\n#endif\r\n" d inner
 
-                | CEntryDef e -> 
-                    return! assembleEntryS e
+            | CEntryDef e -> 
+                return! assembleEntryS e
 
-                | CFunctionDef(signature, body) ->
-                    do! Interface.newFunction signature
-                    let signature = assembleFunctionSignature config.reverseMatrixLogic signature
-                    let! body = assembleStatementS false body
-                    do! Interface.endFunction
-                    return sprintf "%s\r\n{\r\n%s\r\n}\r\n" signature (String.indent body)
+            | CFunctionDef(signature, body) ->
+                do! Interface.newFunction signature
+                let signature = assembleFunctionSignature config.reverseMatrixLogic signature
+                let! body = assembleStatementS false body
+                do! Interface.endFunction
+                return sprintf "%s\r\n{\r\n%s\r\n}\r\n" signature (String.indent body)
 
-                | CConstant(t, n, init) ->
-                    let! init = assembleRExprS init
-                    let n = glslName n
-                    match t with
-                        | CArray(t,l) -> return sprintf "const %s %s[%d] = %s;" (assembleType config.reverseMatrixLogic t).Name n.Name l init
-                        | CPointer(_,t) -> return sprintf "const %s %s[] = %s;" (assembleType config.reverseMatrixLogic t).Name n.Name init
-                        | _ -> return sprintf "const %s %s = %s;" (assembleType config.reverseMatrixLogic t).Name n.Name init
+            | CConstant(t, n, init) ->
+                let! init = assembleRExprS init
+                let n = glslName n
+                match t with
+                    | CArray(t,l) -> return sprintf "const %s %s[%d] = %s;" (assembleType config.reverseMatrixLogic t).Name n.Name l init
+                    | CPointer(_,t) -> return sprintf "const %s %s[] = %s;" (assembleType config.reverseMatrixLogic t).Name n.Name init
+                    | _ -> return sprintf "const %s %s = %s;" (assembleType config.reverseMatrixLogic t).Name n.Name init
 
-                | CUniformDef us ->
-                    let! config = AssemblerState.config
-                    if config.createPerStageUniforms then
-                        return! assembleUniformsS us
-                    else
-                        return ""
+            | CUniformDef us ->
+                let! config = AssemblerState.config
+                if config.createPerStageUniforms then
+                    return! assembleUniformsS us
+                else
+                    return ""
+
+            | CRaytracingDataDef r ->
+                return! assembleRaytracingDataS r
         }
 
     let assembleTypeDef (rev : bool) (d : CTypeDef) =

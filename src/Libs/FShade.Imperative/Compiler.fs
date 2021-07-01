@@ -993,6 +993,18 @@ module Compiler =
             }
         }
 
+    /// converts an RaytracingData to a CRaytracingData
+    /// NOTE that names are not treated here
+    let toCRaytracingDataS (v : RaytracingData) =
+        state {
+            let! ct = toCTypeS v.rtdataType
+            return {
+                cRaytracingDataType = ct
+                cRaytracingDataName = v.rtdataName
+                cRaytracingDataKind = v.rtdataKind
+            }
+        }
+
     let rec asExternalS (e : Expr) =
         state {
             let mutable variables = HashMap.empty
@@ -1780,6 +1792,12 @@ module Compiler =
             return CUniformDef us
         }
 
+    let compileRaytracingDataS (r : list<RaytracingData>) =
+        state {
+            let! rs = r |> List.mapS toCRaytracingDataS
+            return CRaytracingDataDef rs
+        }
+
     let compileEntryS (f : EntryPoint) =
         state {
             // ensure that all inputs, outputs, arguments have their correct names
@@ -1787,12 +1805,11 @@ module Compiler =
             for o in f.outputs do do! CompilerState.reserveName o.paramName
             for a in f.arguments do do! CompilerState.reserveName a.paramName
             for u in f.uniforms do do! CompilerState.reserveName u.uniformName
+            for r in f.raytracingData do do! CompilerState.reserveName r.rtdataName
             
             let! inputs     = f.inputs |> List.mapS toCEntryParameterS
             let! outputs    = f.outputs |> List.mapS toCEntryParameterS
             let! args       = f.arguments |> List.mapS toCEntryParameterS
-            let! rtdata     = f.raytracingData |> List.mapS toCEntryParameterS
-
 
             // compile the body
             let! body = toCStatementS true f.body
@@ -1804,7 +1821,6 @@ module Compiler =
                     cInputs         = inputs
                     cOutputs        = outputs
                     cArguments      = args
-                    cRaytracingData = rtdata
                     cReturnType     = ret
                     cBody           = body
                     cDecorations    = f.decorations

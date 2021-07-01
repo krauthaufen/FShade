@@ -27,11 +27,11 @@ module ModuleCompiler =
     module ValueCompiler =
         open SimpleOrder
 
-        type GraphNode(definition : CValueDef, conditional : option<string>, dependencies : HashSet<GraphNode>) =
+        type GraphNode(definitions : CValueDef list, conditional : option<string>, dependencies : HashSet<GraphNode>) =
             let mutable sortKey : Option<SortKey> = None
             let mutable dependencies = dependencies
             member x.Conditional = conditional
-            member x.Definition = definition
+            member x.Definitions = definitions
             member x.Dependencies 
                 with get() = dependencies
                 and set d = dependencies <- d
@@ -73,7 +73,7 @@ module ModuleCompiler =
 
         [<AutoOpen>]
         module private Helpers = 
-            let rec build (globals : GraphNode) (key : 'a) (conditional : option<string>) (compile : 'a -> State<CompilerState, CValueDef>) : State<GraphState, GraphNode> =
+            let rec build (globals : GraphNode) (key : 'a) (conditional : option<string>) (compile : 'a -> State<CompilerState, CValueDef list>) : State<GraphState, GraphNode> =
                 state {
                     let! (state : GraphState) = State.get
                     let cache : Dictionary<obj, GraphNode> = state.cache
@@ -125,23 +125,35 @@ module ModuleCompiler =
                 }
 
             and ofFunction (globals : GraphNode) (f : FunctionDefinition) =
-                build globals f None compileFunctionS
+                build globals f None (compileFunctionS >> State.map List.singleton)
 
             and ofConstant (globals : GraphNode) (f : ConstantDefinition) =
-                build globals f None compileConstantS
+                build globals f None (compileConstantS >> State.map List.singleton)
 
 
             let ofEntry (e : EntryPoint) =
                 state {
-                    let! (s : GraphState) = State.get
-                    let! globals = build Unchecked.defaultof<_> (e,e.uniforms) None (snd >> compileUniformsS)
+                    let key = (e, e.uniforms, e.raytracingData)
+                    let! globals =
+                        build Unchecked.defaultof<_> key None (fun (_, us, rs) ->
+                            state {
+                                let! uniforms = us |> compileUniformsS
+                                let! rtdata = rs |> compileRaytracingDataS
+                                return [uniforms; rtdata]
+                            }
+                        )
 
-                    let globalNames = e.uniforms |> List.map (fun u -> u.uniformName) |> Set.ofList
+                    let globalNames =
+                        [
+                            yield! e.uniforms |> List.map (fun u -> u.uniformName)
+                            yield! e.raytracingData |> List.map (fun r -> r.rtdataName)
+                        ]
+                        |> Set.ofList
 
                     do! State.modify (fun s -> { s with moduleState = { s.moduleState with ModuleState.globalParameters = globalNames } })
-                    let! root = build globals e e.conditional compileEntryS
+                    let! root = build globals e e.conditional (compileEntryS >> State.map List.singleton)
 
-                    let root = GraphNode(root.Definition, e.conditional, HashSet.add globals root.Dependencies)
+                    let root = GraphNode(root.Definitions, e.conditional, HashSet.add globals root.Dependencies)
 
                     do! State.modify (fun s -> { s with moduleState = { s.moduleState with ModuleState.globalParameters = Set.empty } })
 
@@ -251,7 +263,7 @@ module ModuleCompiler =
                     [
                         yield! 
                             toposort noGroup
-                            |> List.map (fun d -> d.Definition)
+                            |> List.collect (fun d -> d.Definitions)
 
                         for g in groups do
                             let g = toposort g
@@ -259,9 +271,9 @@ module ModuleCompiler =
                                 g |> Seq.choose (fun g -> g.Conditional) |> HashSet.ofSeq
                             if conditionals.Count = 1 then
                                 let c = conditionals |> Seq.head
-                                yield CConditionalDef(c, g |> List.map (fun d -> d.Definition))
+                                yield CConditionalDef(c, g |> List.collect (fun d -> d.Definitions))
                             else
-                                yield! g |> List.map (fun d -> d.Definition)
+                                yield! g |> List.collect (fun d -> d.Definitions)
                     ]
                 all
 

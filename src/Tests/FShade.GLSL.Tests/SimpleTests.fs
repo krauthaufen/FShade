@@ -1329,6 +1329,59 @@ let ``Non-static sampler``() =
 
     GLSL.shouldCompile [Effect.ofFunction fs]
 
+type UniformScope with
+    member x.OutputBuffer : Image2d<Formats.rgba32f> = uniform?OutputBuffer
+    member x.Flags : RayFlags = uniform?Flags
+
+let scene =
+    scene { accelerationStructure uniform?RaytracingScene }
+
+[<ReflectedDefinition>]
+let trace (input : RayHitInput) =
+    scene.TraceRay<V3d>(input.ray.origin, input.ray.direction, flags = uniform.Flags)
+
+[<ReflectedDefinition>]
+let whatever() =
+    V4d(uniform.SomeUniform, 1.0)
+
+[<Test>]
+let ``Raytracing with Reflected Functions``() =
+    Setup.Run()
+
+    let raygenShader (input : RayGenerationInput) =
+        raygen {
+            uniform.OutputBuffer.[input.work.id.XY] <- whatever()
+        }
+
+    let chitShader (input : RayHitInput) =
+        closesthit {
+            return trace input
+        }
+
+    let chitShaderShadow (input : RayHitInput) =
+        closesthit {
+            let shadowed = scene.TraceRay<bool>(V3d.Zero, V3d.XAxis)
+            if shadowed then
+                return V3d.Zero
+            else
+                return trace input
+        }
+
+    let effect =
+         let hitgroupMain =
+             hitgroup { closesthit chitShader }
+
+         let hitgroupShadow =
+             hitgroup { closesthit chitShaderShadow }
+
+         raytracing {
+             raygen raygenShader
+             hitgroup ("Main", hitgroupMain)
+             hitgroup ("Shadow", hitgroupShadow)
+         }
+
+    GLSL.shouldCompileRaytracing effect
+
 //[<EntryPoint>]
 //let main args =
 //    ``New Intrinsics``()

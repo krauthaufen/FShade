@@ -1582,6 +1582,9 @@ module Assembler =
                                     yield OpDecorate(id, Decoration.DescriptorSet, [| int set |])
                                     yield OpDecorate(id, Decoration.Binding, [| int binding |])
                                     do! SpirV.setUniformId f.cUniformName id []
+
+                | CValueDef.CRaytracingDataDef _ ->
+                    failwithf "Not implemented"
         
                 | CValueDef.CConditionalDef(cond, inner) ->
                     for v in inner do

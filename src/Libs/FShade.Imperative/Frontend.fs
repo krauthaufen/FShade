@@ -50,11 +50,6 @@ type ParameterDecoration =
     | StorageBuffer of read : bool * write : bool
     | Shared
     | DepthWrite of DepthWriteMode
-    | RayPayload of location: int
-    | RayPayloadIn
-    | CallableData of location : int
-    | CallableDataIn
-    | HitAttribute
 
 [<RequireQualifiedAccess>]
 type UniformDecoration =
@@ -70,6 +65,21 @@ type Uniform =
         uniformDecorations  : list<UniformDecoration>
         uniformBuffer       : Option<string>
         uniformTextureInfo  : list<string * obj>
+    }
+
+[<RequireQualifiedAccess>]
+type RaytracingDataKind =
+    | RayPayload of location: int
+    | RayPayloadIn
+    | CallableData of location : int
+    | CallableDataIn
+    | HitAttribute
+
+type RaytracingData =
+    {
+        rtdataType : Type
+        rtdataName : string
+        rtdataKind : RaytracingDataKind
     }
 
 type ParameterKind =
@@ -111,7 +121,7 @@ type EntryPoint =
         outputs        : list<EntryParameter>
         uniforms       : list<Uniform>
         arguments      : list<EntryParameter>
-        raytracingData : list<EntryParameter>
+        raytracingData : list<RaytracingData>
         body           : Expr
         decorations    : list<EntryDecoration>
     }

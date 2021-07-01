@@ -405,6 +405,13 @@ module Preprocessor =
             | SemanticInput(semantic, _) when semantic = Intrinsics.HitAttribute -> Some e.Type
             | _ -> None
 
+    // Used to determine which preprocess function to call
+    [<RequireQualifiedAccess>]
+    type ShaderExpressionType =
+        | Normal
+        | Compute
+        | Raytracing of ShaderStage
+
     type State =
         {
             depthWriteMode  : DepthWriteMode
@@ -427,6 +434,7 @@ module Preprocessor =
             missShaders     : Set<string>
             callableShaders : Set<string>
             localSize       : V3i
+            expressionType  : ShaderExpressionType
         }
         
     let shaderUtilityFunctions = System.Collections.Concurrent.ConcurrentDictionary<V3i * MethodBase, Option<Expr * State>>()
@@ -459,7 +467,32 @@ module Preprocessor =
                 missShaders     = Set.empty
                 callableShaders = Set.empty
                 localSize       = V3i.Zero
+                expressionType  = ShaderExpressionType.Normal
             }
+
+        let createInner (parent : State) =
+            { empty with
+                payloads        = parent.payloads
+                payloadIn       = parent.payloadIn
+                callableData    = parent.callableData
+                callableDataIn  = parent.callableDataIn
+                hitAttribute    = parent.hitAttribute
+                expressionType  = parent.expressionType
+                uniforms        = parent.uniforms }
+
+        let mergeInner (inner : State) =
+            State.modify (fun s ->
+                { s with
+                    payloads        = inner.payloads
+                    payloadIn       = inner.payloadIn
+                    callableData    = inner.callableData
+                    callableDataIn  = inner.callableDataIn
+                    hitAttribute    = inner.hitAttribute
+                    uniforms        = inner.uniforms
+                    rayTypes        = Set.union s.rayTypes inner.rayTypes
+                    missShaders     = Set.union s.missShaders inner.missShaders
+                    callableShaders = Set.union s.callableShaders inner.callableShaders }
+            )
 
         let ofInputTypes (types : List<Type>) =
 
@@ -542,6 +575,11 @@ module Preprocessor =
         let setVariableValue (v : Var) (value : Expr) =
             State.modify (fun s ->
                 { s with variableValues = Map.add v value s.variableValues }
+            )
+
+        let setExpressionType (t : ShaderExpressionType) =
+            State.modify (fun s ->
+                { s with expressionType = t }
             )
 
         let tryGetVertexIndex (v : Var) =
@@ -652,8 +690,6 @@ module Preprocessor =
 
     let rec preprocessRaytracingS (stage : ShaderStage) (e : Expr) : Preprocess<Expr> =
         state {
-            let! inputTypes = State.inputTypes
-
             match e with
             | TraceRay _ when not (ShaderStage.supportsTraceRay stage) ->
                 return failwithf "[FShade] Cannot invoke TraceRay in %A shaders" stage
@@ -1216,17 +1252,17 @@ module Preprocessor =
                             return Expr.CallFunction(utility, args)
 
                         | _ ->
-                            
-                            let mutable innerState = State.empty
+                            let! state = State.get
+
+                            let mutable innerState = State.createInner state
                             let processedF =
                                 utility |> UtilityFunction.map (fun b -> 
-                                    let run : Preprocess<Expr> = preprocessS b
+                                    let run : Preprocess<Expr> = preprocessByTypeS state.expressionType b
                                     run.Run(&innerState)
                                 )
-                                
 
                             let processedF = { processedF with functionTag = innerState }
-                            do! State.modify (fun s -> { s with uniforms = Map.union s.uniforms innerState.uniforms })
+                            do! State.mergeInner innerState
 
                             return Expr.CallFunction(processedF, args)
 
@@ -1236,16 +1272,16 @@ module Preprocessor =
 
                     match UtilityFunction.tryCreate mi with
                         | Some utility ->
-
-                            let mutable innerState = State.empty
+                            let! state = State.get
+                            let mutable innerState = State.createInner state
                             let processedF =
                                 utility |> UtilityFunction.map (fun b -> 
-                                    let run : Preprocess<Expr> = preprocessS b
+                                    let run : Preprocess<Expr> = preprocessByTypeS state.expressionType b
                                     run.Run(&innerState)
                                 )
 
                             let processedF = { processedF with functionTag = innerState }
-                            do! State.modify (fun s -> { s with uniforms = Map.union s.uniforms innerState.uniforms })
+                            do! State.mergeInner innerState
 
                             match t with    
                                 | Some t -> return Expr.CallFunction(processedF, t :: args)
@@ -1296,17 +1332,28 @@ module Preprocessor =
                     return Expr.Lambda(v, b)
         }
 
-    and preprocessS (e : Expr) =
+    and preprocessByTypeS (typ : ShaderExpressionType) (e : Expr) =
         state {
+            do! State.setExpressionType typ
+
             let! e0 =
-                match e with
-                | ComputeBuilder _ -> preprocessComputeS e
-                | RaytracingBuilder b -> preprocessRaytracingS b.ShaderStage e
-                | _ -> State.value e
+                match typ with
+                | ShaderExpressionType.Normal -> State.value e
+                | ShaderExpressionType.Compute -> preprocessComputeS e
+                | ShaderExpressionType.Raytracing s -> preprocessRaytracingS s e
 
             let! e1 = preprocessNormalS e0
             return Optimizer.hoistImperativeConstructs e1
         }
+
+    and preprocessS (e : Expr) =
+        let typ =
+            match e with
+            | ComputeBuilder _ -> ShaderExpressionType.Compute
+            | RaytracingBuilder b -> ShaderExpressionType.Raytracing b.ShaderStage
+            | _ -> ShaderExpressionType.Normal
+
+        preprocessByTypeS typ e
 
     and getOutputValues (sem : string) (value : Expr) : Preprocess<list<string * Option<Expr> * Expr>> =
         state {
@@ -2686,31 +2733,31 @@ module Shader =
             )
 
 
-        let ofMap decoration =
+        let ofMap kind =
             Map.toList >> List.map (fun (name, (typ, location)) ->
                 {
-                    paramName = name
-                    paramSemantic = name
-                    paramType = typ
-                    paramDecorations = Set.ofList [decoration location]
+                    rtdataName = name
+                    rtdataType = typ
+                    rtdataKind = kind location
                 }
             )
 
-        let ofOption decoration =
+        let ofOption kind =
             Option.toList >> List.map (fun (name, typ) ->
                 {
-                    paramName = name
-                    paramSemantic = name
-                    paramType = typ
-                    paramDecorations = Set.ofList [decoration]
+                    rtdataName = name
+                    rtdataType = typ
+                    rtdataKind = kind
                 }
             )
 
-        let payloads       = s.shaderPayloads |> ofMap ParameterDecoration.RayPayload
-        let payloadIn      = s.shaderPayloadIn |> ofOption ParameterDecoration.RayPayloadIn
-        let callableData   = s.shaderCallableData |> ofMap ParameterDecoration.CallableData
-        let callableDataIn = s.shaderCallableDataIn |> ofOption ParameterDecoration.CallableDataIn
-        let hitAttribute   = s.shaderHitAttribute |> ofOption ParameterDecoration.HitAttribute
+        let raytracingData =
+            let payloads       = s.shaderPayloads       |> ofMap    RaytracingDataKind.RayPayload
+            let payloadIn      = s.shaderPayloadIn      |> ofOption RaytracingDataKind.RayPayloadIn
+            let callableData   = s.shaderCallableData   |> ofMap    RaytracingDataKind.CallableData
+            let callableDataIn = s.shaderCallableDataIn |> ofOption RaytracingDataKind.CallableDataIn
+            let hitAttribute   = s.shaderHitAttribute   |> ofOption RaytracingDataKind.HitAttribute
+            payloads @ payloadIn @ callableData @ callableDataIn @ hitAttribute
 
         let depthWriteMode =
             if s.shaderStage = ShaderStage.Fragment && s.shaderDepthWriteMode <> DepthWriteMode.None then
@@ -2743,7 +2790,7 @@ module Shader =
                         | UniformValue.SamplerArray arr -> Array.toList arr |> List.map (fun (n,s) -> n, s :> obj)
                         | _ -> []
 
-                { 
+                {
                     uniformName = u.uniformName
                     uniformType = u.uniformType
                     uniformBuffer = uniformBuffer
@@ -2774,8 +2821,8 @@ module Shader =
             inputs         = inputs
             outputs        = outputs
             uniforms       = uniforms
+            raytracingData = raytracingData
             arguments      = []
-            raytracingData = payloads @ payloadIn @ callableData @ callableDataIn @ hitAttribute
             body           = body
             decorations = 
                 [

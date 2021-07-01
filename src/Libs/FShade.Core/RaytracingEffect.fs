@@ -64,6 +64,10 @@ module private RaytracingUtilities =
             | _ ->
                 failwithf "[FShade] Unexpected arguments when substituting executeCallable stub: %A" args
 
+        | CallFunction(f, args) ->
+            let f = f |> UtilityFunction.map (substituteStubs sbt)
+            Expr.CallFunction(f, args |> List.map (substituteStubs sbt))
+
         | ShapeLambda(v, b) -> Expr.Lambda(v, substituteStubs sbt b)
         | ShapeVar(_) -> e
         | ShapeCombination(o, args) ->
