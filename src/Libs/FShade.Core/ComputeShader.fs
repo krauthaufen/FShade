@@ -293,12 +293,7 @@ module ComputeShader =
             body           = s.csBody
             decorations = 
                 [
-                    EntryDecoration.Stages { 
-                        prev = None
-                        self = ShaderStage.Compute
-                        next = None 
-                    }
-
+                    EntryDecoration.Stages ShaderStageDescription.Compute
                     EntryDecoration.LocalSize s.csLocalSize
                 ]
         }

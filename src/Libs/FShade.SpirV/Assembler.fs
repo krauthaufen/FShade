@@ -1469,7 +1469,7 @@ module Assembler =
 
             let stages = e.cDecorations |> List.pick (function (EntryDecoration.Stages s) -> Some s | _ -> None)
             let model =
-                match stages.self with
+                match stages.Stage with
                     | ShaderStage.Vertex -> ExecutionModel.Vertex
                     | ShaderStage.TessControl -> ExecutionModel.TessellationControl
                     | ShaderStage.TessEval -> ExecutionModel.TessellationEvaluation

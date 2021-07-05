@@ -223,10 +223,8 @@ module private Tools =
 type GLSLShaderInterface =
     {
         program                      : GLSLProgramInterface
-                                     
         shaderStage                  : ShaderStage
         shaderEntry                  : string
-                                     
         shaderInputs                 : list<GLSLParameter>
         shaderOutputs                : list<GLSLParameter>
         shaderSamplers               : HashSet<string>
@@ -235,9 +233,7 @@ type GLSLShaderInterface =
         shaderUniformBuffers         : HashSet<string>
         shaderAccelerationStructures : HashSet<string>
         shaderBuiltInFunctions       : HashSet<GLSLIntrinsic>
-                                     
         shaderDecorations            : list<GLSLShaderDecoration>
-                                     
         shaderBuiltIns               : MapExt<ParameterKind, MapExt<string, GLSLType>>
     }
 
@@ -344,6 +340,124 @@ type GLSLShaderInterface =
         ]
                        
 
+and [<RequireQualifiedAccess>] GLSLProgramShaders =
+    | Compute    of GLSLShaderInterface
+    | Graphics   of GLSLGraphicsShaders
+    | Raytracing of GLSLRaytracingShaders
+
+    member x.Slots =
+        match x with
+        | Compute c -> MapExt.ofList [ ShaderSlot.Compute, c]
+        | Graphics g -> g.Slots
+        | Raytracing r -> r.Slots
+
+    member x.Item(slot : ShaderSlot) =
+        x.Slots.[slot]
+
+    override x.ToString() =
+        match x with
+        | Compute c -> c.ToString()
+        | Graphics g -> g.ToString()
+        | Raytracing r -> r.ToString()
+
+and GLSLGraphicsShaders =
+    {
+        stages : MapExt<ShaderStage, GLSLShaderInterface>
+    }
+
+    member x.firstShader = x.stages.[MapExt.min x.stages]
+    member x.lastShader = x.stages.[MapExt.max x.stages]
+
+    member x.Slots =
+        x.stages |> MapExt.mapMonotonic (fun stage shader ->
+            let slot =
+                match stage with
+                | ShaderStage.Vertex ->      ShaderSlot.Vertex
+                | ShaderStage.Fragment ->    ShaderSlot.Fragment
+                | ShaderStage.Geometry ->    ShaderSlot.Geometry
+                | ShaderStage.TessControl -> ShaderSlot.TessControl
+                | ShaderStage.TessEval ->    ShaderSlot.TessEval
+                | _ -> failwithf "unsupported shader stage: %A" stage
+
+            slot, shader
+        )
+
+    override x.ToString() =
+        many [
+            for (name, typ) in MapExt.toSeq x.firstShader.shaderBuiltInInputs do
+                yield sprintf "in %s : %s " name (GLSLType.toString typ) |> Some
+
+            for (name, typ) in MapExt.toSeq x.lastShader.shaderBuiltInOutputs do
+                yield sprintf "out %s : %s " name (GLSLType.toString typ) |> Some
+
+            for (_, shader) in MapExt.toSeq x.stages do
+                yield Some (shader.ToString())
+        ]
+
+and GLSLRaytracingShaders =
+    {
+        raygenShader    : Option<GLSLShaderInterface>
+        missShaders     : MapExt<Symbol, GLSLShaderInterface>
+        callableShaders : MapExt<Symbol, GLSLShaderInterface>
+        hitgroups       : MapExt<Symbol, MapExt<Symbol, GLSLRayHitGroup>>
+    }
+
+    member x.Slots =
+        let inline ofOption slot =
+            Option.map (fun s -> slot, s) >> Option.toList
+
+        MapExt.ofList [
+            yield! x.raygenShader |> ofOption ShaderSlot.RayGeneration
+
+            for (n, s) in MapExt.toList x.missShaders do
+                yield ShaderSlot.Miss n, s
+
+            for (n, s) in MapExt.toList x.callableShaders do
+                yield ShaderSlot.Callable n, s
+
+            for (n, perRay) in MapExt.toList x.hitgroups do
+                for (r, g) in MapExt.toList perRay do
+                    yield! g.anyHitShader |> ofOption (ShaderSlot.AnyHit (n, r))
+                    yield! g.closestHitShader |> ofOption (ShaderSlot.ClosestHit (n, r))
+                    yield! g.intersectionShader |> ofOption (ShaderSlot.Intersection (n, r))
+        ]
+
+    override x.ToString() =
+        many [
+            yield x.raygenShader |> Option.map string
+
+            for (name, shader) in MapExt.toSeq x.missShaders do
+                yield section (sprintf "Miss \"%A\"" name) [
+                    yield Some (shader.ToString())
+                ]
+
+            for (name, shader) in MapExt.toSeq x.callableShaders do
+                yield section (sprintf "Callable \"%A\"" name) [
+                    yield Some (shader.ToString())
+                ]
+
+            for (name, perRay) in MapExt.toSeq x.hitgroups do
+                yield section (sprintf "Hitgroup \"%A\"" name) [
+                    for (name, group) in MapExt.toSeq perRay do
+                        yield section (sprintf "Ray type \"%A\"" name) [
+                            yield Some (group.ToString())
+                        ]
+                ]
+        ]
+
+and GLSLRayHitGroup =
+    {
+        anyHitShader       : Option<GLSLShaderInterface>
+        closestHitShader   : Option<GLSLShaderInterface>
+        intersectionShader : Option<GLSLShaderInterface>
+    }
+
+    override x.ToString() =
+        many [
+            yield x.anyHitShader |> Option.map string
+            yield x.closestHitShader |> Option.map string
+            yield x.intersectionShader |> Option.map string
+        ]
 
 and GLSLProgramInterface =
     {
@@ -354,30 +468,17 @@ and GLSLProgramInterface =
         storageBuffers          : MapExt<string, GLSLStorageBuffer>
         uniformBuffers          : MapExt<string, GLSLUniformBuffer>
         accelerationStructures  : MapExt<string, GLSLAccelerationStructure>
-        shaders                 : MapExt<ShaderStage, GLSLShaderInterface>
+        shaders                 : GLSLProgramShaders
     }
-
-    [<Obsolete("use shaders.[stage].shaderBuiltIns instead")>]
-    member x.usedBuiltIns = x.shaders |> MapExt.choose (fun _ s -> if MapExt.isEmpty s.shaderBuiltIns then None else Some s.shaderBuiltIns)
-    
-    member x.firstShader = x.shaders.[MapExt.min x.shaders]
-    member x.lastShader = x.shaders.[MapExt.max x.shaders]
 
     override x.ToString() =
         many [
             for i in x.inputs do
                 yield sprintf "in %s : %s // location: %d semantic: %s" i.paramName (GLSLType.toString i.paramType) i.paramLocation i.paramSemantic |> Some
-                
-            for (name, typ) in MapExt.toSeq x.firstShader.shaderBuiltInInputs do
-                yield sprintf "in %s : %s " name (GLSLType.toString typ) |> Some
-              
-            
+
             for i in x.outputs do
                 yield sprintf "out %s : %s // location: %d semantic: %s" i.paramName (GLSLType.toString i.paramType) i.paramLocation i.paramSemantic |> Some
-            
-            for (name, typ) in MapExt.toSeq x.lastShader.shaderBuiltInOutputs do
-                yield sprintf "out %s : %s " name (GLSLType.toString typ) |> Some
-          
+
             for (_,b) in MapExt.toSeq x.uniformBuffers do
                 let name = sprintf "ub %s { // set: %d binding: %d" b.ubName b.ubSet b.ubBinding
                 yield Some name
@@ -387,13 +488,13 @@ and GLSLProgramInterface =
 
             for (_,s) in MapExt.toSeq x.storageBuffers do
                 yield sprintf "ssb %s : %s[] // set: %d binding: %d" s.ssbName (GLSLType.toString s.ssbType) s.ssbSet s.ssbBinding |> Some
-       
+
             for (_,s) in MapExt.toSeq x.samplers do
                 let suffix =
                     if s.samplerCount > 1 then  sprintf "[%d]" s.samplerCount
                     else ""
                 yield sprintf "sam %s : %s%s // set: %d binding: %d" s.samplerName (GLSLType.toString (GLSLType.Sampler s.samplerType)) suffix s.samplerSet s.samplerBinding |> Some
-        
+
             for (_,s) in MapExt.toSeq x.images do
                 yield sprintf "img %s : %s // set: %d binding: %d" s.imageName (GLSLType.toString (GLSLType.Image s.imageType)) s.imageSet s.imageBinding |> Some
 
@@ -401,14 +502,11 @@ and GLSLProgramInterface =
                 yield sprintf "accel %s // set: %d binding: %d" s.accelName s.accelSet s.accelBinding |> Some
 
             yield section "shaders" [
-                for (_, shader) in MapExt.toSeq x.shaders do
-
-                    yield Some (shader.ToString())
+                yield Some (x.shaders.ToString())
             ]
 
         ]
 
-    
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module GLSLShaderInterface =
 
@@ -448,7 +546,142 @@ module GLSLShaderInterface =
             false
 
 
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module GLSLGraphicsShaders =
 
+    let empty =
+        { stages = MapExt.empty }
+
+    let usesDiscard (shaders : GLSLGraphicsShaders) =
+        match MapExt.tryFind ShaderStage.Fragment shaders.stages with
+        | Some shader -> GLSLShaderInterface.usesDiscard shader
+        | None -> false
+
+    let usesPointSize (shaders : GLSLGraphicsShaders) =
+        match MapExt.neighboursAt (shaders.stages.Count-1) shaders.stages with
+        | Some (_,prev), Some(_, frag), _ when frag.shaderStage = ShaderStage.Fragment ->
+            GLSLShaderInterface.writesPointSize prev
+        | _ ->
+            false
+
+    let alter (mapping : GLSLShaderInterface option -> GLSLShaderInterface option)
+              (stage : ShaderStage) (shaders : GLSLGraphicsShaders) =
+        { shaders with stages = shaders.stages |> MapExt.alter stage mapping }
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module GLSLRayHitGroup =
+
+    let empty =
+        {
+            anyHitShader = None
+            closestHitShader = None
+            intersectionShader = None
+        }
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module GLSLRaytracingShaders =
+
+    let empty =
+        {
+            raygenShader    = None
+            missShaders     = MapExt.empty
+            callableShaders = MapExt.empty
+            hitgroups       = MapExt.empty
+        }
+
+    let iter (action : GLSLShaderInterface -> unit) (s : GLSLRaytracingShaders) =
+        s.raygenShader |> Option.iter action
+        s.missShaders |> MapExt.iter (fun _ x -> action x)
+        s.callableShaders |> MapExt.iter (fun _ x -> action x)
+
+        for (_, perRay) in MapExt.toSeq s.hitgroups do
+            for (_, group) in MapExt.toSeq perRay do
+                group.anyHitShader |> Option.iter action
+                group.closestHitShader |> Option.iter action
+                group.intersectionShader |> Option.iter action
+
+    let alter (mapping : GLSLShaderInterface option -> GLSLShaderInterface option)
+              (stage : RaytracingStageDescription) (s : GLSLRaytracingShaders) =
+
+        let alterHitGroup (mapping : GLSLRayHitGroup -> GLSLRayHitGroup)
+                          (name : Symbol) (rayType : Symbol)
+                          (groups : MapExt<Symbol, MapExt<Symbol, GLSLRayHitGroup>>) =
+            groups |> MapExt.alter name (
+                Option.defaultValue MapExt.empty >> MapExt.alter rayType (
+                    Option.defaultValue GLSLRayHitGroup.empty >> mapping >> Some
+                ) >> Some
+            )
+
+        match stage with
+        | RaytracingStageDescription.RayGeneration ->
+            { s with raygenShader = s.raygenShader |> mapping }
+
+        | RaytracingStageDescription.Miss name ->
+            { s with missShaders = s.missShaders |> MapExt.alter name mapping }
+
+        | RaytracingStageDescription.Callable name ->
+            { s with callableShaders = s.callableShaders |> MapExt.alter name mapping }
+
+        | RaytracingStageDescription.AnyHit (name, rayType) ->
+            let f g = { g with anyHitShader = g.anyHitShader |> mapping }
+            { s with hitgroups = s.hitgroups |> alterHitGroup f name rayType }
+
+        | RaytracingStageDescription.ClosestHit (name, rayType) ->
+            let f g = { g with closestHitShader = g.closestHitShader |> mapping }
+            { s with hitgroups = s.hitgroups |> alterHitGroup f name rayType }
+
+        | RaytracingStageDescription.Intersection (name, rayType) ->
+            let f g = { g with intersectionShader = g.intersectionShader |> mapping }
+            { s with hitgroups = s.hitgroups |> alterHitGroup f name rayType }
+
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module GLSLProgramShaders =
+
+    let getCompute = function
+        | GLSLProgramShaders.Compute c -> Some c
+        | _ -> None
+
+    let getGraphics = function
+        | GLSLProgramShaders.Graphics g -> Some g
+        | _ -> None
+
+    let getRaytracing = function
+        | GLSLProgramShaders.Raytracing r -> Some r
+        | _ -> None
+
+    let iter (action : GLSLShaderInterface -> unit) (shaders : GLSLProgramShaders) =
+        match shaders with
+        | GLSLProgramShaders.Compute c ->
+            action c
+
+        | GLSLProgramShaders.Graphics g ->
+            g.stages |> MapExt.iter (fun _ s -> action s)
+
+        | GLSLProgramShaders.Raytracing r ->
+            r |> GLSLRaytracingShaders.iter action
+
+    let alter (mapping : GLSLShaderInterface option -> GLSLShaderInterface option)
+              (stage : ShaderStageDescription) (shaders : GLSLProgramShaders) =
+
+        match stage with
+        | ShaderStageDescription.Compute ->
+            getCompute shaders
+            |> mapping
+            |> Option.get
+            |> GLSLProgramShaders.Compute
+
+        | ShaderStageDescription.Graphics s ->
+            getGraphics shaders
+            |> Option.defaultValue GLSLGraphicsShaders.empty
+            |> GLSLGraphicsShaders.alter mapping s.self
+            |> GLSLProgramShaders.Graphics
+
+        | ShaderStageDescription.Raytracing s ->
+            getRaytracing shaders
+            |> Option.defaultValue GLSLRaytracingShaders.empty
+            |> GLSLRaytracingShaders.alter mapping s
+            |> GLSLProgramShaders.Raytracing
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module GLSLProgramInterface =
@@ -463,18 +696,15 @@ module GLSLProgramInterface =
     let inline shaders (i : GLSLProgramInterface) = i.shaders
 
     let usesDiscard (iface : GLSLProgramInterface) =
-        match MapExt.tryFind ShaderStage.Fragment iface.shaders with
-            | Some shader -> GLSLShaderInterface.usesDiscard shader
-            | None -> false
-
+        match iface.shaders with
+        | GLSLProgramShaders.Graphics g -> GLSLGraphicsShaders.usesDiscard g
+        | _ -> false
 
     let usesPointSize (iface : GLSLProgramInterface) =
-        match MapExt.neighboursAt (iface.shaders.Count-1) iface.shaders with
-            | Some (_,prev), Some(_, frag), _ when frag.shaderStage = ShaderStage.Fragment ->
-                GLSLShaderInterface.writesPointSize prev
-            | _ ->
-                false
-            
+        match iface.shaders with
+        | GLSLProgramShaders.Graphics g -> GLSLGraphicsShaders.usesPointSize g
+        | _ -> false
+
     let toString(iface : GLSLProgramInterface) =
         iface.ToString()
 
@@ -482,7 +712,7 @@ module GLSLProgramInterface =
         let str = iface.ToString()
         for line in lines str do
             Log.line "%s" line
-            
+
     let print (iface : GLSLProgramInterface) =
         Console.WriteLine("{0}", iface)
 
@@ -673,22 +903,43 @@ module LayoutStd140 =
         let size = next 16 offset
                     
         { ub with ubFields = newFields; ubSize = size }
-    
+
     let apply (iface : GLSLProgramInterface) =
         // (a,(b,c))
         // ((a,b), (c,d))
         let inline layout a = let (t,_,_) = layout a in t
+
+        let applyToInterface (s : GLSLShaderInterface) =
+            { s with
+                shaderInputs = s.shaderInputs |> List.map (fun p -> { p with paramType = layout p.paramType})
+                shaderOutputs = s.shaderOutputs |> List.map (fun p -> { p with paramType = layout p.paramType}) }
+
+        let applyToGraphics (s : GLSLGraphicsShaders) =
+            { s with stages = s.stages |> MapExt.map (fun _ x -> applyToInterface x) }
+
+        let applyToHitgroup (g : GLSLRayHitGroup) =
+            { g with
+                anyHitShader        = g.anyHitShader |> Option.map applyToInterface
+                closestHitShader    = g.closestHitShader |> Option.map applyToInterface
+                intersectionShader  = g.intersectionShader |> Option.map applyToInterface }
+
+        let applyToRaytracing (s : GLSLRaytracingShaders) =
+            { s with
+                raygenShader    = s.raygenShader    |> Option.map applyToInterface
+                missShaders     = s.missShaders     |> MapExt.map (fun _ x -> applyToInterface x)
+                callableShaders = s.callableShaders |> MapExt.map (fun _ x -> applyToInterface x)
+                hitgroups       = s.hitgroups       |> MapExt.map (fun _ pr -> pr |> MapExt.map (fun _ g -> applyToHitgroup g)) }
+
         { iface with
             storageBuffers = iface.storageBuffers |> MapExt.map (fun _ s -> { s with ssbType = layout s.ssbType })
             uniformBuffers = iface.uniformBuffers |> MapExt.map (fun _ -> applyLayout)
             inputs = iface.inputs |> List.map (fun p -> { p with paramType = layout p.paramType})
             outputs = iface.outputs |> List.map (fun p -> { p with paramType = layout p.paramType})
-            shaders = iface.shaders |> MapExt.map (fun _ (s : GLSLShaderInterface) ->
-                { s with
-                    shaderInputs = s.shaderInputs |> List.map (fun p -> { p with paramType = layout p.paramType})
-                    shaderOutputs = s.shaderOutputs |> List.map (fun p -> { p with paramType = layout p.paramType})
-                }
-            )
+            shaders =
+                match iface.shaders with
+                | GLSLProgramShaders.Graphics g   -> GLSLProgramShaders.Graphics   <| applyToGraphics g
+                | GLSLProgramShaders.Compute c    -> GLSLProgramShaders.Compute    <| applyToInterface c
+                | GLSLProgramShaders.Raytracing r -> GLSLProgramShaders.Raytracing <| applyToRaytracing r
         }
 
 

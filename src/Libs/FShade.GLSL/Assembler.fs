@@ -227,7 +227,7 @@ module AssemblerState =
     let ofConfig (c : Config) =
         {
             config = c
-            stages = { prev = None; self = ShaderStage.Vertex; next = None }
+            stages = ShaderStageDescription.Graphics { prev = None; self = ShaderStage.Vertex; next = None }
             currentDescriptorSet = 0
             currentBinding = Map.empty
             currentInputLocation = 0
@@ -242,7 +242,7 @@ module AssemblerState =
                     storageBuffers          = MapExt.empty
                     uniformBuffers          = MapExt.empty
                     accelerationStructures  = MapExt.empty
-                    shaders                 = MapExt.empty
+                    shaders                 = GLSLProgramShaders.Graphics { stages = MapExt.empty }
                 }
                 
             currentFunction = None
@@ -259,23 +259,18 @@ module AssemblerState =
 
 
     let stages = State.get |> State.map (fun s -> s.stages)
-    let stage = State.get |> State.map (fun s -> s.stages.self)
-    let prevStage = State.get |> State.map (fun s -> s.stages.prev)
-    let nextStage = State.get |> State.map (fun s -> s.stages.next)
-    
-
 
     let tryGetParameterName (kind : ParameterKind) (name : string) =
         state {
             let! stages = stages
             match kind with
                 | ParameterKind.Input ->
-                    return Map.tryFind name IntrinsicParameters.builtInInputs.[stages.self]
+                    return Map.tryFind name IntrinsicParameters.builtInInputs.[stages.Stage]
                 | ParameterKind.Output ->
-                    if name = Intrinsics.Position && stages.next = Some ShaderStage.Fragment then
+                    if name = Intrinsics.Position && stages.Next = Some ShaderStage.Fragment then
                         return Some "gl_Position"
                     else
-                        return Map.tryFind name IntrinsicParameters.builtInOutputs.[stages.self]
+                        return Map.tryFind name IntrinsicParameters.builtInOutputs.[stages.Stage]
                 | _ ->
                     return None
         }
@@ -390,7 +385,10 @@ module Interface =
                 | None ->
                     { s with
                         ifaceNew =
-                            { s.ifaceNew with shaders = MapExt.alter s.stages.self (function Some sh -> Some (action s sh) | None -> None) s.ifaceNew.shaders }
+                            { s.ifaceNew with
+                                shaders =
+                                    (s.stages, s.ifaceNew.shaders) ||> GLSLProgramShaders.alter (function Some sh -> Some (action s sh) | None -> None)
+                            }
                     }
 
         )
@@ -423,10 +421,10 @@ module Interface =
         modify (fun s iface ->
             let adjust (o : Option<GLSLShaderInterface>) =
                 match o with
-                    | Some o -> 
+                    | Some o ->
                         Some o
                     | None ->
-                        match s.stages.self with
+                        match s.stages.Stage with
                             | ShaderStage.Fragment ->
                                 Some {
                                     emptyShader with 
@@ -442,16 +440,14 @@ module Interface =
                                         shaderEntry             = entry
                                 }
 
-            { iface with shaders = MapExt.alter s.stages.self adjust iface.shaders }
+            { iface with shaders = (s.stages, iface.shaders) ||> GLSLProgramShaders.alter adjust }
 
         )
 
     let useBuiltIn (kind : ParameterKind) (name : string) (ctype : CType) =
         modify (fun state iface ->
-            let stage = state.stages.self
-
             let shaders = 
-                iface.shaders |> MapExt.alter stage (
+                (state.stages, iface.shaders) ||> GLSLProgramShaders.alter (
                     function 
                     | Some o ->
                         Some { 
@@ -483,14 +479,14 @@ module Interface =
                 }
                 
             let iface = 
-                match s.stages.prev with
+                match s.stages.Previous with
                 | None -> { iface with  inputs = iface.inputs @ [ip] }
                 | Some _ -> iface
 
             { iface with
                 shaders = 
-                    iface.shaders 
-                    |> MapExt.alter s.stages.self (
+                    (s.stages, iface.shaders)
+                    ||> GLSLProgramShaders.alter (
                         function 
                         | Some o -> Some { o with shaderInputs = o.shaderInputs @ [ip] } 
                         | None -> None
@@ -511,14 +507,14 @@ module Interface =
                 }
                 
             let iface = 
-                match s.stages.next with
+                match s.stages.Next with
                 | None -> { iface with outputs = iface.outputs @ [op] }
                 | Some _ -> iface
 
             { iface with
                 shaders = 
-                    iface.shaders 
-                    |> MapExt.alter s.stages.self (
+                    (s.stages, iface.shaders)
+                    ||> GLSLProgramShaders.alter (
                         function 
                         | Some o -> Some { o with shaderOutputs = o.shaderOutputs @ [op] } 
                         | None -> None
@@ -532,8 +528,8 @@ module Interface =
                 { s.ifaceNew with
                     storageBuffers = MapExt.add ssb.ssbName ssb s.ifaceNew.storageBuffers
                     shaders = 
-                        s.ifaceNew.shaders 
-                        |> MapExt.alter s.stages.self (
+                        (s.stages, s.ifaceNew.shaders)
+                        ||> GLSLProgramShaders.alter (
                             function 
                             | Some s -> Some { s with shaderStorageBuffers = HashSet.add ssb.ssbName s.shaderStorageBuffers } 
                             | None -> None
@@ -549,8 +545,8 @@ module Interface =
                 { s.ifaceNew with
                     uniformBuffers = MapExt.add ub.ubName ub s.ifaceNew.uniformBuffers
                     shaders = 
-                        s.ifaceNew.shaders 
-                        |> MapExt.alter s.stages.self (
+                        (s.stages, s.ifaceNew.shaders)
+                        ||> GLSLProgramShaders.alter (
                             function 
                             | Some s -> Some { s with shaderUniformBuffers = HashSet.add ub.ubName s.shaderUniformBuffers } 
                             | None -> None
@@ -568,8 +564,8 @@ module Interface =
                 { s.ifaceNew with
                     samplers = MapExt.add sampler.samplerName sampler s.ifaceNew.samplers
                     shaders = 
-                        s.ifaceNew.shaders 
-                        |> MapExt.alter s.stages.self (
+                        (s.stages, s.ifaceNew.shaders)
+                        ||> GLSLProgramShaders.alter (
                             function 
                             | Some s -> Some { s with shaderSamplers = HashSet.add sampler.samplerName s.shaderSamplers } 
                             | None -> None
@@ -585,8 +581,8 @@ module Interface =
                 { s.ifaceNew with
                     images = MapExt.add image.imageName image s.ifaceNew.images
                     shaders = 
-                        s.ifaceNew.shaders 
-                        |> MapExt.alter s.stages.self (
+                        (s.stages, s.ifaceNew.shaders)
+                        ||> GLSLProgramShaders.alter (
                             function 
                             | Some s -> Some { s with shaderImages = HashSet.add image.imageName s.shaderImages } 
                             | None -> None
@@ -602,8 +598,8 @@ module Interface =
                 { s.ifaceNew with
                     accelerationStructures = MapExt.add accel.accelName accel s.ifaceNew.accelerationStructures
                     shaders = 
-                        s.ifaceNew.shaders 
-                        |> MapExt.alter s.stages.self (
+                        (s.stages, s.ifaceNew.shaders)
+                        ||> GLSLProgramShaders.alter (
                             function 
                             | Some s -> Some { s with shaderAccelerationStructures = HashSet.add accel.accelName s.shaderAccelerationStructures } 
                             | None -> None
@@ -751,19 +747,17 @@ module Assembler =
                         if name = Intrinsics.FragmentPosition then Intrinsics.Position
                         else name
 
-                    match kind, stages with
-                        | _, { self = ShaderStage.Compute }                 -> return checkName name
-                        
-                        | ParameterKind.Input, { prev = None }              -> return checkName name
+                    match kind, stages.Previous, stages.Next with
+                    | _ when stages.Stage = ShaderStage.Compute  -> return checkName name
+                    | ParameterKind.Input, None, _               -> return checkName name
+                    | ParameterKind.Input, _, _                  -> return ShaderStage.prefix stages.Stage + "_" + name |> glslName
+                    | ParameterKind.Output, _, Some n            -> return ShaderStage.prefix n + "_" + name |> glslName
+                    | ParameterKind.Output, _, None              ->
+                          let name = name + "Out"
+                          return checkName name
 
-                        | ParameterKind.Input, { self = s }                 -> return ShaderStage.prefix s + "_" + name |> glslName
-                        | ParameterKind.Output, { next = Some n }           -> return ShaderStage.prefix n + "_" + name |> glslName
-                        | ParameterKind.Output, { next = None }             -> 
-                            let name = name + "Out"
-                            return checkName name
-
-                        | _                                                 -> 
-                            return checkName name
+                    | _                                          ->
+                        return checkName name
         }
 
     let rec assembleType (rev : bool) (t : CType) =
@@ -868,7 +862,7 @@ module Assembler =
                     match index with
                         | Some index ->
                             let! s = State.get
-                            if Set.contains name.Name nonIndexedGSInputs && s.stages.self = ShaderStage.Geometry then
+                            if Set.contains name.Name nonIndexedGSInputs && s.stages.Stage = ShaderStage.Geometry then
                                 return name.Name
                             else
                                 let! index = assembleExprS index
@@ -1565,9 +1559,9 @@ module Assembler =
             let depthWrite = p.cParamDecorations |> Seq.tryPick (function ParameterDecoration.DepthWrite m -> Some m | _ -> None) |> Option.defaultValue DepthWriteMode.None
             let! stages = AssemblerState.stages
             let! builtIn = AssemblerState.tryGetParameterName kind p.cParamSemantic
-            let prevStage = stages.prev
-            let selfStage = stages.self
-            let nextStage = stages.next
+            let prevStage = stages.Previous
+            let selfStage = stages.Stage
+            let nextStage = stages.Next
             
             let! config = AssemblerState.config
 
@@ -1576,7 +1570,7 @@ module Assembler =
                     do! Interface.useBuiltIn kind name p.cParamType
 
                     let interpolation = 
-                        if kind = ParameterKind.Input && stages.self = ShaderStage.Fragment then
+                        if kind = ParameterKind.Input && stages.Stage = ShaderStage.Fragment then
                             p.cParamDecorations |> Seq.tryPick (function ParameterDecoration.Interpolation i -> Some i | _ -> None)
                         else
                             None
@@ -1772,11 +1766,13 @@ module Assembler =
             let stages =
                 e.cDecorations 
                     |> List.tryPick (function EntryDecoration.Stages t -> Some t | _ -> None) 
-                    |> Option.defaultValue {
-                        prev = None
-                        self = ShaderStage.Vertex
-                        next = None
-                    }
+                    |> Option.defaultValue (
+                        ShaderStageDescription.Graphics {
+                            prev = None
+                            self = ShaderStage.Vertex
+                            next = None
+                        }
+                    )
 
 
             let entryName = checkName e.cEntryName
@@ -1789,11 +1785,11 @@ module Assembler =
                 }
             )
             do! Interface.newShader entryName.Name 
-            do! Interface.addDecorations stages.self e.cDecorations
+            do! Interface.addDecorations stages.Stage e.cDecorations
 
             
             let prefix = 
-                match stages.self with
+                match stages.Stage with
                     | ShaderStage.Geometry -> 
                         let inputTopology = e.cDecorations |> List.tryPick (function EntryDecoration.InputTopology t -> Some t | _ -> None) |> Option.get
                         let outputTopology = e.cDecorations |> List.tryPick (function EntryDecoration.OutputTopology(t) -> Some(t) | _ -> None) |> Option.get
@@ -1994,7 +1990,7 @@ module Assembler =
 
             | :? RaytracingEffect as e ->
                 state <-
-                    { state with
+                    { state with 
                         textureInfos =
                             e.Uniforms |> Map.choose (fun name p ->
                                 match p.uniformValue with
@@ -2033,7 +2029,8 @@ module Assembler =
         let iface = LayoutStd140.apply state.ifaceNew
 
         // unsafely mutate the shader's parent
-        for (_,shader) in MapExt.toSeq iface.shaders do
+        iface.shaders |> GLSLProgramShaders.iter (fun shader ->
             Reflection.setShaderParent shader iface
-        
+        )
+
         { code = code; iface = iface }

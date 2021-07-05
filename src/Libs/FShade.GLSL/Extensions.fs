@@ -96,7 +96,7 @@ module Backends =
     module ModuleCompiler =
 
         let private containsCompute (m : Module) =
-            m.entries |> List.exists (fun e -> e.decorations |> List.exists (function EntryDecoration.Stages { self = ShaderStage.Compute } -> true | _ -> false))
+            m.entries |> List.exists (fun e -> e.decorations |> List.exists (function EntryDecoration.Stages ShaderStageDescription.Compute -> true | _ -> false))
 
         let compileGLSL (cfg : Backend) (module_ : Module) =
             let cfg =

@@ -91,7 +91,7 @@ module EffectInputLayout =
         let mutable textureInfos    = MapExt.empty
 
         for e in m.entries do
-            let prev = e.decorations |> List.tryPick (function EntryDecoration.Stages { prev = prev } -> Some prev | _ -> None)
+            let prev = e.decorations |> List.tryPick (function EntryDecoration.Stages s -> Some s.Previous | _ -> None)
 
             match prev with
                 | Some None ->
@@ -158,7 +158,7 @@ module EffectInputLayout =
         { m with
             entries =
                 m.entries |> List.map (fun e ->
-                    let prev = e.decorations |> List.tryPick (function EntryDecoration.Stages { prev = prev } -> Some prev | _ -> None)
+                    let prev = e.decorations |> List.tryPick (function EntryDecoration.Stages s -> Some s.Previous | _ -> None)
             
                     let e = EntryPoint.setUniforms decorations layout.eUniforms layout.eUniformBuffers e
 

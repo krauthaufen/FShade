@@ -2716,7 +2716,7 @@ module Shader =
 
     /// translates a shader to an EntryPoint which can be used for compiling
     /// the shader to a CAst
-    let toEntryPointWithConditional (conditional : Option<string>) (prev : Option<Shader>) (s : Shader) (next : Option<Shader>) =
+    let toEntryPoint (prev : Option<Shader>) (s : Shader) (next : Option<Shader>) =
         let mutable hasSourceVertexIndex = false
         let inputs = 
             s.shaderInputs |> Map.toList |> List.choose (fun (n,i) -> 
@@ -2731,33 +2731,6 @@ module Shader =
                         paramDecorations = Set.ofList [ParameterDecoration.Interpolation i.paramInterpolation]
                     }
             )
-
-
-        let ofMap kind =
-            Map.toList >> List.map (fun (name, (typ, location)) ->
-                {
-                    rtdataName = name
-                    rtdataType = typ
-                    rtdataKind = kind location
-                }
-            )
-
-        let ofOption kind =
-            Option.toList >> List.map (fun (name, typ) ->
-                {
-                    rtdataName = name
-                    rtdataType = typ
-                    rtdataKind = kind
-                }
-            )
-
-        let raytracingData =
-            let payloads       = s.shaderPayloads       |> ofMap    RaytracingDataKind.RayPayload
-            let payloadIn      = s.shaderPayloadIn      |> ofOption RaytracingDataKind.RayPayloadIn
-            let callableData   = s.shaderCallableData   |> ofMap    RaytracingDataKind.CallableData
-            let callableDataIn = s.shaderCallableDataIn |> ofOption RaytracingDataKind.CallableDataIn
-            let hitAttribute   = s.shaderHitAttribute   |> ofOption RaytracingDataKind.HitAttribute
-            payloads @ payloadIn @ callableData @ callableDataIn @ hitAttribute
 
         let depthWriteMode =
             if s.shaderStage = ShaderStage.Fragment && s.shaderDepthWriteMode <> DepthWriteMode.None then
@@ -2816,17 +2789,17 @@ module Shader =
                 s.shaderBody
   
         {
-            conditional    = conditional
+            conditional    = Some (string s.shaderStage)
             entryName      = "main"
             inputs         = inputs
             outputs        = outputs
             uniforms       = uniforms
-            raytracingData = raytracingData
+            raytracingData = []
             arguments      = []
             body           = body
             decorations = 
                 [
-                    yield EntryDecoration.Stages { 
+                    yield EntryDecoration.Stages <| ShaderStageDescription.Graphics { 
                         prev = prevStage
                         self = s.shaderStage
                         next = nextStage 
@@ -2849,11 +2822,70 @@ module Shader =
                 ]
         }
 
-    /// translates a shader to an EntryPoint which can be used for compiling
-    /// the shader to a CAst
-    let toEntryPoint (prev : Option<Shader>) (s : Shader) (next : Option<Shader>) =
-        let conditional = Some (string s.shaderStage)
-        toEntryPointWithConditional conditional prev s next
+    let toEntryPointRaytracing (stage : RaytracingStageDescription) (s : Shader) =
+        let ofMap kind =
+            Map.toList >> List.map (fun (name, (typ, location)) ->
+                {
+                    rtdataName = name
+                    rtdataType = typ
+                    rtdataKind = kind location
+                }
+            )
+
+        let ofOption kind =
+            Option.toList >> List.map (fun (name, typ) ->
+                {
+                    rtdataName = name
+                    rtdataType = typ
+                    rtdataKind = kind
+                }
+            )
+
+        let raytracingData =
+            let payloads       = s.shaderPayloads       |> ofMap    RaytracingDataKind.RayPayload
+            let payloadIn      = s.shaderPayloadIn      |> ofOption RaytracingDataKind.RayPayloadIn
+            let callableData   = s.shaderCallableData   |> ofMap    RaytracingDataKind.CallableData
+            let callableDataIn = s.shaderCallableDataIn |> ofOption RaytracingDataKind.CallableDataIn
+            let hitAttribute   = s.shaderHitAttribute   |> ofOption RaytracingDataKind.HitAttribute
+            payloads @ payloadIn @ callableData @ callableDataIn @ hitAttribute
+
+        let uniforms =
+            s.shaderUniforms |> Map.toList |> List.map (fun (n, u) ->
+                let uniformBuffer = 
+                    match u.uniformValue with
+                        | Attribute(scope, name) -> Some scope.FullName
+                        | _ -> None
+
+                let textureInfos =
+                    match u.uniformValue with
+                        | UniformValue.Sampler (n,s) -> [n,s :> obj]
+                        | UniformValue.SamplerArray arr -> Array.toList arr |> List.map (fun (n,s) -> n, s :> obj)
+                        | _ -> []
+
+                {
+                    uniformName = u.uniformName
+                    uniformType = u.uniformType
+                    uniformBuffer = uniformBuffer
+                    uniformDecorations = u.decorations
+                    uniformTextureInfo = textureInfos
+                }
+            )
+
+        {
+            conditional    = Some stage.Slot.Conditional
+            entryName      = "main"
+            inputs         = List.empty
+            outputs        = List.empty
+            uniforms       = uniforms
+            raytracingData = raytracingData
+            arguments      = []
+            body           = s.shaderBody
+            decorations =
+                [
+                    yield EntryDecoration.Stages (ShaderStageDescription.Raytracing stage)
+                    yield EntryDecoration.Invocations s.shaderInvocations
+                ]
+        }
 
     /// creates a shader "passing-thru" all supplied attributes
     let passing (attributes : Map<string, Type>) (stage : ShaderStage) =

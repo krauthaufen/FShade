@@ -97,12 +97,64 @@ type EntryParameter =
         paramDecorations    : Set<ParameterDecoration>
     }
 
-type ShaderStageDescription =
+type GraphicsStageDescription =
     {
         prev : Option<ShaderStage>
         self : ShaderStage
         next : Option<ShaderStage>
     }
+
+    member x.Slot =
+        match x.self with
+        | ShaderStage.Vertex      -> ShaderSlot.Vertex
+        | ShaderStage.TessControl -> ShaderSlot.TessControl
+        | ShaderStage.TessEval    -> ShaderSlot.TessEval
+        | ShaderStage.Geometry    -> ShaderSlot.Geometry
+        | ShaderStage.Fragment    -> ShaderSlot.Fragment
+        | s -> failwithf "invalid graphics stage %A" s
+
+[<RequireQualifiedAccess>]
+type RaytracingStageDescription =
+    | RayGeneration
+    | Miss          of name: Symbol
+    | Callable      of name: Symbol
+    | AnyHit        of name: Symbol * rayType: Symbol
+    | ClosestHit    of name: Symbol * rayType: Symbol
+    | Intersection  of name: Symbol * rayType: Symbol
+
+    member x.Slot =
+        match x with
+        | RayGeneration       -> ShaderSlot.RayGeneration
+        | Miss n              -> ShaderSlot.Miss n
+        | Callable n          -> ShaderSlot.Callable n
+        | AnyHit (n, r)       -> ShaderSlot.AnyHit (n, r)
+        | ClosestHit (n, r)   -> ShaderSlot.ClosestHit (n, r)
+        | Intersection (n, r) -> ShaderSlot.Intersection (n, r)
+
+[<RequireQualifiedAccess>]
+type ShaderStageDescription =
+    | Compute
+    | Graphics   of GraphicsStageDescription
+    | Raytracing of RaytracingStageDescription
+
+    member x.Slot =
+        match x with
+        | Compute -> ShaderSlot.Compute
+        | Graphics g -> g.Slot
+        | Raytracing r -> r.Slot
+
+    member x.Stage =
+        x.Slot.Stage
+
+    member x.Previous =
+        match x with
+        | Graphics g -> g.prev
+        | _ -> None
+
+    member x.Next =
+        match x with
+        | Graphics g -> g.next
+        | _ -> None
 
 [<RequireQualifiedAccess>]
 type EntryDecoration =

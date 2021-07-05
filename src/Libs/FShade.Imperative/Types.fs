@@ -75,7 +75,7 @@ module ShaderStage =
     let supportsPayloadIn = function
         | ShaderStage.AnyHit | ShaderStage.ClosestHit | ShaderStage.Miss -> true
         | _ -> false
-        
+
     let supportsHitAttributes = function
         | ShaderStage.Intersection | ShaderStage.AnyHit | ShaderStage.ClosestHit -> true
         | _ -> false
@@ -95,6 +95,47 @@ module ShaderStage =
             ShaderStage.Miss,           "rmiss"
             ShaderStage.Callable,       "rcall"
         ]
+
+[<RequireQualifiedAccess>]
+type ShaderSlot =
+    | Vertex
+    | TessControl
+    | TessEval
+    | Geometry
+    | Fragment
+    | Compute
+    | RayGeneration
+    | Miss          of name: Symbol
+    | Callable      of name: Symbol
+    | AnyHit        of name: Symbol * rayType: Symbol
+    | ClosestHit    of name: Symbol * rayType: Symbol
+    | Intersection  of name: Symbol * rayType: Symbol
+
+    member x.Stage =
+        match x with
+        | Vertex         -> ShaderStage.Vertex
+        | TessControl    -> ShaderStage.TessControl
+        | TessEval       -> ShaderStage.TessEval
+        | Geometry       -> ShaderStage.Geometry
+        | Fragment       -> ShaderStage.Fragment
+        | Compute        -> ShaderStage.Compute
+        | RayGeneration  -> ShaderStage.RayGeneration
+        | Miss _         -> ShaderStage.Miss
+        | Callable _     -> ShaderStage.Callable
+        | AnyHit _       -> ShaderStage.AnyHit
+        | ClosestHit _   -> ShaderStage.ClosestHit
+        | Intersection _ -> ShaderStage.Intersection
+
+    member x.Conditional =
+        let tokens =
+            match x with
+            | Miss n | Callable n -> [n]
+            | AnyHit (n, r) | ClosestHit (n, r) | Intersection (n, r) -> [n; r]
+            | _ -> []
+
+        match tokens |> List.map string with
+        | [] -> sprintf "%A" x.Stage
+        | ts -> sprintf "%A_%s" x.Stage (ts |> String.concat "_")
 
 [<RequireQualifiedAccess>]
 type OutputTopology = 

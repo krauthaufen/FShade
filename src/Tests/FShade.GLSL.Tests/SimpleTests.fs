@@ -1194,7 +1194,7 @@ let ``GLSLTypesToString`` () =
 
     Console.WriteLine(glsl.ToString())
 
-    glsl.iface.shaders |> MapExt.iter (fun k v ->
+    glsl.iface.shaders |> GLSL.GLSLProgramShaders.iter (fun v ->
         Console.WriteLine(v.ToString()))
 
     FShade.GLSL.GLSLProgramInterface.log glsl.iface

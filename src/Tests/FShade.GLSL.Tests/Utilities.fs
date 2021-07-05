@@ -121,7 +121,7 @@ module GLSL =
         
         glsl,
         module_.entries |> List.map (fun e ->
-            let stage = e.decorations |> List.tryPick (function FShade.Imperative.EntryDecoration.Stages { self = s } -> Some s | _ -> None) |> Option.get
+            let stage = e.decorations |> List.tryPick (function FShade.Imperative.EntryDecoration.Stages s -> Some s.Stage | _ -> None) |> Option.get
             
             let res = glslang stage glsl.code
             

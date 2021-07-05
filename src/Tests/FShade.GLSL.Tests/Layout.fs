@@ -215,7 +215,11 @@ let layoutGLSLang (b : GLSLUniformBuffer) =
                             )
                         )
                     )
-                cDecorations = [EntryDecoration.Stages { prev = None; self = ShaderStage.Vertex; next = Some ShaderStage.Fragment}]
+                cDecorations = [
+                    EntryDecoration.Stages (
+                        ShaderStageDescription.Graphics { prev = None; self = ShaderStage.Vertex; next = Some ShaderStage.Fragment}
+                    )
+                ]
             }
 
         ]
