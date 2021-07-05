@@ -2822,7 +2822,7 @@ module Shader =
                 ]
         }
 
-    let toEntryPointRaytracing (stage : RaytracingStageDescription) (s : Shader) =
+    let toEntryPointRaytracing (slot : ShaderSlot) (s : Shader) =
         let ofMap kind =
             Map.toList >> List.map (fun (name, (typ, location)) ->
                 {
@@ -2872,7 +2872,7 @@ module Shader =
             )
 
         {
-            conditional    = Some stage.Slot.Conditional
+            conditional    = Some slot.Conditional
             entryName      = "main"
             inputs         = List.empty
             outputs        = List.empty
@@ -2882,7 +2882,7 @@ module Shader =
             body           = s.shaderBody
             decorations =
                 [
-                    yield EntryDecoration.Stages (ShaderStageDescription.Raytracing stage)
+                    yield EntryDecoration.Stages (ShaderStageDescription.Raytracing slot)
                     yield EntryDecoration.Invocations s.shaderInvocations
                 ]
         }

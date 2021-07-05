@@ -601,7 +601,7 @@ module GLSLRaytracingShaders =
                 group.intersectionShader |> Option.iter action
 
     let alter (mapping : GLSLShaderInterface option -> GLSLShaderInterface option)
-              (stage : RaytracingStageDescription) (s : GLSLRaytracingShaders) =
+              (slot : ShaderSlot) (s : GLSLRaytracingShaders) =
 
         let alterHitGroup (mapping : GLSLRayHitGroup -> GLSLRayHitGroup)
                           (name : Symbol) (rayType : Symbol)
@@ -612,27 +612,30 @@ module GLSLRaytracingShaders =
                 ) >> Some
             )
 
-        match stage with
-        | RaytracingStageDescription.RayGeneration ->
+        match slot with
+        | ShaderSlot.RayGeneration ->
             { s with raygenShader = s.raygenShader |> mapping }
 
-        | RaytracingStageDescription.Miss name ->
+        | ShaderSlot.Miss name ->
             { s with missShaders = s.missShaders |> MapExt.alter name mapping }
 
-        | RaytracingStageDescription.Callable name ->
+        | ShaderSlot.Callable name ->
             { s with callableShaders = s.callableShaders |> MapExt.alter name mapping }
 
-        | RaytracingStageDescription.AnyHit (name, rayType) ->
+        | ShaderSlot.AnyHit (name, rayType) ->
             let f g = { g with anyHitShader = g.anyHitShader |> mapping }
             { s with hitgroups = s.hitgroups |> alterHitGroup f name rayType }
 
-        | RaytracingStageDescription.ClosestHit (name, rayType) ->
+        | ShaderSlot.ClosestHit (name, rayType) ->
             let f g = { g with closestHitShader = g.closestHitShader |> mapping }
             { s with hitgroups = s.hitgroups |> alterHitGroup f name rayType }
 
-        | RaytracingStageDescription.Intersection (name, rayType) ->
+        | ShaderSlot.Intersection (name, rayType) ->
             let f g = { g with intersectionShader = g.intersectionShader |> mapping }
             { s with hitgroups = s.hitgroups |> alterHitGroup f name rayType }
+
+        | _ ->
+            failwithf "%A is not a valid raytracing shader slot" slot
 
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]

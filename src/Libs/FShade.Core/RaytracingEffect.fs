@@ -192,32 +192,32 @@ module RaytracingEffect =
 
     let toModule (effect : RaytracingEffect) =
 
-        let toEntryPoints (shaders : List<RaytracingStageDescription * Shader>) =
-            shaders |> List.map (fun (stage, shader) ->
-                Shader.toEntryPointRaytracing stage shader
+        let toEntryPoints (shaders : List<ShaderSlot * Shader>) =
+            shaders |> List.map (fun (slot, shader) ->
+                Shader.toEntryPointRaytracing slot shader
             )
 
         let hitGroups =
             effect.HitGroups |> Map.toList |> List.collect (fun (name, group) ->
                 group.PerRayType |> Map.toList |> List.collect (fun (ray, entry) ->
-                    let select stage = Option.map (fun s -> stage (name, ray), s)
+                    let select slot = Option.map (fun s -> slot (name, ray), s)
 
-                    [ entry.AnyHit |> select RaytracingStageDescription.AnyHit
-                      entry.ClosestHit |> select RaytracingStageDescription.ClosestHit
-                      entry.Intersection |> select RaytracingStageDescription.Intersection ]
+                    [ entry.AnyHit |> select ShaderSlot.AnyHit
+                      entry.ClosestHit |> select ShaderSlot.ClosestHit
+                      entry.Intersection |> select ShaderSlot.Intersection ]
                     |> List.choose id
                 )
             )
 
-        let toList (stage : Symbol -> RaytracingStageDescription) (map : Map<Symbol, Shader>) =
+        let toList (slot : Symbol -> ShaderSlot) (map : Map<Symbol, Shader>) =
             map |> Map.toList |> List.map (fun (name, shader) ->
-                stage name, shader
+                slot name, shader
             )
 
         let entryPoints =
-            [ toEntryPoints [RaytracingStageDescription.RayGeneration, effect.RayGenerationShader]
-              toEntryPoints (effect.MissShaders |> toList RaytracingStageDescription.Miss)
-              toEntryPoints (effect.CallableShaders |> toList RaytracingStageDescription.Callable)
+            [ toEntryPoints [ShaderSlot.RayGeneration, effect.RayGenerationShader]
+              toEntryPoints (effect.MissShaders |> toList ShaderSlot.Miss)
+              toEntryPoints (effect.CallableShaders |> toList ShaderSlot.Callable)
               toEntryPoints hitGroups ]
             |> List.concat
 
