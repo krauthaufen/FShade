@@ -854,7 +854,7 @@ module Compiler =
                     let fb = free b
                     HashSet.union fe (HashSet.remove (Variable v) fb)
 
-                | ReadInput(kind,name,idx,_) ->
+                | ReadInputOrRaytracingData(kind,name,idx,_) ->
                     match idx with
                         | Some idx -> free idx |> HashSet.add (Global(kind, name, e.Type, Some idx))
                         | None -> HashSet.ofList [ Global(kind, name, e.Type, None) ]
@@ -1151,7 +1151,7 @@ module Compiler =
                 | WhileLoop _ ->
                     return! asExternalS e
 
-                | ReadInput(kind, name, index, _) ->
+                | ReadInputOrRaytracingData(kind, name, index, _) ->
                     let! ct = toCTypeS e.Type
                     let! s = State.get
                     if Set.contains name s.moduleState.globalParameters then

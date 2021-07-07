@@ -1355,7 +1355,7 @@ let ``Raytracing with Reflected Functions``() =
 
     let chitShader (input : RayHitInput) =
         closesthit {
-            return trace input
+            return trace input + whatever().XYZ
         }
 
     let chitShaderShadow (input : RayHitInput) =
@@ -1369,7 +1369,10 @@ let ``Raytracing with Reflected Functions``() =
 
     let effect =
          let hitgroupMain =
-             hitgroup { closesthit chitShader }
+             hitgroup {
+                closesthit ("1", chitShader)
+                closesthit ("2", chitShader)
+            }
 
          let hitgroupShadow =
              hitgroup { closesthit chitShaderShadow }

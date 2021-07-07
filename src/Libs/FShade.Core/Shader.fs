@@ -251,7 +251,7 @@ module Preprocessor =
                 | Value _
                 | TupleGet(TrivialInput, _)
                 | PropertyGet((None | Some TrivialInput), _, [])
-                | ReadInput(_,_,(None | Some TrivialInput),false)
+                | ReadInput(_,_,(None | Some TrivialInput))
                 | FieldGet((None | Some TrivialInput), _) ->
                     Some ()
                 | _ ->
@@ -717,11 +717,10 @@ module Preprocessor =
                 let rayId = Expr.Value(ray)
                 let missId = Expr.Value(miss)
                 let payloadIndex = Expr.Value(payloadIndex)
-                let payloadOut = Expr.ReadInput(ParameterKind.RaytracingData, e.Type, payloadName, volatile = true)
 
                 return Expr.Seq [
                     match payloadIn with
-                    | Some p -> Expr.UnsafeWrite(payloadOut, p)
+                    | Some p -> Expr.WriteRaytracingData(payloadName, p)
                     | _ -> ()
 
                     Expr.Call(
@@ -733,7 +732,7 @@ module Preprocessor =
                         payloadIndex]
                     )
 
-                    payloadOut
+                    Expr.ReadRaytracingData(e.Type, payloadName)
                 ]
 
             | RayPayloadIn _ when not (ShaderStage.supportsPayloadIn stage) ->
@@ -741,7 +740,7 @@ module Preprocessor =
                 
             | RayPayloadIn payload ->
                 let! name = State.usePayloadIn payload
-                return Expr.ReadInput(ParameterKind.RaytracingData, payload, name)
+                return Expr.ReadRaytracingData(payload, name)
 
             | ExecuteCallable(id, data) ->
                 let! id = State.useCallableShader id
@@ -755,16 +754,15 @@ module Preprocessor =
 
                 let! callableDataName, callableDataIndex = State.useCallableData e.Type
                 let callableDataIndex = Expr.Value(callableDataIndex)
-                let callableDataOut = Expr.ReadInput(ParameterKind.RaytracingData, e.Type, callableDataName, volatile = true)
 
                 return Expr.Seq [
                     match callableDataIn with
-                    | Some d -> Expr.UnsafeWrite(callableDataOut, d)
+                    | Some d -> Expr.WriteRaytracingData(callableDataName, d)
                     | _ -> ()
 
                     Expr.Call(Stubs.executeCallableMeth, [Expr.Value id; callableDataIndex])
 
-                    callableDataOut
+                    Expr.ReadRaytracingData(e.Type, callableDataName)
                 ]
 
             | CallableDataIn _ when stage <> ShaderStage.Callable ->
@@ -772,7 +770,7 @@ module Preprocessor =
 
             | CallableDataIn data ->
                 let! name = State.useCallableDataIn data
-                return Expr.ReadInput(ParameterKind.RaytracingData, data, name)
+                return Expr.ReadRaytracingData(data, name)
 
             | ReportIntersection _ when stage <> ShaderStage.Intersection ->
                 return failwith "[FShade] Report.Intersection can only be invoked in intersection shaders"
@@ -794,8 +792,7 @@ module Preprocessor =
                 return Expr.Seq [
                     match attribute with
                     | Some (name, value) ->
-                        let out = Expr.ReadInput(ParameterKind.RaytracingData, value.Type, name, volatile = true)
-                        Expr.UnsafeWrite(out, value)
+                        Expr.WriteRaytracingData(name, value)
 
                     | _ -> ()
 
@@ -807,21 +804,17 @@ module Preprocessor =
 
             | HitAttribute attr ->
                 let! name = State.useHitAttribute attr
-                return Expr.ReadInput(ParameterKind.RaytracingData, attr, name)
+                return Expr.ReadRaytracingData(attr, name)
 
             | BuilderReturn(_, _, value) when ShaderStage.supportsPayloadIn stage ->
                 let! name = State.usePayloadIn value.Type
                 let! value = preprocessRaytracingS stage value
-
-                let payloadOut = Expr.ReadInput(ParameterKind.RaytracingData, e.Type, name)
-                return Expr.UnsafeWrite(payloadOut, value);
+                return Expr.WriteRaytracingData(name, value)
 
             | BuilderReturn(_, _, value) when stage = ShaderStage.Callable ->
                 let! name = State.useCallableDataIn value.Type
                 let! value = preprocessRaytracingS stage value
-
-                let callableDataOut = Expr.ReadInput(ParameterKind.RaytracingData, e.Type, name)
-                return Expr.UnsafeWrite(callableDataOut, value);
+                return Expr.WriteRaytracingData(name, value)
 
             | SemanticInput(semantic, parameter) ->
                 do! State.readInput semantic parameter
@@ -956,7 +949,7 @@ module Preprocessor =
                 | LetCopyOfStruct(e) ->
                     return! preprocessNormalS e
 
-                | ReadInput(kind, name, idx, volatile) ->
+                | ReadInputOrRaytracingData(kind, name, idx, slot) ->
                     let! idx = idx |> Option.mapS preprocessNormalS
 
                     let paramType =
@@ -973,8 +966,8 @@ module Preprocessor =
                         ()
 
                     match idx with
-                        | Some idx -> return Expr.ReadInput(kind, e.Type, name, idx, volatile)
-                        | None -> return Expr.ReadInput(kind, e.Type, name, volatile)
+                        | Some idx -> return Expr.ReadInput(kind, e.Type, name, idx, slot)
+                        | None -> return Expr.ReadInput(kind, e.Type, name, slot)
 
                 | WriteOutputs(map) ->
                     let! map = 
@@ -1033,7 +1026,7 @@ module Preprocessor =
                             |> List.choose2S (fun v ->
                                 state {
                                     match Map.tryFind v s.variableValues with
-                                        | Some (ReadInput(ParameterKind.Input, name, Some TrivialInput, _) as e) ->
+                                        | Some (ReadInput(ParameterKind.Input, name, Some TrivialInput) as e) ->
                                             return Choice1Of2 (v, e)
                                         | _ -> 
                                             do! State.writeOutput v.Name { paramType = v.Type; paramInterpolation = InterpolationMode.Default }
@@ -1508,7 +1501,7 @@ module Preprocessor =
 
     let rec computeIO (localSize : V3i) (e : Expr) =
         match e with
-            | ReadInput(kind,n,idx,_) ->
+            | ReadInputOrRaytracingData(kind,n,idx,_) ->
                 match idx with
                     | Some idx -> computeIO localSize idx |> Map.add (n, kind) e.Type
                     | None -> Map.ofList [(n, kind), e.Type]
@@ -1555,7 +1548,7 @@ module Preprocessor =
 
     let rec usedInputs (localSize : V3i) (e : Expr) =
         match e with
-            | ReadInput(kind,n,idx,_) ->
+            | ReadInputOrRaytracingData(kind,n,idx,_) ->
                 match idx with
                     | Some idx -> usedInputs localSize idx |> Map.add n (kind, e.Type)
                     | None -> Map.ofList [n, (kind, e.Type)]

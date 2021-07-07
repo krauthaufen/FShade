@@ -55,7 +55,7 @@ module PrettyPrinter =
                 let body = print body
                 sprintf "fun %s ->\r\n%s" args (String.indent 1 body)
                   
-            | ReadInput(kind, name, index, _) ->
+            | ReadInputOrRaytracingData(kind, name, index, _) ->
                 let indexer = 
                     match index with
                         | Some idx -> print idx |> sprintf ".[%s]"
@@ -242,8 +242,8 @@ module Optimizer =
                 | TupleGet(Trivial, _)
                 | PropertyGet(Some TrivialOrInput, (FSharpTypeProperty | ArrayLengthProperty), [])
                 | FieldGet(Some TrivialOrInput, _) 
-                | ReadInput(_, _, None, false) 
-                | ReadInput(_, _, Some TrivialOrInput, false) -> 
+                | ReadInput(_, _, None) 
+                | ReadInput(_, _, Some TrivialOrInput) -> 
                     Some()
                 | _ ->
                     None
@@ -313,7 +313,7 @@ module Optimizer =
 
         let rec (|StorageArgument|_|) (e : Expr) =
             match e with
-                | RefOf (GetArray(ReadInput(ParameterKind.Uniform, _, _, _), _)) ->
+                | RefOf (GetArray(ReadInputOrRaytracingData(ParameterKind.Uniform, _, _, _), _)) ->
                     Some ()
                 | _ ->
                     None
@@ -1885,7 +1885,7 @@ module Optimizer =
             state {
                 match e with
 
-                    | ReadInput(ParameterKind.Input, name, idx, _) ->
+                    | ReadInputOrRaytracingData(ParameterKind.Input, name, idx, _) ->
                         do! State.modify (fun s ->
                             if Map.containsKey name s.usedInputs then
                                 s
@@ -1898,7 +1898,7 @@ module Optimizer =
                         )
                         return e
 
-                    | ReadInput(kind, name, idx, _) ->
+                    | ReadInputOrRaytracingData(kind, name, idx, _) ->
                         match idx with
                             | Some idx ->
                                 let! idx = liftInputsS idx
@@ -2118,7 +2118,7 @@ module Optimizer =
         and liftFunctionInputsS (e : Expr) : State<Map<_,_>, Expr> =
             state {
                 match e with
-                    | ReadInput(ParameterKind.Input, name, idx, false) ->
+                    | ReadInput(ParameterKind.Input, name, idx) ->
                         let! (s : Map<string, Var * Expr>) = State.get
 
                         let idxHash = idx |> Option.map Expr.ComputeHash |> Option.defaultValue ""
@@ -2132,13 +2132,13 @@ module Optimizer =
                                 do! State.put (Map.add key (v,e) s)
                                 return Expr.Var v
 
-                    | ReadInput(kind, name, idx, volatile) ->
+                    | ReadInputOrRaytracingData(kind, name, idx, slot) ->
                         match idx with
                             | Some idx ->
                                 let! idx = liftFunctionInputsS idx
-                                return Expr.ReadInput(kind, e.Type, name, idx, volatile)
+                                return Expr.ReadInput(kind, e.Type, name, idx, slot)
                             | None ->
-                                return Expr.ReadInput(kind, e.Type, name, volatile)
+                                return Expr.ReadInput(kind, e.Type, name, slot)
 
                     | CallFunction(utility, args) ->
                         let! args = args |> List.mapS liftFunctionInputsS
@@ -2224,8 +2224,8 @@ module Optimizer =
                     | TupleGet(Trivial, _)
                     | PropertyGet(Some (TrivialOrInput nonMutable), (FSharpTypeProperty | ArrayLengthProperty), [])
                     | FieldGet(Some (TrivialOrInput nonMutable), _) 
-                    | ReadInput(_, _, None, false) 
-                    | ReadInput(_, _, Some (TrivialOrInput nonMutable), false) -> 
+                    | ReadInput(_, _, None) 
+                    | ReadInput(_, _, Some (TrivialOrInput nonMutable)) -> 
                         Some()
                     
                     | PropertyGet(Some (TrivialOrInput nonMutable as t), prop, []) ->
@@ -2333,7 +2333,7 @@ module Optimizer =
                         )
                         return Expr.WriteOutputs map
 
-                    | ReadInput(kind, name, idx, volatile) ->
+                    | ReadInputOrRaytracingData(kind, name, idx, volatile) ->
                         match idx with
                             | Some idx ->
                                 let! idx = inlineS idx
@@ -2537,8 +2537,8 @@ module Optimizer =
                                             | _ -> false
                                         else
                                             match e with
-                                                | ReadInput(_, _, None, volatile) -> not volatile
-                                                | ReadInput(_, _, Some idx, volatile) -> not volatile && canInline idx
+                                                | ReadInput(_, _, None) -> true
+                                                | ReadInput(_, _, Some idx) -> canInline idx
                                         
                                                 | GetArray(e,i) ->
                                                     let res = canInline e && canInline i
@@ -2998,7 +2998,7 @@ module Optimizer =
         let rec getInputPointers (parent : Option<ExprPointer>) (e : Expr) =
             state {
                 match e with
-                    | ReadInput(ParameterKind.Input,name,index,false) ->
+                    | ReadInput(ParameterKind.Input,name,index) ->
                         return MapExt.ofList [name, [(index, parent)]]
                            
                     | WriteOutputs outputs ->

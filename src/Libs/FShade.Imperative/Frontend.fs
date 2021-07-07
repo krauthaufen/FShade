@@ -186,8 +186,8 @@ module ExpressionExtensions =
                     false
             )
 
-        static let readInput        = find "ReadInput" [| typeof<ParameterKind>; typeof<string>; typeof<bool> |]
-        static let readInputIndex   = find "ReadInput" [| typeof<ParameterKind>; typeof<string>; typeof<int>; typeof<bool> |]
+        static let readInput        = find "ReadInput" [| typeof<ParameterKind>; typeof<string>; typeof<ShaderSlot option> |]
+        static let readInputIndex   = find "ReadInput" [| typeof<ParameterKind>; typeof<string>; typeof<int>; typeof<ShaderSlot option> |]
         static let writeOutputs     = find "WriteOutputs" [| typeof<array<string * int * obj>> |]
         static let unsafeWrite      = allMethods |> Array.find (fun m -> m.Name = "UnsafeWrite")
 
@@ -196,10 +196,10 @@ module ExpressionExtensions =
         static member internal WriteOutputsMeth = writeOutputs
         static member internal UnsafeWriteMeth = unsafeWrite
 
-        static member ReadInput<'a>(kind : ParameterKind, name : string, volatile : bool) : 'a =
+        static member ReadInput<'a>(kind : ParameterKind, name : string, slot : Option<ShaderSlot>) : 'a =
             raise <| FShadeOnlyInShaderCodeException "ReadInput"
 
-        static member ReadInput<'a>(kind : ParameterKind, name : string, index : int, volatile : bool) : 'a =
+        static member ReadInput<'a>(kind : ParameterKind, name : string, index : int, slot : Option<ShaderSlot>) : 'a =
             raise <| FShadeOnlyInShaderCodeException "ReadInput"
 
         static member WriteOutputs(values : array<string * int * obj>) : unit =
@@ -221,22 +221,54 @@ module ExpressionExtensions =
             let mi = ShaderIO.UnsafeWriteMeth.MakeGenericMethod [| value.Type |]
             Expr.Call(mi, [target; value])
 
-        static member ReadInput<'a>(kind : ParameterKind, name : string, [<Optional; DefaultParameterValue(false)>] volatile : bool) : Expr<'a> =
+        static member ReadInput<'a>(kind : ParameterKind, name : string, slot : Option<ShaderSlot>) : Expr<'a> =
             let mi = ShaderIO.ReadInputMeth.MakeGenericMethod [| typeof<'a> |]
-            Expr.Call(mi, [ Expr.Value(kind); Expr.Value(name); Expr.Value(volatile) ]) |> Expr.Cast
+            Expr.Call(mi, [ Expr.Value(kind); Expr.Value(name); Expr.Value(slot) ]) |> Expr.Cast
 
-        static member ReadInput<'a>(kind : ParameterKind, name : string, index : Expr, [<Optional; DefaultParameterValue(false)>] volatile : bool) : Expr<'a> =
+        static member ReadInput<'a>(kind : ParameterKind, name : string, index : Expr, slot : Option<ShaderSlot>) : Expr<'a> =
             let mi = ShaderIO.ReadInputIndexedMeth.MakeGenericMethod [| typeof<'a> |]
-            Expr.Call(mi, [ Expr.Value(kind); Expr.Value(name); index; Expr.Value(volatile) ]) |> Expr.Cast
+            Expr.Call(mi, [ Expr.Value(kind); Expr.Value(name); index; Expr.Value(slot) ]) |> Expr.Cast
 
-        static member ReadInput(kind : ParameterKind, t : Type, name : string, [<Optional; DefaultParameterValue(false)>] volatile : bool) =
+        static member ReadInput(kind : ParameterKind, t : Type, name : string, slot : Option<ShaderSlot>) =
             let mi = ShaderIO.ReadInputMeth.MakeGenericMethod [| t |]
-            Expr.Call(mi, [ Expr.Value(kind); Expr.Value(name); Expr.Value(volatile) ])
+            Expr.Call(mi, [ Expr.Value(kind); Expr.Value(name); Expr.Value(slot) ])
 
-        static member ReadInput(kind : ParameterKind, t : Type, name : string, index : Expr, [<Optional; DefaultParameterValue(false)>] volatile : bool) =
+        static member ReadInput(kind : ParameterKind, t : Type, name : string, index : Expr, slot : Option<ShaderSlot>) =
             let mi = ShaderIO.ReadInputIndexedMeth.MakeGenericMethod [| t |]
-            Expr.Call(mi, [ Expr.Value(kind); Expr.Value(name); index; Expr.Value(volatile) ])
-            
+            Expr.Call(mi, [ Expr.Value(kind); Expr.Value(name); index; Expr.Value(slot) ])
+
+        static member ReadInput<'a>(kind : ParameterKind, name : string) =
+            Expr.ReadInput<'a>(kind, name, None)
+
+        static member ReadInput<'a>(kind : ParameterKind, name : string, index : Expr) =
+            Expr.ReadInput<'a>(kind, name, index, None)
+
+        static member ReadInput(kind : ParameterKind, t : Type, name : string) =
+            Expr.ReadInput(kind, t, name, None)
+
+        static member ReadInput(kind : ParameterKind, t : Type, name : string, index : Expr) =
+            Expr.ReadInput(kind, t, name, index, None)
+
+        static member ReadRaytracingData<'a>(name : string) =
+            Expr.ReadInput<'a>(ParameterKind.RaytracingData, name, None)
+
+        static member ReadRaytracingData<'a>(name : string, slot : ShaderSlot) =
+            Expr.ReadInput<'a>(ParameterKind.RaytracingData, name, Some slot)
+
+        static member ReadRaytracingData(t : Type, name : string) =
+            Expr.ReadInput(ParameterKind.RaytracingData, t, name, None)
+
+        static member ReadRaytracingData(t : Type, name : string, slot : ShaderSlot) =
+            Expr.ReadInput(ParameterKind.RaytracingData, t, name, Some slot)
+
+        static member WriteRaytracingData(name : string, value : Expr) =
+            let t = Expr.ReadRaytracingData(value.Type, name)
+            Expr.UnsafeWrite(t, value)
+
+        static member WriteRaytracingData(name : string, value : Expr, slot : ShaderSlot) =
+            let t = Expr.ReadRaytracingData(value.Type, name, slot)
+            Expr.UnsafeWrite(t, value)
+
         static member WriteOutputsRaw(values : list<string * Option<Expr> * Expr>) =
             let values =
                 values 
@@ -274,17 +306,33 @@ module ExpressionExtensions =
         | _ ->
             None
 
+    let (|ReadInputOrRaytracingData|_|) (e : Expr) =
+        match e with
+        | Call(None, mi, [ Value((:? ParameterKind as kind),_); Value((:? string as name),_); Constant(:? Option<ShaderSlot> as slot)]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = ShaderIO.ReadInputMeth ->
+            Some(kind, name, None, slot)
+
+        | Call(None, mi, [ Value((:? ParameterKind as kind),_); Value((:? string as name),_); index;  Constant(:? Option<ShaderSlot> as slot)]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = ShaderIO.ReadInputIndexedMeth ->
+            Some(kind, name, Some index, slot)
+
+        | _ ->
+            None
+
     let (|ReadInput|_|) (e : Expr) =
         match e with
-            | Call(None, mi, [ Value((:? ParameterKind as kind),_); Value((:? string as name),_); Constant(:? bool as volatile)]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = ShaderIO.ReadInputMeth ->
-                Some(kind, name, None, volatile)
+        | ReadInputOrRaytracingData (kind, name, index, _) when kind <> ParameterKind.RaytracingData ->
+            Some (kind, name, index)
 
-            | Call(None, mi, [ Value((:? ParameterKind as kind),_); Value((:? string as name),_); index; Constant(:? bool as volatile)]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = ShaderIO.ReadInputIndexedMeth ->
-                Some(kind, name, Some index, volatile)
+        | _ ->
+            None
 
-            | _ ->
-                None
-                
+    let (|ReadRaytracingData|_|) (e : Expr) =
+        match e with
+        | ReadInputOrRaytracingData (ParameterKind.RaytracingData, name, None, slot) ->
+            Some (name, slot)
+
+        | _ ->
+            None
+
     let (|WriteOutputsRaw|_|) (e : Expr) =
         match e with
             | Call(none, mi, [NewArray(_,args)]) when mi = ShaderIO.WriteOutputsMeth ->
@@ -386,7 +434,7 @@ module private Affected =
     let rec usedInputsS (e : Expr) : State<State, Set<string>> =
         state {
             match e with
-                | ReadInput(ParameterKind.Input, name, idx, _) ->
+                | ReadInputOrRaytracingData(ParameterKind.Input, name, idx, _) ->
                     match idx with
                         | Some idx -> 
                             let! used = usedInputsS idx

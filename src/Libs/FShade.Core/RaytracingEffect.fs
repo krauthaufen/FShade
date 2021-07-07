@@ -34,6 +34,24 @@ module RaytracingIntrinsics =
 [<AutoOpen>]
 module private RaytracingUtilities =
 
+    // Raytracing data is not global but scoped by the shader slot. Encoding
+    // the slot explicitly leads to the creation of per-slot copies of reflected functions
+    // calling traceRay or example.
+    let rec private setShaderSlotForReads (slot : ShaderSlot) (e : Expr) =
+        match e with
+        | ReadRaytracingData(name, _) ->
+            Expr.ReadRaytracingData(e.Type, name, slot)
+
+        | CallFunction(f, args) ->
+            let f = f |> UtilityFunction.map (setShaderSlotForReads slot)
+            Expr.CallFunction(f, args |> List.map (setShaderSlotForReads slot))
+
+        | ShapeLambda(v, b) -> Expr.Lambda(v, setShaderSlotForReads slot b)
+        | ShapeVar(_) -> e
+        | ShapeCombination(o, args) ->
+            let args = args |> List.map (setShaderSlotForReads slot)
+            RebuildShapeCombination(o, args)
+
     let rec private substituteStubs (sbt : ShaderBindingTableLayout) (e : Expr) =
         match e with
         | Call(None, mi, args) when mi = Preprocessor.Stubs.traceRayMeth ->
@@ -74,8 +92,13 @@ module private RaytracingUtilities =
             let args = args |> List.map (substituteStubs sbt)
             RebuildShapeCombination(o, args)
 
-    let resolveIndices (sbt : ShaderBindingTableLayout) (shader : Shader) =
-        { shader with  shaderBody = substituteStubs sbt shader.shaderBody }
+    let prepareShader (sbt : ShaderBindingTableLayout) (slot : ShaderSlot) (shader : Shader) =
+        let prepared =
+            shader.shaderBody
+            |> substituteStubs sbt
+            |> setShaderSlotForReads slot
+
+        { shader with shaderBody = prepared }
 
 
 type HitGroupEntry =
@@ -91,10 +114,10 @@ module internal HitGroupEntry =
     let empty =
         { AnyHit = None; ClosestHit = None; Intersection = None }
 
-    let map (mapping : Shader -> Shader) (e : HitGroupEntry) =
-        { AnyHit       = e.AnyHit |> Option.map mapping
-          ClosestHit   = e.ClosestHit |> Option.map mapping
-          Intersection = e.Intersection |> Option.map mapping }
+    let map (name : Symbol) (ray : Symbol) (mapping : ShaderSlot -> Shader -> Shader) (e : HitGroupEntry) =
+        { AnyHit       = e.AnyHit |> Option.map (mapping <| ShaderSlot.AnyHit(name, ray))
+          ClosestHit   = e.ClosestHit |> Option.map (mapping <| ShaderSlot.ClosestHit(name, ray))
+          Intersection = e.Intersection |> Option.map (mapping <| ShaderSlot.Intersection(name, ray)) }
 
 
 type HitGroup =
@@ -108,8 +131,8 @@ module internal HitGroup =
     let empty =
         { PerRayType = Map.empty }
 
-    let map (mapping : Shader -> Shader) (g : HitGroup) =
-        { PerRayType = g.PerRayType |> Map.map (fun _ -> HitGroupEntry.map mapping) }
+    let map (name : Symbol) (mapping : ShaderSlot -> Shader -> Shader) (g : HitGroup) =
+        { PerRayType = g.PerRayType |> Map.map (fun ray -> HitGroupEntry.map name ray mapping) }
 
 
 type RaytracingEffectState =
@@ -142,11 +165,11 @@ module internal RaytracingEffectState =
                     yield! [e.AnyHit; e.ClosestHit; e.Intersection] |> List.choose id
         |]
 
-    let map (mapping : Shader -> Shader) (s : RaytracingEffectState) =
-        { RaygenShader    = s.RaygenShader |> mapping
-          MissShaders     = s.MissShaders |> Map.map (fun _ -> mapping)
-          CallableShaders = s.CallableShaders |> Map.map (fun _ -> mapping)
-          HitGroups       = s.HitGroups |> Map.map (fun _ -> HitGroup.map mapping) }
+    let map (mapping : ShaderSlot -> Shader -> Shader) (s : RaytracingEffectState) =
+        { RaygenShader    = s.RaygenShader |> mapping ShaderSlot.RayGeneration
+          MissShaders     = s.MissShaders |> Map.map (fun n -> mapping (ShaderSlot.Miss n))
+          CallableShaders = s.CallableShaders |> Map.map (fun n -> mapping (ShaderSlot.Callable n))
+          HitGroups       = s.HitGroups |> Map.map (fun n -> HitGroup.map n mapping) }
 
 type RaytracingEffect internal(state : RaytracingEffectState) =
 
@@ -165,7 +188,7 @@ type RaytracingEffect internal(state : RaytracingEffectState) =
 
     let state =
         lazy (
-            state |> RaytracingEffectState.map (resolveIndices shaderBindingTableLayout.Value)
+            state |> RaytracingEffectState.map (prepareShader shaderBindingTableLayout.Value)
         )
 
     member x.ShaderBindingTableLayout =

@@ -194,7 +194,7 @@ type ExpressionSubstitutionExtensions private() =
 
     static let rec substituteReads (substitute : ParameterKind -> Type -> string -> Option<Expr> -> Option<Expr>) (e : Expr) =
         match e with
-            | ReadInput(kind, name, index, _) ->
+            | ReadInputOrRaytracingData(kind, name, index, _) ->
                 let index = index |> Option.map (substituteReads substitute)
                 match substitute kind e.Type name index with
                     | Some e -> e
