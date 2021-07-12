@@ -89,8 +89,8 @@ module IntrinsicParameters =
                     Intrinsics.RayTmax, "gl_RayTmaxEXT"
                     Intrinsics.IncomingRayFlags, "gl_IncomingRayFlagsEXT"
 
-                    Intrinsics.ObjectToWorld, "mat4(gl_ObjectToWorldEXT)"
-                    Intrinsics.WorldToObject, "mat4(gl_WorldToObjectEXT)"
+                    Intrinsics.ObjectToWorld, "mat4(gl_ObjectToWorld3x4EXT)"
+                    Intrinsics.WorldToObject, "mat4(gl_WorldToObject3x4EXT)"
                 ]
 
             ShaderStage.AnyHit,
@@ -115,8 +115,8 @@ module IntrinsicParameters =
                     Intrinsics.HitT, "gl_HitTEXT"
                     Intrinsics.HitKind, "gl_HitKindEXT"
 
-                    Intrinsics.ObjectToWorld, "mat4(gl_ObjectToWorldEXT)"
-                    Intrinsics.WorldToObject, "mat4(gl_WorldToObjectEXT)"
+                    Intrinsics.ObjectToWorld, "mat4(gl_ObjectToWorld3x4EXT)"
+                    Intrinsics.WorldToObject, "mat4(gl_WorldToObject3x4EXT)"
                 ]
 
             ShaderStage.ClosestHit,
@@ -141,8 +141,8 @@ module IntrinsicParameters =
                     Intrinsics.HitT, "gl_HitTEXT"
                     Intrinsics.HitKind, "gl_HitKindEXT"
 
-                    Intrinsics.ObjectToWorld, "mat4(gl_ObjectToWorldEXT)"
-                    Intrinsics.WorldToObject, "mat4(gl_WorldToObjectEXT)"
+                    Intrinsics.ObjectToWorld, "mat4(gl_ObjectToWorld3x4EXT)"
+                    Intrinsics.WorldToObject, "mat4(gl_WorldToObject3x4EXT)"
                 ]
 
             ShaderStage.Miss,

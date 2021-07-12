@@ -1013,8 +1013,8 @@ module Compiler =
 
 
 
-            let getVar (kind : ParameterKind) (name : string) (typ : Type) (idx : Option<Expr>) =
-                let key = (kind, name, typ, idx)
+            let getVar (kind : ParameterKind) (name : string) (typ : Type) (idx : Option<Expr>) (slot : Option<ShaderSlot>) =
+                let key = (kind, name, typ, idx, slot)
                 match HashMap.tryFind key variables with
                     | Some v -> v
                     | None ->
@@ -1027,19 +1027,19 @@ module Compiler =
                         inputValues <- HashMap.add v key inputValues
                         v
 
-            let mutable usesUniform = false
+            let mutable usesGlobal = false
             let e = 
-                e.SubstituteReads (fun kind typ name idx ->
-                    if kind = ParameterKind.Uniform && Set.contains name globals then 
-                        usesUniform <- true
+                e.SubstituteReads (fun kind typ name idx slot ->
+                    if (kind = ParameterKind.Uniform || kind = ParameterKind.RaytracingData) && Set.contains name globals then 
+                        usesGlobal <- true
                         None
                     else
-                        let v = getVar kind name typ idx
+                        let v = getVar kind name typ idx slot
                         Some (Expr.Var v)
                 )
 
             let free = e.GetFreeVars() |> HashSet.ofSeq
-            if not usesUniform && HashSet.isEmpty free then
+            if not usesGlobal && HashSet.isEmpty free then
                 let hash = Expr.ComputeHash e
                 return! CompilerState.useConstant hash e
             else
@@ -1049,7 +1049,7 @@ module Compiler =
                         |> HashSet.toArray
                         |> Array.sortBy (fun v -> 
                             match HashMap.tryFind v inputValues with
-                                | Some (_,n,_,_) -> 0, n
+                                | Some (_,n,_,_,_) -> 0, n
                                 | None -> 1, v.Name
                             )
  
@@ -1084,13 +1084,13 @@ module Compiler =
                     free |> Array.mapS (fun f ->
                         state {
                             match HashMap.tryFind f inputValues with
-                                | Some (kind, n, t, idx) ->
+                                | Some (kind, n, t, idx, slot) ->
                                     match kind with
-                                        | ParameterKind.Input | ParameterKind.Uniform ->
+                                        | ParameterKind.Input | ParameterKind.Uniform | ParameterKind.RaytracingData ->
                                             let expression = 
                                                 match idx with
-                                                    | Some idx -> Expr.ReadInput(kind, t, n, idx)
-                                                    | None -> Expr.ReadInput(kind, t, n)
+                                                    | Some idx -> Expr.ReadInput(kind, t, n, idx, slot)
+                                                    | None -> Expr.ReadInput(kind, t, n, slot)
                                             let! e = toCExprS expression
                                             return e
                                         | _ ->

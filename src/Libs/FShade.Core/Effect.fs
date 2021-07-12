@@ -638,12 +638,12 @@ module Effect =
                 InputTopology.Triangle, ofFunction(nopTriangle).GeometryShader.Value
             ]
 
-    let substituteUniforms (substitute : string -> Type -> Option<Expr> -> Option<Expr>) (effect : Effect) =
+    let substituteUniforms (substitute : string -> Type -> Option<Expr> -> Option<ShaderSlot> -> Option<Expr>) (effect : Effect) =
         effect |> map (fun shader ->
-            shader |> Shader.substituteReads (fun kind typ name index ->
+            shader |> Shader.substituteReads (fun kind typ name index slot ->
                 match kind with
                     | ParameterKind.Uniform ->
-                        substitute name typ index
+                        substitute name typ index slot
                     | _ ->
                         None
             )
@@ -659,7 +659,7 @@ module Effect =
                 let mutable removed = Map.empty
 
                 let newBody = 
-                    shader.shaderBody.SubstituteReads(fun kind typ oldName index ->
+                    shader.shaderBody.SubstituteReads(fun kind typ oldName index slot ->
                         match kind with
                             | ParameterKind.Uniform ->
                                 match Map.tryFind oldName uniforms with
@@ -670,7 +670,7 @@ module Effect =
                                                 let typ = Peano.getArrayType layerCount old.uniformType
                                                 perLayerUniforms <- Map.add newName { old with uniformName = newName; uniformType = typ } perLayerUniforms
                                                 removed <- Map.add oldName () removed
-                                                let arrInput = Expr.ReadInput(kind, typ, newName)
+                                                let arrInput = Expr.ReadInput(kind, typ, newName, slot)
                                                 let layerItem = Expr.ArrayAccess(arrInput, layer) //Expr.PropertyGet(arrInput, arrInput.Type.GetProperty("Item"), [layer])
                                                 let realItem = Expr.ArrayAccess(arrInput, index) //Expr.PropertyGet(layerItem, layerItem.Type.GetProperty("Item"), [index])
 
@@ -681,7 +681,7 @@ module Effect =
                                                 let typ = Peano.getArrayType layerCount old.uniformType
                                                 perLayerUniforms <- Map.add newName { old with uniformName = newName; uniformType = typ } perLayerUniforms
                                                 removed <- Map.add oldName () removed
-                                                let arrInput = Expr.ReadInput(kind, typ, newName) 
+                                                let arrInput = Expr.ReadInput(kind, typ, newName, slot) 
                                                 let realItem = Expr.ArrayAccess(arrInput, layer) //Expr.PropertyGet(arrInput, arrInput.Type.GetProperty("Item"), [layer])
                                                 realItem |> Some
                                     | _ ->

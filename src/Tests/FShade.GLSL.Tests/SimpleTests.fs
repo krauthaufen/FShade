@@ -1333,12 +1333,23 @@ type UniformScope with
     member x.OutputBuffer : Image2d<Formats.rgba32f> = uniform?OutputBuffer
     member x.Flags : RayFlags = uniform?Flags
 
+type Payload =
+    {
+        color : V3d
+        depth : int
+    }
+
 let scene =
     scene { accelerationStructure uniform?RaytracingScene }
 
 [<ReflectedDefinition>]
-let trace (input : RayHitInput) =
-    scene.TraceRay<V3d>(input.ray.origin, input.ray.direction, flags = uniform.Flags)
+let trace (input : RayHitInput<Payload>) =
+    if input.payload.depth < 16 then
+        let payload = { color = V3d.Zero; depth = input.payload.depth + 1}
+        let result = scene.TraceRay(input.ray.origin, input.ray.direction, payload, flags = uniform.Flags)
+        result.color
+    else
+        V3d.Zero
 
 [<ReflectedDefinition>]
 let whatever() =
@@ -1353,18 +1364,18 @@ let ``Raytracing with Reflected Functions``() =
             uniform.OutputBuffer.[input.work.id.XY] <- whatever()
         }
 
-    let chitShader (input : RayHitInput) =
+    let chitShader (input : RayHitInput<Payload>) =
         closesthit {
-            return trace input + whatever().XYZ
+            return { color = trace input; depth = 0 }
         }
 
-    let chitShaderShadow (input : RayHitInput) =
+    let chitShaderShadow (input : RayHitInput<Payload>) =
         closesthit {
             let shadowed = scene.TraceRay<bool>(V3d.Zero, V3d.XAxis)
             if shadowed then
-                return V3d.Zero
+                return { color = V3d.Zero; depth = 0 }
             else
-                return trace input
+                return { color = trace input; depth = 0 }
         }
 
     let effect =

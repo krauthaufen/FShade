@@ -2472,10 +2472,10 @@ module Shader =
 
         shader |> withBody newBody
   
-    let substituteReads (f : ParameterKind -> Type -> string -> Option<Expr> -> Option<Expr>) (shader : Shader) =
+    let substituteReads (f : ParameterKind -> Type -> string -> Option<Expr> -> Option<ShaderSlot> -> Option<Expr>) (shader : Shader) =
         let newBody =
-            shader.shaderBody.SubstituteReads (fun k t n i ->
-                f k t n i
+            shader.shaderBody.SubstituteReads (fun k t n i s ->
+                f k t n i s
             )
 
         shader |> withBody newBody
@@ -2483,7 +2483,7 @@ module Shader =
     let uniformsToInputs (semantics : Set<string>) (shader : Shader) =
         let needed = semantics |> Set.exists (fun n -> Map.containsKey n shader.shaderUniforms)
         if needed then
-            shader |> substituteReads (fun kind inputType name index ->
+            shader |> substituteReads (fun kind inputType name index slot ->
                 match kind with
                     | ParameterKind.Uniform when Set.contains name semantics ->
                         match index with
@@ -2492,11 +2492,11 @@ module Shader =
                             | None ->
                                 match shader.shaderStage with
                                     | ShaderStage.Vertex | ShaderStage.Fragment ->
-                                        Expr.ReadInput(ParameterKind.Input, inputType, name) |> Some
+                                        Expr.ReadInput(ParameterKind.Input, inputType, name, slot) |> Some
 
                                     | ShaderStage.Geometry | ShaderStage.TessControl | ShaderStage.TessEval ->
                                         Log.warn "[FShade] potentially bad uniform->input conversion (using vertex 0)"
-                                        Expr.ReadInput(ParameterKind.Input, inputType, name, Expr.Value 0) |> Some
+                                        Expr.ReadInput(ParameterKind.Input, inputType, name, Expr.Value 0, slot) |> Some
 
                                     | stage ->
                                         failwithf "[FShade] unknown ShaderStage %A" stage
@@ -2513,7 +2513,7 @@ module Shader =
         let newBody = 
             if scopes |> Map.exists (fun n _ -> Map.containsKey n shader.shaderInputs) then
                 let semantics = scopes |> Map.keys |> Set.ofSeq
-                newBody |> Expr.substituteReads (fun kind inputType name index ->
+                newBody |> Expr.substituteReads (fun kind inputType name index slot ->
                     match kind with
                         | ParameterKind.Input when Set.contains name semantics ->
                             match index with
@@ -2522,9 +2522,9 @@ module Shader =
                                         if inputType.IsArray then inputType.GetElementType()
                                         else inputType
 
-                                    Expr.ReadInput(ParameterKind.Uniform, inputType, name) |> Some
+                                    Expr.ReadInput(ParameterKind.Uniform, inputType, name, slot) |> Some
                                 | None ->
-                                    Expr.ReadInput(ParameterKind.Uniform, inputType, name) |> Some
+                                    Expr.ReadInput(ParameterKind.Uniform, inputType, name, slot) |> Some
                         | _ ->
                             None
                 )
@@ -2770,7 +2770,7 @@ module Shader =
 
         let body =
             if hasSourceVertexIndex then
-                s.shaderBody.SubstituteReads(fun kind typ name index ->
+                s.shaderBody.SubstituteReads(fun kind typ name index slot ->
                     match kind, index with
                         | ParameterKind.Input, Some i when name = Intrinsics.SourceVertexIndex ->
                             Some i
@@ -2982,7 +2982,7 @@ module Shader =
 
                     let rBody =
                         r.shaderBody
-                            |> Expr.substituteReads (fun kind t name idx ->
+                            |> Expr.substituteReads (fun kind t name idx slot ->
                                 match kind with
                                     | ParameterKind.Input -> 
                                         match Map.tryFind name variables with
@@ -3072,7 +3072,7 @@ module Shader =
                     // wrap the right shader with let-bindings for all used inputs
                     let rBody = 
                         rShader.shaderBody
-                            |> Expr.substituteReads (fun kind t name idx ->
+                            |> Expr.substituteReads (fun kind t name idx slot ->
                                 match kind with
                                     | ParameterKind.Input -> 
                                         match Map.tryFind name variables with
@@ -3082,7 +3082,7 @@ module Shader =
                                                 match vertexIndex with
                                                     | Some vertexIndex -> 
                                                         match idx with
-                                                            | None -> Some (Expr.ReadInput(kind, t, name, vertexIndex))
+                                                            | None -> Some (Expr.ReadInput(kind, t, name, vertexIndex, slot))
                                                             | Some i -> failwithf "[FShade] vertex shader reading indexed input %A not supported" name
                                                     | None ->
                                                         failwithf "[FShade] internal error in gsvs"
@@ -3446,7 +3446,7 @@ module Shader =
 
                     let rBody =
                         let rBody =
-                            rShader.shaderBody.SubstituteReads (fun kind typ name index ->
+                            rShader.shaderBody.SubstituteReads (fun kind typ name index slot ->
                                 match kind with
                                     | ParameterKind.Input ->
                                         match index with
@@ -3558,7 +3558,7 @@ module Shader =
                         None
 
             let rBody = 
-                rShader.shaderBody.SubstituteReads (fun kind typ name index ->
+                rShader.shaderBody.SubstituteReads (fun kind typ name index slot ->
                     match kind, index with
                         | ParameterKind.Input, Some index ->
                             tryRead name index
@@ -3574,11 +3574,11 @@ module Shader =
                             let body = lShader.shaderBody
 
                             let body =
-                                body.SubstituteReads(fun kind typ name ii ->
+                                body.SubstituteReads(fun kind typ name ii slot ->
                                     assert (Option.isNone ii)
                                     match kind with
                                         | ParameterKind.Input ->
-                                            Expr.ReadInput(kind, typ, name, index) |> Some
+                                            Expr.ReadInput(kind, typ, name, index, slot) |> Some
                                         | _ ->
                                             None
                                 )

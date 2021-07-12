@@ -192,15 +192,15 @@ type ExpressionSubstitutionExtensions private() =
             | ShapeLambda(v, b) -> numberOfCalls mi b
             | ShapeCombination(o, args) -> args |> List.fold (fun r e -> r <+> numberOfCalls mi e) zero
 
-    static let rec substituteReads (substitute : ParameterKind -> Type -> string -> Option<Expr> -> Option<Expr>) (e : Expr) =
+    static let rec substituteReads (substitute : ParameterKind -> Type -> string -> Option<Expr> -> Option<ShaderSlot> -> Option<Expr>) (e : Expr) =
         match e with
-            | ReadInputOrRaytracingData(kind, name, index, _) ->
+            | ReadInputOrRaytracingData(kind, name, index, slot) ->
                 let index = index |> Option.map (substituteReads substitute)
-                match substitute kind e.Type name index with
+                match substitute kind e.Type name index slot with
                     | Some e -> e
                     | None -> 
                         match index with
-                            | Some index -> Expr.ReadInput(kind, e.Type, name, index)
+                            | Some index -> Expr.ReadInput(kind, e.Type, name, index, slot)
                             | None -> e
 
             | CallFunction(utility, args) ->
@@ -234,7 +234,7 @@ type ExpressionSubstitutionExtensions private() =
  
         
     [<Extension>]
-    static member SubstituteReads (e : Expr, substitute : ParameterKind -> Type -> string -> Option<Expr> -> Option<Expr>) =
+    static member SubstituteReads (e : Expr, substitute : ParameterKind -> Type -> string -> Option<Expr> -> Option<ShaderSlot> -> Option<Expr>) =
         substituteReads substitute e
         
     [<Extension>]
@@ -249,7 +249,7 @@ type ExpressionSubstitutionExtensions private() =
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Expr =
     let inline substitute (f : Var -> Option<Expr>) (e : Expr) = e.Substitute f
-    let inline substituteReads (f : ParameterKind -> Type -> string -> Option<Expr> -> Option<Expr>) (e : Expr) = e.SubstituteReads f
+    let inline substituteReads f (e : Expr) = e.SubstituteReads f
     let inline substituteWrites (f : Map<string, Option<Expr> * Expr> -> Option<Expr>) (e : Expr) = e.SubstituteWrites f
     let getAffectedOutputsMap (e : Expr) = Affected.getAffectedOutputsMap e
     let computeCallCount (mi : MethodInfo) (e : Expr) = e.ComputeCallCount(mi)

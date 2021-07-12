@@ -3047,7 +3047,7 @@ module Optimizer =
                         let mutable uniqueIndex = None
                         let mutable success = true
                         let res = 
-                            e.SubstituteReads(fun kind typ name index ->
+                            e.SubstituteReads(fun kind typ name index slot ->
                                 match kind, index with
                                     | ParameterKind.Input, Some index ->
                                         let iHash = Expr.ComputeHash index
@@ -3099,8 +3099,8 @@ module Optimizer =
                         let last = last |> List.map (fun l -> l.self)
 
                         let h = 
-                            h.self.SubstituteReads(fun kind typ name index ->
-                                Expr.ReadInput(kind, typ, name) |> Some
+                            h.self.SubstituteReads(fun kind typ name index slot ->
+                                Expr.ReadInput(kind, typ, name, slot) |> Some
                             )
 
                         let mutable names = Set.empty
@@ -3109,7 +3109,7 @@ module Optimizer =
                             last |> List.map (fun e ->
                                 let mutable index = Unchecked.defaultof<Expr>
                  
-                                e.SubstituteReads(fun kind typ name idx ->
+                                e.SubstituteReads(fun kind typ name idx slot ->
                                     match kind, idx with
                                         | ParameterKind.Input, Some i ->
                                             index <- i
