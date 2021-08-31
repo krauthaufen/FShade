@@ -1365,12 +1365,12 @@ let ``Raytracing with Reflected Functions``() =
         }
 
     let chitShader (input : RayHitInput<Payload>) =
-        closesthit {
+        closestHit {
             return { color = trace input; depth = 0 }
         }
 
     let chitShaderShadow (input : RayHitInput<Payload>) =
-        closesthit {
+        closestHit {
             let shadowed = scene.TraceRay<bool>(V3d.Zero, V3d.XAxis)
             if shadowed then
                 return { color = V3d.Zero; depth = 0 }
@@ -1381,14 +1381,14 @@ let ``Raytracing with Reflected Functions``() =
     let effect =
          let hitgroupMain =
              hitgroup {
-                closesthit ("1", chitShader)
-                closesthit ("2", chitShader)
+                closestHit ("1", chitShader)
+                closestHit ("2", chitShader)
             }
 
          let hitgroupShadow =
-             hitgroup { closesthit chitShaderShadow }
+             hitgroup { closestHit chitShaderShadow }
 
-         raytracing {
+         raytracingEffect {
              raygen raygenShader
              hitgroup ("Main", hitgroupMain)
              hitgroup ("Shadow", hitgroupShadow)

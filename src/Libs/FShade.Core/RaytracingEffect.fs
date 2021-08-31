@@ -262,7 +262,7 @@ module RaytracingBuilders =
             let entry = s.PerRayType |> Map.tryFind rayId |> Option.defaultValue HitGroupEntry.empty
             { s with PerRayType = s.PerRayType |> Map.add rayId (f entry)}
 
-        [<CustomOperation("anyhit")>]
+        [<CustomOperation("anyHit")>]
         member x.AnyHit(s : HitGroup, (rayId, shader) : Symbol * Shader) =
             match shader.shaderStage with
             | ShaderStage.AnyHit ->
@@ -297,7 +297,7 @@ module RaytracingBuilders =
             x.AnyHit(s, (Identifier.Default, f))
 
 
-        [<CustomOperation("closesthit")>]
+        [<CustomOperation("closestHit")>]
         member x.ClosestHit(s : HitGroup, (rayId, shader) : Symbol * Shader) =
             match shader.shaderStage with
             | ShaderStage.ClosestHit ->
@@ -368,7 +368,7 @@ module RaytracingBuilders =
 
     type RayGenerationShaderMustBeSpecified = RayGenerationShaderMustBeSpecified
 
-    type RaytracingBuilder() =
+    type RaytracingEffectBuilder() =
         member x.Yield(_) = RayGenerationShaderMustBeSpecified
 
         member x.Delay f = f()
@@ -475,4 +475,4 @@ module RaytracingBuilders =
 
 
     let hitgroup = HitGroupBuilder()
-    let raytracing = RaytracingBuilder()
+    let raytracingEffect = RaytracingEffectBuilder()

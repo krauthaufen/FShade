@@ -411,7 +411,7 @@ module RaytracingTest =
         }
 
     let anyHitShader (input : RayHitInput<Payload>) =
-        anyhit {
+        anyHit {
             if input.ray.direction = V3d.Zero then
                 ignoreIntersection()
             elif input.hit.attribute.X = 0.0 then
@@ -419,7 +419,7 @@ module RaytracingTest =
         }
 
     let closestHitShader (input : RayHitInput<Payload>) =
-        closesthit {
+        closestHit {
             let whatever = scene.TraceRay(V3d.Zero, V3d.XAxis)
             return { foo = input.hit.attribute.X; flag = whatever }
         }
@@ -440,12 +440,12 @@ let main args =
     let effect =
         let defaultHitGroup =
             hitgroup {
-                anyhit anyHitShader
-                closesthit closestHitShader
+                anyHit anyHitShader
+                closestHit closestHitShader
                 intersection intersectionShader
             }
 
-        raytracing {
+        raytracingEffect {
             raygen raygenShader
             hitgroup defaultHitGroup
             miss missShader

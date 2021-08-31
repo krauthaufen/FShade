@@ -501,8 +501,8 @@ module ShaderBuilders =
 
     let raygen = RayGenerationBuilder()
     let miss = RayMissBuilder()
-    let anyhit = RayAnyHitBuilder()
-    let closesthit = RayClosestHitBuilder()
+    let anyHit = RayAnyHitBuilder()
+    let closestHit = RayClosestHitBuilder()
     let callable = RayCallableBuilder()
     let intersection = RayIntersectionBuilder()
 
