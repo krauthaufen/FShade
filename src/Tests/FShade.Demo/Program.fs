@@ -426,10 +426,12 @@ module RaytracingTest =
 
     let raygenShader (input : RayGenerationInput) =
         let secondaryRayFlags = RayFlags.Opaque ||| RayFlags.SkipClosestHitShader
+        let rayType = Sym.ofString "rayMain"
+        let missType = Sym.ofString "missMain"
 
         raygen {
             let whatever = Callable.Execute({ flag = true; value = 0.0 })
-            let result = scene.TraceRay<Payload>(scene.TraceRay<V3d>(V3d.Zero, V3d.ZAxis, V3d.One), V3d.YAxis, ray = "Secondary", flags = secondaryRayFlags)
+            let result = scene.TraceRay<Payload>(scene.TraceRay<V3d>(V3d.Zero, V3d.ZAxis, V3d.One), V3d.YAxis, miss = missType, ray = rayType, flags = secondaryRayFlags)
             uniform.OutputBuffer.[input.work.id.XY] <- V4d(result.foo + whatever.value)
         }
 

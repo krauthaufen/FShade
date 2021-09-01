@@ -26,6 +26,10 @@ module private TraceDefaults =
 type Callable private() =
     static member Execute<'T>([<Optional; DefaultParameterValue(Identifier.Default)>] id : string) : 'T = onlyInShaderCode "Callable.Execute"
     static member Execute<'T>(data : 'T, [<Optional; DefaultParameterValue(Identifier.Default)>] id : string) : 'T = onlyInShaderCode "Callable.Execute"
+    [<Inline>]
+    static member Execute<'T>(id : Symbol) : 'T = Callable.Execute<'T>(string id)
+    [<Inline>]
+    static member Execute<'T>(data : 'T, id : Symbol) : 'T = Callable.Execute<'T>(data, string id)
 
 
 type Intersection private() =
@@ -65,6 +69,28 @@ type Scene(accelerationStructure : ISemanticValue) =
                           [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT : float,
                           [<Optional; DefaultParameterValue(TraceDefaults.Flags)>]    flags : RayFlags,
                           [<Optional; DefaultParameterValue(TraceDefaults.CullMask)>] cullMask : int) : 'T = onlyInShaderCode "TraceRay"
+
+    [<Inline>]
+    member x.TraceRay<'T>(origin : V3d, direction : V3d, ray : Symbol, miss : Symbol,
+                          [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT : float,
+                          [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT : float,
+                          [<Optional; DefaultParameterValue(TraceDefaults.Flags)>]    flags : RayFlags,
+                          [<Optional; DefaultParameterValue(TraceDefaults.CullMask)>] cullMask : int) : 'T =
+        x.TraceRay<'T>(origin, direction,
+                       ray = string ray, miss = string miss,
+                       minT = minT, maxT = maxT, flags = flags,
+                       cullMask = cullMask)
+
+    [<Inline>]
+    member x.TraceRay<'T>(origin : V3d, direction : V3d, payload : 'T, ray : Symbol, miss : Symbol,
+                          [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT : float,
+                          [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT : float,
+                          [<Optional; DefaultParameterValue(TraceDefaults.Flags)>]    flags : RayFlags,
+                          [<Optional; DefaultParameterValue(TraceDefaults.CullMask)>] cullMask : int) : 'T =
+        x.TraceRay<'T>(origin, direction, payload,
+                       ray = string ray, miss = string miss,
+                       minT = minT, maxT = maxT, flags = flags,
+                       cullMask = cullMask)
 
 
 [<AutoOpen>]

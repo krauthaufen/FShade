@@ -640,10 +640,16 @@ module Preprocessor =
                     { s with hitAttribute = Some (name, hitAttribute) }, name
             )
 
+        let private (|Name|_|) (value : obj) =
+            match value with
+            | :? string as name -> Some name
+            | :? Symbol as sym -> Some (string sym)
+            | _ -> None
+
         let useRayType (e : Expr) =
             State.custom (fun (s : State) ->
                 match Expr.TryEval e with
-                | (Some (:? string as name)) ->
+                | Some (Name name) ->
                     { s with rayTypes = s.rayTypes |> Set.add name }, name
                 | _ ->
                     failwithf "[FShade] Ray type name must be constant"
@@ -652,7 +658,7 @@ module Preprocessor =
         let useMissShader (e : Expr) =
             State.custom (fun (s : State) ->
                 match Expr.TryEval e with
-                | (Some (:? string as name)) ->
+                | Some (Name name) ->
                     { s with missShaders = s.missShaders |> Set.add name }, name
                 | _ ->
                     failwithf "[FShade] Miss shader name must be constant"
@@ -661,7 +667,7 @@ module Preprocessor =
         let useCallableShader (e : Expr) =
             State.custom (fun (s : State) ->
                 match Expr.TryEval e with
-                | (Some (:? string as name)) ->
+                | (Some (Name name)) ->
                     { s with callableShaders = s.callableShaders |> Set.add name }, name
                 | _ ->
                     failwithf "[FShade] Callable shader name must be constant"
