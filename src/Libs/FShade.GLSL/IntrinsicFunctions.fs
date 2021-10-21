@@ -1918,7 +1918,7 @@ module IntrinsicFunctions =
                 exactly <@ Bitwise.FloatBitsToInt @>
             ]
 
-            CIntrinsic.simple "floatBitsToUInt", [
+            CIntrinsic.simple "floatBitsToUint", [
                 exactly <@ Bitwise.FloatBitsToUInt @>
             ]
 
