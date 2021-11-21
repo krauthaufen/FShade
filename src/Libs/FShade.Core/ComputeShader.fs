@@ -176,7 +176,7 @@ module ComputeShader =
     let private cache = System.Collections.Concurrent.ConcurrentDictionary<string * V3i, ComputeShader>()
     
     let ofExpr (localSize : V3i) (body : Expr) =
-        Pickler.ExprPicklerFunctions.Init()
+        Serializer.Init()
         let body = Expr.InlineSplices body
         let hash = Expr.ComputeHash body
         cache.GetOrAdd((hash, localSize), fun (signature, localSize) ->
@@ -190,7 +190,7 @@ module ComputeShader =
     let ofFunction (maxLocalSize : V3i) (f : 'a -> 'b) : ComputeShader =
         match Shader.Utils.tryExtractExpr f with
             | Some (body, _) ->
-                Pickler.ExprPicklerFunctions.Init()
+                Serializer.Init()
 
                 let localSize, meth =
                     match body.Method with
@@ -204,8 +204,7 @@ module ComputeShader =
                             Log.warn "[FShade] compute shader without local-size"
                             V3i(1,1,1), null
 
-                let hash = Pickler.pickler.ComputeHash ((body, localSize))
-                let hash = hash.Hash |> System.Convert.ToBase64String
+                let hash = sprintf "%s%A" (Expr.ComputeHash body) localSize
 
                 cache.GetOrAdd((hash, localSize), fun (signature, localSize) ->
                     let body = Expr.InlineSplices body

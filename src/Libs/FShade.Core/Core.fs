@@ -2,8 +2,6 @@
 
 open System
 open Aardvark.Base
-open MBrace.FsPickler.Combinators
-open MBrace.FsPickler
 
 [<AttributeUsage(AttributeTargets.Property ||| AttributeTargets.Field, AllowMultiple = false)>]
 type SemanticAttribute(s : string) =

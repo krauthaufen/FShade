@@ -1950,11 +1950,12 @@ module Optimizer =
 
                         let (vars, values) = usedInputs |> Map.toList |> List.map snd |> List.unzip
 
+                        let inputVars = utility.functionArguments @ vars
                         let utility =
                             { utility with
-                                functionArguments = utility.functionArguments @ vars
+                                functionArguments = inputVars
                                 functionBody = newBody
-                                functionId = Expr.ComputeHash newBody
+                                functionId = Expr.ComputeHash (Expr.Lambdas(inputVars, newBody))
                                 functionTag = null
                             }
 
@@ -2147,11 +2148,12 @@ module Optimizer =
 
                         let (vars, values) = usedInputs |> Map.toList |> List.map snd |> List.unzip
 
+                        let inputVars = utility.functionArguments @ vars
                         let utility =
                             { utility with
-                                functionArguments = utility.functionArguments @ vars
+                                functionArguments = inputVars
                                 functionBody = newBody
-                                functionId = Expr.ComputeHash newBody
+                                functionId = Expr.ComputeHash (Expr.Lambdas(inputVars, newBody))
                                 functionTag = null
                             }
 

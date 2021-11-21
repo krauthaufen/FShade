@@ -275,6 +275,11 @@ module ExprExtensions =
                         | l, r -> Expr.Sequential(l, r)
 
 
+        static member Lambdas(args : list<Var>, body : Expr) =
+            match args with
+            | [] -> body
+            | a :: r -> Expr.Lambda(a, Expr.Lambdas(r, body))
+
         static member Unit =
             Expr.Value(())
 

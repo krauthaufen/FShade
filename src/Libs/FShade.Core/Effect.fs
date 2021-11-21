@@ -14,7 +14,7 @@ open FShade.Imperative
 
 
 /// Effect encapsulates a set of shaders for the various ShaderStages defined by FShade.
-type Effect internal(id : string, shaders : Lazy<Map<ShaderStage, Shader>>, composedOf : list<Effect>) =
+type Effect(id : string, shaders : Lazy<Map<ShaderStage, Shader>>, composedOf : list<Effect>) =
     let mutable sourceDefintion : Option<Expr * Type> = None
 
     let inputToplogy =
@@ -246,6 +246,27 @@ module Effect =
             outputSemantics : Map<string, InterpolationMode * DepthWriteMode>
             body : Expr
         }
+
+    module private EffectKey =
+        open System.IO
+        open System.Security.Cryptography
+
+        let computeHash (e : EffectKey) =  
+            use hash = System.Security.Cryptography.MD5.Create()
+            use ms = new MemoryStream()
+            use h = new CryptoStream(ms, hash, CryptoStreamMode.Write)
+            use w = new BinaryWriter(h, System.Text.Encoding.UTF8, true)
+            Expr.serializeInternal (Expr.SerializerState(true)) w e.body
+            w.Write (Map.count e.inputSemantics)
+            for KeyValue(name, mode) in e.inputSemantics do
+                w.Write name; w.Write (int mode)
+            w.Write (Map.count e.outputSemantics)
+            for KeyValue(name, (a, b)) in e.outputSemantics do
+                w.Write name; w.Write (int a); w.Write (int b)
+            h.FlushFinalBlock()
+            hash.Hash |> Convert.ToBase64String
+
+
     /// creates an effect from a shader-function
     let ofFunction (shaderFunction : 'a -> Expr<'b>) =
         let realEx = 
@@ -287,8 +308,8 @@ module Effect =
                 body = expression.WithAttributes []
             }
          
-        Pickler.ExprPicklerFunctions.Init()
-        let hash = Pickler.pickler.ComputeHash(key).Hash |> Convert.ToBase64String
+        Serializer.Init()
+        let hash = EffectKey.computeHash key
 
 
         effectCache.GetOrAdd(hash, fun _ ->
@@ -763,3 +784,40 @@ module Effect =
 
     let toMultiViewportEffect (viewports : int) (uniforms : Map<string, string>) (topology : InputTopology) (effect : Effect) = 
         toLayeredEffect' Intrinsics.ViewportIndex viewports uniforms topology effect
+
+
+    open System.IO
+
+    let internal serializeInternal (state : Shader.SerializerState) (dst : BinaryWriter) (effect : Effect) =
+        dst.Write effect.Id
+        let shaders = effect.Shaders
+        dst.Write (Map.count shaders)
+        for KeyValue(stage, shader) in shaders do
+            dst.Write (int stage)
+            Shader.serializeInternal state dst shader
+        
+    let internal deserializeInternal (state : Shader.DeserializerState) (src : BinaryReader) =
+        let id = src.ReadString()
+        let shaders =
+            let cnt = src.ReadInt32()
+            List.init cnt (fun _ ->
+                let stage = src.ReadInt32() |> unbox<ShaderStage>
+                let shader = Shader.deserializeInternal state src
+                stage, shader
+            )
+            |> Map.ofList
+
+        Effect(id, lazy shaders, [])
+
+
+    let serialize (dst : Stream) (e : Effect) =
+        use w = new BinaryWriter(dst, System.Text.Encoding.UTF8, true)
+        serializeInternal (Shader.SerializerState()) w e
+        
+    let deserialize (src : Stream) =
+        use r = new BinaryReader(src, System.Text.Encoding.UTF8, true)
+        deserializeInternal (Shader.DeserializerState()) r
+         
+    let tryDeserialize (src : Stream) =
+        try Some (deserialize src)
+        with _ -> None
