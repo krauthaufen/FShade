@@ -86,7 +86,44 @@ type GLSLShader =
             "======================= IO =======================",
             x.iface.ToString(),
             "======================= IO =======================")
+     
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module GLSLShader =
+    open System.IO
+
+    let serialize (dst : Stream) (shader : GLSLShader) =
+        use w = new BinaryWriter(dst, System.Text.Encoding.UTF8, true)
+        w.Write "GLSLShader"
+        GLSLProgramInterface.serializeInternal w shader.iface
+        w.Write shader.code
         
+    let deserialize (src : Stream) =
+        use r = new BinaryReader(src, System.Text.Encoding.UTF8, true)
+        let s = r.ReadString()
+        if s <> "GLSLShader" then failwith "not a GLSLShader"
+        let iface = GLSLProgramInterface.deserializeInternal r
+        let code = r.ReadString()
+        { iface = iface; code = code }
+
+
+    let tryDeserialize (src : Stream) =
+        try deserialize src |> Some
+        with _ -> None
+
+    let pickle (shader : GLSLShader) =
+        use ms = new MemoryStream()
+        serialize ms shader
+        ms.ToArray()
+
+    let unpickle (data : byte[]) =
+        use ms = new MemoryStream(data)
+        deserialize ms
+        
+    let tryUnpickle (data : byte[]) =
+        use ms = new MemoryStream(data)
+        tryDeserialize ms
+
+       
 
 type Backend private(config : Config) =
     inherit Compiler.Backend()

@@ -2727,6 +2727,8 @@ module Optimizer =
 
         let rec processExpression (expr : Expr) : Expr * Hoisting =
             match expr with
+                | WithValue(_, _, e) -> 
+                    processExpression e
                 | WriteOutputs _
                 | AddressSet _ 
                 | ForInteger _ 

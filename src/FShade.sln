@@ -1,6 +1,7 @@
-﻿Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.30011.22
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.1.31911.260
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FShade.Imperative", "Libs\FShade.Imperative\FShade.Imperative.fsproj", "{1223C55B-5634-4764-B5BD-BF9AD95C073B}"
 EndProject
@@ -22,7 +23,9 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FShade.Core.Tests", "Tests\
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FShade.Demo", "Tests\FShade.Demo\FShade.Demo.fsproj", "{5D7411A4-C6A7-459F-A418-173F8CF611B9}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FShade.GLSL.Tests", "Tests\FShade.GLSL.Tests\FShade.GLSL.Tests.fsproj", "{F692FFEE-C41D-4422-8B42-3B6F3695C19E}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FShade.GLSL.Tests", "Tests\FShade.GLSL.Tests\FShade.GLSL.Tests.fsproj", "{F692FFEE-C41D-4422-8B42-3B6F3695C19E}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FShade.Preprocessor", "FShade.Preprocessor\FShade.Preprocessor.fsproj", "{8EA0F9FC-F88E-4635-B285-AD5BB286B3D1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -62,6 +65,10 @@ Global
 		{F692FFEE-C41D-4422-8B42-3B6F3695C19E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F692FFEE-C41D-4422-8B42-3B6F3695C19E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F692FFEE-C41D-4422-8B42-3B6F3695C19E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8EA0F9FC-F88E-4635-B285-AD5BB286B3D1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8EA0F9FC-F88E-4635-B285-AD5BB286B3D1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8EA0F9FC-F88E-4635-B285-AD5BB286B3D1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8EA0F9FC-F88E-4635-B285-AD5BB286B3D1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

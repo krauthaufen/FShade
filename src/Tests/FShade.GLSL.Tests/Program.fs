@@ -7,6 +7,7 @@ open Aardvark.Base
 open FShade
 open FShade.Imperative
 open Microsoft.FSharp.Quotations
+open FShade.GLSL
 
 
 type Preprocessor() =
@@ -56,7 +57,7 @@ type Preprocessor() =
 
 [<ReflectedDefinition>]
 let foo(a : float) =
-    2.0 * a
+    3.0 * a
 
 type Rec = { a : float; b : int }
 
@@ -86,39 +87,48 @@ let vert (v : SingleEffects.Vertex) =
     }
 
 open System.Security.Cryptography
+open System.IO
+
+let hans = "asdjnasjdkmsajkdmkasd"
 
 [<EntryPoint>]
 let main args = 
     Aardvark.Base.Aardvark.Init()
+    //FShade.Serializer.Init()
 
-    let e = Effect.ofFunction vert
-
-    let e1 = 
-        use ms = new System.IO.MemoryStream()
-        e |> Effect.serialize ms
-        ms.Position <- 0L
-        Effect.deserialize ms
-
-
-
-
-
-    let body = e.VertexShader.Value.shaderBody
-
-    use ms = new MemoryStream()
-    Expr.serialize ms body
-
-    ms.Position <- 0L
-    let res = Expr.deserialize ms
-
-    let h1 = Expr.computeHash (vert Unchecked.defaultof<_>)
-    let h2 = Expr.computeHash body
-    let h3 = Expr.computeHash res
-
+    let sw = System.Diagnostics.Stopwatch.StartNew()
+    let a = Effect.ofFunction vert
+    let b = a
     
-    printfn "%A" h1
-    printfn "%A" h2
-    printfn "%A" h3
+    let cleanName (file : string) =
+        let bytes = System.Text.Encoding.UTF8.GetBytes(file)
+        let builder = System.Text.StringBuilder()
+        for b in bytes do builder.AppendFormat("{0:X2}", b) |> ignore
+        builder.ToString()
 
-    //ConstantFolding.Broken()
+        
+    let cache = sprintf @"C:\Users\Schorsch\Desktop\%s.txt" (cleanName b.Id)
+
+    let code = 
+        let create() =
+            let glsl = 
+                b
+                |> Effect.toModule { depthRange = Range1d(-1.0, 1.0); flipHandedness = false; lastStage = ShaderStage.Fragment; outputs = Map.ofList ["Colors", (typeof<V4d>, 0)] }
+                |> ModuleCompiler.compileGLSL430
+
+            File.WriteAllBytes(cache, GLSLShader.pickle glsl)
+            glsl
+ 
+        if File.Exists cache then  
+            match GLSLShader.tryUnpickle (File.ReadAllBytes cache) with
+            | Some glsl -> glsl
+            | None -> create()
+        else
+            create()
+
+    sw.Stop()
+    printfn "%s" (string code)
+
+    printfn "took: %A" sw.MicroTime
+
     0

@@ -17,7 +17,7 @@ open FSharp.Data.Adaptive
 module ExprHashExtensions =
     
     [<CompilerMessage("internal use only", 1337, IsHidden = true)>]
-    let mutable _hash : Expr -> string = fun _ -> failwith "not initialized"
+    let mutable _hash : Expr -> string = fun _ -> failwith "not initialized: use FShade.Serializer.Init() to fix"
 
     module private Reflection = 
         open System.Reflection.Emit

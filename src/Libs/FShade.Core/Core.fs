@@ -152,6 +152,48 @@ module ImageFormatExtensions =
             ]
 
 
+        let toFormatType =
+            ConversionHelpers.lookupTable [
+                ImageFormat.Rgba32f, typeof<rgba32f>
+                ImageFormat.Rgba16f, typeof<rgba16f>
+                ImageFormat.Rg32f, typeof<rg32f>
+                ImageFormat.Rg16f, typeof<rg16f>
+                ImageFormat.R11fG11fB10f, typeof<r11g11b10f>
+                ImageFormat.R32f, typeof<r32f>
+                ImageFormat.R16f, typeof<r16f>
+
+                ImageFormat.Rgba16, typeof<rgba16>
+                ImageFormat.Rgb10A2, typeof<rgb10a2>
+                ImageFormat.Rgba8, typeof<rgba8>
+                ImageFormat.Rg16, typeof<rg16>
+                ImageFormat.Rg8, typeof<rg8>
+                ImageFormat.R16, typeof<r16>
+                ImageFormat.R8, typeof<r8>
+
+
+                ImageFormat.Rgba32ui, typeof<rgba32ui>
+                ImageFormat.Rgba16ui, typeof<rgba16ui>
+                ImageFormat.Rgb10A2ui, typeof<rgb10a2ui>
+                ImageFormat.Rgba8ui, typeof<rgba8ui>
+                ImageFormat.Rg32ui, typeof<rg32ui>
+                ImageFormat.Rg16ui, typeof<rg16ui>
+                ImageFormat.Rg8ui, typeof<rg8ui>
+                ImageFormat.R32ui, typeof<r32ui>
+                ImageFormat.R16ui, typeof<r16ui>
+                ImageFormat.R8ui, typeof<r8ui>
+
+                ImageFormat.Rgba32i, typeof<rgba32i>
+                ImageFormat.Rgba16i, typeof<rgba16i>
+                ImageFormat.Rgba8i, typeof<rgba8i>
+                ImageFormat.Rg32i, typeof<rg32i>
+                ImageFormat.Rg16i, typeof<rg16i>
+                ImageFormat.Rg8i, typeof<rg8i>
+                ImageFormat.R32i, typeof<r32i>
+                ImageFormat.R16i, typeof<r16i>
+                ImageFormat.R8i, typeof<r8i>
+            ]
+
+
 
 
 type UniformValue =
