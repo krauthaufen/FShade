@@ -397,6 +397,18 @@ module Compiler =
                     | _ ->
                         e
 
+        let private (|Transpose|_|) (mi : MethodInfo) (args : list<CExpr>) =
+            match mi, args with
+            | MethodQuote <@ Mat.transpose : M44d -> M44d @> _, [m]    
+            | MethodQuote <@ Mat.Transposed : M44d -> M44d @> _, [m]    
+            | Method("Transpose", [MatrixOf _]) , [m]
+            | Method("get_Transposed", _), [m] -> 
+                Some m
+            | _ ->
+                None
+
+                
+
         let rec tryGetBuiltInMethod (b : IBackend) (mi : MethodInfo) (args : list<CExpr>) =
             let ct = CType.ofType b mi.ReturnType
             match mi, args with
@@ -414,22 +426,35 @@ module Compiler =
                 | Method("op_RightShift", _), [l;r]         -> CExpr.CRightShift(ct, l, r) |> Some
             
                
+                | Method("op_Multiply", _), [CTranspose(CMatrix(et0,r0,c0),m0); CTranspose(CMatrix(et1,r1,c1), m1)] ->
+                    CMulMatMat(ct, m1, m0) |> Some
+
+                | Method("op_Multiply", _), [CTranspose(CMatrix(a,b,c),l); r] ->
+                    match r.ctype with
+                    | CVector _ ->
+                        CExpr.CMulVecMat(ct, r, l) |> Some
+                    | _ ->
+                        CMul(ct, CTranspose(CMatrix(a,b,c), l), r) |> Some
+
 
                 | Method("op_Multiply", _), [l;r] ->
                     let lt = l.ctype
                     let rt = r.ctype 
                     match lt, rt with
-                        | CMatrix _, CMatrix _              -> CMulMatMat(ct, l, r) |> Some
-                        | CMatrix _, CVector _              -> CMulMatVec(ct, l, r) |> Simplification.simplifyMatrixTerm |> Some
-                        | CVector _, CMatrix(b,rows,cols)   -> CMulVecMat(ct, l, r) |> Simplification.simplifyMatrixTerm |> Some
-                        | _                                 -> CExpr.CMul(ct, l, r) |> Some
+                    | CMatrix _, CMatrix _  -> CMulMatMat(ct, l, r) |> Some
+                    | CMatrix _, CVector _  -> CMulMatVec(ct, l, r) |> Simplification.simplifyMatrixTerm |> Some
+                    | CVector _, CMatrix _  -> CMulVecMat(ct, l, r) |> Simplification.simplifyMatrixTerm |> Some
+                    | _                     -> CExpr.CMul(ct, l, r) |> Some
 
                 // transpose
                 | MethodQuote <@ Mat.transpose : M44d -> M44d @> _, [m]    
                 | MethodQuote <@ Mat.Transposed : M44d -> M44d @> _, [m]    
                 | Method("Transpose", [MatrixOf _]) , [m]
                 | Method("get_Transposed", _), [m] -> 
-                    match ct with
+                    match m with
+                    | CTranspose(_, m) -> Some m
+                    | _ ->
+                        match ct with
                         | CMatrix(b,r,c) -> CTranspose(CMatrix(b,c,r), m) |> Some
                         | _ -> None
                    
@@ -626,6 +651,7 @@ module Compiler =
                 | Method("GetArray", _), [arr; index] -> 
                     CExpr.CItem(ct, arr, index) |> Some
                     
+                
 
                 | ConversionMethod(_,o), [arg]              -> CExpr.CConvert(CType.ofType b o, arg) |> Some
                 | _ -> None

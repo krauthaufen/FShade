@@ -167,6 +167,25 @@ module Primitives =
     let endPrimitive() = ()
     let restartStrip() = ()
 
+    let private emitVertexMeth = getMethodInfo <@ emitVertex() @>
+    let private restartStripMeth = getMethodInfo <@ restartStrip() @>
+    let private endPrimitiveMeth = getMethodInfo <@ endPrimitive() @>
+    let (|EmitVertex|_|) (e : Microsoft.FSharp.Quotations.Expr) =
+        match e with
+        | Microsoft.FSharp.Quotations.Patterns.Call(None, mi, []) when mi = emitVertexMeth ->
+            Some ()
+        | _ ->
+            None
+            
+    let (|RestartStrip|_|) (e : Microsoft.FSharp.Quotations.Expr) =
+        match e with
+        | Microsoft.FSharp.Quotations.Patterns.Call(None, mi, []) when mi = restartStripMeth || mi = endPrimitiveMeth ->
+            Some ()
+        | _ ->
+            None
+
+
+
     let inline ddx< ^a when ^a : (static member (-) : ^a -> ^a -> ^a) > (v : ^a) : ^a = onlyInShaderCode "ddx"
     let inline ddy< ^a when ^a : (static member (-) : ^a -> ^a -> ^a) > (v : ^a) : ^a = onlyInShaderCode "ddy"
     let inline ddxFine< ^a when ^a : (static member (-) : ^a -> ^a -> ^a) > (v : ^a) : ^a = onlyInShaderCode "ddxFine"

@@ -1,10 +1,7 @@
 ﻿namespace FShade
 
 open System
-open MBrace.FsPickler.Combinators
-open MBrace.FsPickler
 
-[<CustomPickler>]
 type UniformScope private(parent : Option<UniformScope>, name : string) =
     static let mutable currentId = 0
 
@@ -14,19 +11,6 @@ type UniformScope private(parent : Option<UniformScope>, name : string) =
 
     let id = System.Threading.Interlocked.Increment(&currentId)
     let childScopes = System.Collections.Generic.Dictionary<string, UniformScope>()
-
-    static member CreatePickler (r : IPicklerResolver) =
-        Pickler.fix (fun (self : Pickler<UniformScope>) ->
-            let make (parent : Option<UniformScope>) (name : string) =
-                match parent with
-                    | None -> glob
-                    | Some p -> p.GetChildScope(name)
-
-            Pickler.product
-                make
-                ^+ Pickler.field (fun s -> s.Parent) (Pickler.option self)
-                ^. Pickler.field (fun s -> s.Name) Pickler.string
-        )
 
     static member Global = glob
 

@@ -1199,7 +1199,7 @@ module IntrinsicFunctions =
                 generic <@ saturate : V4d -> _ @>
             ]
 
-            CIntrinsic.custom "smoothstep"[1; 2; 0], [
+            CIntrinsic.custom "smoothstep" [1; 2; 0], [
                 exactly <@ Fun.Smoothstep : float32 * float32 * float32 -> _ @>
                 exactly <@ Fun.Smoothstep : float * float * float -> _ @>
                 exactly <@ Fun.Smoothstep : V2f * V2f * V2f -> V2f @>

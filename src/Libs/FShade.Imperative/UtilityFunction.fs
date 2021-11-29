@@ -74,7 +74,7 @@ module UtilityFunction =
                                 args |> List.filter (fun a -> a.Type <> typeof<unit>)
 
                             Some {
-                                functionId = Expr.ComputeHash body
+                                functionId = Expr.ComputeHash e
                                 functionName = methodName m
                                 functionArguments = args
                                 functionBody = body
@@ -94,7 +94,10 @@ module UtilityFunction =
 
     let map (mapping : Expr -> Expr) (f : UtilityFunction) =
         let b = mapping f.functionBody
-        { f with functionBody = b; functionId = Expr.ComputeHash b }
+
+        let lam = Expr.Lambdas(f.functionArguments, b)
+
+        { f with functionBody = b; functionId = Expr.ComputeHash lam }
 
    
 [<AutoOpen>]

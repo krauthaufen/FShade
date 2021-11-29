@@ -12,9 +12,15 @@ open Microsoft.FSharp.Reflection
 open Aardvark.Base
 open FShade.Imperative
 
+#nowarn "1337"
+
+[<AttributeUsage(AttributeTargets.Method)>]
+type WithEffectAttribute() =
+    inherit System.Attribute()
+
 
 /// Effect encapsulates a set of shaders for the various ShaderStages defined by FShade.
-type Effect internal(id : string, shaders : Lazy<Map<ShaderStage, Shader>>, composedOf : list<Effect>) =
+type Effect(id : string, shaders : Lazy<Map<ShaderStage, Shader>>, composedOf : list<Effect>) =
     let mutable sourceDefintion : Option<Expr * Type> = None
 
     let inputToplogy =
@@ -138,16 +144,189 @@ module EffectConfig =
     let ofArray (m : array<string * Type * int>) =
         ofSeq m
 
+//type IPersistentStorage =
+//    abstract IsNone : bool
+//    abstract TryRead : file : string -> option<byte[]>
+//    abstract Write : file : string * data : byte[] -> unit
+//    abstract Delete : file : string -> bool
+//    abstract Exists : file : string -> bool
+//    abstract List : unit -> seq<string>
+
+//module PersistentStorage =
+//    open System
+//    open System.IO
+
+//    let none =
+//        { new IPersistentStorage with
+//            member x.IsNone = true
+//            member x.TryRead _ = None
+//            member x.Write(_,_) = ()
+//            member x.Delete _ = false
+//            member x.Exists _ = false
+//            member x.List() = Seq.empty
+//        }
+
+//    let directory (dir : string) =
+//        let dir = Path.GetFullPath dir
+//        if not (Directory.Exists dir) then Directory.CreateDirectory dir |> ignore
+
+//        let relativePath (file : string) =
+//            let name =
+//                let bytes = System.Text.Encoding.UTF8.GetBytes(file)
+//                let builder = System.Text.StringBuilder()
+//                for b in bytes do builder.AppendFormat("{0:X2}", b) |> ignore
+//                builder.ToString()
+
+//            Path.Combine(dir, name)
+
+//        { new IPersistentStorage with
+//            member x.IsNone = false
+//            member x.TryRead(file) =
+//                try
+//                    let p = relativePath file
+//                    if File.Exists p then File.ReadAllBytes p |> Some
+//                    else None
+//                with _ ->
+//                    None
+//            member x.Write(file, data) =
+//                try
+//                    let p = relativePath file
+//                    File.WriteAllBytes(p, data)
+//                with _ ->
+//                    ()
+
+//            member x.Exists(file) =
+//                try
+//                    let p = relativePath file
+//                    File.Exists p
+//                with _ ->
+//                    false
+                
+//            member x.Delete(file) =
+//                try
+//                    let p = relativePath file
+//                    if File.Exists p then
+//                        File.Delete p
+//                        true
+//                    else
+//                        false
+//                with _ ->
+//                    false
+
+//            member x.List() =
+//                let rec run (dir : string) =
+                    
+//                    let files =
+//                        try Directory.EnumerateFiles dir
+//                        with _ -> Seq.empty
+
+//                    let dirs = 
+//                        try Directory.EnumerateDirectories dir
+//                        with _ -> Seq.empty
+
+//                    Seq.append
+//                        files
+//                        (dirs |> Seq.collect run)
+
+//                let makeRelative (path : string) =
+//                    let path = Path.GetFullPath path
+//                    if path.StartsWith dir then 
+//                        if path.Length > dir.Length && path.[dir.Length] = Path.DirectorySeparatorChar then path.Substring(dir.Length + 1)
+//                        else path.Substring(dir.Length)
+//                    else
+//                        path
+
+//                run dir |> Seq.map makeRelative
+//        }
+
+//    let mutable current =
+//        try
+//            let path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FShade")
+//            directory path
+//        with _ ->
+//            none
+
+
+
 /// the Effect module provides functions for accessing, creating and modifying effects.
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Effect =
     let private effectCache = System.Collections.Concurrent.ConcurrentDictionary<string, Effect>()
     let private composeCache = System.Collections.Concurrent.ConcurrentDictionary<string, Effect>()
 
+
+
     [<CompilerMessage("clearCaches is considered harmful", 4321, IsError=false, IsHidden=true)>]
     let clearCaches() =
         effectCache.Clear()
         composeCache.Clear()
+
+
+
+    open System.IO
+
+    let internal serializeInternal (state : Shader.SerializerState) (dst : BinaryWriter) (effect : Effect) =
+        dst.Write effect.Id
+        let shaders = effect.Shaders
+        dst.Write (Map.count shaders)
+        for KeyValue(stage, shader) in shaders do
+            dst.Write (int stage)
+            Shader.serializeInternal state dst shader
+        
+    let internal deserializeInternal (state : Shader.DeserializerState) (src : BinaryReader) =
+        let id = src.ReadString()
+        let shaders =
+            let cnt = src.ReadInt32()
+            List.init cnt (fun _ ->
+                let stage = src.ReadInt32() |> unbox<ShaderStage>
+                let shader = Shader.deserializeInternal state src
+                stage, shader
+            )
+            |> Map.ofList
+
+        Effect(id, lazy shaders, [])
+
+
+    let serialize (dst : Stream) (e : Effect) =
+        use w = new BinaryWriter(dst, System.Text.Encoding.UTF8, true)
+        serializeInternal (Shader.SerializerState()) w e
+        
+    let deserialize (src : Stream) =
+        use r = new BinaryReader(src, System.Text.Encoding.UTF8, true)
+        deserializeInternal (Shader.DeserializerState()) r
+         
+    let read (src : byte[]) =
+        let id = 
+            use ms = new MemoryStream(src)
+            use r = new BinaryReader(ms, System.Text.Encoding.UTF8, true)
+            r.ReadString()
+
+        let shaders =
+            lazy (
+                use ms = new MemoryStream(src)
+                use src = new BinaryReader(ms, System.Text.Encoding.UTF8, true)
+                let state = Shader.DeserializerState()
+                let _id = src.ReadString()
+                let cnt = src.ReadInt32()
+                List.init cnt (fun _ ->
+                    let stage = src.ReadInt32() |> unbox<ShaderStage>
+                    let shader = Shader.deserializeInternal state src
+                    stage, shader
+                )
+                |> Map.ofList
+            )
+
+        Effect(id, shaders, [])
+
+    let pickle (e : Effect) =
+        use ms = new MemoryStream()
+        serialize ms e
+        ms.ToArray()
+
+    let tryDeserialize (src : Stream) =
+        try Some (deserialize src)
+        with _ -> None
+
 
     let empty = Effect("", Lazy<Map<ShaderStage, Shader>>.CreateFromValue(Map.empty), [])
     
@@ -199,6 +378,7 @@ module Effect =
 
     /// creates an effect from a Map<ShaderStage,Shader>.
     let ofMap (shaders : Map<ShaderStage, Shader>) =
+        Serializer.Init()
         for (stage, shader) in Map.toSeq shaders do
             if stage <> shader.shaderStage then 
                 failwithf "[FShade] inconsistent shader-map: %A claims to be %A" shader.shaderStage stage
@@ -207,6 +387,7 @@ module Effect =
         
     /// creates an effect from a sequence of shaders
     let ofSeq (shaders : seq<Shader>) =
+        Serializer.Init()
         let map =
             lazy (
                 let mutable map = Map.empty
@@ -231,14 +412,13 @@ module Effect =
         
     /// creates an effect from a single shaders
     let ofShader (shader : Shader) =
+        Serializer.Init()
         Effect (Lazy<Map<ShaderStage, Shader>>.CreateFromValue(Map.ofList [shader.shaderStage, shader]))
         
-    /// creates an effect from an expression (assuming expressions as returned by shader-functions)
-    let ofExpr (inputType : Type) (e : Expr) =
-        let effect = Shader.ofExpr [inputType] e |> ofList
-        effect.SourceDefintion <- Some (e, inputType)
-        effect
-
+    
+    [<CompilerMessage("internal use", 1337, IsHidden = true)>]
+    let mutable UsePrecompiled = true
+    
 
     type private EffectKey =
         {
@@ -246,6 +426,69 @@ module Effect =
             outputSemantics : Map<string, InterpolationMode * DepthWriteMode>
             body : Expr
         }
+
+    module private EffectKey =
+        open System.IO
+        open System.Security.Cryptography
+
+        let computeHash (e : EffectKey) =  
+            use hash = System.Security.Cryptography.MD5.Create()
+            use ms = new MemoryStream()
+            use h = new CryptoStream(ms, hash, CryptoStreamMode.Write)
+            use w = new BinaryWriter(h, System.Text.Encoding.UTF8, true)
+            Expr.serializeInternal (Expr.SerializerState(true)) w e.body
+            w.Write (Map.count e.inputSemantics)
+            for KeyValue(name, mode) in e.inputSemantics do
+                w.Write name; w.Write (int mode)
+            w.Write (Map.count e.outputSemantics)
+            for KeyValue(name, (a, b)) in e.outputSemantics do
+                w.Write name; w.Write (int a); w.Write (int b)
+            h.FlushFinalBlock()
+            hash.Hash |> Convert.ToBase64String
+
+    let rec private getRecordFields (t : Type) =
+        if FSharpType.IsRecord(t, true) then 
+            FSharpType.GetRecordFields(t, true)
+        elif t.IsGenericType then
+            match t.GetGenericArguments() with
+                | [| t |] -> getRecordFields t
+                | _ -> [||]
+        else 
+            [||]
+
+    /// creates an effect from an expression (assuming expressions as returned by shader-functions)
+    let ofExpr (inputType : Type) (e : Expr) =
+        match e with
+        | Patterns.WithValue(:? Effect as effect, _, _) when UsePrecompiled ->
+            effect.SourceDefintion <- Some (e, inputType)
+            effect
+        | _ ->
+            let e =
+                match e with
+                | Patterns.WithValue(_,_,e) -> e
+                | e -> e
+
+            
+            let key = 
+                let inputFields = getRecordFields inputType
+                let outputFields = getRecordFields e.Type
+            
+                {
+                    inputSemantics = inputFields |> Seq.map (fun f -> f.Semantic, f.Interpolation) |> Map.ofSeq
+                    outputSemantics = outputFields |> Seq.map (fun f -> f.Semantic, (f.Interpolation, f.DepthWriteMode)) |> Map.ofSeq
+                    body = e.WithAttributes []
+                }
+         
+            Serializer.Init()
+            let hash = EffectKey.computeHash key
+
+            effectCache.GetOrAdd(hash, fun hash ->
+                let map = lazy (Shader.ofExpr [inputType] e |> List.map (fun s -> s.shaderStage, s) |> Map.ofList)
+                let effect = Effect(hash, map, [])
+                effect.SourceDefintion <- Some (e, inputType)
+                effect
+            )
+
     /// creates an effect from a shader-function
     let ofFunction (shaderFunction : 'a -> Expr<'b>) =
         let realEx = 
@@ -256,53 +499,43 @@ module Effect =
                 | e -> 
                     failwithf "[FShade] failed to execute shader function.\nInner cause: %A at\n%A" e e.StackTrace
          
-        let expression = Expr.InlineSplices realEx
+        match realEx with
+        | Patterns.WithValue(:? Effect as e,_,_) when UsePrecompiled ->
+            e
+        | _ ->
+            let realEx =
+                match realEx with
+                | Patterns.WithValue(_, _, e) -> e
+                | e -> e
 
-        let rec getRecordFields (t : Type) =
-            if FSharpType.IsRecord(t, true) then 
-                FSharpType.GetRecordFields(t, true)
-            elif t.IsGenericType then
-                match t.GetGenericArguments() with
-                    | [| t |] -> getRecordFields t
-                    | _ -> [||]
-            else 
-                [||]
-                //let seq = t.GetInterface(typedefof<seq<_>>.FullName)
-                //if not (isNull seq) then 
-                //    getRecordFields (seq.GetGenericArguments().[0])
-                //else
-                //    let prim = t.GetInterface(typedefof<Primitive<_>>.Name)
-                //    if not (isNull prim) then 
-                //        getRecordFields (prim.GetGenericArguments().[0])
-                //    else
-                //        failwithf "[FShade] bad IO-type %A" t
+            let expression = Expr.InlineSplices realEx
 
-        let key = 
-            let inputFields = getRecordFields typeof<'a>
-            let outputFields = getRecordFields typeof<'b>
+            let key = 
+                let inputFields = getRecordFields typeof<'a>
+                let outputFields = getRecordFields typeof<'b>
             
-            {
-                inputSemantics = inputFields |> Seq.map (fun f -> f.Semantic, f.Interpolation) |> Map.ofSeq
-                outputSemantics = outputFields |> Seq.map (fun f -> f.Semantic, (f.Interpolation, f.DepthWriteMode)) |> Map.ofSeq
-                body = expression.WithAttributes []
-            }
+                {
+                    inputSemantics = inputFields |> Seq.map (fun f -> f.Semantic, f.Interpolation) |> Map.ofSeq
+                    outputSemantics = outputFields |> Seq.map (fun f -> f.Semantic, (f.Interpolation, f.DepthWriteMode)) |> Map.ofSeq
+                    body = expression.WithAttributes []
+                }
          
-        Pickler.ExprPicklerFunctions.Init()
-        let hash = Pickler.pickler.ComputeHash(key).Hash |> Convert.ToBase64String
+            Serializer.Init()
+            let hash = EffectKey.computeHash key
 
 
-        effectCache.GetOrAdd(hash, fun _ ->
-            let map =
-                lazy (
-                    let range = expression.DebugRange
-                    let shader = Shader.ofExpr [typeof<'a>] expression
-                    shader |> List.map (fun s -> s.shaderStage, s) |> Map.ofList
-                )
+            effectCache.GetOrAdd(hash, fun _ ->
+                let map =
+                    lazy (
+                        let range = expression.DebugRange
+                        let shader = Shader.ofExpr [typeof<'a>] expression
+                        shader |> List.map (fun s -> s.shaderStage, s) |> Map.ofList
+                    )
 
-            let effect = Effect(hash, map, [])
-            effect.SourceDefintion <- Some (expression, typeof<'a>)
-            effect
-        )
+                let effect = Effect(hash, map, [])
+                effect.SourceDefintion <- Some (expression, typeof<'a>)
+                effect
+            )
 
     /// gets a Map<ShaderStage, Shader> for the effect containing all Shaders.
     let inline toMap (effect : Effect) = effect.Shaders
@@ -355,6 +588,7 @@ module Effect =
     /// the respective (optional) shader for the given stage.
     /// When update returns Some it will be added/replaced and None will cause the shader to get removed.
     let alter (stage : ShaderStage) (update : Option<Shader> -> Option<Shader>) (effect : Effect) =
+        Serializer.Init()
         match update (tryFindShader stage effect) with
             | Some n -> 
                 if stage <> n.shaderStage then
@@ -372,6 +606,7 @@ module Effect =
     /// creates a new effect which will contain exactly the outputs given by <outputs> at the specified
     /// stage.
     let private link (stage : ShaderStage) (outputs : Map<string, Type>) (effect : Effect) =
+        Serializer.Init()
         let rec linkShaders (needed : Map<string, Type>) (l : list<Shader>) =
             match l with
                 | [] -> 
@@ -408,11 +643,13 @@ module Effect =
             |> ofList
           
     let map (f : Shader -> Shader) (effect : Effect) =
+        Serializer.Init()
         effect.Shaders
             |> Map.map (fun _ -> f)
             |> ofMap
 
     let private withDepthRange (flipHandedness : bool) (range : Range1d) (effect : Effect) =
+        Serializer.Init()
         if flipHandedness || range.Min <> -1.0 || range.Max <> 1.0 then
             let convertValue (v : ShaderOutputValue) =
                 let ie = v.Value
@@ -475,7 +712,7 @@ module Effect =
 
     /// creates a Module for the given effect which can be used for compilation.              
     let toModule (config : EffectConfig) (effect : Effect) =
-        
+        Serializer.Init()
         let effectLinked =
             effect
                 |> link config.lastStage (Map.map (fun _ -> fst) config.outputs)
@@ -553,9 +790,11 @@ module Effect =
         }
 
     let inputsToUniforms (scopes : Map<string, UniformScope>) (effect : Effect) =
+        Serializer.Init()
         effect |> map (Shader.inputsToUniforms scopes)
 
     let uniformsToInputs (semantics : Set<string>) (effect : Effect) =
+        Serializer.Init()
         effect |> map (Shader.uniformsToInputs semantics)
 
     /// composes two effects using sequential semantics for 'abstract' stages.
@@ -565,6 +804,7 @@ module Effect =
     /// effects are composed sequentially per 'abstract' stage. 
     /// e.g. r's VertexShader will be appended to l's GeometryShader (if present)
     let compose2 (l : Effect) (r : Effect) =
+        Serializer.Init()
         if l.IsEmpty then r
         elif r.IsEmpty then l
         else
@@ -604,6 +844,7 @@ module Effect =
                         shaders |> Seq.map (fun s -> s.shaderStage, s) |> Map.ofSeq
                     )
                 Effect(resultId, shaders, [l;r])
+             
             )
 
     /// composes many effects using the sequential semantics defined in compose2.
@@ -633,12 +874,13 @@ module Effect =
 
         let nopGS =
             Map.ofList [
-                InputTopology.Point, ofFunction(nopPoint).GeometryShader.Value
-                InputTopology.Line, ofFunction(nopLine).GeometryShader.Value
-                InputTopology.Triangle, ofFunction(nopTriangle).GeometryShader.Value
+                InputTopology.Point, lazy ofFunction(nopPoint).GeometryShader.Value
+                InputTopology.Line, lazy ofFunction(nopLine).GeometryShader.Value
+                InputTopology.Triangle, lazy ofFunction(nopTriangle).GeometryShader.Value
             ]
 
     let substituteUniforms (substitute : string -> Type -> Option<Expr> -> Option<ShaderSlot> -> Option<Expr>) (effect : Effect) =
+        Serializer.Init()
         effect |> map (fun shader ->
             shader |> Shader.substituteReads (fun kind typ name index slot ->
                 match kind with
@@ -699,6 +941,7 @@ module Effect =
 
 
     let toLayeredEffect' (layerSemantic : string) (layers : int) (uniforms : Map<string, string>) (topology : InputTopology) (effect : Effect) = 
+        Serializer.Init()
         if effect.TessControlShader.IsSome || effect.TessEvalShader.IsSome then
             failwithf "[FShade] effects containing tessellation shaders cannot be layered automatically"
 
@@ -707,14 +950,14 @@ module Effect =
                 | None, None ->
                     match Map.tryFind topology Helpers.nopGS with
                         | Some gs ->
-                            gs
+                            gs.Value
                         | None ->
                             failwithf "[FShade] bad topology for layered shader: %A" topology
 
                 | Some vs, None ->
                     match Map.tryFind topology Helpers.nopGS with
                         | Some gs ->
-                            Shader.compose2 gs vs
+                            Shader.compose2 gs.Value vs
                         | None ->
                             failwithf "[FShade] bad topology for layered shader: %A" topology
                     
@@ -763,3 +1006,157 @@ module Effect =
 
     let toMultiViewportEffect (viewports : int) (uniforms : Map<string, string>) (topology : InputTopology) (effect : Effect) = 
         toLayeredEffect' Intrinsics.ViewportIndex viewports uniforms topology effect
+
+
+
+    module private GeometryToVertex =
+        open Aardvark.Base.Monads.State
+
+        type State =
+            {
+                emitIndex : int
+            }
+
+        
+
+        let rec substituteEmits (e : Expr) =
+            state {
+                match e with
+                | RestartStrip ->
+                    return failwith "restartStrip not supported"
+
+                | Sequential(WriteOutputs op, EmitVertex) ->
+                    let vertexId = Expr.ReadInput<int>(ParameterKind.Input, Intrinsics.VertexId)
+                    let! s = State.get
+                    let i = s.emitIndex
+                    do! State.put { s with emitIndex = i + 1 }
+                    return
+                        Expr.IfThenElse(
+                            <@ %vertexId = i @>,
+                            Expr.WriteOutputs op,
+                            Expr.Unit
+                        )
+                | ShapeLambda(v, b) ->
+                    let! b = substituteEmits b
+                    return Expr.Lambda(v, b)
+                | ShapeVar v ->
+                    return e
+                | ShapeCombination(o, args) ->
+                    let! args = args |> List.mapS substituteEmits
+                    return RebuildShapeCombination(o, args)
+
+            }
+
+        let toVertexShader (gs : Shader) =
+            let mutable inputs = Map.empty
+
+            let newBody = 
+                gs.shaderBody.SubstituteReads(fun kind typ name index _ ->
+                    match kind with
+                    | ParameterKind.Input ->
+                        match index with
+                        | Some idx ->
+                            match idx with
+                            | Value((:? int as i), _) ->
+                                let name = sprintf "%s_%d" name i
+                                inputs <- Map.add name { paramType = typ; paramInterpolation = InterpolationMode.Flat } inputs
+                                Some (Expr.ReadInput(kind, typ, name))
+                            | _ ->
+                                failwith "non-constant input access"
+                                None
+                        | None -> 
+                            None
+                    | _ ->
+                        None
+                )
+                |> substituteEmits
+
+            let mutable state = { emitIndex = 0 }
+            let newBody = newBody.Run(&state)
+
+            { 
+                shaderStage = ShaderStage.Vertex
+                shaderBody = newBody
+                shaderInputs = inputs
+                shaderOutputs = gs.shaderOutputs
+                shaderUniforms = gs.shaderUniforms
+                shaderInputTopology = None
+                shaderOutputTopology = None
+                shaderOutputVertices = ShaderOutputVertices.Unknown
+                shaderOutputPrimitives = None
+                shaderInvocations = 1
+                shaderDebugRange = None
+                shaderPayloads = Map.empty
+                shaderPayloadIn = None
+                shaderCallableData = Map.empty
+                shaderCallableDataIn = None
+                shaderHitAttribute = None
+                shaderRayTypes = Set.empty
+                shaderMissShaders = Set.empty
+                shaderCallableShaders = Set.empty
+                shaderDepthWriteMode = DepthWriteMode.None
+            }
+            
+    let tryReplaceGeometry (e : Effect) =
+        if Option.isSome e.TessControlShader || Option.isSome e.TessEvalShader then
+            None
+        else
+            
+            try
+                let renameIO (mapping : string -> string) (vs : Shader) =
+                    let body = 
+                        vs.shaderBody.SubstituteReads(fun kind typ name _ _->
+                            match kind with
+                            | ParameterKind.Input ->
+                                Expr.ReadInput(kind, typ, mapping name) |> Some
+                            | _ ->
+                                None
+                        )
+                    let body =
+                        body.SubstituteWrites(fun map ->
+                            map 
+                            |> Map.toList 
+                            |> List.map (fun (name, (idx, t)) -> mapping name, idx, t)
+                            |> Expr.WriteOutputsRaw
+                            |> Some
+                        )
+                    { vs with 
+                        shaderBody = body
+                        shaderInputs = vs.shaderInputs |> Map.toList |> List.map (fun (name, t) -> mapping name, t) |> Map.ofList
+                        shaderOutputs = vs.shaderOutputs |> Map.toList |> List.map (fun (name, t) -> mapping name, t) |> Map.ofList
+                    }
+
+                match e.GeometryShader with
+                | Some gs0 ->
+                    let newVertex = 
+                        let mutable shader = GeometryToVertex.toVertexShader gs0
+                        match e.VertexShader with
+                        | Some vs ->
+                            let inputs =
+                                match gs0.shaderInputTopology with
+                                | Some InputTopology.Point -> 1
+                                | Some InputTopology.Line -> 2
+                                | Some InputTopology.LineAdjacency -> 4
+                                | Some InputTopology.Triangle -> 3
+                                | Some InputTopology.TriangleAdjacency -> 6
+                                | Some (InputTopology.Patch n) -> n
+                                | None -> 0
+                            for i in 0 .. inputs - 1 do
+                                shader <- Shader.compose2 (renameIO (fun n -> sprintf "%s_%d" n i) vs) shader
+                            shader
+                        | None ->
+                            shader
+                
+
+
+                    let newShaders = 
+                        e.Shaders |> Map.remove ShaderStage.Geometry |> Map.add ShaderStage.Vertex newVertex
+
+                    Effect(e.Id + "VSS", lazy newShaders, []) |> Some
+                | None ->
+                    e |> Some
+            with _ ->
+                None
+
+
+

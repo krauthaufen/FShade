@@ -43,7 +43,315 @@ and GLSLSamplerType =
 and GLSLTextureType =
     | GLSLImage of GLSLImageType
     | GLSLSampler of GLSLSamplerType
+    
 
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module GLSLType =
+    open System.IO
+    
+    [<AutoOpen>]
+    module private Helpers =
+    
+        let imageTypes =
+            LookupTable.lookupTable [
+                (false, false, false, SamplerDimension.Sampler1d), typedefof<Image1d<_>>
+                (false, false, false, SamplerDimension.Sampler2d), typedefof<Image2d<_>>
+                (false, false, false, SamplerDimension.Sampler3d), typedefof<Image3d<_>>
+                (false, false, false, SamplerDimension.SamplerCube), typedefof<ImageCube<_>>
+                 
+                (false, true, false, SamplerDimension.Sampler1d), typedefof<Image1dArray<_>>
+                (false, true, false, SamplerDimension.Sampler2d), typedefof<Image2dArray<_>>
+                (false, true, false, SamplerDimension.SamplerCube), typedefof<ImageCubeArray<_>>
+                 
+                (false, false, true, SamplerDimension.Sampler1d), typedefof<Image1dMS<_>>
+                (false, false, true, SamplerDimension.Sampler2d), typedefof<Image2dMS<_>>
+                (false, false, true, SamplerDimension.Sampler3d), typedefof<Image3dMS<_>>
+                (false, false, true, SamplerDimension.SamplerCube), typedefof<ImageCubeMS<_>>
+                 
+                (false, true, true, SamplerDimension.Sampler1d), typedefof<Image1dArrayMS<_>>
+                (false, true, true, SamplerDimension.Sampler2d), typedefof<Image2dArrayMS<_>>
+                (false, true, true, SamplerDimension.SamplerCube), typedefof<ImageCubeArrayMS<_>>
+                    
+                (true, false, false, SamplerDimension.Sampler1d), typedefof<IntImage1d<_>>
+                (true, false, false, SamplerDimension.Sampler2d), typedefof<IntImage2d<_>>
+                (true, false, false, SamplerDimension.Sampler3d), typedefof<IntImage3d<_>>
+                (true, false, false, SamplerDimension.SamplerCube), typedefof<IntImageCube<_>>
+
+                (true, true, false, SamplerDimension.Sampler1d), typedefof<IntImage1dArray<_>>
+                (true, true, false, SamplerDimension.Sampler2d), typedefof<IntImage2dArray<_>>
+                (true, true, false, SamplerDimension.SamplerCube), typedefof<IntImageCubeArray<_>>
+
+                (true, false, true, SamplerDimension.Sampler1d), typedefof<IntImage1dMS<_>>
+                (true, false, true, SamplerDimension.Sampler2d), typedefof<IntImage2dMS<_>>
+                (true, false, true, SamplerDimension.Sampler3d), typedefof<IntImage3dMS<_>>
+                (true, false, true, SamplerDimension.SamplerCube), typedefof<IntImageCubeMS<_>>
+
+                (true, true, true, SamplerDimension.Sampler1d), typedefof<IntImage1dArrayMS<_>>
+                (true, true, true, SamplerDimension.Sampler2d), typedefof<IntImage2dArrayMS<_>>
+                (true, true, true, SamplerDimension.SamplerCube), typedefof<IntImageCubeArrayMS<_>>
+
+            ]
+
+        // integral, isArray, isMS, isShadow
+        let samplerTypes =
+            LookupTable.lookupTable [
+                (false, false, false, false, SamplerDimension.Sampler1d), typeof<Sampler1d>
+                (false, false, false, false, SamplerDimension.Sampler2d), typeof<Sampler2d>
+                (false, false, false, false, SamplerDimension.Sampler3d), typeof<Sampler3d>
+                (false, false, false, false, SamplerDimension.SamplerCube), typeof<SamplerCube>
+
+                (false, false, false, true, SamplerDimension.Sampler1d), typeof<Sampler1dShadow>
+                (false, false, false, true, SamplerDimension.Sampler2d), typeof<Sampler2dShadow>
+                (false, false, false, true, SamplerDimension.Sampler3d), typeof<Sampler3dShadow>
+                (false, false, false, true, SamplerDimension.SamplerCube), typeof<SamplerCubeShadow>
+
+                (false, false, true, false, SamplerDimension.Sampler1d), typeof<Sampler1dMS>
+                (false, false, true, false, SamplerDimension.Sampler2d), typeof<Sampler2dMS>
+                (false, false, true, false, SamplerDimension.Sampler3d), typeof<Sampler3dMS>
+                (false, false, true, false, SamplerDimension.SamplerCube), typeof<SamplerCubeMS>
+
+                (false, false, true, true, SamplerDimension.Sampler1d), typeof<Sampler1dShadowMS>
+                (false, false, true, true, SamplerDimension.Sampler2d), typeof<Sampler2dShadowMS>
+                (false, false, true, true, SamplerDimension.Sampler3d), typeof<Sampler3dShadowMS>
+                (false, false, true, true, SamplerDimension.SamplerCube), typeof<SamplerCubeShadowMS>
+
+                
+                (false, true, false, false, SamplerDimension.Sampler1d), typeof<Sampler1dArray>
+                (false, true, false, false, SamplerDimension.Sampler2d), typeof<Sampler2dArray>
+                (false, true, false, false, SamplerDimension.SamplerCube), typeof<SamplerCubeArray>
+
+                (false, true, false, true, SamplerDimension.Sampler1d), typeof<Sampler1dArrayShadow>
+                (false, true, false, true, SamplerDimension.Sampler2d), typeof<Sampler2dArrayShadow>
+                (false, true, false, true, SamplerDimension.SamplerCube), typeof<SamplerCubeArrayShadow>
+
+                (false, true, true, false, SamplerDimension.Sampler1d), typeof<Sampler1dArrayMS>
+                (false, true, true, false, SamplerDimension.Sampler2d), typeof<Sampler2dArrayMS>
+                (false, true, true, false, SamplerDimension.SamplerCube), typeof<SamplerCubeArrayMS>
+
+                (false, true, true, true, SamplerDimension.Sampler1d), typeof<Sampler1dArrayShadowMS>
+                (false, true, true, true, SamplerDimension.Sampler2d), typeof<Sampler2dArrayShadowMS>
+                (false, true, true, true, SamplerDimension.SamplerCube), typeof<SamplerCubeArrayShadowMS>
+
+                
+                (true, false, false, false, SamplerDimension.Sampler1d), typeof<IntSampler1d>
+                (true, false, false, false, SamplerDimension.Sampler2d), typeof<IntSampler2d>
+                (true, false, false, false, SamplerDimension.Sampler3d), typeof<IntSampler3d>
+                (true, false, false, false, SamplerDimension.SamplerCube), typeof<IntSamplerCube>
+
+                (true, false, true, false, SamplerDimension.Sampler1d), typeof<IntSampler1dMS>
+                (true, false, true, false, SamplerDimension.Sampler2d), typeof<IntSampler2dMS>
+                (true, false, true, false, SamplerDimension.Sampler3d), typeof<IntSampler3dMS>
+                (true, false, true, false, SamplerDimension.SamplerCube), typeof<IntSamplerCubeMS>
+
+                (true, true, false, false, SamplerDimension.Sampler1d), typeof<IntSampler1dArray>
+                (true, true, false, false, SamplerDimension.Sampler2d), typeof<IntSampler2dArray>
+                (true, true, false, false, SamplerDimension.SamplerCube), typeof<IntSamplerCubeArray>
+
+                (true, true, true, false, SamplerDimension.Sampler1d), typeof<IntSampler1dArrayMS>
+                (true, true, true, false, SamplerDimension.Sampler2d), typeof<IntSampler2dArrayMS>
+                (true, true, true, false, SamplerDimension.SamplerCube), typeof<IntSamplerCubeArrayMS>
+
+            ]
+            
+
+        let rec isIntegral (t : GLSLType) =
+            match t with
+            | GLSLType.Vec(_, v) -> isIntegral v
+            | GLSLType.Mat(_,_,v) -> isIntegral v
+            | Float _ -> false
+            | Int _ -> true
+            | _ -> false
+
+    let rec ofCType (rev : bool) (t : CType) =
+        match t with    
+            | CType.CBool -> GLSLType.Bool
+            | CType.CVoid -> GLSLType.Void
+            | CType.CInt(signed, width) -> GLSLType.Int(signed, width)
+
+            | CType.CFloat 64 -> GLSLType.Float 32
+            | CType.CFloat(width) -> GLSLType.Float(width)
+
+            | CType.CVector(elem, dim) -> GLSLType.Vec(dim, ofCType rev elem)
+            | CType.CMatrix(elem, r, c) -> 
+                if rev then GLSLType.Mat(r, c, ofCType rev elem)
+                else GLSLType.Mat(c, r, ofCType rev elem)
+
+            | CType.CArray(elem, len) -> GLSLType.Array(len, ofCType rev elem, -1)
+            | CType.CStruct(name, fields,_) -> GLSLType.Struct(name, fields |> List.map (fun (t, n) -> n, ofCType rev t, -1), -1)
+
+            | CType.CIntrinsic a ->
+                match a.tag with
+                    | :? GLSLTextureType as t -> 
+                        match t with
+                            | GLSLImage t -> GLSLType.Image t
+                            | GLSLSampler t -> GLSLType.Sampler t
+                    | _ ->
+                        GLSLType.Intrinsic a.intrinsicTypeName
+
+            | CType.CPointer(_,e) -> GLSLType.DynamicArray (ofCType rev e, -1)
+
+    let rec internal serializeInternal (dst : BinaryWriter) (t : GLSLType) =
+        match t with
+        | GLSLType.Bool ->
+            dst.Write 0uy
+        | GLSLType.Void ->
+            dst.Write 1uy
+        | GLSLType.Int(signed, bits) ->
+            dst.Write 2uy
+            dst.Write signed
+            dst.Write (byte bits)
+        | GLSLType.Float bits ->
+            dst.Write 3uy
+            dst.Write (byte bits)
+        | GLSLType.Vec(dim, elem) ->
+            dst.Write 4uy
+            dst.Write (byte dim)
+            serializeInternal dst elem
+        | GLSLType.Mat(c,r,elem) ->
+            dst.Write 5uy
+            dst.Write (byte c)
+            dst.Write (byte r)
+            serializeInternal dst elem
+        | GLSLType.Struct(name, fields, size) ->
+            dst.Write 6uy
+            dst.Write name
+            dst.Write (List.length fields)
+            for (fn, ft, fs) in fields do
+                dst.Write(fn)
+                serializeInternal dst ft
+                dst.Write fs
+            dst.Write size
+        | GLSLType.Array(len, elem, align) ->
+            dst.Write 7uy
+            dst.Write len
+            serializeInternal dst elem
+            dst.Write align
+        | GLSLType.Image img ->
+            dst.Write 8uy
+            dst.Write (int img.dimension)
+            match img.format with
+            | Some fmt ->
+                dst.Write 1uy
+                dst.Write (int fmt)
+            | None ->
+                dst.Write 0uy
+
+            serializeInternal dst img.valueType
+            dst.Write img.isArray
+            dst.Write img.isMS
+        | GLSLType.Sampler sam ->
+            dst.Write 9uy
+            dst.Write (int sam.dimension)
+            serializeInternal dst sam.valueType
+            dst.Write sam.isArray
+            dst.Write sam.isMS
+            dst.Write sam.isShadow
+        | GLSLType.DynamicArray(elem, stride) ->
+            dst.Write 10uy
+            serializeInternal dst elem
+            dst.Write stride
+        | GLSLType.Intrinsic name ->
+            dst.Write 11uy
+            dst.Write name
+
+    let rec internal deserializeInternal (src : BinaryReader) =
+        match src.ReadByte() with
+        | 0uy -> 
+            GLSLType.Bool
+
+        | 1uy ->
+            GLSLType.Void
+
+        | 2uy ->
+            let signed = src.ReadBoolean()
+            let bits = src.ReadByte() |> int
+            GLSLType.Int(signed, bits)
+
+        | 3uy ->
+            let bits = src.ReadByte() |> int
+            GLSLType.Float bits
+
+        | 4uy ->
+            let dim = src.ReadByte() |> int
+            let elem = deserializeInternal src
+            GLSLType.Vec(dim, elem)
+
+        | 5uy ->
+            let c = src.ReadByte() |> int
+            let r = src.ReadByte() |> int
+            let elem = deserializeInternal src
+            GLSLType.Mat(c, r, elem)
+
+        | 6uy ->
+            let name = src.ReadString()
+            let cnt = src.ReadInt32()
+            let fields =
+                List.init cnt (fun _ ->
+                    let fn = src.ReadString()
+                    let ft = deserializeInternal src
+                    let fs = src.ReadInt32()
+                    (fn, ft, fs)
+                )
+            let size = src.ReadInt32()
+            GLSLType.Struct(name, fields, size)
+
+        | 7uy ->
+            let len = src.ReadInt32()
+            let elem = deserializeInternal src
+            let align = src.ReadInt32()
+            GLSLType.Array(len, elem, align)
+
+        | 8uy ->
+            let dim = src.ReadInt32() |> unbox<SamplerDimension>
+            let format =
+                match src.ReadByte() with
+                | 0uy -> None
+                | _ -> Some (src.ReadInt32() |> unbox<ImageFormat>)
+
+            let valueType = deserializeInternal src
+            let isArray = src.ReadBoolean()
+            let isMS = src.ReadBoolean()
+
+            let original = 
+                let gen = imageTypes (isIntegral valueType, isArray, isMS, dim)
+                match format with
+                | Some fmt -> gen.MakeGenericType [| ImageFormat.toFormatType fmt |]
+                | None -> gen
+
+            GLSLType.Image {
+                GLSLImageType.dimension = dim
+                GLSLImageType.isArray = isArray
+                GLSLImageType.isMS = isMS
+                GLSLImageType.format = format
+                GLSLImageType.valueType = valueType
+                GLSLImageType.original = original
+            }
+        | 9uy ->
+            let dim = src.ReadInt32() |> unbox<SamplerDimension>
+            let valueType = deserializeInternal src
+            let isArray = src.ReadBoolean()
+            let isMS = src.ReadBoolean()
+            let isShadow = src.ReadBoolean()
+
+            let original = samplerTypes (isIntegral valueType, isArray, isMS, isShadow, dim)
+            
+            GLSLType.Sampler {
+                GLSLSamplerType.dimension = dim
+                GLSLSamplerType.isArray = isArray
+                GLSLSamplerType.isMS = isMS
+                GLSLSamplerType.isShadow = isShadow
+                GLSLSamplerType.valueType = valueType
+                GLSLSamplerType.original = original
+            }
+        | 10uy ->
+            let elem = deserializeInternal src
+            let stride = src.ReadInt32()
+            GLSLType.DynamicArray(elem, stride)
+        | 11uy ->
+            let name = src.ReadString()
+            GLSLType.Intrinsic name
+        | id ->
+            failwithf "unexpected GLSLType: %A" id
 
 type GLSLParameter =
     {
@@ -459,7 +767,7 @@ and GLSLRayHitGroup =
             yield x.intersectionShader |> Option.map string
         ]
 
-and GLSLProgramInterface =
+and [<StructuredFormatDisplay("{AsString}")>] GLSLProgramInterface =
     {
         inputs                  : list<GLSLParameter>
         outputs                 : list<GLSLParameter>
@@ -507,6 +815,40 @@ and GLSLProgramInterface =
 
         ]
 
+    member private x.AsString = x.ToString()
+
+module GLSLParameter =
+    open System.IO
+
+    let internal serializeInternal (dst : BinaryWriter) (i : GLSLParameter) =
+        dst.Write i.paramLocation
+        dst.Write i.paramName
+        dst.Write i.paramSemantic
+        GLSLType.serializeInternal dst i.paramType
+        match i.paramInterpolation with
+        | Some i ->
+            dst.Write 1uy
+            dst.Write (int i)
+        | None ->
+            dst.Write 0uy
+
+    let internal deserializeInternal (src : BinaryReader) =
+        let paramLocation = src.ReadInt32()
+        let paramName = src.ReadString()
+        let paramSemantic = src.ReadString()
+        let paramType = GLSLType.deserializeInternal src
+        let interpolation =
+            match src.ReadByte() with
+            | 0uy -> None
+            | _ -> Some (src.ReadInt32() |> unbox<InterpolationMode>)
+        {
+            paramLocation = paramLocation
+            paramName = paramName
+            paramSemantic = paramSemantic
+            paramType = paramType
+            paramInterpolation = interpolation
+        }
+
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module GLSLShaderInterface =
 
@@ -545,6 +887,198 @@ module GLSLShaderInterface =
         else
             false
 
+    open System.IO
+
+    let internal serializeInternal (dst : BinaryWriter) (s : GLSLShaderInterface) =
+
+        dst.Write (int s.shaderStage)
+        dst.Write s.shaderEntry
+
+        dst.Write (List.length s.shaderInputs)
+        for i in s.shaderInputs do
+            GLSLParameter.serializeInternal dst i
+
+        dst.Write (List.length s.shaderOutputs)
+        for i in s.shaderOutputs do
+            GLSLParameter.serializeInternal dst i
+
+        dst.Write s.shaderSamplers.Count
+        for v in s.shaderSamplers do dst.Write v
+        
+        dst.Write s.shaderImages.Count
+        for v in s.shaderImages do dst.Write v
+        
+        dst.Write s.shaderStorageBuffers.Count
+        for v in s.shaderStorageBuffers do dst.Write v
+        
+        dst.Write s.shaderUniformBuffers.Count
+        for v in s.shaderUniformBuffers do dst.Write v
+
+        dst.Write s.shaderAccelerationStructures.Count
+        for v in s.shaderAccelerationStructures do dst.Write v
+        
+        dst.Write s.shaderBuiltInFunctions.Count
+        for v in s.shaderBuiltInFunctions do 
+            dst.Write v.name
+            GLSLType.serializeInternal dst v.ret
+            dst.Write v.args.Length
+            for a in v.args do GLSLType.serializeInternal dst a
+
+        dst.Write (List.length s.shaderDecorations)
+        for v in s.shaderDecorations do
+            match v with
+            | GLSLInvocations v ->
+                dst.Write 0uy; dst.Write v
+            | GLSLInputTopology top ->
+                dst.Write 1uy
+                match top with
+                | InputTopology.Point -> dst.Write 0uy
+                | InputTopology.Line -> dst.Write 1uy
+                | InputTopology.LineAdjacency -> dst.Write 2uy 
+                | InputTopology.Triangle -> dst.Write 3uy
+                | InputTopology.TriangleAdjacency -> dst.Write 4uy
+                | InputTopology.Patch c -> dst.Write 5uy; dst.Write c
+            | GLSLOutputTopology top ->
+                dst.Write 2uy
+                match top with
+                | OutputTopology.Points -> dst.Write 0uy
+                | OutputTopology.LineStrip -> dst.Write 1uy
+                | OutputTopology.TriangleStrip -> dst.Write 2uy
+            | GLSLMaxVertices v ->
+                dst.Write 3uy
+                dst.Write v
+            | GLSLSpacing s ->
+                dst.Write 4uy
+                match s with
+                | GLSLSpacing.Equal -> dst.Write 0uy
+                | GLSLSpacing.FractionalEven -> dst.Write 1uy
+                | GLSLSpacing.FractionalOdd -> dst.Write 2uy
+            | GLSLWinding w ->
+                dst.Write 5uy
+                match w with
+                | GLSLWinding.CW -> dst.Write 0uy
+                | GLSLWinding.CCW -> dst.Write 1uy
+            | GLSLLocalSize s ->
+                dst.Write 6uy
+                dst.Write s.X
+                dst.Write s.Y
+                dst.Write s.Z
+
+        dst.Write (s.shaderBuiltIns.Count)
+        for KeyValue(kind, m) in s.shaderBuiltIns do
+            dst.Write (int kind)
+            dst.Write m.Count
+            for KeyValue(name, t) in m do
+                dst.Write name
+                GLSLType.serializeInternal dst t
+
+    let internal deserializeInternal (src : BinaryReader) =
+        let stage = src.ReadInt32() |> unbox<ShaderStage>
+        let entry = src.ReadString() 
+
+        let input =
+            let cnt = src.ReadInt32()
+            List.init cnt (fun _ -> GLSLParameter.deserializeInternal src)
+     
+        let output =
+            let cnt = src.ReadInt32()
+            List.init cnt (fun _ -> GLSLParameter.deserializeInternal src)
+
+        let shaderSamplers =
+            let cnt = src.ReadInt32()
+            List.init cnt (fun _ ->  src.ReadString()) |> HashSet.ofList
+            
+        let shaderImages =
+            let cnt = src.ReadInt32()
+            List.init cnt (fun _ ->  src.ReadString()) |> HashSet.ofList
+            
+        let shaderStorageBuffers =
+            let cnt = src.ReadInt32()
+            List.init cnt (fun _ ->  src.ReadString()) |> HashSet.ofList
+            
+        let shaderUniformBuffers =
+            let cnt = src.ReadInt32()
+            List.init cnt (fun _ ->  src.ReadString()) |> HashSet.ofList
+            
+        let shaderAccelerationStructures =
+            let cnt = src.ReadInt32()
+            List.init cnt (fun _ ->  src.ReadString()) |> HashSet.ofList
+            
+        let shaderBuiltInFunctions =
+            let cnt = src.ReadInt32()
+            List.init cnt (fun _ ->  
+                let name = src.ReadString()
+                let ret = GLSLType.deserializeInternal src
+                let args = Array.init (src.ReadInt32()) (fun _ -> GLSLType.deserializeInternal src)
+                { name = name; ret = ret; args = args }
+            )
+            |> HashSet.ofList
+
+        let shaderDecorations =
+            let cnt = src.ReadInt32()
+            List.init cnt (fun _ ->
+                match src.ReadByte() with
+                | 0uy -> 
+                    src.ReadInt32() |> GLSLInvocations
+                | 1uy -> 
+                    match src.ReadByte() with
+                    | 0uy -> GLSLInputTopology InputTopology.Point
+                    | 1uy -> GLSLInputTopology InputTopology.Line
+                    | 2uy -> GLSLInputTopology InputTopology.LineAdjacency
+                    | 3uy -> GLSLInputTopology InputTopology.Triangle
+                    | 4uy -> GLSLInputTopology InputTopology.TriangleAdjacency
+                    | _ -> GLSLInputTopology (InputTopology.Patch(src.ReadInt32()))
+                | 2uy ->
+                    match src.ReadByte() with
+                    | 0uy -> GLSLOutputTopology OutputTopology.Points
+                    | 1uy -> GLSLOutputTopology OutputTopology.LineStrip
+                    | _ -> GLSLOutputTopology OutputTopology.TriangleStrip
+                | 3uy ->
+                    GLSLMaxVertices (src.ReadInt32())
+                | 4uy ->
+                    match src.ReadByte() with
+                    | 0uy -> GLSLSpacing GLSLSpacing.Equal
+                    | 1uy -> GLSLSpacing GLSLSpacing.FractionalEven
+                    | _ -> GLSLSpacing GLSLSpacing.FractionalOdd
+                | 5uy ->
+                    match src.ReadByte() with
+                    | 0uy -> GLSLWinding GLSLWinding.CW
+                    | _ -> GLSLWinding GLSLWinding.CCW
+                | _ ->
+                    GLSLLocalSize(V3i(src.ReadInt32(), src.ReadInt32(), src.ReadInt32()))
+            )
+            
+        let shaderBuiltIns =
+            let cnt = src.ReadInt32()
+            List.init cnt (fun _ ->
+                let kind = src.ReadInt32() |> unbox<ParameterKind>
+                let cnt = src.ReadInt32()
+                kind, List.init cnt (fun _ ->
+                    let name = src.ReadString()
+                    let typ = GLSLType.deserializeInternal src
+                    name, typ
+                )
+                |> MapExt.ofList
+            )
+            |> MapExt.ofList
+
+        {
+            program                      = Unchecked.defaultof<_>
+            shaderStage                  = stage
+            shaderEntry                  = entry
+            shaderInputs                 = input
+            shaderOutputs                = output
+            shaderSamplers               = shaderSamplers
+            shaderImages                 = shaderImages
+            shaderStorageBuffers         = shaderStorageBuffers
+            shaderUniformBuffers         = shaderUniformBuffers
+            shaderAccelerationStructures = shaderAccelerationStructures
+            shaderBuiltInFunctions       = shaderBuiltInFunctions
+            shaderDecorations            = shaderDecorations
+            shaderBuiltIns               = shaderBuiltIns
+        }
+
+     
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module GLSLGraphicsShaders =
@@ -720,37 +1254,449 @@ module GLSLProgramInterface =
         Console.WriteLine("{0}", iface)
 
 
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module GLSLType =
-    
-    let rec ofCType (rev : bool) (t : CType) =
-        match t with    
-            | CType.CBool -> GLSLType.Bool
-            | CType.CVoid -> GLSLType.Void
-            | CType.CInt(signed, width) -> GLSLType.Int(signed, width)
+    open System.IO
 
-            | CType.CFloat 64 -> GLSLType.Float 32
-            | CType.CFloat(width) -> GLSLType.Float(width)
 
-            | CType.CVector(elem, dim) -> GLSLType.Vec(dim, ofCType rev elem)
-            | CType.CMatrix(elem, r, c) -> 
-                if rev then GLSLType.Mat(r, c, ofCType rev elem)
-                else GLSLType.Mat(c, r, ofCType rev elem)
+    module private SamplerState =
 
-            | CType.CArray(elem, len) -> GLSLType.Array(len, ofCType rev elem, -1)
-            | CType.CStruct(name, fields,_) -> GLSLType.Struct(name, fields |> List.map (fun (t, n) -> n, ofCType rev t, -1), -1)
+        let serialize (dst : BinaryWriter) (s : SamplerState) =
+            match s.AddressU with
+            | Some v -> dst.Write 1uy; dst.Write (int v)
+            | None -> dst.Write 0uy
+            match s.AddressV with
+            | Some v -> dst.Write 1uy; dst.Write (int v)
+            | None -> dst.Write 0uy
+            match s.AddressW with
+            | Some v -> dst.Write 1uy; dst.Write (int v)
+            | None -> dst.Write 0uy
+            match s.Filter with
+            | Some v -> dst.Write 1uy; dst.Write (int v)
+            | None -> dst.Write 0uy
+            match s.Comparison with
+            | Some v -> dst.Write 1uy; dst.Write (int v)
+            | None -> dst.Write 0uy
+            match s.BorderColor with
+            | Some v -> dst.Write 1uy; dst.Write v.R; dst.Write v.G; dst.Write v.B; dst.Write v.A
+            | None -> dst.Write 0uy
+            match s.MaxAnisotropy with
+            | Some v -> dst.Write 1uy; dst.Write v
+            | None -> dst.Write 0uy
+            match s.MaxLod with
+            | Some v -> dst.Write 1uy; dst.Write v
+            | None -> dst.Write 0uy
+            match s.MinLod with
+            | Some v -> dst.Write 1uy; dst.Write v
+            | None -> dst.Write 0uy
+            match s.MipLodBias with
+            | Some v -> dst.Write 1uy; dst.Write v
+            | None -> dst.Write 0uy
 
-            | CType.CIntrinsic a ->
-                match a.tag with
-                    | :? GLSLTextureType as t -> 
-                        match t with
-                            | GLSLImage t -> GLSLType.Image t
-                            | GLSLSampler t -> GLSLType.Sampler t
-                    | _ ->
-                        GLSLType.Intrinsic a.intrinsicTypeName
+        let deserialize (src : BinaryReader) =
+            let addressU = 
+                match src.ReadByte() with
+                | 0uy -> None
+                | _ -> Some (src.ReadInt32() |> unbox<WrapMode>)
+            let addressV = 
+                match src.ReadByte() with
+                | 0uy -> None
+                | _ -> Some (src.ReadInt32() |> unbox<WrapMode>)
+            let addressW = 
+                match src.ReadByte() with
+                | 0uy -> None
+                | _ -> Some (src.ReadInt32() |> unbox<WrapMode>)
+            let filter = 
+                match src.ReadByte() with
+                | 0uy -> None
+                | _ -> Some (src.ReadInt32() |> unbox<Filter>)
+            let comparison = 
+                match src.ReadByte() with
+                | 0uy -> None
+                | _ -> Some (src.ReadInt32() |> unbox<ComparisonFunction>)
+            let borderColor = 
+                match src.ReadByte() with
+                | 0uy -> None
+                | _ -> Some (Aardvark.Base.C4f(src.ReadSingle(), src.ReadSingle(), src.ReadSingle(), src.ReadSingle()))
+            let maxAnisotropy = 
+                match src.ReadByte() with
+                | 0uy -> None
+                | _ -> Some (src.ReadInt32())
+            let maxLod = 
+                match src.ReadByte() with
+                | 0uy -> None
+                | _ -> Some (src.ReadDouble())
+            let minLod = 
+                match src.ReadByte() with
+                | 0uy -> None
+                | _ -> Some (src.ReadDouble())
+            let mipLodBias = 
+                match src.ReadByte() with
+                | 0uy -> None
+                | _ -> Some (src.ReadDouble())
 
-            | CType.CPointer(_,e) -> GLSLType.DynamicArray (ofCType rev e, -1)
+            {
+                AddressU = addressU
+                AddressV = addressV
+                AddressW = addressW
+                Filter = filter
+                Comparison = comparison
+                BorderColor = borderColor
+                MaxAnisotropy = maxAnisotropy
+                MaxLod = maxLod
+                MinLod = minLod
+                MipLodBias = mipLodBias
+            }
 
+    module private Reflection =
+        open System.Reflection
+        open Aardvark.Base.IL
+
+        let setShaderParent : GLSLShaderInterface -> GLSLProgramInterface -> unit =
+            let tShader = typeof<GLSLShaderInterface>
+            let fParent = tShader.GetField("program@", System.Reflection.BindingFlags.NonPublic ||| System.Reflection.BindingFlags.Instance)
+            if isNull fParent then
+                failwith "[FShade] internal error: cannot get parent field for GLSLShaderInterface"
+            cil {
+                do! IL.ldarg 0
+                do! IL.ldarg 1
+                do! IL.stfld fParent
+                do! IL.ret
+            }
+
+    let internal serializeInternal (dst : BinaryWriter) (program : GLSLProgramInterface) =
+        dst.Write (List.length program.inputs)
+        for p in program.inputs do GLSLParameter.serializeInternal dst p
+        
+        dst.Write (List.length program.outputs)
+        for p in program.outputs do GLSLParameter.serializeInternal dst p
+
+        dst.Write program.samplers.Count
+        for KeyValue(name, sampler) in program.samplers do
+            dst.Write name
+            dst.Write sampler.samplerBinding
+            dst.Write sampler.samplerCount
+            dst.Write sampler.samplerName
+            dst.Write sampler.samplerSet
+            GLSLType.serializeInternal dst (GLSLType.Sampler sampler.samplerType)
+            
+            dst.Write (List.length sampler.samplerTextures)
+            for (name, state) in sampler.samplerTextures do
+                dst.Write name
+                SamplerState.serialize dst state
+                
+        dst.Write program.images.Count
+        for KeyValue(name, image) in program.images do
+            dst.Write name
+            dst.Write image.imageBinding
+            dst.Write image.imageName
+            dst.Write image.imageSet
+            GLSLType.serializeInternal dst (GLSLType.Image image.imageType)
+            
+        dst.Write program.storageBuffers.Count
+        for KeyValue(name, ssb) in program.storageBuffers do
+            dst.Write name
+            dst.Write ssb.ssbBinding
+            dst.Write ssb.ssbName
+            dst.Write ssb.ssbSet
+            GLSLType.serializeInternal dst ssb.ssbType
+            
+        dst.Write program.uniformBuffers.Count
+        for KeyValue(name, ub) in program.uniformBuffers do
+            dst.Write name
+            dst.Write ub.ubBinding
+            dst.Write ub.ubName
+            dst.Write ub.ubSet
+            dst.Write ub.ubSize
+            dst.Write (List.length ub.ubFields)
+            for f in ub.ubFields do
+                dst.Write f.ufName
+                dst.Write f.ufOffset
+                GLSLType.serializeInternal dst f.ufType
+
+        dst.Write program.accelerationStructures.Count
+        for KeyValue(name, acc) in program.accelerationStructures do
+            dst.Write name
+            dst.Write acc.accelBinding
+            dst.Write acc.accelName
+            dst.Write acc.accelSet
+
+        match program.shaders with
+        | GLSLProgramShaders.Graphics gr ->
+            dst.Write 0uy
+            dst.Write gr.stages.Count
+            for KeyValue(stage, shader) in gr.stages do
+                dst.Write (int stage)
+                GLSLShaderInterface.serializeInternal dst shader
+
+        | GLSLProgramShaders.Compute comp ->
+            dst.Write 1uy
+            GLSLShaderInterface.serializeInternal dst comp
+            ()
+        | GLSLProgramShaders.Raytracing rt ->
+            dst.Write 2uy
+            
+            match rt.raygenShader with
+            | Some r ->
+                dst.Write 1uy
+                GLSLShaderInterface.serializeInternal dst r
+            | None ->
+                dst.Write 0uy
+
+
+            dst.Write rt.callableShaders.Count
+            for KeyValue(a, b) in rt.callableShaders do
+                dst.Write (string a)
+                GLSLShaderInterface.serializeInternal dst b
+
+            dst.Write rt.missShaders.Count
+            for KeyValue(a, b) in rt.missShaders do
+                dst.Write (string a)
+                GLSLShaderInterface.serializeInternal dst b
+                
+            dst.Write rt.hitgroups.Count
+            for KeyValue(name, grp) in rt.hitgroups do
+                dst.Write (string name)
+                dst.Write grp.Count
+                for KeyValue(n, b) in grp do
+                    dst.Write (string n)
+
+                    match b.anyHitShader with
+                    | None -> dst.Write 0uy
+                    | Some s ->
+                        dst.Write 1uy
+                        GLSLShaderInterface.serializeInternal dst s
+                        
+                    match b.closestHitShader with
+                    | None -> dst.Write 0uy
+                    | Some s ->
+                        dst.Write 1uy
+                        GLSLShaderInterface.serializeInternal dst s
+                        
+                    match b.intersectionShader with
+                    | None -> dst.Write 0uy
+                    | Some s ->
+                        dst.Write 1uy
+                        GLSLShaderInterface.serializeInternal dst s
+
+    let internal deserializeInternal (src : BinaryReader) =
+
+        let allShaders = System.Collections.Generic.List<GLSLShaderInterface>()
+        let inline add s = allShaders.Add s; s
+
+        let inputs =
+            let cnt = src.ReadInt32()
+            List.init cnt (fun _ -> GLSLParameter.deserializeInternal src)
+        let outputs =
+            let cnt = src.ReadInt32()
+            List.init cnt (fun _ -> GLSLParameter.deserializeInternal src)
+
+        let samplers =
+            let cnt = src.ReadInt32()
+            List.init cnt (fun _ ->
+                let name = src.ReadString()
+                let samplerBinding = src.ReadInt32()
+                let samplerCount = src.ReadInt32()
+                let samplerName = src.ReadString()
+                let samplerSet = src.ReadInt32()
+                let samplerType =
+                    match GLSLType.deserializeInternal src with
+                    | GLSLType.Sampler s -> s
+                    | t -> failwithf "unexpected SamplerType: %A" t
+
+                let samplerTextures =
+                    let cnt = src.ReadInt32()
+                    List.init cnt (fun _ ->
+                        let texName = src.ReadString()
+                        let state = SamplerState.deserialize src
+                        texName, state
+                    )
+
+                name, {
+                    samplerBinding = samplerBinding
+                    samplerCount = samplerCount
+                    samplerName = samplerName
+                    samplerSet = samplerSet
+                    samplerType = samplerType
+                    samplerTextures = samplerTextures
+                }
+
+            )
+            |> MapExt.ofList
+
+        let images =
+            let cnt = src.ReadInt32()
+            List.init cnt (fun _ ->
+                let name = src.ReadString()
+                let imageBinding = src.ReadInt32()
+                let imageName = src.ReadString()
+                let imageSet = src.ReadInt32()
+                let imageType =
+                    match GLSLType.deserializeInternal src with
+                    | GLSLType.Image i -> i
+                    | t -> failwithf "bad ImageType: %A" t
+
+                name, {
+                    imageBinding = imageBinding
+                    imageName = imageName
+                    imageSet = imageSet
+                    imageType = imageType
+                }
+            )   
+            |> MapExt.ofList
+            
+        let storageBuffers =
+            let cnt = src.ReadInt32()
+            List.init cnt (fun _ ->
+                let name = src.ReadString()
+                let ssbBinding = src.ReadInt32()
+                let ssbName = src.ReadString()
+                let ssbSet = src.ReadInt32()
+                let ssbType = GLSLType.deserializeInternal src
+                name, {
+                    ssbBinding = ssbBinding
+                    ssbName = ssbName
+                    ssbSet = ssbSet
+                    ssbType = ssbType
+                }
+            )   
+            |> MapExt.ofList
+
+        let uniformBuffers =
+            let cnt = src.ReadInt32()
+            List.init cnt (fun _ ->
+                let name = src.ReadString()
+                let ubBinding = src.ReadInt32()
+                let ubName = src.ReadString()
+                let ubSet = src.ReadInt32()
+                let ubSize = src.ReadInt32()
+                let ubFields =
+                    let cnt = src.ReadInt32()
+                    List.init cnt (fun _ ->
+                        let ufName = src.ReadString()
+                        let ufOffset = src.ReadInt32()
+                        let ufType = GLSLType.deserializeInternal src
+                        { ufName = ufName; ufOffset = ufOffset; ufType = ufType }
+                    )
+                name, {
+                    ubSet = ubSet
+                    ubBinding = ubBinding
+                    ubName = ubName
+                    ubSize = ubSize
+                    ubFields = ubFields
+                }
+            ) |> MapExt.ofList
+
+        let accelerationStructures =
+            let cnt = src.ReadInt32()
+            List.init cnt (fun _ ->
+                let name = src.ReadString()
+                let accelBinding = src.ReadInt32()
+                let accelName = src.ReadString()
+                let accelSet = src.ReadInt32()
+                name, { accelSet = accelSet; accelBinding = accelBinding; accelName = accelName }
+            )
+            |> MapExt.ofList
+
+        let shaders = 
+            match src.ReadByte() with
+            | 0uy ->
+                let shaders =
+                    let cnt = src.ReadInt32()
+                    List.init cnt (fun _ -> 
+                        let stage = src.ReadInt32() |> unbox<ShaderStage>
+                        stage, add (GLSLShaderInterface.deserializeInternal src)
+                    )
+                    |> MapExt.ofList
+
+                GLSLProgramShaders.Graphics { GLSLGraphicsShaders.stages = shaders }
+            | 1uy ->
+                let comp = GLSLShaderInterface.deserializeInternal src
+                GLSLProgramShaders.Compute comp
+            | _ ->
+                let rayGen =
+                    match src.ReadByte() with
+                    | 0uy -> None
+                    | _ -> Some (add (GLSLShaderInterface.deserializeInternal src))
+
+                let callableShaders =
+                    let cnt = src.ReadInt32()
+                    List.init cnt (fun _ ->
+                        let name = Symbol.Create (src.ReadString())
+                        let shader = GLSLShaderInterface.deserializeInternal src
+                        name, add shader
+                    )
+                    |> MapExt.ofList
+
+                let missShaders =
+                    let cnt = src.ReadInt32()
+                    List.init cnt (fun _ ->
+                        let name = Symbol.Create (src.ReadString())
+                        let shader = GLSLShaderInterface.deserializeInternal src
+                        name, add shader
+                    )
+                    |> MapExt.ofList
+
+
+                let hitgroups =
+                    let cnt = src.ReadInt32()
+                    List.init cnt (fun _ ->
+                        let name = src.ReadString() |> Symbol.Create
+                        let cnt = src.ReadInt32()
+                        let group =
+                            List.init cnt (fun _ ->
+                                let n = src.ReadString() |> Symbol.Create
+
+                                let anyHit =
+                                    match src.ReadByte() with
+                                    | 0uy -> None
+                                    | _ -> GLSLShaderInterface.deserializeInternal src |> add |> Some
+                                    
+                                let closestHit =
+                                    match src.ReadByte() with
+                                    | 0uy -> None
+                                    | _ -> GLSLShaderInterface.deserializeInternal src |> add |> Some
+                                    
+                                let intersectionShader =
+                                    match src.ReadByte() with
+                                    | 0uy -> None
+                                    | _ -> GLSLShaderInterface.deserializeInternal src |> add |> Some
+
+                                name, {
+                                    anyHitShader = anyHit
+                                    closestHitShader = closestHit
+                                    intersectionShader = intersectionShader
+                                }
+
+                            )
+                            |> MapExt.ofList
+
+                        name, group
+                    )
+                    |> MapExt.ofList
+
+                GLSLProgramShaders.Raytracing {
+                    raygenShader = rayGen
+                    callableShaders = callableShaders
+                    missShaders = missShaders
+                    hitgroups = hitgroups
+                }
+
+        let result = 
+            {
+                inputs = inputs
+                outputs = outputs
+                samplers = samplers
+                images = images
+                storageBuffers = storageBuffers
+                uniformBuffers = uniformBuffers
+                shaders = shaders
+                accelerationStructures = accelerationStructures
+            }
+
+        for s in allShaders do 
+            Reflection.setShaderParent s result
+
+
+        result
 
 module LayoutStd140 =
     // https://www.khronos.org/registry/OpenGL/extensions/ARB/ARB_uniform_buffer_object.txt

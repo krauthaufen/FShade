@@ -489,6 +489,26 @@ module Optimizer =
                         else
                             return Expr.Unit
 
+                    | CallWithWitnesses(t, oi, mi, ws, args) ->
+                        let! needed = callNeededS t oi args
+
+                        if needed then
+                            let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
+                            let! t = t |> Option.mapS eliminateDeadCodeS
+
+                            match t with
+                                | Some t -> return Expr.CallWithWitnesses(t, oi, mi, ws, args) |> Expr.Ignore
+                                | None -> return Expr.CallWithWitnesses(oi, mi, ws, args) |> Expr.Ignore
+                        else
+                            let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+                            let! t = t |> Option.mapS withoutValueS
+
+                            match t with
+                                | Some t -> return Expr.Seq (t :: args)
+                                | None -> return Expr.Seq args            
+
+                        
+
                     | Call(t, mi, args) ->
                         let! needed = callNeededS t mi args
 
@@ -838,6 +858,21 @@ module Optimizer =
                             let! idx = eliminateDeadCodeS idx
                             let! arr = eliminateDeadCodeS arr
                             return Expr.ArraySet(arr, idx, value)
+                        else
+                            return Expr.Unit
+
+                    | CallWithWitnesses(t, oi, mi, ws, args) ->
+                        let! needed = 
+                            if e.Type <> typeof<unit> then State.value true
+                            else callNeededS t oi args
+
+                        if needed then
+                            let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
+                            let! t = t |> Option.mapS eliminateDeadCodeS
+
+                            match t with
+                                | Some t -> return Expr.CallWithWitnesses(t, oi, mi, ws, args)
+                                | None -> return Expr.CallWithWitnesses(oi, mi, ws, args)
                         else
                             return Expr.Unit
 
@@ -1434,6 +1469,28 @@ module Optimizer =
                 | _ ->
                     None
    
+
+        let private buildFun =
+            match <@ FunctionReflection.buildFunction null null : int -> int @> with
+            | Patterns.Call(None, mi, _) ->
+                mi.GetGenericMethodDefinition()
+            | _ ->
+                failwith "bad"
+        
+        let private witnessTable =
+            System.Collections.Concurrent.ConcurrentDictionary<MethodInfo, obj>()
+
+        let private compileWitness (e : Expr) =
+            match e with
+            | DerivedPatterns.Lambdas(_, Patterns.Call(None, mi, _)) ->
+                witnessTable.GetOrAdd(mi, fun mi ->
+                    let m = buildFun.MakeGenericMethod [|e.Type|]
+                    m.Invoke(null, [|null; mi|])
+                )
+            | _ ->
+                failwith "bad witness"
+
+
         let rec evaluateConstantsS (e : Expr) =
             state {
                 match e with
@@ -1555,6 +1612,46 @@ module Optimizer =
                             | _ -> 
                                 return Expr.Call(mi, [v])
        
+
+                    | CallWithWitnesses(None, original, meth, witnesses, args) ->
+                        let! needed = State.needsCall original
+                        let! args = args |> List.mapS evaluateConstantsS
+                        if needed then
+                            return Expr.CallWithWitnesses(original, meth, witnesses, args)
+                        else
+                            match args with
+                            | AllConstant values ->
+                                try
+                                    let ws = witnesses |> List.map compileWitness
+                                    let value = meth.Invoke(null, List.toArray (ws @ values))
+                                    return Expr.Value(value, e.Type)
+                                with _ ->
+                                    return Expr.CallWithWitnesses(original, meth, witnesses, args)
+                            | _ ->
+                                return Expr.CallWithWitnesses(original, meth, witnesses, args)
+                            
+                    | CallWithWitnesses(Some target, original, meth, witnesses, args) ->
+                        let! needed = State.needsCall original
+                        let! target = evaluateConstantsS target
+                        let! args = args |> List.mapS evaluateConstantsS
+                        if needed then
+                            return Expr.CallWithWitnesses(target, original, meth, witnesses, args)
+                        else    
+                            match target with
+                            | Constant targetValue ->
+                                match args with
+                                | AllConstant values ->
+                                    try
+                                        let ws = witnesses |> List.map compileWitness
+                                        let value = meth.Invoke(targetValue, List.toArray (ws @ values))
+                                        return Expr.Value(value, e.Type)
+                                    with _ ->
+                                        return Expr.CallWithWitnesses(target, original, meth, witnesses, args)
+                                | _ ->
+                                    return Expr.CallWithWitnesses(target, original, meth, witnesses, args)
+                            | _ ->  
+                                return Expr.CallWithWitnesses(target, original, meth, witnesses, args)
+
                     | Call(None, mi, args) ->
                         let! needed = State.needsCall mi
                         let! args = args |> List.mapS evaluateConstantsS
@@ -1950,11 +2047,12 @@ module Optimizer =
 
                         let (vars, values) = usedInputs |> Map.toList |> List.map snd |> List.unzip
 
+                        let inputVars = utility.functionArguments @ vars
                         let utility =
                             { utility with
-                                functionArguments = utility.functionArguments @ vars
+                                functionArguments = inputVars
                                 functionBody = newBody
-                                functionId = Expr.ComputeHash newBody
+                                functionId = Expr.ComputeHash (Expr.Lambdas(inputVars, newBody))
                                 functionTag = null
                             }
 
@@ -1963,6 +2061,15 @@ module Optimizer =
                         return Expr.CallFunction(utility, args @ values)
                         
        
+                    | CallWithWitnesses(None, oi, mi, ws, args) ->
+                        let! args = args |> List.mapS liftInputsS
+                        return Expr.CallWithWitnesses(oi, mi, ws, args)
+
+                    | CallWithWitnesses(Some t, oi, mi, ws, args) ->
+                        let! t = liftInputsS t
+                        let! args = args |> List.mapS liftInputsS
+                        return Expr.CallWithWitnesses(t, oi, mi, ws, args)
+                        
                     | Call(None, mi, args) ->
                         let! args = args |> List.mapS liftInputsS
                         return Expr.Call(mi, args)
@@ -2147,11 +2254,12 @@ module Optimizer =
 
                         let (vars, values) = usedInputs |> Map.toList |> List.map snd |> List.unzip
 
+                        let inputVars = utility.functionArguments @ vars
                         let utility =
                             { utility with
-                                functionArguments = utility.functionArguments @ vars
+                                functionArguments = inputVars
                                 functionBody = newBody
-                                functionId = Expr.ComputeHash newBody
+                                functionId = Expr.ComputeHash (Expr.Lambdas(inputVars, newBody))
                                 functionTag = null
                             }
 
@@ -2465,6 +2573,15 @@ module Optimizer =
                                 )
                             let utility = { utility with functionTag = null }
                             return Expr.CallFunction(utility, args)
+                            
+                    | CallWithWitnesses(None, oi, mi, ws, args) ->
+                        let! args = args |> List.mapS inlineS
+                        return Expr.CallWithWitnesses(oi, mi, ws, args)
+
+                    | CallWithWitnesses(Some t, oi, mi, ws, args) ->
+                        let! t = inlineS t
+                        let! args = args |> List.mapS inlineS
+                        return Expr.CallWithWitnesses(t, oi, mi, ws, args)
 
                     | Call(None, mi, args) ->
                         let! args = args |> List.mapS inlineS
@@ -2725,6 +2842,8 @@ module Optimizer =
 
         let rec processExpression (expr : Expr) : Expr * Hoisting =
             match expr with
+                | WithValue(_, _, e) -> 
+                    processExpression e
                 | WriteOutputs _
                 | AddressSet _ 
                 | ForInteger _ 
@@ -2773,6 +2892,15 @@ module Optimizer =
                     let utility = utility |> UtilityFunction.map processStatement
                     Expr.CallFunction(utility, args), ah
                     
+                | CallWithWitnesses(None, oi, mi, ws, args) ->
+                    let args, ah = processManyExpresions args
+                    Expr.CallWithWitnesses(oi, mi, ws, args), ah
+
+                | CallWithWitnesses(Some t, oi, mi, ws, args) ->
+                    let t, th = processExpression t
+                    let args, ah = processManyExpresions args
+                    Expr.CallWithWitnesses(t, oi, mi, ws, args), th + ah
+
                 | Call(None, mi, args) ->
                     let args, ah = processManyExpresions args
                     Expr.Call(mi, args), ah
