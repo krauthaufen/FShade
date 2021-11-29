@@ -1265,6 +1265,33 @@ module Preprocessor =
 
                             return Expr.CallFunction(processedF, args)
 
+                | CallWithWitnesses(t, original, m, ws, args) ->
+                    let! args = args |> List.mapS preprocessNormalS
+                    let! t = t |> Option.mapS preprocessNormalS
+                    
+                    match UtilityFunction.tryCreate original with
+                    | Some utility ->
+                        let! state = State.get
+                        let mutable innerState = State.createInner state
+                        let processedF =
+                            utility |> UtilityFunction.map (fun b -> 
+                                let run : Preprocess<Expr> = preprocessByTypeS state.expressionType b
+                                run.Run(&innerState)
+                            )
+
+                        let processedF = { processedF with functionTag = innerState }
+                        do! State.mergeInner innerState
+
+                        match t with    
+                            | Some t -> return Expr.CallFunction(processedF, t :: args)
+                            | None -> return Expr.CallFunction(processedF, args)
+
+                    | None -> 
+                        match t with
+                        | Some t -> return Expr.CallWithWitnesses(t, original, m, ws, args)
+                        | None -> return Expr.CallWithWitnesses(original, m, ws, args)
+                    
+
                 | Call(t, mi, args) ->
                     let! args = args |> List.mapS preprocessNormalS
                     let! t = t |> Option.mapS preprocessNormalS
