@@ -1626,7 +1626,7 @@ module Serializer =
             with _ -> None
 
         let computeHash (e : Expr) =
-            use hash = System.Security.Cryptography.MD5.Create()
+            use hash = System.Security.Cryptography.SHA1.Create()
             use ms = new MemoryStream()
             use h = new CryptoStream(ms, hash, CryptoStreamMode.Write)
             use w = new BinaryWriter(h, System.Text.Encoding.UTF8, true)
