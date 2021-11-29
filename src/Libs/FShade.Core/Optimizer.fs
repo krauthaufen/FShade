@@ -489,6 +489,26 @@ module Optimizer =
                         else
                             return Expr.Unit
 
+                    | CallWithWitnesses(t, oi, mi, ws, args) ->
+                        let! needed = callNeededS t oi args
+
+                        if needed then
+                            let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
+                            let! t = t |> Option.mapS eliminateDeadCodeS
+
+                            match t with
+                                | Some t -> return Expr.CallWithWitnesses(t, oi, mi, ws, args) |> Expr.Ignore
+                                | None -> return Expr.CallWithWitnesses(oi, mi, ws, args) |> Expr.Ignore
+                        else
+                            let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+                            let! t = t |> Option.mapS withoutValueS
+
+                            match t with
+                                | Some t -> return Expr.Seq (t :: args)
+                                | None -> return Expr.Seq args            
+
+                        
+
                     | Call(t, mi, args) ->
                         let! needed = callNeededS t mi args
 
@@ -844,7 +864,7 @@ module Optimizer =
                     | CallWithWitnesses(t, oi, mi, ws, args) ->
                         let! needed = 
                             if e.Type <> typeof<unit> then State.value true
-                            else callNeededS t mi args
+                            else callNeededS t oi args
 
                         if needed then
                             let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev

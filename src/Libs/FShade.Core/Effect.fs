@@ -1008,3 +1008,155 @@ module Effect =
         toLayeredEffect' Intrinsics.ViewportIndex viewports uniforms topology effect
 
 
+
+    module private GeometryToVertex =
+        open Aardvark.Base.Monads.State
+
+        type State =
+            {
+                emitIndex : int
+            }
+
+        
+
+        let rec substituteEmits (e : Expr) =
+            state {
+                match e with
+                | RestartStrip ->
+                    return failwith "restartStrip not supported"
+
+                | Sequential(WriteOutputs op, EmitVertex) ->
+                    let vertexId = Expr.ReadInput<int>(ParameterKind.Input, Intrinsics.VertexId)
+                    let! s = State.get
+                    let i = s.emitIndex
+                    do! State.put { s with emitIndex = i + 1 }
+                    return
+                        Expr.IfThenElse(
+                            <@ %vertexId = i @>,
+                            Expr.WriteOutputs op,
+                            Expr.Unit
+                        )
+                | ShapeLambda(v, b) ->
+                    let! b = substituteEmits b
+                    return Expr.Lambda(v, b)
+                | ShapeVar v ->
+                    return e
+                | ShapeCombination(o, args) ->
+                    let! args = args |> List.mapS substituteEmits
+                    return RebuildShapeCombination(o, args)
+
+            }
+
+        let toVertexShader (gs : Shader) =
+            let mutable inputs = Map.empty
+
+            let newBody = 
+                gs.shaderBody.SubstituteReads(fun kind typ name index _ ->
+                    match kind with
+                    | ParameterKind.Input ->
+                        match index with
+                        | Some idx ->
+                            match idx with
+                            | Value((:? int as i), _) ->
+                                let name = sprintf "%s_%d" name i
+                                inputs <- Map.add name { paramType = typ; paramInterpolation = InterpolationMode.Flat } inputs
+                                Some (Expr.ReadInput(kind, typ, name))
+                            | _ ->
+                                failwith "non-constant input access"
+                                None
+                        | None -> 
+                            None
+                    | _ ->
+                        None
+                )
+                |> substituteEmits
+
+            let mutable state = { emitIndex = 0 }
+            let newBody = newBody.Run(&state)
+
+            { 
+                shaderStage = ShaderStage.Vertex
+                shaderBody = newBody
+                shaderInputs = inputs
+                shaderOutputs = gs.shaderOutputs
+                shaderUniforms = gs.shaderUniforms
+                shaderInputTopology = None
+                shaderOutputTopology = None
+                shaderOutputVertices = ShaderOutputVertices.Unknown
+                shaderOutputPrimitives = None
+                shaderInvocations = 1
+                shaderDebugRange = None
+                shaderPayloads = Map.empty
+                shaderPayloadIn = None
+                shaderCallableData = Map.empty
+                shaderCallableDataIn = None
+                shaderHitAttribute = None
+                shaderRayTypes = Set.empty
+                shaderMissShaders = Set.empty
+                shaderCallableShaders = Set.empty
+                shaderDepthWriteMode = DepthWriteMode.None
+            }
+            
+    let tryReplaceGeometry (e : Effect) =
+        if Option.isSome e.TessControlShader || Option.isSome e.TessEvalShader then
+            None
+        else
+            
+            try
+                let renameIO (mapping : string -> string) (vs : Shader) =
+                    let body = 
+                        vs.shaderBody.SubstituteReads(fun kind typ name _ _->
+                            match kind with
+                            | ParameterKind.Input ->
+                                Expr.ReadInput(kind, typ, mapping name) |> Some
+                            | _ ->
+                                None
+                        )
+                    let body =
+                        body.SubstituteWrites(fun map ->
+                            map 
+                            |> Map.toList 
+                            |> List.map (fun (name, (idx, t)) -> mapping name, idx, t)
+                            |> Expr.WriteOutputsRaw
+                            |> Some
+                        )
+                    { vs with 
+                        shaderBody = body
+                        shaderInputs = vs.shaderInputs |> Map.toList |> List.map (fun (name, t) -> mapping name, t) |> Map.ofList
+                        shaderOutputs = vs.shaderOutputs |> Map.toList |> List.map (fun (name, t) -> mapping name, t) |> Map.ofList
+                    }
+
+                match e.GeometryShader with
+                | Some gs0 ->
+                    let newVertex = 
+                        let mutable shader = GeometryToVertex.toVertexShader gs0
+                        match e.VertexShader with
+                        | Some vs ->
+                            let inputs =
+                                match gs0.shaderInputTopology with
+                                | Some InputTopology.Point -> 1
+                                | Some InputTopology.Line -> 2
+                                | Some InputTopology.LineAdjacency -> 4
+                                | Some InputTopology.Triangle -> 3
+                                | Some InputTopology.TriangleAdjacency -> 6
+                                | Some (InputTopology.Patch n) -> n
+                                | None -> 0
+                            for i in 0 .. inputs - 1 do
+                                shader <- Shader.compose2 (renameIO (fun n -> sprintf "%s_%d" n i) vs) shader
+                            shader
+                        | None ->
+                            shader
+                
+
+
+                    let newShaders = 
+                        e.Shaders |> Map.remove ShaderStage.Geometry |> Map.add ShaderStage.Vertex newVertex
+
+                    Effect(e.Id + "VSS", lazy newShaders, []) |> Some
+                | None ->
+                    e |> Some
+            with _ ->
+                None
+
+
+

@@ -236,6 +236,8 @@ module Preprocessor =
                 | _ ->
                     None
 
+
+
         let (|TessellateCall|_|) (e : Expr) =
             match e with
                 | Call(None, MethodQuote <@ tessellateTriangle @> _, [li; l01;l12;l20]) ->
@@ -3658,6 +3660,9 @@ module Shader =
 
             | ShaderStage.Geometry, ShaderStage.Geometry ->
                 Composition.gsgs l r
+
+            | ShaderStage.Vertex, ShaderStage.Geometry ->
+                Composition.vsgs l r
 
             | _ ->
                 failwithf "[FShade] cannot compose %AShader with %AShader" l.shaderStage r.shaderStage

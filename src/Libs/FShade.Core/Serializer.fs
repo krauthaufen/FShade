@@ -343,6 +343,15 @@ module Serializer =
             | :? V3d as o -> dst.Write o.X; dst.Write o.Y; dst.Write o.Z
             | :? V4d as o -> dst.Write o.X; dst.Write o.Y; dst.Write o.Z; dst.Write o.W
 
+            | :? UniformScope as o ->
+                let rec all (acc : list<string>) (u : UniformScope) =
+                    match u.Parent with
+                    | None -> u.Name :: acc
+                    | Some p -> all (u.Name :: acc) p
+                let scope = all [] o
+                dst.Write (List.length scope)
+                for s in scope do dst.Write s
+
             | _ ->
                 if typ = typeof<unit> then
                     ()
@@ -790,7 +799,19 @@ module Serializer =
 
             | Patterns.IntrinsicCall(atts, args) when state.IsHash ->
                 for a in atts do
-                    dst.Write a.intrinsicName
+                    if isNull a.intrinsicName then 
+                        dst.Write 0uy
+                    else
+                        dst.Write 1uy
+                        dst.Write a.intrinsicName
+
+                    match a.tag with
+                    | :? string as tag ->
+                        dst.Write 1uy
+                        dst.Write tag
+                    | _ ->
+                        dst.Write 0uy
+
                 for a in args do
                     serializeInternal state dst a
 
@@ -2048,6 +2069,13 @@ module Serializer =
                 shaderCallableShaders = shaderCallableShaders
                 shaderDepthWriteMode = shaderDepthWriteMode
             }
+
+[<AutoOpen>]
+module ExprHashingExtensions =
+    open Microsoft.FSharp.Quotations
+    type Expr with
+        static member ComputeHash(e : Expr) =
+            Expr.computeHash e
 
 type Serializer private() =
     static member Init() =

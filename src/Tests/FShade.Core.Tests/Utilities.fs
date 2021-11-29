@@ -18,6 +18,8 @@ open NUnit.Framework.Constraints
 
 [<AutoOpen>]
 module Utilities = 
+    do Serializer.Init()
+
     let keep a = ()
 
     let produce<'a>() : 'a = onlyInShaderCode "produce"
@@ -39,7 +41,7 @@ module Utilities =
             override x.ApplyTo<'B>(other : 'B) =    
                 match other :> obj with
                 | :? Expr as r -> 
-                    if Expr.ComputeHash (normalize l) = Expr.ComputeHash (normalize r) then
+                    if Expr.computeHash (normalize l) = Expr.computeHash (normalize r) then
                         ConstraintResult(x, other, true)
                     else
                         ConstraintResult(x, other, false)
