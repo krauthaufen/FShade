@@ -25,7 +25,7 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FShade.Demo", "Tests\FShade
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FShade.GLSL.Tests", "Tests\FShade.GLSL.Tests\FShade.GLSL.Tests.fsproj", "{F692FFEE-C41D-4422-8B42-3B6F3695C19E}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FShade.Preprocessor", "FShade.Preprocessor\FShade.Preprocessor.fsproj", "{8EA0F9FC-F88E-4635-B285-AD5BB286B3D1}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "fshadeaot", "FShade.Preprocessor\fshadeaot.fsproj", "{8EA0F9FC-F88E-4635-B285-AD5BB286B3D1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

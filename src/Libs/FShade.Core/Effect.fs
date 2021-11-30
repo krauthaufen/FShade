@@ -791,11 +791,24 @@ module Effect =
 
     let inputsToUniforms (scopes : Map<string, UniformScope>) (effect : Effect) =
         Serializer.Init()
-        effect |> map (Shader.inputsToUniforms scopes)
+
+        let newShaders =
+            lazy (
+                effect.Shaders
+                |> Map.map (fun _ -> Shader.inputsToUniforms scopes)
+            )
+
+        Effect(effect.Id + "IU", newShaders, [])
 
     let uniformsToInputs (semantics : Set<string>) (effect : Effect) =
         Serializer.Init()
-        effect |> map (Shader.uniformsToInputs semantics)
+        let newShaders =
+            lazy (
+                effect.Shaders
+                |> Map.map (fun _ -> Shader.uniformsToInputs semantics)
+            )
+            
+        Effect(effect.Id + "UI", newShaders, [])
 
     /// composes two effects using sequential semantics for 'abstract' stages.
     /// these 'abstract' stages consist of the following 'real' stages:
@@ -1127,33 +1140,36 @@ module Effect =
                     }
 
                 match e.GeometryShader with
-                | Some gs0 ->
-                    let newVertex = 
-                        let mutable shader = GeometryToVertex.toVertexShader gs0
-                        match e.VertexShader with
-                        | Some vs ->
-                            let inputs =
-                                match gs0.shaderInputTopology with
-                                | Some InputTopology.Point -> 1
-                                | Some InputTopology.Line -> 2
-                                | Some InputTopology.LineAdjacency -> 4
-                                | Some InputTopology.Triangle -> 3
-                                | Some InputTopology.TriangleAdjacency -> 6
-                                | Some (InputTopology.Patch n) -> n
-                                | None -> 0
-                            for i in 0 .. inputs - 1 do
-                                shader <- Shader.compose2 (renameIO (fun n -> sprintf "%s_%d" n i) vs) shader
-                            shader
-                        | None ->
-                            shader
+                | Some ({ shaderOutputVertices = (ShaderOutputVertices.Computed ov | ShaderOutputVertices.UserGiven ov) } as gs0)  ->
+                    let newShaders =
+                        lazy (
+                            let newVertex = 
+                                let mutable shader = GeometryToVertex.toVertexShader gs0
+                                match e.VertexShader with
+                                | Some vs ->
+                                    let inputs =
+                                        match gs0.shaderInputTopology with
+                                        | Some InputTopology.Point -> 1
+                                        | Some InputTopology.Line -> 2
+                                        | Some InputTopology.LineAdjacency -> 4
+                                        | Some InputTopology.Triangle -> 3
+                                        | Some InputTopology.TriangleAdjacency -> 6
+                                        | Some (InputTopology.Patch n) -> n
+                                        | None -> 0
+
+                                    for i in 0 .. inputs - 1 do
+                                        shader <- Shader.compose2 (renameIO (fun n -> sprintf "%s_%d" n i) vs) shader
+                                    shader
+                                | None ->
+                                    shader
                 
 
 
-                    let newShaders = 
-                        e.Shaders |> Map.remove ShaderStage.Geometry |> Map.add ShaderStage.Vertex newVertex
+                            e.Shaders |> Map.remove ShaderStage.Geometry |> Map.add ShaderStage.Vertex newVertex
+                        )
 
-                    Effect(e.Id + "VSS", lazy newShaders, []) |> Some
-                | None ->
+                    Effect(e.Id + "VSS", newShaders, []) |> Some
+                | _ ->
                     e |> Some
             with _ ->
                 None
