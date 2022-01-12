@@ -1290,25 +1290,62 @@ let ``VS/TS shared helper`` () =
 
     GLSL.shouldCompile [ Effect.ofFunction vs; Effect.ofFunction ts; Effect.ofFunction frag ]
 
-[<ReflectedDefinition>]
-let foo () =
-    V3d.Zero
+module ReflectedFunctionTest = 
+
+    let constantArray =
+        [| V4d.Zero |]
+
+    [<ReflectedDefinition>]
+    let foo () =
+        V3d.Zero
+
+    [<ReflectedDefinition>]
+    let get (tc : float) =
+        constantArray.[int tc]
 
 [<Test>]
-let ``Reflected Function``() =
+let ``Reflected function``() =
     Setup.Run()
 
     let vs (v : Vertex) =
         vertex {
-            return foo()
+            return ReflectedFunctionTest.foo()
         }
 
     let fs (v : Vertex) =
         fragment {
-            return V4d(foo(), 1.0)
+            return V4d(ReflectedFunctionTest.foo(), 1.0)
         }
 
     GLSL.shouldCompile [Effect.ofFunction vs; Effect.ofFunction fs]
+
+[<Test>]
+let ``Reflected function with constant array``() =
+    Setup.Run()
+
+    let function0 (v : MyVertex) =
+         vertex {
+            let h = ReflectedFunctionTest.get (float ((v.pos.X**0.15)*0.8))
+            return { v with c = h }
+         }
+
+    let function1 (v : MyVertex) =
+        vertex { 
+            let h = ReflectedFunctionTest.get (float v.trafo.M00 / 6.0)
+            return { v with pos = h }
+        }
+
+    let function2 (v : MyVertex) =
+        fragment {
+            let h = ReflectedFunctionTest.get (v.pos.X / 8.0)
+            return { v with pos = h }
+        }
+
+    GLSL.shouldCompile [
+        Effect.ofFunction function0
+        Effect.ofFunction function1
+        Effect.ofFunction function2
+    ]
 
 [<Test>]
 let ``Non-static sampler``() =
