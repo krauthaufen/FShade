@@ -873,6 +873,21 @@ type CValueDef =
     | CUniformDef of list<CUniform>
     | CRaytracingDataDef of list<CRaytracingData>
 
+    member x.SortKey =
+        match x with
+        | CConstant(_,name,_) -> 
+            sprintf "CONSTANT(%s)" name
+        | CFunctionDef(signature, _) -> 
+            sprintf "FUNCTION(%s)" signature.name
+        | CEntryDef e -> 
+            sprintf "SHADER(%s)" e.cEntryName
+        | CConditionalDef(c, l) ->
+            l |> List.map (fun l -> l.SortKey) |> String.concat "; " |> sprintf "IFDEF(%s, %s)" c
+        | CUniformDef us ->
+            us |> List.map (fun u -> u.cUniformName) |> String.concat "; " |> sprintf "UNIFORM(%s)"
+        | CRaytracingDataDef l ->
+            l |> List.map (fun rt -> rt.cRaytracingDataName) |> String.concat "; " |> sprintf "RAYDATA(%s)"
+
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module CValueDef =
     let rec internal visit (used : Used) (d : CValueDef) =

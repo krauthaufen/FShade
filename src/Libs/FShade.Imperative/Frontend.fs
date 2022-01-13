@@ -339,7 +339,11 @@ module ExpressionExtensions =
                 let args =
                     args |> List.map (fun a ->
                         match a with
-                            | NewTuple [String name; index; Coerce(value, _) ] ->
+                            | NewTuple [String name; index; value ] ->
+                                let value =
+                                    match value with
+                                    | Coerce(value, t) when t = typeof<obj> -> value
+                                    | e -> e
                                 match index with
                                     | Int32 -1 -> name, None, value
                                     | _ -> name, (Some index), value

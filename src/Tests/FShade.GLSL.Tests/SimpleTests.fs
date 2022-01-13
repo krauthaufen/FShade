@@ -744,6 +744,12 @@ type MyVertex =
         [<Color>] c : V4d
         [<Semantic("AAATrafo")>] trafo : M34d
     }
+    
+type MyVertex2 =
+    {
+        [<Position>] pos : V4d
+        [<Color>] c : V4d
+    }
 
 [<Test>]
 let ``Compose variables correct``() =
@@ -1323,19 +1329,19 @@ let ``Reflected function``() =
 let ``Reflected function with constant array``() =
     Setup.Run()
 
-    let function0 (v : MyVertex) =
+    let function0 (v : MyVertex2) =
          vertex {
             let h = ReflectedFunctionTest.get (float ((v.pos.X**0.15)*0.8))
             return { v with c = h }
          }
 
-    let function1 (v : MyVertex) =
+    let function1 (v : MyVertex2) =
         vertex { 
-            let h = ReflectedFunctionTest.get (float v.trafo.M00 / 6.0)
+            let h = ReflectedFunctionTest.get (float v.pos.Y / 6.0)
             return { v with pos = h }
         }
 
-    let function2 (v : MyVertex) =
+    let function2 (v : MyVertex2) =
         fragment {
             let h = ReflectedFunctionTest.get (v.pos.X / 8.0)
             return { v with pos = h }

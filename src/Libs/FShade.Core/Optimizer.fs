@@ -1500,7 +1500,7 @@ module Optimizer =
                                 state {
                                     let! v = 
                                         match v with
-                                            | Coerce(v, t) -> evaluateConstantsS v |> State.map (fun v -> Expr.Coerce(v, t))
+                                            | Coerce(v, t) when t = typeof<obj> -> evaluateConstantsS v |> State.map (fun v -> Expr.Coerce(v, t))
                                             | v -> evaluateConstantsS v
 
                                     let! i = i |> Option.mapS evaluateConstantsS
