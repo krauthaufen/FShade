@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - master
+      - newbuild
     paths:
       - RELEASE_NOTES.md
       - .github/workflows/publish.yml
