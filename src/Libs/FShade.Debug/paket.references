@@ -7,3 +7,4 @@ Dotnet.ProjInfo
 Dotnet.ProjInfo.Workspace
 FSharp.Compiler.Service
 BlackFox.VsWhere
+Aardvark.Build

@@ -434,10 +434,70 @@ module RaytracingTest =
             let result = scene.TraceRay<Payload>(scene.TraceRay<V3d>(V3d.Zero, V3d.ZAxis, V3d.One), V3d.YAxis, miss = missType, ray = rayType, flags = secondaryRayFlags)
             uniform.OutputBuffer.[input.work.id.XY] <- V4d(result.foo + whatever.value)
         }
+[<AutoOpen>]
+module IOExtensions =
+    open System.Runtime.CompilerServices
+    open System.IO
+    open Microsoft.FSharp.NativeInterop
+    open Microsoft.FSharp.Core.LanguagePrimitives.IntrinsicOperators
+
+    [<AbstractClass; Sealed; Extension>]
+    type SpanExtensions private() =
+        [<Extension>]
+        static member inline Cast<'a, 'b when 'a : unmanaged and 'b : unmanaged>(x : Span<'a>) : Span<'b> =
+            Span<'b>(
+                NativePtr.toVoidPtr (&&x.GetPinnableReference()),
+                int ((int64 x.Length * int64 sizeof<'a>) / int64 sizeof<'b>)
+            )
+        [<Extension>]
+        static member inline Cast<'a, 'b when 'a : unmanaged and 'b : unmanaged>(x : ReadOnlySpan<'a>) : ReadOnlySpan<'b> =
+            ReadOnlySpan<'b>(
+                NativePtr.toVoidPtr (&&x.GetPinnableReference()),
+                int ((int64 x.Length * int64 sizeof<'a>) / int64 sizeof<'b>)
+            )
+
+    type Stream with
+
+        member x.Write(data : Span<'a>) =
+            x.Write(Span.op_Implicit (data.Cast<_,byte>()))
+
+        member x.Write(data : ReadOnlySpan<'a>) =
+            x.Write(data.Cast<_,byte>())
+
+        member x.Write(data : 'a[], index : int, count : int) =
+            x.Write(Span(data, index, count))
+
+        member x.ReadSafe(span : Span<'a>) = 
+            let mutable dst = span.Cast<_, byte>()
+            let mutable rem = dst.Length
+            while rem > 0 do
+                let r = x.Read(dst)
+                if r = 0 then failwith "stream ended"
+                rem <- rem - r
+                dst <- dst.Slice r
+
+        member x.ReadSafe(buffer : 'a[], index : int, count : int) =
+            x.ReadSafe(Span(buffer, index, count))
+
 
 [<EntryPoint>]
 let main args =
     Aardvark.Init()
+
+    let f = System.IO.Path.GetTempFileName()
+    do
+        use f = System.IO.File.OpenWrite f
+        f.Write (Span [|V3d.III; V3d.OIO; V3d.IIO|])
+
+
+    do 
+        use f = System.IO.File.OpenRead f
+        let arr = Array.zeroCreate<V3d> (int (f.Length / int64 sizeof<V3d>))
+        f.ReadSafe(Span arr)
+        printfn "%A" arr
+
+    exit 0
+
 
     let effect =
         let defaultHitGroup =

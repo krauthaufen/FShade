@@ -126,7 +126,7 @@ let ``[Hashing] deterministic uniforms``() =
 
     let e1 = Effect.ofFunction Shader6.shader
 
-    e1.Id |> should equal "yPicFNRu6buhBDkw4KdCPkTo48g="
+    e1.Id |> should equal "Rt5bdasgX4CG8+noOPDS++X7ipg="
     
 
 [<Test>]
