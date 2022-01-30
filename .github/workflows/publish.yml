@@ -27,6 +27,8 @@ jobs:
         run: dotnet build -c Release src/FShade.sln
       - name: Pack
         run: dotnet aardpack src/FShade.sln
+        env:
+          GITHUB_TOKEN: ${{ GITHUB_TOKEN }}
       - name: Upload Packages
         uses: actions/upload-artifact@v2
         with:
