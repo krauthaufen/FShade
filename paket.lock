@@ -25,7 +25,7 @@ NUGET
     Aardvark.Base.Telemetry (5.1.25)
     Aardvark.Base.TypeProviders (4.5.15)
       FSharp.Core (>= 4.2.3)
-    Aardvark.Build (1.0.5)
+    Aardvark.Build (1.0.6)
     BlackFox.VsWhere (1.0)
       FSharp.Core (>= 4.2.3)
     DevILSharp (0.2.11)
