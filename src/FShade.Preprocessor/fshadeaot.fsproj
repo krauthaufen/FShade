@@ -13,7 +13,8 @@
     <Copyright>The Aardvark Platform Team</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/krauthaufen/FShade</PackageProjectUrl>
-	
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/krauthaufen/FShade</RepositoryUrl>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <OutputPath>..\..\bin\Debug\</OutputPath>

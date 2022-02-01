@@ -1,6 +1,10 @@
 type file
 id FShade
 authors Georg Haaser
+projectUrl https://fshade.org
+licenseUrl http://www.apache.org/licenses/LICENSE-2.0.txt
+repositoryType git
+repositoryUrl https://github.com/krauthaufen/FShade
 description
     F# embedded shaders
 dependencies
