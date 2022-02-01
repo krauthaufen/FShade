@@ -36,7 +36,7 @@ jobs:
           path: bin\pack
       - name: GitHub Packages
         env:
-          NUGET_KEY: ${{ secrets.GITHUB_KEY }}
+          NUGET_KEY: ${{ secrets.GITHUB_TOKEN }}
         shell: cmd
         run: dotnet nuget push "bin\pack\*.nupkg" -k %NUGET_KEY% -s "https://nuget.pkg.github.com/krauthaufen/index.json" --skip-duplicate
       - name: NuGet
