@@ -28,7 +28,7 @@ jobs:
       - name: Pack
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: dotnet aardpack src/FShade.sln 
+        run: dotnet aardpack src/FShade.sln --notag
       - name: Upload Packages
         uses: actions/upload-artifact@v2
         with:
