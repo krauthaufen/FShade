@@ -607,7 +607,7 @@ module Preprocessor =
         let usePayloadIn (payload : Type) =
             State.custom (fun (s : State) ->
                 match s.payloadIn with
-                | Some (_, p) when payload <> p -> failwith "[FShade] Can only use one type of incoming payload"
+                | Some (_, p) when payload <> p -> failwithf "[FShade] Can only use one type of incoming payload (got %A and %A)" p payload
                 | _ ->
                     let name = "rayPayloadIn"
                     { s with payloadIn = Some (name, payload) }, name
@@ -627,7 +627,7 @@ module Preprocessor =
         let useCallableDataIn (data : Type) =
             State.custom (fun (s : State) ->
                 match s.callableDataIn with
-                | Some (_, d) when data <> d -> failwith "[FShade] Can only use one type of incoming callable data"
+                | Some (_, d) when data <> d -> failwithf "[FShade] Can only use one type of incoming callable data (got %A and %A)" d data
                 | _ ->
                     let name = "callableDataIn"
                     { s with callableDataIn = Some (name, data) }, name
@@ -636,7 +636,7 @@ module Preprocessor =
         let useHitAttribute (hitAttribute : Type) =
             State.custom (fun (s : State) ->
                 match s.hitAttribute with
-                | Some (_, h) when hitAttribute <> h -> failwith "[FShade] Can only use one type of hit attribute"
+                | Some (_, h) when hitAttribute <> h -> failwithf "[FShade] Can only use one type of hit attribute (got %A and %A)" h hitAttribute
                 | _ ->
                     let name = "rayHitAttribute"
                     { s with hitAttribute = Some (name, hitAttribute) }, name
