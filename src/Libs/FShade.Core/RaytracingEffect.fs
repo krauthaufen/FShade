@@ -214,6 +214,7 @@ type RaytracingEffect internal(state : RaytracingEffectState) =
 module RaytracingEffect =
 
     let toModule (effect : RaytracingEffect) =
+        Serializer.Init()
 
         let toEntryPoints (shaders : List<ShaderSlot * Shader>) =
             shaders |> List.map (fun (slot, shader) ->
@@ -256,6 +257,8 @@ module RaytracingEffect =
 module RaytracingBuilders =
 
     type HitGroupBuilder() =
+        do Serializer.Init()
+
         member x.Yield(_) = HitGroup.empty
 
         member private x.UpdateEntry(s : HitGroup, rayId : Symbol, f : HitGroupEntry -> HitGroupEntry) =
@@ -369,6 +372,8 @@ module RaytracingBuilders =
     type RayGenerationShaderMustBeSpecified = RayGenerationShaderMustBeSpecified
 
     type RaytracingEffectBuilder() =
+        do Serializer.Init()
+
         member x.Yield(_) = RayGenerationShaderMustBeSpecified
 
         member x.Delay f = f()
