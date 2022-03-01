@@ -1439,7 +1439,7 @@ module IntrinsicFunctions =
                 exactly <@ Fun.MultiplyAdd : V3d     * V3d     * V3d -> _ @>
                 exactly <@ Fun.MultiplyAdd : V4d     * V4d     * V4d -> _ @>
 
-                generic <@ madd @>
+                generic <@ madd : float -> float -> float -> float @>
             ]
 
             CIntrinsic.tagged "fma({0}, ivec2({1}), {2})", [

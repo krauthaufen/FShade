@@ -271,7 +271,7 @@ module CLiteral =
             | :? unativeint as v    -> CLiteral.CIntegral(int64 v) |> Some
 
 
-            | :? float16 as v       -> CLiteral.CFractional(float v.Float32) |> Some
+            | :? float16 as v       -> CLiteral.CFractional(float v) |> Some
             | :? float32 as v       -> CLiteral.CFractional(float v) |> Some
             | :? float as v         -> CLiteral.CFractional(v) |> Some
             | :? decimal as v       -> CLiteral.CFractional(float v) |> Some

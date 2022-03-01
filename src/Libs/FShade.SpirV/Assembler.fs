@@ -753,9 +753,8 @@ module Assembler =
                     yield OpConstant(tid, id, [| BitConverter.ToInt32(value, 0) |])
                     
                 | CFloat(16), CFractional v ->
-                    let mutable value = float16()
-                    value.Float32 <- float32 v
-                    yield OpConstant(tid, id, [| int value.UInt16 |])
+                    let value = float16 v
+                    yield OpConstant(tid, id, [| int <| Half.GetBits value |])
 
                 | _, CBool v ->
                     if v then yield OpConstantTrue(tid, id)

@@ -6,9 +6,9 @@ source https://vrvis.myget.org/F/aardvark_public/api/v2
 
 nuget FSharp.Core                           >= 5.0.0 lowest_matching: true
 nuget Aardvark.Build                        ~> 1.0.10
-nuget Aardvark.Base                         ~> 5.1.22
-nuget Aardvark.Base.FSharp                  ~> 5.1.22
-nuget Aardvark.Base.Incremental             ~> 5.1.22
+nuget Aardvark.Base                         ~> 5.2.0
+nuget Aardvark.Base.FSharp                  ~> 5.2.0
+nuget Aardvark.Base.Incremental             ~> 5.2.0
 
 nuget BlackFox.VsWhere                      ~> 1.0.0
 nuget Dotnet.ProjInfo                       ~> 0.36.0
