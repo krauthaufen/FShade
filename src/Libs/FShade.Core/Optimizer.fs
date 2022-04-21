@@ -708,6 +708,11 @@ module Optimizer =
                         let! t = eliminateDeadCodeS t
                         return Expr.PropertySet(t, pi, value, idx)
 
+                    | UnsafeWrite(ReadRaytracingData _ as t, value) ->
+                        let! value = eliminateDeadCodeS value
+                        let! t = eliminateDeadCodeS t
+                        return Expr.UnsafeWrite(t, value)
+
                     | UnsafeWrite(t, value) ->
                         Log.warn "[FShade] found UnsafeWrite on unknown expression: %A" t
                         let! value = eliminateDeadCodeS value
