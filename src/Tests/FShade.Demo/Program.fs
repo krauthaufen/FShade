@@ -17,6 +17,7 @@ open System.Runtime.InteropServices
 open FSharp.Data.Adaptive
 
 #nowarn "9"
+#nowarn "51"
 
 [<RequireQualifiedAccess>]
 type SegmentMergeMode =

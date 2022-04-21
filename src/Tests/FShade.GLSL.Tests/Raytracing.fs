@@ -73,7 +73,8 @@ let ``Reflected functions``() =
              hitgroup ("Shadow", hitgroupShadow)
          }
 
-    GLSL.shouldCompileRaytracing effect
+    let regex = "helper\(vec3 WorldRayDirection, vec3 WorldRayOrigin\)"
+    GLSL.shouldCompileRaytracingAndContainRegex effect [regex]
 
 [<Test>]
 let ``Simple uniform access in reflected function``() =

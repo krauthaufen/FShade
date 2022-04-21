@@ -1056,7 +1056,9 @@ module Compiler =
             let mutable usesGlobal = false
             let e = 
                 e.SubstituteReads (fun kind typ name idx slot ->
-                    if (kind = ParameterKind.Uniform || kind = ParameterKind.RaytracingData) && Set.contains name globals then 
+                    // Is the check in the global name set really necessary for uniforms?
+                    // Since raytracing data is not in that set anyway, we never replace those reads
+                    if kind = ParameterKind.RaytracingData || (kind = ParameterKind.Uniform && Set.contains name globals) then 
                         usesGlobal <- true
                         None
                     else
@@ -1069,7 +1071,6 @@ module Compiler =
                 let hash = Expr.ComputeHash e
                 return! CompilerState.useConstant hash e
             else
-                let! globals = State.get |> State.map (fun s -> s.moduleState.globalParameters)
                 let free = 
                     free
                         |> HashSet.toArray
@@ -1177,7 +1178,11 @@ module Compiler =
                 | WhileLoop _ ->
                     return! asExternalS e
 
-                | ReadInputOrRaytracingData(kind, name, index, _) ->
+                | ReadRaytracingData(name, _) ->
+                    let! ct = toCTypeS e.Type
+                    return CReadInput(ParameterKind.RaytracingData, ct, name, None)
+
+                | ReadInput(kind, name, index) ->
                     let! ct = toCTypeS e.Type
                     let! s = State.get
                     if Set.contains name s.moduleState.globalParameters then

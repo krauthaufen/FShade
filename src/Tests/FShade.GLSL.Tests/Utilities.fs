@@ -177,6 +177,17 @@ module GLSL =
                 | Warning w -> shouldContainRegex glsl s
                 | Error e -> failwithf "ERROR: %A" e
 
+    let shouldCompileRaytracingAndContainRegex (e : RaytracingEffect) (s : list<string>) =
+        let glsl, res = compileRaytracing e
+        
+        Console.WriteLine("{0}", glsl.code)
+        for (stage, r) in res do
+            Console.WriteLine("{0}: {1}", stage, sprintf "%A" r)
+            match r with
+                | Success -> shouldContainRegex glsl s
+                | Warning w -> shouldContainRegex glsl s
+                | Error e -> failwithf "ERROR: %A" e
+
 type Setup() =
     static let initialized = ref false
 

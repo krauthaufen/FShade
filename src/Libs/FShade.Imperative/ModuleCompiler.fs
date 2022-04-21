@@ -133,25 +133,25 @@ module ModuleCompiler =
 
             let ofEntry (e : EntryPoint) =
                 state {
-                    let key = (e, e.uniforms, e.raytracingData)
                     let! globals =
-                        build Unchecked.defaultof<_> key None (fun (_, us, rs) ->
-                            state {
-                                let! uniforms = us |> compileUniformsS
-                                let! rtdata = rs |> compileRaytracingDataS
-                                return [uniforms; rtdata]
-                            }
-                        )
+                        build Unchecked.defaultof<_> e.uniforms None (compileUniformsS >> State.map List.singleton)
 
                     let globalNames =
-                        [
-                            yield! e.uniforms |> List.map (fun u -> u.uniformName)
-                            yield! e.raytracingData |> List.map (fun r -> r.rtdataName)
-                        ]
+                        e.uniforms
+                        |> List.map (fun u -> u.uniformName)
                         |> Set.ofList
 
                     do! State.modify (fun s -> { s with moduleState = { s.moduleState with ModuleState.globalParameters = globalNames } })
-                    let! root = build globals e e.conditional (compileEntryS >> State.map List.singleton)
+
+                    let! root =
+                        let key = (e, e.raytracingData)
+                        build globals key e.conditional (fun (entry, raydata) ->
+                            state {
+                                let! e = compileEntryS entry
+                                let! r = compileRaytracingDataS raydata
+                                return [e; r]
+                            }
+                        )
 
                     let root = GraphNode(root.Definitions, e.conditional, HashSet.add globals root.Dependencies)
 
@@ -274,19 +274,25 @@ module ModuleCompiler =
                     for (entry, _, _) in graphs do
                         match HashMap.tryFind entry entryGroups with
                         | Some g ->
-                            let res = 
-                                toposort g 
-                                |> List.collect (   
-                                    HashSet.toList >> 
-                                    List.sortBy sortKey >> 
-                                    List.collect (fun d -> d.Definitions)
-                                ) 
+                            let definitions =
+                                let ray, defs =
+                                    toposort g
+                                    |> List.collect (
+                                        HashSet.toList >>
+                                        List.sortBy sortKey >>
+                                        List.collect (fun d -> d.Definitions)
+                                    )
+                                    |> List.partition (function CRaytracingDataDef _ -> true | _ -> false)
+
+                                // Ray data definitions must be first and not moved out of the entry group
+                                // Maybe there is a more elegant way to do this?
+                                List.concat [ray; defs]
 
                             match entry.conditional with
                             | Some c ->
-                                yield CConditionalDef(c, res)
+                                yield CConditionalDef(c, definitions)
                             | None ->
-                                yield! res
+                                yield! definitions
                         | _ ->
                             ()
                 ]
