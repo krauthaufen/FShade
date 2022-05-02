@@ -1,3 +1,7 @@
+### 5.2.9
+* Fixed issue with topological sort and raytracing data
+* Removed warnings in raytracing shaders
+
 ### 5.2.8
 * Updated to Aardvark.Base 5.2
 
