@@ -32,12 +32,12 @@ module Serializer =
             | NativeInt = 11uy
             | UNativeInt = 12uy
 
-            | Bool      = 11uy
-            | Unit      = 12uy
-            | String    = 13uy
-            | Char      = 14uy
-            | Void      = 15uy
-        
+            | Bool      = 13uy
+            | Unit      = 14uy
+            | String    = 15uy
+            | Char      = 16uy
+            | Void      = 17uy
+
             | V2i       = 32uy
             | V3i       = 33uy
             | V4i       = 34uy
