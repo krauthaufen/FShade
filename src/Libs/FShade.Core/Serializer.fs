@@ -15,6 +15,57 @@ module Serializer =
     open Microsoft.FSharp.Quotations
     open FShade.Imperative
 
+    [<AutoOpen>]
+    module private TypeExtensions =
+
+        [<Literal>]
+        let private defaultFlags =
+            BindingFlags.Public    |||
+            BindingFlags.NonPublic |||
+            BindingFlags.FlattenHierarchy
+
+        let private (|GenericMethodDef|_|) (mi : MethodInfo) =
+            if mi.IsGenericMethodDefinition then
+                let args = mi.GetGenericArguments()
+                Some args.Length
+            else
+                None
+
+        type Type with
+
+            member x.GetMethodEx(name : string, typeArguments : Type[], parameters : Type[],
+                                 [<Optional; DefaultParameterValue(BindingFlags.Static ||| BindingFlags.Instance)>] flags : BindingFlags) =
+
+                let makeGeneric (mi : MethodInfo) =
+                    match mi with
+                    | GenericMethodDef args when typeArguments.Length = args ->
+                        mi.MakeGenericMethod(typeArguments)
+
+                    | _ -> mi
+
+                let isCompatible (mi : MethodInfo) =
+                    let expected = mi.GetParameters() |> Array.map (fun t -> t.ParameterType)
+
+                    parameters.Length = expected.Length &&
+                    (parameters, expected) ||> Array.forall2 (=)
+
+                let candidates =
+                    x.GetMember(name, MemberTypes.Method, flags ||| defaultFlags)
+                    |> Array.map (unbox<MethodInfo> >> makeGeneric)
+                    |> Array.filter isCompatible
+
+                if candidates.Length = 1 then
+                    candidates.[0]
+                elif candidates.Length > 1 then
+                    raise <| AmbiguousMatchException($"Multiple matching methods with name {name} found.")
+                else
+                    raise <| ArgumentException($"Method with name {name} not found.")
+
+            member x.GetMethodEx(name : string, typeArguments : Type[], parameters : Expr list,
+                                 [<Optional; DefaultParameterValue(BindingFlags.Static ||| BindingFlags.Instance)>] flags : BindingFlags) =
+                let parameters = parameters |> List.map (fun p -> p.Type) |> Array.ofList
+                x.GetMethodEx(name, typeArguments, parameters, flags)
+
     module Type =
 
         type private TypeId =
@@ -276,7 +327,6 @@ module Serializer =
                 | TypeId.Ref ->
                     let id = src.ReadInt32()
                     state.Table.[id]
-                
 
                 | id ->
                     failwithf "unexpected TypeId: %A" id
@@ -656,7 +706,7 @@ module Serializer =
             let serialize (state : SerializerState) (dst : BinaryWriter) (u : UtilityFunction) =
                 dst.Write u.functionId
                 dst.Write u.functionName
-            
+
                 dst.Write (List.length u.functionArguments)
                 for v in u.functionArguments do
                     let id = state.VariableId
@@ -664,26 +714,39 @@ module Serializer =
                     dst.Write v.Name
                     Type.serializeInternal state.TypeState dst v.Type
                     dst.Write v.IsMutable
-            
+
                     state.VariableId <- id + 1
                     state.VariableIds <- Map.add v id state.VariableIds
-            
+
                 Expr.serializeInternal state dst u.functionBody
 
-                for v in u.functionArguments do state.VariableIds <- Map.remove v state.VariableIds
+                for v in u.functionArguments do
+                    state.VariableIds <- Map.remove v state.VariableIds
 
                 match u.functionMethod with
-                | Some m ->
+                | Some (:? MethodInfo as mi) ->
                     dst.Write 1uy
-                    Type.serializeInternal state.TypeState dst m.DeclaringType
-                    dst.Write m.MetadataToken
-                    if m.IsGenericMethod then
-                        for a in m.GetGenericArguments() do
-                            Type.serializeInternal state.TypeState dst a
-                | None ->
+                    Type.serializeInternal state.TypeState dst mi.DeclaringType
+
+                    dst.Write mi.Name
+                    dst.Write mi.IsStatic
+
+                    // Write type arguments
+                    let typeArguments = mi.GetGenericArguments()
+                    dst.Write typeArguments.Length
+                    for a in typeArguments do Type.serializeInternal state.TypeState dst a
+
+                    // Write parameter types
+                    let parameters = mi.GetParameters()
+                    dst.Write parameters.Length
+                    for p in parameters do Type.serializeInternal state.TypeState dst p.ParameterType
+
+                | Some m ->
+                    Log.warn "[FShade] Expected a MethodInfo but got %A" m.Type
                     dst.Write 0uy
 
-                // TODO: functionTag???
+                | _ ->
+                    dst.Write 0uy
 
                 dst.Write u.functionIsInline
 
@@ -712,19 +775,21 @@ module Serializer =
                     | 0uy ->
                         None
                     | _ ->
-                        let typ = Type.deserializeInternal state.TypeState src
-                        let token = src.ReadInt32()
+                        let decl = Type.deserializeInternal state.TypeState src
+                        let name = src.ReadString()
+                        let isStatic = src.ReadBoolean()
 
-                        let m = typ.Module.ResolveMethod(token)
+                        let typeArgumentCount = src.ReadInt32()
+                        let typeArguments = Array.init typeArgumentCount (fun _ -> Type.deserializeInternal state.TypeState src)
+
+                        let parameterCount = src.ReadInt32()
+                        let parameterTypes = Array.init parameterCount (fun _ -> Type.deserializeInternal state.TypeState src)
+
                         let method =
-                            if m.IsGenericMethod then
-                                let m = m :?> MethodInfo
-                                let targs = Array.init (m.GetGenericArguments().Length) (fun _ -> Type.deserializeInternal state.TypeState src)
-                                if m.IsGenericMethodDefinition then m.MakeGenericMethod(targs) :> MethodBase
-                                else m.GetGenericMethodDefinition().MakeGenericMethod(targs) :> MethodBase
-                            else
-                                m
-                        Some method
+                            let flags = if isStatic then BindingFlags.Static else BindingFlags.Instance
+                            decl.GetMethodEx(name, typeArguments, parameterTypes, flags)
+
+                        Some (method :> MethodBase)
 
                 let functionIsInline = src.ReadBoolean()
                 {
@@ -792,8 +857,6 @@ module Serializer =
 
         let rec internal serializeInternal (state : SerializerState) (dst : BinaryWriter) (e : Expr) =
             match e with
-
-        
             | Patterns.Call(None, mi, [ExprValue v]) when (mi.Name = "op_Splice" || mi.Name = "op_SpliceUntyped") && state.IsHash ->
                 serializeInternal state dst v
 
@@ -818,13 +881,20 @@ module Serializer =
             | Patterns.ReflectedCall(isInline, mi, def, args) ->
                 dst.Write (byte ExprId.ReflectedCall)
                 Type.serializeInternal state.TypeState dst mi.DeclaringType
-                dst.Write mi.MetadataToken
-                if mi.IsGenericMethod then
-                    for a in mi.GetGenericArguments() do Type.serializeInternal state.TypeState dst a
+
+                dst.Write mi.Name
+
+                // Write type arguments
+                let typeArguments = mi.GetGenericArguments()
+                dst.Write typeArguments.Length
+                for a in typeArguments do Type.serializeInternal state.TypeState dst a
+
+                // Write parameters
+                dst.Write args.Length
+                for a in args do serializeInternal state dst a
 
                 dst.Write isInline
                 serializeInternal state dst def
-                for a in args do serializeInternal state dst a
 
             | CallFunction(f, args) ->
                 dst.Write (byte ExprId.CallFunction)
@@ -915,24 +985,24 @@ module Serializer =
 
             | Patterns.Call(target, mi, args) ->
                 match target with
-                | Some t -> 
+                | Some t ->
                     dst.Write (byte ExprId.InstanceCall)
                     serializeInternal state dst t
                 | None ->
                     dst.Write (byte ExprId.StaticCall)
                     Type.serializeInternal state.TypeState dst mi.DeclaringType
 
-                if mi.IsGenericMethod then
-                    dst.Write 1uy
-                    let ps = mi.GetGenericArguments()
-                    dst.Write ps.Length
-                    for p in ps do Type.serializeInternal state.TypeState dst p
-                else
-                    dst.Write 0uy
+                dst.Write mi.Name
 
-                dst.Write mi.MetadataToken
+                // Write type arguments
+                let typeArguments = mi.GetGenericArguments()
+                dst.Write typeArguments.Length
+                for a in typeArguments do Type.serializeInternal state.TypeState dst a
+
+                // Write arguments
+                dst.Write args.Length
                 for a in args do serializeInternal state dst a
-            
+
             | Patterns.Coerce(e, t) ->
                 dst.Write (byte ExprId.Coerce)
                 serializeInternal state dst e
@@ -950,7 +1020,8 @@ module Serializer =
                 | None ->
                     dst.Write(byte ExprId.StaticFieldGet)
                     Type.serializeInternal state.TypeState dst field.DeclaringType
-                dst.Write field.MetadataToken
+
+                dst.Write field.Name
 
             | Patterns.FieldSet(target, field, value) ->
                 match target with
@@ -960,7 +1031,8 @@ module Serializer =
                 | None ->
                     dst.Write(byte ExprId.StaticFieldSet)
                     Type.serializeInternal state.TypeState dst field.DeclaringType
-                dst.Write field.MetadataToken
+
+                dst.Write field.Name
                 serializeInternal state dst value
              
             | Patterns.IfThenElse(c, i, e) ->
@@ -1048,8 +1120,7 @@ module Serializer =
             | Patterns.NewObject(ctor, args) ->
                 dst.Write (byte ExprId.NewObj)
                 Type.serializeInternal state.TypeState dst ctor.DeclaringType
-                dst.Write ctor.MetadataToken
-
+                dst.Write args.Length
                 for a in args do serializeInternal state dst a
 
             | Patterns.NewRecord(typ, args) ->
@@ -1196,23 +1267,23 @@ module Serializer =
                     )
 
                 Expr.CallFunction(f, args)
-            
 
             | ExprId.ReflectedCall ->
                 let decl = Type.deserializeInternal state.TypeState src
-                let method = 
-                    let token = src.ReadInt32()
-                    let m = decl.Module.ResolveMethod(token) :?> MethodInfo
-                    if m.IsGenericMethod then
-                        let targs = Array.init (m.GetGenericArguments().Length) (fun _ -> Type.deserializeInternal state.TypeState src)
-                        m.MakeGenericMethod targs
-                    else
-                        m
-                let isInline = src.ReadBoolean()
-                let def = deserializeInternal state src
-                let args = List.init (method.GetParameters().Length) (fun _ -> deserializeInternal state src)
-                Expr.Call(method, args)
+                let name = src.ReadString()
 
+                let typeArgumentCount = src.ReadInt32()
+                let typeArguments = Array.init typeArgumentCount (fun _ -> Type.deserializeInternal state.TypeState src)
+
+                let parameterCount = src.ReadInt32()
+                let parameters = List.init parameterCount (fun _ -> deserializeInternal state src)
+
+                let method = decl.GetMethodEx(name, typeArguments, parameters)
+
+                let _isInline = src.ReadBoolean()
+                let _def = deserializeInternal state src
+
+                Expr.Call(method, parameters)
 
             | ExprId.WriteOutputs ->
                 let cnt = src.ReadInt32()
@@ -1233,7 +1304,7 @@ module Serializer =
                 let typ = Type.deserializeInternal state.TypeState src
                 let kind = src.ReadInt32() |> unbox<ParameterKind>
                 let name = src.ReadString()
-            
+
                 let index = 
                     match src.ReadByte() with
                     | 0uy -> None
@@ -1271,7 +1342,7 @@ module Serializer =
                 Expr.Application(a, b)
             
             | ExprId.StaticCall | ExprId.InstanceCall ->
-                let target, declaringType = 
+                let target, declaringType =
                     match id with
                     | ExprId.StaticCall ->
                         let t = Type.deserializeInternal state.TypeState src
@@ -1280,34 +1351,22 @@ module Serializer =
                         let target = deserializeInternal state src
                         Some target, target.Type
 
-                let m = declaringType.Module
-                let targs =
-                    match src.ReadByte() with
-                    | 0uy -> [||]
-                    | _ -> Array.init (src.ReadInt32()) (fun _ -> Type.deserializeInternal state.TypeState src)
-                let token = src.ReadInt32()
+                let name = src.ReadString()
 
-                let method = 
-                    if declaringType.IsGenericType then
-                        m.ResolveMethod(token, declaringType.GetGenericArguments(), targs) :?> MethodInfo
-                    elif targs.Length > 0 then
-                        m.ResolveMethod(token, [||], targs) :?> MethodInfo
-                    else
-                        m.ResolveMethod(token) :?> MethodInfo
+                let typeArgumentCount = src.ReadInt32()
+                let typeArguments = Array.init typeArgumentCount (fun _ -> Type.deserializeInternal state.TypeState src)
+
+                let parameterCount = src.ReadInt32()
+                let parameters = List.init parameterCount (fun _ -> deserializeInternal state src)
 
                 let method =
-                    if targs.Length > 0 then method.MakeGenericMethod targs
-                    else method
-
-                let args =
-                    List.init (method.GetParameters().Length) (fun _ -> deserializeInternal state src)
-
-                if method.ContainsGenericParameters then failwith "generic method"
+                    let flags = if id = ExprId.StaticCall then BindingFlags.Static else BindingFlags.Instance
+                    declaringType.GetMethodEx(name, typeArguments, parameters, flags)
 
                 match target with
-                | Some target -> Expr.Call(target, method, args)
-                | None -> Expr.Call(method, args)
-            
+                | Some target -> Expr.Call(target, method, parameters)
+                | None -> Expr.Call(method, parameters)
+
             | ExprId.Coerce ->
                 let e = deserializeInternal state src
                 let t = Type.deserializeInternal state.TypeState src
@@ -1319,44 +1378,40 @@ module Serializer =
 
             | ExprId.StaticFieldGet ->
                 let t = Type.deserializeInternal state.TypeState src
-                let m = t.Module
-                let token = src.ReadInt32()
-                let field = 
-                    if t.IsGenericType then m.ResolveField(token, t.GetGenericArguments(), [||])
-                    else m.ResolveField(token)
+
+                let name = src.ReadString()
+                let field = t.GetField(name)
+
                 Expr.FieldGet(field)
-                
+
             | ExprId.InstanceFieldGet ->
                 let target = deserializeInternal state src 
                 let t = target.Type
-                let m = t.Module
-                let token = src.ReadInt32()
-                let field = 
-                    if t.IsGenericType then m.ResolveField(token, t.GetGenericArguments(), [||])
-                    else m.ResolveField(token)
+
+                let name = src.ReadString()
+                let field = t.GetField(name)
+
                 Expr.FieldGet(target, field)
 
             | ExprId.StaticFieldSet ->
                 let t = Type.deserializeInternal state.TypeState src
-                let m = t.Module
-                let token = src.ReadInt32()
-                let field = 
-                    if t.IsGenericType then m.ResolveField(token, t.GetGenericArguments(), [||])
-                    else m.ResolveField(token)
-                let value = deserializeInternal state src 
+
+                let name = src.ReadString()
+                let field = t.GetField(name)
+
+                let value = deserializeInternal state src
                 Expr.FieldSet(field, value)
-            
+
             | ExprId.InstanceFieldSet ->
-                let target = deserializeInternal state src 
+                let target = deserializeInternal state src
                 let t = target.Type
-                let m = t.Module
-                let token = src.ReadInt32()
-                let field = 
-                    if t.IsGenericType then m.ResolveField(token, t.GetGenericArguments(), [||])
-                    else m.ResolveField(token)
-                let value = deserializeInternal state src 
+
+                let name = src.ReadString()
+                let field = t.GetField(name)
+
+                let value = deserializeInternal state src
                 Expr.FieldSet(target, field, value)
-            
+
             | ExprId.ForInteger ->
                 let vid = src.ReadInt32()
                 let name = src.ReadString()
@@ -1388,7 +1443,7 @@ module Serializer =
                 let b = deserializeInternal state src
                 state.Variables <- Map.remove vid state.Variables
                 Expr.Lambda(v, b)
-            
+
             | ExprId.Let ->
                 let vid = src.ReadInt32()
                 let name = src.ReadString()
@@ -1449,11 +1504,11 @@ module Serializer =
 
             | ExprId.NewObj ->
                 let t = Type.deserializeInternal state.TypeState src
-                let token = src.ReadInt32()
-                let ctor = t.Module.ResolveMember(token) :?> ConstructorInfo
 
-                let cnt = ctor.GetParameters().Length
+                let cnt = src.ReadInt32()
                 let args = List.init cnt (fun _ -> deserializeInternal state src)
+
+                let ctor = t.GetConstructor(args |> List.map (fun e -> e.Type) |> List.toArray)
                 Expr.NewObject(ctor, args)
 
             | ExprId.NewRecord ->
@@ -1482,7 +1537,7 @@ module Serializer =
                     | _ ->
                         let target = deserializeInternal state src
                         target.Type, Some target
-                    
+
                 let name = src.ReadString()
                 let prop = t.GetProperty(name, BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Static ||| BindingFlags.Instance)
 
@@ -1498,7 +1553,7 @@ module Serializer =
                 match target with
                 | Some target -> Expr.PropertyGet(target, prop, ?indexerArgs = indices)
                 | None -> Expr.PropertyGet(prop, ?indexerArgs = indices)
-            
+
             | ExprId.StaticPropertySet | ExprId.InstancePropertySet ->
                 let t, target =
                     match id with
@@ -1507,7 +1562,7 @@ module Serializer =
                     | _ ->
                         let target = deserializeInternal state src
                         target.Type, Some target
-                    
+
                 let name = src.ReadString()
                 let prop = t.GetProperty(name, BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Static ||| BindingFlags.Instance)
 
@@ -1543,7 +1598,6 @@ module Serializer =
                 let a = deserializeInternal state src
                 let b = deserializeInternal state src
                 Expr.TryFinally(a,b)
-            
 
             | ExprId.TryWith ->
                 let body = deserializeInternal state src
@@ -1558,13 +1612,12 @@ module Serializer =
                 let filterBody = deserializeInternal state src
                 state.Variables <- Map.remove vid state.Variables
 
-            
                 let vid = src.ReadInt32()
                 let name = src.ReadString()
                 let typ = Type.deserializeInternal state.TypeState src
                 let isMutable = src.ReadBoolean()
                 let catchVar = Var(name, typ, isMutable)
-            
+
                 state.Variables <- Map.add vid catchVar state.Variables
                 let catchBody = deserializeInternal state src
                 state.Variables <- Map.remove vid state.Variables
@@ -1598,7 +1651,7 @@ module Serializer =
                 match name with
                 | Some name -> Expr.ValueWithName(value, t, name)
                 | None -> Expr.Value(value, t)
-            
+
             | ExprId.VarSet ->
                 let vid = src.ReadInt32()
                 let value = deserializeInternal state src
@@ -1616,7 +1669,7 @@ module Serializer =
         let serialize (dst : Stream) (e : Expr) =
             use w = new BinaryWriter(dst, System.Text.Encoding.UTF8, true)
             serializeInternal (SerializerState(false)) w e
-        
+
         let deserialize (src : Stream) =
             use r = new BinaryReader(src, System.Text.Encoding.UTF8, true)
             deserializeInternal (DeserializerState()) r

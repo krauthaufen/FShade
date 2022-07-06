@@ -4,12 +4,29 @@ open FsUnit
 open NUnit.Framework
 open Aardvark.Base
 open FShade
+open System.IO
 
 type Vertex = 
     {
         [<Position>] pos : V4d
         [<Semantic("TexCoord")>] tc : V2d
     }
+
+type Effect0 private () =
+
+    [<GLSLIntrinsic("someFun({0})")>]
+    static let sepp (a : V2d) : V4d =
+        onlyInShaderCode "sepp"
+
+    static member vertexShader (v : Vertex) =
+        vertex {
+            return { v with pos = sepp v.tc }
+        }
+
+    static member fragmentShader (v : Vertex) =
+        fragment {
+            return V4d.Zero
+        }
 
 type Shader1 private () =
 
@@ -85,6 +102,181 @@ type Shader6 private () =
             let a : V4d = uniform?Blubber?Value
             return a
         }
+
+
+[<AutoOpen>]
+module private Utilities =
+    open FSharp.Quotations
+
+    let roundtripExpr (expected : string) (input : Expr) =
+        use memory = new MemoryStream()
+
+        let inputHash = Serializer.Expr.computeHash input
+        inputHash |> should equal expected
+        input |> Serializer.Expr.serialize memory
+
+        memory.Position <- 0L
+        let output = Serializer.Expr.deserialize memory
+        let outputHash = Serializer.Expr.computeHash output
+
+        outputHash |> should equal inputHash
+
+    let roundtrip (expected : string) (func : 'T -> Expr<'U>) =
+        let expr = func Unchecked.defaultof<_>
+        roundtripExpr expected expr
+
+[<Test>]
+let ``[Serializer] instance field get``() =
+
+    let bla (v : Vertex) =
+        fragment {
+            return V4d(v.pos.X)
+        }
+
+    bla |> roundtrip "uL27SN9ivodWX04FzXDFc5Mua2U="
+
+[<Test>]
+let ``[Serializer] instance field set and get``() =
+
+    let bla (v : Vertex) =
+        fragment {
+            let mutable res = v.pos
+            res.X <- v.pos.Z
+            return res
+        }
+
+    bla |> roundtrip "DvbfEAJ6LXtOgXP3YHTSpkFphiI="
+
+type SomeFuncs() =
+
+    [<ReflectedDefinition>]
+    static member Hehe (input : V4d) =
+        input.XYZ
+
+    [<ReflectedDefinition>]
+    static member Hehe<'T> (input : 'T) =
+        input
+
+    [<ReflectedDefinition>]
+    static member Hehe<'T> (input : 'T, foo : int) =
+        input
+
+    [<ReflectedDefinition>]
+    static member Hehe<'T1, 'T2> (i1 : 'T1, i2 : 'T2, foo : int) =
+        i1
+
+    static member Haha (input : V4d) =
+        input.XYZ
+
+    static member Haha<'T> (input : 'T) =
+        input
+
+    static member Haha<'T> (input : 'T, foo : int) =
+        input
+
+    static member Haha<'T1, 'T2> (i1 : 'T1, i2 : 'T2, foo : int) =
+        i1
+
+    member x.Hihi (input : V4d) =
+        input.XYZ
+
+    member x.Hihi<'T> (input : 'T) =
+        input
+
+    member x.Hihi<'T> (input : 'T, foo : int) =
+        input
+
+    member x.Hihi<'T1, 'T2> (i1 : 'T1, i2 : 'T2, foo : int) =
+        i1
+
+
+[<Test>]
+let ``[Serializer] reflected function``() =
+
+    let bla (v : Vertex) =
+        fragment {
+            return V4d(SomeFuncs.Hehe v.pos, 0.0)
+        }
+
+    bla |> roundtrip "5Cyik5ypZUTWmEhS/qjWUVVCYOA="
+
+[<Test>]
+let ``[Serializer] reflected generic function``() =
+
+    let bla (v : Vertex) =
+        fragment {
+            return V4d(SomeFuncs.Hehe(v.pos.XYZ, 3) + SomeFuncs.Hehe(v.pos.XYZ, v.tc, 3), 0.0)
+        }
+
+    bla |> roundtrip "+HO7h6f2D/ft9AoHkp9F7mLyF+w="
+
+[<Test>]
+let ``[Serializer] static call``() =
+
+    let bla (v : Vertex) =
+        fragment {
+            return V4d(SomeFuncs.Haha v.pos, 0.0)
+        }
+
+    bla |> roundtrip "PL2hHQgi3x3ZPyW1EFuS4nWHoK8="
+
+[<Test>]
+let ``[Serializer] static generic call``() =
+
+    let bla (v : Vertex) =
+        fragment {
+            return V4d(SomeFuncs.Haha(v.pos.XYZ, 3) + SomeFuncs.Haha(v.pos.XYZ, v.tc, 3), 0.0)
+        }
+
+    bla |> roundtrip "k1dL58zcqsR0umSubM/pvE7YV3w="
+
+[<Test>]
+let ``[Serializer] instance call``() =
+
+    let bla (v : Vertex) =
+        fragment {
+            let funcs = SomeFuncs()
+            return V4d(funcs.Hihi v.pos, 0.0)
+        }
+
+    bla |> roundtrip "C0LomJg4nJTNGWFqCYoOqWDa4aM="
+
+[<Test>]
+let ``[Serializer] instance generic call``() =
+
+    let bla (v : Vertex) =
+        fragment {
+            let funcs = Unchecked.defaultof<SomeFuncs>
+            return V4d(funcs.Hihi(v.pos.XYZ, 3) + funcs.Hihi(v.pos.XYZ, v.tc, 3), 0.0)
+        }
+
+    bla |> roundtrip "x+pzfkmq9kpSUnMB4Id3HwIA2Y0="
+
+
+[<Test>]
+let ``[Serializer] utility function call``() =
+    Serializer.Init()
+
+    let bla (v : Vertex) =
+        fragment {
+            return V4d(SomeFuncs.Hehe v.pos, 1.0)
+        }
+
+    let shader = Shader.ofFunction bla |> List.head
+    shader.shaderBody |> roundtripExpr "HjiiX8umznSdGrQ03JUZq2b4nAc="
+
+[<Test>]
+let ``[Serializer] utility function generic call``() =
+    Serializer.Init()
+
+    let bla (v : Vertex) =
+        fragment {
+            return V4d(SomeFuncs.Hehe v.pos.XYZ, 1.0)
+        }
+
+    let shader = Shader.ofFunction bla |> List.head
+    shader.shaderBody |> roundtripExpr "cH0b4Q0FVt0FkN1wVQpQQ+6CPqI="
+
 [<Test>]
 let ``[Hashing] includes SamplerState``() =
 
@@ -92,7 +284,7 @@ let ``[Hashing] includes SamplerState``() =
     let e2 = Effect.ofFunction (Shader2.shader)
 
     e1.Id |> should not' (equal e2.Id)
-        
+
 [<Test>]
 let ``[Hashing] SamplerState hash works``() =
 
@@ -126,8 +318,8 @@ let ``[Hashing] deterministic uniforms``() =
 
     let e1 = Effect.ofFunction Shader6.shader
 
-    e1.Id |> should equal "Rt5bdasgX4CG8+noOPDS++X7ipg="
-    
+    e1.Id |> should equal "0GgmEa3UiRwpgMr8ttkNkaDwIww="
+
 
 [<Test>]
 let ``[ComputeHashing] equal => equal hash``() =
