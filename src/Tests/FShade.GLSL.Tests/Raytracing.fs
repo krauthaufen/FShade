@@ -10,6 +10,7 @@ type UniformScope with
     member x.SomeUniform : V3d = uniform?SomeUniform
     member x.OutputBuffer : Image2d<Formats.rgba32f> = uniform?OutputBuffer
     member x.Flags : RayFlags = uniform?Flags
+    member x.SomeAttribute : V3d[] = uniform?StorageBuffer?SomeAttribute
 
 type Payload =
     {
@@ -101,6 +102,43 @@ let ``Simple uniform access in reflected function``() =
              raygen raygenShader
              hitgroup ("1", hitgroup1)
              hitgroup ("2", hitgroup2)
+         }
+
+    GLSL.shouldCompileRaytracing effect
+
+[<ReflectedDefinition>]
+let getValueWithPrimitiveId (input : RayHitInput<'T, 'V>) =
+    input.geometry.primitiveId
+
+[<ReflectedDefinition>]
+let getSomeAttribute (ai : int) =
+    uniform.SomeAttribute.[ai]
+
+let chitWithPrimitiveId (input : RayHitInput<Payload>) =
+    closestHit {
+        let ai = getValueWithPrimitiveId input
+
+        let attr = getSomeAttribute ai
+
+        return { color = attr; depth = 0 }
+    }
+
+[<Test>]
+let ``Helper with PrimitiveId``() =
+    Setup.Run()
+
+    let raygenShader =
+        raygen {
+            ()
+        }
+
+    let effect =
+         let hitgroup1 =
+             hitgroup { closestHit chitWithPrimitiveId }
+
+         raytracingEffect {
+             raygen raygenShader
+             hitgroup ("1", hitgroup1)
          }
 
     GLSL.shouldCompileRaytracing effect
