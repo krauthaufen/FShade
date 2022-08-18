@@ -940,11 +940,55 @@ module Preprocessor =
 
     let private defaultOfMeth = getMethodInfo <@ Unchecked.defaultof<int> @>
 
+    let private (|VectorExpr|_|) (e : Expr) =
+        match e.Type with
+        | Aardvark.Base.TypeInfo.Patterns.VectorOf(_, t) -> Some (e, t)
+        | _ -> None
+        
+    let private zeroOneVecProperty =
+        System.Text.RegularExpressions.Regex @"([XYZW]*[ONIP])+"
+
     let rec preprocessNormalS (e : Expr) : Preprocess<Expr> =
         state {
             let! vertexType = State.vertexType
 
             match e with
+                | PropertyGet(Some (VectorExpr(v, baseType)), prop, []) when zeroOneVecProperty.IsMatch prop.Name ->
+                    let tmp = Var("tmp", v.Type)
+                    let components =
+                        prop.Name |> Seq.toArray |> Array.map (function
+                            | 'X' -> Expr.FieldGet(Expr.Var tmp, v.Type.GetField "X")
+                            | 'Y' -> Expr.FieldGet(Expr.Var tmp, v.Type.GetField "Y")
+                            | 'Z' -> Expr.FieldGet(Expr.Var tmp, v.Type.GetField "Z")
+                            | 'W' -> Expr.FieldGet(Expr.Var tmp, v.Type.GetField "W")
+                            | 'I' | 'P' ->
+                                if baseType = typeof<int> then Expr.Value 1
+                                elif baseType = typeof<float32> then Expr.Value 1.0f
+                                elif baseType = typeof<double> then Expr.Value 1.0
+                                else failwith "not implemented"
+                            | 'O' ->
+                                if baseType = typeof<int> then Expr.Value 0
+                                elif baseType = typeof<float32> then Expr.Value 0.0f
+                                elif baseType = typeof<double> then Expr.Value 0.0
+                                else failwith "not implemented"
+                            | 'N' ->
+                                if baseType = typeof<int> then Expr.Value -1
+                                elif baseType = typeof<float32> then Expr.Value -1.0f
+                                elif baseType = typeof<double> then Expr.Value -1.0
+                                else failwith "not implemented"
+                            | c ->
+                                failwithf "bad swizzle: %A" c
+                        )
+                    
+                    let ctor = e.Type.GetConstructor(components |> Array.map (fun c -> c.Type))
+                    
+                    let! v = preprocessNormalS v
+                    return 
+                        Expr.Let(tmp, v,
+                            Expr.NewObject(
+                                ctor, Array.toList components
+                            )
+                        )
                 | Call(None, mi, [ExprValue v]) when mi.Name = "op_Splice" || mi.Name = "op_SpliceUntyped" ->
                     if v.Type = e.Type then
                         return! preprocessNormalS v

@@ -408,7 +408,7 @@ module Compiler =
                 None
 
                 
-
+        let private vecSwizzleRx = System.Text.RegularExpressions.Regex @"get_([XYZW]+)"
         let rec tryGetBuiltInMethod (b : IBackend) (mi : MethodInfo) (args : list<CExpr>) =
             let ct = CType.ofType b mi.ReturnType
             match mi, args with
@@ -564,45 +564,18 @@ module Compiler =
 
                 | Method("get_Item", [VectorOf _; Int32]), [v;i] -> CVecItem(ct, v, i) |> Some
 
-                | Method("get_ZW", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Z; CVecComponent.W]) |> Some
-                | Method("get_WZ", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.W; CVecComponent.Z]) |> Some
-                | Method("get_YW", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Y; CVecComponent.W]) |> Some
-                | Method("get_WY", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.W; CVecComponent.Y]) |> Some
-                | Method("get_YZ", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Y; CVecComponent.Z]) |> Some
-                | Method("get_ZY", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Z; CVecComponent.Y]) |> Some
-                | Method("get_XW", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.X; CVecComponent.W]) |> Some
-                | Method("get_WX", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.W; CVecComponent.X]) |> Some
-                | Method("get_XZ", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.X; CVecComponent.Z]) |> Some
-                | Method("get_ZX", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Z; CVecComponent.X]) |> Some
-                | Method("get_XY", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.X; CVecComponent.Y]) |> Some
-                | Method("get_YX", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Y; CVecComponent.X]) |> Some
-
-
-                | Method("get_YZW", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Y; CVecComponent.Z; CVecComponent.W]) |> Some
-                | Method("get_ZYW", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Z; CVecComponent.Y; CVecComponent.W]) |> Some
-                | Method("get_ZWY", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Z; CVecComponent.W; CVecComponent.Y]) |> Some
-                | Method("get_YWZ", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Y; CVecComponent.W; CVecComponent.Z]) |> Some
-                | Method("get_WYZ", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.W; CVecComponent.Y; CVecComponent.Z]) |> Some
-                | Method("get_WZY", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.W; CVecComponent.Z; CVecComponent.Y]) |> Some
-                | Method("get_XZW", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.X; CVecComponent.Z; CVecComponent.W]) |> Some
-                | Method("get_ZXW", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Z; CVecComponent.X; CVecComponent.W]) |> Some
-                | Method("get_ZWX", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Z; CVecComponent.W; CVecComponent.X]) |> Some
-                | Method("get_XWZ", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.X; CVecComponent.W; CVecComponent.Z]) |> Some
-                | Method("get_WXZ", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.W; CVecComponent.X; CVecComponent.Z]) |> Some
-                | Method("get_WZX", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.W; CVecComponent.Z; CVecComponent.X]) |> Some
-                | Method("get_XYW", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.X; CVecComponent.Y; CVecComponent.W]) |> Some
-                | Method("get_YXW", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Y; CVecComponent.X; CVecComponent.W]) |> Some
-                | Method("get_YWX", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Y; CVecComponent.W; CVecComponent.X]) |> Some
-                | Method("get_XWY", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.X; CVecComponent.W; CVecComponent.Y]) |> Some
-                | Method("get_WXY", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.W; CVecComponent.X; CVecComponent.Y]) |> Some
-                | Method("get_WYX", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.W; CVecComponent.Y; CVecComponent.X]) |> Some
-                | Method("get_XYZ", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.X; CVecComponent.Y; CVecComponent.Z]) |> Some
-                | Method("get_YXZ", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Y; CVecComponent.X; CVecComponent.Z]) |> Some
-                | Method("get_YZX", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Y; CVecComponent.Z; CVecComponent.X]) |> Some
-                | Method("get_XZY", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.X; CVecComponent.Z; CVecComponent.Y]) |> Some
-                | Method("get_ZXY", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Z; CVecComponent.X; CVecComponent.Y]) |> Some
-                | Method("get_ZYX", [VectorOf _]), [v] -> CVecSwizzle(ct, v, [CVecComponent.Z; CVecComponent.Y; CVecComponent.X]) |> Some
-
+                | Method(name, [VectorOf _]), [v] when vecSwizzleRx.IsMatch name ->
+                    let m = vecSwizzleRx.Match name
+                    let components = 
+                        m.Groups.[1].Value |> Seq.toList |> List.map (function
+                            | 'X' -> CVecComponent.X
+                            | 'Y' -> CVecComponent.Y
+                            | 'Z' -> CVecComponent.Z
+                            | 'W' -> CVecComponent.W
+                            | c -> failwithf "bad regex match: %A" m
+                        )
+                    CVecSwizzle(ct, v, components) |> Some
+                
                 // matrix creation
                 | Method("FromRows", _), rows -> CMatrixFromRows(ct, rows) |> Some
                 | Method("FromCols", _), rows -> CMatrixFromCols(ct, rows) |> Some
