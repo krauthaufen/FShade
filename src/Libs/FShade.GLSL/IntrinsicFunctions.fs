@@ -408,6 +408,18 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Pown : int64   * V4l -> V4l @>
             ]
 
+            CIntrinsic.simple "exp2", [
+                exactly <@ Fun.PowerOfTwo : float32 -> float32 @>
+                exactly <@ Fun.PowerOfTwo : float   -> float @>
+                exactly <@ Fun.PowerOfTwo : V2f -> V2f @>
+                exactly <@ Fun.PowerOfTwo : V2d -> V2d @>
+                exactly <@ Fun.PowerOfTwo : V3f -> V3f @>
+                exactly <@ Fun.PowerOfTwo : V3d -> V3d @>
+                exactly <@ Fun.PowerOfTwo : V4f -> V4f @>
+                exactly <@ Fun.PowerOfTwo : V4d -> V4d @>
+                
+            ]
+
             CIntrinsic.simple "exp", [
                 exactly <@ Math.Exp @>
                 exactly <@ Fun.Exp : float32 -> float32 @>
