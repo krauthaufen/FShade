@@ -11,6 +11,8 @@ type Vertex =
     {
         [<Position>] pos : V4d
         [<Color>] c : V4d
+        [<Interpolation(InterpolationMode.NoPerspective ||| InterpolationMode.Sample)>] hugo : V3d
+        [<Interpolation(InterpolationMode.Flat ||| InterpolationMode.PerPatch)>] hugo2 : V3d
         foo : V4d
     }
 
@@ -1371,6 +1373,18 @@ let ``Non-static sampler``() =
         }
 
     GLSL.shouldCompile [Effect.ofFunction fs]
+
+
+[<Test>]
+let ``Multiple interpolation qualifiers``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            return v.hugo + v.hugo2
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction fs] ["flat"; "noperspective sample"]
 
 //[<EntryPoint>]
 //let main args =

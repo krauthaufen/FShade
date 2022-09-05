@@ -2660,7 +2660,7 @@ module Shader =
             let patchOutputs =
                 if shader.shaderStage = ShaderStage.TessControl then
                     shader.shaderOutputs |> Map.filter (fun name p ->
-                        p.paramInterpolation = InterpolationMode.PerPatch
+                        p.paramInterpolation.HasFlag InterpolationMode.PerPatch
                     )
                 else
                     Map.empty
@@ -2668,7 +2668,7 @@ module Shader =
             shader |> substituteWrites (fun values ->
                 let isPatchOutput = 
                     if shader.shaderStage = ShaderStage.TessControl then
-                        values |> Map.exists (fun _ v -> v.Interpolation = InterpolationMode.PerPatch)
+                        values |> Map.exists (fun _ v -> v.Interpolation.HasFlag InterpolationMode.PerPatch)
                     else
                         false
 

@@ -1590,6 +1590,11 @@ module Assembler =
             | DepthWriteMode.OnlyGreater -> "depth_greater"
             | _ -> "depth_any"
 
+    let assembleInterpolationMode (mode : InterpolationMode) =
+        [ if mode.HasFlag InterpolationMode.Centroid then "centroid"
+          if mode.HasFlag InterpolationMode.Flat then "flat"
+          if mode.HasFlag InterpolationMode.NoPerspective then "noperspective"
+          if mode.HasFlag InterpolationMode.Sample then "sample" ]
 
     let assembleEntryParameterS (kind : ParameterKind) (p : CEntryParameter) =
         state {
@@ -1621,20 +1626,15 @@ module Assembler =
                     else
                         match interpolation with
                         | Some i ->
-                            let mode =
-                                match i with
-                                | InterpolationMode.Centroid -> Some "centroid"
-                                | InterpolationMode.Flat -> Some "flat"
-                                | InterpolationMode.NoPerspective -> Some "noperspective"
-                                | InterpolationMode.Perspective -> Some "perspective"
-                                | InterpolationMode.Sample -> Some "sample"
-                                | _ -> None
+                            let mode = assembleInterpolationMode i
+
                             match mode with
-                            | Some m ->
-                                let t = assembleType config.reverseMatrixLogic p.cParamType
-                                return Some (sprintf "%s in %s %s;" m t.Name name)
-                            | None ->
+                            | [] ->
                                 return None
+                            | _ ->
+                                let t = assembleType config.reverseMatrixLogic p.cParamType
+                                let m = mode |> String.concat " "
+                                return Some (sprintf "%s in %s %s;" m t.Name name)
                         | None -> 
                             return None
 
@@ -1649,14 +1649,14 @@ module Assembler =
                     let! decorations =
                         p.cParamDecorations 
                         |> Set.toList
-                        |> List.chooseS (fun d ->
+                        |> List.collectS (fun d ->
                             state {
                                 match d with
                                 | ParameterDecoration.DepthWrite _ ->
-                                    return None
+                                    return []
 
                                 | ParameterDecoration.Const -> 
-                                    return Some "const"
+                                    return ["const"]
 
                                 | ParameterDecoration.Interpolation m ->
                                         
@@ -1669,15 +1669,9 @@ module Assembler =
                                         (selfStage = ShaderStage.TessControl && kind = ParameterKind.Output)
 
                                     match isTessPatch, isFragmentInput, m with
-                                        | _, true, InterpolationMode.Centroid -> return Some "centroid"
-                                        | _, true, InterpolationMode.Flat -> return Some "flat"
-                                        | _, true, InterpolationMode.NoPerspective -> return Some "noperspective"
-                                        | _, true, InterpolationMode.Perspective -> return Some "perspective"
-                                        | _, true, InterpolationMode.Sample -> return Some "sample"
-
-                                        | true, _, InterpolationMode.PerPatch -> return Some "patch"
-
-                                        | _ -> return None
+                                        | _, true, mode -> return assembleInterpolationMode mode
+                                        | true, _, mode when mode.HasFlag InterpolationMode.PerPatch -> return ["patch"]
+                                        | _ -> return []
 
                                 | ParameterDecoration.StorageBuffer(read, write) ->
                                     let! binding = AssemblerState.newBinding InputKind.StorageBuffer 1
@@ -1703,13 +1697,13 @@ module Assembler =
 //                                                | true, false -> " readonly"
 //                                                | _ -> ""
 
-                                    return Some (sprintf "layout(%s) buffer%s " args rw + (p.cParamSemantic + "_ssb"))
+                                    return [sprintf "layout(%s) buffer%s " args rw + (p.cParamSemantic + "_ssb")]
 
                                 | ParameterDecoration.Shared -> 
-                                    return Some "shared"
+                                    return ["shared"]
 
                                 | ParameterDecoration.Memory _ | ParameterDecoration.Slot _ ->
-                                    return None
+                                    return []
                             }
 
                         )
