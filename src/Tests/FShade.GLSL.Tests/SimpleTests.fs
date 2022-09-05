@@ -1386,6 +1386,57 @@ let ``Multiple interpolation qualifiers``() =
 
     GLSL.shouldCompileAndContainRegex [Effect.ofFunction fs] ["flat"; "noperspective sample"]
 
+[<Test>]
+let ``Texture Gather``() =
+    Setup.Run()
+
+    let sam2D              = sampler2d { texture uniform?DiffuseTexture }
+    let sam2DArray         = sampler2dArray { texture uniform?DiffuseTexture }
+    let samCube            = samplerCube { texture uniform?DiffuseTexture }
+    let samCubeArray       = samplerCubeArray { texture uniform?DiffuseTexture }
+    let sam2DShadow        = sampler2dShadow { texture uniform?DiffuseTexture }
+    let sam2DArrayShadow   = sampler2dArrayShadow { texture uniform?DiffuseTexture }
+    let samCubeShadow      = samplerCubeShadow { texture uniform?DiffuseTexture }
+    let samCubeArrayShadow = samplerCubeArrayShadow { texture uniform?DiffuseTexture }
+
+    let fs (v : Vertex) =
+        fragment {
+            let a = sam2D.Gather V2d.Zero + sam2D.Gather(V2d.Zero, 1)
+            let b = sam2DArray.Gather V3d.Zero + sam2DArray.Gather(V3d.Zero, 1)
+            let c = samCube.Gather V3d.Zero + samCube.Gather(V3d.Zero, 1)
+            let d = samCubeArray.Gather V4d.Zero + samCubeArray.Gather(V4d.Zero, 1)
+
+            let e = sam2DShadow.Gather(V2d.Zero, 0.5)
+            let f = sam2DArrayShadow.Gather(V3d.Zero, 0.5)
+            let g = samCubeShadow.Gather(V3d.Zero, 0.5)
+            let h = samCubeArrayShadow.Gather(V4d.Zero, 0.5)
+
+            return a + b + c + d + e + f + g + h
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs]
+
+[<Test>]
+let ``Texture Gather with Offset``() =
+    Setup.Run()
+
+    let sam2D            = sampler2d { texture uniform?DiffuseTexture }
+    let sam2DArray       = sampler2dArray { texture uniform?DiffuseTexture }
+    let sam2DShadow      = sampler2dShadow { texture uniform?DiffuseTexture }
+    let sam2DArrayShadow = sampler2dArrayShadow { texture uniform?DiffuseTexture }
+
+    let fs (v : Vertex) =
+        fragment {
+            let a = sam2D.GatherOffset(V2d.Zero, V2i.Zero) + sam2D.GatherOffset(V2d.Zero, V2i.Zero, 1)
+            let b = sam2DArray.GatherOffset(V3d.Zero, V2i.Zero) + sam2DArray.GatherOffset(V3d.Zero, V2i.Zero, 1)
+            let c = sam2DShadow.GatherOffset(V2d.Zero, 0.5, V2i.Zero)
+            let d = sam2DArrayShadow.GatherOffset(V3d.Zero, 0.5, V2i.Zero)
+
+            return a + b + c + d
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs]
+
 //[<EntryPoint>]
 //let main args =
 //    ``New Intrinsics``()

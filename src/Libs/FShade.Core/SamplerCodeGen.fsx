@@ -69,8 +69,16 @@ type SampleVariants =
     | Bias = 0x1
     
 
-let samplerFunction (comment : string) (variants : SampleVariants) (name : string) (args : list<string * string>) (ret : string) =
-    let args = args |> List.map (fun (n,t) -> sprintf "%s : %s" n t) |> String.concat ", "
+let samplerFunctionDefaultArgs (comment : string) (variants : SampleVariants) (name : string)
+                               (args : list<string * string * Option<string>>) (ret : string) =
+    let args =
+        args |> List.map (fun (n,t,o) ->
+            match o with
+            | Some def -> sprintf "[<Optional; DefaultParameterValue(%s)>] %s : %s" def n t
+            | _ -> sprintf "%s : %s" n t
+        ) |> String.concat ", "
+
+
     line "/// %s" comment
     line "member x.%s(%s) : %s = onlyInShaderCode \"%s\"" name args ret name
     line ""
@@ -80,6 +88,9 @@ let samplerFunction (comment : string) (variants : SampleVariants) (name : strin
         line "member x.%s(%s, lodBias : float) : %s = onlyInShaderCode \"%s\"" name args ret name
         line ""
 
+let samplerFunction (comment : string) (variants : SampleVariants) (name : string) (args : list<string * string>) (ret : string) =
+    let args = args |> List.map (fun (n, t) -> n, t, None)
+    samplerFunctionDefaultArgs comment variants name args ret
 
 let floatVec (c : int) =
     match c with
@@ -96,6 +107,7 @@ let run() =
 
     line "namespace FShade"
     line "open Aardvark.Base"
+    line "open System.Runtime.InteropServices"
     line ""
     line ""
 
@@ -123,11 +135,17 @@ let run() =
 
         let returnType =
             match t with
-                | SamplerType.Float -> 
-                    if s then "float"
-                    else "V4d"
-                | SamplerType.Int -> "V4i"
-                | _ -> failwith "unknown sampler baseType"
+            | SamplerType.Float -> 
+                if s then "float"
+                else "V4d"
+            | SamplerType.Int -> "V4i"
+            | _ -> failwith "unknown sampler baseType"
+
+        let gatherReturnType =
+            match t with
+            | SamplerType.Float -> "V4d"
+            | SamplerType.Int -> "V4i"
+            | _ -> failwith "unknown sampler baseType"
 
         let coordComponents =
             match d with
@@ -147,6 +165,7 @@ let run() =
 
         let coordType = floatVec coordComponents
         let projCoordType = floatVec (coordComponents + 1)
+        let arrayCoordType = if a then projCoordType else coordType
         let texelCoordType = intVec coordComponents
         let readCoordType = intVec coordComponents //(if a then coordComponents + 1 else coordComponents)
 
@@ -247,31 +266,37 @@ let run() =
                 "V2d"
 
 
-        if d = SamplerDimension.Sampler2d && not m then
-            let additionalArgs = 
-                if a then ["slice", "int"]
-                else []
+        // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureGather.xhtml
+        if (d = SamplerDimension.Sampler2d || d = SamplerDimension.SamplerCube) && not m then
 
-            let gatherType =
-                match t with
-                    | SamplerType.Int -> "V4i"
-                    | _ -> "V4d"
+            let arguments =
+                if s then
+                    (["coord", arrayCoordType, None] @ ["refZ", "float", None])
+                else
+                    (["coord", arrayCoordType, None] @ ["comp", "int", Some "0"])
 
-            samplerFunction 
+            samplerFunctionDefaultArgs
                 "gathers one component for the neighbouring 4 texels"
                 SampleVariants.None
                 "Gather"
-                (["coord", coordType] @ additionalArgs @ ["comp", "int"])
-                gatherType
+                arguments
+                gatherReturnType
 
-            samplerFunction 
-                "gathers one component for the neighbouring 4 texels with an offset"
+        // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureGatherOffset.xhtml
+        if d = SamplerDimension.Sampler2d && not m then
+
+            let arguments =
+                if s then
+                    ["coord", arrayCoordType, None] @ ["refZ", "float", None] @ ["offset", texelCoordType, None]
+                else
+                    ["coord", arrayCoordType, None] @ ["offset", texelCoordType, None] @ ["comp", "int", Some "0"]
+
+            samplerFunctionDefaultArgs
+                "gathers one component for the neighbouring 4 texels"
                 SampleVariants.None
                 "GatherOffset"
-                (["coord", coordType] @ additionalArgs @ ["offset", texelCoordType; "comp", "int"])
-                gatherType
-
-
+                arguments
+                gatherReturnType
 
         if d <> SamplerDimension.SamplerCube then
             if m then
