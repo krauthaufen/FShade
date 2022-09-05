@@ -28,6 +28,7 @@ let allImageCombinations =
             for d in dims do
                 let arr = if d = SamplerDimension.Sampler3d then [false] else arr
                 for a in arr do
+                    let ms = if d = SamplerDimension.Sampler2d then ms else [false]
                     for m in ms do
                         yield (t,d,a,m)
     ]

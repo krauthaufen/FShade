@@ -1341,21 +1341,6 @@ module SamplerBuilders =
     let intSamplerCube = IntSamplerCubeBuilder()
     
 
-type Image1dArrayMS<'f when 'f :> Formats.IFloatingFormat>() =
-    interface IImage
-    static member FormatType = typeof<'f>
-    static member Dimension = SamplerDimension.Sampler1d
-    static member ValueType = typeof<V4d>
-    static member CoordType = typeof<int>
-    static member IsArray = true
-    static member IsMultisampled = true
-    
-    member x.Size : int = onlyInShaderCode "Size"
-    member x.Item
-        with get(coord : int, slice : int, sample : int) : V4d = onlyInShaderCode "fetch"
-        and set(coord : int, slice : int, sample : int) (v : V4d) : unit = onlyInShaderCode "write"
-
-
 type Image1dArray<'f when 'f :> Formats.IFloatingFormat>() =
     interface IImage
     static member FormatType = typeof<'f>
@@ -1369,21 +1354,6 @@ type Image1dArray<'f when 'f :> Formats.IFloatingFormat>() =
     member x.Item
         with get(coord : int, slice : int) : V4d = onlyInShaderCode "fetch"
         and set(coord : int, slice : int) (v : V4d) : unit = onlyInShaderCode "write"
-
-
-type Image1dMS<'f when 'f :> Formats.IFloatingFormat>() =
-    interface IImage
-    static member FormatType = typeof<'f>
-    static member Dimension = SamplerDimension.Sampler1d
-    static member ValueType = typeof<V4d>
-    static member CoordType = typeof<int>
-    static member IsArray = false
-    static member IsMultisampled = true
-    
-    member x.Size : int = onlyInShaderCode "Size"
-    member x.Item
-        with get(coord : int, sample : int) : V4d = onlyInShaderCode "fetch"
-        and set(coord : int, sample : int) (v : V4d) : unit = onlyInShaderCode "write"
 
 
 type Image1d<'f when 'f :> Formats.IFloatingFormat>() =
@@ -1461,21 +1431,6 @@ type Image2d<'f when 'f :> Formats.IFloatingFormat>() =
         and set(coord : V2i) (v : V4d) : unit = onlyInShaderCode "write"
 
 
-type Image3dMS<'f when 'f :> Formats.IFloatingFormat>() =
-    interface IImage
-    static member FormatType = typeof<'f>
-    static member Dimension = SamplerDimension.Sampler3d
-    static member ValueType = typeof<V4d>
-    static member CoordType = typeof<V3i>
-    static member IsArray = false
-    static member IsMultisampled = true
-    
-    member x.Size : V3i = onlyInShaderCode "Size"
-    member x.Item
-        with get(coord : V3i, sample : int) : V4d = onlyInShaderCode "fetch"
-        and set(coord : V3i, sample : int) (v : V4d) : unit = onlyInShaderCode "write"
-
-
 type Image3d<'f when 'f :> Formats.IFloatingFormat>() =
     interface IImage
     static member FormatType = typeof<'f>
@@ -1489,21 +1444,6 @@ type Image3d<'f when 'f :> Formats.IFloatingFormat>() =
     member x.Item
         with get(coord : V3i) : V4d = onlyInShaderCode "fetch"
         and set(coord : V3i) (v : V4d) : unit = onlyInShaderCode "write"
-
-
-type ImageCubeArrayMS<'f when 'f :> Formats.IFloatingFormat>() =
-    interface IImage
-    static member FormatType = typeof<'f>
-    static member Dimension = SamplerDimension.SamplerCube
-    static member ValueType = typeof<V4d>
-    static member CoordType = typeof<V3i>
-    static member IsArray = true
-    static member IsMultisampled = true
-    
-    member x.Size : V2i = onlyInShaderCode "Size"
-    member x.Item
-        with get(coord : V3i, slice : int, sample : int) : V4d = onlyInShaderCode "fetch"
-        and set(coord : V3i, slice : int, sample : int) (v : V4d) : unit = onlyInShaderCode "write"
 
 
 type ImageCubeArray<'f when 'f :> Formats.IFloatingFormat>() =
@@ -1521,21 +1461,6 @@ type ImageCubeArray<'f when 'f :> Formats.IFloatingFormat>() =
         and set(coord : V3i, slice : int) (v : V4d) : unit = onlyInShaderCode "write"
 
 
-type ImageCubeMS<'f when 'f :> Formats.IFloatingFormat>() =
-    interface IImage
-    static member FormatType = typeof<'f>
-    static member Dimension = SamplerDimension.SamplerCube
-    static member ValueType = typeof<V4d>
-    static member CoordType = typeof<V3i>
-    static member IsArray = false
-    static member IsMultisampled = true
-    
-    member x.Size : V2i = onlyInShaderCode "Size"
-    member x.Item
-        with get(coord : V3i, sample : int) : V4d = onlyInShaderCode "fetch"
-        and set(coord : V3i, sample : int) (v : V4d) : unit = onlyInShaderCode "write"
-
-
 type ImageCube<'f when 'f :> Formats.IFloatingFormat>() =
     interface IImage
     static member FormatType = typeof<'f>
@@ -1550,29 +1475,6 @@ type ImageCube<'f when 'f :> Formats.IFloatingFormat>() =
         with get(coord : V3i) : V4d = onlyInShaderCode "fetch"
         and set(coord : V3i) (v : V4d) : unit = onlyInShaderCode "write"
 
-
-type IntImage1dArrayMS<'f when 'f :> Formats.ISignedFormat>() =
-    interface IImage
-    static member FormatType = typeof<'f>
-    static member Dimension = SamplerDimension.Sampler1d
-    static member ValueType = typeof<V4i>
-    static member CoordType = typeof<int>
-    static member IsArray = true
-    static member IsMultisampled = true
-    
-    member x.Size : int = onlyInShaderCode "Size"
-    member x.Item
-        with get(coord : int, slice : int, sample : int) : V4i = onlyInShaderCode "fetch"
-        and set(coord : int, slice : int, sample : int) (v : V4i) : unit = onlyInShaderCode "write"
-
-    member x.AtomicAdd(coord : int, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicAdd"
-    member x.AtomicMin(coord : int, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicMin"
-    member x.AtomicMax(coord : int, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicMax"
-    member x.AtomicAnd(coord : int, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicAnd"
-    member x.AtomicOr(coord : int, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicOr"
-    member x.AtomicXor(coord : int, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicXor"
-    member x.AtomicExchange(coord : int, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicExchange"
-    member x.AtomicCompareExchange(coord : int, slice : int, sample : int, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
 
 type IntImage1dArray<'f when 'f :> Formats.ISignedFormat>() =
     interface IImage
@@ -1596,29 +1498,6 @@ type IntImage1dArray<'f when 'f :> Formats.ISignedFormat>() =
     member x.AtomicXor(coord : int, slice : int, data : int) : int = onlyInShaderCode "AtomicXor"
     member x.AtomicExchange(coord : int, slice : int, data : int) : int = onlyInShaderCode "AtomicExchange"
     member x.AtomicCompareExchange(coord : int, slice : int, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
-
-type IntImage1dMS<'f when 'f :> Formats.ISignedFormat>() =
-    interface IImage
-    static member FormatType = typeof<'f>
-    static member Dimension = SamplerDimension.Sampler1d
-    static member ValueType = typeof<V4i>
-    static member CoordType = typeof<int>
-    static member IsArray = false
-    static member IsMultisampled = true
-    
-    member x.Size : int = onlyInShaderCode "Size"
-    member x.Item
-        with get(coord : int, sample : int) : V4i = onlyInShaderCode "fetch"
-        and set(coord : int, sample : int) (v : V4i) : unit = onlyInShaderCode "write"
-
-    member x.AtomicAdd(coord : int, sample : int, data : int) : int = onlyInShaderCode "AtomicAdd"
-    member x.AtomicMin(coord : int, sample : int, data : int) : int = onlyInShaderCode "AtomicMin"
-    member x.AtomicMax(coord : int, sample : int, data : int) : int = onlyInShaderCode "AtomicMax"
-    member x.AtomicAnd(coord : int, sample : int, data : int) : int = onlyInShaderCode "AtomicAnd"
-    member x.AtomicOr(coord : int, sample : int, data : int) : int = onlyInShaderCode "AtomicOr"
-    member x.AtomicXor(coord : int, sample : int, data : int) : int = onlyInShaderCode "AtomicXor"
-    member x.AtomicExchange(coord : int, sample : int, data : int) : int = onlyInShaderCode "AtomicExchange"
-    member x.AtomicCompareExchange(coord : int, sample : int, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
 
 type IntImage1d<'f when 'f :> Formats.ISignedFormat>() =
     interface IImage
@@ -1735,29 +1614,6 @@ type IntImage2d<'f when 'f :> Formats.ISignedFormat>() =
     member x.AtomicExchange(coord : V2i, data : int) : int = onlyInShaderCode "AtomicExchange"
     member x.AtomicCompareExchange(coord : V2i, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
 
-type IntImage3dMS<'f when 'f :> Formats.ISignedFormat>() =
-    interface IImage
-    static member FormatType = typeof<'f>
-    static member Dimension = SamplerDimension.Sampler3d
-    static member ValueType = typeof<V4i>
-    static member CoordType = typeof<V3i>
-    static member IsArray = false
-    static member IsMultisampled = true
-    
-    member x.Size : V3i = onlyInShaderCode "Size"
-    member x.Item
-        with get(coord : V3i, sample : int) : V4i = onlyInShaderCode "fetch"
-        and set(coord : V3i, sample : int) (v : V4i) : unit = onlyInShaderCode "write"
-
-    member x.AtomicAdd(coord : V3i, sample : int, data : int) : int = onlyInShaderCode "AtomicAdd"
-    member x.AtomicMin(coord : V3i, sample : int, data : int) : int = onlyInShaderCode "AtomicMin"
-    member x.AtomicMax(coord : V3i, sample : int, data : int) : int = onlyInShaderCode "AtomicMax"
-    member x.AtomicAnd(coord : V3i, sample : int, data : int) : int = onlyInShaderCode "AtomicAnd"
-    member x.AtomicOr(coord : V3i, sample : int, data : int) : int = onlyInShaderCode "AtomicOr"
-    member x.AtomicXor(coord : V3i, sample : int, data : int) : int = onlyInShaderCode "AtomicXor"
-    member x.AtomicExchange(coord : V3i, sample : int, data : int) : int = onlyInShaderCode "AtomicExchange"
-    member x.AtomicCompareExchange(coord : V3i, sample : int, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
-
 type IntImage3d<'f when 'f :> Formats.ISignedFormat>() =
     interface IImage
     static member FormatType = typeof<'f>
@@ -1781,29 +1637,6 @@ type IntImage3d<'f when 'f :> Formats.ISignedFormat>() =
     member x.AtomicExchange(coord : V3i, data : int) : int = onlyInShaderCode "AtomicExchange"
     member x.AtomicCompareExchange(coord : V3i, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
 
-type IntImageCubeArrayMS<'f when 'f :> Formats.ISignedFormat>() =
-    interface IImage
-    static member FormatType = typeof<'f>
-    static member Dimension = SamplerDimension.SamplerCube
-    static member ValueType = typeof<V4i>
-    static member CoordType = typeof<V3i>
-    static member IsArray = true
-    static member IsMultisampled = true
-    
-    member x.Size : V2i = onlyInShaderCode "Size"
-    member x.Item
-        with get(coord : V3i, slice : int, sample : int) : V4i = onlyInShaderCode "fetch"
-        and set(coord : V3i, slice : int, sample : int) (v : V4i) : unit = onlyInShaderCode "write"
-
-    member x.AtomicAdd(coord : V3i, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicAdd"
-    member x.AtomicMin(coord : V3i, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicMin"
-    member x.AtomicMax(coord : V3i, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicMax"
-    member x.AtomicAnd(coord : V3i, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicAnd"
-    member x.AtomicOr(coord : V3i, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicOr"
-    member x.AtomicXor(coord : V3i, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicXor"
-    member x.AtomicExchange(coord : V3i, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicExchange"
-    member x.AtomicCompareExchange(coord : V3i, slice : int, sample : int, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
-
 type IntImageCubeArray<'f when 'f :> Formats.ISignedFormat>() =
     interface IImage
     static member FormatType = typeof<'f>
@@ -1826,29 +1659,6 @@ type IntImageCubeArray<'f when 'f :> Formats.ISignedFormat>() =
     member x.AtomicXor(coord : V3i, slice : int, data : int) : int = onlyInShaderCode "AtomicXor"
     member x.AtomicExchange(coord : V3i, slice : int, data : int) : int = onlyInShaderCode "AtomicExchange"
     member x.AtomicCompareExchange(coord : V3i, slice : int, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
-
-type IntImageCubeMS<'f when 'f :> Formats.ISignedFormat>() =
-    interface IImage
-    static member FormatType = typeof<'f>
-    static member Dimension = SamplerDimension.SamplerCube
-    static member ValueType = typeof<V4i>
-    static member CoordType = typeof<V3i>
-    static member IsArray = false
-    static member IsMultisampled = true
-    
-    member x.Size : V2i = onlyInShaderCode "Size"
-    member x.Item
-        with get(coord : V3i, sample : int) : V4i = onlyInShaderCode "fetch"
-        and set(coord : V3i, sample : int) (v : V4i) : unit = onlyInShaderCode "write"
-
-    member x.AtomicAdd(coord : V3i, sample : int, data : int) : int = onlyInShaderCode "AtomicAdd"
-    member x.AtomicMin(coord : V3i, sample : int, data : int) : int = onlyInShaderCode "AtomicMin"
-    member x.AtomicMax(coord : V3i, sample : int, data : int) : int = onlyInShaderCode "AtomicMax"
-    member x.AtomicAnd(coord : V3i, sample : int, data : int) : int = onlyInShaderCode "AtomicAnd"
-    member x.AtomicOr(coord : V3i, sample : int, data : int) : int = onlyInShaderCode "AtomicOr"
-    member x.AtomicXor(coord : V3i, sample : int, data : int) : int = onlyInShaderCode "AtomicXor"
-    member x.AtomicExchange(coord : V3i, sample : int, data : int) : int = onlyInShaderCode "AtomicExchange"
-    member x.AtomicCompareExchange(coord : V3i, sample : int, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
 
 type IntImageCube<'f when 'f :> Formats.ISignedFormat>() =
     interface IImage
