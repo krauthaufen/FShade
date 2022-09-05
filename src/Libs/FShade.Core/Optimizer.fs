@@ -2046,7 +2046,6 @@ module Optimizer =
                         return Expr.ForEach(v, s, b)
 
                     | CallFunction(utility, args) ->
-                        
                         let mutable usedInputs = Map.empty
                         let newBody = liftFunctionInputsS(utility.functionBody).Run(&usedInputs)
 
@@ -2061,11 +2060,10 @@ module Optimizer =
                                 functionTag = null
                             }
 
-
+                        let! args = args |> List.mapS liftInputsS
                         let! values = values |> List.mapS liftInputsS
                         return Expr.CallFunction(utility, args @ values)
-                        
-       
+
                     | CallWithWitnesses(None, oi, mi, ws, args) ->
                         let! args = args |> List.mapS liftInputsS
                         return Expr.CallWithWitnesses(oi, mi, ws, args)
