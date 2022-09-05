@@ -2,56 +2,6 @@ namespace FShade
 open Aardvark.Base
 
 
-type Sampler1dArrayShadowMS(tex : ISemanticValue, state : SamplerState) =
-    interface ISampler with
-        member x.Texture = tex
-        member x.State = state
-
-    static member Dimension = SamplerDimension.Sampler1d
-    static member ValueType = typeof<float>
-    static member CoordType = typeof<float>
-    static member IsArray = true
-    static member IsShadow = true
-    static member IsMultisampled = true
-    
-    /// the mipmap-levels for the sampler
-    member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
-    
-    /// the size for the sampler
-    member x.GetSize (level : int) : int = onlyInShaderCode "GetSize"
-    
-    /// the size for the sampler
-    member x.Size : int = onlyInShaderCode "Size"
-    
-    /// non-sampled texture read
-    member x.Read(coord : int, slice : int, sample : int) : float = onlyInShaderCode "Read"
-    
-
-type Sampler1dArrayMS(tex : ISemanticValue, state : SamplerState) =
-    interface ISampler with
-        member x.Texture = tex
-        member x.State = state
-
-    static member Dimension = SamplerDimension.Sampler1d
-    static member ValueType = typeof<V4d>
-    static member CoordType = typeof<float>
-    static member IsArray = true
-    static member IsShadow = false
-    static member IsMultisampled = true
-    
-    /// the mipmap-levels for the sampler
-    member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
-    
-    /// the size for the sampler
-    member x.GetSize (level : int) : int = onlyInShaderCode "GetSize"
-    
-    /// the size for the sampler
-    member x.Size : int = onlyInShaderCode "Size"
-    
-    /// non-sampled texture read
-    member x.Read(coord : int, slice : int, sample : int) : V4d = onlyInShaderCode "Read"
-    
-
 type Sampler1dArrayShadow(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
         member x.Texture = tex
@@ -142,56 +92,6 @@ type Sampler1dArray(tex : ISemanticValue, state : SamplerState) =
     
     /// non-sampled texture read
     member x.Read(coord : int, slice : int, lod : int) : V4d = onlyInShaderCode "Read"
-    
-
-type Sampler1dShadowMS(tex : ISemanticValue, state : SamplerState) =
-    interface ISampler with
-        member x.Texture = tex
-        member x.State = state
-
-    static member Dimension = SamplerDimension.Sampler1d
-    static member ValueType = typeof<float>
-    static member CoordType = typeof<float>
-    static member IsArray = false
-    static member IsShadow = true
-    static member IsMultisampled = true
-    
-    /// the mipmap-levels for the sampler
-    member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
-    
-    /// the size for the sampler
-    member x.GetSize (level : int) : int = onlyInShaderCode "GetSize"
-    
-    /// the size for the sampler
-    member x.Size : int = onlyInShaderCode "Size"
-    
-    /// non-sampled texture read
-    member x.Read(coord : int, sample : int) : float = onlyInShaderCode "Read"
-    
-
-type Sampler1dMS(tex : ISemanticValue, state : SamplerState) =
-    interface ISampler with
-        member x.Texture = tex
-        member x.State = state
-
-    static member Dimension = SamplerDimension.Sampler1d
-    static member ValueType = typeof<V4d>
-    static member CoordType = typeof<float>
-    static member IsArray = false
-    static member IsShadow = false
-    static member IsMultisampled = true
-    
-    /// the mipmap-levels for the sampler
-    member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
-    
-    /// the size for the sampler
-    member x.GetSize (level : int) : int = onlyInShaderCode "GetSize"
-    
-    /// the size for the sampler
-    member x.Size : int = onlyInShaderCode "Size"
-    
-    /// non-sampled texture read
-    member x.Read(coord : int, sample : int) : V4d = onlyInShaderCode "Read"
     
 
 type Sampler1dShadow(tex : ISemanticValue, state : SamplerState) =
@@ -302,31 +202,6 @@ type Sampler1d(tex : ISemanticValue, state : SamplerState) =
     
     member x.Item
         with get(coord : int, level : int) : V4d = onlyInShaderCode "Fetch"
-
-type Sampler2dArrayShadowMS(tex : ISemanticValue, state : SamplerState) =
-    interface ISampler with
-        member x.Texture = tex
-        member x.State = state
-
-    static member Dimension = SamplerDimension.Sampler2d
-    static member ValueType = typeof<float>
-    static member CoordType = typeof<V2d>
-    static member IsArray = true
-    static member IsShadow = true
-    static member IsMultisampled = true
-    
-    /// the mipmap-levels for the sampler
-    member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
-    
-    /// the size for the sampler
-    member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
-    
-    /// the size for the sampler
-    member x.Size : V2i = onlyInShaderCode "Size"
-    
-    /// non-sampled texture read
-    member x.Read(coord : V2i, slice : int, sample : int) : float = onlyInShaderCode "Read"
-    
 
 type Sampler2dArrayMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -455,31 +330,6 @@ type Sampler2dArray(tex : ISemanticValue, state : SamplerState) =
     
     /// non-sampled texture read
     member x.Read(coord : V2i, slice : int, lod : int) : V4d = onlyInShaderCode "Read"
-    
-
-type Sampler2dShadowMS(tex : ISemanticValue, state : SamplerState) =
-    interface ISampler with
-        member x.Texture = tex
-        member x.State = state
-
-    static member Dimension = SamplerDimension.Sampler2d
-    static member ValueType = typeof<float>
-    static member CoordType = typeof<V2d>
-    static member IsArray = false
-    static member IsShadow = true
-    static member IsMultisampled = true
-    
-    /// the mipmap-levels for the sampler
-    member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
-    
-    /// the size for the sampler
-    member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
-    
-    /// the size for the sampler
-    member x.Size : V2i = onlyInShaderCode "Size"
-    
-    /// non-sampled texture read
-    member x.Read(coord : V2i, sample : int) : float = onlyInShaderCode "Read"
     
 
 type Sampler2dMS(tex : ISemanticValue, state : SamplerState) =
@@ -628,56 +478,6 @@ type Sampler2d(tex : ISemanticValue, state : SamplerState) =
     member x.Item
         with get(coord : V2i, level : int) : V4d = onlyInShaderCode "Fetch"
 
-type Sampler3dShadowMS(tex : ISemanticValue, state : SamplerState) =
-    interface ISampler with
-        member x.Texture = tex
-        member x.State = state
-
-    static member Dimension = SamplerDimension.Sampler3d
-    static member ValueType = typeof<float>
-    static member CoordType = typeof<V3d>
-    static member IsArray = false
-    static member IsShadow = true
-    static member IsMultisampled = true
-    
-    /// the mipmap-levels for the sampler
-    member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
-    
-    /// the size for the sampler
-    member x.GetSize (level : int) : V3i = onlyInShaderCode "GetSize"
-    
-    /// the size for the sampler
-    member x.Size : V3i = onlyInShaderCode "Size"
-    
-    /// non-sampled texture read
-    member x.Read(coord : V3i, sample : int) : float = onlyInShaderCode "Read"
-    
-
-type Sampler3dMS(tex : ISemanticValue, state : SamplerState) =
-    interface ISampler with
-        member x.Texture = tex
-        member x.State = state
-
-    static member Dimension = SamplerDimension.Sampler3d
-    static member ValueType = typeof<V4d>
-    static member CoordType = typeof<V3d>
-    static member IsArray = false
-    static member IsShadow = false
-    static member IsMultisampled = true
-    
-    /// the mipmap-levels for the sampler
-    member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
-    
-    /// the size for the sampler
-    member x.GetSize (level : int) : V3i = onlyInShaderCode "GetSize"
-    
-    /// the size for the sampler
-    member x.Size : V3i = onlyInShaderCode "Size"
-    
-    /// non-sampled texture read
-    member x.Read(coord : V3i, sample : int) : V4d = onlyInShaderCode "Read"
-    
-
 type Sampler3dShadow(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
         member x.Texture = tex
@@ -787,50 +587,6 @@ type Sampler3d(tex : ISemanticValue, state : SamplerState) =
     member x.Item
         with get(coord : V3i, level : int) : V4d = onlyInShaderCode "Fetch"
 
-type SamplerCubeArrayShadowMS(tex : ISemanticValue, state : SamplerState) =
-    interface ISampler with
-        member x.Texture = tex
-        member x.State = state
-
-    static member Dimension = SamplerDimension.SamplerCube
-    static member ValueType = typeof<float>
-    static member CoordType = typeof<V3d>
-    static member IsArray = true
-    static member IsShadow = true
-    static member IsMultisampled = true
-    
-    /// the mipmap-levels for the sampler
-    member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
-    
-    /// the size for the sampler
-    member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
-    
-    /// the size for the sampler
-    member x.Size : V2i = onlyInShaderCode "Size"
-    
-
-type SamplerCubeArrayMS(tex : ISemanticValue, state : SamplerState) =
-    interface ISampler with
-        member x.Texture = tex
-        member x.State = state
-
-    static member Dimension = SamplerDimension.SamplerCube
-    static member ValueType = typeof<V4d>
-    static member CoordType = typeof<V3d>
-    static member IsArray = true
-    static member IsShadow = false
-    static member IsMultisampled = true
-    
-    /// the mipmap-levels for the sampler
-    member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
-    
-    /// the size for the sampler
-    member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
-    
-    /// the size for the sampler
-    member x.Size : V2i = onlyInShaderCode "Size"
-    
-
 type SamplerCubeArrayShadow(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
         member x.Texture = tex
@@ -894,50 +650,6 @@ type SamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
     
     /// query lod levels
     member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
-    
-
-type SamplerCubeShadowMS(tex : ISemanticValue, state : SamplerState) =
-    interface ISampler with
-        member x.Texture = tex
-        member x.State = state
-
-    static member Dimension = SamplerDimension.SamplerCube
-    static member ValueType = typeof<float>
-    static member CoordType = typeof<V3d>
-    static member IsArray = false
-    static member IsShadow = true
-    static member IsMultisampled = true
-    
-    /// the mipmap-levels for the sampler
-    member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
-    
-    /// the size for the sampler
-    member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
-    
-    /// the size for the sampler
-    member x.Size : V2i = onlyInShaderCode "Size"
-    
-
-type SamplerCubeMS(tex : ISemanticValue, state : SamplerState) =
-    interface ISampler with
-        member x.Texture = tex
-        member x.State = state
-
-    static member Dimension = SamplerDimension.SamplerCube
-    static member ValueType = typeof<V4d>
-    static member CoordType = typeof<V3d>
-    static member IsArray = false
-    static member IsShadow = false
-    static member IsMultisampled = true
-    
-    /// the mipmap-levels for the sampler
-    member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
-    
-    /// the size for the sampler
-    member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
-    
-    /// the size for the sampler
-    member x.Size : V2i = onlyInShaderCode "Size"
     
 
 type SamplerCubeShadow(tex : ISemanticValue, state : SamplerState) =
@@ -1008,31 +720,6 @@ type SamplerCube(tex : ISemanticValue, state : SamplerState) =
     member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
     
 
-type IntSampler1dArrayMS(tex : ISemanticValue, state : SamplerState) =
-    interface ISampler with
-        member x.Texture = tex
-        member x.State = state
-
-    static member Dimension = SamplerDimension.Sampler1d
-    static member ValueType = typeof<V4i>
-    static member CoordType = typeof<float>
-    static member IsArray = true
-    static member IsShadow = false
-    static member IsMultisampled = true
-    
-    /// the mipmap-levels for the sampler
-    member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
-    
-    /// the size for the sampler
-    member x.GetSize (level : int) : int = onlyInShaderCode "GetSize"
-    
-    /// the size for the sampler
-    member x.Size : int = onlyInShaderCode "Size"
-    
-    /// non-sampled texture read
-    member x.Read(coord : int, slice : int, sample : int) : V4i = onlyInShaderCode "Read"
-    
-
 type IntSampler1dArray(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
         member x.Texture = tex
@@ -1077,31 +764,6 @@ type IntSampler1dArray(tex : ISemanticValue, state : SamplerState) =
     
     /// non-sampled texture read
     member x.Read(coord : int, slice : int, lod : int) : V4i = onlyInShaderCode "Read"
-    
-
-type IntSampler1dMS(tex : ISemanticValue, state : SamplerState) =
-    interface ISampler with
-        member x.Texture = tex
-        member x.State = state
-
-    static member Dimension = SamplerDimension.Sampler1d
-    static member ValueType = typeof<V4i>
-    static member CoordType = typeof<float>
-    static member IsArray = false
-    static member IsShadow = false
-    static member IsMultisampled = true
-    
-    /// the mipmap-levels for the sampler
-    member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
-    
-    /// the size for the sampler
-    member x.GetSize (level : int) : int = onlyInShaderCode "GetSize"
-    
-    /// the size for the sampler
-    member x.Size : int = onlyInShaderCode "Size"
-    
-    /// non-sampled texture read
-    member x.Read(coord : int, sample : int) : V4i = onlyInShaderCode "Read"
     
 
 type IntSampler1d(tex : ISemanticValue, state : SamplerState) =
@@ -1326,31 +988,6 @@ type IntSampler2d(tex : ISemanticValue, state : SamplerState) =
     member x.Item
         with get(coord : V2i, level : int) : V4i = onlyInShaderCode "Fetch"
 
-type IntSampler3dMS(tex : ISemanticValue, state : SamplerState) =
-    interface ISampler with
-        member x.Texture = tex
-        member x.State = state
-
-    static member Dimension = SamplerDimension.Sampler3d
-    static member ValueType = typeof<V4i>
-    static member CoordType = typeof<V3d>
-    static member IsArray = false
-    static member IsShadow = false
-    static member IsMultisampled = true
-    
-    /// the mipmap-levels for the sampler
-    member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
-    
-    /// the size for the sampler
-    member x.GetSize (level : int) : V3i = onlyInShaderCode "GetSize"
-    
-    /// the size for the sampler
-    member x.Size : V3i = onlyInShaderCode "Size"
-    
-    /// non-sampled texture read
-    member x.Read(coord : V3i, sample : int) : V4i = onlyInShaderCode "Read"
-    
-
 type IntSampler3d(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
         member x.Texture = tex
@@ -1408,28 +1045,6 @@ type IntSampler3d(tex : ISemanticValue, state : SamplerState) =
     member x.Item
         with get(coord : V3i, level : int) : V4i = onlyInShaderCode "Fetch"
 
-type IntSamplerCubeArrayMS(tex : ISemanticValue, state : SamplerState) =
-    interface ISampler with
-        member x.Texture = tex
-        member x.State = state
-
-    static member Dimension = SamplerDimension.SamplerCube
-    static member ValueType = typeof<V4i>
-    static member CoordType = typeof<V3d>
-    static member IsArray = true
-    static member IsShadow = false
-    static member IsMultisampled = true
-    
-    /// the mipmap-levels for the sampler
-    member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
-    
-    /// the size for the sampler
-    member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
-    
-    /// the size for the sampler
-    member x.Size : V2i = onlyInShaderCode "Size"
-    
-
 type IntSamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
         member x.Texture = tex
@@ -1462,28 +1077,6 @@ type IntSamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
     
     /// query lod levels
     member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
-    
-
-type IntSamplerCubeMS(tex : ISemanticValue, state : SamplerState) =
-    interface ISampler with
-        member x.Texture = tex
-        member x.State = state
-
-    static member Dimension = SamplerDimension.SamplerCube
-    static member ValueType = typeof<V4i>
-    static member CoordType = typeof<V3d>
-    static member IsArray = false
-    static member IsShadow = false
-    static member IsMultisampled = true
-    
-    /// the mipmap-levels for the sampler
-    member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
-    
-    /// the size for the sampler
-    member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
-    
-    /// the size for the sampler
-    member x.Size : V2i = onlyInShaderCode "Size"
     
 
 type IntSamplerCube(tex : ISemanticValue, state : SamplerState) =
@@ -1522,24 +1115,6 @@ type IntSamplerCube(tex : ISemanticValue, state : SamplerState) =
 
 [<AutoOpen>]
 module SamplerBuilders = 
-    type Sampler1dArrayShadowMSBuilder() = 
-        inherit SamplerBaseBuilder()
-        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
-            Sampler1dArrayShadowMS(t, s)
-        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
-            Array.init count (fun i -> Sampler1dArrayShadowMS(t.WithIndex(i), s))
-
-    let sampler1dArrayShadowMS = Sampler1dArrayShadowMSBuilder()
-    
-    type Sampler1dArrayMSBuilder() = 
-        inherit SamplerBaseBuilder()
-        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
-            Sampler1dArrayMS(t, s)
-        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
-            Array.init count (fun i -> Sampler1dArrayMS(t.WithIndex(i), s))
-
-    let sampler1dArrayMS = Sampler1dArrayMSBuilder()
-    
     type Sampler1dArrayShadowBuilder() = 
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
@@ -1558,24 +1133,6 @@ module SamplerBuilders =
 
     let sampler1dArray = Sampler1dArrayBuilder()
     
-    type Sampler1dShadowMSBuilder() = 
-        inherit SamplerBaseBuilder()
-        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
-            Sampler1dShadowMS(t, s)
-        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
-            Array.init count (fun i -> Sampler1dShadowMS(t.WithIndex(i), s))
-
-    let sampler1dShadowMS = Sampler1dShadowMSBuilder()
-    
-    type Sampler1dMSBuilder() = 
-        inherit SamplerBaseBuilder()
-        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
-            Sampler1dMS(t, s)
-        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
-            Array.init count (fun i -> Sampler1dMS(t.WithIndex(i), s))
-
-    let sampler1dMS = Sampler1dMSBuilder()
-    
     type Sampler1dShadowBuilder() = 
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
@@ -1593,15 +1150,6 @@ module SamplerBuilders =
             Array.init count (fun i -> Sampler1d(t.WithIndex(i), s))
 
     let sampler1d = Sampler1dBuilder()
-    
-    type Sampler2dArrayShadowMSBuilder() = 
-        inherit SamplerBaseBuilder()
-        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
-            Sampler2dArrayShadowMS(t, s)
-        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
-            Array.init count (fun i -> Sampler2dArrayShadowMS(t.WithIndex(i), s))
-
-    let sampler2dArrayShadowMS = Sampler2dArrayShadowMSBuilder()
     
     type Sampler2dArrayMSBuilder() = 
         inherit SamplerBaseBuilder()
@@ -1630,15 +1178,6 @@ module SamplerBuilders =
 
     let sampler2dArray = Sampler2dArrayBuilder()
     
-    type Sampler2dShadowMSBuilder() = 
-        inherit SamplerBaseBuilder()
-        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
-            Sampler2dShadowMS(t, s)
-        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
-            Array.init count (fun i -> Sampler2dShadowMS(t.WithIndex(i), s))
-
-    let sampler2dShadowMS = Sampler2dShadowMSBuilder()
-    
     type Sampler2dMSBuilder() = 
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
@@ -1666,24 +1205,6 @@ module SamplerBuilders =
 
     let sampler2d = Sampler2dBuilder()
     
-    type Sampler3dShadowMSBuilder() = 
-        inherit SamplerBaseBuilder()
-        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
-            Sampler3dShadowMS(t, s)
-        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
-            Array.init count (fun i -> Sampler3dShadowMS(t.WithIndex(i), s))
-
-    let sampler3dShadowMS = Sampler3dShadowMSBuilder()
-    
-    type Sampler3dMSBuilder() = 
-        inherit SamplerBaseBuilder()
-        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
-            Sampler3dMS(t, s)
-        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
-            Array.init count (fun i -> Sampler3dMS(t.WithIndex(i), s))
-
-    let sampler3dMS = Sampler3dMSBuilder()
-    
     type Sampler3dShadowBuilder() = 
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
@@ -1701,24 +1222,6 @@ module SamplerBuilders =
             Array.init count (fun i -> Sampler3d(t.WithIndex(i), s))
 
     let sampler3d = Sampler3dBuilder()
-    
-    type SamplerCubeArrayShadowMSBuilder() = 
-        inherit SamplerBaseBuilder()
-        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
-            SamplerCubeArrayShadowMS(t, s)
-        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
-            Array.init count (fun i -> SamplerCubeArrayShadowMS(t.WithIndex(i), s))
-
-    let samplerCubeArrayShadowMS = SamplerCubeArrayShadowMSBuilder()
-    
-    type SamplerCubeArrayMSBuilder() = 
-        inherit SamplerBaseBuilder()
-        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
-            SamplerCubeArrayMS(t, s)
-        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
-            Array.init count (fun i -> SamplerCubeArrayMS(t.WithIndex(i), s))
-
-    let samplerCubeArrayMS = SamplerCubeArrayMSBuilder()
     
     type SamplerCubeArrayShadowBuilder() = 
         inherit SamplerBaseBuilder()
@@ -1738,24 +1241,6 @@ module SamplerBuilders =
 
     let samplerCubeArray = SamplerCubeArrayBuilder()
     
-    type SamplerCubeShadowMSBuilder() = 
-        inherit SamplerBaseBuilder()
-        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
-            SamplerCubeShadowMS(t, s)
-        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
-            Array.init count (fun i -> SamplerCubeShadowMS(t.WithIndex(i), s))
-
-    let samplerCubeShadowMS = SamplerCubeShadowMSBuilder()
-    
-    type SamplerCubeMSBuilder() = 
-        inherit SamplerBaseBuilder()
-        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
-            SamplerCubeMS(t, s)
-        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
-            Array.init count (fun i -> SamplerCubeMS(t.WithIndex(i), s))
-
-    let samplerCubeMS = SamplerCubeMSBuilder()
-    
     type SamplerCubeShadowBuilder() = 
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
@@ -1774,15 +1259,6 @@ module SamplerBuilders =
 
     let samplerCube = SamplerCubeBuilder()
     
-    type IntSampler1dArrayMSBuilder() = 
-        inherit SamplerBaseBuilder()
-        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
-            IntSampler1dArrayMS(t, s)
-        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
-            Array.init count (fun i -> IntSampler1dArrayMS(t.WithIndex(i), s))
-
-    let intSampler1dArrayMS = IntSampler1dArrayMSBuilder()
-    
     type IntSampler1dArrayBuilder() = 
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
@@ -1791,15 +1267,6 @@ module SamplerBuilders =
             Array.init count (fun i -> IntSampler1dArray(t.WithIndex(i), s))
 
     let intSampler1dArray = IntSampler1dArrayBuilder()
-    
-    type IntSampler1dMSBuilder() = 
-        inherit SamplerBaseBuilder()
-        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
-            IntSampler1dMS(t, s)
-        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
-            Array.init count (fun i -> IntSampler1dMS(t.WithIndex(i), s))
-
-    let intSampler1dMS = IntSampler1dMSBuilder()
     
     type IntSampler1dBuilder() = 
         inherit SamplerBaseBuilder()
@@ -1846,15 +1313,6 @@ module SamplerBuilders =
 
     let intSampler2d = IntSampler2dBuilder()
     
-    type IntSampler3dMSBuilder() = 
-        inherit SamplerBaseBuilder()
-        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
-            IntSampler3dMS(t, s)
-        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
-            Array.init count (fun i -> IntSampler3dMS(t.WithIndex(i), s))
-
-    let intSampler3dMS = IntSampler3dMSBuilder()
-    
     type IntSampler3dBuilder() = 
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
@@ -1864,15 +1322,6 @@ module SamplerBuilders =
 
     let intSampler3d = IntSampler3dBuilder()
     
-    type IntSamplerCubeArrayMSBuilder() = 
-        inherit SamplerBaseBuilder()
-        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
-            IntSamplerCubeArrayMS(t, s)
-        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
-            Array.init count (fun i -> IntSamplerCubeArrayMS(t.WithIndex(i), s))
-
-    let intSamplerCubeArrayMS = IntSamplerCubeArrayMSBuilder()
-    
     type IntSamplerCubeArrayBuilder() = 
         inherit SamplerBaseBuilder()
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
@@ -1881,15 +1330,6 @@ module SamplerBuilders =
             Array.init count (fun i -> IntSamplerCubeArray(t.WithIndex(i), s))
 
     let intSamplerCubeArray = IntSamplerCubeArrayBuilder()
-    
-    type IntSamplerCubeMSBuilder() = 
-        inherit SamplerBaseBuilder()
-        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
-            IntSamplerCubeMS(t, s)
-        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
-            Array.init count (fun i -> IntSamplerCubeMS(t.WithIndex(i), s))
-
-    let intSamplerCubeMS = IntSamplerCubeMSBuilder()
     
     type IntSamplerCubeBuilder() = 
         inherit SamplerBaseBuilder()

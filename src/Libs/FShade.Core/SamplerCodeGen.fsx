@@ -2,6 +2,7 @@
 #r @"..\..\..\packages\Aardvark.Base\lib\netstandard2.0\Aardvark.Base.dll"
 #r @"..\..\..\packages\Aardvark.Base.TypeProviders\lib\netstandard2.0\Aardvark.Base.TypeProviders.dll"
 #r @"..\..\..\packages\Aardvark.Base.FSharp\lib\netstandard2.0\Aardvark.Base.FSharp.dll"
+#r @"..\..\..\packages\FSharp.Data.Adaptive\lib\netstandard2.0\FSharp.Data.Adaptive.dll"
 #r @"..\..\..\bin\Debug\netstandard2.0\FShade.Imperative.dll"
 #r @"..\..\..\bin\Debug\netstandard2.0\FShade.Core.dll"
 
@@ -37,12 +38,11 @@ let allCombinations =
             for d in dims do
                 let arr = if d = SamplerDimension.Sampler3d then [false] else arr
                 for a in arr do
+                    let ms = if d = SamplerDimension.Sampler2d then ms else [false]
                     for m in ms do
+                        let shadow = if t = SamplerType.Int || m then [false] else shadow
                         for s in shadow do
-                            if t = SamplerType.Int && s then 
-                                ()
-                            else
-                                yield (t,d,a,m,s)
+                            yield (t,d,a,m,s)
     ]
 
 let formats =
@@ -460,3 +460,4 @@ let run() =
 
     ()
 
+run()
