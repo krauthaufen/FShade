@@ -425,12 +425,15 @@ let run() =
         let coordType = intVec coordComponents
 
         let sizeType =
-            match d with
-                | SamplerDimension.Sampler1d -> "int"
-                | SamplerDimension.Sampler2d -> "V2i"
-                | SamplerDimension.Sampler3d -> "V3i"
-                | SamplerDimension.SamplerCube -> "V2i"
+            let dim =
+                match d with
+                | SamplerDimension.Sampler1d -> 1
+                | SamplerDimension.Sampler2d
+                | SamplerDimension.SamplerCube -> 2
+                | SamplerDimension.Sampler3d -> 3
                 | _ -> failwith "unsupported sampler-kind"
+
+            intVec <| if a then dim + 1 else dim
 
         let iface =
             match t with

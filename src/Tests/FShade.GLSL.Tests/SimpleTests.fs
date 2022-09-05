@@ -1469,6 +1469,43 @@ let ``Texture Size``() =
     GLSL.shouldCompile [Effect.ofFunction fs]
 
 
+[<AutoOpen>]
+module ImageUniforms =
+
+    type UniformScope with
+        member x.Img1D        : Image1d<Formats.rgba8> = x?Foo1D
+        member x.Img1DArray   : Image1dArray<Formats.rgba8> = x?Foo1DArray
+        member x.Img2D        : Image2d<Formats.rgba8> = x?Foo2D
+        member x.Img2DArray   : Image2dArray<Formats.rgba8> = x?Foo2DArray
+        member x.Img2DMS      : Image2dMS<Formats.rgba8> = x?Foo2DMS
+        member x.Img2DArrayMS : Image2dArrayMS<Formats.rgba8> = x?Foo2DArrayMS
+        member x.Img3D        : Image3d<Formats.rgba8> = x?Foo3D
+        member x.ImgCube      : ImageCube<Formats.rgba8> = x?FooCube
+        member x.ImgCubeArray : ImageCubeArray<Formats.rgba8> = x?FooCubeArray
+
+
+[<Test>]
+let ``Image Size``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            let a = V3i uniform.Img1D.Size
+            let b = V3i(uniform.Img1DArray.Size, 0)
+            let c = V3i(uniform.Img2D.Size, 0)
+            let d = uniform.Img2DArray.Size
+            let e = uniform.Img3D.Size
+            let f = V3i(uniform.ImgCube.Size, 0)
+            let g = uniform.ImgCubeArray.Size
+            let h = V3i(uniform.Img2DMS.Size, 0)
+            let i = uniform.Img2DArrayMS.Size
+
+            return V4d(V3d(a + b + c + d + e + f + g + h + i), 1.0)
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs]
+
+
 //[<EntryPoint>]
 //let main args =
 //    ``New Intrinsics``()

@@ -1357,7 +1357,7 @@ type Image1dArray<'f when 'f :> Formats.IFloatingFormat>() =
     static member IsArray = true
     static member IsMultisampled = false
     
-    member x.Size : int = onlyInShaderCode "Size"
+    member x.Size : V2i = onlyInShaderCode "Size"
     member x.Item
         with get(coord : int, slice : int) : V4d = onlyInShaderCode "fetch"
         and set(coord : int, slice : int) (v : V4d) : unit = onlyInShaderCode "write"
@@ -1387,7 +1387,7 @@ type Image2dArrayMS<'f when 'f :> Formats.IFloatingFormat>() =
     static member IsArray = true
     static member IsMultisampled = true
     
-    member x.Size : V2i = onlyInShaderCode "Size"
+    member x.Size : V3i = onlyInShaderCode "Size"
     member x.Item
         with get(coord : V2i, slice : int, sample : int) : V4d = onlyInShaderCode "fetch"
         and set(coord : V2i, slice : int, sample : int) (v : V4d) : unit = onlyInShaderCode "write"
@@ -1402,7 +1402,7 @@ type Image2dArray<'f when 'f :> Formats.IFloatingFormat>() =
     static member IsArray = true
     static member IsMultisampled = false
     
-    member x.Size : V2i = onlyInShaderCode "Size"
+    member x.Size : V3i = onlyInShaderCode "Size"
     member x.Item
         with get(coord : V2i, slice : int) : V4d = onlyInShaderCode "fetch"
         and set(coord : V2i, slice : int) (v : V4d) : unit = onlyInShaderCode "write"
@@ -1462,7 +1462,7 @@ type ImageCubeArray<'f when 'f :> Formats.IFloatingFormat>() =
     static member IsArray = true
     static member IsMultisampled = false
     
-    member x.Size : V2i = onlyInShaderCode "Size"
+    member x.Size : V3i = onlyInShaderCode "Size"
     member x.Item
         with get(coord : V3i, slice : int) : V4d = onlyInShaderCode "fetch"
         and set(coord : V3i, slice : int) (v : V4d) : unit = onlyInShaderCode "write"
@@ -1492,7 +1492,7 @@ type IntImage1dArray<'f when 'f :> Formats.ISignedFormat>() =
     static member IsArray = true
     static member IsMultisampled = false
     
-    member x.Size : int = onlyInShaderCode "Size"
+    member x.Size : V2i = onlyInShaderCode "Size"
     member x.Item
         with get(coord : int, slice : int) : V4i = onlyInShaderCode "fetch"
         and set(coord : int, slice : int) (v : V4i) : unit = onlyInShaderCode "write"
@@ -1538,7 +1538,7 @@ type IntImage2dArrayMS<'f when 'f :> Formats.ISignedFormat>() =
     static member IsArray = true
     static member IsMultisampled = true
     
-    member x.Size : V2i = onlyInShaderCode "Size"
+    member x.Size : V3i = onlyInShaderCode "Size"
     member x.Item
         with get(coord : V2i, slice : int, sample : int) : V4i = onlyInShaderCode "fetch"
         and set(coord : V2i, slice : int, sample : int) (v : V4i) : unit = onlyInShaderCode "write"
@@ -1561,7 +1561,7 @@ type IntImage2dArray<'f when 'f :> Formats.ISignedFormat>() =
     static member IsArray = true
     static member IsMultisampled = false
     
-    member x.Size : V2i = onlyInShaderCode "Size"
+    member x.Size : V3i = onlyInShaderCode "Size"
     member x.Item
         with get(coord : V2i, slice : int) : V4i = onlyInShaderCode "fetch"
         and set(coord : V2i, slice : int) (v : V4i) : unit = onlyInShaderCode "write"
@@ -1653,7 +1653,7 @@ type IntImageCubeArray<'f when 'f :> Formats.ISignedFormat>() =
     static member IsArray = true
     static member IsMultisampled = false
     
-    member x.Size : V2i = onlyInShaderCode "Size"
+    member x.Size : V3i = onlyInShaderCode "Size"
     member x.Item
         with get(coord : V3i, slice : int) : V4i = onlyInShaderCode "fetch"
         and set(coord : V3i, slice : int) (v : V4i) : unit = onlyInShaderCode "write"
