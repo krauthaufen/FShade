@@ -18,11 +18,11 @@ type Sampler1dArrayShadow(tex : ISemanticValue, state : SamplerState) =
     /// the mipmap-levels for the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
-    /// the size for the sampler
-    member x.GetSize (level : int) : int = onlyInShaderCode "GetSize"
+    /// the level size for the sampler
+    member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
     
     /// the size for the sampler
-    member x.Size : int = onlyInShaderCode "Size"
+    member x.Size : V2i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
     member x.Sample(coord : float, slice : int, cmp : float) : float = onlyInShaderCode "Sample"
@@ -64,11 +64,11 @@ type Sampler1dArray(tex : ISemanticValue, state : SamplerState) =
     /// the mipmap-levels for the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
-    /// the size for the sampler
-    member x.GetSize (level : int) : int = onlyInShaderCode "GetSize"
+    /// the level size for the sampler
+    member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
     
     /// the size for the sampler
-    member x.Size : int = onlyInShaderCode "Size"
+    member x.Size : V2i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
     member x.Sample(coord : float, slice : int) : V4d = onlyInShaderCode "Sample"
@@ -110,7 +110,7 @@ type Sampler1dShadow(tex : ISemanticValue, state : SamplerState) =
     /// the mipmap-levels for the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
-    /// the size for the sampler
+    /// the level size for the sampler
     member x.GetSize (level : int) : int = onlyInShaderCode "GetSize"
     
     /// the size for the sampler
@@ -162,7 +162,7 @@ type Sampler1d(tex : ISemanticValue, state : SamplerState) =
     /// the mipmap-levels for the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
-    /// the size for the sampler
+    /// the level size for the sampler
     member x.GetSize (level : int) : int = onlyInShaderCode "GetSize"
     
     /// the size for the sampler
@@ -220,10 +220,7 @@ type Sampler2dArrayMS(tex : ISemanticValue, state : SamplerState) =
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
     /// the size for the sampler
-    member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
-    
-    /// the size for the sampler
-    member x.Size : V2i = onlyInShaderCode "Size"
+    member x.Size : V3i = onlyInShaderCode "Size"
     
     /// non-sampled texture read
     member x.Read(coord : V2i, slice : int, sample : int) : V4d = onlyInShaderCode "Read"
@@ -244,11 +241,11 @@ type Sampler2dArrayShadow(tex : ISemanticValue, state : SamplerState) =
     /// the mipmap-levels for the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
-    /// the size for the sampler
-    member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
+    /// the level size for the sampler
+    member x.GetSize (level : int) : V3i = onlyInShaderCode "GetSize"
     
     /// the size for the sampler
-    member x.Size : V2i = onlyInShaderCode "Size"
+    member x.Size : V3i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
     member x.Sample(coord : V2d, slice : int, cmp : float) : float = onlyInShaderCode "Sample"
@@ -296,11 +293,11 @@ type Sampler2dArray(tex : ISemanticValue, state : SamplerState) =
     /// the mipmap-levels for the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
-    /// the size for the sampler
-    member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
+    /// the level size for the sampler
+    member x.GetSize (level : int) : V3i = onlyInShaderCode "GetSize"
     
     /// the size for the sampler
-    member x.Size : V2i = onlyInShaderCode "Size"
+    member x.Size : V3i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
     member x.Sample(coord : V2d, slice : int) : V4d = onlyInShaderCode "Sample"
@@ -349,9 +346,6 @@ type Sampler2dMS(tex : ISemanticValue, state : SamplerState) =
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
     /// the size for the sampler
-    member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
-    
-    /// the size for the sampler
     member x.Size : V2i = onlyInShaderCode "Size"
     
     /// non-sampled texture read
@@ -373,7 +367,7 @@ type Sampler2dShadow(tex : ISemanticValue, state : SamplerState) =
     /// the mipmap-levels for the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
-    /// the size for the sampler
+    /// the level size for the sampler
     member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
     
     /// the size for the sampler
@@ -431,7 +425,7 @@ type Sampler2d(tex : ISemanticValue, state : SamplerState) =
     /// the mipmap-levels for the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
-    /// the size for the sampler
+    /// the level size for the sampler
     member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
     
     /// the size for the sampler
@@ -494,7 +488,7 @@ type Sampler3dShadow(tex : ISemanticValue, state : SamplerState) =
     /// the mipmap-levels for the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
-    /// the size for the sampler
+    /// the level size for the sampler
     member x.GetSize (level : int) : V3i = onlyInShaderCode "GetSize"
     
     /// the size for the sampler
@@ -546,7 +540,7 @@ type Sampler3d(tex : ISemanticValue, state : SamplerState) =
     /// the mipmap-levels for the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
-    /// the size for the sampler
+    /// the level size for the sampler
     member x.GetSize (level : int) : V3i = onlyInShaderCode "GetSize"
     
     /// the size for the sampler
@@ -603,11 +597,11 @@ type SamplerCubeArrayShadow(tex : ISemanticValue, state : SamplerState) =
     /// the mipmap-levels for the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
-    /// the size for the sampler
-    member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
+    /// the level size for the sampler
+    member x.GetSize (level : int) : V3i = onlyInShaderCode "GetSize"
     
     /// the size for the sampler
-    member x.Size : V2i = onlyInShaderCode "Size"
+    member x.Size : V3i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
     member x.Sample(coord : V3d, slice : int, cmp : float) : float = onlyInShaderCode "Sample"
@@ -637,11 +631,11 @@ type SamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
     /// the mipmap-levels for the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
-    /// the size for the sampler
-    member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
+    /// the level size for the sampler
+    member x.GetSize (level : int) : V3i = onlyInShaderCode "GetSize"
     
     /// the size for the sampler
-    member x.Size : V2i = onlyInShaderCode "Size"
+    member x.Size : V3i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
     member x.Sample(coord : V3d, slice : int) : V4d = onlyInShaderCode "Sample"
@@ -674,7 +668,7 @@ type SamplerCubeShadow(tex : ISemanticValue, state : SamplerState) =
     /// the mipmap-levels for the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
-    /// the size for the sampler
+    /// the level size for the sampler
     member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
     
     /// the size for the sampler
@@ -711,7 +705,7 @@ type SamplerCube(tex : ISemanticValue, state : SamplerState) =
     /// the mipmap-levels for the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
-    /// the size for the sampler
+    /// the level size for the sampler
     member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
     
     /// the size for the sampler
@@ -748,11 +742,11 @@ type IntSampler1dArray(tex : ISemanticValue, state : SamplerState) =
     /// the mipmap-levels for the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
-    /// the size for the sampler
-    member x.GetSize (level : int) : int = onlyInShaderCode "GetSize"
+    /// the level size for the sampler
+    member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
     
     /// the size for the sampler
-    member x.Size : int = onlyInShaderCode "Size"
+    member x.Size : V2i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
     member x.Sample(coord : float, slice : int) : V4i = onlyInShaderCode "Sample"
@@ -794,7 +788,7 @@ type IntSampler1d(tex : ISemanticValue, state : SamplerState) =
     /// the mipmap-levels for the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
-    /// the size for the sampler
+    /// the level size for the sampler
     member x.GetSize (level : int) : int = onlyInShaderCode "GetSize"
     
     /// the size for the sampler
@@ -852,10 +846,7 @@ type IntSampler2dArrayMS(tex : ISemanticValue, state : SamplerState) =
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
     /// the size for the sampler
-    member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
-    
-    /// the size for the sampler
-    member x.Size : V2i = onlyInShaderCode "Size"
+    member x.Size : V3i = onlyInShaderCode "Size"
     
     /// non-sampled texture read
     member x.Read(coord : V2i, slice : int, sample : int) : V4i = onlyInShaderCode "Read"
@@ -876,11 +867,11 @@ type IntSampler2dArray(tex : ISemanticValue, state : SamplerState) =
     /// the mipmap-levels for the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
-    /// the size for the sampler
-    member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
+    /// the level size for the sampler
+    member x.GetSize (level : int) : V3i = onlyInShaderCode "GetSize"
     
     /// the size for the sampler
-    member x.Size : V2i = onlyInShaderCode "Size"
+    member x.Size : V3i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
     member x.Sample(coord : V2d, slice : int) : V4i = onlyInShaderCode "Sample"
@@ -929,9 +920,6 @@ type IntSampler2dMS(tex : ISemanticValue, state : SamplerState) =
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
     /// the size for the sampler
-    member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
-    
-    /// the size for the sampler
     member x.Size : V2i = onlyInShaderCode "Size"
     
     /// non-sampled texture read
@@ -953,7 +941,7 @@ type IntSampler2d(tex : ISemanticValue, state : SamplerState) =
     /// the mipmap-levels for the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
-    /// the size for the sampler
+    /// the level size for the sampler
     member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
     
     /// the size for the sampler
@@ -1016,7 +1004,7 @@ type IntSampler3d(tex : ISemanticValue, state : SamplerState) =
     /// the mipmap-levels for the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
-    /// the size for the sampler
+    /// the level size for the sampler
     member x.GetSize (level : int) : V3i = onlyInShaderCode "GetSize"
     
     /// the size for the sampler
@@ -1073,11 +1061,11 @@ type IntSamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
     /// the mipmap-levels for the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
-    /// the size for the sampler
-    member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
+    /// the level size for the sampler
+    member x.GetSize (level : int) : V3i = onlyInShaderCode "GetSize"
     
     /// the size for the sampler
-    member x.Size : V2i = onlyInShaderCode "Size"
+    member x.Size : V3i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
     member x.Sample(coord : V3d, slice : int) : V4i = onlyInShaderCode "Sample"
@@ -1110,7 +1098,7 @@ type IntSamplerCube(tex : ISemanticValue, state : SamplerState) =
     /// the mipmap-levels for the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
-    /// the size for the sampler
+    /// the level size for the sampler
     member x.GetSize (level : int) : V2i = onlyInShaderCode "GetSize"
     
     /// the size for the sampler

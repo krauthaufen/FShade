@@ -1437,6 +1437,38 @@ let ``Texture Gather with Offset``() =
 
     GLSL.shouldCompile [Effect.ofFunction fs]
 
+[<Test>]
+let ``Texture Size``() =
+    Setup.Run()
+
+    let sam1D        = sampler1d { texture uniform?DiffuseTexture }
+    let sam1DArray   = sampler1dArray { texture uniform?DiffuseTexture }
+    let sam2D        = sampler2d { texture uniform?DiffuseTexture }
+    let sam2DArray   = sampler2dArray { texture uniform?DiffuseTexture }
+    let sam2DMS      = sampler2dMS { texture uniform?DiffuseTexture }
+    let sam2DArrayMS = sampler2dArrayMS { texture uniform?DiffuseTexture }
+    let sam3D        = sampler3d { texture uniform?DiffuseTexture }
+    let samCube      = samplerCube { texture uniform?DiffuseTexture }
+    let samCubeArray = samplerCubeArray { texture uniform?DiffuseTexture }
+
+    let fs (v : Vertex) =
+        fragment {
+            let a = V3i sam1D.Size
+            let b = V3i(sam1DArray.Size, 0)
+            let c = V3i(sam2D.Size, 0)
+            let d = sam2DArray.Size
+            let e = sam3D.GetSize 5
+            let f = V3i(samCube.GetSize 10, 0)
+            let g = samCubeArray.Size
+            let h = V3i(sam2DMS.Size, 0)
+            let i = sam2DArrayMS.Size
+
+            return V4d(V3d(a + b + c + d + e + f + g + h + i), 1.0)
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs]
+
+
 //[<EntryPoint>]
 //let main args =
 //    ``New Intrinsics``()
