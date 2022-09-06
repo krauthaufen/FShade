@@ -223,15 +223,22 @@ let run() =
         let additionalDefaultArgs =
             additionalArgs |> List.map (fun (n, t) -> n, t, None)
 
+        // https://registry.khronos.org/OpenGL-Refpages/gl4/html/texture.xhtml
         if not m then
-            samplerFunction 
+            let variant =
+                if s && a && d = SamplerDimension.SamplerCube then
+                    SampleVariants.None
+                else
+                    SampleVariants.Bias
+
+            samplerFunction
                 "regular sampled texture-lookup"
-                SampleVariants.Bias
+                variant
                 "Sample"
                 (["coord", coordType] @ additionalArgs)
                 returnType
 
-        // Cubemap, multisample, and buffer samplers are not allowed
+        // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureOffset.xhtml
         if d <> SamplerDimension.SamplerCube && not m then
             samplerFunction 
                 "regular sampled texture-lookup with offset"

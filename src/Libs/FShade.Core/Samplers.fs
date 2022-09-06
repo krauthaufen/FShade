@@ -552,9 +552,6 @@ type SamplerCubeArrayShadow(tex : ISemanticValue, state : SamplerState) =
     /// regular sampled texture-lookup
     member x.Sample(coord : V3d, slice : int, cmp : float) : float = onlyInShaderCode "Sample"
     
-    /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V3d, slice : int, cmp : float, lodBias : float) : float = onlyInShaderCode "Sample"
-    
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V3d, slice : int, cmp : float, dTdx : V3d, dTdy : V3d) : float = onlyInShaderCode "SampleGrad"
     
