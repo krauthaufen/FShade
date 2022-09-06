@@ -39,6 +39,9 @@ type Sampler1dArrayShadow(tex : ISemanticValue, state : SamplerState) =
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : float, slice : int, cmp : float, level : float) : float = onlyInShaderCode "SampleLevel"
     
+    /// sampled texture-lookup with given level and offset
+    member x.SampleLevelOffset(coord : float, slice : int, cmp : float, level : float, offset : int) : float = onlyInShaderCode "SampleLevelOffset"
+    
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : float, slice : int, cmp : float, dTdx : float, dTdy : float) : float = onlyInShaderCode "SampleGrad"
     
@@ -81,6 +84,9 @@ type Sampler1dArray(tex : ISemanticValue, state : SamplerState) =
     
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : float, slice : int, level : float) : V4d = onlyInShaderCode "SampleLevel"
+    
+    /// sampled texture-lookup with given level and offset
+    member x.SampleLevelOffset(coord : float, slice : int, level : float, offset : int) : V4d = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : float, slice : int, dTdx : float, dTdy : float) : V4d = onlyInShaderCode "SampleGrad"
@@ -138,6 +144,9 @@ type Sampler1dShadow(tex : ISemanticValue, state : SamplerState) =
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : float, cmp : float, level : float) : float = onlyInShaderCode "SampleLevel"
     
+    /// sampled texture-lookup with given level and offset
+    member x.SampleLevelOffset(coord : float, cmp : float, level : float, offset : int) : float = onlyInShaderCode "SampleLevelOffset"
+    
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : float, cmp : float, dTdx : float, dTdy : float) : float = onlyInShaderCode "SampleGrad"
     
@@ -186,6 +195,9 @@ type Sampler1d(tex : ISemanticValue, state : SamplerState) =
     
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : float, level : float) : V4d = onlyInShaderCode "SampleLevel"
+    
+    /// sampled texture-lookup with given level and offset
+    member x.SampleLevelOffset(coord : float, level : float, offset : int) : V4d = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : float, dTdx : float, dTdy : float) : V4d = onlyInShaderCode "SampleGrad"
@@ -309,6 +321,9 @@ type Sampler2dArray(tex : ISemanticValue, state : SamplerState) =
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : V2d, slice : int, level : float) : V4d = onlyInShaderCode "SampleLevel"
     
+    /// sampled texture-lookup with given level and offset
+    member x.SampleLevelOffset(coord : V2d, slice : int, level : float, offset : V2i) : V4d = onlyInShaderCode "SampleLevelOffset"
+    
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V2d, slice : int, dTdx : V2d, dTdy : V2d) : V4d = onlyInShaderCode "SampleGrad"
     
@@ -397,6 +412,9 @@ type Sampler2dShadow(tex : ISemanticValue, state : SamplerState) =
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : V2d, cmp : float, level : float) : float = onlyInShaderCode "SampleLevel"
     
+    /// sampled texture-lookup with given level and offset
+    member x.SampleLevelOffset(coord : V2d, cmp : float, level : float, offset : V2i) : float = onlyInShaderCode "SampleLevelOffset"
+    
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V2d, cmp : float, dTdx : V2d, dTdy : V2d) : float = onlyInShaderCode "SampleGrad"
     
@@ -451,6 +469,9 @@ type Sampler2d(tex : ISemanticValue, state : SamplerState) =
     
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : V2d, level : float) : V4d = onlyInShaderCode "SampleLevel"
+    
+    /// sampled texture-lookup with given level and offset
+    member x.SampleLevelOffset(coord : V2d, level : float, offset : V2i) : V4d = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V2d, dTdx : V2d, dTdy : V2d) : V4d = onlyInShaderCode "SampleGrad"
@@ -513,6 +534,9 @@ type Sampler3d(tex : ISemanticValue, state : SamplerState) =
     
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : V3d, level : float) : V4d = onlyInShaderCode "SampleLevel"
+    
+    /// sampled texture-lookup with given level and offset
+    member x.SampleLevelOffset(coord : V3d, level : float, offset : V3i) : V4d = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V3d, dTdx : V3d, dTdy : V3d) : V4d = onlyInShaderCode "SampleGrad"
@@ -715,6 +739,9 @@ type IntSampler1dArray(tex : ISemanticValue, state : SamplerState) =
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : float, slice : int, level : float) : V4i = onlyInShaderCode "SampleLevel"
     
+    /// sampled texture-lookup with given level and offset
+    member x.SampleLevelOffset(coord : float, slice : int, level : float, offset : int) : V4i = onlyInShaderCode "SampleLevelOffset"
+    
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : float, slice : int, dTdx : float, dTdy : float) : V4i = onlyInShaderCode "SampleGrad"
     
@@ -770,6 +797,9 @@ type IntSampler1d(tex : ISemanticValue, state : SamplerState) =
     
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : float, level : float) : V4i = onlyInShaderCode "SampleLevel"
+    
+    /// sampled texture-lookup with given level and offset
+    member x.SampleLevelOffset(coord : float, level : float, offset : int) : V4i = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : float, dTdx : float, dTdy : float) : V4i = onlyInShaderCode "SampleGrad"
@@ -846,6 +876,9 @@ type IntSampler2dArray(tex : ISemanticValue, state : SamplerState) =
     
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : V2d, slice : int, level : float) : V4i = onlyInShaderCode "SampleLevel"
+    
+    /// sampled texture-lookup with given level and offset
+    member x.SampleLevelOffset(coord : V2d, slice : int, level : float, offset : V2i) : V4i = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V2d, slice : int, dTdx : V2d, dTdy : V2d) : V4i = onlyInShaderCode "SampleGrad"
@@ -935,6 +968,9 @@ type IntSampler2d(tex : ISemanticValue, state : SamplerState) =
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : V2d, level : float) : V4i = onlyInShaderCode "SampleLevel"
     
+    /// sampled texture-lookup with given level and offset
+    member x.SampleLevelOffset(coord : V2d, level : float, offset : V2i) : V4i = onlyInShaderCode "SampleLevelOffset"
+    
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V2d, dTdx : V2d, dTdy : V2d) : V4i = onlyInShaderCode "SampleGrad"
     
@@ -996,6 +1032,9 @@ type IntSampler3d(tex : ISemanticValue, state : SamplerState) =
     
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : V3d, level : float) : V4i = onlyInShaderCode "SampleLevel"
+    
+    /// sampled texture-lookup with given level and offset
+    member x.SampleLevelOffset(coord : V3d, level : float, offset : V3i) : V4i = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
     member x.SampleGrad(coord : V3d, dTdx : V3d, dTdy : V3d) : V4i = onlyInShaderCode "SampleGrad"

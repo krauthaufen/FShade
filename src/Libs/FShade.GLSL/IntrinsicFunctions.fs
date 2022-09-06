@@ -2076,33 +2076,33 @@ module IntrinsicFunctions =
                 let argCount = List.length args - 1
 
                 match name with
-                    | "get_Size" ->
-                        if isMS then Some "textureSize({0})"
-                        else Some "textureSize({0}, 0)"
+                | "get_Size" ->
+                    if isMS then Some "textureSize({0})"
+                    else Some "textureSize({0}, 0)"
 
-                    | "get_MipMapLevels" ->
-                        if isMS then Some "1"
-                        else Some "textureQueryLevels({0})"
+                | "get_MipMapLevels" ->
+                    if isMS then Some "1"
+                    else Some "textureQueryLevels({0})"
 
-                    | "GetSize" ->
-                        if isMS then Some "textureSize({0})"
-                        else Some "textureSize({0}, {1})"
+                | "GetSize" ->
+                    if isMS then Some "textureSize({0})"
+                    else Some "textureSize({0}, {1})"
 
+                | "Sample" -> sprintf "texture(%s)" (sampleArgs false) |> Some
+                | "SampleOffset" -> sprintf "textureOffset(%s)" (sampleArgs false) |> Some
+                | "SampleProj" -> sprintf "textureProj(%s)" (plainArgs 0) |> Some
+                | "SampleLevel" -> sprintf "textureLod(%s)" (sampleArgs false) |> Some
+                | "SampleLevelOffset" -> sprintf "textureLodOffset(%s)" (sampleArgs false) |> Some
+                | "SampleGrad" -> sprintf "textureGrad(%s)" (sampleArgs false) |> Some
+                | "Gather" -> sprintf "textureGather(%s)" (sampleArgs true) |> Some
+                | "GatherOffset" -> sprintf "textureGatherOffset(%s)" (sampleArgs true) |> Some
 
-                    | "Sample" -> sprintf "texture(%s)" (sampleArgs false) |> Some
-                    | "SampleOffset" -> sprintf "textureOffset(%s)" (sampleArgs false) |> Some
-                    | "SampleProj" -> sprintf "textureProj(%s)" (plainArgs 0) |> Some
-                    | "SampleLevel" -> sprintf "textureLod(%s)" (sampleArgs false) |> Some
-                    | "SampleGrad" -> sprintf "textureGrad(%s)" (sampleArgs false) |> Some
-                    | "Gather" -> sprintf "textureGather(%s)" (sampleArgs true) |> Some
-                    | "GatherOffset" -> sprintf "textureGatherOffset(%s)" (sampleArgs true) |> Some
+                | "Read" -> sprintf "texelFetch(%s)" (fetchArgs()) |> Some
+                | "get_Item" -> sprintf "texelFetch(%s)" (fetchArgs()) |> Some
 
-                    | "Read" -> sprintf "texelFetch(%s)" (fetchArgs()) |> Some
-                    | "get_Item" -> sprintf "texelFetch(%s)" (fetchArgs()) |> Some
+                | "QueryLod" -> sprintf "textureQueryLod(%s)" (plainArgs 0) |> Some
 
-                    | "QueryLod" -> sprintf "textureQueryLod(%s)" (plainArgs 0) |> Some
-
-                    | name -> None
+                | name -> None
             | _ ->
                 None
 

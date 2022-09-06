@@ -275,6 +275,15 @@ let run() =
                 (["coord", coordType] @ additionalArgs @ ["level", "float"])
                 returnType
 
+        // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureLodOffset.xhtml
+        if not m && d <> SamplerDimension.SamplerCube && not (s && a && d = SamplerDimension.Sampler2d) then
+            samplerFunction
+                "sampled texture-lookup with given level and offset"
+                SampleVariants.None
+                "SampleLevelOffset"
+                (["coord", coordType] @ additionalArgs @ ["level", "float"; "offset", texelCoordType])
+                returnType
+
         // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureGrad.xhtml
         if not m then
             samplerFunction
