@@ -249,8 +249,9 @@ let run() =
                 (["coord", projCoordType] @ additionalArgs)
                 returnType
 
-        if not m && not (a && s && d = SamplerDimension.SamplerCube) then
-            samplerFunction 
+        // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureLod.xhtml
+        if not m && not (s && d = SamplerDimension.SamplerCube) && not (s && a && d = SamplerDimension.Sampler2d) then
+            samplerFunction
                 "sampled texture-lookup with given level"
                 SampleVariants.None
                 "SampleLevel"
