@@ -1620,6 +1620,32 @@ let ``Texture LoD``() =
     GLSL.shouldCompile [Effect.ofFunction fs]
 
 
+[<Test>]
+let ``Texture Proj``() =
+    Setup.Run()
+
+    let sam1D        = sampler1d { texture uniform?DiffuseTexture }
+    let sam2D        = sampler2d { texture uniform?DiffuseTexture }
+    let sam3D        = sampler3d { texture uniform?DiffuseTexture }
+
+    let sam1DShadow        = sampler1dShadow { texture uniform?DiffuseTexture }
+    let sam2DShadow        = sampler2dShadow { texture uniform?DiffuseTexture }
+
+    let fs (v : Vertex) =
+        fragment {
+            let a = sam1D.SampleProj(V2d.Zero)
+            let b = sam2D.SampleProj(V3d.Zero, 1.0)
+            let c = sam3D.SampleProj(V4d.Zero, 1.0)
+
+            let d = V4d(sam1DShadow.SampleProj(V4d.Zero, 1.0), 0.0, 0.0, 0.0)
+            let e = V4d(sam2DShadow.SampleProj(V4d.Zero, 1.0), 0.0, 0.0, 0.0)
+
+            return a + b + c + d + e
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs]
+
+
 [<AutoOpen>]
 module ImageUniforms =
 

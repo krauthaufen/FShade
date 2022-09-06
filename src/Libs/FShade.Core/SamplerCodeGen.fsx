@@ -240,13 +240,23 @@ let run() =
                 (["coord", coordType] @ additionalArgs @ ["offset", texelCoordType])
                 returnType
 
-        // Array, cubemap, multisample, and buffer samplers cannot be used with this function
+        // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureProj.xhtml
         if d <> SamplerDimension.SamplerCube && not m && not a then
+
+            let arguments =
+                if s then
+                    // shadow variants take vec4 (x, [y], cmp, w)
+                    // since cmp comes at 3rd position, building this vector is not possible at GLSL level (leads to duplicated code)
+                    // therefore, we only provide the native overload
+                    ["coord", "V4d"]
+                else
+                    ["coord", projCoordType] @ additionalArgs
+
             samplerFunction 
                 "projective sampled texture-lookup"
                 SampleVariants.Bias
                 "SampleProj"
-                (["coord", projCoordType] @ additionalArgs)
+                arguments
                 returnType
 
         // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureLod.xhtml

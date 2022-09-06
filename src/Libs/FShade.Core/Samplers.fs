@@ -130,10 +130,10 @@ type Sampler1dShadow(tex : ISemanticValue, state : SamplerState) =
     member x.SampleOffset(coord : float, cmp : float, offset : int, lodBias : float) : float = onlyInShaderCode "SampleOffset"
     
     /// projective sampled texture-lookup
-    member x.SampleProj(coord : V2d, cmp : float) : float = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V4d) : float = onlyInShaderCode "SampleProj"
     
     /// projective sampled texture-lookup with lod-bias
-    member x.SampleProj(coord : V2d, cmp : float, lodBias : float) : float = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V4d, lodBias : float) : float = onlyInShaderCode "SampleProj"
     
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : float, cmp : float, level : float) : float = onlyInShaderCode "SampleLevel"
@@ -389,10 +389,10 @@ type Sampler2dShadow(tex : ISemanticValue, state : SamplerState) =
     member x.SampleOffset(coord : V2d, cmp : float, offset : V2i, lodBias : float) : float = onlyInShaderCode "SampleOffset"
     
     /// projective sampled texture-lookup
-    member x.SampleProj(coord : V3d, cmp : float) : float = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V4d) : float = onlyInShaderCode "SampleProj"
     
     /// projective sampled texture-lookup with lod-bias
-    member x.SampleProj(coord : V3d, cmp : float, lodBias : float) : float = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V4d, lodBias : float) : float = onlyInShaderCode "SampleProj"
     
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : V2d, cmp : float, level : float) : float = onlyInShaderCode "SampleLevel"
