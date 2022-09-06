@@ -14,6 +14,7 @@ type Vertex =
         [<Interpolation(InterpolationMode.NoPerspective ||| InterpolationMode.Sample)>] hugo : V3d
         [<Interpolation(InterpolationMode.Flat ||| InterpolationMode.PerPatch)>] hugo2 : V3d
         foo : V4d
+        what : V3i
     }
 
 
@@ -1301,6 +1302,17 @@ let ``Multiple interpolation qualifiers``() =
         }
 
     GLSL.shouldCompileAndContainRegex [Effect.ofFunction fs] ["flat"; "noperspective sample"]
+
+[<Test>]
+let ``Integer with implicit flat interpolation``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            return V3d v.what
+        }
+
+    GLSL.shouldCompile[Effect.ofFunction fs]
 
 
 [<AutoOpen>]

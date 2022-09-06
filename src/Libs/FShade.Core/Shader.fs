@@ -199,7 +199,14 @@ module Preprocessor =
 
     [<AutoOpen>] 
     module OtherPatterns =
-        
+
+        let rec (|Integral|_|) (t : Type) =
+            match t with
+            | TypeInfo.Patterns.Integral
+            | TypeInfo.Patterns.VectorOf(_, Integral)
+            | TypeInfo.Patterns.MatrixOf(_, Integral) -> Some ()
+            | _ -> None
+
         let (|Primitive|_|) (e : Expr) =
             let iface = e.Type.GetInterface("Primitive`1")
             if isNull iface then
@@ -531,20 +538,19 @@ module Preprocessor =
         let readInput (name : string) (desc : ParameterDescription) = 
             State.modify (fun s ->
                 match Map.tryFind name s.inputs with
-                    | Some odesc ->
-                        if odesc.paramType = desc.paramType then
-                            let newInterpolation =
-                                match odesc.paramInterpolation, desc.paramInterpolation with
-                                    | InterpolationMode.Default, o -> o
-                                    | o, InterpolationMode.Default -> o
-                                    | o, n ->
-                                        if o = n then o
-                                        else failwithf "[FShade] conflicting interpolationmodes for %s: %A vs %A" name o n
-                            { s with State.inputs = Map.add name { desc with paramInterpolation = newInterpolation } s.inputs }
-                        else
-                            failwithf "[FShade] conflicting input types for %s: %A vs %A" name odesc.paramType desc.paramType
-                    | None ->
-                        { s with State.inputs = Map.add name desc s.inputs }
+                | Some odesc ->
+                    if odesc.paramType = desc.paramType then
+                        let implicitInterp =
+                            match desc.paramType with
+                            | Integral -> InterpolationMode.Flat
+                            | _ -> InterpolationMode.Default
+
+                        let interp = odesc.paramInterpolation ||| desc.paramInterpolation ||| implicitInterp
+                        { s with State.inputs = Map.add name { desc with paramInterpolation = interp } s.inputs }
+                    else
+                        failwithf "[FShade] conflicting input types for %s: %A vs %A" name odesc.paramType desc.paramType
+                | None ->
+                    { s with State.inputs = Map.add name desc s.inputs }
             )
 
         let readUniform (p : UniformParameter) = 
