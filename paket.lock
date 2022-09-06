@@ -61,7 +61,7 @@ NUGET
       FSharp.Core (>= 4.2.3)
       NETStandard.Library (>= 2.0.3)
       NUnit (>= 3.12 < 4.0)
-    GLSLangSharp (0.4.12)
+    GLSLangSharp (0.4.15)
       FSharp.Core (>= 5.0)
     Microsoft.Bcl.AsyncInterfaces (5.0) - restriction: || (&& (== net6.0) (>= monoandroid) (< netstandard2.0)) (&& (== net6.0) (>= monotouch)) (&& (== net6.0) (>= net461)) (&& (== net6.0) (< netcoreapp2.0)) (&& (== net6.0) (< netcoreapp2.1)) (&& (== net6.0) (< netcoreapp3.0)) (&& (== net6.0) (< netstandard2.0) (>= xamarintvos)) (&& (== net6.0) (< netstandard2.0) (>= xamarinwatchos)) (&& (== net6.0) (>= uap10.1)) (== netstandard2.0)
       System.Threading.Tasks.Extensions (>= 4.5.4) - restriction: || (&& (== net6.0) (>= net461)) (&& (== net6.0) (< netcoreapp2.1) (< netstandard2.1)) (== netstandard2.0)
