@@ -2039,10 +2039,23 @@ module IntrinsicFunctions =
                 let sampleArgs() =
                     let consumedArgs, sampleArgs =
                         match isArray, isShadow with
-                            | true, true -> 4, sprintf "{0}, vec%d({1}, {2}, {3})" (coordComponents + 2)
-                            | true, false -> 3, sprintf "{0}, vec%d({1}, {2})" (coordComponents + 1)
-                            | false, true -> 3, sprintf "{0}, vec%d({1}, {2})" (coordComponents + 1)
-                            | false, false -> 2, "{0}, {1}"
+                        | true, true ->
+                            if coordComponents = 3 then
+                                4, "{0}, vec4({1}, {2}), {3}" // Cube array shadow sampler has separate cmp argument
+                            else
+                                4, sprintf "{0}, vec%d({1}, {2}, {3})" (coordComponents + 2)
+
+                        | true, false ->
+                            3, sprintf "{0}, vec%d({1}, {2})" (coordComponents + 1)
+
+                        | false, true ->
+                            if coordComponents = 1 then
+                                3, "{0}, vec3({1}, 0, {2})" // 1D shadow sampler has unused 2nd component
+                            else
+                                3, sprintf "{0}, vec%d({1}, {2})" (coordComponents + 1)
+
+                        | false, false ->
+                            2, "{0}, {1}"
 
                     let args = List.skip consumedArgs args
 
