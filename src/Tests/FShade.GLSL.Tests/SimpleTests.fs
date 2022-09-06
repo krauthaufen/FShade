@@ -1646,6 +1646,41 @@ let ``Texture Proj``() =
     GLSL.shouldCompile [Effect.ofFunction fs]
 
 
+[<Test>]
+let ``Texture Offset``() =
+    Setup.Run()
+
+    let sam1D        = sampler1d { texture uniform?DiffuseTexture }
+    let sam1DArray   = sampler1dArray { texture uniform?DiffuseTexture }
+    let sam2D        = sampler2d { texture uniform?DiffuseTexture }
+    let sam2DArray   = sampler2dArray { texture uniform?DiffuseTexture }
+    let sam3D        = sampler3d { texture uniform?DiffuseTexture }
+
+    let sam1DShadow        = sampler1dShadow { texture uniform?DiffuseTexture }
+    let sam1DArrayShadow   = sampler1dArrayShadow { texture uniform?DiffuseTexture }
+    let sam2DShadow        = sampler2dShadow { texture uniform?DiffuseTexture }
+    let sam2DArrayShadow   = sampler2dArrayShadow { texture uniform?DiffuseTexture }
+
+    let fs (v : Vertex) =
+        fragment {
+            let a = sam1D.SampleOffset(0.0, 7)
+            let b = sam1DArray.SampleOffset(0.0, 0, 1, 0.0)
+            let c = sam2D.SampleOffset(V2d.Zero, V2i.Zero, 0.0)
+            let d = sam2DArray.SampleOffset(V2d.Zero, 0, V2i.Zero)
+            let e = sam3D.SampleOffset(V3d.Zero, V3i.Zero, 1.0)
+
+            let f = V4d(sam1DShadow.SampleOffset(0.0, 0.5, 1, 0.0), 0.0, 0.0, 0.0)
+            let g = V4d(sam1DArrayShadow.SampleOffset(0.0, 0, 0.5, 3, 0.0), 0.0, 0.0, 0.0)
+            let h = V4d(sam2DShadow.SampleOffset(V2d.Zero, 0.5, V2i.Zero, 1.0), 0.0, 0.0, 0.0)
+            let i = V4d(sam2DArrayShadow.SampleOffset(V2d.Zero, 0, 0.5, V2i.Zero), 0.0, 0.0, 0.0)
+
+            return a + b + c + d + e +
+                   f + g + h + i
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs]
+
+
 [<AutoOpen>]
 module ImageUniforms =
 
