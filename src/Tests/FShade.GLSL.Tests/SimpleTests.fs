@@ -1506,9 +1506,51 @@ let ``Texture Query LoD``() =
             let m = samCubeArrayShadow.QueryLod V3d.Zero
 
             return V4d(
-                a + b + c + d + f + g +
+                a + b + c + d + e + f + g +
                 h + i + j + k + l + m, 1.0, 1.0
             )
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs]
+
+[<Test>]
+let ``Texture Grad``() =
+    Setup.Run()
+
+    let sam1D        = sampler1d { texture uniform?DiffuseTexture }
+    let sam1DArray   = sampler1dArray { texture uniform?DiffuseTexture }
+    let sam2D        = sampler2d { texture uniform?DiffuseTexture }
+    let sam2DArray   = sampler2dArray { texture uniform?DiffuseTexture }
+    let sam3D        = sampler3d { texture uniform?DiffuseTexture }
+    let samCube      = samplerCube { texture uniform?DiffuseTexture }
+    let samCubeArray = samplerCubeArray { texture uniform?DiffuseTexture }
+
+    let sam1DShadow        = sampler1dShadow { texture uniform?DiffuseTexture }
+    let sam1DArrayShadow   = sampler1dArrayShadow { texture uniform?DiffuseTexture }
+    let sam2DShadow        = sampler2dShadow { texture uniform?DiffuseTexture }
+    let sam2DArrayShadow   = sampler2dArrayShadow { texture uniform?DiffuseTexture }
+    let samCubeShadow      = samplerCubeShadow { texture uniform?DiffuseTexture }
+    let samCubeArrayShadow = samplerCubeArrayShadow { texture uniform?DiffuseTexture }
+
+    let fs (v : Vertex) =
+        fragment {
+            let a = sam1D.SampleGrad(0.0, 0.0, 0.0)
+            let b = sam1DArray.SampleGrad(0.0, 0, 0.0, 0.0)
+            let c = sam2D.SampleGrad(V2d.Zero, V2d.Zero, V2d.Zero)
+            let d = sam2DArray.SampleGrad(V2d.Zero, 0, V2d.Zero, V2d.Zero)
+            let e = sam3D.SampleGrad(V3d.Zero, V3d.Zero, V3d.Zero)
+            let f = samCube.SampleGrad(V3d.Zero, V3d.Zero, V3d.Zero)
+            let g = samCubeArray.SampleGrad(V3d.Zero, 0, V3d.Zero, V3d.Zero)
+
+            let h = V4d(sam1DShadow.SampleGrad(0.0, 0.5, 0.0, 0.0), 0.0, 0.0, 0.0)
+            let i = V4d(sam1DArrayShadow.SampleGrad(0.0, 0, 0.5, 0.0, 0.0), 0.0, 0.0, 0.0)
+            let j = V4d(sam2DShadow.SampleGrad(V2d.Zero, 0.5, V2d.Zero, V2d.Zero), 0.0, 0.0, 0.0)
+            let k = V4d(sam2DArrayShadow.SampleGrad(V2d.Zero, 0, 0.5, V2d.Zero, V2d.Zero), 0.0, 0.0, 0.0)
+            let l = V4d(samCubeShadow.SampleGrad(V3d.Zero, 0.5, V3d.Zero, V3d.Zero), 0.0, 0.0, 0.0)
+            let m = V4d(samCubeArrayShadow.SampleGrad(V3d.Zero, 0, 0.5, V3d.Zero, V3d.Zero), 0.0, 0.0, 0.0)
+
+            return a + b + c + d + e + f + g +
+                   h + i + j + k + l + m
         }
 
     GLSL.shouldCompile [Effect.ofFunction fs]

@@ -251,9 +251,9 @@ let run() =
                 (["coord", coordType] @ additionalArgs @ ["level", "float"])
                 returnType
 
-        // This function works for sampler types that are not multisample, buffer texture, or cubemap array samplers
-        if d <> SamplerDimension.SamplerCube && not m then
-            samplerFunction 
+        // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureGrad.xhtml
+        if not m then
+            samplerFunction
                 "sampled texture-lookup with explicit gradients"
                 SampleVariants.None
                 "SampleGrad"

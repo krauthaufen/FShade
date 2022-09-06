@@ -557,6 +557,9 @@ type SamplerCubeArrayShadow(tex : ISemanticValue, state : SamplerState) =
     /// regular sampled texture-lookup with lod-bias
     member x.Sample(coord : V3d, slice : int, cmp : float, lodBias : float) : float = onlyInShaderCode "Sample"
     
+    /// sampled texture-lookup with explicit gradients
+    member x.SampleGrad(coord : V3d, slice : int, cmp : float, dTdx : V3d, dTdy : V3d) : float = onlyInShaderCode "SampleGrad"
+    
     /// query lod levels
     member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
     
@@ -593,6 +596,9 @@ type SamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
     
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : V3d, slice : int, level : float) : V4d = onlyInShaderCode "SampleLevel"
+    
+    /// sampled texture-lookup with explicit gradients
+    member x.SampleGrad(coord : V3d, slice : int, dTdx : V3d, dTdy : V3d) : V4d = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
     member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
@@ -631,6 +637,9 @@ type SamplerCubeShadow(tex : ISemanticValue, state : SamplerState) =
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : V3d, cmp : float, level : float) : float = onlyInShaderCode "SampleLevel"
     
+    /// sampled texture-lookup with explicit gradients
+    member x.SampleGrad(coord : V3d, cmp : float, dTdx : V3d, dTdy : V3d) : float = onlyInShaderCode "SampleGrad"
+    
     /// query lod levels
     member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
     
@@ -667,6 +676,9 @@ type SamplerCube(tex : ISemanticValue, state : SamplerState) =
     
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : V3d, level : float) : V4d = onlyInShaderCode "SampleLevel"
+    
+    /// sampled texture-lookup with explicit gradients
+    member x.SampleGrad(coord : V3d, dTdx : V3d, dTdy : V3d) : V4d = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
     member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
@@ -1024,6 +1036,9 @@ type IntSamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : V3d, slice : int, level : float) : V4i = onlyInShaderCode "SampleLevel"
     
+    /// sampled texture-lookup with explicit gradients
+    member x.SampleGrad(coord : V3d, slice : int, dTdx : V3d, dTdy : V3d) : V4i = onlyInShaderCode "SampleGrad"
+    
     /// query lod levels
     member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
     
@@ -1060,6 +1075,9 @@ type IntSamplerCube(tex : ISemanticValue, state : SamplerState) =
     
     /// sampled texture-lookup with given level
     member x.SampleLevel(coord : V3d, level : float) : V4i = onlyInShaderCode "SampleLevel"
+    
+    /// sampled texture-lookup with explicit gradients
+    member x.SampleGrad(coord : V3d, dTdx : V3d, dTdy : V3d) : V4i = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
     member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
