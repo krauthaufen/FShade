@@ -269,10 +269,10 @@ type Sampler2dArrayShadow(tex : ISemanticValue, state : SamplerState) =
     member x.QueryLod(coord : V2d) : V2d = onlyInShaderCode "QueryLod"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.Gather(coord : V3d, refZ : float) : V4d = onlyInShaderCode "Gather"
+    member x.Gather(coord : V2d, slice : int, cmp : float) : V4d = onlyInShaderCode "Gather"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.GatherOffset(coord : V3d, refZ : float, offset : V2i) : V4d = onlyInShaderCode "GatherOffset"
+    member x.GatherOffset(coord : V2d, slice : int, cmp : float, offset : V2i) : V4d = onlyInShaderCode "GatherOffset"
     
     /// non-sampled texture read
     member x.Read(coord : V2i, slice : int, lod : int) : float = onlyInShaderCode "Read"
@@ -321,10 +321,10 @@ type Sampler2dArray(tex : ISemanticValue, state : SamplerState) =
     member x.QueryLod(coord : V2d) : V2d = onlyInShaderCode "QueryLod"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.Gather(coord : V3d, [<Optional; DefaultParameterValue(0)>] comp : int) : V4d = onlyInShaderCode "Gather"
+    member x.Gather(coord : V2d, slice : int, [<Optional; DefaultParameterValue(0)>] comp : int) : V4d = onlyInShaderCode "Gather"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.GatherOffset(coord : V3d, offset : V2i, [<Optional; DefaultParameterValue(0)>] comp : int) : V4d = onlyInShaderCode "GatherOffset"
+    member x.GatherOffset(coord : V2d, slice : int, offset : V2i, [<Optional; DefaultParameterValue(0)>] comp : int) : V4d = onlyInShaderCode "GatherOffset"
     
     /// non-sampled texture read
     member x.Read(coord : V2i, slice : int, lod : int) : V4d = onlyInShaderCode "Read"
@@ -401,10 +401,10 @@ type Sampler2dShadow(tex : ISemanticValue, state : SamplerState) =
     member x.QueryLod(coord : V2d) : V2d = onlyInShaderCode "QueryLod"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.Gather(coord : V2d, refZ : float) : V4d = onlyInShaderCode "Gather"
+    member x.Gather(coord : V2d, cmp : float) : V4d = onlyInShaderCode "Gather"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.GatherOffset(coord : V2d, refZ : float, offset : V2i) : V4d = onlyInShaderCode "GatherOffset"
+    member x.GatherOffset(coord : V2d, cmp : float, offset : V2i) : V4d = onlyInShaderCode "GatherOffset"
     
     /// non-sampled texture read
     member x.Read(coord : V2i, lod : int) : float = onlyInShaderCode "Read"
@@ -564,7 +564,7 @@ type SamplerCubeArrayShadow(tex : ISemanticValue, state : SamplerState) =
     member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.Gather(coord : V4d, refZ : float) : V4d = onlyInShaderCode "Gather"
+    member x.Gather(coord : V3d, slice : int, cmp : float) : V4d = onlyInShaderCode "Gather"
     
 
 type SamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
@@ -604,7 +604,7 @@ type SamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
     member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.Gather(coord : V4d, [<Optional; DefaultParameterValue(0)>] comp : int) : V4d = onlyInShaderCode "Gather"
+    member x.Gather(coord : V3d, slice : int, [<Optional; DefaultParameterValue(0)>] comp : int) : V4d = onlyInShaderCode "Gather"
     
 
 type SamplerCubeShadow(tex : ISemanticValue, state : SamplerState) =
@@ -644,7 +644,7 @@ type SamplerCubeShadow(tex : ISemanticValue, state : SamplerState) =
     member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.Gather(coord : V3d, refZ : float) : V4d = onlyInShaderCode "Gather"
+    member x.Gather(coord : V3d, cmp : float) : V4d = onlyInShaderCode "Gather"
     
 
 type SamplerCube(tex : ISemanticValue, state : SamplerState) =
@@ -855,10 +855,10 @@ type IntSampler2dArray(tex : ISemanticValue, state : SamplerState) =
     member x.QueryLod(coord : V2d) : V2d = onlyInShaderCode "QueryLod"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.Gather(coord : V3d, [<Optional; DefaultParameterValue(0)>] comp : int) : V4i = onlyInShaderCode "Gather"
+    member x.Gather(coord : V2d, slice : int, [<Optional; DefaultParameterValue(0)>] comp : int) : V4i = onlyInShaderCode "Gather"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.GatherOffset(coord : V3d, offset : V2i, [<Optional; DefaultParameterValue(0)>] comp : int) : V4i = onlyInShaderCode "GatherOffset"
+    member x.GatherOffset(coord : V2d, slice : int, offset : V2i, [<Optional; DefaultParameterValue(0)>] comp : int) : V4i = onlyInShaderCode "GatherOffset"
     
     /// non-sampled texture read
     member x.Read(coord : V2i, slice : int, lod : int) : V4i = onlyInShaderCode "Read"
@@ -1043,7 +1043,7 @@ type IntSamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
     member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.Gather(coord : V4d, [<Optional; DefaultParameterValue(0)>] comp : int) : V4i = onlyInShaderCode "Gather"
+    member x.Gather(coord : V3d, slice : int, [<Optional; DefaultParameterValue(0)>] comp : int) : V4i = onlyInShaderCode "Gather"
     
 
 type IntSamplerCube(tex : ISemanticValue, state : SamplerState) =

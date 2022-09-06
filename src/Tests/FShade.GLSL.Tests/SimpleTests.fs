@@ -1402,14 +1402,14 @@ let ``Texture Gather``() =
     let fs (v : Vertex) =
         fragment {
             let a = sam2D.Gather V2d.Zero + sam2D.Gather(V2d.Zero, 1)
-            let b = sam2DArray.Gather V3d.Zero + sam2DArray.Gather(V3d.Zero, 1)
+            let b = sam2DArray.Gather(V2d.Zero, 5) + sam2DArray.Gather(V2d.Zero, 5, 1)
             let c = samCube.Gather V3d.Zero + samCube.Gather(V3d.Zero, 1)
-            let d = samCubeArray.Gather V4d.Zero + samCubeArray.Gather(V4d.Zero, 1)
+            let d = samCubeArray.Gather(V3d.Zero, 5) + samCubeArray.Gather(V3d.Zero, 5, 1)
 
             let e = sam2DShadow.Gather(V2d.Zero, 0.5)
-            let f = sam2DArrayShadow.Gather(V3d.Zero, 0.5)
+            let f = sam2DArrayShadow.Gather(V2d.Zero, 5, 0.5)
             let g = samCubeShadow.Gather(V3d.Zero, 0.5)
-            let h = samCubeArrayShadow.Gather(V4d.Zero, 0.5)
+            let h = samCubeArrayShadow.Gather(V3d.Zero, 5, 0.5)
 
             return a + b + c + d + e + f + g + h
         }
@@ -1428,9 +1428,9 @@ let ``Texture Gather with Offset``() =
     let fs (v : Vertex) =
         fragment {
             let a = sam2D.GatherOffset(V2d.Zero, V2i.Zero) + sam2D.GatherOffset(V2d.Zero, V2i.Zero, 1)
-            let b = sam2DArray.GatherOffset(V3d.Zero, V2i.Zero) + sam2DArray.GatherOffset(V3d.Zero, V2i.Zero, 1)
+            let b = sam2DArray.GatherOffset(V2d.Zero, 5, V2i.Zero) + sam2DArray.GatherOffset(V2d.Zero, 5, V2i.Zero, 1)
             let c = sam2DShadow.GatherOffset(V2d.Zero, 0.5, V2i.Zero)
-            let d = sam2DArrayShadow.GatherOffset(V3d.Zero, 0.5, V2i.Zero)
+            let d = sam2DArrayShadow.GatherOffset(V2d.Zero, 5, 0.5, V2i.Zero)
 
             return a + b + c + d
         }

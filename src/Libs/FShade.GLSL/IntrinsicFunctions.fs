@@ -2036,9 +2036,9 @@ module IntrinsicFunctions =
 
                     sampleArgs + rest
 
-                let sampleArgs() =
+                let sampleArgs (separateCmpArg : bool) =
                     let consumedArgs, sampleArgs =
-                        match isArray, isShadow with
+                        match isArray, isShadow && not separateCmpArg with
                         | true, true ->
                             if coordComponents = 3 then
                                 4, "{0}, vec4({1}, {2}), {3}" // Cube array shadow sampler has separate cmp argument
@@ -2106,13 +2106,13 @@ module IntrinsicFunctions =
                         else Some "textureSize({0}, {1})"
 
 
-                    | "Sample" -> sprintf "texture(%s)" (sampleArgs()) |> Some
-                    | "SampleOffset" -> sprintf "textureOffset(%s)" (sampleArgs()) |> Some
+                    | "Sample" -> sprintf "texture(%s)" (sampleArgs false) |> Some
+                    | "SampleOffset" -> sprintf "textureOffset(%s)" (sampleArgs false) |> Some
                     | "SampleProj" -> sprintf "textureProj(%s)" (projArgs()) |> Some
-                    | "SampleLevel" -> sprintf "textureLod(%s)" (sampleArgs()) |> Some
-                    | "SampleGrad" -> sprintf "textureGrad(%s)" (sampleArgs()) |> Some
-                    | "Gather" -> sprintf "textureGather(%s)" (plainArgs 0) |> Some
-                    | "GatherOffset" -> sprintf "textureGatherOffset(%s)" (plainArgs 0) |> Some
+                    | "SampleLevel" -> sprintf "textureLod(%s)" (sampleArgs false) |> Some
+                    | "SampleGrad" -> sprintf "textureGrad(%s)" (sampleArgs false) |> Some
+                    | "Gather" -> sprintf "textureGather(%s)" (sampleArgs true) |> Some
+                    | "GatherOffset" -> sprintf "textureGatherOffset(%s)" (sampleArgs true) |> Some
 
                     | "Read" -> sprintf "texelFetch(%s)" (fetchArgs()) |> Some
                     | "get_Item" -> sprintf "texelFetch(%s)" (fetchArgs()) |> Some

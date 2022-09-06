@@ -165,7 +165,6 @@ let run() =
 
         let coordType = floatVec coordComponents
         let projCoordType = floatVec (coordComponents + 1)
-        let arrayCoordType = if a then projCoordType else coordType
         let texelCoordType = intVec coordComponents
         let readCoordType = intVec coordComponents //(if a then coordComponents + 1 else coordComponents)
 
@@ -212,10 +211,13 @@ let run() =
 
         let additionalArgs =
             match a, s with
-                | true, true -> ["slice", "int"; "cmp", returnType]
-                | true, false -> ["slice", "int"]
-                | false, true -> ["cmp", returnType]
-                | false, false -> []
+            | true, true -> ["slice", "int"; "cmp", returnType]
+            | true, false -> ["slice", "int"]
+            | false, true -> ["cmp", returnType]
+            | false, false -> []
+
+        let additionalDefaultArgs =
+            additionalArgs |> List.map (fun (n, t) -> n, t, None)
 
         if not m then
             samplerFunction 
@@ -274,9 +276,9 @@ let run() =
 
             let arguments =
                 if s then
-                    (["coord", arrayCoordType, None] @ ["refZ", "float", None])
+                    ["coord", coordType, None] @ additionalDefaultArgs
                 else
-                    (["coord", arrayCoordType, None] @ ["comp", "int", Some "0"])
+                    ["coord", coordType, None] @ additionalDefaultArgs  @ ["comp", "int", Some "0"]
 
             samplerFunctionDefaultArgs
                 "gathers one component for the neighbouring 4 texels"
@@ -290,9 +292,9 @@ let run() =
 
             let arguments =
                 if s then
-                    ["coord", arrayCoordType, None] @ ["refZ", "float", None] @ ["offset", texelCoordType, None]
+                    ["coord", coordType, None] @ additionalDefaultArgs @ ["offset", texelCoordType, None]
                 else
-                    ["coord", arrayCoordType, None] @ ["offset", texelCoordType, None] @ ["comp", "int", Some "0"]
+                    ["coord", coordType, None] @ additionalDefaultArgs @ ["offset", texelCoordType, None; "comp", "int", Some "0"]
 
             samplerFunctionDefaultArgs
                 "gathers one component for the neighbouring 4 texels"
