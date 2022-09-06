@@ -260,6 +260,7 @@ let run() =
                 (["coord", coordType] @ additionalArgs @ ["dTdx", coordType; "dTdy", coordType])
                 returnType
 
+        // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureQueryLod.xhtml
         if not m then
             samplerFunction
                 "query lod levels"
@@ -267,7 +268,6 @@ let run() =
                 "QueryLod"
                 ["coord", coordType]
                 "V2d"
-
 
         // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureGather.xhtml
         if (d = SamplerDimension.Sampler2d || d = SamplerDimension.SamplerCube) && not m then

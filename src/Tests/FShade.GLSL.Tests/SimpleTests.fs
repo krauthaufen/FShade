@@ -1469,6 +1469,50 @@ let ``Texture Size``() =
     GLSL.shouldCompile [Effect.ofFunction fs]
 
 
+[<Test>]
+let ``Texture Query LoD``() =
+    Setup.Run()
+
+    let sam1D        = sampler1d { texture uniform?DiffuseTexture }
+    let sam1DArray   = sampler1dArray { texture uniform?DiffuseTexture }
+    let sam2D        = sampler2d { texture uniform?DiffuseTexture }
+    let sam2DArray   = sampler2dArray { texture uniform?DiffuseTexture }
+    let sam3D        = sampler3d { texture uniform?DiffuseTexture }
+    let samCube      = samplerCube { texture uniform?DiffuseTexture }
+    let samCubeArray = samplerCubeArray { texture uniform?DiffuseTexture }
+
+    let sam1DShadow        = sampler1dShadow { texture uniform?DiffuseTexture }
+    let sam1DArrayShadow   = sampler1dArrayShadow { texture uniform?DiffuseTexture }
+    let sam2DShadow        = sampler2dShadow { texture uniform?DiffuseTexture }
+    let sam2DArrayShadow   = sampler2dArrayShadow { texture uniform?DiffuseTexture }
+    let samCubeShadow      = samplerCubeShadow { texture uniform?DiffuseTexture }
+    let samCubeArrayShadow = samplerCubeArrayShadow { texture uniform?DiffuseTexture }
+
+    let fs (v : Vertex) =
+        fragment {
+            let a = sam1D.QueryLod 0.0
+            let b = sam1DArray.QueryLod 0.0
+            let c = sam2D.QueryLod V2d.Zero
+            let d = sam2DArray.QueryLod V2d.Zero
+            let e = sam3D.QueryLod <| V3d.Zero
+            let f = samCube.QueryLod V3d.Zero
+            let g = samCubeArray.QueryLod V3d.Zero
+
+            let h = sam1DShadow.QueryLod 0.0
+            let i = sam1DArrayShadow.QueryLod 0.0
+            let j = sam2DShadow.QueryLod V2d.Zero
+            let k = sam2DArrayShadow.QueryLod V2d.Zero
+            let l = samCubeShadow.QueryLod V3d.Zero
+            let m = samCubeArrayShadow.QueryLod V3d.Zero
+
+            return V4d(
+                a + b + c + d + f + g +
+                h + i + j + k + l + m, 1.0, 1.0
+            )
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs]
+
 [<AutoOpen>]
 module ImageUniforms =
 
