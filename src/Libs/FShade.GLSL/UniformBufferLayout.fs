@@ -89,7 +89,6 @@ module GLSLType =
 
                 (false, false, false, true, SamplerDimension.Sampler1d), typeof<Sampler1dShadow>
                 (false, false, false, true, SamplerDimension.Sampler2d), typeof<Sampler2dShadow>
-                (false, false, false, true, SamplerDimension.Sampler3d), typeof<Sampler3dShadow>
                 (false, false, false, true, SamplerDimension.SamplerCube), typeof<SamplerCubeShadow>
 
                 (false, false, true, false, SamplerDimension.Sampler2d), typeof<Sampler2dMS>

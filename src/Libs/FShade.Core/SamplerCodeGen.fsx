@@ -41,7 +41,7 @@ let allCombinations =
                 for a in arr do
                     let ms = if d = SamplerDimension.Sampler2d then ms else [false]
                     for m in ms do
-                        let shadow = if t = SamplerType.Int || m then [false] else shadow
+                        let shadow = if d = SamplerDimension.Sampler3d || t = SamplerType.Int || m then [false] else shadow
                         for s in shadow do
                             yield (t,d,a,m,s)
     ]

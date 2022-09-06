@@ -473,58 +473,6 @@ type Sampler2d(tex : ISemanticValue, state : SamplerState) =
     member x.Item
         with get(coord : V2i, level : int) : V4d = onlyInShaderCode "Fetch"
 
-type Sampler3dShadow(tex : ISemanticValue, state : SamplerState) =
-    interface ISampler with
-        member x.Texture = tex
-        member x.State = state
-
-    static member Dimension = SamplerDimension.Sampler3d
-    static member ValueType = typeof<float>
-    static member CoordType = typeof<V3d>
-    static member IsArray = false
-    static member IsShadow = true
-    static member IsMultisampled = false
-    
-    /// the mipmap-levels for the sampler
-    member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
-    
-    /// the level size for the sampler
-    member x.GetSize (level : int) : V3i = onlyInShaderCode "GetSize"
-    
-    /// the size for the sampler
-    member x.Size : V3i = onlyInShaderCode "Size"
-    
-    /// regular sampled texture-lookup
-    member x.Sample(coord : V3d, cmp : float) : float = onlyInShaderCode "Sample"
-    
-    /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V3d, cmp : float, lodBias : float) : float = onlyInShaderCode "Sample"
-    
-    /// regular sampled texture-lookup with offset
-    member x.SampleOffset(coord : V3d, cmp : float, offset : V3i) : float = onlyInShaderCode "SampleOffset"
-    
-    /// regular sampled texture-lookup with offset with lod-bias
-    member x.SampleOffset(coord : V3d, cmp : float, offset : V3i, lodBias : float) : float = onlyInShaderCode "SampleOffset"
-    
-    /// projective sampled texture-lookup
-    member x.SampleProj(coord : V4d, cmp : float) : float = onlyInShaderCode "SampleProj"
-    
-    /// projective sampled texture-lookup with lod-bias
-    member x.SampleProj(coord : V4d, cmp : float, lodBias : float) : float = onlyInShaderCode "SampleProj"
-    
-    /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, cmp : float, level : float) : float = onlyInShaderCode "SampleLevel"
-    
-    /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : V3d, cmp : float, dTdx : V3d, dTdy : V3d) : float = onlyInShaderCode "SampleGrad"
-    
-    /// query lod levels
-    member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
-    
-    /// non-sampled texture read
-    member x.Read(coord : V3i, lod : int) : float = onlyInShaderCode "Read"
-    
-
 type Sampler3d(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
         member x.Texture = tex
@@ -1211,15 +1159,6 @@ module SamplerBuilders =
             Array.init count (fun i -> Sampler2d(t.WithIndex(i), s))
 
     let sampler2d = Sampler2dBuilder()
-    
-    type Sampler3dShadowBuilder() = 
-        inherit SamplerBaseBuilder()
-        member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
-            Sampler3dShadow(t, s)
-        member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
-            Array.init count (fun i -> Sampler3dShadow(t.WithIndex(i), s))
-
-    let sampler3dShadow = Sampler3dShadowBuilder()
     
     type Sampler3dBuilder() = 
         inherit SamplerBaseBuilder()
