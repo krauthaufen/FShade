@@ -45,9 +45,6 @@ type Sampler1dArrayShadow(tex : ISemanticValue, state : SamplerState) =
     /// query lod levels
     member x.QueryLod(coord : float) : V2d = onlyInShaderCode "QueryLod"
     
-    /// non-sampled texture read
-    member x.Read(coord : int, slice : int, lod : int) : float = onlyInShaderCode "Read"
-    
 
 type Sampler1dArray(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -92,7 +89,11 @@ type Sampler1dArray(tex : ISemanticValue, state : SamplerState) =
     member x.QueryLod(coord : float) : V2d = onlyInShaderCode "QueryLod"
     
     /// non-sampled texture read
-    member x.Read(coord : int, slice : int, lod : int) : V4d = onlyInShaderCode "Read"
+    member x.Read(coord : int, slice : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4d = onlyInShaderCode "Read"
+    
+    /// non-sampled texture read
+    member x.Item
+        with get (coord : int, slice : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4d = onlyInShaderCode "Fetch"
     
 
 type Sampler1dShadow(tex : ISemanticValue, state : SamplerState) =
@@ -142,9 +143,6 @@ type Sampler1dShadow(tex : ISemanticValue, state : SamplerState) =
     
     /// query lod levels
     member x.QueryLod(coord : float) : V2d = onlyInShaderCode "QueryLod"
-    
-    /// non-sampled texture read
-    member x.Read(coord : int, lod : int) : float = onlyInShaderCode "Read"
     
 
 type Sampler1d(tex : ISemanticValue, state : SamplerState) =
@@ -196,13 +194,12 @@ type Sampler1d(tex : ISemanticValue, state : SamplerState) =
     member x.QueryLod(coord : float) : V2d = onlyInShaderCode "QueryLod"
     
     /// non-sampled texture read
-    member x.Read(coord : int, lod : int) : V4d = onlyInShaderCode "Read"
+    member x.Read(coord : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4d = onlyInShaderCode "Read"
     
+    /// non-sampled texture read
     member x.Item
-        with get (coord : int) : V4d = onlyInShaderCode "Fetch"
+        with get (coord : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4d = onlyInShaderCode "Fetch"
     
-    member x.Item
-        with get(coord : int, level : int) : V4d = onlyInShaderCode "Fetch"
 
 type Sampler2dArrayMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -223,7 +220,11 @@ type Sampler2dArrayMS(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V3i = onlyInShaderCode "Size"
     
     /// non-sampled texture read
-    member x.Read(coord : V2i, slice : int, sample : int) : V4d = onlyInShaderCode "Read"
+    member x.Read(coord : V2i, slice : int, [<Optional; DefaultParameterValue(0)>] sample : int) : V4d = onlyInShaderCode "Read"
+    
+    /// non-sampled texture read
+    member x.Item
+        with get (coord : V2i, slice : int, [<Optional; DefaultParameterValue(0)>] sample : int) : V4d = onlyInShaderCode "Fetch"
     
 
 type Sampler2dArrayShadow(tex : ISemanticValue, state : SamplerState) =
@@ -273,9 +274,6 @@ type Sampler2dArrayShadow(tex : ISemanticValue, state : SamplerState) =
     
     /// gathers one component for the neighbouring 4 texels
     member x.GatherOffset(coord : V2d, slice : int, cmp : float, offset : V2i) : V4d = onlyInShaderCode "GatherOffset"
-    
-    /// non-sampled texture read
-    member x.Read(coord : V2i, slice : int, lod : int) : float = onlyInShaderCode "Read"
     
 
 type Sampler2dArray(tex : ISemanticValue, state : SamplerState) =
@@ -327,7 +325,11 @@ type Sampler2dArray(tex : ISemanticValue, state : SamplerState) =
     member x.GatherOffset(coord : V2d, slice : int, offset : V2i, [<Optional; DefaultParameterValue(0)>] comp : int) : V4d = onlyInShaderCode "GatherOffset"
     
     /// non-sampled texture read
-    member x.Read(coord : V2i, slice : int, lod : int) : V4d = onlyInShaderCode "Read"
+    member x.Read(coord : V2i, slice : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4d = onlyInShaderCode "Read"
+    
+    /// non-sampled texture read
+    member x.Item
+        with get (coord : V2i, slice : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4d = onlyInShaderCode "Fetch"
     
 
 type Sampler2dMS(tex : ISemanticValue, state : SamplerState) =
@@ -349,7 +351,11 @@ type Sampler2dMS(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V2i = onlyInShaderCode "Size"
     
     /// non-sampled texture read
-    member x.Read(coord : V2i, sample : int) : V4d = onlyInShaderCode "Read"
+    member x.Read(coord : V2i, [<Optional; DefaultParameterValue(0)>] sample : int) : V4d = onlyInShaderCode "Read"
+    
+    /// non-sampled texture read
+    member x.Item
+        with get (coord : V2i, [<Optional; DefaultParameterValue(0)>] sample : int) : V4d = onlyInShaderCode "Fetch"
     
 
 type Sampler2dShadow(tex : ISemanticValue, state : SamplerState) =
@@ -405,9 +411,6 @@ type Sampler2dShadow(tex : ISemanticValue, state : SamplerState) =
     
     /// gathers one component for the neighbouring 4 texels
     member x.GatherOffset(coord : V2d, cmp : float, offset : V2i) : V4d = onlyInShaderCode "GatherOffset"
-    
-    /// non-sampled texture read
-    member x.Read(coord : V2i, lod : int) : float = onlyInShaderCode "Read"
     
 
 type Sampler2d(tex : ISemanticValue, state : SamplerState) =
@@ -465,13 +468,12 @@ type Sampler2d(tex : ISemanticValue, state : SamplerState) =
     member x.GatherOffset(coord : V2d, offset : V2i, [<Optional; DefaultParameterValue(0)>] comp : int) : V4d = onlyInShaderCode "GatherOffset"
     
     /// non-sampled texture read
-    member x.Read(coord : V2i, lod : int) : V4d = onlyInShaderCode "Read"
+    member x.Read(coord : V2i, [<Optional; DefaultParameterValue(0)>] lod : int) : V4d = onlyInShaderCode "Read"
     
+    /// non-sampled texture read
     member x.Item
-        with get (coord : V2i) : V4d = onlyInShaderCode "Fetch"
+        with get (coord : V2i, [<Optional; DefaultParameterValue(0)>] lod : int) : V4d = onlyInShaderCode "Fetch"
     
-    member x.Item
-        with get(coord : V2i, level : int) : V4d = onlyInShaderCode "Fetch"
 
 type Sampler3d(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -522,13 +524,12 @@ type Sampler3d(tex : ISemanticValue, state : SamplerState) =
     member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
     
     /// non-sampled texture read
-    member x.Read(coord : V3i, lod : int) : V4d = onlyInShaderCode "Read"
+    member x.Read(coord : V3i, [<Optional; DefaultParameterValue(0)>] lod : int) : V4d = onlyInShaderCode "Read"
     
+    /// non-sampled texture read
     member x.Item
-        with get (coord : V3i) : V4d = onlyInShaderCode "Fetch"
+        with get (coord : V3i, [<Optional; DefaultParameterValue(0)>] lod : int) : V4d = onlyInShaderCode "Fetch"
     
-    member x.Item
-        with get(coord : V3i, level : int) : V4d = onlyInShaderCode "Fetch"
 
 type SamplerCubeArrayShadow(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -730,7 +731,11 @@ type IntSampler1dArray(tex : ISemanticValue, state : SamplerState) =
     member x.QueryLod(coord : float) : V2d = onlyInShaderCode "QueryLod"
     
     /// non-sampled texture read
-    member x.Read(coord : int, slice : int, lod : int) : V4i = onlyInShaderCode "Read"
+    member x.Read(coord : int, slice : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4i = onlyInShaderCode "Read"
+    
+    /// non-sampled texture read
+    member x.Item
+        with get (coord : int, slice : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4i = onlyInShaderCode "Fetch"
     
 
 type IntSampler1d(tex : ISemanticValue, state : SamplerState) =
@@ -782,13 +787,12 @@ type IntSampler1d(tex : ISemanticValue, state : SamplerState) =
     member x.QueryLod(coord : float) : V2d = onlyInShaderCode "QueryLod"
     
     /// non-sampled texture read
-    member x.Read(coord : int, lod : int) : V4i = onlyInShaderCode "Read"
+    member x.Read(coord : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4i = onlyInShaderCode "Read"
     
+    /// non-sampled texture read
     member x.Item
-        with get (coord : int) : V4i = onlyInShaderCode "Fetch"
+        with get (coord : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4i = onlyInShaderCode "Fetch"
     
-    member x.Item
-        with get(coord : int, level : int) : V4i = onlyInShaderCode "Fetch"
 
 type IntSampler2dArrayMS(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -809,7 +813,11 @@ type IntSampler2dArrayMS(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V3i = onlyInShaderCode "Size"
     
     /// non-sampled texture read
-    member x.Read(coord : V2i, slice : int, sample : int) : V4i = onlyInShaderCode "Read"
+    member x.Read(coord : V2i, slice : int, [<Optional; DefaultParameterValue(0)>] sample : int) : V4i = onlyInShaderCode "Read"
+    
+    /// non-sampled texture read
+    member x.Item
+        with get (coord : V2i, slice : int, [<Optional; DefaultParameterValue(0)>] sample : int) : V4i = onlyInShaderCode "Fetch"
     
 
 type IntSampler2dArray(tex : ISemanticValue, state : SamplerState) =
@@ -861,7 +869,11 @@ type IntSampler2dArray(tex : ISemanticValue, state : SamplerState) =
     member x.GatherOffset(coord : V2d, slice : int, offset : V2i, [<Optional; DefaultParameterValue(0)>] comp : int) : V4i = onlyInShaderCode "GatherOffset"
     
     /// non-sampled texture read
-    member x.Read(coord : V2i, slice : int, lod : int) : V4i = onlyInShaderCode "Read"
+    member x.Read(coord : V2i, slice : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4i = onlyInShaderCode "Read"
+    
+    /// non-sampled texture read
+    member x.Item
+        with get (coord : V2i, slice : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4i = onlyInShaderCode "Fetch"
     
 
 type IntSampler2dMS(tex : ISemanticValue, state : SamplerState) =
@@ -883,7 +895,11 @@ type IntSampler2dMS(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V2i = onlyInShaderCode "Size"
     
     /// non-sampled texture read
-    member x.Read(coord : V2i, sample : int) : V4i = onlyInShaderCode "Read"
+    member x.Read(coord : V2i, [<Optional; DefaultParameterValue(0)>] sample : int) : V4i = onlyInShaderCode "Read"
+    
+    /// non-sampled texture read
+    member x.Item
+        with get (coord : V2i, [<Optional; DefaultParameterValue(0)>] sample : int) : V4i = onlyInShaderCode "Fetch"
     
 
 type IntSampler2d(tex : ISemanticValue, state : SamplerState) =
@@ -941,13 +957,12 @@ type IntSampler2d(tex : ISemanticValue, state : SamplerState) =
     member x.GatherOffset(coord : V2d, offset : V2i, [<Optional; DefaultParameterValue(0)>] comp : int) : V4i = onlyInShaderCode "GatherOffset"
     
     /// non-sampled texture read
-    member x.Read(coord : V2i, lod : int) : V4i = onlyInShaderCode "Read"
+    member x.Read(coord : V2i, [<Optional; DefaultParameterValue(0)>] lod : int) : V4i = onlyInShaderCode "Read"
     
+    /// non-sampled texture read
     member x.Item
-        with get (coord : V2i) : V4i = onlyInShaderCode "Fetch"
+        with get (coord : V2i, [<Optional; DefaultParameterValue(0)>] lod : int) : V4i = onlyInShaderCode "Fetch"
     
-    member x.Item
-        with get(coord : V2i, level : int) : V4i = onlyInShaderCode "Fetch"
 
 type IntSampler3d(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -998,13 +1013,12 @@ type IntSampler3d(tex : ISemanticValue, state : SamplerState) =
     member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
     
     /// non-sampled texture read
-    member x.Read(coord : V3i, lod : int) : V4i = onlyInShaderCode "Read"
+    member x.Read(coord : V3i, [<Optional; DefaultParameterValue(0)>] lod : int) : V4i = onlyInShaderCode "Read"
     
+    /// non-sampled texture read
     member x.Item
-        with get (coord : V3i) : V4i = onlyInShaderCode "Fetch"
+        with get (coord : V3i, [<Optional; DefaultParameterValue(0)>] lod : int) : V4i = onlyInShaderCode "Fetch"
     
-    member x.Item
-        with get(coord : V3i, level : int) : V4i = onlyInShaderCode "Fetch"
 
 type IntSamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with

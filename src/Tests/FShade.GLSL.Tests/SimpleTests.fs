@@ -1555,6 +1555,34 @@ let ``Texture Grad``() =
 
     GLSL.shouldCompile [Effect.ofFunction fs]
 
+[<Test>]
+let ``Texel Fetch``() =
+    Setup.Run()
+
+    let sam1D        = sampler1d { texture uniform?DiffuseTexture }
+    let sam1DArray   = sampler1dArray { texture uniform?DiffuseTexture }
+    let sam2D        = sampler2d { texture uniform?DiffuseTexture }
+    let sam2DArray   = sampler2dArray { texture uniform?DiffuseTexture }
+    let sam2DMS      = sampler2dMS { texture uniform?DiffuseTexture }
+    let sam2DArrayMS = sampler2dArrayMS { texture uniform?DiffuseTexture }
+    let sam3D        = sampler3d { texture uniform?DiffuseTexture }
+
+    let fs (v : Vertex) =
+        fragment {
+            let a = sam1D.Read(0, 7)
+            let b = sam1DArray.Read(0, 1, 7) + sam1DArray.[0, 1, 7]
+            let c = sam2D.Read(V2i.Zero, 7)
+            let d = sam2DArray.Read(V2i.Zero, 1, 7) + sam2DArray.[V2i.Zero, 1]
+            let e = sam2DMS.Read(V2i.Zero, 7)
+            let f = sam2DArrayMS.Read(V2i.Zero, 1, 7)
+            let g = sam3D.Read(V3i.Zero, 7)
+
+            return a + b + c + d + e + f + g
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs]
+
+
 [<AutoOpen>]
 module ImageUniforms =
 

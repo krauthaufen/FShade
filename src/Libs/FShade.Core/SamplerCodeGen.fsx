@@ -88,6 +88,19 @@ let samplerFunctionDefaultArgs (comment : string) (variants : SampleVariants) (n
         line "member x.%s(%s, lodBias : float) : %s = onlyInShaderCode \"%s\"" name args ret name
         line ""
 
+let memberDefaultArgs (comment : string) (name : string) (args : list<string * string * Option<string>>) (ret : string) =
+    let args =
+        args |> List.map (fun (n,t,o) ->
+            match o with
+            | Some def -> sprintf "[<Optional; DefaultParameterValue(%s)>] %s : %s" def n t
+            | _ -> sprintf "%s : %s" n t
+        ) |> String.concat ", "
+
+    line "/// %s" comment
+    line "member x.Item"
+    line "    with get (%s) : %s = onlyInShaderCode \"%s\"" args ret name
+    line ""
+
 let samplerFunction (comment : string) (variants : SampleVariants) (name : string) (args : list<string * string>) (ret : string) =
     let args = args |> List.map (fun (n, t) -> n, t, None)
     samplerFunctionDefaultArgs comment variants name args ret
@@ -155,18 +168,9 @@ let run() =
                 | SamplerDimension.SamplerCube -> 3
                 | _ -> failwith "unsupported sampler-kind"
 
-//        let coordComponents =
-//            if a then coordComponents + 1
-//            else coordComponents
-//
-//        let coordComponents =
-//            if s then coordComponents + 1
-//            else coordComponents
-
         let coordType = floatVec coordComponents
         let projCoordType = floatVec (coordComponents + 1)
         let texelCoordType = intVec coordComponents
-        let readCoordType = intVec coordComponents //(if a then coordComponents + 1 else coordComponents)
 
         let sizeType =
             let dim =
@@ -303,47 +307,29 @@ let run() =
                 arguments
                 gatherReturnType
 
-        if d <> SamplerDimension.SamplerCube then
-            if m then
-                let args = 
-                    if a then ["coord", readCoordType; "slice", "int"; "sample", "int"]
-                    else ["coord", readCoordType; "sample", "int"]
+        // https://registry.khronos.org/OpenGL-Refpages/gl4/html/texelFetch.xhtml
+        if d <> SamplerDimension.SamplerCube && not s then
 
-                samplerFunction 
-                    "non-sampled texture read"
-                    SampleVariants.None
-                    "Read"
-                    args
-                    returnType
-            else
-                let args = 
-                    if a then ["coord", readCoordType; "slice", "int"; "lod", "int"]
-                    else ["coord", readCoordType; "lod", "int"]
+            let arguments =
+                if m then
+                    ["coord", texelCoordType, None] @ additionalDefaultArgs @ ["sample", "int", Some "0"]
+                else
+                    ["coord", texelCoordType, None] @ additionalDefaultArgs @ ["lod", "int", Some "0"]
 
-                samplerFunction 
-                    "non-sampled texture read"
-                    SampleVariants.None
-                    "Read"
-                    args
-                    returnType
+            samplerFunctionDefaultArgs
+                "non-sampled texture read"
+                SampleVariants.None
+                "Read"
+                arguments
+                returnType
 
+            memberDefaultArgs
+                "non-sampled texture read"
+                "Fetch"
+                arguments
+                returnType
 
-            if not s && not a && not m then
-                line "member x.Item"
-                line "    with get (coord : %s) : %s = onlyInShaderCode \"Fetch\"" texelCoordType returnType 
-                line ""
-                line "member x.Item"
-                line "    with get(coord : %s, level : int) : %s = onlyInShaderCode \"Fetch\"" texelCoordType returnType 
-                
-//                if coordComponents > 1 then
-//                    let argNames = ["cx"; "cy"; "cz"; "cw"]
-//                    let args = argNames |> List.take coordComponents |> List.map (sprintf "%s : int") |> String.concat ", "
-//                    line  "member x.Item"
-//                    line  "    with get (%s) : %s = onlyInShaderCode \"Fetch\"" args returnType 
-//                    line  ""
-        
         stop()
-        //line ""
 
 
     line  "[<AutoOpen>]"
@@ -495,3 +481,4 @@ let run() =
     ()
 
 run()
+exit 0
