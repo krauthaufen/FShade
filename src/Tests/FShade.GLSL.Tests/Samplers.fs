@@ -358,8 +358,8 @@ let ``Texture Proj``() =
             let b = sam2D.SampleProj(V3d.Zero, 1.0)
             let c = sam3D.SampleProj(V4d.Zero, 1.0)
 
-            let d = V4d(sam1DShadow.SampleProj(V4d.Zero, 1.0), 0.0, 0.0, 0.0)
-            let e = V4d(sam2DShadow.SampleProj(V4d.Zero, 1.0), 0.0, 0.0, 0.0)
+            let d = V4d(sam1DShadow.SampleProj(V2d(0.1, 1.0), 0.6, 1.0), 0.0, 0.0, 0.0)
+            let e = V4d(sam2DShadow.SampleProj(V3d(0.1, 0.2, 1.0), 0.4), 0.0, 0.0, 0.0)
 
             return a + b + c + d + e
         }

@@ -240,7 +240,7 @@ let run() =
 
         // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureOffset.xhtml
         if d <> SamplerDimension.SamplerCube && not m then
-            samplerFunction 
+            samplerFunction
                 "regular sampled texture-lookup with offset"
                 SampleVariants.Bias
                 "SampleOffset"
@@ -249,21 +249,11 @@ let run() =
 
         // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureProj.xhtml
         if d <> SamplerDimension.SamplerCube && not m && not a then
-
-            let arguments =
-                if s then
-                    // shadow variants take vec4 (x, [y], cmp, w)
-                    // since cmp comes at 3rd position, building this vector is not possible at GLSL level (leads to duplicated code)
-                    // therefore, we only provide the native overload
-                    ["coord", "V4d"]
-                else
-                    ["coord", projCoordType] @ additionalArgs
-
-            samplerFunction 
+            samplerFunction
                 "projective sampled texture-lookup"
                 SampleVariants.Bias
                 "SampleProj"
-                arguments
+                (["coord", projCoordType] @ additionalArgs)
                 returnType
 
         // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureLod.xhtml

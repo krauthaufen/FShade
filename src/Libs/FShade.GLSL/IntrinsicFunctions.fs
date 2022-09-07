@@ -2065,6 +2065,26 @@ module IntrinsicFunctions =
                             | _ ->
                                 args |> List.mapi (fun i _ -> sprintf "{%d}" (i + consumedArgs)) |> String.concat ", " |> sprintf ", %s"
 
+                    sampleArgs + rest
+
+
+                let projArgs() =
+                    let consumedArgs, sampleArgs =
+                        if isShadow then
+                            if coordComponents = 1 then
+                                3, "{0}, vec4({1}, {2}, 0).xwzy"
+                            else
+                                3, "{0}, vec4({1}, {2}).xywz"
+                        else
+                            2, "{0}, {1}"
+
+                    let args = List.skip consumedArgs args
+
+                    let rest =
+                        match args with
+                            | [] -> ""
+                            | _ ->
+                                args |> List.mapi (fun i _ -> sprintf "{%d}" (i + consumedArgs)) |> String.concat ", " |> sprintf ", %s"
 
                     sampleArgs + rest
 
@@ -2090,7 +2110,7 @@ module IntrinsicFunctions =
 
                 | "Sample" -> sprintf "texture(%s)" (sampleArgs false) |> Some
                 | "SampleOffset" -> sprintf "textureOffset(%s)" (sampleArgs false) |> Some
-                | "SampleProj" -> sprintf "textureProj(%s)" (plainArgs 0) |> Some
+                | "SampleProj" -> sprintf "textureProj(%s)" (projArgs()) |> Some
                 | "SampleLevel" -> sprintf "textureLod(%s)" (sampleArgs false) |> Some
                 | "SampleLevelOffset" -> sprintf "textureLodOffset(%s)" (sampleArgs false) |> Some
                 | "SampleGrad" -> sprintf "textureGrad(%s)" (sampleArgs false) |> Some
