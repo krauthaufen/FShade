@@ -1832,22 +1832,6 @@ module IntrinsicFunctions =
             // MATRIX
             // ==========================================================================
 
-            CIntrinsic.simple "transpose", [
-                exactly <@ Mat.Transposed : M22f -> _ @>
-                exactly <@ Mat.Transposed : M33f -> _ @>
-                exactly <@ Mat.Transposed : M44f -> _ @>
-                exactly <@ Mat.Transposed : M22d -> _ @>
-                exactly <@ Mat.Transposed : M33d -> _ @>
-                exactly <@ Mat.Transposed : M44d -> _ @>
-                exactly <@ fun (v : M22f) -> v.Transposed @>
-                exactly <@ fun (v : M33f) -> v.Transposed @>
-                exactly <@ fun (v : M44f) -> v.Transposed @>
-                exactly <@ fun (v : M22d) -> v.Transposed @>
-                exactly <@ fun (v : M33d) -> v.Transposed @>
-                exactly <@ fun (v : M44d) -> v.Transposed @>
-                generic <@ Mat.transpose : M22d -> M22d @>
-            ]
-
             CIntrinsic.simple "determinant", [
                 exactly <@ Mat.Determinant : M22f -> _ @>
                 exactly <@ Mat.Determinant : M33f -> _ @>

@@ -113,7 +113,7 @@ module CType =
                         match t with
                             | Enum              -> CInt(true, 32)
                             | VectorOf(d, t)    -> CVector(ofTypeInternal seen b t, d)
-                            | MatrixOf(s, t)    -> CMatrix(ofTypeInternal seen b t, s.Y, s.X)
+                            | MatrixOf'(s, t)   -> CMatrix(ofTypeInternal seen b t, s.Y, s.X)
                             | ArrOf(len, t)     -> CArray(ofTypeInternal seen b t, len)
                             | Ref t             -> ofTypeInternal seen b t
                             | t when t.IsArray  -> CType.CPointer(CPointerModifier.None, ofTypeInternal seen b (t.GetElementType()))

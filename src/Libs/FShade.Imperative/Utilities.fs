@@ -206,6 +206,18 @@ module ReflectionPatterns =
             | Enum -> Some ()
             | _ -> None
 
+    // Workaround for missing 2x3 matrices
+    // TODO: Remove when updated to Aardvark.Base >= 5.2.13
+    let (|MatrixOf'|_|) (t : Type) =
+        match t with
+        | TypeInfo.Patterns.MatrixOf(dim, t) -> Some (dim, t)
+        | _ ->
+            if t = typeof<M23d> then Some(V2i(3, 2), typeof<float>)
+            elif t = typeof<M23f> then Some(V2i(3, 2), typeof<float32>)
+            elif t = typeof<M23i> then Some(V2i(3, 2), typeof<int32>)
+            elif t = typeof<M23l> then Some(V2i(3, 2), typeof<int64>)
+            else None
+
 [<AutoOpen>]
 module ExprExtensions =
 

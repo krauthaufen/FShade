@@ -358,9 +358,9 @@ module Preprocessor =
 
         let private (|StaticMethod|_|) (e : Expr) =
             match e with
-            | Call(None, mi, args) -> Some (mi.DeclaringType, mi.Name, args)
+            | Call(None, mi, args) when mi.IsStatic -> Some (mi.DeclaringType, mi.Name, args)
             | _ -> None
-            
+
         let (|ExecuteCallable|_|) (e : Expr) =
             match e with
             | StaticMethod(t, "Execute", args) when t = typeof<Callable> ->

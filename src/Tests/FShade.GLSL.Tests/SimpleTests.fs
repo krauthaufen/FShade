@@ -14,7 +14,7 @@ type Vertex =
         [<Interpolation(InterpolationMode.NoPerspective ||| InterpolationMode.Sample)>] hugo : V3d
         [<Interpolation(InterpolationMode.Flat ||| InterpolationMode.PerPatch)>] hugo2 : V3d
         foo : V4d
-        what : V3i
+        what : V4i
     }
 
 
@@ -229,6 +229,16 @@ let ``New Intrinsics``() =
 
     let shader (v : Vertex) =
         vertex {
+            let _ = m22d <| M33d(v.c.X)
+            let _ = m23d <| M33d(v.c.X)
+            let _ = m33d <| M33d(v.c.X)
+            let _ = m34d <| M33d(v.c.X)
+            let _ = m44d <| M33d(v.c.X)
+            let _ = m22f <| M33d(v.c.X)
+            let _ = m23f <| M33d(v.c.X)
+            let _ = m33f <| M33d(v.c.X)
+            let _ = m34f <| M33d(v.c.X)
+            let _ = m44f <| M33d(v.c.X)
             let _ = Fun.Lerp(float32 v.c.X, V2f.Zero, V2f.One)
             let _ = Fun.Lerp(v.c.X, V2d.Zero, V2d.One)
             let _ = Fun.Lerp(float32 v.c.X, V2f.Zero, V2f.One)
@@ -318,34 +328,74 @@ let ``New Intrinsics``() =
             let _ = v.c.X.DegreesFromRadians()
             let _ = Vec.length v.c
             let _ = Vec.Length v.c
+            let _ = Vec.Length v.c.XYZ
+            let _ = Vec.Length v.c.XY
+            let _ = Vec.Length v.what
+            let _ = Vec.Length v.what.XYZ
+            let _ = Vec.Length v.what.XY
             let _ = Vec.lengthSquared v.c
             let _ = Vec.LengthSquared v.c
+            let _ = Vec.LengthSquared v.c.XYZ
+            let _ = Vec.LengthSquared v.c.XY
+            let _ = Vec.LengthSquared v.what
+            let _ = Vec.LengthSquared v.what.XYZ
+            let _ = Vec.LengthSquared v.what.XY
             let _ = Vec.dot v.c v.c
             let _ = Vec.Dot(v.c, v.c)
+            let _ = Vec.Dot(v.c.XYZ, v.c.XYZ)
+            let _ = Vec.Dot(v.c.XY, v.c.XY)
+            let _ = Vec.Dot(v.what, v.what)
+            let _ = Vec.Dot(v.what.XYZ, v.what.XYZ)
+            let _ = Vec.Dot(v.what.XY, v.what.XY)
             let _ = Vec.cross v.c.XYZ v.c.XYZ
             let _ = Vec.Cross(v.c.XYZ, v.c.XYZ)
+            let _ = Vec.Cross(v.what.XYZ, v.what.XYZ)
             let _ = Mat.transpose <| M33d(v.c.X)
+            let _ = Mat.Transposed(M44d(v.c.X))
             let _ = Mat.Transposed(M33d(v.c.X))
+            let _ = Mat.Transposed(M22d(v.c.X))
             let _ = Mat.transformDir (M44d(v.c.X)) v.c.XYZ
             let _ = Mat.TransformDir(M44d(v.c.X), v.c.XYZ)
+            let _ = Mat.TransformDir(M33d(v.c.X), v.c.XY)
+            let _ = Mat.TransformDir(M34d(v.c.X), v.c.XYZ)
+            let _ = Mat.TransformDir(M23d(v.c.X), v.c.XY)
             let _ = Mat.transformPos (M44d(v.c.X)) v.c.XYZ
             let _ = Mat.TransformPos(M44d(v.c.X), v.c.XYZ)
+            let _ = Mat.TransformPos(M34d(v.c.X), v.c.XYZ)
+            let _ = Mat.TransformPos(M33d(v.c.X), v.c.XY)
+            let _ = Mat.TransformPos(M23d(v.c.X), v.c.XY)
             let _ = Mat.TransposedTransformDir(M44d(v.c.X), v.c.XYZ)
+            let _ = Mat.TransposedTransformDir(M33d(v.c.X), v.c.XY)
             let _ = Mat.TransposedTransformPos(M44d(v.c.X), v.c.XYZ)
+            let _ = Mat.TransposedTransformPos(M33d(v.c.X), v.c.XY)
             let _ = Mat.det <| M44d(v.c.X)
             let _ = Mat.Determinant(M44d(v.c.X))
+            let _ = Mat.Determinant(M33d(v.c.X))
+            let _ = Mat.Determinant(M22d(v.c.X))
             let _ = Vec.MinElement(v.c.XY)
             let _ = Vec.MinElement(v.c.XYZ)
             let _ = Vec.MinElement(v.c)
+            let _ = Vec.MinElement(v.what.XY)
+            let _ = Vec.MinElement(v.what.XYZ)
+            let _ = Vec.MinElement(v.what)
             let _ = v.c.XY.MinElement
             let _ = v.c.XYZ.MinElement
             let _ = v.c.MinElement
+            let _ = v.what.XY.MinElement
+            let _ = v.what.XYZ.MinElement
+            let _ = v.what.MinElement
             let _ = Vec.MaxElement(v.c.XY)
             let _ = Vec.MaxElement(v.c.XYZ)
             let _ = Vec.MaxElement(v.c)
+            let _ = Vec.MaxElement(v.what.XY)
+            let _ = Vec.MaxElement(v.what.XYZ)
+            let _ = Vec.MaxElement(v.what)
             let _ = v.c.XY.MaxElement
             let _ = v.c.XYZ.MaxElement
             let _ = v.c.MaxElement
+            let _ = v.what.XY.MaxElement
+            let _ = v.what.XYZ.MaxElement
+            let _ = v.what.MaxElement
             let normalized = Vec.Normalized (V4i(v.c))
             let added = normalized + (Vec.normalize V4d.Half)
 
