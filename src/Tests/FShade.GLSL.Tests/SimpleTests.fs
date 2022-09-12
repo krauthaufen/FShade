@@ -1362,7 +1362,19 @@ let ``Integer with implicit flat interpolation``() =
             return V3d v.what
         }
 
-    GLSL.shouldCompile[Effect.ofFunction fs]
+    GLSL.shouldCompile [Effect.ofFunction fs]
+
+[<Test>]
+let ``Integer with implicit flat interpolation 2``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            let _ = v.what
+            return v.c
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs]
 
 [<Test>]
 let ``Vector conversion``() =

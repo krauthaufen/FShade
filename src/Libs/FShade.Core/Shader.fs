@@ -535,21 +535,22 @@ module Preprocessor =
         let vertexType = State.get |> State.map (fun s -> s.vertexType)
         let builder = State.get |> State.map (fun s -> s.builder)
 
-        let readInput (name : string) (desc : ParameterDescription) = 
+        let readInput (name : string) (desc : ParameterDescription) =
+            let implicitInterp =
+                match desc.paramType with
+                | Integral -> InterpolationMode.Flat
+                | _ -> InterpolationMode.Default
+
             State.modify (fun s ->
                 match Map.tryFind name s.inputs with
                 | Some odesc ->
                     if odesc.paramType = desc.paramType then
-                        let implicitInterp =
-                            match desc.paramType with
-                            | Integral -> InterpolationMode.Flat
-                            | _ -> InterpolationMode.Default
-
                         let interp = odesc.paramInterpolation ||| desc.paramInterpolation ||| implicitInterp
                         { s with State.inputs = Map.add name { desc with paramInterpolation = interp } s.inputs }
                     else
                         failwithf "[FShade] conflicting input types for %s: %A vs %A" name odesc.paramType desc.paramType
                 | None ->
+                    let desc = { desc with paramInterpolation = desc.paramInterpolation ||| implicitInterp }
                     { s with State.inputs = Map.add name desc s.inputs }
             )
 
