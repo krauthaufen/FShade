@@ -539,8 +539,26 @@ module Compiler =
                         | CMatrix(et, r, c) ->
                             CConvertMatrix(ct, m) |> Some
                         | _ ->
-                            None 
+                            None
 
+                | MethodQuote <@ v2d : V4d -> _ @> _, args
+                | MethodQuote <@ v3d : V4d -> _ @> _, args
+                | MethodQuote <@ v4d : V4d -> _ @> _, args
+                | MethodQuote <@ v2f : V4d -> _ @> _, args
+                | MethodQuote <@ v3f : V4d -> _ @> _, args
+                | MethodQuote <@ v4f : V4d -> _ @> _, args
+                | MethodQuote <@ v2l : V4d -> _ @> _, args
+                | MethodQuote <@ v3l : V4d -> _ @> _, args
+                | MethodQuote <@ v4l : V4d -> _ @> _, args
+                | MethodQuote <@ v2i : V4d -> _ @> _, args
+                | MethodQuote <@ v3i : V4d -> _ @> _, args
+                | MethodQuote <@ v4i : V4d -> _ @> _, args
+                | Method("op_Explicit", [VectorOf _]), args ->
+                    match ct with
+                    | CVector(_, d) ->
+                        CNewVector(ct, d, args) |> Some
+                    | _ ->
+                        None
 
                 // vector swizzles
                 | (MethodQuote <@ Vec.xy : V4d -> V2d @> _ ), [v] -> CVecSwizzle(ct, v, CVecComponent.xy) |> Some

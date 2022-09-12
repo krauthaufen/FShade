@@ -1364,6 +1364,25 @@ let ``Integer with implicit flat interpolation``() =
 
     GLSL.shouldCompile[Effect.ofFunction fs]
 
+[<Test>]
+let ``Vector conversion``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            let _ = v2d v.what
+            let _ = v3d v.what
+            let _ = v4d v.what
+            let _ = V4d.op_Explicit v.what
+            let _ = v4d v.c
+            let _ = v2i v.c
+            let _ = v3i v.c
+            let _ = v4i v.c
+            return v.c
+        }
+
+    GLSL.shouldCompile[Effect.ofFunction fs]
+
 
 [<AutoOpen>]
 module ImageUniforms =
