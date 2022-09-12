@@ -432,16 +432,6 @@ module Preprocessor =
         let private zeroOneVecProperty =
             System.Text.RegularExpressions.Regex @"([XYZW]*[ONIP])+"
 
-        type Type with
-            member x.FloatType =
-                match x with
-                | FloatingPoint  -> x
-                | Num            -> typeof<float>
-                | VectorOf(2, _) -> typeof<V2d>
-                | VectorOf(3, _) -> typeof<V3d>
-                | VectorOf(4, _) -> typeof<V4d>
-                | _ -> failwithf "[FShade] Cannot get corresponding float type for %A" x
-
         let private (|VectorExpr|_|) (e : Expr) =
             match e.Type with
             | VectorOf(d, t) -> Some (e, d, t)
@@ -482,10 +472,10 @@ module Preprocessor =
         let (|InvLerp|_|) (e : Expr) =
             match e with
             | Call(_, MethodQuote <@ invLerp : float -> float -> float -> float @> _, [a; b; y]) ->
-                Some (a.Type.FloatType, [a; b; y])
+                Some [a; b; y]
 
             | Call(_, (Method("InvLerp", _) as mi), [y; a; b]) when mi.DeclaringType = typeof<Fun> ->
-                Some (a.Type.FloatType, [a; b; y])
+                Some [a; b; y]
 
             | _ ->
                 None
@@ -808,7 +798,31 @@ module Preprocessor =
                 typeof<V4d>
             |]
 
+        let private (|TensorOp|_|) (a : Expr, b : Expr) =
+            match a.Type, b.Type with
+            | (VectorOf(_, _) | MatrixOf(_, _)), _ -> Some a.Type
+            | _, (VectorOf(_, _) | MatrixOf(_, _)) -> Some b.Type
+            | _ -> None
+
         type Expr with
+            static member Subtract(a : Expr, b : Expr) =
+                match a, b with
+                | TensorOp t ->
+                    let mi = t.GetMethod("op_Subtraction", [| a.Type; b.Type |])
+                    Expr.Call(mi, [a; b])
+                | _ ->
+                    let mi = MethodInfo.op_subtraction.MakeGenericMethod(a.Type, b.Type, b.Type)
+                    Expr.Call(mi, [a; b])
+
+            static member Division(a : Expr, b : Expr) =
+                match a, b with
+                | TensorOp t ->
+                    let mi = t.GetMethod("op_Division", [| a.Type; b.Type |])
+                    Expr.Call(mi, [a; b])
+                | _ ->
+                    let mi = MethodInfo.op_division.MakeGenericMethod(a.Type, b.Type, b.Type)
+                    Expr.Call(mi, [a; b])
+
             static member ToFloat(expr : Expr) =
                 match expr.Type with
                 | FloatingPoint -> expr
@@ -1136,24 +1150,21 @@ module Preprocessor =
                 let! v = preprocessNormalS v
                 return Expr.Let(tmp, v, minMaxExpr)
 
-            | InvLerp (returnType, [a; b; y]) ->
-                let sub = MethodInfo.op_subtraction.MakeGenericMethod(returnType, returnType, returnType)
-                let div = MethodInfo.op_division.MakeGenericMethod(returnType, returnType, returnType)
-
-                let ta = Var("tmp", returnType)
-
+            | InvLerp [a; b; y] ->
                 // Convert to floating point if input is integral
                 // E.g invLerp : int32 -> int32 -> int32 -> float
                 let! a = preprocessNormalS (Expr.ToFloat a)
                 let! b = preprocessNormalS (Expr.ToFloat b)
                 let! y = preprocessNormalS (Expr.ToFloat y)
 
+                let ta = Var("tmp", y.Type)
+
                 return
                     Expr.Let(ta, a,
-                        Expr.Call(div, [
-                            Expr.Call(sub, [Expr.Var ta; y])
-                            Expr.Call(sub, [Expr.Var ta; b])
-                        ])
+                        Expr.Division(
+                            Expr.Subtract(Expr.Var ta, y),
+                            Expr.Subtract(Expr.Var ta, b)
+                        )
                     )
 
             | LinearStep [edge0; edge1; x] ->

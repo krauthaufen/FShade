@@ -1,10 +1,9 @@
 ﻿module Intrinsics
 
-open System
+open System.Text.RegularExpressions
 open Aardvark.Base
 open FShade
 open NUnit.Framework
-open FsUnit
 open FShade.Tests
 
 type Vertex =
@@ -155,6 +154,23 @@ let ``Inverse lerp``() =
         }
 
     GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader] ["getVec", 17]
+
+[<Test>]
+let ``Inverse lerp constant``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = V2d(1.5) |> invLerp (V2d(1.0)) (V2d(2.0))
+            let _ = V2i(2) |> invLerp (V2i(1)) (V2i(3))
+            let _ = 1.5 |> invLerp 1.0 2.0
+            return v.pos
+        }
+
+    GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader] [
+        Regex.Escape "vec2(0.5, 0.5);", 2
+        Regex.Escape "0.5;", 1
+    ]
 
 [<Test>]
 let ``Lerp integer overloads``() =
