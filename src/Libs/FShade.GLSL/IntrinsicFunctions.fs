@@ -417,7 +417,7 @@ module IntrinsicFunctions =
                 exactly <@ Fun.PowerOfTwo : V3d -> V3d @>
                 exactly <@ Fun.PowerOfTwo : V4f -> V4f @>
                 exactly <@ Fun.PowerOfTwo : V4d -> V4d @>
-                
+                generic <@ exp2 : float -> float @>
             ]
 
             CIntrinsic.simple "exp", [

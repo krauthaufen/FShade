@@ -396,13 +396,29 @@ let ``New Intrinsics``() =
             let _ = v.what.XY.MaxElement
             let _ = v.what.XYZ.MaxElement
             let _ = v.what.MaxElement
+            let _ = exp2 v.c.X
+            let _ = exp2 v.c.XY
+            let _ = exp2 v.c.XYZ
+            let _ = exp2 v.c
+            let _ = exp2 (float32 v.c.X)
+            let _ = exp2 (v2f v.c.XY)
+            let _ = exp2 (v3f v.c.XYZ)
+            let _ = exp2 (v4f v.c)
+            let _ = Fun.PowerOfTwo v.c.X
+            let _ = Fun.PowerOfTwo v.c.XY
+            let _ = Fun.PowerOfTwo v.c.XYZ
+            let _ = Fun.PowerOfTwo v.c
+            let _ = Fun.PowerOfTwo (float32 v.c.X)
+            let _ = Fun.PowerOfTwo (v2f v.c.XY)
+            let _ = Fun.PowerOfTwo (v3f v.c.XYZ)
+            let _ = Fun.PowerOfTwo (v4f v.c)
             let normalized = Vec.Normalized (V4i(v.c))
             let added = normalized + (Vec.normalize V4d.Half)
 
             return added
         }
 
-    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["mix"; "exp"; "log"; "pow"; "sign"; "sqrt"; "length"]
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["mix"; "exp"; "log"; "pow"; "sign"; "sqrt"; "length"; "exp2"]
 
 [<Test>]
 let ``Broken GLSL Shader``() =
