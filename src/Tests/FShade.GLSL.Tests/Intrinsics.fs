@@ -533,6 +533,33 @@ let ``Step``() =
     GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["step"]
 
 [<Test>]
+let ``Linearstep``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = linearstep 0.5 1.0 v.c.X
+            let _ = linearstep (V2d(0.5)) (V2d(1.0)) v.c.XY
+            let _ = linearstep (V3d(0.5)) (V3d(1.0)) v.c.XYZ
+            let _ = linearstep (getVec()) (V4d(1.0)) v.c
+            let _ = linearstep 0.5f 1.0f (float32 v.c.X)
+            let _ = linearstep (V2f(0.5f)) (V2f(1.0f)) (v2f v.c.XY)
+            let _ = linearstep (V3f(0.5f)) (V3f(1.0f)) (v3f v.c.XYZ)
+            let _ = linearstep (V4f(0.5f)) (V4f(1.0f)) (v4f v.c)
+            let _ = Fun.Linearstep(v.c.X, 0.5, 1.0)
+            let _ = Fun.Linearstep(v.c.XY, V2d(0.5), V2d(1.0))
+            let _ = Fun.Linearstep(v.c.XYZ, V3d(0.5), V3d(1.0))
+            let _ = Fun.Linearstep(v.c, V4d(0.5), V4d(1.0))
+            let _ = Fun.Linearstep((float32 v.c.X), 0.5f, 1.0f)
+            let _ = Fun.Linearstep((v2f v.c.XY), V2f(0.5f), V2f(1.0f))
+            let _ = Fun.Linearstep((v3f v.c.XYZ), V3f(0.5f), V3f(1.0f))
+            let _ = Fun.Linearstep((v4f v.c), V4f(0.5f), V4f(1.0f))
+            return v.pos
+        }
+
+    GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader] ["clamp", 16; "getVec", 2]
+
+[<Test>]
 let ``Smoothstep``() =
     Setup.Run()
 

@@ -490,6 +490,17 @@ module Preprocessor =
             | _ ->
                 None
 
+        let (|LinearStep|_|) (e : Expr) =
+            match e with
+            | Call(_, MethodQuote <@ linearstep : float -> float -> float -> float @> _, [edge0; edge1; x]) ->
+                Some [edge0; edge1; x]
+
+            | Call(_, (Method("Linearstep", _) as mi), [x; edge0; edge1]) when mi.DeclaringType = typeof<Fun> ->
+                Some [edge0; edge1; x]
+
+            | _ ->
+                None
+
     // Used to determine which preprocess function to call
     [<RequireQualifiedAccess>]
     type ShaderExpressionType =
@@ -1144,6 +1155,17 @@ module Preprocessor =
                             Expr.Call(sub, [Expr.Var ta; b])
                         ])
                     )
+
+            | LinearStep [edge0; edge1; x] ->
+                let invLerp = typeof<Fun>.GetMethod("InvLerp", [| x.Type; edge0.Type; edge1.Type |])
+                let saturate = typeof<Fun>.GetMethod("Saturate", [| x.Type |])
+
+                let expr =
+                    Expr.Call(saturate, [
+                        Expr.Call(invLerp, [x; edge0; edge1])
+                    ])
+
+                return! preprocessNormalS expr
 
             | Call(None, mi, [ExprValue v]) when mi.Name = "op_Splice" || mi.Name = "op_SpliceUntyped" ->
                 if v.Type = e.Type then
