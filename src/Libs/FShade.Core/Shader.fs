@@ -202,8 +202,17 @@ module Preprocessor =
 
         let rec (|Integral|_|) (t : Type) =
             match t with
-            | TypeInfo.Patterns.Integral -> Some 1
-            | TypeInfo.Patterns.VectorOf(d, Integral 1) -> Some d
+            | TypeInfo.Patterns.Integral
+            | TypeInfo.Patterns.VectorOf(_, Integral) -> Some ()
+            | MatrixOf'(_, Integral) -> Some ()
+            | _ -> None
+
+        let rec (|FloatingPoint|_|) (t : Type) =
+            match t with
+            | TypeInfo.Patterns.Float32
+            | TypeInfo.Patterns.Float64
+            | TypeInfo.Patterns.VectorOf(_, (TypeInfo.Patterns.Float32 | TypeInfo.Patterns.Float64)) -> Some ()
+            | MatrixOf'(_, (TypeInfo.Patterns.Float32 | TypeInfo.Patterns.Float64)) -> Some ()
             | _ -> None
 
         let (|Primitive|_|) (e : Expr) =
@@ -426,6 +435,7 @@ module Preprocessor =
         type Type with
             member x.FloatType =
                 match x with
+                | FloatingPoint  -> x
                 | Num            -> typeof<float>
                 | VectorOf(2, _) -> typeof<V2d>
                 | VectorOf(3, _) -> typeof<V3d>
@@ -604,7 +614,7 @@ module Preprocessor =
         let readInput (name : string) (desc : ParameterDescription) =
             let implicitInterp =
                 match desc.paramType with
-                | Integral _ -> InterpolationMode.Flat
+                | Integral -> InterpolationMode.Flat
                 | _ -> InterpolationMode.Default
 
             State.modify (fun s ->
@@ -772,15 +782,34 @@ module Preprocessor =
         let op_subtraction = getMethodInfo <@ (-) : float -> float -> float @>
         let op_division    = getMethodInfo <@ (/) : float -> float -> float @>
 
-        let toFloat = [|
-                getMethodInfo <@ float : int -> float @>
-                getMethodInfo <@ v2d : V2i -> V2d @>
-                getMethodInfo <@ v3d : V3i -> V3d @>
-                getMethodInfo <@ v4d : V4i -> V4d @>
-            |]
-
         let defaultOf = getMethodInfo <@ Unchecked.defaultof<int> @>
         let reportIntersection = getMethodInfo <@ reportIntersection @>
+
+    [<AutoOpen>]
+    module private ExprExtensions =
+        open TypeInfo.Patterns
+
+        let private toFloat = getMethodInfo <@ float : int -> float @>
+
+        let private floatVecType = [|
+                typeof<V2d>
+                typeof<V3d>
+                typeof<V4d>
+            |]
+
+        type Expr with
+            static member ToFloat(expr : Expr) =
+                match expr.Type with
+                | FloatingPoint -> expr
+
+                | VectorOf(dim, _) ->
+                    let vdt = floatVecType.[dim - 2]
+                    let ctor = vdt.GetConstructor [| expr.Type |]
+                    Expr.NewObject(ctor, [expr])
+
+                | _ ->
+                    let tf = toFloat.MakeGenericMethod expr.Type
+                    Expr.Call(tf, [expr])
 
 
     let rec preprocessRaytracingS (stage : ShaderStage) (e : Expr) : Preprocess<Expr> =
@@ -1104,19 +1133,9 @@ module Preprocessor =
 
                 // Convert to floating point if input is integral
                 // E.g invLerp : int32 -> int32 -> int32 -> float
-                let a, b, y =
-                    match a.Type with
-                    | Integral d ->
-                        let tf = MethodInfo.toFloat.[d - 1].MakeGenericMethod(a.Type)
-                        Expr.Call(tf, [a]),
-                        Expr.Call(tf, [b]),
-                        Expr.Call(tf, [y])
-                    | _ ->
-                        a, b, y
-
-                let! a = preprocessNormalS a
-                let! b = preprocessNormalS b
-                let! y = preprocessNormalS y
+                let! a = preprocessNormalS (Expr.ToFloat a)
+                let! b = preprocessNormalS (Expr.ToFloat b)
+                let! y = preprocessNormalS (Expr.ToFloat y)
 
                 return
                     Expr.Let(ta, a,

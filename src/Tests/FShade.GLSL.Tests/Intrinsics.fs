@@ -23,7 +23,7 @@ let getVec() =
     V4d(uniform.SomeUniform, 1.0)
 
 [<Test>]
-let ``Constructors Matrix``() =
+let ``Matrix Constructors``() =
     Setup.Run()
 
     let shader (v : Vertex) =
@@ -38,7 +38,7 @@ let ``Constructors Matrix``() =
 
 
 [<Test>]
-let ``Constructors Vector``() =
+let ``Vector Constructors``() =
     Setup.Run()
 
     let shader (v : Vertex) =
@@ -55,7 +55,7 @@ let ``Constructors Vector``() =
     GLSL.shouldCompile [Effect.ofFunction shader]
 
 [<Test>]
-let ``Vector conversion``() =
+let ``Vector Conversion``() =
     Setup.Run()
 
     let fs (v : Vertex) =
