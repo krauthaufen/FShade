@@ -461,13 +461,6 @@ module Compiler =
                 | Method("get_Length", [ArrOf(l,_)]), [a] ->
                     CValue(CType.CInt(true, 32), CIntegral (int64 l)) |> Some
 
-                 // lengthSquared     
-                | MethodQuote <@ Vec.lengthSquared : V4d -> float @> _, [v]
-                | Method("LengthSquared", [VectorOf _]), [v]
-                | Method("get_LengthSquared", [VectorOf _]), [v] ->
-                    CDot(ct, v, v) |> Some
-                               
-
                 // cross              
                 | MethodQuote <@ Vec.cross : V3d -> V3d -> V3d @> _, [l;r]
                 | Method("Cross", [VectorOf _; VectorOf _]), [l;r] ->

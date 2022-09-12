@@ -202,9 +202,8 @@ module Preprocessor =
 
         let rec (|Integral|_|) (t : Type) =
             match t with
-            | TypeInfo.Patterns.Integral
-            | TypeInfo.Patterns.VectorOf(_, Integral)
-            | TypeInfo.Patterns.MatrixOf(_, Integral) -> Some ()
+            | TypeInfo.Patterns.Integral -> Some 1
+            | TypeInfo.Patterns.VectorOf(d, Integral 1) -> Some d
             | _ -> None
 
         let (|Primitive|_|) (e : Expr) =
@@ -414,6 +413,73 @@ module Preprocessor =
             | SemanticInput(semantic, _) when semantic = Intrinsics.HitAttribute -> Some e.Type
             | _ -> None
 
+    [<AutoOpen>]
+    module private ComplexIntrinsicPatterns =
+        open TypeInfo.Patterns
+
+        let private vectorFields =
+            ["X"; "Y"; "Z"; "W"]
+
+        let private zeroOneVecProperty =
+            System.Text.RegularExpressions.Regex @"([XYZW]*[ONIP])+"
+
+        type Type with
+            member x.FloatType =
+                match x with
+                | Num            -> typeof<float>
+                | VectorOf(2, _) -> typeof<V2d>
+                | VectorOf(3, _) -> typeof<V3d>
+                | VectorOf(4, _) -> typeof<V4d>
+                | _ -> failwithf "[FShade] Cannot get corresponding float type for %A" x
+
+        let private (|VectorExpr|_|) (e : Expr) =
+            match e.Type with
+            | VectorOf(d, t) -> Some (e, d, t)
+            | _ -> None
+
+        let private (|Property|_|) (pi : PropertyInfo) =
+            Some pi.Name
+
+        let (|ConstantSwizzle|_|) (e : Expr) =
+            match e with
+            | PropertyGet(Some (VectorExpr(v, _, baseType)), prop, []) when zeroOneVecProperty.IsMatch prop.Name ->
+                Some (v, prop, baseType)
+            | _ ->
+                None
+
+        let (|LengthSquared|_|) (e : Expr) =
+            match e with
+            | Call(_, MethodQuote <@ Vec.lengthSquared : V4d -> float @> _, [VectorExpr (v, d, ft)])
+            | Call(_, Method("LengthSquared", _), [VectorExpr (v, d, ft)])
+            | PropertyGet(Some (VectorExpr (v, d, ft)), Property "LengthSquared", _) ->
+                Some v
+            | _ ->
+                None
+
+        let (|MinMaxElement|_|) (e : Expr) =
+            match e with
+            | Call(_, Method("MinElement", _), [VectorExpr (v, d, ft)])
+            | PropertyGet(Some (VectorExpr (v, d, ft)), Property "MinElement", _) ->
+                Some (v, "Min", ft, vectorFields |> List.take d)
+
+            | Call(_, Method("MaxElement", _), [VectorExpr (v, d, ft)])
+            | PropertyGet(Some (VectorExpr (v, d, ft)), Property "MaxElement", _) ->
+                Some (v, "Max", ft, vectorFields |> List.take d)
+
+            | _ ->
+                None
+
+        let (|InvLerp|_|) (e : Expr) =
+            match e with
+            | Call(_, MethodQuote <@ invLerp : float -> float -> float -> float @> _, [a; b; y]) ->
+                Some (a.Type.FloatType, [a; b; y])
+
+            | Call(_, (Method("InvLerp", _) as mi), [y; a; b]) when mi.DeclaringType = typeof<Fun> ->
+                Some (a.Type.FloatType, [a; b; y])
+
+            | _ ->
+                None
+
     // Used to determine which preprocess function to call
     [<RequireQualifiedAccess>]
     type ShaderExpressionType =
@@ -538,7 +604,7 @@ module Preprocessor =
         let readInput (name : string) (desc : ParameterDescription) =
             let implicitInterp =
                 match desc.paramType with
-                | Integral -> InterpolationMode.Flat
+                | Integral _ -> InterpolationMode.Flat
                 | _ -> InterpolationMode.Default
 
             State.modify (fun s ->
@@ -701,7 +767,21 @@ module Preprocessor =
 
         let executeCallableMeth = getMethodInfo <@ executeCallable @>
 
-    let private reportIntersectionMeth = getMethodInfo <@ reportIntersection @>
+    module private MethodInfo =
+
+        let op_subtraction = getMethodInfo <@ (-) : float -> float -> float @>
+        let op_division    = getMethodInfo <@ (/) : float -> float -> float @>
+
+        let toFloat = [|
+                getMethodInfo <@ float : int -> float @>
+                getMethodInfo <@ v2d : V2i -> V2d @>
+                getMethodInfo <@ v3d : V3i -> V3d @>
+                getMethodInfo <@ v4d : V4i -> V4d @>
+            |]
+
+        let defaultOf = getMethodInfo <@ Unchecked.defaultof<int> @>
+        let reportIntersection = getMethodInfo <@ reportIntersection @>
+
 
     let rec preprocessRaytracingS (stage : ShaderStage) (e : Expr) : Preprocess<Expr> =
         state {
@@ -811,7 +891,7 @@ module Preprocessor =
 
                     | _ -> ()
 
-                    Expr.Call(reportIntersectionMeth, [t; kind])
+                    Expr.Call(MethodInfo.reportIntersection, [t; kind])
                 ]
 
             | HitAttribute _ when not (ShaderStage.supportsHitAttributes stage) ->
@@ -945,384 +1025,461 @@ module Preprocessor =
           
         }
 
-    let private defaultOfMeth = getMethodInfo <@ Unchecked.defaultof<int> @>
-
-    let private (|VectorExpr|_|) (e : Expr) =
-        match e.Type with
-        | Aardvark.Base.TypeInfo.Patterns.VectorOf(_, t) -> Some (e, t)
-        | _ -> None
-        
-    let private zeroOneVecProperty =
-        System.Text.RegularExpressions.Regex @"([XYZW]*[ONIP])+"
-
     let rec preprocessNormalS (e : Expr) : Preprocess<Expr> =
         state {
             let! vertexType = State.vertexType
 
             match e with
-                | PropertyGet(Some (VectorExpr(v, baseType)), prop, []) when zeroOneVecProperty.IsMatch prop.Name ->
-                    let tmp = Var("tmp", v.Type)
-                    let components =
-                        prop.Name |> Seq.toArray |> Array.map (function
-                            | 'X' -> Expr.FieldGet(Expr.Var tmp, v.Type.GetField "X")
-                            | 'Y' -> Expr.FieldGet(Expr.Var tmp, v.Type.GetField "Y")
-                            | 'Z' -> Expr.FieldGet(Expr.Var tmp, v.Type.GetField "Z")
-                            | 'W' -> Expr.FieldGet(Expr.Var tmp, v.Type.GetField "W")
-                            | 'I' | 'P' ->
-                                if baseType = typeof<int> then Expr.Value 1
-                                elif baseType = typeof<float32> then Expr.Value 1.0f
-                                elif baseType = typeof<double> then Expr.Value 1.0
-                                else failwith "not implemented"
-                            | 'O' ->
-                                if baseType = typeof<int> then Expr.Value 0
-                                elif baseType = typeof<float32> then Expr.Value 0.0f
-                                elif baseType = typeof<double> then Expr.Value 0.0
-                                else failwith "not implemented"
-                            | 'N' ->
-                                if baseType = typeof<int> then Expr.Value -1
-                                elif baseType = typeof<float32> then Expr.Value -1.0f
-                                elif baseType = typeof<double> then Expr.Value -1.0
-                                else failwith "not implemented"
-                            | c ->
-                                failwithf "bad swizzle: %A" c
+            | ConstantSwizzle(v, prop, baseType) ->
+                let tmp = Var("tmp", v.Type)
+                let components =
+                    prop.Name |> Seq.toArray |> Array.map (function
+                        | 'X' -> Expr.FieldGet(Expr.Var tmp, v.Type.GetField "X")
+                        | 'Y' -> Expr.FieldGet(Expr.Var tmp, v.Type.GetField "Y")
+                        | 'Z' -> Expr.FieldGet(Expr.Var tmp, v.Type.GetField "Z")
+                        | 'W' -> Expr.FieldGet(Expr.Var tmp, v.Type.GetField "W")
+                        | 'I' | 'P' ->
+                            if baseType = typeof<int> then Expr.Value 1
+                            elif baseType = typeof<float32> then Expr.Value 1.0f
+                            elif baseType = typeof<double> then Expr.Value 1.0
+                            else failwith "not implemented"
+                        | 'O' ->
+                            if baseType = typeof<int> then Expr.Value 0
+                            elif baseType = typeof<float32> then Expr.Value 0.0f
+                            elif baseType = typeof<double> then Expr.Value 0.0
+                            else failwith "not implemented"
+                        | 'N' ->
+                            if baseType = typeof<int> then Expr.Value -1
+                            elif baseType = typeof<float32> then Expr.Value -1.0f
+                            elif baseType = typeof<double> then Expr.Value -1.0
+                            else failwith "not implemented"
+                        | c ->
+                            failwithf "bad swizzle: %A" c
+                    )
+
+                let ctor = e.Type.GetConstructor(components |> Array.map (fun c -> c.Type))
+
+                let! v = preprocessNormalS v
+                return
+                    Expr.Let(tmp, v,
+                        Expr.NewObject(
+                            ctor, Array.toList components
                         )
-                    
-                    let ctor = e.Type.GetConstructor(components |> Array.map (fun c -> c.Type))
-                    
-                    let! v = preprocessNormalS v
-                    return 
-                        Expr.Let(tmp, v,
-                            Expr.NewObject(
-                                ctor, Array.toList components
-                            )
-                        )
-                | Call(None, mi, [ExprValue v]) when mi.Name = "op_Splice" || mi.Name = "op_SpliceUntyped" ->
-                    if v.Type = e.Type then
-                        return! preprocessNormalS v
-                    else
-                        return! preprocessNormalS (Expr.Coerce(v, e.Type))
+                    )
 
-                | Pipe(e) ->
-                    return! preprocessNormalS e
+            | LengthSquared v ->
+                let dot = typeof<Vec>.GetMethod("Dot", [| v.Type; v.Type |])
 
-                | LetCopyOfStruct(e) ->
-                    return! preprocessNormalS e
+                let tmp = Var("tmp", v.Type)
+                let! v = preprocessNormalS v
+                return Expr.Let(tmp, v,
+                    Expr.Call(dot, [Expr.Var tmp; Expr.Var tmp])
+                )
 
-                | ReadInputOrRaytracingData(kind, name, idx, slot) ->
-                    let! idx = idx |> Option.mapS preprocessNormalS
+            | MinMaxElement(v, name, fieldType, fields) ->
+                let mi = typeof<Fun>.GetMethod(name, [| fieldType; fieldType |])
 
-                    let paramType =
-                        match idx with
-                            | Some _ -> e.Type.MakeArrayType()
-                            | _ -> e.Type
+                let rec getMinMaxExpr = function
+                    | a::b::tail -> getMinMaxExpr (Expr.Call(mi, [a; b])::tail)
+                    | [e] -> e
+                    | _ -> failwith "[FShade] Encountered min / max element call without arguments"
 
-                    match kind with
-                    | ParameterKind.Input -> 
-                        do! State.readInput name { paramType = paramType; paramInterpolation = InterpolationMode.Default }
-                    | ParameterKind.Uniform ->
-                        do! State.readUniform { uniformType = paramType; uniformName = name; uniformValue = UniformValue.Attribute(uniform, name) }
+                let tmp = Var("tmp", v.Type)
+
+                let minMaxExpr =
+                    fields
+                    |> List.map (fun f ->
+                        Expr.FieldGet(Expr.Var tmp, v.Type.GetField f)
+                    )
+                    |> getMinMaxExpr
+
+                let! v = preprocessNormalS v
+                return Expr.Let(tmp, v, minMaxExpr)
+
+            | InvLerp (returnType, [a; b; y]) ->
+                let sub = MethodInfo.op_subtraction.MakeGenericMethod(returnType, returnType, returnType)
+                let div = MethodInfo.op_division.MakeGenericMethod(returnType, returnType, returnType)
+
+                let ta = Var("tmp", returnType)
+
+                // Convert to floating point if input is integral
+                // E.g invLerp : int32 -> int32 -> int32 -> float
+                let a, b, y =
+                    match a.Type with
+                    | Integral d ->
+                        let tf = MethodInfo.toFloat.[d - 1].MakeGenericMethod(a.Type)
+                        Expr.Call(tf, [a]),
+                        Expr.Call(tf, [b]),
+                        Expr.Call(tf, [y])
                     | _ ->
-                        ()
+                        a, b, y
 
+                let! a = preprocessNormalS a
+                let! b = preprocessNormalS b
+                let! y = preprocessNormalS y
+
+                return
+                    Expr.Let(ta, a,
+                        Expr.Call(div, [
+                            Expr.Call(sub, [Expr.Var ta; y])
+                            Expr.Call(sub, [Expr.Var ta; b])
+                        ])
+                    )
+
+            | Call(None, mi, [ExprValue v]) when mi.Name = "op_Splice" || mi.Name = "op_SpliceUntyped" ->
+                if v.Type = e.Type then
+                    return! preprocessNormalS v
+                else
+                    return! preprocessNormalS (Expr.Coerce(v, e.Type))
+
+            | Pipe(e) ->
+                return! preprocessNormalS e
+
+            | LetCopyOfStruct(e) ->
+                return! preprocessNormalS e
+
+            | ReadInputOrRaytracingData(kind, name, idx, slot) ->
+                let! idx = idx |> Option.mapS preprocessNormalS
+
+                let paramType =
                     match idx with
-                        | Some idx -> return Expr.ReadInput(kind, e.Type, name, idx, slot)
-                        | None -> return Expr.ReadInput(kind, e.Type, name, slot)
+                        | Some _ -> e.Type.MakeArrayType()
+                        | _ -> e.Type
 
-                | WriteOutputs(map) ->
-                    let! map = 
-                        map |> Map.mapS (fun name (idx, value) ->
+                match kind with
+                | ParameterKind.Input -> 
+                    do! State.readInput name { paramType = paramType; paramInterpolation = InterpolationMode.Default }
+                | ParameterKind.Uniform ->
+                    do! State.readUniform { uniformType = paramType; uniformName = name; uniformValue = UniformValue.Attribute(uniform, name) }
+                | _ ->
+                    ()
+
+                match idx with
+                    | Some idx -> return Expr.ReadInput(kind, e.Type, name, idx, slot)
+                    | None -> return Expr.ReadInput(kind, e.Type, name, slot)
+
+            | WriteOutputs(map) ->
+                let! map = 
+                    map |> Map.mapS (fun name (idx, value) ->
+                        state {
+                            let! idx = idx |> Option.mapS preprocessNormalS
+                            let! value = preprocessNormalS value
+                            return idx, value
+                        }
+                    )
+                for (name, (idx, value)) in Map.toSeq map do
+                    do! State.modify (fun s ->
+                            if Map.containsKey name s.outputs then 
+                                s
+                            else 
+                                let typ =
+                                    match idx with
+                                        | None -> value.Type
+                                        | Some _ -> value.Type.MakeArrayType()
+                                { s with State.outputs = Map.add name { paramType = typ; paramInterpolation = InterpolationMode.Default } s.outputs }
+                        ) 
+
+
+                return Expr.WriteOutputs(map)
+
+            | BuilderRun(b, body)
+            | BuilderDelay(b, body) ->
+                do! State.setBuilder b
+                return! preprocessNormalS body
+
+            | BuilderCombine(b, l, r) ->
+                do! State.setBuilder b
+                let! l = preprocessNormalS l
+                let! r = preprocessNormalS r
+                return Expr.Seq [l;r]
+
+            | BuilderZero(b) ->
+                do! State.setBuilder b
+                return Expr.Unit
+
+
+            | BuilderBind(b, var, TessellateCall(dim, inner, outer), tev) ->
+                do! State.setBuilder b
+
+                let coord = 
+                    let c = Expr.ReadInput(ParameterKind.Input, typeof<V3d>, Intrinsics.TessCoord)
+                    if var.Type = c.Type then c
+                    else <@@ (%%c : V3d).XY @@>
+
+                let tev = Expr.Let(var, coord, tev)
+
+                let! s = State.get
+                let! bindings, free = 
+                    tev.GetFreeVars() 
+                        |> Seq.toList 
+                        |> List.choose2S (fun v ->
                             state {
-                                let! idx = idx |> Option.mapS preprocessNormalS
-                                let! value = preprocessNormalS value
-                                return idx, value
+                                match Map.tryFind v s.variableValues with
+                                    | Some (ReadInput(ParameterKind.Input, name, Some TrivialInput) as e) ->
+                                        return Choice1Of2 (v, e)
+                                    | _ -> 
+                                        do! State.writeOutput v.Name { paramType = v.Type; paramInterpolation = InterpolationMode.Default }
+                                        return Choice2Of2(v, Expr.ReadInput(ParameterKind.Input, v.Type, v.Name))
                             }
                         )
-                    for (name, (idx, value)) in Map.toSeq map do
-                        do! State.modify (fun s ->
-                                if Map.containsKey name s.outputs then 
-                                    s
-                                else 
-                                    let typ =
-                                        match idx with
-                                            | None -> value.Type
-                                            | Some _ -> value.Type.MakeArrayType()
-                                    { s with State.outputs = Map.add name { paramType = typ; paramInterpolation = InterpolationMode.Default } s.outputs }
-                            ) 
 
-
-                    return Expr.WriteOutputs(map)
-
-                | BuilderRun(b, body)
-                | BuilderDelay(b, body) ->
-                    do! State.setBuilder b
-                    return! preprocessNormalS body
-
-                | BuilderCombine(b, l, r) ->
-                    do! State.setBuilder b
-                    let! l = preprocessNormalS l
-                    let! r = preprocessNormalS r
-                    return Expr.Seq [l;r]
-
-                | BuilderZero(b) ->
-                    do! State.setBuilder b
-                    return Expr.Unit
-
-
-                | BuilderBind(b, var, TessellateCall(dim, inner, outer), tev) ->
-                    do! State.setBuilder b
-
-                    let coord = 
-                        let c = Expr.ReadInput(ParameterKind.Input, typeof<V3d>, Intrinsics.TessCoord)
-                        if var.Type = c.Type then c
-                        else <@@ (%%c : V3d).XY @@>
-
-                    let tev = Expr.Let(var, coord, tev)
-
-                    let! s = State.get
-                    let! bindings, free = 
-                        tev.GetFreeVars() 
-                            |> Seq.toList 
-                            |> List.choose2S (fun v ->
-                                state {
-                                    match Map.tryFind v s.variableValues with
-                                        | Some (ReadInput(ParameterKind.Input, name, Some TrivialInput) as e) ->
-                                            return Choice1Of2 (v, e)
-                                        | _ -> 
-                                            do! State.writeOutput v.Name { paramType = v.Type; paramInterpolation = InterpolationMode.Default }
-                                            return Choice2Of2(v, Expr.ReadInput(ParameterKind.Input, v.Type, v.Name))
-                                }
-                            )
-
-                    let rec wrap (bindings : list<Var * Expr>) (b : Expr) =
-                        match bindings with
-                            | [] -> b
-                            | (h, he) :: rest ->
-                                Expr.Let(h, he, wrap rest b)
+                let rec wrap (bindings : list<Var * Expr>) (b : Expr) =
+                    match bindings with
+                        | [] -> b
+                        | (h, he) :: rest ->
+                            Expr.Let(h, he, wrap rest b)
                         
-                    let tev = wrap (bindings @ free) tev |> toShaders s.inputTypes s.vertexIndex
-                    match tev with
-                        | [tev] ->
-                            do! State.modify (fun s -> { s with shaders = [ { tev with shaderStage = ShaderStage.TessEval } ] })
-                        | _ ->
-                            failwithf "[FShade] invalid shader(s) after tessellate-call: %A" tev
+                let tev = wrap (bindings @ free) tev |> toShaders s.inputTypes s.vertexIndex
+                match tev with
+                    | [tev] ->
+                        do! State.modify (fun s -> { s with shaders = [ { tev with shaderStage = ShaderStage.TessEval } ] })
+                    | _ ->
+                        failwithf "[FShade] invalid shader(s) after tessellate-call: %A" tev
 
-                    do! State.writeOutput Intrinsics.TessLevelInner { paramType = typeof<float[]>; paramInterpolation = InterpolationMode.Default }
-                    do! State.writeOutput Intrinsics.TessLevelOuter { paramType = typeof<float[]>; paramInterpolation = InterpolationMode.Default }
+                do! State.writeOutput Intrinsics.TessLevelInner { paramType = typeof<float[]>; paramInterpolation = InterpolationMode.Default }
+                do! State.writeOutput Intrinsics.TessLevelOuter { paramType = typeof<float[]>; paramInterpolation = InterpolationMode.Default }
 
-                    return 
-                        Expr.WriteOutputs [
-                            yield Intrinsics.TessLevelInner, None, Expr.NewArray(typeof<float>, inner)
-                            yield Intrinsics.TessLevelOuter, None, Expr.NewArray(typeof<float>, outer)
-                            yield! free |> List.map (fun (v,_) -> v.Name, None, Expr.Var v)
-                        ]
+                return 
+                    Expr.WriteOutputs [
+                        yield Intrinsics.TessLevelInner, None, Expr.NewArray(typeof<float>, inner)
+                        yield Intrinsics.TessLevelOuter, None, Expr.NewArray(typeof<float>, outer)
+                        yield! free |> List.map (fun (v,_) -> v.Name, None, Expr.Var v)
+                    ]
 
 
-                | BuilderUsing(b, var, value, body)
-                | BuilderBind(b, var, value, body) ->
-                    do! State.setBuilder b
-                    let! value = preprocessNormalS value
-                    let! body = preprocessNormalS body
-                    if var.Type <> typeof<unit> then
-                        return Expr.Let(var, value, body)
-                    else
-                        match value with
-                            | Unit -> return body
-                            | _ -> return Expr.Sequential(value, body)
+            | BuilderUsing(b, var, value, body)
+            | BuilderBind(b, var, value, body) ->
+                do! State.setBuilder b
+                let! value = preprocessNormalS value
+                let! body = preprocessNormalS body
+                if var.Type <> typeof<unit> then
+                    return Expr.Let(var, value, body)
+                else
+                    match value with
+                        | Unit -> return body
+                        | _ -> return Expr.Sequential(value, body)
 
-                | BuilderFor(b, var, RangeSequence(first, step, last), body) ->
-                    do! State.setBuilder b
-                    let! first = preprocessNormalS first
-                    let! step = preprocessNormalS step
-                    let! last = preprocessNormalS last
-                    let! body = preprocessNormalS body
-                    return Expr.ForInteger(var, first, step, last, body)
+            | BuilderFor(b, var, RangeSequence(first, step, last), body) ->
+                do! State.setBuilder b
+                let! first = preprocessNormalS first
+                let! step = preprocessNormalS step
+                let! last = preprocessNormalS last
+                let! body = preprocessNormalS body
+                return Expr.ForInteger(var, first, step, last, body)
                     
-                | BuilderFor(b, var, Coerce(Primitive(primitive, vertexCount), _), body) ->
-                    do! State.setBuilder b
-                    let iVar = Var(var.Name + "Index", typeof<int>)
-                    let prop = primitive.Type.GetProperty("Item", BindingFlags.Instance ||| BindingFlags.NonPublic ||| BindingFlags.Public)
-                    let replacement = Expr.PropertyGet(primitive, prop, [Expr.Var iVar])
+            | BuilderFor(b, var, Coerce(Primitive(primitive, vertexCount), _), body) ->
+                do! State.setBuilder b
+                let iVar = Var(var.Name + "Index", typeof<int>)
+                let prop = primitive.Type.GetProperty("Item", BindingFlags.Instance ||| BindingFlags.NonPublic ||| BindingFlags.Public)
+                let replacement = Expr.PropertyGet(primitive, prop, [Expr.Var iVar])
                     
-                    do! State.setVertexIndex var (Expr.Var iVar)
-                    let! body = preprocessNormalS body
+                do! State.setVertexIndex var (Expr.Var iVar)
+                let! body = preprocessNormalS body
 
-                    return Expr.ForIntegerRangeLoop(iVar, Expr.Value 0, Expr.Value (vertexCount - 1), body)
+                return Expr.ForIntegerRangeLoop(iVar, Expr.Value 0, Expr.Value (vertexCount - 1), body)
 
-                | BuilderFor(b, var, sequence, body) ->
-                    do! State.setBuilder b
-                    let! sequence = preprocessNormalS sequence
-                    let! body = preprocessNormalS body
-                    return Expr.ForEach(var, sequence, body)
+            | BuilderFor(b, var, sequence, body) ->
+                do! State.setBuilder b
+                let! sequence = preprocessNormalS sequence
+                let! body = preprocessNormalS body
+                return Expr.ForEach(var, sequence, body)
 
-                | BuilderWhile(b, Lambda(unitVar, guard), body) ->
-                    do! State.setBuilder b
-                    let! guard = preprocessNormalS guard
-                    let! body = preprocessNormalS body
-                    return Expr.WhileLoop(guard, body)
+            | BuilderWhile(b, Lambda(unitVar, guard), body) ->
+                do! State.setBuilder b
+                let! guard = preprocessNormalS guard
+                let! body = preprocessNormalS body
+                return Expr.WhileLoop(guard, body)
                     
 
-                | Uniform u ->
-                    do! State.readUniform u
-                    return Expr.ReadInput(ParameterKind.Uniform, e.Type, u.uniformName)
+            | Uniform u ->
+                do! State.readUniform u
+                return Expr.ReadInput(ParameterKind.Uniform, e.Type, u.uniformName)
 
-                | Let(var, Call(None, mi, []), b) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = defaultOfMeth ->
-                    let! b = preprocessNormalS b
-                    return Expr.Let(var, Expr.DefaultValue(mi.ReturnType), b)
+            | Let(var, Call(None, mi, []), b) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = MethodInfo.defaultOf ->
+                let! b = preprocessNormalS b
+                return Expr.Let(var, Expr.DefaultValue(mi.ReturnType), b)
 
-                // let p0 = tri.P0 in <body>
-                // store (p0 -> 0) and preprocess <body>
-                | Let(var, PrimitiveVertexGet(p, index), body) when var.Type = vertexType ->
-                    let! index = preprocessNormalS index
-                    do! State.setVertexIndex var index
-                    return! preprocessNormalS body
+            // let p0 = tri.P0 in <body>
+            // store (p0 -> 0) and preprocess <body>
+            | Let(var, PrimitiveVertexGet(p, index), body) when var.Type = vertexType ->
+                let! index = preprocessNormalS index
+                do! State.setVertexIndex var index
+                return! preprocessNormalS body
 
 
-                | Let(var, e, body) ->
-                    let! e = preprocessNormalS e
-                    do! State.setVariableValue var e
-                    let! body = preprocessNormalS body
-                    return Expr.Let(var, e, body)
+            | Let(var, e, body) ->
+                let! e = preprocessNormalS e
+                do! State.setVariableValue var e
+                let! body = preprocessNormalS body
+                return Expr.Let(var, e, body)
 
-                // tri.P0.pos -> ReadInput(pos, 0)
-                | InputRead vertexType (PrimitiveVertexGet(p, index), semantic, parameter) ->
+            // tri.P0.pos -> ReadInput(pos, 0)
+            | InputRead vertexType (PrimitiveVertexGet(p, index), semantic, parameter) ->
 //                    if semantic = Intrinsics.SourceVertexIndex then
 //                        let! index = preprocessNormalS index
 //                        return index
 //                    else
-                    let! index = preprocessNormalS index
-                    do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
-                    return Expr.ReadInput(ParameterKind.Input, e.Type, semantic, index)
+                let! index = preprocessNormalS index
+                do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
+                return Expr.ReadInput(ParameterKind.Input, e.Type, semantic, index)
 
-                // real vertex-read needed
-                | PrimitiveVertexGet(p, index) ->
-                    let! index = preprocessNormalS index
-                    let fields = FSharpType.GetRecordFields(e.Type, true) |> Array.toList
+            // real vertex-read needed
+            | PrimitiveVertexGet(p, index) ->
+                let! index = preprocessNormalS index
+                let fields = FSharpType.GetRecordFields(e.Type, true) |> Array.toList
 
-                    let! args =
-                        fields |> List.mapS (fun f ->
-                            state {
-                                let interpolation = f.Interpolation
-                                let semantic = f.Semantic 
+                let! args =
+                    fields |> List.mapS (fun f ->
+                        state {
+                            let interpolation = f.Interpolation
+                            let semantic = f.Semantic 
 //                                if semantic = Intrinsics.SourceVertexIndex then
 //                                    return index
 //                                else
-                                let parameter = { paramType = f.PropertyType; paramInterpolation = interpolation }
-                                do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
-                                return Expr.ReadInput(ParameterKind.Input, f.PropertyType, semantic, index)
-                            }
-                        )
+                            let parameter = { paramType = f.PropertyType; paramInterpolation = interpolation }
+                            do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
+                            return Expr.ReadInput(ParameterKind.Input, f.PropertyType, semantic, index)
+                        }
+                    )
                         
-                    return Expr.NewRecord(e.Type, args)
+                return Expr.NewRecord(e.Type, args)
 
 
-                // vertex.pos -> ReadInput(pos)
-                | InputRead vertexType (vertex, semantic, parameter) ->
-                    let! index =
-                        match vertex with
-                            | Var v -> State.tryGetVertexIndex v
-                            | Value _ -> State.value None
+            // vertex.pos -> ReadInput(pos)
+            | InputRead vertexType (vertex, semantic, parameter) ->
+                let! index =
+                    match vertex with
+                        | Var v -> State.tryGetVertexIndex v
+                        | Value _ -> State.value None
                             
-                            | _ -> failwithf "[FShade] found non-primitive vertex-expression: %A" vertex
+                        | _ -> failwithf "[FShade] found non-primitive vertex-expression: %A" vertex
 
-                    match index with
-                        | Some index -> 
+                match index with
+                    | Some index -> 
 //                            if semantic = Intrinsics.SourceVertexIndex then
 //                                return index
 //                            else
-                            do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
-                            return Expr.ReadInput(ParameterKind.Input, parameter.paramType, semantic, index)
-                        | _ ->
-                            do! State.readInput semantic parameter
-                            return Expr.ReadInput(ParameterKind.Input, parameter.paramType, semantic)
+                        do! State.readInput semantic { parameter with paramType = parameter.paramType.MakeArrayType() }
+                        return Expr.ReadInput(ParameterKind.Input, parameter.paramType, semantic, index)
+                    | _ ->
+                        do! State.readInput semantic parameter
+                        return Expr.ReadInput(ParameterKind.Input, parameter.paramType, semantic)
                     
                     
-                | BuilderYield(b, mi, Let(var, value, body)) | BuilderReturn(b, mi, Let(var, value, body)) ->
-                    let mutable used = 0
-                    let newBody =
-                        body.Substitute (fun vi -> 
-                            if vi = var then 
-                                used <- used + 1
-                                Some value 
-                            else 
-                                None
+            | BuilderYield(b, mi, Let(var, value, body)) | BuilderReturn(b, mi, Let(var, value, body)) ->
+                let mutable used = 0
+                let newBody =
+                    body.Substitute (fun vi -> 
+                        if vi = var then 
+                            used <- used + 1
+                            Some value 
+                        else 
+                            None
+                    )
+
+                let real = 
+                    if used <= 1 then Expr.Call(b, mi, [newBody])
+                    else Expr.Let(var, value, Expr.Call(b, mi, [body]))
+
+                return! preprocessNormalS real
+
+                    
+            | BuilderYield(b, _, value) ->
+                do! State.setBuilder b
+                let! value = preprocessNormalS value
+                let defaultSem = 
+                    if b.Type = typeof<FragmentBuilder> then Intrinsics.Color
+                    else Intrinsics.Position
+
+                let! values = getOutputValues defaultSem value
+
+                return 
+                    Expr.Sequential(
+                        Expr.WriteOutputs values,
+                        <@ emitVertex() @>
+                    )
+
+            | BuilderReturn(b, _, value) ->
+                do! State.setBuilder b
+                let! value = preprocessNormalS value
+                let defaultSem = 
+                    if b.Type = typeof<FragmentBuilder> then Intrinsics.Color
+                    else Intrinsics.Position
+
+                let! values = getOutputValues defaultSem value
+
+                return Expr.WriteOutputs values
+
+            | Sequential(l, r) ->
+                let! l = preprocessNormalS l
+                let! r = preprocessNormalS r
+                return Expr.Seq [l;r]
+                    
+            | IfThenElse(cond, i, e) ->
+                let! cond = preprocessNormalS cond
+                let! i = preprocessNormalS i
+                let! e = preprocessNormalS e
+                return Expr.IfThenElse(cond, i, e)
+
+            | Let(v, e, b) ->
+                let! e = preprocessNormalS e
+                let! b = preprocessNormalS b
+                return Expr.Let(v, e, b)
+
+            | CallFunction(utility, args) ->
+                let! args = args |> List.mapS preprocessNormalS
+                match utility.functionTag with
+                    | :? State as innerState ->
+                        do! State.modify (fun s -> { s with uniforms = Map.union s.uniforms innerState.uniforms })
+                        return Expr.CallFunction(utility, args)
+
+                    | _ ->
+                        let! state = State.get
+
+                        let mutable innerState = State.createInner state
+                        let processedF =
+                            utility |> UtilityFunction.map (fun b -> 
+                                let run : Preprocess<Expr> = preprocessByTypeS state.expressionType b
+                                run.Run(&innerState)
+                            )
+
+                        let processedF = { processedF with functionTag = innerState }
+                        do! State.mergeInner innerState
+
+                        return Expr.CallFunction(processedF, args)
+
+            | CallWithWitnesses(t, original, m, ws, args) ->
+                let! args = args |> List.mapS preprocessNormalS
+                let! t = t |> Option.mapS preprocessNormalS
+                    
+                match UtilityFunction.tryCreate original with
+                | Some utility ->
+                    let! state = State.get
+                    let mutable innerState = State.createInner state
+                    let processedF =
+                        utility |> UtilityFunction.map (fun b -> 
+                            let run : Preprocess<Expr> = preprocessByTypeS state.expressionType b
+                            run.Run(&innerState)
                         )
 
-                    let real = 
-                        if used <= 1 then Expr.Call(b, mi, [newBody])
-                        else Expr.Let(var, value, Expr.Call(b, mi, [body]))
+                    let processedF = { processedF with functionTag = innerState }
+                    do! State.mergeInner innerState
 
-                    return! preprocessNormalS real
+                    match t with    
+                        | Some t -> return Expr.CallFunction(processedF, t :: args)
+                        | None -> return Expr.CallFunction(processedF, args)
 
+                | None -> 
+                    match t with
+                    | Some t -> return Expr.CallWithWitnesses(t, original, m, ws, args)
+                    | None -> return Expr.CallWithWitnesses(original, m, ws, args)
                     
-                | BuilderYield(b, _, value) ->
-                    do! State.setBuilder b
-                    let! value = preprocessNormalS value
-                    let defaultSem = 
-                        if b.Type = typeof<FragmentBuilder> then Intrinsics.Color
-                        else Intrinsics.Position
 
-                    let! values = getOutputValues defaultSem value
+            | Call(t, mi, args) ->
+                let! args = args |> List.mapS preprocessNormalS
+                let! t = t |> Option.mapS preprocessNormalS
 
-                    return 
-                        Expr.Sequential(
-                            Expr.WriteOutputs values,
-                            <@ emitVertex() @>
-                        )
-
-                | BuilderReturn(b, _, value) ->
-                    do! State.setBuilder b
-                    let! value = preprocessNormalS value
-                    let defaultSem = 
-                        if b.Type = typeof<FragmentBuilder> then Intrinsics.Color
-                        else Intrinsics.Position
-
-                    let! values = getOutputValues defaultSem value
-
-                    return Expr.WriteOutputs values
-
-                | Sequential(l, r) ->
-                    let! l = preprocessNormalS l
-                    let! r = preprocessNormalS r
-                    return Expr.Seq [l;r]
-                    
-                | IfThenElse(cond, i, e) ->
-                    let! cond = preprocessNormalS cond
-                    let! i = preprocessNormalS i
-                    let! e = preprocessNormalS e
-                    return Expr.IfThenElse(cond, i, e)
-
-                | Let(v, e, b) ->
-                    let! e = preprocessNormalS e
-                    let! b = preprocessNormalS b
-                    return Expr.Let(v, e, b)
-
-                | CallFunction(utility, args) ->
-                    let! args = args |> List.mapS preprocessNormalS
-                    match utility.functionTag with
-                        | :? State as innerState ->
-                            do! State.modify (fun s -> { s with uniforms = Map.union s.uniforms innerState.uniforms })
-                            return Expr.CallFunction(utility, args)
-
-                        | _ ->
-                            let! state = State.get
-
-                            let mutable innerState = State.createInner state
-                            let processedF =
-                                utility |> UtilityFunction.map (fun b -> 
-                                    let run : Preprocess<Expr> = preprocessByTypeS state.expressionType b
-                                    run.Run(&innerState)
-                                )
-
-                            let processedF = { processedF with functionTag = innerState }
-                            do! State.mergeInner innerState
-
-                            return Expr.CallFunction(processedF, args)
-
-                | CallWithWitnesses(t, original, m, ws, args) ->
-                    let! args = args |> List.mapS preprocessNormalS
-                    let! t = t |> Option.mapS preprocessNormalS
-                    
-                    match UtilityFunction.tryCreate original with
+                match UtilityFunction.tryCreate mi with
                     | Some utility ->
                         let! state = State.get
                         let mutable innerState = State.createInner state
@@ -1341,35 +1498,8 @@ module Preprocessor =
 
                     | None -> 
                         match t with
-                        | Some t -> return Expr.CallWithWitnesses(t, original, m, ws, args)
-                        | None -> return Expr.CallWithWitnesses(original, m, ws, args)
-                    
-
-                | Call(t, mi, args) ->
-                    let! args = args |> List.mapS preprocessNormalS
-                    let! t = t |> Option.mapS preprocessNormalS
-
-                    match UtilityFunction.tryCreate mi with
-                        | Some utility ->
-                            let! state = State.get
-                            let mutable innerState = State.createInner state
-                            let processedF =
-                                utility |> UtilityFunction.map (fun b -> 
-                                    let run : Preprocess<Expr> = preprocessByTypeS state.expressionType b
-                                    run.Run(&innerState)
-                                )
-
-                            let processedF = { processedF with functionTag = innerState }
-                            do! State.mergeInner innerState
-
-                            match t with    
-                                | Some t -> return Expr.CallFunction(processedF, t :: args)
-                                | None -> return Expr.CallFunction(processedF, args)
-
-                        | None -> 
-                            match t with
-                                | Some t -> return Expr.Call(t, mi, args)
-                                | None -> return Expr.Call(mi, args)
+                            | Some t -> return Expr.Call(t, mi, args)
+                            | None -> return Expr.Call(mi, args)
 //                            
 //                    let! s = State.get
 //                    match preprocessMethod s.localSize mi with
@@ -1385,30 +1515,30 @@ module Preprocessor =
 //                        | Some t -> return Expr.Call(t, mi, args)
 //                        | None -> return Expr.Call(mi, args)
 
-                | NewArr(t, l, []) ->
-                    return Expr.DefaultValue(e.Type)
+            | NewArr(t, l, []) ->
+                return Expr.DefaultValue(e.Type)
 
-                | NewArr(t, l, args) ->
-                    let! args = args |> List.mapS preprocessNormalS
-                    let t = Var("arr", e.Type, false)
-                    return Expr.Let(
-                        t, Expr.DefaultValue(e.Type),
-                        Expr.Seq [
-                            args |> List.mapi (fun i a -> Expr.ArraySet(Expr.Var t, Expr.Value i, a)) |> Expr.Seq
-                            Expr.Var t
-                        ]
-                    )             
+            | NewArr(t, l, args) ->
+                let! args = args |> List.mapS preprocessNormalS
+                let t = Var("arr", e.Type, false)
+                return Expr.Let(
+                    t, Expr.DefaultValue(e.Type),
+                    Expr.Seq [
+                        args |> List.mapi (fun i a -> Expr.ArraySet(Expr.Var t, Expr.Value i, a)) |> Expr.Seq
+                        Expr.Var t
+                    ]
+                )             
                                    
-                | ShapeCombination(o, args) ->
-                    let! args = args |> List.mapS preprocessNormalS
-                    return RebuildShapeCombination(o, args)
+            | ShapeCombination(o, args) ->
+                let! args = args |> List.mapS preprocessNormalS
+                return RebuildShapeCombination(o, args)
 
-                | ShapeVar _ ->
-                    return e
+            | ShapeVar _ ->
+                return e
 
-                | ShapeLambda(v, b) ->
-                    let! b = preprocessNormalS b
-                    return Expr.Lambda(v, b)
+            | ShapeLambda(v, b) ->
+                let! b = preprocessNormalS b
+                return Expr.Lambda(v, b)
         }
 
     and preprocessByTypeS (typ : ShaderExpressionType) (e : Expr) =

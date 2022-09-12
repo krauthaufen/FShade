@@ -1395,6 +1395,67 @@ let ``Vector conversion``() =
 
     GLSL.shouldCompile[Effect.ofFunction fs]
 
+[<ReflectedDefinition>]
+let getVec() =
+    V4d(uniform.SomeUniform, 1.0)
+
+[<Test>]
+let ``Non-trivial intrinsics without duplication``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            let _ = getVec().XYOI
+            let _ = getVec().OXXX
+            let _ = getVec().ZIXO
+
+            let _ = Vec.lengthSquared <| getVec()
+            let _ = Vec.LengthSquared(getVec())
+            let _ = Vec.LengthSquared(getVec().XYZ)
+            let _ = Vec.LengthSquared(getVec().XY)
+            let _ = getVec().LengthSquared
+            let _ = getVec().XYZ.LengthSquared
+            let _ = getVec().XY.LengthSquared
+
+            let _ = Vec.MinElement(getVec().XY)
+            let _ = Vec.MinElement(getVec().XYZ)
+            let _ = Vec.MinElement(getVec())
+            let _ = getVec().XY.MinElement
+            let _ = getVec().XYZ.MinElement
+            let _ = getVec().MinElement
+
+            let _ = Vec.MaxElement(getVec().XY)
+            let _ = Vec.MaxElement(getVec().XYZ)
+            let _ = Vec.MaxElement(getVec())
+            let _ = getVec().XY.MaxElement
+            let _ = getVec().XYZ.MaxElement
+            let _ = getVec().MaxElement
+
+            let _ = invLerp (getVec()) V4d.Zero V4d.One
+            let _ = invLerp (getVec().XYZ) V3d.Zero V3d.One
+            let _ = invLerp (getVec().XY) V2d.Zero V2d.One
+            let _ = invLerp (getVec().X) 0.0 1.0
+
+            let _ = Fun.InvLerp(V4d.One, getVec(), V4d.Zero)
+            let _ = Fun.InvLerp(V3d.One, getVec().XYZ, V3d.Zero)
+            let _ = Fun.InvLerp(V2d.One, getVec().XY, V2d.Zero)
+            let _ = Fun.InvLerp(1.0, getVec().X, 0.0)
+
+            let _ = invLerp (V4i (getVec())) V4i.Zero V4i.One
+            let _ = invLerp (V3i (getVec().XYZ)) V3i.Zero V3i.One
+            let _ = invLerp (V2i (getVec().XY)) V2i.Zero V2i.One
+            let _ = invLerp (int <| getVec().X) 0 1
+
+            let _ = Fun.InvLerp(V4i.One, V4i (getVec()), V4i.Zero)
+            let _ = Fun.InvLerp(V3i.One, V3i (getVec().XYZ), V3i.Zero)
+            let _ = Fun.InvLerp(V2i.One, V2i (getVec().XY), V2i.Zero)
+            let x = Fun.InvLerp(1, int <| getVec().X, 0)
+
+            return lerp v.c V4d.Zero x
+        }
+
+    GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction fs] ["getVec", 39]
+
 
 [<AutoOpen>]
 module ImageUniforms =
