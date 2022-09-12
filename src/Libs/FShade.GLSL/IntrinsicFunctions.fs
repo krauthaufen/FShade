@@ -1145,6 +1145,27 @@ module IntrinsicFunctions =
                 generic <@ saturate : V4d -> _ @>
             ]
 
+            CIntrinsic.custom "step" [1; 0], [
+                exactly <@ Fun.Step : float32 * float32 -> _ @>
+                exactly <@ Fun.Step : float * float -> _ @>
+                exactly <@ Fun.Step : V2f * V2f -> V2f @>
+                exactly <@ Fun.Step : V2f * float32 -> V2f @>
+                exactly <@ Fun.Step : V2d * V2d -> V2d @>
+                exactly <@ Fun.Step : V2d * float -> V2d @>
+                exactly <@ Fun.Step : V3f * V3f -> V3f @>
+                exactly <@ Fun.Step : V3f * float32 -> V3f @>
+                exactly <@ Fun.Step : V3d * V3d -> V3d @>
+                exactly <@ Fun.Step : V3d * float -> V3d @>
+                exactly <@ Fun.Step : V4f * V4f -> V4f @>
+                exactly <@ Fun.Step : V4f * float32 -> V4f @>
+                exactly <@ Fun.Step : V4d * V4d -> V4d @>
+                exactly <@ Fun.Step : V4d * float -> V4d @>
+            ]
+
+            CIntrinsic.simple "step", [
+                generic <@ step : float -> float -> _ @>
+            ]
+
             CIntrinsic.custom "smoothstep" [1; 2; 0], [
                 exactly <@ Fun.Smoothstep : float32 * float32 * float32 -> _ @>
                 exactly <@ Fun.Smoothstep : float * float * float -> _ @>
