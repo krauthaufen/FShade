@@ -1853,142 +1853,163 @@ module IntrinsicFunctions =
 
     let (|TextureLookup|_|) (mi : MethodInfo) =
         match mi with
-            | Method(name, ((ImageType(_, dim, isArray, isMS, valueType)::_) as args)) ->
+        | Method(name, ((ImageType(_, dim, isArray, isMS, valueType)::_) as args)) ->
 
-                let plainArgs(skip : int) =
-                    args |> List.skip skip |> List.mapi (fun i _ -> sprintf "{%d}" (skip + i)) |> String.concat ", "
+            let plainArgs(skip : int) =
+                args |> List.skip skip |> List.mapi (fun i _ -> sprintf "{%d}" (skip + i)) |> String.concat ", "
 
-                let argCount = List.length args - 1
+            let coordComponents =
+                match dim with
+                | SamplerDimension.Sampler1d -> 1
+                | SamplerDimension.Sampler2d -> 2
+                | SamplerDimension.Sampler3d -> 3
+                | SamplerDimension.SamplerCube -> 2
+                | _ -> failwithf "unknown sampler dimension: %A" dim
 
-                let functionName =
-                    match name with
-                        | "get_Size" -> "imageSize({0})"
-                        | "get_Item" when argCount = 1 -> sprintf "imageLoad(%s)" (plainArgs 0)
-                        | "set_Item" when argCount = 2 -> sprintf "imageStore(%s)" (plainArgs 0)
-                        | "get_Item" -> sprintf "imageLoad({0}, ivec%d(%s), 0)" argCount (plainArgs 1)
-                        | "AtomicCompareExchange" -> sprintf "imageAtomicCompSwap(%s)" (plainArgs 0)
-                        | "AtomicAdd" -> sprintf "imageAtomicAdd(%s)" (plainArgs 0)
+            let loadStoreArgs() =
+                let consumedArgs, reshapedArgs =
+                    if isArray || dim = SamplerDimension.SamplerCube then
+                        3, sprintf "{0}, ivec%d({1}, {2})" (coordComponents + 1)
+                    else
+                        1, "{0}"
 
+                let args = List.skip consumedArgs args
 
+                let rest =
+                    match args with
+                    | [] -> ""
+                    | _ ->
+                        args |> List.mapi (fun i _ -> sprintf "{%d}" (i + consumedArgs)) |> String.concat ", " |> sprintf ", %s"
 
-                        | _ ->failwithf "unknown image function %A" name
+                reshapedArgs + rest
 
-                Some functionName
-
-            | Method(name, ((SamplerType(dim, isArray, isShadow, isMS, valueType)::_) as args)) ->
-                let coordComponents =
-                    match dim with
-                        | SamplerDimension.Sampler1d -> 1
-                        | SamplerDimension.Sampler2d -> 2
-                        | SamplerDimension.Sampler3d -> 3
-                        | SamplerDimension.SamplerCube -> 3
-                        | _ -> failwithf "unknown sampler dimension: %A" dim
-
-                let fetchArgs() =
-                    let consumedArgs, sampleArgs =
-                        match isArray with
-                            | true -> 3, sprintf "{0}, ivec%d({1}, {2})" (coordComponents + 1)
-                            | false -> 2, "{0}, {1}"
-
-                    let args = List.skip consumedArgs args
-
-                    let rest =
-                        match args with
-                            | [] ->
-                                ", 0"
-                            | _ ->
-                                args |> List.mapi (fun i _ -> sprintf "{%d}" (i + consumedArgs)) |> String.concat ", " |> sprintf ", %s"
+            let functionName =
+                match name with
+                | "get_Size" -> "imageSize({0})"
+                | "Load" | "get_Item" -> sprintf "imageLoad(%s)" (loadStoreArgs())
+                | "Store" | "set_Item" -> sprintf "imageStore(%s)" (loadStoreArgs())
 
 
-                    sampleArgs + rest
+                | "AtomicCompareExchange" -> sprintf "imageAtomicCompSwap(%s)" (plainArgs 0)
+                | "AtomicAdd" -> sprintf "imageAtomicAdd(%s)" (plainArgs 0)
+                | _ -> failwithf "unknown image function %s" name
 
-                let sampleArgs (separateCmpArg : bool) =
-                    let consumedArgs, sampleArgs =
-                        match isArray, isShadow && not separateCmpArg with
-                        | true, true ->
-                            if coordComponents = 3 then
-                                4, "{0}, vec4({1}, {2}), {3}" // Cube array shadow sampler has separate cmp argument
-                            else
-                                4, sprintf "{0}, vec%d({1}, {2}, {3})" (coordComponents + 2)
+            Some functionName
 
-                        | true, false ->
+        | Method(name, ((SamplerType(dim, isArray, isShadow, isMS, valueType)::_) as args)) ->
+            let coordComponents =
+                match dim with
+                    | SamplerDimension.Sampler1d -> 1
+                    | SamplerDimension.Sampler2d -> 2
+                    | SamplerDimension.Sampler3d -> 3
+                    | SamplerDimension.SamplerCube -> 3
+                    | _ -> failwithf "unknown sampler dimension: %A" dim
+
+            let fetchArgs() =
+                let consumedArgs, sampleArgs =
+                    match isArray with
+                        | true -> 3, sprintf "{0}, ivec%d({1}, {2})" (coordComponents + 1)
+                        | false -> 2, "{0}, {1}"
+
+                let args = List.skip consumedArgs args
+
+                let rest =
+                    match args with
+                    | [] ->
+                        ""
+                    | _ ->
+                        args |> List.mapi (fun i _ -> sprintf "{%d}" (i + consumedArgs)) |> String.concat ", " |> sprintf ", %s"
+
+
+                sampleArgs + rest
+
+            let sampleArgs (separateCmpArg : bool) =
+                let consumedArgs, sampleArgs =
+                    match isArray, isShadow && not separateCmpArg with
+                    | true, true ->
+                        if coordComponents = 3 then
+                            4, "{0}, vec4({1}, {2}), {3}" // Cube array shadow sampler has separate cmp argument
+                        else
+                            4, sprintf "{0}, vec%d({1}, {2}, {3})" (coordComponents + 2)
+
+                    | true, false ->
+                        3, sprintf "{0}, vec%d({1}, {2})" (coordComponents + 1)
+
+                    | false, true ->
+                        if coordComponents = 1 then
+                            3, "{0}, vec3({1}, 0, {2})" // 1D shadow sampler has unused 2nd component
+                        else
                             3, sprintf "{0}, vec%d({1}, {2})" (coordComponents + 1)
 
-                        | false, true ->
-                            if coordComponents = 1 then
-                                3, "{0}, vec3({1}, 0, {2})" // 1D shadow sampler has unused 2nd component
-                            else
-                                3, sprintf "{0}, vec%d({1}, {2})" (coordComponents + 1)
+                    | false, false ->
+                        2, "{0}, {1}"
 
-                        | false, false ->
-                            2, "{0}, {1}"
+                let args = List.skip consumedArgs args
 
-                    let args = List.skip consumedArgs args
+                let rest =
+                    match args with
+                        | [] -> ""
+                        | _ ->
+                            args |> List.mapi (fun i _ -> sprintf "{%d}" (i + consumedArgs)) |> String.concat ", " |> sprintf ", %s"
 
-                    let rest =
-                        match args with
-                            | [] -> ""
-                            | _ ->
-                                args |> List.mapi (fun i _ -> sprintf "{%d}" (i + consumedArgs)) |> String.concat ", " |> sprintf ", %s"
-
-                    sampleArgs + rest
+                sampleArgs + rest
 
 
-                let projArgs() =
-                    let consumedArgs, sampleArgs =
-                        if isShadow then
-                            if coordComponents = 1 then
-                                3, "{0}, vec4({1}, {2}, 0).xwzy"
-                            else
-                                3, "{0}, vec4({1}, {2}).xywz"
+            let projArgs() =
+                let consumedArgs, sampleArgs =
+                    if isShadow then
+                        if coordComponents = 1 then
+                            3, "{0}, vec4({1}, {2}, 0).xwzy"
                         else
-                            2, "{0}, {1}"
+                            3, "{0}, vec4({1}, {2}).xywz"
+                    else
+                        2, "{0}, {1}"
 
-                    let args = List.skip consumedArgs args
+                let args = List.skip consumedArgs args
 
-                    let rest =
-                        match args with
-                            | [] -> ""
-                            | _ ->
-                                args |> List.mapi (fun i _ -> sprintf "{%d}" (i + consumedArgs)) |> String.concat ", " |> sprintf ", %s"
+                let rest =
+                    match args with
+                        | [] -> ""
+                        | _ ->
+                            args |> List.mapi (fun i _ -> sprintf "{%d}" (i + consumedArgs)) |> String.concat ", " |> sprintf ", %s"
 
-                    sampleArgs + rest
-
-
-                let plainArgs(skip : int) =
-                    args |> List.skip skip |> List.mapi (fun i _ -> sprintf "{%d}" (skip + i)) |> String.concat ", "
+                sampleArgs + rest
 
 
-                let argCount = List.length args - 1
+            let plainArgs(skip : int) =
+                args |> List.skip skip |> List.mapi (fun i _ -> sprintf "{%d}" (skip + i)) |> String.concat ", "
 
-                match name with
-                | "get_Size" ->
-                    if isMS then Some "textureSize({0})"
-                    else Some "textureSize({0}, 0)"
 
-                | "get_MipMapLevels" ->
-                    if isMS then Some "1"
-                    else Some "textureQueryLevels({0})"
+            let argCount = List.length args - 1
 
-                | "GetSize" ->
-                    if isMS then Some "textureSize({0})"
-                    else Some "textureSize({0}, {1})"
+            match name with
+            | "get_Size" ->
+                if isMS then Some "textureSize({0})"
+                else Some "textureSize({0}, 0)"
 
-                | "Sample" -> sprintf "texture(%s)" (sampleArgs false) |> Some
-                | "SampleOffset" -> sprintf "textureOffset(%s)" (sampleArgs false) |> Some
-                | "SampleProj" -> sprintf "textureProj(%s)" (projArgs()) |> Some
-                | "SampleLevel" -> sprintf "textureLod(%s)" (sampleArgs false) |> Some
-                | "SampleLevelOffset" -> sprintf "textureLodOffset(%s)" (sampleArgs false) |> Some
-                | "SampleGrad" -> sprintf "textureGrad(%s)" (sampleArgs false) |> Some
-                | "Gather" -> sprintf "textureGather(%s)" (sampleArgs true) |> Some
-                | "GatherOffset" -> sprintf "textureGatherOffset(%s)" (sampleArgs true) |> Some
+            | "get_MipMapLevels" ->
+                if isMS then Some "1"
+                else Some "textureQueryLevels({0})"
 
-                | "Read" -> sprintf "texelFetch(%s)" (fetchArgs()) |> Some
-                | "get_Item" -> sprintf "texelFetch(%s)" (fetchArgs()) |> Some
+            | "GetSize" ->
+                if isMS then Some "textureSize({0})"
+                else Some "textureSize({0}, {1})"
 
-                | "QueryLod" -> sprintf "textureQueryLod(%s)" (plainArgs 0) |> Some
+            | "Sample" -> sprintf "texture(%s)" (sampleArgs false) |> Some
+            | "SampleOffset" -> sprintf "textureOffset(%s)" (sampleArgs false) |> Some
+            | "SampleProj" -> sprintf "textureProj(%s)" (projArgs()) |> Some
+            | "SampleLevel" -> sprintf "textureLod(%s)" (sampleArgs false) |> Some
+            | "SampleLevelOffset" -> sprintf "textureLodOffset(%s)" (sampleArgs false) |> Some
+            | "SampleGrad" -> sprintf "textureGrad(%s)" (sampleArgs false) |> Some
+            | "Gather" -> sprintf "textureGather(%s)" (sampleArgs true) |> Some
+            | "GatherOffset" -> sprintf "textureGatherOffset(%s)" (sampleArgs true) |> Some
 
-                | name -> None
-            | _ ->
-                None
+            | "Read" -> sprintf "texelFetch(%s)" (fetchArgs()) |> Some
+            | "get_Item" -> sprintf "texelFetch(%s)" (fetchArgs()) |> Some
+
+            | "QueryLod" -> sprintf "textureQueryLod(%s)" (plainArgs 0) |> Some
+
+            | _ -> failwithf "unknown sampler function %s" name
+        | _ ->
+            None
 

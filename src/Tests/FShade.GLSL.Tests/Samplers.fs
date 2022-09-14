@@ -59,7 +59,7 @@ let ``Simple Fetch`` () =
 
     GLSL.shouldCompile [ Effect.ofFunction (frag) ]
 
-let intergerSampler =
+let integerSampler =
     intSampler2d {
         texture uniform?IntTexture
     }
@@ -70,7 +70,7 @@ let ``IntSampler`` () =
 
     let ps (v : Vertex) =
         fragment {
-            let value = intergerSampler.Sample(v.pos.XY).X
+            let value = integerSampler.Sample(v.pos.XY).X
             return V4d(value, 1, 1, 1)
         }
 

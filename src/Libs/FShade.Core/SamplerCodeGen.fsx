@@ -69,8 +69,8 @@ type SampleVariants =
     | Bias = 0x1
     
 
-let samplerFunctionDefaultArgs (comment : string) (variants : SampleVariants) (name : string)
-                               (args : list<string * string * Option<string>>) (ret : string) =
+let memberFunctionAttributesDefaultArgs (comment : string) (attributes : Option<string>) (variants : SampleVariants) (name : string)
+                                        (args : list<string * string * Option<string>>) (ret : string) =
     let args =
         args |> List.map (fun (n,t,o) ->
             match o with
@@ -80,6 +80,11 @@ let samplerFunctionDefaultArgs (comment : string) (variants : SampleVariants) (n
 
 
     line "/// %s" comment
+
+    match attributes with
+    | Some attr -> line "%s" attr
+    | _ -> ()
+
     line "member x.%s(%s) : %s = onlyInShaderCode \"%s\"" name args ret name
     line ""
 
@@ -88,7 +93,20 @@ let samplerFunctionDefaultArgs (comment : string) (variants : SampleVariants) (n
         line "member x.%s(%s, lodBias : float) : %s = onlyInShaderCode \"%s\"" name args ret name
         line ""
 
-let memberDefaultArgs (comment : string) (name : string) (args : list<string * string * Option<string>>) (ret : string) =
+let memberFunctionDefaultArgs (comment : string) (variants : SampleVariants) (name : string)
+                              (args : list<string * string * Option<string>>) (ret : string) =
+    memberFunctionAttributesDefaultArgs comment None variants name args ret
+
+let memberFunctionAttributes (comment : string) (attributes : Option<string>) (variants : SampleVariants)
+                             (name : string) (args : list<string * string>) (ret : string) =
+    let args = args |> List.map (fun (n, t) -> n, t, None)
+    memberFunctionAttributesDefaultArgs comment attributes variants name args ret
+
+let memberFunction (comment : string) (variants : SampleVariants)
+                   (name : string) (args : list<string * string>) (ret : string) =
+    memberFunctionAttributes comment None variants name args ret
+
+let propertyDefaultArgs (comment : string) (name : string) (setter : Option<String>) (args : list<string * string * Option<string>>) (ret : string) =
     let args =
         args |> List.map (fun (n,t,o) ->
             match o with
@@ -99,11 +117,18 @@ let memberDefaultArgs (comment : string) (name : string) (args : list<string * s
     line "/// %s" comment
     line "member x.Item"
     line "    with get (%s) : %s = onlyInShaderCode \"%s\"" args ret name
+
+    match setter with
+    | Some name ->
+        line "    and set (%s) (data : %s) : unit = onlyInShaderCode \"%s\"" args ret name
+    | _ ->
+        ()
+
     line ""
 
-let samplerFunction (comment : string) (variants : SampleVariants) (name : string) (args : list<string * string>) (ret : string) =
+let property (comment : string) (name : string) (setter : Option<String>) (args : list<string * string>) (ret : string) =
     let args = args |> List.map (fun (n, t) -> n, t, None)
-    samplerFunctionDefaultArgs comment variants name args ret
+    propertyDefaultArgs comment name setter args ret
 
 let floatVec (c : int) =
     match c with
@@ -231,7 +256,7 @@ let run() =
                 else
                     SampleVariants.Bias
 
-            samplerFunction
+            memberFunction
                 "regular sampled texture-lookup"
                 variant
                 "Sample"
@@ -240,7 +265,7 @@ let run() =
 
         // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureOffset.xhtml
         if d <> SamplerDimension.SamplerCube && not m then
-            samplerFunction
+            memberFunction
                 "regular sampled texture-lookup with offset"
                 SampleVariants.Bias
                 "SampleOffset"
@@ -249,7 +274,7 @@ let run() =
 
         // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureProj.xhtml
         if d <> SamplerDimension.SamplerCube && not m && not a then
-            samplerFunction
+            memberFunction
                 "projective sampled texture-lookup"
                 SampleVariants.Bias
                 "SampleProj"
@@ -258,7 +283,7 @@ let run() =
 
         // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureLod.xhtml
         if not m && not (s && d = SamplerDimension.SamplerCube) && not (s && a && d = SamplerDimension.Sampler2d) then
-            samplerFunction
+            memberFunction
                 "sampled texture-lookup with given level"
                 SampleVariants.None
                 "SampleLevel"
@@ -267,7 +292,7 @@ let run() =
 
         // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureLodOffset.xhtml
         if not m && d <> SamplerDimension.SamplerCube && not (s && a && d = SamplerDimension.Sampler2d) then
-            samplerFunction
+            memberFunction
                 "sampled texture-lookup with given level and offset"
                 SampleVariants.None
                 "SampleLevelOffset"
@@ -276,7 +301,7 @@ let run() =
 
         // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureGrad.xhtml
         if not m then
-            samplerFunction
+            memberFunction
                 "sampled texture-lookup with explicit gradients"
                 SampleVariants.None
                 "SampleGrad"
@@ -285,7 +310,7 @@ let run() =
 
         // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureQueryLod.xhtml
         if not m then
-            samplerFunction
+            memberFunction
                 "query lod levels"
                 SampleVariants.None
                 "QueryLod"
@@ -301,7 +326,7 @@ let run() =
                 else
                     ["coord", coordType, None] @ additionalDefaultArgs  @ ["comp", "int", Some "0"]
 
-            samplerFunctionDefaultArgs
+            memberFunctionDefaultArgs
                 "gathers one component for the neighbouring 4 texels"
                 SampleVariants.None
                 "Gather"
@@ -317,7 +342,7 @@ let run() =
                 else
                     ["coord", coordType, None] @ additionalDefaultArgs @ ["offset", texelCoordType, None; "comp", "int", Some "0"]
 
-            samplerFunctionDefaultArgs
+            memberFunctionDefaultArgs
                 "gathers one component for the neighbouring 4 texels"
                 SampleVariants.None
                 "GatherOffset"
@@ -333,16 +358,17 @@ let run() =
                 else
                     ["coord", texelCoordType, None] @ additionalDefaultArgs @ ["lod", "int", Some "0"]
 
-            samplerFunctionDefaultArgs
+            memberFunctionDefaultArgs
                 "non-sampled texture read"
                 SampleVariants.None
                 "Read"
                 arguments
                 returnType
 
-            memberDefaultArgs
+            propertyDefaultArgs
                 "non-sampled texture read"
                 "Fetch"
+                None
                 arguments
                 returnType
 
@@ -424,7 +450,7 @@ let run() =
                 | SamplerDimension.Sampler1d -> 1
                 | SamplerDimension.Sampler2d -> 2
                 | SamplerDimension.Sampler3d -> 3
-                | SamplerDimension.SamplerCube -> 3
+                | SamplerDimension.SamplerCube -> 2
                 | _ -> failwith "unsupported image-kind"
 
         let coordType = intVec coordComponents
@@ -459,22 +485,45 @@ let run() =
         line  ""
 
         line "member x.Size : %s = onlyInShaderCode \"Size\"" sizeType
+        line  ""
 
 
         let args =
             [
                 yield "coord", coordType
-                if a then yield "slice", "int"
+                if d = SamplerDimension.SamplerCube then
+                    if a then
+                        yield "layerFace", "int"
+                    else
+                        yield "face", "int"
+                elif a then
+                    yield "slice", "int"
                 if m then yield "sample", "int"
             ]
 
         let itemArgs = args |> List.map (fun (n,t) -> sprintf "%s : %s" n t) |> String.concat ", "
 
-        start "member x.Item"
-        line "with get(%s) : %s = onlyInShaderCode \"fetch\"" itemArgs returnType
-        line "and set(%s) (v : %s) : unit = onlyInShaderCode \"write\"" itemArgs returnType
-        stop()
+        memberFunction
+            "load single texel from image"
+            SampleVariants.None
+            "Load"
+            args
+            returnType
 
+        memberFunctionAttributes
+            "write single texel into image"
+            (Some "[<FShade.Imperative.KeepCall>]")
+            SampleVariants.None
+            "Store"
+            (args @ ["data", returnType])
+            "unit"
+
+        property
+            "access single texel of image"
+            "Load"
+            (Some "Store")
+            args
+            returnType
 
         if t = SamplerType.Int then
             line "member x.AtomicAdd(%s, data : int) : int = onlyInShaderCode \"AtomicAdd\"" itemArgs

@@ -1359,10 +1359,19 @@ type Image1dArray<'f when 'f :> Formats.IFloatingFormat>() =
     static member IsMultisampled = false
     
     member x.Size : V2i = onlyInShaderCode "Size"
+    
+    /// load single texel from image
+    member x.Load(coord : int, slice : int) : V4d = onlyInShaderCode "Load"
+    
+    /// write single texel into image
+    [<FShade.Imperative.KeepCall>]
+    member x.Store(coord : int, slice : int, data : V4d) : unit = onlyInShaderCode "Store"
+    
+    /// access single texel of image
     member x.Item
-        with get(coord : int, slice : int) : V4d = onlyInShaderCode "fetch"
-        and set(coord : int, slice : int) (v : V4d) : unit = onlyInShaderCode "write"
-
+        with get (coord : int, slice : int) : V4d = onlyInShaderCode "Load"
+        and set (coord : int, slice : int) (data : V4d) : unit = onlyInShaderCode "Store"
+    
 
 type Image1d<'f when 'f :> Formats.IFloatingFormat>() =
     interface IImage
@@ -1374,10 +1383,19 @@ type Image1d<'f when 'f :> Formats.IFloatingFormat>() =
     static member IsMultisampled = false
     
     member x.Size : int = onlyInShaderCode "Size"
+    
+    /// load single texel from image
+    member x.Load(coord : int) : V4d = onlyInShaderCode "Load"
+    
+    /// write single texel into image
+    [<FShade.Imperative.KeepCall>]
+    member x.Store(coord : int, data : V4d) : unit = onlyInShaderCode "Store"
+    
+    /// access single texel of image
     member x.Item
-        with get(coord : int) : V4d = onlyInShaderCode "fetch"
-        and set(coord : int) (v : V4d) : unit = onlyInShaderCode "write"
-
+        with get (coord : int) : V4d = onlyInShaderCode "Load"
+        and set (coord : int) (data : V4d) : unit = onlyInShaderCode "Store"
+    
 
 type Image2dArrayMS<'f when 'f :> Formats.IFloatingFormat>() =
     interface IImage
@@ -1389,10 +1407,19 @@ type Image2dArrayMS<'f when 'f :> Formats.IFloatingFormat>() =
     static member IsMultisampled = true
     
     member x.Size : V3i = onlyInShaderCode "Size"
+    
+    /// load single texel from image
+    member x.Load(coord : V2i, slice : int, sample : int) : V4d = onlyInShaderCode "Load"
+    
+    /// write single texel into image
+    [<FShade.Imperative.KeepCall>]
+    member x.Store(coord : V2i, slice : int, sample : int, data : V4d) : unit = onlyInShaderCode "Store"
+    
+    /// access single texel of image
     member x.Item
-        with get(coord : V2i, slice : int, sample : int) : V4d = onlyInShaderCode "fetch"
-        and set(coord : V2i, slice : int, sample : int) (v : V4d) : unit = onlyInShaderCode "write"
-
+        with get (coord : V2i, slice : int, sample : int) : V4d = onlyInShaderCode "Load"
+        and set (coord : V2i, slice : int, sample : int) (data : V4d) : unit = onlyInShaderCode "Store"
+    
 
 type Image2dArray<'f when 'f :> Formats.IFloatingFormat>() =
     interface IImage
@@ -1404,10 +1431,19 @@ type Image2dArray<'f when 'f :> Formats.IFloatingFormat>() =
     static member IsMultisampled = false
     
     member x.Size : V3i = onlyInShaderCode "Size"
+    
+    /// load single texel from image
+    member x.Load(coord : V2i, slice : int) : V4d = onlyInShaderCode "Load"
+    
+    /// write single texel into image
+    [<FShade.Imperative.KeepCall>]
+    member x.Store(coord : V2i, slice : int, data : V4d) : unit = onlyInShaderCode "Store"
+    
+    /// access single texel of image
     member x.Item
-        with get(coord : V2i, slice : int) : V4d = onlyInShaderCode "fetch"
-        and set(coord : V2i, slice : int) (v : V4d) : unit = onlyInShaderCode "write"
-
+        with get (coord : V2i, slice : int) : V4d = onlyInShaderCode "Load"
+        and set (coord : V2i, slice : int) (data : V4d) : unit = onlyInShaderCode "Store"
+    
 
 type Image2dMS<'f when 'f :> Formats.IFloatingFormat>() =
     interface IImage
@@ -1419,10 +1455,19 @@ type Image2dMS<'f when 'f :> Formats.IFloatingFormat>() =
     static member IsMultisampled = true
     
     member x.Size : V2i = onlyInShaderCode "Size"
+    
+    /// load single texel from image
+    member x.Load(coord : V2i, sample : int) : V4d = onlyInShaderCode "Load"
+    
+    /// write single texel into image
+    [<FShade.Imperative.KeepCall>]
+    member x.Store(coord : V2i, sample : int, data : V4d) : unit = onlyInShaderCode "Store"
+    
+    /// access single texel of image
     member x.Item
-        with get(coord : V2i, sample : int) : V4d = onlyInShaderCode "fetch"
-        and set(coord : V2i, sample : int) (v : V4d) : unit = onlyInShaderCode "write"
-
+        with get (coord : V2i, sample : int) : V4d = onlyInShaderCode "Load"
+        and set (coord : V2i, sample : int) (data : V4d) : unit = onlyInShaderCode "Store"
+    
 
 type Image2d<'f when 'f :> Formats.IFloatingFormat>() =
     interface IImage
@@ -1434,10 +1479,19 @@ type Image2d<'f when 'f :> Formats.IFloatingFormat>() =
     static member IsMultisampled = false
     
     member x.Size : V2i = onlyInShaderCode "Size"
+    
+    /// load single texel from image
+    member x.Load(coord : V2i) : V4d = onlyInShaderCode "Load"
+    
+    /// write single texel into image
+    [<FShade.Imperative.KeepCall>]
+    member x.Store(coord : V2i, data : V4d) : unit = onlyInShaderCode "Store"
+    
+    /// access single texel of image
     member x.Item
-        with get(coord : V2i) : V4d = onlyInShaderCode "fetch"
-        and set(coord : V2i) (v : V4d) : unit = onlyInShaderCode "write"
-
+        with get (coord : V2i) : V4d = onlyInShaderCode "Load"
+        and set (coord : V2i) (data : V4d) : unit = onlyInShaderCode "Store"
+    
 
 type Image3d<'f when 'f :> Formats.IFloatingFormat>() =
     interface IImage
@@ -1449,40 +1503,67 @@ type Image3d<'f when 'f :> Formats.IFloatingFormat>() =
     static member IsMultisampled = false
     
     member x.Size : V3i = onlyInShaderCode "Size"
+    
+    /// load single texel from image
+    member x.Load(coord : V3i) : V4d = onlyInShaderCode "Load"
+    
+    /// write single texel into image
+    [<FShade.Imperative.KeepCall>]
+    member x.Store(coord : V3i, data : V4d) : unit = onlyInShaderCode "Store"
+    
+    /// access single texel of image
     member x.Item
-        with get(coord : V3i) : V4d = onlyInShaderCode "fetch"
-        and set(coord : V3i) (v : V4d) : unit = onlyInShaderCode "write"
-
+        with get (coord : V3i) : V4d = onlyInShaderCode "Load"
+        and set (coord : V3i) (data : V4d) : unit = onlyInShaderCode "Store"
+    
 
 type ImageCubeArray<'f when 'f :> Formats.IFloatingFormat>() =
     interface IImage
     static member FormatType = typeof<'f>
     static member Dimension = SamplerDimension.SamplerCube
     static member ValueType = typeof<V4d>
-    static member CoordType = typeof<V3i>
+    static member CoordType = typeof<V2i>
     static member IsArray = true
     static member IsMultisampled = false
     
     member x.Size : V3i = onlyInShaderCode "Size"
+    
+    /// load single texel from image
+    member x.Load(coord : V2i, layerFace : int) : V4d = onlyInShaderCode "Load"
+    
+    /// write single texel into image
+    [<FShade.Imperative.KeepCall>]
+    member x.Store(coord : V2i, layerFace : int, data : V4d) : unit = onlyInShaderCode "Store"
+    
+    /// access single texel of image
     member x.Item
-        with get(coord : V3i, slice : int) : V4d = onlyInShaderCode "fetch"
-        and set(coord : V3i, slice : int) (v : V4d) : unit = onlyInShaderCode "write"
-
+        with get (coord : V2i, layerFace : int) : V4d = onlyInShaderCode "Load"
+        and set (coord : V2i, layerFace : int) (data : V4d) : unit = onlyInShaderCode "Store"
+    
 
 type ImageCube<'f when 'f :> Formats.IFloatingFormat>() =
     interface IImage
     static member FormatType = typeof<'f>
     static member Dimension = SamplerDimension.SamplerCube
     static member ValueType = typeof<V4d>
-    static member CoordType = typeof<V3i>
+    static member CoordType = typeof<V2i>
     static member IsArray = false
     static member IsMultisampled = false
     
     member x.Size : V2i = onlyInShaderCode "Size"
+    
+    /// load single texel from image
+    member x.Load(coord : V2i, face : int) : V4d = onlyInShaderCode "Load"
+    
+    /// write single texel into image
+    [<FShade.Imperative.KeepCall>]
+    member x.Store(coord : V2i, face : int, data : V4d) : unit = onlyInShaderCode "Store"
+    
+    /// access single texel of image
     member x.Item
-        with get(coord : V3i) : V4d = onlyInShaderCode "fetch"
-        and set(coord : V3i) (v : V4d) : unit = onlyInShaderCode "write"
-
+        with get (coord : V2i, face : int) : V4d = onlyInShaderCode "Load"
+        and set (coord : V2i, face : int) (data : V4d) : unit = onlyInShaderCode "Store"
+    
 
 type IntImage1dArray<'f when 'f :> Formats.ISignedFormat>() =
     interface IImage
@@ -1494,10 +1575,19 @@ type IntImage1dArray<'f when 'f :> Formats.ISignedFormat>() =
     static member IsMultisampled = false
     
     member x.Size : V2i = onlyInShaderCode "Size"
+    
+    /// load single texel from image
+    member x.Load(coord : int, slice : int) : V4i = onlyInShaderCode "Load"
+    
+    /// write single texel into image
+    [<FShade.Imperative.KeepCall>]
+    member x.Store(coord : int, slice : int, data : V4i) : unit = onlyInShaderCode "Store"
+    
+    /// access single texel of image
     member x.Item
-        with get(coord : int, slice : int) : V4i = onlyInShaderCode "fetch"
-        and set(coord : int, slice : int) (v : V4i) : unit = onlyInShaderCode "write"
-
+        with get (coord : int, slice : int) : V4i = onlyInShaderCode "Load"
+        and set (coord : int, slice : int) (data : V4i) : unit = onlyInShaderCode "Store"
+    
     member x.AtomicAdd(coord : int, slice : int, data : int) : int = onlyInShaderCode "AtomicAdd"
     member x.AtomicMin(coord : int, slice : int, data : int) : int = onlyInShaderCode "AtomicMin"
     member x.AtomicMax(coord : int, slice : int, data : int) : int = onlyInShaderCode "AtomicMax"
@@ -1517,10 +1607,19 @@ type IntImage1d<'f when 'f :> Formats.ISignedFormat>() =
     static member IsMultisampled = false
     
     member x.Size : int = onlyInShaderCode "Size"
+    
+    /// load single texel from image
+    member x.Load(coord : int) : V4i = onlyInShaderCode "Load"
+    
+    /// write single texel into image
+    [<FShade.Imperative.KeepCall>]
+    member x.Store(coord : int, data : V4i) : unit = onlyInShaderCode "Store"
+    
+    /// access single texel of image
     member x.Item
-        with get(coord : int) : V4i = onlyInShaderCode "fetch"
-        and set(coord : int) (v : V4i) : unit = onlyInShaderCode "write"
-
+        with get (coord : int) : V4i = onlyInShaderCode "Load"
+        and set (coord : int) (data : V4i) : unit = onlyInShaderCode "Store"
+    
     member x.AtomicAdd(coord : int, data : int) : int = onlyInShaderCode "AtomicAdd"
     member x.AtomicMin(coord : int, data : int) : int = onlyInShaderCode "AtomicMin"
     member x.AtomicMax(coord : int, data : int) : int = onlyInShaderCode "AtomicMax"
@@ -1540,10 +1639,19 @@ type IntImage2dArrayMS<'f when 'f :> Formats.ISignedFormat>() =
     static member IsMultisampled = true
     
     member x.Size : V3i = onlyInShaderCode "Size"
+    
+    /// load single texel from image
+    member x.Load(coord : V2i, slice : int, sample : int) : V4i = onlyInShaderCode "Load"
+    
+    /// write single texel into image
+    [<FShade.Imperative.KeepCall>]
+    member x.Store(coord : V2i, slice : int, sample : int, data : V4i) : unit = onlyInShaderCode "Store"
+    
+    /// access single texel of image
     member x.Item
-        with get(coord : V2i, slice : int, sample : int) : V4i = onlyInShaderCode "fetch"
-        and set(coord : V2i, slice : int, sample : int) (v : V4i) : unit = onlyInShaderCode "write"
-
+        with get (coord : V2i, slice : int, sample : int) : V4i = onlyInShaderCode "Load"
+        and set (coord : V2i, slice : int, sample : int) (data : V4i) : unit = onlyInShaderCode "Store"
+    
     member x.AtomicAdd(coord : V2i, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicAdd"
     member x.AtomicMin(coord : V2i, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicMin"
     member x.AtomicMax(coord : V2i, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicMax"
@@ -1563,10 +1671,19 @@ type IntImage2dArray<'f when 'f :> Formats.ISignedFormat>() =
     static member IsMultisampled = false
     
     member x.Size : V3i = onlyInShaderCode "Size"
+    
+    /// load single texel from image
+    member x.Load(coord : V2i, slice : int) : V4i = onlyInShaderCode "Load"
+    
+    /// write single texel into image
+    [<FShade.Imperative.KeepCall>]
+    member x.Store(coord : V2i, slice : int, data : V4i) : unit = onlyInShaderCode "Store"
+    
+    /// access single texel of image
     member x.Item
-        with get(coord : V2i, slice : int) : V4i = onlyInShaderCode "fetch"
-        and set(coord : V2i, slice : int) (v : V4i) : unit = onlyInShaderCode "write"
-
+        with get (coord : V2i, slice : int) : V4i = onlyInShaderCode "Load"
+        and set (coord : V2i, slice : int) (data : V4i) : unit = onlyInShaderCode "Store"
+    
     member x.AtomicAdd(coord : V2i, slice : int, data : int) : int = onlyInShaderCode "AtomicAdd"
     member x.AtomicMin(coord : V2i, slice : int, data : int) : int = onlyInShaderCode "AtomicMin"
     member x.AtomicMax(coord : V2i, slice : int, data : int) : int = onlyInShaderCode "AtomicMax"
@@ -1586,10 +1703,19 @@ type IntImage2dMS<'f when 'f :> Formats.ISignedFormat>() =
     static member IsMultisampled = true
     
     member x.Size : V2i = onlyInShaderCode "Size"
+    
+    /// load single texel from image
+    member x.Load(coord : V2i, sample : int) : V4i = onlyInShaderCode "Load"
+    
+    /// write single texel into image
+    [<FShade.Imperative.KeepCall>]
+    member x.Store(coord : V2i, sample : int, data : V4i) : unit = onlyInShaderCode "Store"
+    
+    /// access single texel of image
     member x.Item
-        with get(coord : V2i, sample : int) : V4i = onlyInShaderCode "fetch"
-        and set(coord : V2i, sample : int) (v : V4i) : unit = onlyInShaderCode "write"
-
+        with get (coord : V2i, sample : int) : V4i = onlyInShaderCode "Load"
+        and set (coord : V2i, sample : int) (data : V4i) : unit = onlyInShaderCode "Store"
+    
     member x.AtomicAdd(coord : V2i, sample : int, data : int) : int = onlyInShaderCode "AtomicAdd"
     member x.AtomicMin(coord : V2i, sample : int, data : int) : int = onlyInShaderCode "AtomicMin"
     member x.AtomicMax(coord : V2i, sample : int, data : int) : int = onlyInShaderCode "AtomicMax"
@@ -1609,10 +1735,19 @@ type IntImage2d<'f when 'f :> Formats.ISignedFormat>() =
     static member IsMultisampled = false
     
     member x.Size : V2i = onlyInShaderCode "Size"
+    
+    /// load single texel from image
+    member x.Load(coord : V2i) : V4i = onlyInShaderCode "Load"
+    
+    /// write single texel into image
+    [<FShade.Imperative.KeepCall>]
+    member x.Store(coord : V2i, data : V4i) : unit = onlyInShaderCode "Store"
+    
+    /// access single texel of image
     member x.Item
-        with get(coord : V2i) : V4i = onlyInShaderCode "fetch"
-        and set(coord : V2i) (v : V4i) : unit = onlyInShaderCode "write"
-
+        with get (coord : V2i) : V4i = onlyInShaderCode "Load"
+        and set (coord : V2i) (data : V4i) : unit = onlyInShaderCode "Store"
+    
     member x.AtomicAdd(coord : V2i, data : int) : int = onlyInShaderCode "AtomicAdd"
     member x.AtomicMin(coord : V2i, data : int) : int = onlyInShaderCode "AtomicMin"
     member x.AtomicMax(coord : V2i, data : int) : int = onlyInShaderCode "AtomicMax"
@@ -1632,10 +1767,19 @@ type IntImage3d<'f when 'f :> Formats.ISignedFormat>() =
     static member IsMultisampled = false
     
     member x.Size : V3i = onlyInShaderCode "Size"
+    
+    /// load single texel from image
+    member x.Load(coord : V3i) : V4i = onlyInShaderCode "Load"
+    
+    /// write single texel into image
+    [<FShade.Imperative.KeepCall>]
+    member x.Store(coord : V3i, data : V4i) : unit = onlyInShaderCode "Store"
+    
+    /// access single texel of image
     member x.Item
-        with get(coord : V3i) : V4i = onlyInShaderCode "fetch"
-        and set(coord : V3i) (v : V4i) : unit = onlyInShaderCode "write"
-
+        with get (coord : V3i) : V4i = onlyInShaderCode "Load"
+        and set (coord : V3i) (data : V4i) : unit = onlyInShaderCode "Store"
+    
     member x.AtomicAdd(coord : V3i, data : int) : int = onlyInShaderCode "AtomicAdd"
     member x.AtomicMin(coord : V3i, data : int) : int = onlyInShaderCode "AtomicMin"
     member x.AtomicMax(coord : V3i, data : int) : int = onlyInShaderCode "AtomicMax"
@@ -1650,44 +1794,62 @@ type IntImageCubeArray<'f when 'f :> Formats.ISignedFormat>() =
     static member FormatType = typeof<'f>
     static member Dimension = SamplerDimension.SamplerCube
     static member ValueType = typeof<V4i>
-    static member CoordType = typeof<V3i>
+    static member CoordType = typeof<V2i>
     static member IsArray = true
     static member IsMultisampled = false
     
     member x.Size : V3i = onlyInShaderCode "Size"
+    
+    /// load single texel from image
+    member x.Load(coord : V2i, layerFace : int) : V4i = onlyInShaderCode "Load"
+    
+    /// write single texel into image
+    [<FShade.Imperative.KeepCall>]
+    member x.Store(coord : V2i, layerFace : int, data : V4i) : unit = onlyInShaderCode "Store"
+    
+    /// access single texel of image
     member x.Item
-        with get(coord : V3i, slice : int) : V4i = onlyInShaderCode "fetch"
-        and set(coord : V3i, slice : int) (v : V4i) : unit = onlyInShaderCode "write"
-
-    member x.AtomicAdd(coord : V3i, slice : int, data : int) : int = onlyInShaderCode "AtomicAdd"
-    member x.AtomicMin(coord : V3i, slice : int, data : int) : int = onlyInShaderCode "AtomicMin"
-    member x.AtomicMax(coord : V3i, slice : int, data : int) : int = onlyInShaderCode "AtomicMax"
-    member x.AtomicAnd(coord : V3i, slice : int, data : int) : int = onlyInShaderCode "AtomicAnd"
-    member x.AtomicOr(coord : V3i, slice : int, data : int) : int = onlyInShaderCode "AtomicOr"
-    member x.AtomicXor(coord : V3i, slice : int, data : int) : int = onlyInShaderCode "AtomicXor"
-    member x.AtomicExchange(coord : V3i, slice : int, data : int) : int = onlyInShaderCode "AtomicExchange"
-    member x.AtomicCompareExchange(coord : V3i, slice : int, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
+        with get (coord : V2i, layerFace : int) : V4i = onlyInShaderCode "Load"
+        and set (coord : V2i, layerFace : int) (data : V4i) : unit = onlyInShaderCode "Store"
+    
+    member x.AtomicAdd(coord : V2i, layerFace : int, data : int) : int = onlyInShaderCode "AtomicAdd"
+    member x.AtomicMin(coord : V2i, layerFace : int, data : int) : int = onlyInShaderCode "AtomicMin"
+    member x.AtomicMax(coord : V2i, layerFace : int, data : int) : int = onlyInShaderCode "AtomicMax"
+    member x.AtomicAnd(coord : V2i, layerFace : int, data : int) : int = onlyInShaderCode "AtomicAnd"
+    member x.AtomicOr(coord : V2i, layerFace : int, data : int) : int = onlyInShaderCode "AtomicOr"
+    member x.AtomicXor(coord : V2i, layerFace : int, data : int) : int = onlyInShaderCode "AtomicXor"
+    member x.AtomicExchange(coord : V2i, layerFace : int, data : int) : int = onlyInShaderCode "AtomicExchange"
+    member x.AtomicCompareExchange(coord : V2i, layerFace : int, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
 
 type IntImageCube<'f when 'f :> Formats.ISignedFormat>() =
     interface IImage
     static member FormatType = typeof<'f>
     static member Dimension = SamplerDimension.SamplerCube
     static member ValueType = typeof<V4i>
-    static member CoordType = typeof<V3i>
+    static member CoordType = typeof<V2i>
     static member IsArray = false
     static member IsMultisampled = false
     
     member x.Size : V2i = onlyInShaderCode "Size"
+    
+    /// load single texel from image
+    member x.Load(coord : V2i, face : int) : V4i = onlyInShaderCode "Load"
+    
+    /// write single texel into image
+    [<FShade.Imperative.KeepCall>]
+    member x.Store(coord : V2i, face : int, data : V4i) : unit = onlyInShaderCode "Store"
+    
+    /// access single texel of image
     member x.Item
-        with get(coord : V3i) : V4i = onlyInShaderCode "fetch"
-        and set(coord : V3i) (v : V4i) : unit = onlyInShaderCode "write"
-
-    member x.AtomicAdd(coord : V3i, data : int) : int = onlyInShaderCode "AtomicAdd"
-    member x.AtomicMin(coord : V3i, data : int) : int = onlyInShaderCode "AtomicMin"
-    member x.AtomicMax(coord : V3i, data : int) : int = onlyInShaderCode "AtomicMax"
-    member x.AtomicAnd(coord : V3i, data : int) : int = onlyInShaderCode "AtomicAnd"
-    member x.AtomicOr(coord : V3i, data : int) : int = onlyInShaderCode "AtomicOr"
-    member x.AtomicXor(coord : V3i, data : int) : int = onlyInShaderCode "AtomicXor"
-    member x.AtomicExchange(coord : V3i, data : int) : int = onlyInShaderCode "AtomicExchange"
-    member x.AtomicCompareExchange(coord : V3i, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
+        with get (coord : V2i, face : int) : V4i = onlyInShaderCode "Load"
+        and set (coord : V2i, face : int) (data : V4i) : unit = onlyInShaderCode "Store"
+    
+    member x.AtomicAdd(coord : V2i, face : int, data : int) : int = onlyInShaderCode "AtomicAdd"
+    member x.AtomicMin(coord : V2i, face : int, data : int) : int = onlyInShaderCode "AtomicMin"
+    member x.AtomicMax(coord : V2i, face : int, data : int) : int = onlyInShaderCode "AtomicMax"
+    member x.AtomicAnd(coord : V2i, face : int, data : int) : int = onlyInShaderCode "AtomicAnd"
+    member x.AtomicOr(coord : V2i, face : int, data : int) : int = onlyInShaderCode "AtomicOr"
+    member x.AtomicXor(coord : V2i, face : int, data : int) : int = onlyInShaderCode "AtomicXor"
+    member x.AtomicExchange(coord : V2i, face : int, data : int) : int = onlyInShaderCode "AtomicExchange"
+    member x.AtomicCompareExchange(coord : V2i, face : int, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
 
