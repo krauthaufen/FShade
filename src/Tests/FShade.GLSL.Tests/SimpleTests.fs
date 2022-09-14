@@ -15,6 +15,12 @@ type Vertex =
         [<Interpolation(InterpolationMode.Flat ||| InterpolationMode.PerPatch)>] hugo2 : V3d
         foo : V4d
         what : V4i
+        [<Semantic("Id")>] id : int
+    }
+
+type IntVertex =
+    {
+        [<Color>] c : int
     }
 
 
@@ -1012,6 +1018,63 @@ let ``Integer with implicit flat interpolation 2``() =
         }
 
     GLSL.shouldCompile [Effect.ofFunction fs]
+
+[<Test>]
+let ``Integer fragment output``() =
+    Setup.Run()
+
+    let fs (v : IntVertex) =
+        fragment {
+            return V2i(v.c + 1, 0)
+        }
+
+    let fs2 (v : IntVertex) =
+        fragment {
+            return v.c + 2
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs; Effect.ofFunction fs2]
+
+[<Test>]
+let ``Integer vertex field output``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            return { v with c = v.c + 1.0 }
+        }
+
+    let fs2 (v : Vertex) =
+        fragment {
+            return { v with id = v.id }
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs; Effect.ofFunction fs2]
+
+[<Test>]
+let ``Output type conversions``() =
+    Setup.Run()
+
+    let fs1 (v : Vertex) =
+        fragment {
+            return v.c + 1.0
+        }
+
+    let fs2 (v : Vertex) =
+        fragment {
+            return v.c.ZXY + 2.0
+        }
+
+    let fs3 (v : Vertex) =
+        fragment {
+            return v.c.WX + 3.0
+        }
+
+    GLSL.shouldCompile [
+        Effect.ofFunction fs1
+        Effect.ofFunction fs2
+        Effect.ofFunction fs3
+    ]
 
 [<AutoOpen>]
 module ImageUniforms =
