@@ -702,7 +702,10 @@ module Optimizer =
                         return Expr.FieldSet(t, f, value)
 
                     | PropertySet(Some t, pi, idx, value) ->
-                        Log.warn "[FShade] found PropertySet on unknown expression: %A" t
+                        match t.Type with
+                         | ImageType _ -> ()
+                         | _ -> Log.warn "[FShade] found PropertySet on unknown expression: %A" t
+
                         let! idx = idx |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
                         let! value = eliminateDeadCodeS value
                         let! t = eliminateDeadCodeS t
