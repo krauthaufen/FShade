@@ -10,10 +10,7 @@ open System
 open System.IO
 open FShade
 open Aardvark.Base
-open System.Runtime.CompilerServices
-
-
-let namespaceName = "FShade"
+open System.Runtime.InteropServices 
 
 let types = [ SamplerType.Float; SamplerType.Int ]
 let dims = [ SamplerDimension.Sampler1d; SamplerDimension.Sampler2d; SamplerDimension.Sampler3d; SamplerDimension.SamplerCube]
@@ -46,13 +43,6 @@ let allCombinations =
                             yield (t,d,a,m,s)
     ]
 
-let formats =
-    [
-        "RGBA"
-        "RGB"
-        "RG"
-        "R"
-    ]
 
 let mutable indent = ""
 
@@ -67,68 +57,94 @@ let stop() = Console.WriteLine(""); builder.AppendLine("") |> ignore; indent <- 
 type SampleVariants =
     | None = 0x0
     | Bias = 0x1
-    
 
-let memberFunctionAttributesDefaultArgs (comment : string) (attributes : Option<string>) (variants : SampleVariants) (name : string)
-                                        (args : list<string * string * Option<string>>) (ret : string) =
-    let args =
-        args |> List.map (fun (n,t,o) ->
-            match o with
-            | Some def -> sprintf "[<Optional; DefaultParameterValue(%s)>] %s : %s" def n t
-            | _ -> sprintf "%s : %s" n t
-        ) |> String.concat ", "
+type Argument =
+    { Name : string
+      Type : string
+      DefaultValue : Option<string> }
+
+    override x.ToString() =
+        match x.DefaultValue with
+        | Some def -> sprintf "[<Optional; DefaultParameterValue(%s)>] %s : %s" def x.Name x.Type
+        | _ -> sprintf "%s : %s" x.Name x.Type
 
 
-    line "/// %s" comment
+module Argument =
+    let create (name : string) (typ : string) (defaultValue : Option<String>) =
+        { Name = name; Type = typ; DefaultValue = defaultValue }
 
-    match attributes with
-    | Some attr -> line "%s" attr
-    | _ -> ()
+    let simple (name : string) (typ : string) =
+        { Name = name; Type = typ; DefaultValue = None }
 
-    line "member x.%s(%s) : %s = onlyInShaderCode \"%s\"" name args ret name
-    line ""
 
-    if (variants &&& SampleVariants.Bias) <> SampleVariants.None then
-        line "/// %s with lod-bias" comment
-        line "member x.%s(%s, lodBias : float) : %s = onlyInShaderCode \"%s\"" name args ret name
+[<Sealed; AbstractClass>]
+type Write private() =
+
+    static member MemberFunction(name : string, arguments : list<Argument>, returnType : string,
+                                 [<Optional; DefaultParameterValue(null : string)>] comment : string,
+                                 [<Optional; DefaultParameterValue(null : string)>] attributes : string,
+                                 [<Optional; DefaultParameterValue(SampleVariants.None)>] variants : SampleVariants) =
+        let args =
+            arguments |> List.map string |> String.concat ", "
+
+        if not <| comment.IsNullOrEmpty() then
+            line "/// %s" comment
+
+        if not <| attributes.IsNullOrEmpty() then
+            line "%s" attributes
+
+        line "member x.%s(%s) : %s = onlyInShaderCode \"%s\"" name args returnType name
         line ""
 
-let memberFunctionDefaultArgs (comment : string) (variants : SampleVariants) (name : string)
-                              (args : list<string * string * Option<string>>) (ret : string) =
-    memberFunctionAttributesDefaultArgs comment None variants name args ret
+        if (variants &&& SampleVariants.Bias) <> SampleVariants.None then
+            line "/// %s with lod-bias" comment
+            line "member x.%s(%s, lodBias : float) : %s = onlyInShaderCode \"%s\"" name args returnType name
+            line ""
 
-let memberFunctionAttributes (comment : string) (attributes : Option<string>) (variants : SampleVariants)
-                             (name : string) (args : list<string * string>) (ret : string) =
-    let args = args |> List.map (fun (n, t) -> n, t, None)
-    memberFunctionAttributesDefaultArgs comment attributes variants name args ret
+    static member MemberFunction(name : string, arguments : list<string * string>, returnType : string,
+                                [<Optional; DefaultParameterValue(null : string)>] comment : string,
+                                [<Optional; DefaultParameterValue(null : string)>] attributes : string,
+                                [<Optional; DefaultParameterValue(SampleVariants.None)>] variants : SampleVariants) =
+        let arguments = arguments |> List.map (fun (n, t) -> Argument.simple n t)
+        Write.MemberFunction(name, arguments, returnType, comment, attributes, variants)
 
-let memberFunction (comment : string) (variants : SampleVariants)
-                   (name : string) (args : list<string * string>) (ret : string) =
-    memberFunctionAttributes comment None variants name args ret
+    static member MemberFunction(name : string, arguments : list<string * string * Option<string>>, returnType : string,
+                                [<Optional; DefaultParameterValue(null : string)>] comment : string,
+                                [<Optional; DefaultParameterValue(null : string)>] attributes : string,
+                                [<Optional; DefaultParameterValue(SampleVariants.None)>] variants : SampleVariants) =
+        let arguments = arguments |> List.map (fun (n, t, d) -> Argument.create n t d)
+        Write.MemberFunction(name, arguments, returnType, comment, attributes, variants)
 
-let propertyDefaultArgs (comment : string) (name : string) (setter : Option<String>) (args : list<string * string * Option<string>>) (ret : string) =
-    let args =
-        args |> List.map (fun (n,t,o) ->
-            match o with
-            | Some def -> sprintf "[<Optional; DefaultParameterValue(%s)>] %s : %s" def n t
-            | _ -> sprintf "%s : %s" n t
-        ) |> String.concat ", "
 
-    line "/// %s" comment
-    line "member x.Item"
-    line "    with get (%s) : %s = onlyInShaderCode \"%s\"" args ret name
+    static member Property(name : string, arguments : list<Argument>, returnType : string,
+                           [<Optional; DefaultParameterValue(null : string)>] setter : string,
+                           [<Optional; DefaultParameterValue(null : string)>] comment : string) =
+        let args =
+            arguments |> List.map string |> String.concat ", "
 
-    match setter with
-    | Some name ->
-        line "    and set (%s) (data : %s) : unit = onlyInShaderCode \"%s\"" args ret name
-    | _ ->
-        ()
+        if not <| comment.IsNullOrEmpty() then
+            line "/// %s" comment
 
-    line ""
+        line "member x.Item"
+        line "    with get (%s) : %s = onlyInShaderCode \"%s\"" args returnType name
 
-let property (comment : string) (name : string) (setter : Option<String>) (args : list<string * string>) (ret : string) =
-    let args = args |> List.map (fun (n, t) -> n, t, None)
-    propertyDefaultArgs comment name setter args ret
+        if not <| setter.IsNullOrEmpty() then
+            line "    and set (%s) (data : %s) : unit = onlyInShaderCode \"%s\"" args returnType setter
+
+        line ""
+
+    static member Property(name : string, arguments : list<string * string>, returnType : string,
+                           [<Optional; DefaultParameterValue(null : string)>] setter : string,
+                           [<Optional; DefaultParameterValue(null : string)>] comment : string) =
+        let arguments = arguments |> List.map (fun (n, t) -> Argument.simple n t)
+        Write.Property(name, arguments, returnType, setter, comment)
+
+    static member Property(name : string, arguments : list<string * string * Option<string>>, returnType : string,
+                           [<Optional; DefaultParameterValue(null : string)>] setter : string,
+                           [<Optional; DefaultParameterValue(null : string)>] comment : string) =
+        let arguments = arguments |> List.map (fun (n, t, d) -> Argument.create n t d)
+        Write.Property(name, arguments, returnType, setter, comment)
+
 
 let floatVec (c : int) =
     match c with
@@ -256,66 +272,69 @@ let run() =
                 else
                     SampleVariants.Bias
 
-            memberFunction
-                "regular sampled texture-lookup"
-                variant
-                "Sample"
-                (["coord", coordType] @ additionalArgs)
-                returnType
+            Write.MemberFunction(
+                "Sample",
+                (["coord", coordType] @ additionalArgs),
+                returnType,
+                comment = "regular sampled texture-lookup",
+                variants = variant
+            )
 
         // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureOffset.xhtml
         if d <> SamplerDimension.SamplerCube && not m then
-            memberFunction
-                "regular sampled texture-lookup with offset"
-                SampleVariants.Bias
-                "SampleOffset"
-                (["coord", coordType] @ additionalArgs @ ["offset", texelCoordType])
-                returnType
+            Write.MemberFunction(
+                "SampleOffset",
+                (["coord", coordType] @ additionalArgs @ ["offset", texelCoordType]),
+                returnType,
+                comment = "regular sampled texture-lookup with offset",
+                variants = SampleVariants.Bias
+            )
 
         // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureProj.xhtml
         if d <> SamplerDimension.SamplerCube && not m && not a then
-            memberFunction
-                "projective sampled texture-lookup"
-                SampleVariants.Bias
-                "SampleProj"
-                (["coord", projCoordType] @ additionalArgs)
-                returnType
+            Write.MemberFunction(
+                "SampleProj",
+                (["coord", projCoordType] @ additionalArgs),
+                returnType,
+                comment ="projective sampled texture-lookup",
+                variants = SampleVariants.Bias
+            )
 
         // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureLod.xhtml
         if not m && not (s && d = SamplerDimension.SamplerCube) && not (s && a && d = SamplerDimension.Sampler2d) then
-            memberFunction
-                "sampled texture-lookup with given level"
-                SampleVariants.None
-                "SampleLevel"
-                (["coord", coordType] @ additionalArgs @ ["level", "float"])
-                returnType
+            Write.MemberFunction(
+                "SampleLevel",
+                (["coord", coordType] @ additionalArgs @ ["level", "float"]),
+                returnType,
+                comment = "sampled texture-lookup with given level"
+            )
 
         // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureLodOffset.xhtml
         if not m && d <> SamplerDimension.SamplerCube && not (s && a && d = SamplerDimension.Sampler2d) then
-            memberFunction
-                "sampled texture-lookup with given level and offset"
-                SampleVariants.None
-                "SampleLevelOffset"
-                (["coord", coordType] @ additionalArgs @ ["level", "float"; "offset", texelCoordType])
-                returnType
+            Write.MemberFunction(
+                "SampleLevelOffset",
+                (["coord", coordType] @ additionalArgs @ ["level", "float"; "offset", texelCoordType]),
+                returnType,
+                comment = "sampled texture-lookup with given level and offset"
+            )
 
         // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureGrad.xhtml
         if not m then
-            memberFunction
-                "sampled texture-lookup with explicit gradients"
-                SampleVariants.None
-                "SampleGrad"
-                (["coord", coordType] @ additionalArgs @ ["dTdx", coordType; "dTdy", coordType])
-                returnType
+            Write.MemberFunction(
+                "SampleGrad",
+                (["coord", coordType] @ additionalArgs @ ["dTdx", coordType; "dTdy", coordType]),
+                returnType,
+                comment = "sampled texture-lookup with explicit gradients"
+            )
 
         // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureQueryLod.xhtml
         if not m then
-            memberFunction
-                "query lod levels"
-                SampleVariants.None
-                "QueryLod"
-                ["coord", coordType]
-                "V2d"
+            Write.MemberFunction(
+                "QueryLod",
+                ["coord", coordType],
+                "V2d",
+                comment = "query lod levels"
+            )
 
         // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureGather.xhtml
         if (d = SamplerDimension.Sampler2d || d = SamplerDimension.SamplerCube) && not m then
@@ -326,12 +345,12 @@ let run() =
                 else
                     ["coord", coordType, None] @ additionalDefaultArgs  @ ["comp", "int", Some "0"]
 
-            memberFunctionDefaultArgs
-                "gathers one component for the neighbouring 4 texels"
-                SampleVariants.None
-                "Gather"
-                arguments
-                gatherReturnType
+            Write.MemberFunction(
+                "Gather",
+                arguments,
+                gatherReturnType,
+                comment ="gathers one component for the neighbouring 4 texels"
+            )
 
         // https://registry.khronos.org/OpenGL-Refpages/gl4/html/textureGatherOffset.xhtml
         if d = SamplerDimension.Sampler2d && not m then
@@ -342,12 +361,12 @@ let run() =
                 else
                     ["coord", coordType, None] @ additionalDefaultArgs @ ["offset", texelCoordType, None; "comp", "int", Some "0"]
 
-            memberFunctionDefaultArgs
-                "gathers one component for the neighbouring 4 texels"
-                SampleVariants.None
-                "GatherOffset"
-                arguments
-                gatherReturnType
+            Write.MemberFunction(
+                "GatherOffset",
+                arguments,
+                gatherReturnType,
+                comment = "gathers one component for the neighbouring 4 texels"
+            )
 
         // https://registry.khronos.org/OpenGL-Refpages/gl4/html/texelFetch.xhtml
         if d <> SamplerDimension.SamplerCube && not s then
@@ -358,19 +377,19 @@ let run() =
                 else
                     ["coord", texelCoordType, None] @ additionalDefaultArgs @ ["lod", "int", Some "0"]
 
-            memberFunctionDefaultArgs
-                "non-sampled texture read"
-                SampleVariants.None
-                "Read"
-                arguments
-                returnType
+            Write.MemberFunction(
+                "Read",
+                arguments,
+                returnType,
+                comment = "non-sampled texture read"
+            )
 
-            propertyDefaultArgs
-                "non-sampled texture read"
-                "Fetch"
-                None
-                arguments
-                returnType
+            Write.Property(
+                "Fetch",
+                arguments,
+                returnType,
+                comment = "non-sampled texture read"
+            )
 
         stop()
 
@@ -503,27 +522,28 @@ let run() =
 
         let itemArgs = args |> List.map (fun (n,t) -> sprintf "%s : %s" n t) |> String.concat ", "
 
-        memberFunction
-            "load single texel from image"
-            SampleVariants.None
-            "Load"
-            args
-            returnType
+        Write.MemberFunction(
+            "Load",
+            args,
+            returnType,
+            comment = "load single texel from image"
+        )
 
-        memberFunctionAttributes
-            "write single texel into image"
-            (Some "[<FShade.Imperative.KeepCall>]")
-            SampleVariants.None
-            "Store"
-            (args @ ["data", returnType])
-            "unit"
+        Write.MemberFunction(
+            "Store",
+            (args @ ["data", returnType]),
+            "unit",
+            comment = "write single texel into image",
+            attributes = "[<FShade.Imperative.KeepCall>]"
+        )
 
-        property
-            "access single texel of image"
-            "Load"
-            (Some "Store")
-            args
-            returnType
+        Write.Property(
+            "Load",
+            args,
+            returnType,
+            setter = "Store",
+            comment = "access single texel of image"
+        )
 
         if t = SamplerType.Int then
             line "member x.AtomicAdd(%s, data : int) : int = onlyInShaderCode \"AtomicAdd\"" itemArgs
