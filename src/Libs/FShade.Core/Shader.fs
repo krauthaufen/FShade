@@ -430,7 +430,7 @@ module Preprocessor =
             ["X"; "Y"; "Z"; "W"]
 
         let private zeroOneVecProperty =
-            System.Text.RegularExpressions.Regex @"([XYZW]*[ONIP])+"
+            System.Text.RegularExpressions.Regex @"^([XYZW]*[OINP]+[XYZW]*)+$"
 
         let private (|VectorExpr|_|) (e : Expr) =
             match e.Type with

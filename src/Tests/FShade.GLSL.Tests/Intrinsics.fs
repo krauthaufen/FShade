@@ -863,10 +863,13 @@ let ``Constant swizzles``() =
             let _ = getVec().XYOI
             let _ = getVec().OXXX
             let _ = getVec().ZIXO
+            let _ = getVec().ZYXN
+            let _ = getVec().OXOX
+            let _ = getVec().XOOO
             return v.pos
         }
 
-    GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader] ["getVec", 4]
+    GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader] ["getVec", 7]
 
 [<Test>]
 let ``IsInfinity``() =
