@@ -1886,6 +1886,7 @@ module IntrinsicFunctions =
             let functionName =
                 match name with
                 | "get_Size" -> "imageSize({0})"
+                | "get_Samples" -> "imageSamples({0})"
                 | "Load" | "get_Item" -> sprintf "imageLoad(%s)" (loadStoreArgs())
                 | "Store" | "set_Item" -> sprintf "imageStore(%s)" (loadStoreArgs())
                 | "AtomicAdd" -> sprintf "imageAtomicAdd(%s)" (loadStoreArgs())
@@ -1898,7 +1899,12 @@ module IntrinsicFunctions =
                 | "AtomicCompareExchange" -> sprintf "imageAtomicCompSwap(%s)" (loadStoreArgs())
                 | _ -> failwithf "unknown image function %s" name
 
-            Some functionName
+            let extensions =
+                match name with
+                | "get_Samples" -> ["GL_ARB_shader_texture_image_samples"]
+                | _ -> []
+
+            Some (functionName, Set.ofList extensions)
 
         | Method(name, ((SamplerType(dim, isArray, isShadow, isMS, valueType)::_) as args)) ->
             let coordComponents =
@@ -1983,37 +1989,45 @@ module IntrinsicFunctions =
             let plainArgs(skip : int) =
                 args |> List.skip skip |> List.mapi (fun i _ -> sprintf "{%d}" (skip + i)) |> String.concat ", "
 
+            let functionName =
+                match name with
+                | "get_Size" ->
+                    if isMS then "textureSize({0})"
+                    else "textureSize({0}, 0)"
 
-            let argCount = List.length args - 1
+                | "get_MipMapLevels" ->
+                    if isMS then "1"
+                    else "textureQueryLevels({0})"
 
-            match name with
-            | "get_Size" ->
-                if isMS then Some "textureSize({0})"
-                else Some "textureSize({0}, 0)"
+                | "GetSize" ->
+                    if isMS then "textureSize({0})"
+                    else "textureSize({0}, {1})"
 
-            | "get_MipMapLevels" ->
-                if isMS then Some "1"
-                else Some "textureQueryLevels({0})"
+                | "get_Samples" ->
+                    "textureSamples({0})"
 
-            | "GetSize" ->
-                if isMS then Some "textureSize({0})"
-                else Some "textureSize({0}, {1})"
+                | "Sample" -> sprintf "texture(%s)" (sampleArgs false)
+                | "SampleOffset" -> sprintf "textureOffset(%s)" (sampleArgs false)
+                | "SampleProj" -> sprintf "textureProj(%s)" (projArgs())
+                | "SampleLevel" -> sprintf "textureLod(%s)" (sampleArgs false)
+                | "SampleLevelOffset" -> sprintf "textureLodOffset(%s)" (sampleArgs false)
+                | "SampleGrad" -> sprintf "textureGrad(%s)" (sampleArgs false)
+                | "Gather" -> sprintf "textureGather(%s)" (sampleArgs true)
+                | "GatherOffset" -> sprintf "textureGatherOffset(%s)" (sampleArgs true)
 
-            | "Sample" -> sprintf "texture(%s)" (sampleArgs false) |> Some
-            | "SampleOffset" -> sprintf "textureOffset(%s)" (sampleArgs false) |> Some
-            | "SampleProj" -> sprintf "textureProj(%s)" (projArgs()) |> Some
-            | "SampleLevel" -> sprintf "textureLod(%s)" (sampleArgs false) |> Some
-            | "SampleLevelOffset" -> sprintf "textureLodOffset(%s)" (sampleArgs false) |> Some
-            | "SampleGrad" -> sprintf "textureGrad(%s)" (sampleArgs false) |> Some
-            | "Gather" -> sprintf "textureGather(%s)" (sampleArgs true) |> Some
-            | "GatherOffset" -> sprintf "textureGatherOffset(%s)" (sampleArgs true) |> Some
+                | "Read" -> sprintf "texelFetch(%s)" (fetchArgs())
+                | "get_Item" -> sprintf "texelFetch(%s)" (fetchArgs())
 
-            | "Read" -> sprintf "texelFetch(%s)" (fetchArgs()) |> Some
-            | "get_Item" -> sprintf "texelFetch(%s)" (fetchArgs()) |> Some
+                | "QueryLod" -> sprintf "textureQueryLod(%s)" (plainArgs 0)
 
-            | "QueryLod" -> sprintf "textureQueryLod(%s)" (plainArgs 0) |> Some
+                | _ -> failwithf "unknown sampler function %s" name
 
-            | _ -> failwithf "unknown sampler function %s" name
+            let extensions =
+                match name with
+                | "get_Samples" -> ["GL_ARB_shader_texture_image_samples"]
+                | _ -> []
+
+            Some (functionName, Set.ofList extensions)
         | _ ->
             None
 

@@ -231,6 +231,9 @@ type Sampler2dArrayMS(tex : ISemanticValue, state : SamplerState) =
     /// the size for the sampler
     member x.Size : V3i = onlyInShaderCode "Size"
     
+    /// the number of samples of the texture bound to the sampler
+    member x.Samples : int = onlyInShaderCode "Samples"
+    
     /// non-sampled texture read
     member x.Read(coord : V2i, slice : int, [<Optional; DefaultParameterValue(0)>] sample : int) : V4d = onlyInShaderCode "Read"
     
@@ -361,6 +364,9 @@ type Sampler2dMS(tex : ISemanticValue, state : SamplerState) =
     
     /// the size for the sampler
     member x.Size : V2i = onlyInShaderCode "Size"
+    
+    /// the number of samples of the texture bound to the sampler
+    member x.Samples : int = onlyInShaderCode "Samples"
     
     /// non-sampled texture read
     member x.Read(coord : V2i, [<Optional; DefaultParameterValue(0)>] sample : int) : V4d = onlyInShaderCode "Read"
@@ -833,6 +839,9 @@ type IntSampler2dArrayMS(tex : ISemanticValue, state : SamplerState) =
     /// the size for the sampler
     member x.Size : V3i = onlyInShaderCode "Size"
     
+    /// the number of samples of the texture bound to the sampler
+    member x.Samples : int = onlyInShaderCode "Samples"
+    
     /// non-sampled texture read
     member x.Read(coord : V2i, slice : int, [<Optional; DefaultParameterValue(0)>] sample : int) : V4i = onlyInShaderCode "Read"
     
@@ -917,6 +926,9 @@ type IntSampler2dMS(tex : ISemanticValue, state : SamplerState) =
     
     /// the size for the sampler
     member x.Size : V2i = onlyInShaderCode "Size"
+    
+    /// the number of samples of the texture bound to the sampler
+    member x.Samples : int = onlyInShaderCode "Samples"
     
     /// non-sampled texture read
     member x.Read(coord : V2i, [<Optional; DefaultParameterValue(0)>] sample : int) : V4i = onlyInShaderCode "Read"
@@ -1408,6 +1420,9 @@ type Image2dArrayMS<'f when 'f :> Formats.IFloatingFormat>() =
     
     member x.Size : V3i = onlyInShaderCode "Size"
     
+    /// the number of samples of the image
+    member x.Samples : int = onlyInShaderCode "Samples"
+    
     /// load single texel from image
     member x.Load(coord : V2i, slice : int, sample : int) : V4d = onlyInShaderCode "Load"
     
@@ -1455,6 +1470,9 @@ type Image2dMS<'f when 'f :> Formats.IFloatingFormat>() =
     static member IsMultisampled = true
     
     member x.Size : V2i = onlyInShaderCode "Size"
+    
+    /// the number of samples of the image
+    member x.Samples : int = onlyInShaderCode "Samples"
     
     /// load single texel from image
     member x.Load(coord : V2i, sample : int) : V4d = onlyInShaderCode "Load"
@@ -1672,6 +1690,9 @@ type IntImage2dArrayMS<'f when 'f :> Formats.ISignedFormat>() =
     
     member x.Size : V3i = onlyInShaderCode "Size"
     
+    /// the number of samples of the image
+    member x.Samples : int = onlyInShaderCode "Samples"
+    
     /// load single texel from image
     member x.Load(coord : V2i, slice : int, sample : int) : V4i = onlyInShaderCode "Load"
     
@@ -1767,6 +1788,9 @@ type IntImage2dMS<'f when 'f :> Formats.ISignedFormat>() =
     static member IsMultisampled = true
     
     member x.Size : V2i = onlyInShaderCode "Size"
+    
+    /// the number of samples of the image
+    member x.Samples : int = onlyInShaderCode "Samples"
     
     /// load single texel from image
     member x.Load(coord : V2i, sample : int) : V4i = onlyInShaderCode "Load"

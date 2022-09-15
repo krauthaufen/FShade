@@ -70,6 +70,22 @@ let ``Size``() =
 
 
 [<Test>]
+let ``Samples``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            let _ = uniform.Img2DMS.Samples
+            let _ = uniform.Img2DArrayMS.Samples
+            let _ = uniform.IntImg2DMS.Samples
+            let _ = uniform.IntImg2DArrayMS.Samples
+
+            return 0
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs]
+
+[<Test>]
 let ``Load``() =
     Setup.Run()
 

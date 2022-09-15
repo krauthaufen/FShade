@@ -253,6 +253,10 @@ let run() =
         line  "member x.Size : %s = onlyInShaderCode \"Size\"" sizeType
         line  ""
 
+        if m then
+            line "/// the number of samples of the texture bound to the sampler"
+            line "member x.Samples : int = onlyInShaderCode \"Samples\""
+            line ""
 
         let additionalArgs =
             match a, s with
@@ -505,6 +509,11 @@ let run() =
 
         line "member x.Size : %s = onlyInShaderCode \"Size\"" sizeType
         line  ""
+
+        if m then
+            line "/// the number of samples of the image"
+            line "member x.Samples : int = onlyInShaderCode \"Samples\""
+            line ""
 
         let args =
             [

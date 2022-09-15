@@ -158,6 +158,26 @@ let ``Texture Size``() =
 
     GLSL.shouldCompile [Effect.ofFunction fs]
 
+[<Test>]
+let ``Texture Samples``() =
+    Setup.Run()
+
+    let sam2DMS         = sampler2dMS { texture uniform?DiffuseTexture }
+    let sam2DArrayMS    = sampler2dArrayMS { texture uniform?DiffuseTexture }
+    let intSam2DMS      = intSampler2dMS { texture uniform?DiffuseTexture }
+    let intSam2DArrayMS = intSampler2dArrayMS { texture uniform?DiffuseTexture }
+
+    let fs (v : Vertex) =
+        fragment {
+            let _ = sam2DMS.Samples
+            let _ = sam2DArrayMS.Samples
+            let _ = intSam2DMS.Samples
+            let _ = intSam2DArrayMS.Samples
+
+            return V3i.Zero
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs]
 
 [<Test>]
 let ``Texture Query LoD``() =
