@@ -1,3 +1,7 @@
+### 5.3.0-prerelease0002
+* Fixed regular expression for constant swizzles
+* Improved error message for incompatible output types
+
 ### 5.3.0-prerelease0001
 * Initial prerelease version for 5.3
 
