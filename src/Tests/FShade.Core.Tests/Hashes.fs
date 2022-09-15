@@ -133,7 +133,7 @@ let ``[Serializer] instance field get``() =
             return V4d(v.pos.X)
         }
 
-    bla |> roundtrip "uL27SN9ivodWX04FzXDFc5Mua2U="
+    bla |> roundtrip "ZKYVV9FXCKYqaTHYinvUeR4mpXM="
 
 [<Test>]
 let ``[Serializer] instance field set and get``() =
@@ -145,7 +145,7 @@ let ``[Serializer] instance field set and get``() =
             return res
         }
 
-    bla |> roundtrip "DvbfEAJ6LXtOgXP3YHTSpkFphiI="
+    bla |> roundtrip "R7ppsFFGJn6+Ek0AEDhEUCpHMCs="
 
 type SomeFuncs() =
 
@@ -198,7 +198,7 @@ let ``[Serializer] reflected function``() =
             return V4d(SomeFuncs.Hehe v.pos, 0.0)
         }
 
-    bla |> roundtrip "5Cyik5ypZUTWmEhS/qjWUVVCYOA="
+    bla |> roundtrip "53q9keXrHst6opl6uBYEOJaruVA="
 
 [<Test>]
 let ``[Serializer] reflected generic function``() =
@@ -208,7 +208,7 @@ let ``[Serializer] reflected generic function``() =
             return V4d(SomeFuncs.Hehe(v.pos.XYZ, 3) + SomeFuncs.Hehe(v.pos.XYZ, v.tc, 3), 0.0)
         }
 
-    bla |> roundtrip "+HO7h6f2D/ft9AoHkp9F7mLyF+w="
+    bla |> roundtrip "/Gdj9LJ8I3E+Om7xSWyNsc/vBaA="
 
 [<Test>]
 let ``[Serializer] static call``() =
@@ -218,7 +218,7 @@ let ``[Serializer] static call``() =
             return V4d(SomeFuncs.Haha v.pos, 0.0)
         }
 
-    bla |> roundtrip "PL2hHQgi3x3ZPyW1EFuS4nWHoK8="
+    bla |> roundtrip "EyFZGQY69k9P1/t0WIoHM51F0NI="
 
 [<Test>]
 let ``[Serializer] static generic call``() =
@@ -228,7 +228,7 @@ let ``[Serializer] static generic call``() =
             return V4d(SomeFuncs.Haha(v.pos.XYZ, 3) + SomeFuncs.Haha(v.pos.XYZ, v.tc, 3), 0.0)
         }
 
-    bla |> roundtrip "k1dL58zcqsR0umSubM/pvE7YV3w="
+    bla |> roundtrip "T/SgCTOXRbXVL23mPYu5m2VKOq4="
 
 [<Test>]
 let ``[Serializer] instance call``() =
@@ -239,7 +239,7 @@ let ``[Serializer] instance call``() =
             return V4d(funcs.Hihi v.pos, 0.0)
         }
 
-    bla |> roundtrip "C0LomJg4nJTNGWFqCYoOqWDa4aM="
+    bla |> roundtrip "RnGvWDgPOPyruyzqDfwDhDhc1k8="
 
 [<Test>]
 let ``[Serializer] instance generic call``() =
@@ -250,7 +250,7 @@ let ``[Serializer] instance generic call``() =
             return V4d(funcs.Hihi(v.pos.XYZ, 3) + funcs.Hihi(v.pos.XYZ, v.tc, 3), 0.0)
         }
 
-    bla |> roundtrip "x+pzfkmq9kpSUnMB4Id3HwIA2Y0="
+    bla |> roundtrip "bO0+aiV6RH0aFhjETLoUjIrUPYY="
 
 
 [<Test>]
@@ -318,7 +318,7 @@ let ``[Hashing] deterministic uniforms``() =
 
     let e1 = Effect.ofFunction Shader6.shader
 
-    e1.Id |> should equal "0GgmEa3UiRwpgMr8ttkNkaDwIww="
+    e1.Id |> should equal "WwnIq7ZKhwyUc8NOsxHgGVoDeVg="
 
 
 [<Test>]
