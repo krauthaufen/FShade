@@ -2504,11 +2504,11 @@ module Shader =
             (typeof<V4i>, typeof<V3i>),   fun value -> <@@ (%%value : V4i).XYZ @@>
         ]
 
-    let private converter (inType : Type) (outType : Type) : Expr -> Expr =
+    let private converter (semantic : string) (inType : Type) (outType : Type) : Expr -> Expr =
         if inType <> outType then
             match typeConversions (inType, outType) with
             | Some conv -> conv
-            | _ -> failwithf "[FShade] cannot convert value from %A to %A" inType outType
+            | _ -> failwithf "[FShade] cannot convert %s value from %A to %A" semantic inType outType
         else
             id
 
@@ -2888,7 +2888,7 @@ module Shader =
                                 match Map.tryFind n outputs with
                                 | Some t ->
                                     if t = v.Type then Some v
-                                    else v |> ShaderOutputValue.withValue (converter v.Type t v.Value) |> Some
+                                    else v |> ShaderOutputValue.withValue (converter n v.Type t v.Value) |> Some
                                 | None ->
                                     None
                             )
@@ -2928,7 +2928,7 @@ module Shader =
                                 match Map.tryFind n values with
                                 | Some value ->
                                     if not (t.IsAssignableFrom value.Type) then
-                                        value |> ShaderOutputValue.withValue (converter value.Type t value.Value)
+                                        value |> ShaderOutputValue.withValue (converter n value.Type t value.Value)
                                     else
                                         value
                                 | None ->
@@ -3267,7 +3267,7 @@ module Shader =
                     let variables =
                         needed |> Map.map (fun name (lv, rv) -> 
                             let variable = Var(name + "C", rv.paramType)
-                            let converter = converter lv.paramType rv.paramType
+                            let converter = converter name lv.paramType rv.paramType
                             variable, converter
                         )
 
@@ -3334,7 +3334,7 @@ module Shader =
                     let variables =
                         needed |> Map.map (fun name (lv, rv) -> 
                             let variable = Var(name + "C", rv.paramType)
-                            let converter = converter lv.paramType rv.paramType
+                            let converter = converter name lv.paramType rv.paramType
                             variable, converter
                         )
 
