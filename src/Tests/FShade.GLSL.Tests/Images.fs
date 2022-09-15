@@ -25,15 +25,15 @@ module ImageUniforms =
         member x.ImgCube      : ImageCube<Formats.rgba8> = x?FooCube
         member x.ImgCubeArray : ImageCubeArray<Formats.rgba8> = x?FooCubeArray
 
-        member x.IntImg1D        : IntImage1d<Formats.rgba8i> = x?IntFoo1D
-        member x.IntImg1DArray   : IntImage1dArray<Formats.rgba8i> = x?IntFoo1DArray
-        member x.IntImg2D        : IntImage2d<Formats.rgba8i> = x?IntFoo2D
-        member x.IntImg2DArray   : IntImage2dArray<Formats.rgba8i> = x?IntFoo2DArray
-        member x.IntImg2DMS      : IntImage2dMS<Formats.rgba8i> = x?IntFoo2DMS
-        member x.IntImg2DArrayMS : IntImage2dArrayMS<Formats.rgba8i> = x?IntFoo2DArrayMS
-        member x.IntImg3D        : IntImage3d<Formats.rgba8i> = x?IntFoo3D
-        member x.IntImgCube      : IntImageCube<Formats.rgba8i> = x?IntFooCube
-        member x.IntImgCubeArray : IntImageCubeArray<Formats.rgba8i> = x?IntFooCubeArray
+        member x.IntImg1D        : IntImage1d<Formats.r32i> = x?IntFoo1D
+        member x.IntImg1DArray   : IntImage1dArray<Formats.r32i> = x?IntFoo1DArray
+        member x.IntImg2D        : IntImage2d<Formats.r32i> = x?IntFoo2D
+        member x.IntImg2DArray   : IntImage2dArray<Formats.r32i> = x?IntFoo2DArray
+        member x.IntImg2DMS      : IntImage2dMS<Formats.r32i> = x?IntFoo2DMS
+        member x.IntImg2DArrayMS : IntImage2dArrayMS<Formats.r32i> = x?IntFoo2DArrayMS
+        member x.IntImg3D        : IntImage3d<Formats.r32i> = x?IntFoo3D
+        member x.IntImgCube      : IntImageCube<Formats.r32i> = x?IntFooCube
+        member x.IntImgCubeArray : IntImageCubeArray<Formats.r32i> = x?IntFooCubeArray
 
 
 [<Test>]
@@ -152,3 +152,171 @@ let ``Store``() =
         }
 
     GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction fs] ["IntFoo1DArray", 3]
+
+[<Test>]
+let ``AtomicAdd``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            let _ = uniform.IntImg1D.AtomicAdd(1, 0)
+            let _ = uniform.IntImg1DArray.AtomicAdd(0, 1, 0)
+            let _ = uniform.IntImg2D.AtomicAdd(V2i.Zero, 0)
+            let _ = uniform.IntImg2DArray.AtomicAdd(V2i.Zero, 1, 0)
+            let _ = uniform.IntImg3D.AtomicAdd(V3i.Zero, 0)
+            let _ = uniform.IntImgCube.AtomicAdd(V2i.Zero, 3, 0)
+            let _ = uniform.IntImgCubeArray.AtomicAdd(V2i.Zero, 4, 0)
+            let _ = uniform.IntImg2DMS.AtomicAdd(V2i.Zero, 0, 0)
+            let _ = uniform.IntImg2DArrayMS.AtomicAdd(V2i.Zero, 1, 0, 0)
+
+            return V3d.Zero
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs]
+
+[<Test>]
+let ``AtomicMin``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            let _ = uniform.IntImg1D.AtomicMin(1, 0)
+            let _ = uniform.IntImg1DArray.AtomicMin(0, 1, 0)
+            let _ = uniform.IntImg2D.AtomicMin(V2i.Zero, 0)
+            let _ = uniform.IntImg2DArray.AtomicMin(V2i.Zero, 1, 0)
+            let _ = uniform.IntImg3D.AtomicMin(V3i.Zero, 0)
+            let _ = uniform.IntImgCube.AtomicMin(V2i.Zero, 3, 0)
+            let _ = uniform.IntImgCubeArray.AtomicMin(V2i.Zero, 4, 0)
+            let _ = uniform.IntImg2DMS.AtomicMin(V2i.Zero, 0, 0)
+            let _ = uniform.IntImg2DArrayMS.AtomicMin(V2i.Zero, 1, 0, 0)
+
+            return V3d.Zero
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs]
+
+[<Test>]
+let ``AtomicMax``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            let _ = uniform.IntImg1D.AtomicMax(1, 0)
+            let _ = uniform.IntImg1DArray.AtomicMax(0, 1, 0)
+            let _ = uniform.IntImg2D.AtomicMax(V2i.Zero, 0)
+            let _ = uniform.IntImg2DArray.AtomicMax(V2i.Zero, 1, 0)
+            let _ = uniform.IntImg3D.AtomicMax(V3i.Zero, 0)
+            let _ = uniform.IntImgCube.AtomicMax(V2i.Zero, 3, 0)
+            let _ = uniform.IntImgCubeArray.AtomicMax(V2i.Zero, 4, 0)
+            let _ = uniform.IntImg2DMS.AtomicMax(V2i.Zero, 0, 0)
+            let _ = uniform.IntImg2DArrayMS.AtomicMax(V2i.Zero, 1, 0, 0)
+
+            return V3d.Zero
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs]
+
+[<Test>]
+let ``AtomicAnd``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            let _ = uniform.IntImg1D.AtomicAnd(1, 0)
+            let _ = uniform.IntImg1DArray.AtomicAnd(0, 1, 0)
+            let _ = uniform.IntImg2D.AtomicAnd(V2i.Zero, 0)
+            let _ = uniform.IntImg2DArray.AtomicAnd(V2i.Zero, 1, 0)
+            let _ = uniform.IntImg3D.AtomicAnd(V3i.Zero, 0)
+            let _ = uniform.IntImgCube.AtomicAnd(V2i.Zero, 3, 0)
+            let _ = uniform.IntImgCubeArray.AtomicAnd(V2i.Zero, 4, 0)
+            let _ = uniform.IntImg2DMS.AtomicAnd(V2i.Zero, 0, 0)
+            let _ = uniform.IntImg2DArrayMS.AtomicAnd(V2i.Zero, 1, 0, 0)
+
+            return V3d.Zero
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs]
+
+[<Test>]
+let ``AtomicOr``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            let _ = uniform.IntImg1D.AtomicOr(1, 0)
+            let _ = uniform.IntImg1DArray.AtomicOr(0, 1, 0)
+            let _ = uniform.IntImg2D.AtomicOr(V2i.Zero, 0)
+            let _ = uniform.IntImg2DArray.AtomicOr(V2i.Zero, 1, 0)
+            let _ = uniform.IntImg3D.AtomicOr(V3i.Zero, 0)
+            let _ = uniform.IntImgCube.AtomicOr(V2i.Zero, 3, 0)
+            let _ = uniform.IntImgCubeArray.AtomicOr(V2i.Zero, 4, 0)
+            let _ = uniform.IntImg2DMS.AtomicOr(V2i.Zero, 0, 0)
+            let _ = uniform.IntImg2DArrayMS.AtomicOr(V2i.Zero, 1, 0, 0)
+
+            return V3d.Zero
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs]
+
+[<Test>]
+let ``AtomicXor``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            let _ = uniform.IntImg1D.AtomicXor(1, 0)
+            let _ = uniform.IntImg1DArray.AtomicXor(0, 1, 0)
+            let _ = uniform.IntImg2D.AtomicXor(V2i.Zero, 0)
+            let _ = uniform.IntImg2DArray.AtomicXor(V2i.Zero, 1, 0)
+            let _ = uniform.IntImg3D.AtomicXor(V3i.Zero, 0)
+            let _ = uniform.IntImgCube.AtomicXor(V2i.Zero, 3, 0)
+            let _ = uniform.IntImgCubeArray.AtomicXor(V2i.Zero, 4, 0)
+            let _ = uniform.IntImg2DMS.AtomicXor(V2i.Zero, 0, 0)
+            let _ = uniform.IntImg2DArrayMS.AtomicXor(V2i.Zero, 1, 0, 0)
+
+            return V3d.Zero
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs]
+
+[<Test>]
+let ``AtomicExchange``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            let _ = uniform.IntImg1D.AtomicExchange(1, 0)
+            let _ = uniform.IntImg1DArray.AtomicExchange(0, 1, 0)
+            let _ = uniform.IntImg2D.AtomicExchange(V2i.Zero, 0)
+            let _ = uniform.IntImg2DArray.AtomicExchange(V2i.Zero, 1, 0)
+            let _ = uniform.IntImg3D.AtomicExchange(V3i.Zero, 0)
+            let _ = uniform.IntImgCube.AtomicExchange(V2i.Zero, 3, 0)
+            let _ = uniform.IntImgCubeArray.AtomicExchange(V2i.Zero, 4, 0)
+            let _ = uniform.IntImg2DMS.AtomicExchange(V2i.Zero, 0, 0)
+            let _ = uniform.IntImg2DArrayMS.AtomicExchange(V2i.Zero, 1, 0, 0)
+
+            return V3d.Zero
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs]
+
+[<Test>]
+let ``AtomicCompareExchange``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            let _ = uniform.IntImg1D.AtomicCompareExchange(1, 42, 0)
+            let _ = uniform.IntImg1DArray.AtomicCompareExchange(0, 1, 42, 0)
+            let _ = uniform.IntImg2D.AtomicCompareExchange(V2i.Zero, 42, 0)
+            let _ = uniform.IntImg2DArray.AtomicCompareExchange(V2i.Zero, 1, 42, 0)
+            let _ = uniform.IntImg3D.AtomicCompareExchange(V3i.Zero, 42, 0)
+            let _ = uniform.IntImgCube.AtomicCompareExchange(V2i.Zero, 3, 42, 0)
+            let _ = uniform.IntImgCubeArray.AtomicCompareExchange(V2i.Zero, 4, 42, 0)
+            let _ = uniform.IntImg2DMS.AtomicCompareExchange(V2i.Zero, 0, 42, 0)
+            let _ = uniform.IntImg2DArrayMS.AtomicCompareExchange(V2i.Zero, 1, 0, 42, 0)
+
+            return V3d.Zero
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs]

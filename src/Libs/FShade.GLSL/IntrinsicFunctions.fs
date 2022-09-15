@@ -1888,10 +1888,14 @@ module IntrinsicFunctions =
                 | "get_Size" -> "imageSize({0})"
                 | "Load" | "get_Item" -> sprintf "imageLoad(%s)" (loadStoreArgs())
                 | "Store" | "set_Item" -> sprintf "imageStore(%s)" (loadStoreArgs())
-
-
-                | "AtomicCompareExchange" -> sprintf "imageAtomicCompSwap(%s)" (plainArgs 0)
-                | "AtomicAdd" -> sprintf "imageAtomicAdd(%s)" (plainArgs 0)
+                | "AtomicAdd" -> sprintf "imageAtomicAdd(%s)" (loadStoreArgs())
+                | "AtomicMin" -> sprintf "imageAtomicMin(%s)" (loadStoreArgs())
+                | "AtomicMax" -> sprintf "imageAtomicMax(%s)" (loadStoreArgs())
+                | "AtomicAnd" -> sprintf "imageAtomicAnd(%s)" (loadStoreArgs())
+                | "AtomicOr" -> sprintf "imageAtomicOr(%s)" (loadStoreArgs())
+                | "AtomicXor" -> sprintf "imageAtomicXor(%s)" (loadStoreArgs())
+                | "AtomicExchange" -> sprintf "imageAtomicExchange(%s)" (loadStoreArgs())
+                | "AtomicCompareExchange" -> sprintf "imageAtomicCompSwap(%s)" (loadStoreArgs())
                 | _ -> failwithf "unknown image function %s" name
 
             Some functionName

@@ -1588,14 +1588,30 @@ type IntImage1dArray<'f when 'f :> Formats.ISignedFormat>() =
         with get (coord : int, slice : int) : V4i = onlyInShaderCode "Load"
         and set (coord : int, slice : int) (data : V4i) : unit = onlyInShaderCode "Store"
     
+    /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : int, slice : int, data : int) : int = onlyInShaderCode "AtomicAdd"
+    
+    /// atomically compute the minimum of a value with an existing value in memory, store that value and return the original value
     member x.AtomicMin(coord : int, slice : int, data : int) : int = onlyInShaderCode "AtomicMin"
+    
+    /// atomically compute the maximum of a value with an existing value in memory, store that value and return the original value
     member x.AtomicMax(coord : int, slice : int, data : int) : int = onlyInShaderCode "AtomicMax"
+    
+    /// atomically compute the logical AND of a value with an existing value in memory, store that value and return the original value
     member x.AtomicAnd(coord : int, slice : int, data : int) : int = onlyInShaderCode "AtomicAnd"
+    
+    /// atomically compute the logical OR of a value with an existing value in memory, store that value and return the original value
     member x.AtomicOr(coord : int, slice : int, data : int) : int = onlyInShaderCode "AtomicOr"
+    
+    /// atomically compute the logical exclusive OR of a value with an existing value in memory, store that value and return the original value
     member x.AtomicXor(coord : int, slice : int, data : int) : int = onlyInShaderCode "AtomicXor"
+    
+    /// atomically store supplied data into memory and return the original value from memory
     member x.AtomicExchange(coord : int, slice : int, data : int) : int = onlyInShaderCode "AtomicExchange"
+    
+    /// atomically compare supplied data with that in memory and store it to memory, if the original value was equal to cmp.
     member x.AtomicCompareExchange(coord : int, slice : int, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
+    
 
 type IntImage1d<'f when 'f :> Formats.ISignedFormat>() =
     interface IImage
@@ -1620,14 +1636,30 @@ type IntImage1d<'f when 'f :> Formats.ISignedFormat>() =
         with get (coord : int) : V4i = onlyInShaderCode "Load"
         and set (coord : int) (data : V4i) : unit = onlyInShaderCode "Store"
     
+    /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : int, data : int) : int = onlyInShaderCode "AtomicAdd"
+    
+    /// atomically compute the minimum of a value with an existing value in memory, store that value and return the original value
     member x.AtomicMin(coord : int, data : int) : int = onlyInShaderCode "AtomicMin"
+    
+    /// atomically compute the maximum of a value with an existing value in memory, store that value and return the original value
     member x.AtomicMax(coord : int, data : int) : int = onlyInShaderCode "AtomicMax"
+    
+    /// atomically compute the logical AND of a value with an existing value in memory, store that value and return the original value
     member x.AtomicAnd(coord : int, data : int) : int = onlyInShaderCode "AtomicAnd"
+    
+    /// atomically compute the logical OR of a value with an existing value in memory, store that value and return the original value
     member x.AtomicOr(coord : int, data : int) : int = onlyInShaderCode "AtomicOr"
+    
+    /// atomically compute the logical exclusive OR of a value with an existing value in memory, store that value and return the original value
     member x.AtomicXor(coord : int, data : int) : int = onlyInShaderCode "AtomicXor"
+    
+    /// atomically store supplied data into memory and return the original value from memory
     member x.AtomicExchange(coord : int, data : int) : int = onlyInShaderCode "AtomicExchange"
+    
+    /// atomically compare supplied data with that in memory and store it to memory, if the original value was equal to cmp.
     member x.AtomicCompareExchange(coord : int, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
+    
 
 type IntImage2dArrayMS<'f when 'f :> Formats.ISignedFormat>() =
     interface IImage
@@ -1652,14 +1684,30 @@ type IntImage2dArrayMS<'f when 'f :> Formats.ISignedFormat>() =
         with get (coord : V2i, slice : int, sample : int) : V4i = onlyInShaderCode "Load"
         and set (coord : V2i, slice : int, sample : int) (data : V4i) : unit = onlyInShaderCode "Store"
     
+    /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : V2i, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicAdd"
+    
+    /// atomically compute the minimum of a value with an existing value in memory, store that value and return the original value
     member x.AtomicMin(coord : V2i, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicMin"
+    
+    /// atomically compute the maximum of a value with an existing value in memory, store that value and return the original value
     member x.AtomicMax(coord : V2i, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicMax"
+    
+    /// atomically compute the logical AND of a value with an existing value in memory, store that value and return the original value
     member x.AtomicAnd(coord : V2i, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicAnd"
+    
+    /// atomically compute the logical OR of a value with an existing value in memory, store that value and return the original value
     member x.AtomicOr(coord : V2i, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicOr"
+    
+    /// atomically compute the logical exclusive OR of a value with an existing value in memory, store that value and return the original value
     member x.AtomicXor(coord : V2i, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicXor"
+    
+    /// atomically store supplied data into memory and return the original value from memory
     member x.AtomicExchange(coord : V2i, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicExchange"
+    
+    /// atomically compare supplied data with that in memory and store it to memory, if the original value was equal to cmp.
     member x.AtomicCompareExchange(coord : V2i, slice : int, sample : int, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
+    
 
 type IntImage2dArray<'f when 'f :> Formats.ISignedFormat>() =
     interface IImage
@@ -1684,14 +1732,30 @@ type IntImage2dArray<'f when 'f :> Formats.ISignedFormat>() =
         with get (coord : V2i, slice : int) : V4i = onlyInShaderCode "Load"
         and set (coord : V2i, slice : int) (data : V4i) : unit = onlyInShaderCode "Store"
     
+    /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : V2i, slice : int, data : int) : int = onlyInShaderCode "AtomicAdd"
+    
+    /// atomically compute the minimum of a value with an existing value in memory, store that value and return the original value
     member x.AtomicMin(coord : V2i, slice : int, data : int) : int = onlyInShaderCode "AtomicMin"
+    
+    /// atomically compute the maximum of a value with an existing value in memory, store that value and return the original value
     member x.AtomicMax(coord : V2i, slice : int, data : int) : int = onlyInShaderCode "AtomicMax"
+    
+    /// atomically compute the logical AND of a value with an existing value in memory, store that value and return the original value
     member x.AtomicAnd(coord : V2i, slice : int, data : int) : int = onlyInShaderCode "AtomicAnd"
+    
+    /// atomically compute the logical OR of a value with an existing value in memory, store that value and return the original value
     member x.AtomicOr(coord : V2i, slice : int, data : int) : int = onlyInShaderCode "AtomicOr"
+    
+    /// atomically compute the logical exclusive OR of a value with an existing value in memory, store that value and return the original value
     member x.AtomicXor(coord : V2i, slice : int, data : int) : int = onlyInShaderCode "AtomicXor"
+    
+    /// atomically store supplied data into memory and return the original value from memory
     member x.AtomicExchange(coord : V2i, slice : int, data : int) : int = onlyInShaderCode "AtomicExchange"
+    
+    /// atomically compare supplied data with that in memory and store it to memory, if the original value was equal to cmp.
     member x.AtomicCompareExchange(coord : V2i, slice : int, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
+    
 
 type IntImage2dMS<'f when 'f :> Formats.ISignedFormat>() =
     interface IImage
@@ -1716,14 +1780,30 @@ type IntImage2dMS<'f when 'f :> Formats.ISignedFormat>() =
         with get (coord : V2i, sample : int) : V4i = onlyInShaderCode "Load"
         and set (coord : V2i, sample : int) (data : V4i) : unit = onlyInShaderCode "Store"
     
+    /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : V2i, sample : int, data : int) : int = onlyInShaderCode "AtomicAdd"
+    
+    /// atomically compute the minimum of a value with an existing value in memory, store that value and return the original value
     member x.AtomicMin(coord : V2i, sample : int, data : int) : int = onlyInShaderCode "AtomicMin"
+    
+    /// atomically compute the maximum of a value with an existing value in memory, store that value and return the original value
     member x.AtomicMax(coord : V2i, sample : int, data : int) : int = onlyInShaderCode "AtomicMax"
+    
+    /// atomically compute the logical AND of a value with an existing value in memory, store that value and return the original value
     member x.AtomicAnd(coord : V2i, sample : int, data : int) : int = onlyInShaderCode "AtomicAnd"
+    
+    /// atomically compute the logical OR of a value with an existing value in memory, store that value and return the original value
     member x.AtomicOr(coord : V2i, sample : int, data : int) : int = onlyInShaderCode "AtomicOr"
+    
+    /// atomically compute the logical exclusive OR of a value with an existing value in memory, store that value and return the original value
     member x.AtomicXor(coord : V2i, sample : int, data : int) : int = onlyInShaderCode "AtomicXor"
+    
+    /// atomically store supplied data into memory and return the original value from memory
     member x.AtomicExchange(coord : V2i, sample : int, data : int) : int = onlyInShaderCode "AtomicExchange"
+    
+    /// atomically compare supplied data with that in memory and store it to memory, if the original value was equal to cmp.
     member x.AtomicCompareExchange(coord : V2i, sample : int, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
+    
 
 type IntImage2d<'f when 'f :> Formats.ISignedFormat>() =
     interface IImage
@@ -1748,14 +1828,30 @@ type IntImage2d<'f when 'f :> Formats.ISignedFormat>() =
         with get (coord : V2i) : V4i = onlyInShaderCode "Load"
         and set (coord : V2i) (data : V4i) : unit = onlyInShaderCode "Store"
     
+    /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : V2i, data : int) : int = onlyInShaderCode "AtomicAdd"
+    
+    /// atomically compute the minimum of a value with an existing value in memory, store that value and return the original value
     member x.AtomicMin(coord : V2i, data : int) : int = onlyInShaderCode "AtomicMin"
+    
+    /// atomically compute the maximum of a value with an existing value in memory, store that value and return the original value
     member x.AtomicMax(coord : V2i, data : int) : int = onlyInShaderCode "AtomicMax"
+    
+    /// atomically compute the logical AND of a value with an existing value in memory, store that value and return the original value
     member x.AtomicAnd(coord : V2i, data : int) : int = onlyInShaderCode "AtomicAnd"
+    
+    /// atomically compute the logical OR of a value with an existing value in memory, store that value and return the original value
     member x.AtomicOr(coord : V2i, data : int) : int = onlyInShaderCode "AtomicOr"
+    
+    /// atomically compute the logical exclusive OR of a value with an existing value in memory, store that value and return the original value
     member x.AtomicXor(coord : V2i, data : int) : int = onlyInShaderCode "AtomicXor"
+    
+    /// atomically store supplied data into memory and return the original value from memory
     member x.AtomicExchange(coord : V2i, data : int) : int = onlyInShaderCode "AtomicExchange"
+    
+    /// atomically compare supplied data with that in memory and store it to memory, if the original value was equal to cmp.
     member x.AtomicCompareExchange(coord : V2i, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
+    
 
 type IntImage3d<'f when 'f :> Formats.ISignedFormat>() =
     interface IImage
@@ -1780,14 +1876,30 @@ type IntImage3d<'f when 'f :> Formats.ISignedFormat>() =
         with get (coord : V3i) : V4i = onlyInShaderCode "Load"
         and set (coord : V3i) (data : V4i) : unit = onlyInShaderCode "Store"
     
+    /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : V3i, data : int) : int = onlyInShaderCode "AtomicAdd"
+    
+    /// atomically compute the minimum of a value with an existing value in memory, store that value and return the original value
     member x.AtomicMin(coord : V3i, data : int) : int = onlyInShaderCode "AtomicMin"
+    
+    /// atomically compute the maximum of a value with an existing value in memory, store that value and return the original value
     member x.AtomicMax(coord : V3i, data : int) : int = onlyInShaderCode "AtomicMax"
+    
+    /// atomically compute the logical AND of a value with an existing value in memory, store that value and return the original value
     member x.AtomicAnd(coord : V3i, data : int) : int = onlyInShaderCode "AtomicAnd"
+    
+    /// atomically compute the logical OR of a value with an existing value in memory, store that value and return the original value
     member x.AtomicOr(coord : V3i, data : int) : int = onlyInShaderCode "AtomicOr"
+    
+    /// atomically compute the logical exclusive OR of a value with an existing value in memory, store that value and return the original value
     member x.AtomicXor(coord : V3i, data : int) : int = onlyInShaderCode "AtomicXor"
+    
+    /// atomically store supplied data into memory and return the original value from memory
     member x.AtomicExchange(coord : V3i, data : int) : int = onlyInShaderCode "AtomicExchange"
+    
+    /// atomically compare supplied data with that in memory and store it to memory, if the original value was equal to cmp.
     member x.AtomicCompareExchange(coord : V3i, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
+    
 
 type IntImageCubeArray<'f when 'f :> Formats.ISignedFormat>() =
     interface IImage
@@ -1812,14 +1924,30 @@ type IntImageCubeArray<'f when 'f :> Formats.ISignedFormat>() =
         with get (coord : V2i, layerFace : int) : V4i = onlyInShaderCode "Load"
         and set (coord : V2i, layerFace : int) (data : V4i) : unit = onlyInShaderCode "Store"
     
+    /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : V2i, layerFace : int, data : int) : int = onlyInShaderCode "AtomicAdd"
+    
+    /// atomically compute the minimum of a value with an existing value in memory, store that value and return the original value
     member x.AtomicMin(coord : V2i, layerFace : int, data : int) : int = onlyInShaderCode "AtomicMin"
+    
+    /// atomically compute the maximum of a value with an existing value in memory, store that value and return the original value
     member x.AtomicMax(coord : V2i, layerFace : int, data : int) : int = onlyInShaderCode "AtomicMax"
+    
+    /// atomically compute the logical AND of a value with an existing value in memory, store that value and return the original value
     member x.AtomicAnd(coord : V2i, layerFace : int, data : int) : int = onlyInShaderCode "AtomicAnd"
+    
+    /// atomically compute the logical OR of a value with an existing value in memory, store that value and return the original value
     member x.AtomicOr(coord : V2i, layerFace : int, data : int) : int = onlyInShaderCode "AtomicOr"
+    
+    /// atomically compute the logical exclusive OR of a value with an existing value in memory, store that value and return the original value
     member x.AtomicXor(coord : V2i, layerFace : int, data : int) : int = onlyInShaderCode "AtomicXor"
+    
+    /// atomically store supplied data into memory and return the original value from memory
     member x.AtomicExchange(coord : V2i, layerFace : int, data : int) : int = onlyInShaderCode "AtomicExchange"
+    
+    /// atomically compare supplied data with that in memory and store it to memory, if the original value was equal to cmp.
     member x.AtomicCompareExchange(coord : V2i, layerFace : int, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
+    
 
 type IntImageCube<'f when 'f :> Formats.ISignedFormat>() =
     interface IImage
@@ -1844,12 +1972,28 @@ type IntImageCube<'f when 'f :> Formats.ISignedFormat>() =
         with get (coord : V2i, face : int) : V4i = onlyInShaderCode "Load"
         and set (coord : V2i, face : int) (data : V4i) : unit = onlyInShaderCode "Store"
     
+    /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : V2i, face : int, data : int) : int = onlyInShaderCode "AtomicAdd"
+    
+    /// atomically compute the minimum of a value with an existing value in memory, store that value and return the original value
     member x.AtomicMin(coord : V2i, face : int, data : int) : int = onlyInShaderCode "AtomicMin"
+    
+    /// atomically compute the maximum of a value with an existing value in memory, store that value and return the original value
     member x.AtomicMax(coord : V2i, face : int, data : int) : int = onlyInShaderCode "AtomicMax"
+    
+    /// atomically compute the logical AND of a value with an existing value in memory, store that value and return the original value
     member x.AtomicAnd(coord : V2i, face : int, data : int) : int = onlyInShaderCode "AtomicAnd"
+    
+    /// atomically compute the logical OR of a value with an existing value in memory, store that value and return the original value
     member x.AtomicOr(coord : V2i, face : int, data : int) : int = onlyInShaderCode "AtomicOr"
+    
+    /// atomically compute the logical exclusive OR of a value with an existing value in memory, store that value and return the original value
     member x.AtomicXor(coord : V2i, face : int, data : int) : int = onlyInShaderCode "AtomicXor"
+    
+    /// atomically store supplied data into memory and return the original value from memory
     member x.AtomicExchange(coord : V2i, face : int, data : int) : int = onlyInShaderCode "AtomicExchange"
+    
+    /// atomically compare supplied data with that in memory and store it to memory, if the original value was equal to cmp.
     member x.AtomicCompareExchange(coord : V2i, face : int, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
+    
 

@@ -506,7 +506,6 @@ let run() =
         line "member x.Size : %s = onlyInShaderCode \"Size\"" sizeType
         line  ""
 
-
         let args =
             [
                 yield "coord", coordType
@@ -519,8 +518,6 @@ let run() =
                     yield "slice", "int"
                 if m then yield "sample", "int"
             ]
-
-        let itemArgs = args |> List.map (fun (n,t) -> sprintf "%s : %s" n t) |> String.concat ", "
 
         Write.MemberFunction(
             "Load",
@@ -546,15 +543,62 @@ let run() =
         )
 
         if t = SamplerType.Int then
-            line "member x.AtomicAdd(%s, data : int) : int = onlyInShaderCode \"AtomicAdd\"" itemArgs
-            line "member x.AtomicMin(%s, data : int) : int = onlyInShaderCode \"AtomicMin\"" itemArgs
-            line "member x.AtomicMax(%s, data : int) : int = onlyInShaderCode \"AtomicMax\"" itemArgs
-            line "member x.AtomicAnd(%s, data : int) : int = onlyInShaderCode \"AtomicAnd\"" itemArgs
-            line "member x.AtomicOr(%s, data : int) : int = onlyInShaderCode \"AtomicOr\"" itemArgs
-            line "member x.AtomicXor(%s, data : int) : int = onlyInShaderCode \"AtomicXor\"" itemArgs
-            line "member x.AtomicExchange(%s, data : int) : int = onlyInShaderCode \"AtomicExchange\"" itemArgs
-            line "member x.AtomicCompareExchange(%s, cmp : int, data : int) : int = onlyInShaderCode \"AtomicCompareExchange\"" itemArgs
 
+            Write.MemberFunction(
+                "AtomicAdd",
+                args @ ["data", "int"],
+                "int",
+                comment = "atomically add a value to an existing value in memory and return the original value"
+            )
+
+            Write.MemberFunction(
+                "AtomicMin",
+                args @ ["data", "int"],
+                "int",
+                comment = "atomically compute the minimum of a value with an existing value in memory, store that value and return the original value"
+            )
+
+            Write.MemberFunction(
+                "AtomicMax",
+                args @ ["data", "int"],
+                "int",
+                comment = "atomically compute the maximum of a value with an existing value in memory, store that value and return the original value"
+            )
+
+            Write.MemberFunction(
+                "AtomicAnd",
+                args @ ["data", "int"],
+                "int",
+                comment = "atomically compute the logical AND of a value with an existing value in memory, store that value and return the original value"
+            )
+
+            Write.MemberFunction(
+                "AtomicOr",
+                args @ ["data", "int"],
+                "int",
+                comment = "atomically compute the logical OR of a value with an existing value in memory, store that value and return the original value"
+            )
+
+            Write.MemberFunction(
+                "AtomicXor",
+                args @ ["data", "int"],
+                "int",
+                comment = "atomically compute the logical exclusive OR of a value with an existing value in memory, store that value and return the original value"
+            )
+
+            Write.MemberFunction(
+                "AtomicExchange",
+                args @ ["data", "int"],
+                "int",
+                comment = "atomically store supplied data into memory and return the original value from memory"
+            )
+
+            Write.MemberFunction(
+                "AtomicCompareExchange",
+                args @ ["cmp", "int"; "data", "int"],
+                "int",
+                comment = "atomically compare supplied data with that in memory and store it to memory, if the original value was equal to cmp."
+            )
 
         stop()
         ()
