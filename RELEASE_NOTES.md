@@ -1,3 +1,6 @@
+### 5.3.0-prerelease0001
+* Initial prerelease version for 5.3
+
 ### 5.2.9
 * Fixed issue with topological sort and raytracing data
 * Removed warnings in raytracing shaders
