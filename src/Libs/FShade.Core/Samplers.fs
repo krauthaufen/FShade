@@ -15,7 +15,7 @@ type Sampler1dArrayShadow(tex : ISemanticValue, state : SamplerState) =
     static member IsShadow = true
     static member IsMultisampled = false
     
-    /// the mipmap-levels for the sampler
+    /// the number of mip-map levels of the texture bound to the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
     /// the level size for the sampler
@@ -61,7 +61,7 @@ type Sampler1dArray(tex : ISemanticValue, state : SamplerState) =
     static member IsShadow = false
     static member IsMultisampled = false
     
-    /// the mipmap-levels for the sampler
+    /// the number of mip-map levels of the texture bound to the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
     /// the level size for the sampler
@@ -114,7 +114,7 @@ type Sampler1dShadow(tex : ISemanticValue, state : SamplerState) =
     static member IsShadow = true
     static member IsMultisampled = false
     
-    /// the mipmap-levels for the sampler
+    /// the number of mip-map levels of the texture bound to the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
     /// the level size for the sampler
@@ -166,7 +166,7 @@ type Sampler1d(tex : ISemanticValue, state : SamplerState) =
     static member IsShadow = false
     static member IsMultisampled = false
     
-    /// the mipmap-levels for the sampler
+    /// the number of mip-map levels of the texture bound to the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
     /// the level size for the sampler
@@ -225,9 +225,6 @@ type Sampler2dArrayMS(tex : ISemanticValue, state : SamplerState) =
     static member IsShadow = false
     static member IsMultisampled = true
     
-    /// the mipmap-levels for the sampler
-    member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
-    
     /// the size for the sampler
     member x.Size : V3i = onlyInShaderCode "Size"
     
@@ -254,7 +251,7 @@ type Sampler2dArrayShadow(tex : ISemanticValue, state : SamplerState) =
     static member IsShadow = true
     static member IsMultisampled = false
     
-    /// the mipmap-levels for the sampler
+    /// the number of mip-map levels of the texture bound to the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
     /// the level size for the sampler
@@ -300,7 +297,7 @@ type Sampler2dArray(tex : ISemanticValue, state : SamplerState) =
     static member IsShadow = false
     static member IsMultisampled = false
     
-    /// the mipmap-levels for the sampler
+    /// the number of mip-map levels of the texture bound to the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
     /// the level size for the sampler
@@ -359,9 +356,6 @@ type Sampler2dMS(tex : ISemanticValue, state : SamplerState) =
     static member IsShadow = false
     static member IsMultisampled = true
     
-    /// the mipmap-levels for the sampler
-    member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
-    
     /// the size for the sampler
     member x.Size : V2i = onlyInShaderCode "Size"
     
@@ -388,7 +382,7 @@ type Sampler2dShadow(tex : ISemanticValue, state : SamplerState) =
     static member IsShadow = true
     static member IsMultisampled = false
     
-    /// the mipmap-levels for the sampler
+    /// the number of mip-map levels of the texture bound to the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
     /// the level size for the sampler
@@ -446,7 +440,7 @@ type Sampler2d(tex : ISemanticValue, state : SamplerState) =
     static member IsShadow = false
     static member IsMultisampled = false
     
-    /// the mipmap-levels for the sampler
+    /// the number of mip-map levels of the texture bound to the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
     /// the level size for the sampler
@@ -511,7 +505,7 @@ type Sampler3d(tex : ISemanticValue, state : SamplerState) =
     static member IsShadow = false
     static member IsMultisampled = false
     
-    /// the mipmap-levels for the sampler
+    /// the number of mip-map levels of the texture bound to the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
     /// the level size for the sampler
@@ -570,7 +564,7 @@ type SamplerCubeArrayShadow(tex : ISemanticValue, state : SamplerState) =
     static member IsShadow = true
     static member IsMultisampled = false
     
-    /// the mipmap-levels for the sampler
+    /// the number of mip-map levels of the texture bound to the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
     /// the level size for the sampler
@@ -604,7 +598,7 @@ type SamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
     static member IsShadow = false
     static member IsMultisampled = false
     
-    /// the mipmap-levels for the sampler
+    /// the number of mip-map levels of the texture bound to the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
     /// the level size for the sampler
@@ -644,7 +638,7 @@ type SamplerCubeShadow(tex : ISemanticValue, state : SamplerState) =
     static member IsShadow = true
     static member IsMultisampled = false
     
-    /// the mipmap-levels for the sampler
+    /// the number of mip-map levels of the texture bound to the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
     /// the level size for the sampler
@@ -681,7 +675,7 @@ type SamplerCube(tex : ISemanticValue, state : SamplerState) =
     static member IsShadow = false
     static member IsMultisampled = false
     
-    /// the mipmap-levels for the sampler
+    /// the number of mip-map levels of the texture bound to the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
     /// the level size for the sampler
@@ -721,7 +715,7 @@ type IntSampler1dArray(tex : ISemanticValue, state : SamplerState) =
     static member IsShadow = false
     static member IsMultisampled = false
     
-    /// the mipmap-levels for the sampler
+    /// the number of mip-map levels of the texture bound to the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
     /// the level size for the sampler
@@ -774,7 +768,7 @@ type IntSampler1d(tex : ISemanticValue, state : SamplerState) =
     static member IsShadow = false
     static member IsMultisampled = false
     
-    /// the mipmap-levels for the sampler
+    /// the number of mip-map levels of the texture bound to the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
     /// the level size for the sampler
@@ -833,9 +827,6 @@ type IntSampler2dArrayMS(tex : ISemanticValue, state : SamplerState) =
     static member IsShadow = false
     static member IsMultisampled = true
     
-    /// the mipmap-levels for the sampler
-    member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
-    
     /// the size for the sampler
     member x.Size : V3i = onlyInShaderCode "Size"
     
@@ -862,7 +853,7 @@ type IntSampler2dArray(tex : ISemanticValue, state : SamplerState) =
     static member IsShadow = false
     static member IsMultisampled = false
     
-    /// the mipmap-levels for the sampler
+    /// the number of mip-map levels of the texture bound to the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
     /// the level size for the sampler
@@ -921,9 +912,6 @@ type IntSampler2dMS(tex : ISemanticValue, state : SamplerState) =
     static member IsShadow = false
     static member IsMultisampled = true
     
-    /// the mipmap-levels for the sampler
-    member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
-    
     /// the size for the sampler
     member x.Size : V2i = onlyInShaderCode "Size"
     
@@ -950,7 +938,7 @@ type IntSampler2d(tex : ISemanticValue, state : SamplerState) =
     static member IsShadow = false
     static member IsMultisampled = false
     
-    /// the mipmap-levels for the sampler
+    /// the number of mip-map levels of the texture bound to the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
     /// the level size for the sampler
@@ -1015,7 +1003,7 @@ type IntSampler3d(tex : ISemanticValue, state : SamplerState) =
     static member IsShadow = false
     static member IsMultisampled = false
     
-    /// the mipmap-levels for the sampler
+    /// the number of mip-map levels of the texture bound to the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
     /// the level size for the sampler
@@ -1074,7 +1062,7 @@ type IntSamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
     static member IsShadow = false
     static member IsMultisampled = false
     
-    /// the mipmap-levels for the sampler
+    /// the number of mip-map levels of the texture bound to the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
     /// the level size for the sampler
@@ -1114,7 +1102,7 @@ type IntSamplerCube(tex : ISemanticValue, state : SamplerState) =
     static member IsShadow = false
     static member IsMultisampled = false
     
-    /// the mipmap-levels for the sampler
+    /// the number of mip-map levels of the texture bound to the sampler
     member x.MipMapLevels : int = onlyInShaderCode "MipMapLevels"
     
     /// the level size for the sampler

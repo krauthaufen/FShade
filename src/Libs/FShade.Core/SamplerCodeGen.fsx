@@ -239,12 +239,11 @@ let run() =
         line  "static member IsMultisampled = %s" (if m then "true" else "false")
         line  ""
 
-
-        line  "/// the mipmap-levels for the sampler"
-        line  "member x.MipMapLevels : int = onlyInShaderCode \"MipMapLevels\""
-        line  ""
-
         if not m then
+            line  "/// the number of mip-map levels of the texture bound to the sampler"
+            line  "member x.MipMapLevels : int = onlyInShaderCode \"MipMapLevels\""
+            line  ""
+
             line  "/// the level size for the sampler"
             line  "member x.GetSize (level : int) : %s = onlyInShaderCode \"GetSize\"" sizeType
             line  ""

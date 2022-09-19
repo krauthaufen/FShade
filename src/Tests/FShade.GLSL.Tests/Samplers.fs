@@ -11,21 +11,29 @@ type Vertex =
         [<Color>] c : V4d
     }
 
-let private arraySampler =
-    sampler2dArray {
-        texture uniform?TextureArray
-        filter Filter.MinMagLinear
-        addressU WrapMode.Clamp
-        addressV WrapMode.Clamp
-    }
+[<AutoOpen>]
+module private Samplers =
 
-let private simpleSampler =
-    sampler2d {
-        texture uniform?Simple
-        filter Filter.MinMagLinear
-        addressU WrapMode.Clamp
-        addressV WrapMode.Clamp
-    }
+    let sam1D        = sampler1d { texture uniform?DiffuseTexture }
+    let sam1DArray   = sampler1dArray { texture uniform?DiffuseTexture }
+    let sam2D        = sampler2d { texture uniform?DiffuseTexture }
+    let sam2DArray   = sampler2dArray { texture uniform?DiffuseTexture }
+    let sam2DMS      = sampler2dMS { texture uniform?DiffuseTexture }
+    let sam2DArrayMS = sampler2dArrayMS { texture uniform?DiffuseTexture }
+    let sam3D        = sampler3d { texture uniform?DiffuseTexture }
+    let samCube      = samplerCube { texture uniform?DiffuseTexture }
+    let samCubeArray = samplerCubeArray { texture uniform?DiffuseTexture }
+
+    let sam1DShadow        = sampler1dShadow { texture uniform?DiffuseTexture }
+    let sam1DArrayShadow   = sampler1dArrayShadow { texture uniform?DiffuseTexture }
+    let sam2DShadow        = sampler2dShadow { texture uniform?DiffuseTexture }
+    let sam2DArrayShadow   = sampler2dArrayShadow { texture uniform?DiffuseTexture }
+    let samCubeShadow      = samplerCubeShadow { texture uniform?DiffuseTexture }
+    let samCubeArrayShadow = samplerCubeArrayShadow { texture uniform?DiffuseTexture }
+
+    let intSam2D        = intSampler2d { texture uniform?IntTexture }
+    let intSam2DMS      = intSampler2dMS { texture uniform?DiffuseTexture }
+    let intSam2DArrayMS = intSampler2dArrayMS { texture uniform?DiffuseTexture }
 
 [<Test>]
 let ``Array Samplers`` () =
@@ -36,7 +44,7 @@ let ``Array Samplers`` () =
             let lc = v.pos.XY
             let mutable sum = V4d.Zero
             for i in 0..uniform?TextureCount-1 do
-                let layer = arraySampler.Read(V2i(int lc.X, int lc.Y), i, 0)
+                let layer = sam2DArray.Read(V2i(int lc.X, int lc.Y), i, 0)
                 sum <- sum + layer
 
             return sum
@@ -50,19 +58,14 @@ let ``Simple Fetch`` () =
 
     let frag (v : Vertex) =
         fragment {
-            let a = simpleSampler.[V2i.IO]
-            let b = simpleSampler.[V2i.OI, 1]
-            let c = simpleSampler.Read(V2i.II, 7)
+            let a = sam2D.[V2i.IO]
+            let b = sam2D.[V2i.OI, 1]
+            let c = sam2D.Read(V2i.II, 7)
 
             return a + b + c
         }
 
     GLSL.shouldCompile [ Effect.ofFunction (frag) ]
-
-let integerSampler =
-    intSampler2d {
-        texture uniform?IntTexture
-    }
 
 [<Test>]
 let ``IntSampler`` () =
@@ -70,7 +73,7 @@ let ``IntSampler`` () =
 
     let ps (v : Vertex) =
         fragment {
-            let value = integerSampler.Sample(v.pos.XY).X
+            let value = intSam2D.Sample(v.pos.XY).X
             return V4d(value, 1, 1, 1)
         }
 
@@ -79,15 +82,6 @@ let ``IntSampler`` () =
 [<Test>]
 let ``Texture Gather``() =
     Setup.Run()
-
-    let sam2D              = sampler2d { texture uniform?DiffuseTexture }
-    let sam2DArray         = sampler2dArray { texture uniform?DiffuseTexture }
-    let samCube            = samplerCube { texture uniform?DiffuseTexture }
-    let samCubeArray       = samplerCubeArray { texture uniform?DiffuseTexture }
-    let sam2DShadow        = sampler2dShadow { texture uniform?DiffuseTexture }
-    let sam2DArrayShadow   = sampler2dArrayShadow { texture uniform?DiffuseTexture }
-    let samCubeShadow      = samplerCubeShadow { texture uniform?DiffuseTexture }
-    let samCubeArrayShadow = samplerCubeArrayShadow { texture uniform?DiffuseTexture }
 
     let fs (v : Vertex) =
         fragment {
@@ -110,11 +104,6 @@ let ``Texture Gather``() =
 let ``Texture Gather with Offset``() =
     Setup.Run()
 
-    let sam2D            = sampler2d { texture uniform?DiffuseTexture }
-    let sam2DArray       = sampler2dArray { texture uniform?DiffuseTexture }
-    let sam2DShadow      = sampler2dShadow { texture uniform?DiffuseTexture }
-    let sam2DArrayShadow = sampler2dArrayShadow { texture uniform?DiffuseTexture }
-
     let fs (v : Vertex) =
         fragment {
             let a = sam2D.GatherOffset(V2d.Zero, V2i.Zero) + sam2D.GatherOffset(V2d.Zero, V2i.Zero, 1)
@@ -131,16 +120,6 @@ let ``Texture Gather with Offset``() =
 let ``Texture Size``() =
     Setup.Run()
 
-    let sam1D        = sampler1d { texture uniform?DiffuseTexture }
-    let sam1DArray   = sampler1dArray { texture uniform?DiffuseTexture }
-    let sam2D        = sampler2d { texture uniform?DiffuseTexture }
-    let sam2DArray   = sampler2dArray { texture uniform?DiffuseTexture }
-    let sam2DMS      = sampler2dMS { texture uniform?DiffuseTexture }
-    let sam2DArrayMS = sampler2dArrayMS { texture uniform?DiffuseTexture }
-    let sam3D        = sampler3d { texture uniform?DiffuseTexture }
-    let samCube      = samplerCube { texture uniform?DiffuseTexture }
-    let samCubeArray = samplerCubeArray { texture uniform?DiffuseTexture }
-
     let fs (v : Vertex) =
         fragment {
             let a = V3i sam1D.Size
@@ -153,7 +132,18 @@ let ``Texture Size``() =
             let h = V3i(sam2DMS.Size, 0)
             let i = sam2DArrayMS.Size
 
-            return V4d(V3d(a + b + c + d + e + f + g + h + i), 1.0)
+            let j = V3i sam1DShadow.Size
+            let k = V3i(sam1DArrayShadow.Size, 0)
+            let l = V3i(sam2DShadow.Size, 0)
+            let m = sam2DArrayShadow.Size
+            let n = V3i(samCubeShadow.Size, 0)
+            let o = samCubeArrayShadow.Size
+
+            return V4i(
+                a + b + c + d + e + f + g + h + i +
+                j + k + l + m + n + o,
+                1
+            )
         }
 
     GLSL.shouldCompile [Effect.ofFunction fs]
@@ -161,11 +151,6 @@ let ``Texture Size``() =
 [<Test>]
 let ``Texture Samples``() =
     Setup.Run()
-
-    let sam2DMS         = sampler2dMS { texture uniform?DiffuseTexture }
-    let sam2DArrayMS    = sampler2dArrayMS { texture uniform?DiffuseTexture }
-    let intSam2DMS      = intSampler2dMS { texture uniform?DiffuseTexture }
-    let intSam2DArrayMS = intSampler2dArrayMS { texture uniform?DiffuseTexture }
 
     let fs (v : Vertex) =
         fragment {
@@ -180,23 +165,34 @@ let ``Texture Samples``() =
     GLSL.shouldCompile [Effect.ofFunction fs]
 
 [<Test>]
-let ``Texture Query LoD``() =
+let ``Texture Levels``() =
     Setup.Run()
 
-    let sam1D        = sampler1d { texture uniform?DiffuseTexture }
-    let sam1DArray   = sampler1dArray { texture uniform?DiffuseTexture }
-    let sam2D        = sampler2d { texture uniform?DiffuseTexture }
-    let sam2DArray   = sampler2dArray { texture uniform?DiffuseTexture }
-    let sam3D        = sampler3d { texture uniform?DiffuseTexture }
-    let samCube      = samplerCube { texture uniform?DiffuseTexture }
-    let samCubeArray = samplerCubeArray { texture uniform?DiffuseTexture }
+    let fs (v : Vertex) =
+        fragment {
+            let _ = sam1D.MipMapLevels
+            let _ = sam1DArray.MipMapLevels
+            let _ = sam2D.MipMapLevels
+            let _ = sam2DArray.MipMapLevels
+            let _ = sam3D.MipMapLevels
+            let _ = samCube.MipMapLevels
+            let _ = samCubeArray.MipMapLevels
 
-    let sam1DShadow        = sampler1dShadow { texture uniform?DiffuseTexture }
-    let sam1DArrayShadow   = sampler1dArrayShadow { texture uniform?DiffuseTexture }
-    let sam2DShadow        = sampler2dShadow { texture uniform?DiffuseTexture }
-    let sam2DArrayShadow   = sampler2dArrayShadow { texture uniform?DiffuseTexture }
-    let samCubeShadow      = samplerCubeShadow { texture uniform?DiffuseTexture }
-    let samCubeArrayShadow = samplerCubeArrayShadow { texture uniform?DiffuseTexture }
+            let _ = sam1DShadow.MipMapLevels
+            let _ = sam1DArrayShadow.MipMapLevels
+            let _ = sam2DShadow.MipMapLevels
+            let _ = sam2DArrayShadow.MipMapLevels
+            let _ = samCubeShadow.MipMapLevels
+            let _ = samCubeArrayShadow.MipMapLevels
+
+            return V3i.Zero
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs]
+
+[<Test>]
+let ``Texture Query LoD``() =
+    Setup.Run()
 
     let fs (v : Vertex) =
         fragment {
@@ -227,21 +223,6 @@ let ``Texture Query LoD``() =
 let ``Texture Grad``() =
     Setup.Run()
 
-    let sam1D        = sampler1d { texture uniform?DiffuseTexture }
-    let sam1DArray   = sampler1dArray { texture uniform?DiffuseTexture }
-    let sam2D        = sampler2d { texture uniform?DiffuseTexture }
-    let sam2DArray   = sampler2dArray { texture uniform?DiffuseTexture }
-    let sam3D        = sampler3d { texture uniform?DiffuseTexture }
-    let samCube      = samplerCube { texture uniform?DiffuseTexture }
-    let samCubeArray = samplerCubeArray { texture uniform?DiffuseTexture }
-
-    let sam1DShadow        = sampler1dShadow { texture uniform?DiffuseTexture }
-    let sam1DArrayShadow   = sampler1dArrayShadow { texture uniform?DiffuseTexture }
-    let sam2DShadow        = sampler2dShadow { texture uniform?DiffuseTexture }
-    let sam2DArrayShadow   = sampler2dArrayShadow { texture uniform?DiffuseTexture }
-    let samCubeShadow      = samplerCubeShadow { texture uniform?DiffuseTexture }
-    let samCubeArrayShadow = samplerCubeArrayShadow { texture uniform?DiffuseTexture }
-
     let fs (v : Vertex) =
         fragment {
             let a = sam1D.SampleGrad(0.0, 0.0, 0.0)
@@ -269,14 +250,6 @@ let ``Texture Grad``() =
 let ``Texel Fetch``() =
     Setup.Run()
 
-    let sam1D        = sampler1d { texture uniform?DiffuseTexture }
-    let sam1DArray   = sampler1dArray { texture uniform?DiffuseTexture }
-    let sam2D        = sampler2d { texture uniform?DiffuseTexture }
-    let sam2DArray   = sampler2dArray { texture uniform?DiffuseTexture }
-    let sam2DMS      = sampler2dMS { texture uniform?DiffuseTexture }
-    let sam2DArrayMS = sampler2dArrayMS { texture uniform?DiffuseTexture }
-    let sam3D        = sampler3d { texture uniform?DiffuseTexture }
-
     let fs (v : Vertex) =
         fragment {
             let a = sam1D.Read(0, 7)
@@ -296,18 +269,6 @@ let ``Texel Fetch``() =
 [<Test>]
 let ``Texture LoD``() =
     Setup.Run()
-
-    let sam1D        = sampler1d { texture uniform?DiffuseTexture }
-    let sam1DArray   = sampler1dArray { texture uniform?DiffuseTexture }
-    let sam2D        = sampler2d { texture uniform?DiffuseTexture }
-    let sam2DArray   = sampler2dArray { texture uniform?DiffuseTexture }
-    let sam3D        = sampler3d { texture uniform?DiffuseTexture }
-    let samCube      = samplerCube { texture uniform?DiffuseTexture }
-    let samCubeArray = samplerCubeArray { texture uniform?DiffuseTexture }
-
-    let sam1DShadow        = sampler1dShadow { texture uniform?DiffuseTexture }
-    let sam1DArrayShadow   = sampler1dArrayShadow { texture uniform?DiffuseTexture }
-    let sam2DShadow        = sampler2dShadow { texture uniform?DiffuseTexture }
 
     let fs (v : Vertex) =
         fragment {
@@ -333,16 +294,6 @@ let ``Texture LoD``() =
 let ``Texture LoD with Offset``() =
     Setup.Run()
 
-    let sam1D        = sampler1d { texture uniform?DiffuseTexture }
-    let sam1DArray   = sampler1dArray { texture uniform?DiffuseTexture }
-    let sam2D        = sampler2d { texture uniform?DiffuseTexture }
-    let sam2DArray   = sampler2dArray { texture uniform?DiffuseTexture }
-    let sam3D        = sampler3d { texture uniform?DiffuseTexture }
-
-    let sam1DShadow        = sampler1dShadow { texture uniform?DiffuseTexture }
-    let sam1DArrayShadow   = sampler1dArrayShadow { texture uniform?DiffuseTexture }
-    let sam2DShadow        = sampler2dShadow { texture uniform?DiffuseTexture }
-
     let fs (v : Vertex) =
         fragment {
             let a = sam1D.SampleLevelOffset(0.0, 4.0, 3)
@@ -365,13 +316,6 @@ let ``Texture LoD with Offset``() =
 let ``Texture Proj``() =
     Setup.Run()
 
-    let sam1D        = sampler1d { texture uniform?DiffuseTexture }
-    let sam2D        = sampler2d { texture uniform?DiffuseTexture }
-    let sam3D        = sampler3d { texture uniform?DiffuseTexture }
-
-    let sam1DShadow        = sampler1dShadow { texture uniform?DiffuseTexture }
-    let sam2DShadow        = sampler2dShadow { texture uniform?DiffuseTexture }
-
     let fs (v : Vertex) =
         fragment {
             let a = sam1D.SampleProj(V2d.Zero)
@@ -390,17 +334,6 @@ let ``Texture Proj``() =
 [<Test>]
 let ``Texture Offset``() =
     Setup.Run()
-
-    let sam1D        = sampler1d { texture uniform?DiffuseTexture }
-    let sam1DArray   = sampler1dArray { texture uniform?DiffuseTexture }
-    let sam2D        = sampler2d { texture uniform?DiffuseTexture }
-    let sam2DArray   = sampler2dArray { texture uniform?DiffuseTexture }
-    let sam3D        = sampler3d { texture uniform?DiffuseTexture }
-
-    let sam1DShadow        = sampler1dShadow { texture uniform?DiffuseTexture }
-    let sam1DArrayShadow   = sampler1dArrayShadow { texture uniform?DiffuseTexture }
-    let sam2DShadow        = sampler2dShadow { texture uniform?DiffuseTexture }
-    let sam2DArrayShadow   = sampler2dArrayShadow { texture uniform?DiffuseTexture }
 
     let fs (v : Vertex) =
         fragment {
@@ -424,21 +357,6 @@ let ``Texture Offset``() =
 [<Test>]
 let ``Texture``() =
     Setup.Run()
-
-    let sam1D        = sampler1d { texture uniform?DiffuseTexture }
-    let sam1DArray   = sampler1dArray { texture uniform?DiffuseTexture }
-    let sam2D        = sampler2d { texture uniform?DiffuseTexture }
-    let sam2DArray   = sampler2dArray { texture uniform?DiffuseTexture }
-    let sam3D        = sampler3d { texture uniform?DiffuseTexture }
-    let samCube      = samplerCube { texture uniform?DiffuseTexture }
-    let samCubeArray = samplerCubeArray { texture uniform?DiffuseTexture }
-
-    let sam1DShadow        = sampler1dShadow { texture uniform?DiffuseTexture }
-    let sam1DArrayShadow   = sampler1dArrayShadow { texture uniform?DiffuseTexture }
-    let sam2DShadow        = sampler2dShadow { texture uniform?DiffuseTexture }
-    let sam2DArrayShadow   = sampler2dArrayShadow { texture uniform?DiffuseTexture }
-    let samCubeShadow      = samplerCubeShadow { texture uniform?DiffuseTexture }
-    let samCubeArrayShadow = samplerCubeArrayShadow { texture uniform?DiffuseTexture }
 
     let fs (v : Vertex) =
         fragment {
