@@ -390,7 +390,9 @@ type CExpr =
 
     | CAddressOf of t : CType * target : CExpr
     | CField of t : CType * target : CExpr * fieldName : string
-    | CItem of t : CType * target : CExpr * index : CExpr 
+    | CItem of t : CType * target : CExpr * index : CExpr
+
+    | CDebugPrintf of format : CExpr * values : CExpr[]
 
     member x.ctype =
         match x with
@@ -445,6 +447,7 @@ type CExpr =
             | CField(t,_,_) -> t
             | CItem(t,_,_) -> t
 
+            | CDebugPrintf _ -> CType.CVoid
 
 type internal Used() =
     let types = System.Collections.Generic.HashSet<CType>()
@@ -577,6 +580,11 @@ module CExpr =
                 used.AddType t
                 visit used target
                 visit used index
+
+            | CDebugPrintf(fmt, values) ->
+                visit used fmt
+                for v in values do
+                    visit used v
 
 /// represents a c-style rhs-expression
 type CRExpr =

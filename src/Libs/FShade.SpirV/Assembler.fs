@@ -1213,6 +1213,9 @@ module Assembler =
                     failwith "not implemented"
                     return id
 
+                | CDebugPrintf(fmt, values) ->
+                    return failwith "not implemented"
+
         }
 
     let rec assembleRExpr (e : CRExpr) : SpirV<uint32> =

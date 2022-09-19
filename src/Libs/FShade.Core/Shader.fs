@@ -2422,16 +2422,19 @@ module Shader =
             ShaderStage.Vertex, 
                 HashSet.ofList [
                     getMethodInfo <@ barrier @>
+                    getMethodInfo <@ Debug.Printf @>
                 ]
 
             ShaderStage.TessControl, 
                 HashSet.ofList [
                     getMethodInfo <@ barrier @>
+                    getMethodInfo <@ Debug.Printf @>
                 ]
 
             ShaderStage.TessEval, 
                 HashSet.ofList [
                     getMethodInfo <@ barrier @>
+                    getMethodInfo <@ Debug.Printf @>
                 ]
 
             ShaderStage.Geometry, 
@@ -2440,44 +2443,53 @@ module Shader =
                     getMethodInfo <@ restartStrip @>
                     getMethodInfo <@ endPrimitive @>
                     getMethodInfo <@ barrier @>
+                    getMethodInfo <@ Debug.Printf @>
                 ]
 
             ShaderStage.Fragment, 
                 HashSet.ofList [
                     getMethodInfo <@ discard @>
                     getMethodInfo <@ barrier @>
+                    getMethodInfo <@ Debug.Printf @>
                 ]
 
             ShaderStage.Compute,
                 HashSet.ofList [
                     getMethodInfo <@ barrier @>
+                    getMethodInfo <@ Debug.Printf @>
                 ]
 
             ShaderStage.RayGeneration,
                 HashSet.ofList [
+                    getMethodInfo <@ Debug.Printf @>
                 ]
 
             ShaderStage.Intersection,
                 HashSet.ofList [
                     getMethodInfo <@ reportIntersection @>
+                    getMethodInfo <@ Debug.Printf @>
                 ]
 
             ShaderStage.AnyHit,
                 HashSet.ofList [
                     getMethodInfo <@ ignoreIntersection @>
                     getMethodInfo <@ terminateRay @>
+                    getMethodInfo <@ Debug.Printf @>
                 ]
 
             ShaderStage.ClosestHit,
                 HashSet.ofList [
+                    getMethodInfo <@ Debug.Printf @>
                 ]
 
             ShaderStage.Miss,
                 HashSet.ofList [
+                    getMethodInfo <@ Debug.Printf @>
                 ]
 
             ShaderStage.Callable,
                 HashSet.ofList [
+                    getMethodInfo <@ Debug.Printf @>
                 ]
         ]
 

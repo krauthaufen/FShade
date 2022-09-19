@@ -621,8 +621,8 @@ module Compiler =
                 | Method("get_Item", [ArrOf(_,_); _]), [arr; index]
                 | Method("GetArray", _), [arr; index] -> 
                     CExpr.CItem(ct, arr, index) |> Some
-                    
-                
+
+
 
                 | ConversionMethod(_,o), [arg]              -> CExpr.CConvert(CType.ofType b o, arg) |> Some
                 | _ -> None
@@ -1288,7 +1288,32 @@ module Compiler =
                             let! def = FunctionDefinition.Utility f |> CompilerState.useGlobalFunction f.uniqueName
                             return CCall(def, List.toArray args)
 
-                
+                | Call(None, (Method("Printf", _) as mi), [fmt; values]) when mi.DeclaringType.Name = "Debug" ->
+                    let fmt =
+                        match Expr.TryEval fmt with
+                        | Some (:? string as fmt) -> CExpr.CValue(CType.CVoid, CLiteral.CString fmt)
+                        | _ -> failwithf "[FShade] Failed to evaluate format expression"
+
+                    let removeCoerce = function
+                        | Coerce(e, _) -> e
+                        | e -> e
+
+                    let values =
+                        match values with
+                        | NewArray(_, values)
+                        | NewFixedArray(_, _, values) ->
+                            values |> List.toArray |> Array.map removeCoerce
+
+                        | Value((:? array<obj> as arr), _) ->
+                            arr |> Array.map (fun e -> Expr.Value(e, e.GetType()))
+
+                        | _ ->
+                            failwithf "[FShade] Unknown arguments for Debug.Printf (%A)" values
+
+                    let! values =
+                        values |> Array.mapS toCExprS
+
+                    return CDebugPrintf(fmt, values)
 
                 | Call(None, mi, t :: args) | Call(Some t, mi, args) ->
                     let args = t :: args

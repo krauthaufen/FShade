@@ -303,6 +303,15 @@ module Primitives =
     let ignoreIntersection() : unit = onlyInShaderCode "ignoreIntersection"
     let terminateRay() : unit = onlyInShaderCode "terminateRay"
 
+    [<Sealed; AbstractClass>]
+    type Debug private() =
+
+        /// Print to the debug output (only Vulkan with validation layers)
+        // See: https://github.com/KhronosGroup/Vulkan-ValidationLayers/blob/master/docs/debug_printf.md
+        static member Printf(format : string, [<ParamArray>] values : obj[]) : unit =
+            onlyInShaderCode "debugPrintf"
+
+
     [<Literal>]
     let MaxLocalSize = 2147483647
 

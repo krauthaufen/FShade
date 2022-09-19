@@ -1089,3 +1089,24 @@ let ``Primitive id``() =
     GLSL.shouldCompile [
         Effect.ofFunction fs
     ]
+
+[<Test>]
+let ``Debug output``() =
+    Setup.Run()
+
+    let formatStr = "This is a format string"
+
+    let fs (v : Vertex) =
+        fragment {
+            Debug.Printf("Hello" + " my " +  "World!")
+            Debug.Printf(formatStr)
+            Debug.Printf("Hello, look at my float: %f", 0.0)
+            Debug.Printf("Hello, look at my float: %f", 0.0)
+            Debug.Printf("Hello, look at my float: %f", v.c.X)
+            Debug.Printf("Hello, look at my vector: %v4f", v.c)
+            return V4i.Zero
+        }
+
+    GLSL.shouldCompile [
+        Effect.ofFunction fs
+    ]

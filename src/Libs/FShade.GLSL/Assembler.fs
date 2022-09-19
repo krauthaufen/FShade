@@ -384,7 +384,11 @@ module AssemblerState =
                     
         )
 
-    
+    let useExtension (extensionName : string) =
+        State.modify (fun s ->
+            { s with requiredExtensions = s.requiredExtensions |> Set.add extensionName }
+        )
+  
 module Interface =
     let private modify (f : AssemblerState -> GLSLProgramInterface -> GLSLProgramInterface) =
         State.modify (fun (s : AssemblerState) ->
@@ -1198,8 +1202,18 @@ module Assembler =
                                 return sprintf "%s[%d]" m col
                         | _ ->
                             return failwith "sadsadsad"
-                    
 
+                | CDebugPrintf(fmt, values) ->
+                    do! AssemblerState.useExtension "GL_EXT_debug_printf"
+
+                    let! fmt = assembleExprS fmt
+                    let! values = values |> Array.mapS assembleExprS
+
+                    if values.Length = 0 then
+                        return sprintf "debugPrintfEXT(%s)" fmt
+                    else
+                        let values = values |> String.concat ", "
+                        return sprintf "debugPrintfEXT(%s, %s)" fmt values
         }
     
     and assembleExprsS (join : string) (args : seq<CExpr>) =
