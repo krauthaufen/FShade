@@ -16,6 +16,7 @@ type Vertex =
         foo : V4d
         what : V4i
         [<Semantic("Id")>] id : int
+        [<PrimitiveId>] primId : int
     }
 
 type IntVertex =
@@ -1074,4 +1075,17 @@ let ``Output type conversions``() =
         Effect.ofFunction fs1
         Effect.ofFunction fs2
         Effect.ofFunction fs3
+    ]
+
+[<Test>]
+let ``Primitive id``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            return V4i(v.primId)
+        }
+
+    GLSL.shouldCompile [
+        Effect.ofFunction fs
     ]

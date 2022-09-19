@@ -1611,12 +1611,6 @@ module Assembler =
                 | Some name -> 
                     do! Interface.useBuiltIn kind name p.cParamType
 
-                    let interpolation = 
-                        if kind = ParameterKind.Input && stages.Stage = ShaderStage.Fragment then
-                            p.cParamDecorations |> Seq.tryPick (function ParameterDecoration.Interpolation i -> Some i | _ -> None)
-                        else
-                            None
-
                     if name = "gl_FragDepth" && depthWrite <> DepthWriteMode.None then
                         if config.depthWriteMode then
                             let mode = assembleDepthWriteMode depthWrite
@@ -1624,19 +1618,7 @@ module Assembler =
                         else 
                             return None
                     else
-                        match interpolation with
-                        | Some i ->
-                            let mode = assembleInterpolationMode i
-
-                            match mode with
-                            | [] ->
-                                return None
-                            | _ ->
-                                let t = assembleType config.reverseMatrixLogic p.cParamType
-                                let m = mode |> String.concat " "
-                                return Some (sprintf "%s in %s %s;" m t.Name name)
-                        | None -> 
-                            return None
+                        return None
 
                 | None ->
                     let! set = 
