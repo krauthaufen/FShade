@@ -311,6 +311,11 @@ module Primitives =
         static member Printf(format : string, [<ParamArray>] values : obj[]) : unit =
             onlyInShaderCode "debugPrintf"
 
+        /// Print to the debug output (only Vulkan with validation layers)
+        [<ReflectedDefinition; KeepCall; Inline>]
+        static member Printfn(format : string, [<ParamArray>] values : obj[]) : unit =
+            Debug.Printf(format + @"\n", values)
+
 
     [<Literal>]
     let MaxLocalSize = 2147483647

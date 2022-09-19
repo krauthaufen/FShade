@@ -1104,6 +1104,14 @@ let ``Debug output``() =
             Debug.Printf("Hello, look at my float: %f", 0.0)
             Debug.Printf("Hello, look at my float: %f", v.c.X)
             Debug.Printf("Hello, look at my vector: %v4f", v.c)
+
+            Debug.Printfn("Hello" + " my " +  "World!")
+            Debug.Printfn(formatStr)
+            Debug.Printfn("Hello, look at my float: %f", 0.0)
+            Debug.Printfn("Hello, look at my float: %f", 0.0)
+            Debug.Printfn("Hello, look at my float: %f", v.c.X)
+            Debug.Printfn("Hello, look at my vector: %v4f", v.c)
+
             return V4i.Zero
         }
 
