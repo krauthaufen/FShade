@@ -142,3 +142,31 @@ let ``Helper with PrimitiveId``() =
          }
 
     GLSL.shouldCompileRaytracing effect
+
+[<Test>]
+let ``Callable shader``() =
+    Setup.Run()
+
+    let someName = Sym.ofString "someName"
+
+    let raygenShader =
+        raygen {
+            Callable.Execute(0, "someName")   |> ignore
+            Callable.Execute<int>("someName") |> ignore
+            Callable.Execute(0, someName)     |> ignore
+            Callable.Execute<int>(someName)   |> ignore
+            ()
+        }
+
+    let callableShader (input : RayCallableInput<int>)=
+        callable {
+            return input.data
+        }
+
+    let effect =
+         raytracingEffect {
+             raygen raygenShader
+             callable (someName, callableShader)
+         }
+
+    GLSL.shouldCompileRaytracing effect

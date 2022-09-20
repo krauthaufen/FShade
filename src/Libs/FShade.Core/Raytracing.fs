@@ -23,15 +23,15 @@ module private TraceDefaults =
     let CullMask = 0xFF
 
 
+[<AbstractClass; Sealed>]
 type Callable private() =
     static member Execute<'T>([<Optional; DefaultParameterValue(Identifier.Default)>] id : string) : 'T = onlyInShaderCode "Callable.Execute"
     static member Execute<'T>(data : 'T, [<Optional; DefaultParameterValue(Identifier.Default)>] id : string) : 'T = onlyInShaderCode "Callable.Execute"
-    [<Inline>]
-    static member Execute<'T>(id : Symbol) : 'T = Callable.Execute<'T>(string id)
-    [<Inline>]
-    static member Execute<'T>(data : 'T, id : Symbol) : 'T = Callable.Execute<'T>(data, string id)
+    static member Execute<'T>(id : Symbol) : 'T = onlyInShaderCode "Callable.Execute"
+    static member Execute<'T>(data : 'T, id : Symbol) : 'T = onlyInShaderCode "Callable.Execute"
 
 
+[<AbstractClass; Sealed>]
 type Intersection private() =
     static member Report(t : float, [<Optional; DefaultParameterValue(0)>] hitKind : int32) : bool =
         onlyInShaderCode "Intersection.Report"
