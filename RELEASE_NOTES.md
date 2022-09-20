@@ -1,3 +1,8 @@
+### 5.3.0-prerelease0003
+* Removed interpolation modes for built-in fragement inputs
+* Removed MipMapLevels for multisampled samplers
+* Implemented Debug.Printf
+
 ### 5.3.0-prerelease0002
 * Fixed regular expression for constant swizzles
 * Improved error message for incompatible output types
