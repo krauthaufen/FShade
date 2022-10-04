@@ -12,7 +12,7 @@ open FShade
 open Aardvark.Base
 open System.Runtime.InteropServices 
 
-let types = [ SamplerType.Float; SamplerType.Int ]
+let types = [ SamplerType.Float; SamplerType.Int; SamplerType.UInt ]
 let dims = [ SamplerDimension.Sampler1d; SamplerDimension.Sampler2d; SamplerDimension.Sampler3d; SamplerDimension.SamplerCube]
 let arr = [ true; false ]
 let ms = [ true; false ]
@@ -38,7 +38,7 @@ let allCombinations =
                 for a in arr do
                     let ms = if d = SamplerDimension.Sampler2d then ms else [false]
                     for m in ms do
-                        let shadow = if d = SamplerDimension.Sampler3d || t = SamplerType.Int || m then [false] else shadow
+                        let shadow = if d = SamplerDimension.Sampler3d || t = SamplerType.Int || t = SamplerType.UInt|| m then [false] else shadow
                         for s in shadow do
                             yield (t,d,a,m,s)
     ]
@@ -170,6 +170,7 @@ let run() =
             match t with
                 | SamplerType.Float -> ""
                 | SamplerType.Int -> "Int"
+                | SamplerType.UInt -> "UInt"
                 | _ -> ""
 
         let dim =
@@ -193,12 +194,14 @@ let run() =
                 if s then "float"
                 else "V4d"
             | SamplerType.Int -> "V4i"
+            | SamplerType.UInt -> "V4ui"
             | _ -> failwith "unknown sampler baseType"
 
         let gatherReturnType =
             match t with
             | SamplerType.Float -> "V4d"
             | SamplerType.Int -> "V4i"
+            | SamplerType.UInt -> "V4ui"
             | _ -> failwith "unknown sampler baseType"
 
         let coordComponents =
@@ -405,6 +408,7 @@ let run() =
             match t with
                 | SamplerType.Float -> ""
                 | SamplerType.Int -> "Int"
+                | SamplerType.UInt -> "UInt"
                 | _ -> ""
 
         let dim =
@@ -424,8 +428,10 @@ let run() =
         let builderName = sprintf "%sBuilder" typeName
         let valueName = 
             match t with
-                | SamplerType.Float -> sprintf "sampler%s%s%s%s" dim arr shadow ms
-                | _ -> sprintf "intSampler%s%s%s%s" dim arr shadow ms
+            | SamplerType.Float -> sprintf "sampler%s%s%s%s" dim arr shadow ms
+            | SamplerType.Int -> sprintf "intSampler%s%s%s%s" dim arr shadow ms
+            | SamplerType.UInt -> sprintf "uintSampler%s%s%s%s" dim arr shadow ms
+            | _ -> failwithf "Unknown sampler type %A" t
 
         start "type %s() = " builderName
         line  "inherit SamplerBaseBuilder()"
@@ -445,6 +451,7 @@ let run() =
             match t with
                 | SamplerType.Float -> ""
                 | SamplerType.Int -> "Int"
+                | SamplerType.UInt -> "UInt"
                 | _ -> ""
 
         let dim =
@@ -465,6 +472,7 @@ let run() =
             match t with
                 | SamplerType.Float -> "V4d"
                 | SamplerType.Int -> "V4i"
+                | SamplerType.UInt -> "V4ui"
                 | _ -> failwith "unknown image baseType"
 
         let coordComponents =
@@ -492,6 +500,7 @@ let run() =
             match t with
                 | SamplerType.Float -> "Formats.IFloatingFormat"
                 | SamplerType.Int -> "Formats.ISignedFormat"
+                | SamplerType.UInt -> "Formats.IUnsignedFormat"
                 | _ -> ""
 
         start "type %s<'f when 'f :> %s>() =" name iface
@@ -550,61 +559,67 @@ let run() =
             comment = "access single texel of image"
         )
 
-        if t = SamplerType.Int then
+        if t = SamplerType.Int || t = SamplerType.UInt then
+
+            let atomicDataType =
+                match t with
+                | SamplerType.Int -> "int"
+                | SamplerType.UInt -> "uint"
+                | _ -> failwith "unknown image baseType"
 
             Write.MemberFunction(
                 "AtomicAdd",
-                args @ ["data", "int"],
-                "int",
+                args @ ["data", atomicDataType],
+                atomicDataType,
                 comment = "atomically add a value to an existing value in memory and return the original value"
             )
 
             Write.MemberFunction(
                 "AtomicMin",
-                args @ ["data", "int"],
-                "int",
+                args @ ["data", atomicDataType],
+                atomicDataType,
                 comment = "atomically compute the minimum of a value with an existing value in memory, store that value and return the original value"
             )
 
             Write.MemberFunction(
                 "AtomicMax",
-                args @ ["data", "int"],
-                "int",
+                args @ ["data", atomicDataType],
+                atomicDataType,
                 comment = "atomically compute the maximum of a value with an existing value in memory, store that value and return the original value"
             )
 
             Write.MemberFunction(
                 "AtomicAnd",
-                args @ ["data", "int"],
-                "int",
+                args @ ["data", atomicDataType],
+                atomicDataType,
                 comment = "atomically compute the logical AND of a value with an existing value in memory, store that value and return the original value"
             )
 
             Write.MemberFunction(
                 "AtomicOr",
-                args @ ["data", "int"],
-                "int",
+                args @ ["data", atomicDataType],
+                atomicDataType,
                 comment = "atomically compute the logical OR of a value with an existing value in memory, store that value and return the original value"
             )
 
             Write.MemberFunction(
                 "AtomicXor",
-                args @ ["data", "int"],
-                "int",
+                args @ ["data", atomicDataType],
+                atomicDataType,
                 comment = "atomically compute the logical exclusive OR of a value with an existing value in memory, store that value and return the original value"
             )
 
             Write.MemberFunction(
                 "AtomicExchange",
-                args @ ["data", "int"],
-                "int",
+                args @ ["data", atomicDataType],
+                atomicDataType,
                 comment = "atomically store supplied data into memory and return the original value from memory"
             )
 
             Write.MemberFunction(
                 "AtomicCompareExchange",
-                args @ ["cmp", "int"; "data", "int"],
-                "int",
+                args @ ["cmp", atomicDataType; "data", atomicDataType],
+                atomicDataType,
                 comment = "atomically compare supplied data with that in memory and store it to memory, if the original value was equal to cmp."
             )
 

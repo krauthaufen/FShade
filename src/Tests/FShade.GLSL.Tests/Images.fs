@@ -35,6 +35,16 @@ module ImageUniforms =
         member x.IntImgCube      : IntImageCube<Formats.r32i> = x?IntFooCube
         member x.IntImgCubeArray : IntImageCubeArray<Formats.r32i> = x?IntFooCubeArray
 
+        member x.UIntImg1D        : UIntImage1d<Formats.r32ui> = x?UIntFoo1D
+        member x.UIntImg1DArray   : UIntImage1dArray<Formats.r32ui> = x?UIntFoo1DArray
+        member x.UIntImg2D        : UIntImage2d<Formats.r32ui> = x?UIntFoo2D
+        member x.UIntImg2DArray   : UIntImage2dArray<Formats.r32ui> = x?UIntFoo2DArray
+        member x.UIntImg2DMS      : UIntImage2dMS<Formats.r32ui> = x?UIntFoo2DMS
+        member x.UIntImg2DArrayMS : UIntImage2dArrayMS<Formats.r32ui> = x?UIntFoo2DArrayMS
+        member x.UIntImg3D        : UIntImage3d<Formats.r32ui> = x?UIntFoo3D
+        member x.UIntImgCube      : UIntImageCube<Formats.r32ui> = x?UIntFooCube
+        member x.UIntImgCubeArray : UIntImageCubeArray<Formats.r32ui> = x?UIntFooCubeArray
+
 
 [<Test>]
 let ``Size``() =
@@ -42,28 +52,39 @@ let ``Size``() =
 
     let fs (v : Vertex) =
         fragment {
-            let a0 = V3i(uniform.Img1D.Size, 0, 0)
-            let a1 = V3i(uniform.Img1DArray.Size, 0)
-            let a2 = V3i(uniform.Img2D.Size, 0)
-            let a3 = uniform.Img2DArray.Size
-            let a4 = uniform.Img3D.Size
-            let a5 = V3i(uniform.ImgCube.Size, 0)
-            let a6 = uniform.ImgCubeArray.Size
-            let a7 = V3i(uniform.Img2DMS.Size, 0)
-            let a8 = uniform.Img2DArrayMS.Size
+            let mutable ret = V3i.Zero
 
-            let a9  = V3i(uniform.IntImg1D.Size, 0, 0)
-            let a10 = V3i(uniform.IntImg1DArray.Size, 0)
-            let a11 = V3i(uniform.IntImg2D.Size, 0)
-            let a12 = uniform.IntImg2DArray.Size
-            let a13 = uniform.IntImg3D.Size
-            let a14 = V3i(uniform.IntImgCube.Size, 0)
-            let a15 = uniform.IntImgCubeArray.Size
-            let a16 = V3i(uniform.IntImg2DMS.Size, 0)
-            let a17 = uniform.IntImg2DArrayMS.Size
+            ret <- ret + V3i(uniform.Img1D.Size, 0, 0)
+            ret <- ret + V3i(uniform.Img1DArray.Size, 0)
+            ret <- ret + V3i(uniform.Img2D.Size, 0)
+            ret <- ret + uniform.Img2DArray.Size
+            ret <- ret + uniform.Img3D.Size
+            ret <- ret + V3i(uniform.ImgCube.Size, 0)
+            ret <- ret + uniform.ImgCubeArray.Size
+            ret <- ret + V3i(uniform.Img2DMS.Size, 0)
+            ret <- ret + uniform.Img2DArrayMS.Size
 
-            return a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 +
-                   a9 + a10 + a11 + a12 + a13 + a14 + a15 + a16 + a17
+            ret <- ret + V3i(uniform.IntImg1D.Size, 0, 0)
+            ret <- ret + V3i(uniform.IntImg1DArray.Size, 0)
+            ret <- ret + V3i(uniform.IntImg2D.Size, 0)
+            ret <- ret + uniform.IntImg2DArray.Size
+            ret <- ret + uniform.IntImg3D.Size
+            ret <- ret + V3i(uniform.IntImgCube.Size, 0)
+            ret <- ret + uniform.IntImgCubeArray.Size
+            ret <- ret + V3i(uniform.IntImg2DMS.Size, 0)
+            ret <- ret + uniform.IntImg2DArrayMS.Size
+
+            ret <- ret + V3i(uniform.UIntImg1D.Size, 0, 0)
+            ret <- ret + V3i(uniform.UIntImg1DArray.Size, 0)
+            ret <- ret + V3i(uniform.UIntImg2D.Size, 0)
+            ret <- ret + uniform.UIntImg2DArray.Size
+            ret <- ret + uniform.UIntImg3D.Size
+            ret <- ret + V3i(uniform.UIntImgCube.Size, 0)
+            ret <- ret + uniform.UIntImgCubeArray.Size
+            ret <- ret + V3i(uniform.UIntImg2DMS.Size, 0)
+            ret <- ret + uniform.UIntImg2DArrayMS.Size
+
+            return ret
         }
 
     GLSL.shouldCompile [Effect.ofFunction fs]
@@ -79,6 +100,8 @@ let ``Samples``() =
             let _ = uniform.Img2DArrayMS.Samples
             let _ = uniform.IntImg2DMS.Samples
             let _ = uniform.IntImg2DArrayMS.Samples
+            let _ = uniform.UIntImg2DMS.Samples
+            let _ = uniform.UIntImg2DArrayMS.Samples
 
             return 0
         }
@@ -91,29 +114,40 @@ let ``Load``() =
 
     let fs (v : Vertex) =
         fragment {
+            let mutable c = V4d.Zero
+            c <- c + uniform.Img1D.Load(1)                      + uniform.Img1D.[1]
+            c <- c + uniform.Img1DArray.Load(0, 1)              + uniform.Img1DArray.[0, 1]
+            c <- c + uniform.Img2D.Load V2i.Zero                + uniform.Img2D.[V2i.Zero]
+            c <- c + uniform.Img2DArray.Load(V2i.Zero, 1)       + uniform.Img2DArray.[V2i.Zero, 1]
+            c <- c + uniform.Img3D.Load(V3i.Zero)               + uniform.Img3D.[V3i.Zero]
+            c <- c + uniform.ImgCube.Load(V2i.Zero, 3)          + uniform.ImgCube.[V2i.Zero, 3]
+            c <- c + uniform.ImgCubeArray.Load(V2i.Zero, 4)     + uniform.ImgCubeArray.[V2i.Zero, 4]
+            c <- c + uniform.Img2DMS.Load(V2i.Zero, 0)          + uniform.Img2DMS.[V2i.Zero, 0]
+            c <- c + uniform.Img2DArrayMS.Load(V2i.Zero, 1, 0)  + uniform.Img2DArrayMS.[V2i.Zero, 1, 0]
 
-            let a0 = uniform.Img1D.Load(1)                      + uniform.Img1D.[1]
-            let a1 = uniform.Img1DArray.Load(0, 1)              + uniform.Img1DArray.[0, 1]
-            let a2 = uniform.Img2D.Load V2i.Zero                + uniform.Img2D.[V2i.Zero]
-            let a3 = uniform.Img2DArray.Load(V2i.Zero, 1)       + uniform.Img2DArray.[V2i.Zero, 1]
-            let a4 = uniform.Img3D.Load(V3i.Zero)               + uniform.Img3D.[V3i.Zero]
-            let a5 = uniform.ImgCube.Load(V2i.Zero, 3)          + uniform.ImgCube.[V2i.Zero, 3]
-            let a6 = uniform.ImgCubeArray.Load(V2i.Zero, 4)     + uniform.ImgCubeArray.[V2i.Zero, 4]
-            let a7 = uniform.Img2DMS.Load(V2i.Zero, 0)          + uniform.Img2DMS.[V2i.Zero, 0]
-            let a8 = uniform.Img2DArrayMS.Load(V2i.Zero, 1, 0)  + uniform.Img2DArrayMS.[V2i.Zero, 1, 0]
+            let mutable ci = V4i.Zero
+            ci <- ci + uniform.IntImg1D.Load(1)                     + uniform.IntImg1D.[1]
+            ci <- ci + uniform.IntImg1DArray.Load(0, 1)             + uniform.IntImg1DArray.[0, 1]
+            ci <- ci + uniform.IntImg2D.Load(V2i.Zero)              + uniform.IntImg2D.[V2i.Zero]
+            ci <- ci + uniform.IntImg2DArray.Load(V2i.Zero, 1)      + uniform.IntImg2DArray.[V2i.Zero, 1]
+            ci <- ci + uniform.IntImg3D.Load(V3i.Zero)              + uniform.IntImg3D.[V3i.Zero]
+            ci <- ci + uniform.IntImgCube.Load(V2i.Zero, 3)         + uniform.IntImgCube.[V2i.Zero, 3]
+            ci <- ci + uniform.IntImgCubeArray.Load(V2i.Zero, 4)    + uniform.IntImgCubeArray.[V2i.Zero, 4]
+            ci <- ci + uniform.IntImg2DMS.Load(V2i.Zero, 0)         + uniform.IntImg2DMS.[V2i.Zero, 0]
+            ci <- ci + uniform.IntImg2DArrayMS.Load(V2i.Zero, 1, 0) + uniform.IntImg2DArrayMS.[V2i.Zero, 1, 0]
 
-            let a9  = uniform.IntImg1D.Load(1)                     + uniform.IntImg1D.[1]
-            let a10 = uniform.IntImg1DArray.Load(0, 1)             + uniform.IntImg1DArray.[0, 1]
-            let a11 = uniform.IntImg2D.Load(V2i.Zero)              + uniform.IntImg2D.[V2i.Zero]
-            let a12 = uniform.IntImg2DArray.Load(V2i.Zero, 1)      + uniform.IntImg2DArray.[V2i.Zero, 1]
-            let a13 = uniform.IntImg3D.Load(V3i.Zero)              + uniform.IntImg3D.[V3i.Zero]
-            let a14 = uniform.IntImgCube.Load(V2i.Zero, 3)         + uniform.IntImgCube.[V2i.Zero, 3]
-            let a15 = uniform.IntImgCubeArray.Load(V2i.Zero, 4)    + uniform.IntImgCubeArray.[V2i.Zero, 4]
-            let a16 = uniform.IntImg2DMS.Load(V2i.Zero, 0)         + uniform.IntImg2DMS.[V2i.Zero, 0]
-            let a17 = uniform.IntImg2DArrayMS.Load(V2i.Zero, 1, 0) + uniform.IntImg2DArrayMS.[V2i.Zero, 1, 0]
+            let mutable cui = V4ui.Zero
+            cui <- cui + uniform.UIntImg1D.Load(1)                     + uniform.UIntImg1D.[1]
+            cui <- cui + uniform.UIntImg1DArray.Load(0, 1)             + uniform.UIntImg1DArray.[0, 1]
+            cui <- cui + uniform.UIntImg2D.Load(V2i.Zero)              + uniform.UIntImg2D.[V2i.Zero]
+            cui <- cui + uniform.UIntImg2DArray.Load(V2i.Zero, 1)      + uniform.UIntImg2DArray.[V2i.Zero, 1]
+            cui <- cui + uniform.UIntImg3D.Load(V3i.Zero)              + uniform.UIntImg3D.[V3i.Zero]
+            cui <- cui + uniform.UIntImgCube.Load(V2i.Zero, 3)         + uniform.UIntImgCube.[V2i.Zero, 3]
+            cui <- cui + uniform.UIntImgCubeArray.Load(V2i.Zero, 4)    + uniform.UIntImgCubeArray.[V2i.Zero, 4]
+            cui <- cui + uniform.UIntImg2DMS.Load(V2i.Zero, 0)         + uniform.UIntImg2DMS.[V2i.Zero, 0]
+            cui <- cui + uniform.UIntImg2DArrayMS.Load(V2i.Zero, 1, 0) + uniform.UIntImg2DArrayMS.[V2i.Zero, 1, 0]
 
-            return {| Color = a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8;
-                      Colori = a9 + a10 + a11 + a12 + a13 + a14 + a15 + a16 + a17 |}
+            return {| Color = c; Colori = ci; Colorui = cui |}
         }
 
     GLSL.shouldCompile [Effect.ofFunction fs]
@@ -164,10 +198,30 @@ let ``Store``() =
             uniform.IntImg2DMS.[V2i.Zero, 0] <- V4i.Zero
             uniform.IntImg2DArrayMS.[V2i.Zero, 1, 0] <- V4i.Zero
 
+            uniform.UIntImg1D.Store(1, V4ui.Zero)
+            uniform.UIntImg1DArray.Store(0, 1, V4ui.Zero)
+            uniform.UIntImg2D.Store(V2i.Zero, V4ui.Zero)
+            uniform.UIntImg2DArray.Store(V2i.Zero, 1, V4ui.Zero)
+            uniform.UIntImg3D.Store(V3i.Zero, V4ui.Zero)
+            uniform.UIntImgCube.Store(V2i.Zero, 3, V4ui.Zero)
+            uniform.UIntImgCubeArray.Store(V2i.Zero, 4, V4ui.Zero)
+            uniform.UIntImg2DMS.Store(V2i.Zero, 0, V4ui.Zero)
+            uniform.UIntImg2DArrayMS.Store(V2i.Zero, 1, 0, V4ui.Zero)
+
+            uniform.UIntImg1D.[1] <- V4ui.Zero
+            uniform.UIntImg1DArray.[0, 1] <- V4ui.Zero
+            uniform.UIntImg2D.[V2i.Zero] <- V4ui.Zero
+            uniform.UIntImg2DArray.[V2i.Zero, 1] <- V4ui.Zero
+            uniform.UIntImg3D.[V3i.Zero] <- V4ui.Zero
+            uniform.UIntImgCube.[V2i.Zero, 3] <- V4ui.Zero
+            uniform.UIntImgCubeArray.[V2i.Zero, 4] <- V4ui.Zero
+            uniform.UIntImg2DMS.[V2i.Zero, 0] <- V4ui.Zero
+            uniform.UIntImg2DArrayMS.[V2i.Zero, 1, 0] <- V4ui.Zero
+
             return V3d.Zero
         }
 
-    GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction fs] ["IntFoo1DArray", 3]
+    GLSL.shouldCompile [Effect.ofFunction fs]
 
 [<Test>]
 let ``AtomicAdd``() =
@@ -184,6 +238,16 @@ let ``AtomicAdd``() =
             let _ = uniform.IntImgCubeArray.AtomicAdd(V2i.Zero, 4, 0)
             let _ = uniform.IntImg2DMS.AtomicAdd(V2i.Zero, 0, 0)
             let _ = uniform.IntImg2DArrayMS.AtomicAdd(V2i.Zero, 1, 0, 0)
+
+            let _ = uniform.UIntImg1D.AtomicAdd(1, 0u)
+            let _ = uniform.UIntImg1DArray.AtomicAdd(0, 1, 0u)
+            let _ = uniform.UIntImg2D.AtomicAdd(V2i.Zero, 0u)
+            let _ = uniform.UIntImg2DArray.AtomicAdd(V2i.Zero, 1, 0u)
+            let _ = uniform.UIntImg3D.AtomicAdd(V3i.Zero, 0u)
+            let _ = uniform.UIntImgCube.AtomicAdd(V2i.Zero, 3, 0u)
+            let _ = uniform.UIntImgCubeArray.AtomicAdd(V2i.Zero, 4, 0u)
+            let _ = uniform.UIntImg2DMS.AtomicAdd(V2i.Zero, 0, 0u)
+            let _ = uniform.UIntImg2DArrayMS.AtomicAdd(V2i.Zero, 1, 0, 0u)
 
             return V3d.Zero
         }
@@ -206,6 +270,16 @@ let ``AtomicMin``() =
             let _ = uniform.IntImg2DMS.AtomicMin(V2i.Zero, 0, 0)
             let _ = uniform.IntImg2DArrayMS.AtomicMin(V2i.Zero, 1, 0, 0)
 
+            let _ = uniform.UIntImg1D.AtomicMin(1, 0u)
+            let _ = uniform.UIntImg1DArray.AtomicMin(0, 1, 0u)
+            let _ = uniform.UIntImg2D.AtomicMin(V2i.Zero, 0u)
+            let _ = uniform.UIntImg2DArray.AtomicMin(V2i.Zero, 1, 0u)
+            let _ = uniform.UIntImg3D.AtomicMin(V3i.Zero, 0u)
+            let _ = uniform.UIntImgCube.AtomicMin(V2i.Zero, 3, 0u)
+            let _ = uniform.UIntImgCubeArray.AtomicMin(V2i.Zero, 4, 0u)
+            let _ = uniform.UIntImg2DMS.AtomicMin(V2i.Zero, 0, 0u)
+            let _ = uniform.UIntImg2DArrayMS.AtomicMin(V2i.Zero, 1, 0, 0u)
+
             return V3d.Zero
         }
 
@@ -226,6 +300,16 @@ let ``AtomicMax``() =
             let _ = uniform.IntImgCubeArray.AtomicMax(V2i.Zero, 4, 0)
             let _ = uniform.IntImg2DMS.AtomicMax(V2i.Zero, 0, 0)
             let _ = uniform.IntImg2DArrayMS.AtomicMax(V2i.Zero, 1, 0, 0)
+
+            let _ = uniform.UIntImg1D.AtomicMax(1, 0u)
+            let _ = uniform.UIntImg1DArray.AtomicMax(0, 1, 0u)
+            let _ = uniform.UIntImg2D.AtomicMax(V2i.Zero, 0u)
+            let _ = uniform.UIntImg2DArray.AtomicMax(V2i.Zero, 1, 0u)
+            let _ = uniform.UIntImg3D.AtomicMax(V3i.Zero, 0u)
+            let _ = uniform.UIntImgCube.AtomicMax(V2i.Zero, 3, 0u)
+            let _ = uniform.UIntImgCubeArray.AtomicMax(V2i.Zero, 4, 0u)
+            let _ = uniform.UIntImg2DMS.AtomicMax(V2i.Zero, 0, 0u)
+            let _ = uniform.UIntImg2DArrayMS.AtomicMax(V2i.Zero, 1, 0, 0u)
 
             return V3d.Zero
         }
@@ -248,6 +332,16 @@ let ``AtomicAnd``() =
             let _ = uniform.IntImg2DMS.AtomicAnd(V2i.Zero, 0, 0)
             let _ = uniform.IntImg2DArrayMS.AtomicAnd(V2i.Zero, 1, 0, 0)
 
+            let _ = uniform.UIntImg1D.AtomicAnd(1, 0u)
+            let _ = uniform.UIntImg1DArray.AtomicAnd(0, 1, 0u)
+            let _ = uniform.UIntImg2D.AtomicAnd(V2i.Zero, 0u)
+            let _ = uniform.UIntImg2DArray.AtomicAnd(V2i.Zero, 1, 0u)
+            let _ = uniform.UIntImg3D.AtomicAnd(V3i.Zero, 0u)
+            let _ = uniform.UIntImgCube.AtomicAnd(V2i.Zero, 3, 0u)
+            let _ = uniform.UIntImgCubeArray.AtomicAnd(V2i.Zero, 4, 0u)
+            let _ = uniform.UIntImg2DMS.AtomicAnd(V2i.Zero, 0, 0u)
+            let _ = uniform.UIntImg2DArrayMS.AtomicAnd(V2i.Zero, 1, 0, 0u)
+
             return V3d.Zero
         }
 
@@ -268,6 +362,16 @@ let ``AtomicOr``() =
             let _ = uniform.IntImgCubeArray.AtomicOr(V2i.Zero, 4, 0)
             let _ = uniform.IntImg2DMS.AtomicOr(V2i.Zero, 0, 0)
             let _ = uniform.IntImg2DArrayMS.AtomicOr(V2i.Zero, 1, 0, 0)
+
+            let _ = uniform.UIntImg1D.AtomicOr(1, 0u)
+            let _ = uniform.UIntImg1DArray.AtomicOr(0, 1, 0u)
+            let _ = uniform.UIntImg2D.AtomicOr(V2i.Zero, 0u)
+            let _ = uniform.UIntImg2DArray.AtomicOr(V2i.Zero, 1, 0u)
+            let _ = uniform.UIntImg3D.AtomicOr(V3i.Zero, 0u)
+            let _ = uniform.UIntImgCube.AtomicOr(V2i.Zero, 3, 0u)
+            let _ = uniform.UIntImgCubeArray.AtomicOr(V2i.Zero, 4, 0u)
+            let _ = uniform.UIntImg2DMS.AtomicOr(V2i.Zero, 0, 0u)
+            let _ = uniform.UIntImg2DArrayMS.AtomicOr(V2i.Zero, 1, 0, 0u)
 
             return V3d.Zero
         }
@@ -290,6 +394,16 @@ let ``AtomicXor``() =
             let _ = uniform.IntImg2DMS.AtomicXor(V2i.Zero, 0, 0)
             let _ = uniform.IntImg2DArrayMS.AtomicXor(V2i.Zero, 1, 0, 0)
 
+            let _ = uniform.UIntImg1D.AtomicXor(1, 0u)
+            let _ = uniform.UIntImg1DArray.AtomicXor(0, 1, 0u)
+            let _ = uniform.UIntImg2D.AtomicXor(V2i.Zero, 0u)
+            let _ = uniform.UIntImg2DArray.AtomicXor(V2i.Zero, 1, 0u)
+            let _ = uniform.UIntImg3D.AtomicXor(V3i.Zero, 0u)
+            let _ = uniform.UIntImgCube.AtomicXor(V2i.Zero, 3, 0u)
+            let _ = uniform.UIntImgCubeArray.AtomicXor(V2i.Zero, 4, 0u)
+            let _ = uniform.UIntImg2DMS.AtomicXor(V2i.Zero, 0, 0u)
+            let _ = uniform.UIntImg2DArrayMS.AtomicXor(V2i.Zero, 1, 0, 0u)
+
             return V3d.Zero
         }
 
@@ -311,6 +425,16 @@ let ``AtomicExchange``() =
             let _ = uniform.IntImg2DMS.AtomicExchange(V2i.Zero, 0, 0)
             let _ = uniform.IntImg2DArrayMS.AtomicExchange(V2i.Zero, 1, 0, 0)
 
+            let _ = uniform.UIntImg1D.AtomicExchange(1, 0u)
+            let _ = uniform.UIntImg1DArray.AtomicExchange(0, 1, 0u)
+            let _ = uniform.UIntImg2D.AtomicExchange(V2i.Zero, 0u)
+            let _ = uniform.UIntImg2DArray.AtomicExchange(V2i.Zero, 1, 0u)
+            let _ = uniform.UIntImg3D.AtomicExchange(V3i.Zero, 0u)
+            let _ = uniform.UIntImgCube.AtomicExchange(V2i.Zero, 3, 0u)
+            let _ = uniform.UIntImgCubeArray.AtomicExchange(V2i.Zero, 4, 0u)
+            let _ = uniform.UIntImg2DMS.AtomicExchange(V2i.Zero, 0, 0u)
+            let _ = uniform.UIntImg2DArrayMS.AtomicExchange(V2i.Zero, 1, 0, 0u)
+
             return V3d.Zero
         }
 
@@ -331,6 +455,16 @@ let ``AtomicCompareExchange``() =
             let _ = uniform.IntImgCubeArray.AtomicCompareExchange(V2i.Zero, 4, 42, 0)
             let _ = uniform.IntImg2DMS.AtomicCompareExchange(V2i.Zero, 0, 42, 0)
             let _ = uniform.IntImg2DArrayMS.AtomicCompareExchange(V2i.Zero, 1, 0, 42, 0)
+
+            let _ = uniform.UIntImg1D.AtomicCompareExchange(1, 42u, 0u)
+            let _ = uniform.UIntImg1DArray.AtomicCompareExchange(0, 1, 42u, 0u)
+            let _ = uniform.UIntImg2D.AtomicCompareExchange(V2i.Zero, 42u, 0u)
+            let _ = uniform.UIntImg2DArray.AtomicCompareExchange(V2i.Zero, 1, 42u, 0u)
+            let _ = uniform.UIntImg3D.AtomicCompareExchange(V3i.Zero, 42u, 0u)
+            let _ = uniform.UIntImgCube.AtomicCompareExchange(V2i.Zero, 3, 42u, 0u)
+            let _ = uniform.UIntImgCubeArray.AtomicCompareExchange(V2i.Zero, 4, 42u, 0u)
+            let _ = uniform.UIntImg2DMS.AtomicCompareExchange(V2i.Zero, 0, 42u, 0u)
+            let _ = uniform.UIntImg2DArrayMS.AtomicCompareExchange(V2i.Zero, 1, 0, 42u, 0u)
 
             return V3d.Zero
         }

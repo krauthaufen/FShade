@@ -115,6 +115,7 @@ module SamplerState =
 type SamplerType = 
     | Float = 0
     | Int = 1
+    | UInt = 2
 
 type SamplerDimension = 
     | Sampler1d = 0

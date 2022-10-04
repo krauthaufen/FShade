@@ -161,6 +161,7 @@ type Backend private(config : Config) =
                 let typePrefix = 
                     match valueType.Name with
                         | "V4i" -> "i"
+                        | "V4ui" -> "u"
                         | _ -> ""
 
                 let name = 
@@ -195,6 +196,7 @@ type Backend private(config : Config) =
                 let typePrefix = 
                     match valueType.Name with
                         | "V4i" -> "i"
+                        | "V4ui" -> "u"
                         | _ -> ""
 
                 let fmt = tFmt.Name
