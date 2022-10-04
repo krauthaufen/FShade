@@ -76,6 +76,7 @@ module ReflectionPatterns =
             getMethodInfo <@ uint16 @>  
             getMethodInfo <@ int @> 
             getMethodInfo <@ int32 @> 
+            getMethodInfo <@ uint @> 
             getMethodInfo <@ uint32 @> 
             getMethodInfo <@ int64 @> 
             getMethodInfo <@ uint64 @> 

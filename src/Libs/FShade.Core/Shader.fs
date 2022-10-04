@@ -1619,8 +1619,8 @@ module Preprocessor =
     and getOutputValues (sem : string) (value : Expr) : Preprocess<list<string * Option<Expr> * Expr>> =
         state {
             match value.Type with
-            | TypeInfo.Patterns.VectorOf (_, (TypeInfo.Patterns.Float64 | TypeInfo.Patterns.Int32))
-            | TypeInfo.Patterns.Float64 | TypeInfo.Patterns.Int32 ->
+            | TypeInfo.Patterns.VectorOf (_, (TypeInfo.Patterns.Float64 | TypeInfo.Patterns.Int32 | TypeInfo.Patterns.UInt32))
+            | TypeInfo.Patterns.Float64 | TypeInfo.Patterns.Int32 | TypeInfo.Patterns.UInt32 ->
                 let! value = preprocessS value
                 do! State.writeOutput sem { paramType = value.Type; paramInterpolation = InterpolationMode.Default }
                 return [sem, None, value]
@@ -2510,10 +2510,21 @@ module Shader =
             (typeof<V2i>, typeof<int32>), fun value -> <@@ (%%value : V2i).X @@>
 
             (typeof<V3i>, typeof<int32>), fun value -> <@@ (%%value : V3i).X @@>
+            (typeof<V3i>, typeof<V2i>),   fun value -> <@@ (%%value : V3i).XY @@>
 
             (typeof<V4i>, typeof<int32>), fun value -> <@@ (%%value : V4i).X @@>
             (typeof<V4i>, typeof<V2i>),   fun value -> <@@ (%%value : V4i).XY @@>
             (typeof<V4i>, typeof<V3i>),   fun value -> <@@ (%%value : V4i).XYZ @@>
+
+            // UInt32
+            (typeof<V2ui>, typeof<uint32>), fun value -> <@@ (%%value : V2ui).X @@>
+
+            (typeof<V3ui>, typeof<uint32>), fun value -> <@@ (%%value : V3ui).X @@>
+            (typeof<V3ui>, typeof<V2ui>),   fun value -> <@@ (%%value : V3ui).XY @@>
+
+            (typeof<V4ui>, typeof<uint32>), fun value -> <@@ (%%value : V4ui).X @@>
+            (typeof<V4ui>, typeof<V2ui>),   fun value -> <@@ (%%value : V4ui).XY @@>
+            (typeof<V4ui>, typeof<V3ui>),   fun value -> <@@ (%%value : V4ui).XYZ @@>
         ]
 
     let private converter (semantic : string) (inType : Type) (outType : Type) : Expr -> Expr =

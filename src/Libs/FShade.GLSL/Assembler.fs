@@ -815,6 +815,7 @@ module Assembler =
             | CType.CFloat(32 | 64)                     -> "float" |> Identifier
                 
             | CType.CVector(CType.CInt(true, (8 | 16 | 32 | 64)), d)   -> "ivec" + string d |> Identifier
+            | CType.CVector(CType.CInt(false, (8 | 16 | 32 | 64)), d)  -> "uvec" + string d |> Identifier
             | CType.CVector(CType.CFloat(32 | 64), d)   -> "vec" + string d |> Identifier
             | CType.CMatrix(CType.CFloat(32 | 64), r,c) -> 
                 if rev then "mat" + string r + "x" + string c |> Identifier

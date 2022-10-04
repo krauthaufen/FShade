@@ -546,6 +546,9 @@ module Compiler =
                 | MethodQuote <@ v2i : V4d -> _ @> _, args
                 | MethodQuote <@ v3i : V4d -> _ @> _, args
                 | MethodQuote <@ v4i : V4d -> _ @> _, args
+                | MethodQuote <@ v2ui : V4d -> _ @> _, args
+                | MethodQuote <@ v3ui : V4d -> _ @> _, args
+                | MethodQuote <@ v4ui : V4d -> _ @> _, args
                 | Method("op_Explicit", [VectorOf _]), args ->
                     match ct with
                     | CVector(_, d) ->

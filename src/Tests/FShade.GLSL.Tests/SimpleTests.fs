@@ -17,6 +17,7 @@ type Vertex =
         what : V4i
         [<Semantic("Id")>] id : int
         [<PrimitiveId>] primId : int
+        [<Semantic("uid")>] uid : uint
     }
 
 type IntVertex =
@@ -1015,6 +1016,7 @@ let ``Integer with implicit flat interpolation 2``() =
     let fs (v : Vertex) =
         fragment {
             let _ = v.what
+            let _ = v.uid
             return v.c
         }
 
@@ -1047,7 +1049,7 @@ let ``Integer vertex field output``() =
 
     let fs2 (v : Vertex) =
         fragment {
-            return { v with id = v.id }
+            return { v with id = int v.id; uid = uint v.id}
         }
 
     GLSL.shouldCompile [Effect.ofFunction fs; Effect.ofFunction fs2]
@@ -1083,7 +1085,7 @@ let ``Primitive id``() =
 
     let fs (v : Vertex) =
         fragment {
-            return V4i(v.primId)
+            return v3ui <| V4i(v.primId)
         }
 
     GLSL.shouldCompile [
