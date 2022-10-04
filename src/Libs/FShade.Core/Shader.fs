@@ -204,7 +204,7 @@ module Preprocessor =
             match t with
             | TypeInfo.Patterns.Integral
             | TypeInfo.Patterns.VectorOf(_, Integral) -> Some ()
-            | MatrixOf'(_, Integral) -> Some ()
+            | TypeInfo.Patterns.MatrixOf(_, Integral) -> Some ()
             | _ -> None
 
         let rec (|FloatingPoint|_|) (t : Type) =
@@ -212,7 +212,7 @@ module Preprocessor =
             | TypeInfo.Patterns.Float32
             | TypeInfo.Patterns.Float64
             | TypeInfo.Patterns.VectorOf(_, (TypeInfo.Patterns.Float32 | TypeInfo.Patterns.Float64)) -> Some ()
-            | MatrixOf'(_, (TypeInfo.Patterns.Float32 | TypeInfo.Patterns.Float64)) -> Some ()
+            | TypeInfo.Patterns.MatrixOf(_, (TypeInfo.Patterns.Float32 | TypeInfo.Patterns.Float64)) -> Some ()
             | _ -> None
 
         let (|Primitive|_|) (e : Expr) =

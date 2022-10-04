@@ -437,8 +437,8 @@ module Compiler =
 
                 // transpose
                 | MethodQuote <@ Mat.transpose : M44d -> M44d @> _, [m]    
-                | Method("Transpose", [MatrixOf' _]) , [m]
-                | Method("Transposed", [MatrixOf' _]) , [m]
+                | Method("Transpose", [MatrixOf _]) , [m]
+                | Method("Transposed", [MatrixOf _]) , [m]
                 | Method("get_Transposed", _), [m] -> 
                     match m with
                     | CTranspose(_, m) -> Some m
@@ -468,7 +468,7 @@ module Compiler =
 
                 // transformDir
                 | MethodQuote <@ Mat.transformDir : M44d -> V3d -> V3d @> _, [m;v]
-                | Method("TransformDir", [MatrixOf' _; VectorOf _]), [m;v] ->
+                | Method("TransformDir", [MatrixOf _; VectorOf _]), [m;v] ->
                     match ct, v.ctype with
                     | CVector(rt, rd), CVector(t, d) ->
                         let res = CMulMatVec(CVector(rt, rd + 1), m, CNewVector(CVector(t, d + 1), d, [v; zero t])) |> Simplification.simplifyMatrixTerm
@@ -478,7 +478,7 @@ module Compiler =
 
                 // transformPos
                 | MethodQuote <@ Mat.transformPos : M44d -> V3d -> V3d @> _, [m;v] 
-                | Method("TransformPos", [MatrixOf' _; VectorOf _]), [m;v] ->
+                | Method("TransformPos", [MatrixOf _; VectorOf _]), [m;v] ->
                     match ct, v.ctype with
                         | CVector(rt, rd), CVector(t, d) ->
                             let res = CMulMatVec(CVector(rt, rd + 1), m, CNewVector(CVector(t, d + 1), d, [v; one t])) |> Simplification.simplifyMatrixTerm
@@ -487,7 +487,7 @@ module Compiler =
                             None
 
                 // transposedTransformDir
-                | Method("TransposedTransformDir", [MatrixOf' _; VectorOf _]), [m;v] ->
+                | Method("TransposedTransformDir", [MatrixOf _; VectorOf _]), [m;v] ->
                     match ct, v.ctype with
                         | CVector(rt, rd), CVector(t, d) ->
                             let res = CMulVecMat(CVector(rt, rd + 1), CNewVector(CVector(t, d + 1), d, [v; zero t]), m) |> Simplification.simplifyMatrixTerm
@@ -496,7 +496,7 @@ module Compiler =
                             None
 
                 // transposedTransformPos
-                | Method("TransposedTransformPos", [MatrixOf' _; VectorOf _]), [m;v] ->
+                | Method("TransposedTransformPos", [MatrixOf _; VectorOf _]), [m;v] ->
                     match ct, v.ctype with
                         | CVector(rt, rd), CVector(t, d) ->
                             let res = CMulVecMat(CVector(rt, rd + 1), CNewVector(CVector(t, d + 1), d, [v; one t]), m) |> Simplification.simplifyMatrixTerm
@@ -526,8 +526,8 @@ module Compiler =
                 | MethodQuote <@ m33l : M33d -> _ @> _, [m] 
                 | MethodQuote <@ m34l : M34d -> _ @> _, [m] 
                 | MethodQuote <@ m44l : M44d -> _ @> _, [m] 
-                | Method("UpperLeftM33", [MatrixOf' _]), [m]
-                | Method("op_Explicit", [MatrixOf' _]), [m] ->
+                | Method("UpperLeftM33", [MatrixOf _]), [m]
+                | Method("op_Explicit", [MatrixOf _]), [m] ->
                     match ct with
                         | CMatrix(et, r, c) ->
                             CConvertMatrix(ct, m) |> Some
@@ -579,28 +579,28 @@ module Compiler =
                 | Method("FromCols", _), rows -> CMatrixFromCols(ct, rows) |> Some
 
                 // matrix swizzles
-                | Method("get_R0", [MatrixOf' _]), [m] -> 
+                | Method("get_R0", [MatrixOf _]), [m] -> 
                     CMatrixRow(ct, m, 0) |> Some
 
-                | Method("get_R1", [MatrixOf' _]), [m] -> 
+                | Method("get_R1", [MatrixOf _]), [m] -> 
                     CMatrixRow(ct, m, 1) |> Some
 
-                | Method("get_R2", [MatrixOf' _]), [m] -> 
+                | Method("get_R2", [MatrixOf _]), [m] -> 
                     CMatrixRow(ct, m, 2) |> Some
                     
-                | Method("get_R3", [MatrixOf' _]), [m] -> 
+                | Method("get_R3", [MatrixOf _]), [m] -> 
                     CMatrixRow(ct, m, 3) |> Some
 
-                | Method("get_C0", [MatrixOf' _]), [m] -> 
+                | Method("get_C0", [MatrixOf _]), [m] -> 
                     CMatrixCol(ct, m, 0) |> Some
 
-                | Method("get_C1", [MatrixOf' _]), [m] -> 
+                | Method("get_C1", [MatrixOf _]), [m] -> 
                     CMatrixCol(ct, m, 1) |> Some
 
-                | Method("get_C2", [MatrixOf' _]), [m] -> 
+                | Method("get_C2", [MatrixOf _]), [m] -> 
                     CMatrixCol(ct, m, 2) |> Some
 
-                | Method("get_C3", [MatrixOf' _]), [m] -> 
+                | Method("get_C3", [MatrixOf _]), [m] -> 
                     CMatrixCol(ct, m, 3) |> Some
 
 
@@ -653,7 +653,7 @@ module Compiler =
 
                     CNewVector(CType.ofType b ctor.DeclaringType, d, args) |> Some
 
-                | MatrixOf'(s, _) ->
+                | MatrixOf(s, _) ->
                     let l = List.length args
 
                     if l = s.X * s.Y || l = 1 then
@@ -671,22 +671,22 @@ module Compiler =
                 | VectorOf _, "Z" -> CVecSwizzle(ct, arg, [CVecComponent.Z]) |> Some
                 | VectorOf _, "W" -> CVecSwizzle(ct, arg, [CVecComponent.W]) |> Some
 
-                | MatrixOf' _, "M00" -> CMatrixElement(ct, arg, 0, 0) |> Some
-                | MatrixOf' _, "M01" -> CMatrixElement(ct, arg, 0, 1) |> Some
-                | MatrixOf' _, "M02" -> CMatrixElement(ct, arg, 0, 2) |> Some
-                | MatrixOf' _, "M03" -> CMatrixElement(ct, arg, 0, 3) |> Some
-                | MatrixOf' _, "M10" -> CMatrixElement(ct, arg, 1, 0) |> Some
-                | MatrixOf' _, "M11" -> CMatrixElement(ct, arg, 1, 1) |> Some
-                | MatrixOf' _, "M12" -> CMatrixElement(ct, arg, 1, 2) |> Some
-                | MatrixOf' _, "M13" -> CMatrixElement(ct, arg, 1, 3) |> Some
-                | MatrixOf' _, "M20" -> CMatrixElement(ct, arg, 2, 0) |> Some
-                | MatrixOf' _, "M21" -> CMatrixElement(ct, arg, 2, 1) |> Some
-                | MatrixOf' _, "M22" -> CMatrixElement(ct, arg, 2, 2) |> Some
-                | MatrixOf' _, "M23" -> CMatrixElement(ct, arg, 2, 3) |> Some
-                | MatrixOf' _, "M30" -> CMatrixElement(ct, arg, 3, 0) |> Some
-                | MatrixOf' _, "M31" -> CMatrixElement(ct, arg, 3, 1) |> Some
-                | MatrixOf' _, "M32" -> CMatrixElement(ct, arg, 3, 2) |> Some
-                | MatrixOf' _, "M33" -> CMatrixElement(ct, arg, 3, 3) |> Some
+                | MatrixOf _, "M00" -> CMatrixElement(ct, arg, 0, 0) |> Some
+                | MatrixOf _, "M01" -> CMatrixElement(ct, arg, 0, 1) |> Some
+                | MatrixOf _, "M02" -> CMatrixElement(ct, arg, 0, 2) |> Some
+                | MatrixOf _, "M03" -> CMatrixElement(ct, arg, 0, 3) |> Some
+                | MatrixOf _, "M10" -> CMatrixElement(ct, arg, 1, 0) |> Some
+                | MatrixOf _, "M11" -> CMatrixElement(ct, arg, 1, 1) |> Some
+                | MatrixOf _, "M12" -> CMatrixElement(ct, arg, 1, 2) |> Some
+                | MatrixOf _, "M13" -> CMatrixElement(ct, arg, 1, 3) |> Some
+                | MatrixOf _, "M20" -> CMatrixElement(ct, arg, 2, 0) |> Some
+                | MatrixOf _, "M21" -> CMatrixElement(ct, arg, 2, 1) |> Some
+                | MatrixOf _, "M22" -> CMatrixElement(ct, arg, 2, 2) |> Some
+                | MatrixOf _, "M23" -> CMatrixElement(ct, arg, 2, 3) |> Some
+                | MatrixOf _, "M30" -> CMatrixElement(ct, arg, 3, 0) |> Some
+                | MatrixOf _, "M31" -> CMatrixElement(ct, arg, 3, 1) |> Some
+                | MatrixOf _, "M32" -> CMatrixElement(ct, arg, 3, 2) |> Some
+                | MatrixOf _, "M33" -> CMatrixElement(ct, arg, 3, 3) |> Some
 
                 | _ -> None
 
