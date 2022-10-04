@@ -1,3 +1,6 @@
+### 5.3.0-prerelease0004
+* Added support for unsigned integer types (output, samplers, images, ...) 
+
 ### 5.3.0-prerelease0003
 * Removed interpolation modes for built-in fragement inputs
 * Removed MipMapLevels for multisampled samplers
