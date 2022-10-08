@@ -18,7 +18,8 @@ module ExprWorkardound =
 
     let TryGetReflectedDefinition (mb : MethodBase) =
         lock lockObj (fun _ -> 
-            Expr.TryGetReflectedDefinition mb
+            try Expr.TryGetReflectedDefinition mb
+            with _ -> None
         )
 
 module Peano = 

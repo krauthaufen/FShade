@@ -1,3 +1,6 @@
+### 5.2.10
+* try/with for Expr.TryGetReflectedDefinition (seems to raise exceptions in some cases)
+
 ### 5.2.9
 * Fixed issue with topological sort and raytracing data
 * Removed warnings in raytracing shaders

@@ -823,7 +823,9 @@ module Serializer =
             let (|ReflectedCall|_|) (e : Expr) =
                 match e with
                     | Call(t,mi,args) ->
-                        let isInline = mi.GetCustomAttributes<InlineAttribute>() |> Seq.isEmpty |> not
+                        let isInline = 
+                            try mi.GetCustomAttributes<InlineAttribute>() |> Seq.isEmpty |> not
+                            with _ -> false
                         match ExprWorkardound.TryGetReflectedDefinition mi with
                             | Some def -> 
                                 let args = 
