@@ -19,9 +19,7 @@ module ExprWorkardound =
     let TryGetReflectedDefinition (mb : MethodBase) =
         lock lockObj (fun _ -> 
             try Expr.TryGetReflectedDefinition mb
-            with e -> 
-                Aardvark.Base.Report.Warn(sprintf "Expr.TryGetReflectedDefinition failed on %0A %0A with:\r\n%0A" mb.DeclaringType mb e)
-                None
+            with e -> None
         )
 
 module Peano = 

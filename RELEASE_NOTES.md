@@ -1,3 +1,6 @@
+### 5.2.12
+* disabled warnings again
+
 ### 5.2.11
 * printing warnings when Expr.TryGetReflectedDefinition fails
 
