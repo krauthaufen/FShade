@@ -1,3 +1,6 @@
+### 5.2.11
+* printing warnings when Expr.TryGetReflectedDefinition fails
+
 ### 5.2.10
 * try/with for Expr.TryGetReflectedDefinition (seems to raise exceptions in some cases)
 
