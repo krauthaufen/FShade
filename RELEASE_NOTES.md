@@ -1,3 +1,6 @@
+### 5.2.14
+* new experimental AOT
+
 ### 5.2.13
 * Fixed issue with constant swizzles
 
