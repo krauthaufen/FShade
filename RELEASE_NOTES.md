@@ -1,3 +1,6 @@
+### 5.2.13
+* Fixed issue with constant swizzles
+
 ### 5.2.12
 * disabled warnings again
 
