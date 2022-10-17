@@ -946,7 +946,7 @@ module Preprocessor =
         | _ -> None
         
     let private zeroOneVecProperty =
-        System.Text.RegularExpressions.Regex @"([XYZW]*[ONIP])+"
+        System.Text.RegularExpressions.Regex @"^([XYZW]*[OINP]+[XYZW]*)+$"
 
     let rec preprocessNormalS (e : Expr) : Preprocess<Expr> =
         state {
