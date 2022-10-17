@@ -303,17 +303,21 @@ module Effect =
 
         let shaders =
             lazy (
-                use ms = new MemoryStream(src)
-                use src = new BinaryReader(ms, System.Text.Encoding.UTF8, true)
-                let state = Shader.DeserializerState()
-                let _id = src.ReadString()
-                let cnt = src.ReadInt32()
-                List.init cnt (fun _ ->
-                    let stage = src.ReadInt32() |> unbox<ShaderStage>
-                    let shader = Shader.deserializeInternal state src
-                    stage, shader
-                )
-                |> Map.ofList
+                try
+                    use ms = new MemoryStream(src)
+                    use src = new BinaryReader(ms, System.Text.Encoding.UTF8, true)
+                    let state = Shader.DeserializerState()
+                    let _id = src.ReadString()
+                    let cnt = src.ReadInt32()
+                    List.init cnt (fun _ ->
+                        let stage = src.ReadInt32() |> unbox<ShaderStage>
+                        let shader = Shader.deserializeInternal state src
+                        stage, shader
+                    )
+                    |> Map.ofList
+                with _ ->
+                    let b64 = System.Convert.ToBase64String src
+                    failwithf "Failed to read effect base64: \"%s\"" b64
             )
 
         Effect(id, shaders, [])
@@ -321,18 +325,21 @@ module Effect =
     let unpickleWithId (id : string) (data : string) =
         let shaders =
             lazy (
-                let binary = System.Convert.FromBase64String data
-                use ms = new MemoryStream(binary)
-                use src = new BinaryReader(ms, System.Text.Encoding.UTF8, true)
-                let state = Shader.DeserializerState()
-                let _id = src.ReadString()
-                let cnt = src.ReadInt32()
-                List.init cnt (fun _ ->
-                    let stage = src.ReadInt32() |> unbox<ShaderStage>
-                    let shader = Shader.deserializeInternal state src
-                    stage, shader
-                )
-                |> Map.ofList
+                try
+                    let binary = System.Convert.FromBase64String data
+                    use ms = new MemoryStream(binary)
+                    use src = new BinaryReader(ms, System.Text.Encoding.UTF8, true)
+                    let state = Shader.DeserializerState()
+                    let _id = src.ReadString()
+                    let cnt = src.ReadInt32()
+                    List.init cnt (fun _ ->
+                        let stage = src.ReadInt32() |> unbox<ShaderStage>
+                        let shader = Shader.deserializeInternal state src
+                        stage, shader
+                    )
+                    |> Map.ofList
+                with e ->
+                    failwithf "Failed to read effect base64: \"%s\"" data
             )
 
         Effect(id, shaders, [])
