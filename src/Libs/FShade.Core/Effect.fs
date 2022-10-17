@@ -318,6 +318,25 @@ module Effect =
 
         Effect(id, shaders, [])
 
+    let unpickleWithId (id : string) (data : string) =
+        let shaders =
+            lazy (
+                let binary = System.Convert.FromBase64String data
+                use ms = new MemoryStream(binary)
+                use src = new BinaryReader(ms, System.Text.Encoding.UTF8, true)
+                let state = Shader.DeserializerState()
+                let _id = src.ReadString()
+                let cnt = src.ReadInt32()
+                List.init cnt (fun _ ->
+                    let stage = src.ReadInt32() |> unbox<ShaderStage>
+                    let shader = Shader.deserializeInternal state src
+                    stage, shader
+                )
+                |> Map.ofList
+            )
+
+        Effect(id, shaders, [])
+
     let pickle (e : Effect) =
         use ms = new MemoryStream()
         serialize ms e

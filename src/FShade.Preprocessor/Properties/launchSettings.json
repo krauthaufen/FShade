@@ -2,7 +2,7 @@
   "profiles": {
     "FShade.Preprocessor": {
       "commandName": "Project",
-      "commandLineArgs": "\"C:\\Users\\Schorsch\\Development\\Aardvark.Blazor\\src\\Aardvark.Blazor.Core\\bin\\Debug\\net6.0\\Aardvark.Rendering.dll\""
+      "commandLineArgs": ""
     },
     "Profile 1": {
       "commandName": "Project",
