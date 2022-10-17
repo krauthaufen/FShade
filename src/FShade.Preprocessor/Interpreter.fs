@@ -35,13 +35,7 @@ let getMethodBase (ctx : AssemblyLoadContext) (m : MethodReference) =
     let mName = mm.Name
 
     let typ = getType ctx m.DeclaringType
-    if typ.ContainsGenericParameters then printfn "asdasdasd"
-    let targs = 
-        match m.DeclaringType with
-        | :? GenericInstanceType as t ->
-            t.GenericArguments |> Seq.map (getType ctx) |> Seq.toArray
-        | _ ->
-            [||]
+    
     let mtargs =
         match m with
         | :? GenericInstanceMethod as m ->
@@ -65,13 +59,7 @@ let getMethodBase (ctx : AssemblyLoadContext) (m : MethodReference) =
         typ.GetConstructors(BindingFlags.Public ||| BindingFlags.NonPublic ||| BindingFlags.Static ||| BindingFlags.Instance)
         |> Array.find (fun mi -> mi.MetadataToken = mToken)
         :> MethodBase
-
-    ////let m = m.ResolveMethod(mToken, targs, mtargs)
-    //let m =
-    //    match m with
-    //    | :? MethodInfo as m when m.IsGenericMethod -> m.MakeGenericMethod mtargs :> MethodBase
-    //    | _ -> m
-    //m
+        
 let getFieldInfo (ctx : AssemblyLoadContext) (m : FieldReference) =
     let d = m.Resolve()
     let mm = d.Module
@@ -383,7 +371,7 @@ let rec private tryGetTopOfStackInternal (state : State) (instructions : Instruc
             
 
         | _ ->
-            printfn "bad instruction: %A" i
+            Log.warn "bad instruction: %A" i
             idx - 1, None
            
     else

@@ -1,12 +1,8 @@
 {
   "profiles": {
-    "FShade.Preprocessor": {
-      "commandName": "Project",
-      "commandLineArgs": ""
-    },
     "Profile 1": {
       "commandName": "Project",
-      "commandLineArgs": "-s \"C:\\Users\\Schorsch\\Development\\FShade\\bin\\Debug\\netcoreapp3.1\\FShade.GLSL.Tests.dll\""
+      "commandLineArgs": "\"C:\\Users\\Schorsch\\Development\\template\\bin\\Release\\net6.0\\Example.dll\""
     }
   }
 }
