@@ -1,3 +1,20 @@
+### 5.3.0
+* Removed unused / unnecessary image and sampler types
+* Remove unused image formats
+* Remove MipMapLevels property for multisampled samplers
+* Allow multiple InterpolationMode values
+* Fixed various image and sampler methods and properties
+* Added Samples property for multisampled images and samplers
+* Added SampleLevelOffset
+* Implemented implicit flat interpolation for integral types
+* Fixed and added vector and matrix intrinsics
+* Fixed various intrinsics with regard to duplicated expressions
+* Added exp2 intrinsic
+* Added step, linearstep intrinsics
+* Implemented basic output type conversion (e.g. from V4d to V2d)
+* Added Debug.Printfn (Vulkan via validation layers only)
+* Implemented full support for unsigned integer types (images, samplers, output types)
+
 ### 5.3.0-prerelease0004
 * Added support for unsigned integer types (output, samplers, images, ...) 
 
