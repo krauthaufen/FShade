@@ -8,25 +8,51 @@ open System.Runtime.Loader
 
 
 let rec getType (ctx : AssemblyLoadContext) (t : TypeReference) : System.Type =
+    
     let d = t.Resolve()
-    let mm = d.Module
-    let aName = mm.Assembly.FullName
-    let mName = mm.Name
-    
-    let ass = ctx.LoadFromAssemblyName(AssemblyName aName)
-    let mToken = d.MetadataToken.ToInt32()
-    let m = ass.GetModule(mName)
-    
-    let targs = 
-        match t with
-        | :? GenericInstanceType as t ->
-            t.GenericArguments |> Seq.map (getType ctx) |> Seq.toArray
-        | _ ->
-            [||]
+    if d.IsPrimitive then
+        match d.FullName with
+        | "System.Byte" -> typeof<System.Byte>
+        | "System.SByte" -> typeof<System.SByte>
+        | "System.UInt16" -> typeof<System.UInt16>
+        | "System.Int16" -> typeof<System.Int16>
+        | "System.UInt32" -> typeof<System.UInt32>
+        | "System.Int32" -> typeof<System.Int32>
+        | "System.UInt64" -> typeof<System.UInt64>
+        | "System.Int64" -> typeof<System.Int64>
+        | "System.Single" -> typeof<System.Single>
+        | "System.Double" -> typeof<System.Double>
+        | "System.Decimal" -> typeof<System.Decimal>
+        | "System.String" -> typeof<System.String>
+        | "System.Boolean" -> typeof<System.Boolean>
+        | "System.IntPtr" -> typeof<System.IntPtr>
+        | "System.UIntPtr" -> typeof<System.UIntPtr>
+        | _ -> failwithf "bad primitive: %A" d.FullName
+    else
+        let mm = d.Module
 
-    let r = m.ResolveType(mToken, targs, [||])
-    if targs.Length > 0 then r.MakeGenericType targs
-    else r
+        let aName, mName = 
+            if mm.Assembly.Name.Name = "System.Runtime" then
+                "System.Runtime", "System.Runtime.dll"
+            else
+                mm.Assembly.FullName, mm.Name
+        //let aName = assName
+        //let mName = mm.Name
+    
+        let ass = ctx.LoadFromAssemblyName(AssemblyName aName)
+        let mToken = d.MetadataToken.ToInt32()
+        let m = ass.GetModule(mName)
+    
+        let targs = 
+            match t with
+            | :? GenericInstanceType as t ->
+                t.GenericArguments |> Seq.map (getType ctx) |> Seq.toArray
+            | _ ->
+                [||]
+
+        let r = m.ResolveType(mToken, targs, [||])
+        if targs.Length > 0 then r.MakeGenericType targs
+        else r
     
 let getMethodBase (ctx : AssemblyLoadContext) (m : MethodReference) =
     let d = m.Resolve()
@@ -116,6 +142,30 @@ module Patterns =
         if i.OpCode = OpCodes.Pop then Some ()
         else None
         
+    let (|Nop|_|) (i : Instruction) =
+        if i.OpCode = OpCodes.Nop then Some ()
+        else None
+        
+    let (|Ceq|_|) (i : Instruction) =
+        if i.OpCode = OpCodes.Ceq then Some ()
+        else None
+    let (|Clt|_|) (i : Instruction) =
+        if i.OpCode = OpCodes.Clt then Some ()
+        else None
+    let (|Cgt|_|) (i : Instruction) =
+        if i.OpCode = OpCodes.Cgt then Some ()
+        else None
+    let (|CltUn|_|) (i : Instruction) =
+        if i.OpCode = OpCodes.Clt_Un then Some ()
+        else None
+    let (|CgtUn|_|) (i : Instruction) =
+        if i.OpCode = OpCodes.Cgt_Un then Some ()
+        else None
+        
+    let (|Ldnull|_|) (i : Instruction) =
+        if i.OpCode = OpCodes.Ldnull then Some ()
+        else None
+
     let (|Ldfld|_|) (ctx : AssemblyLoadContext) (i : Instruction) =
         if i.OpCode = OpCodes.Ldsfld || i.OpCode = OpCodes.Ldfld then Some (getFieldInfo ctx (i.Operand :?> FieldReference))
         else None
@@ -125,8 +175,14 @@ module Patterns =
         else None
        
     let (|Ldloc|_|) (i : Instruction) =
-        if i.OpCode = OpCodes.Ldloc then Some (System.Convert.ToInt32 i.Operand)
-        elif i.OpCode = OpCodes.Ldloc_S then Some (System.Convert.ToInt32 i.Operand)
+        if i.OpCode = OpCodes.Ldloc then 
+            match i.Operand with
+            | :? VariableReference as v -> Some v.Index
+            | _ -> Some (System.Convert.ToInt32 i.Operand)
+        elif i.OpCode = OpCodes.Ldloc_S then 
+            match i.Operand with
+            | :? VariableReference as v -> Some v.Index
+            | _ -> Some (System.Convert.ToInt32 i.Operand)
         elif i.OpCode = OpCodes.Ldloc_0 then Some 0
         elif i.OpCode = OpCodes.Ldloc_1 then Some 1
         elif i.OpCode = OpCodes.Ldloc_2 then Some 2
@@ -134,8 +190,14 @@ module Patterns =
         else None
         
     let (|Stloc|_|) (i : Instruction) =
-        if i.OpCode = OpCodes.Stloc then Some (System.Convert.ToInt32 i.Operand)
-        elif i.OpCode = OpCodes.Stloc_S then Some (System.Convert.ToInt32 i.Operand)
+        if i.OpCode = OpCodes.Stloc then 
+            match i.Operand with
+            | :? VariableReference as v -> Some v.Index
+            | _ -> Some (System.Convert.ToInt32 i.Operand)
+        elif i.OpCode = OpCodes.Stloc_S then 
+            match i.Operand with
+            | :? VariableReference as v -> Some v.Index
+            | _ -> Some (System.Convert.ToInt32 i.Operand)
         elif i.OpCode = OpCodes.Stloc_0 then Some 0
         elif i.OpCode = OpCodes.Stloc_1 then Some 1
         elif i.OpCode = OpCodes.Stloc_2 then Some 2
@@ -228,7 +290,7 @@ let rec private tryGetTopOfStackInternal (state : State) (instructions : Instruc
             // arguments are unknown
             idx-1, None
 
-        | Patterns.Tail | Patterns.Volatile ->
+        | Patterns.Tail | Patterns.Volatile | Patterns.Nop ->
             // JIT helpers
             tryGetTopOfStackInternal state instructions (idx - 1)
 
@@ -369,6 +431,25 @@ let rec private tryGetTopOfStackInternal (state : State) (instructions : Instruc
             let idx, _ = tryGetTopOfStackInternal state instructions (idx - 1)
             tryGetTopOfStackInternal state instructions idx
             
+        | Patterns.Ldnull ->
+            idx - 1, Some null
+
+        | Patterns.Ceq ->
+            let idx, v1 = tryGetTopOfStackInternal state instructions (idx - 1)
+            let idx, v2 = tryGetTopOfStackInternal state instructions idx
+            match v1, v2 with
+            | Some v1, Some v2 ->
+                idx, Some (Unchecked.equals v1 v2)
+            | _ ->
+                idx, None
+        //| Patterns.Cgt ->
+        //    let idx, v1 = tryGetTopOfStackInternal state instructions (idx - 1)
+        //    let idx, v2 = tryGetTopOfStackInternal state instructions idx
+        //    match v1, v2 with
+        //    | Some v1, Some v2 ->
+        //        idx, Some (System.Convert.ToInt64 v1 > System.Convert.ToInt64 v2)
+        //    | _ ->
+        //        idx, None
 
         | _ ->
             Log.warn "bad instruction: %A" i

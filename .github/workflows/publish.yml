@@ -25,6 +25,9 @@ jobs:
       - name: Build
         shell: cmd
         run: dotnet build -c Release src/FShade.sln
+      - name: Pack Tool
+        shell: cmd
+        run: packtool.cmd
       - name: Pack
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -97,8 +97,11 @@ let loadAllAssemblies (cfg : Config) =
             if set.Add a then
                 let referenced = 
                     a.GetReferencedAssemblies() |> Array.choose (fun name ->
-                        try tryLoadAssembly ctx name
-                        with _ -> None
+                        if name.Name.StartsWith "System" then
+                            None
+                        else
+                            try tryLoadAssembly ctx name
+                            with _ -> None
                     )
                 for r in referenced do run set r
         
@@ -110,6 +113,12 @@ let loadAllAssemblies (cfg : Config) =
 let getReplacableShaderCompileMethods (ctx : AssemblyLoadContext) =
     let allAssemblies =
         ctx.Assemblies 
+        |> Seq.filter (fun a ->
+            a.GetName().Name = "FShade.Core" || 
+            a.GetReferencedAssemblies() |> Seq.exists (fun n ->
+                n.Name = "FShade.Core"
+            )
+        )
         |> Seq.toArray
         |> Array.sortBy (fun a -> a.FullName)
         
@@ -128,16 +137,12 @@ let getReplacableShaderCompileMethods (ctx : AssemblyLoadContext) =
                     (Seq.singleton t)
                     (nested |> Seq.collect getAllTypes)
         allAssemblies |> Seq.collect (fun a ->
-            let name = a.GetName().Name
-            if name = "FSharp.Core" || name.StartsWith "System." then
-                Seq.empty
-            else
-                let types = 
-                    try a.GetTypes()
-                    with 
-                        | :? ReflectionTypeLoadException as e -> e.Types
-                        | _ -> [||]
-                types |> Seq.collect getAllTypes   
+            let types = 
+                try a.GetTypes()
+                with 
+                    | :? ReflectionTypeLoadException as e -> e.Types
+                    | _ -> [||]
+            types |> Seq.collect getAllTypes   
         )
         |> System.Collections.Generic.HashSet
         |> Seq.toArray
@@ -362,6 +367,8 @@ let main argv =
         let shaderCompileMethods = 
             getReplacableShaderCompileMethods ctx
                   
+      
+                  
         for (mi, _, replacement) in shaderCompileMethods do
             match replacement with
             | Some repl ->
@@ -384,7 +391,7 @@ let main argv =
         let mPickle = tEffectModule.GetMethod("pickle")
         let pId = tEffect.GetProperty("Id")
     
-        let allDefs =
+        let legacy, allDefs =
 
             let rec load (set : System.Collections.Generic.Dictionary<string, option<string * AssemblyDefinition>>) (name : AssemblyNameReference) =
                 let strName = name.FullName
@@ -403,9 +410,27 @@ let main argv =
             let state = System.Collections.Generic.Dictionary()
         
             let entryDef = cecilRead config.Entry (Some readerParams) //AssemblyDefinition.ReadAssembly(config.Entry, readerParams)
+            
+            let framework = 
+                entryDef.CustomAttributes |> Seq.pick (fun a ->
+                    let name = typeof<System.Runtime.Versioning.TargetFrameworkAttribute>.FullName
+                    if a.AttributeType.FullName = name then
+                        a.ConstructorArguments |> Seq.tryPick (fun a ->
+                            match a.Value with
+                            | :? string as s -> Some s
+                            | _ -> None
+                        )
+                    else
+                        None
+                )
+
+            let legacy = framework.ToLower().Contains "netframework"
+            
             state.[AssemblyNameReference(entryDef.Name.Name, entryDef.Name.Version).ToString()] <- Some (config.Entry, entryDef)
             for m in entryDef.Modules do
                 for r in m.AssemblyReferences do load state r
+
+            legacy,
             state.Values 
             |> Seq.choose id 
             |> Seq.toArray
@@ -413,6 +438,10 @@ let main argv =
                 ass.Name.Name <> "FShade.GLSL" &&
                 ass.Modules |> Seq.exists (fun m -> m.AssemblyReferences |> Seq.exists (fun r -> r.Name = "FShade.Core"))
             )
+
+        if legacy then 
+            Log.error "netframework dlls cannot be patched atm."
+            exit -1
 
         Log.start "processing %d assemblies" allDefs.Length
 
@@ -422,24 +451,35 @@ let main argv =
             |> snd
         
         let rtDef =
-        
-            resolveAssembly config.Dirs (Some readerParams) (AssemblyNameReference("System.Private.CoreLib", Version(0,0,0,0)))
+            let name = AssemblyNameReference("System.Private.CoreLib", Version(0,0,0,0))
+            resolveAssembly config.Dirs (Some readerParams) name
             |> Option.get
             |> snd
         
+        let aardvarkBase =
+            resolveAssembly config.Dirs (Some readerParams) (AssemblyNameReference("Aardvark.Base", Version(0,0,0,0)))
+            |> Option.get
+            |> snd
+            
         let read = 
             fshadeDef.Modules |> Seq.pick (fun m ->
                 let r = m.GetType "FShade.EffectModule"
                 if not (isNull r) then
                     let d = r.Resolve()
-                    let unpickleWithId = d.Methods |> Seq.tryFind (fun m -> m.Name = "unpickleWithId")
-                    match unpickleWithId with
-                    | Some m -> Some (Choice1Of2 m)
+                    
+                    let unpickleInternal = d.Methods |> Seq.tryFind (fun m -> m.Name = "unpickleInternal")
+
+                    match unpickleInternal with
+                    | Some m -> Some (Choice1Of3 m)
                     | None ->
-                        let read = d.Methods |> Seq.tryFind (fun m -> m.Name = "read")
-                        match read with
-                        | Some r -> Some (Choice2Of2 r)
-                        | None -> None
+                        let unpickleWithId = d.Methods |> Seq.tryFind (fun m -> m.Name = "unpickleWithId")
+                        match unpickleWithId with
+                        | Some m -> Some (Choice2Of3 m)
+                        | None ->
+                            let read = d.Methods |> Seq.tryFind (fun m -> m.Name = "read")
+                            match read with
+                            | Some r -> Some (Choice3Of3 r)
+                            | None -> None
                 
                 else
                     None
@@ -454,6 +494,35 @@ let main argv =
                 else
                     None
             )
+            
+        //let tObject =
+        //    rtDef.Modules |> Seq.pick (fun m ->
+        //        let r = m.GetType "System.Object"
+        //        if not (isNull r) then
+        //            Some r
+        //        else
+        //            None
+        //    )
+
+        //Report.Line(4, "", [||])
+        //let reportLine = 
+        //    aardvarkBase.Modules |> Seq.pick (fun m ->
+        //        let r = m.GetType "Aardvark.Base.Report"
+        //        if not (isNull r) then
+        //            let d = r.Resolve()
+        //            d.Methods |> Seq.tryFind (fun m -> 
+        //                m.Name = "Line" && m.Parameters.Count = 3 && 
+        //                m.Parameters.[0].ParameterType.Name = "Int32" &&
+        //                m.Parameters.[1].ParameterType.Name = "String" &&
+        //                m.Parameters.[2].ParameterType.IsArray
+        //            )
+        //        else
+        //            None
+        //    )
+
+
+        
+
         
         let changedAssemblies = System.Collections.Generic.List<string * AssemblyDefinition>()
         
@@ -463,16 +532,22 @@ let main argv =
             let mutable changed = 0
         
             for mod_ in def.Modules do
-                let fromBase64 = 
-                    lazy (mod_.ImportReference fromBase64)
+                let fromBase64 =
+                    lazy (mod_.ImportReference(fromBase64))
                 
                 let read = 
                     lazy (
                         match read with
-                        | Choice1Of2 r -> Choice1Of2(mod_.ImportReference r)
-                        | Choice2Of2 r -> Choice2Of2(mod_.ImportReference r)
+                        | Choice1Of3 r -> Choice1Of3(mod_.ImportReference r)
+                        | Choice2Of3 r -> Choice2Of3(mod_.ImportReference r)
+                        | Choice3Of3 r -> Choice3Of3(mod_.ImportReference r)
                     )
                 
+                //let reportLine =
+                //    lazy (
+                //        mod_.ImportReference reportLine
+                //    )
+
                 let allTypes =
                     let rec collect (t : TypeDefinition) =
                         Seq.append 
@@ -558,14 +633,23 @@ let main argv =
                                                         
                                                         let replacement =
                                                             [
-                                                                Instruction.Create(OpCodes.Pop)
                                                                 match read.Value with
-                                                                | Choice1Of2 read ->
+                                                                | Choice1Of3 read ->
+                                                                    // unpickleInternal
+                                                                    Instruction.Create(OpCodes.Ldstr, id)
+                                                                    Instruction.Create(OpCodes.Ldstr, System.Convert.ToBase64String binary)
+                                                                    Instruction.Create(OpCodes.Call, read)
+                                                                    
+                                                                | Choice2Of3 read ->
+                                                                    // unpickleWithId
+                                                                    Instruction.Create(OpCodes.Pop)
                                                                     Instruction.Create(OpCodes.Ldstr, id)
                                                                     Instruction.Create(OpCodes.Ldstr, System.Convert.ToBase64String binary)
                                                                     Instruction.Create(OpCodes.Call, read)
                                                             
-                                                                | Choice2Of2 read ->                                                             
+                                                                | Choice3Of3 read -> 
+                                                                    // read
+                                                                    Instruction.Create(OpCodes.Pop)                                                          
                                                                     Instruction.Create(OpCodes.Ldstr, System.Convert.ToBase64String binary)
                                                                     Instruction.Create(OpCodes.Call, fromBase64.Value)
                                                                     Instruction.Create(OpCodes.Call, read)
@@ -610,7 +694,7 @@ let main argv =
                 Log.line "patched %d effect-creations" changed
                 changedAssemblies.Add (path, def)
             else
-                Log.line "no suitable effect-creations found"
+                Log.line "no patchable effect-creations found"
             Log.stop()
             
         ctx.Unload()
