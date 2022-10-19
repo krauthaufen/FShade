@@ -1,4 +1,4 @@
-### 5.2.15
+### 5.2.16
 * `unpickleInternal` now prints exception when failing
 
 ### 5.2.15
