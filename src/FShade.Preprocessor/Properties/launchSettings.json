@@ -2,7 +2,7 @@
   "profiles": {
     "Profile 1": {
       "commandName": "Project",
-      "commandLineArgs": "--verbose \"C:\\Users\\Schorsch\\Development\\PRo3D\\bin\\Release\\net6.0\\PRo3D.Viewer.dll\""
+      "commandLineArgs": "--verbose \"C:\\Users\\Schorsch\\Development\\FShade\\bin\\Debug\\net6.0\\FShade.Demo.dll\""
     }
   }
 }
