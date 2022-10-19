@@ -1243,8 +1243,8 @@ module Effect =
                             stage, shader
                         )
                         |> Map.ofList
-                    with _ ->
-                        Report.Warn("[FShade] Effect deserialization failed, re-creating Effect using ofFunction")
+                    with e ->
+                        Report.Warn("[FShade] Effect deserialization failed, re-creating Effect using ofFunction: {0}", e)
 
                         match recreate() with
                         | Some e -> e.Shaders

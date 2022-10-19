@@ -1,4 +1,7 @@
 ### 5.2.15
+* `unpickleInternal` now prints exception when failing
+
+### 5.2.15
 * AOT improvements
 
 ### 5.2.14
