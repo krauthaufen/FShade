@@ -1,3 +1,6 @@
+### 5.2.17
+* shorter type-names in serializer
+
 ### 5.2.16
 * `unpickleInternal` now prints exception when failing
 
