@@ -1,3 +1,6 @@
+### 5.2.15
+* AOT improvements
+
 ### 5.2.14
 * new experimental AOT
 
