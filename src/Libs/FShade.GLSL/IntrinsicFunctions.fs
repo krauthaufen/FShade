@@ -1853,7 +1853,7 @@ module IntrinsicFunctions =
 
     let (|TextureLookup|_|) (mi : MethodInfo) =
         match mi with
-        | Method(name, ((ImageType(_, dim, isArray, isMS, valueType)::_) as args)) ->
+        | Method(name, (((ImageType(_, dim, isArray, isMS, valueType)) as img ::_) as args)) when mi.DeclaringType = img ->
 
             let plainArgs(skip : int) =
                 args |> List.skip skip |> List.mapi (fun i _ -> sprintf "{%d}" (skip + i)) |> String.concat ", "
@@ -1906,7 +1906,7 @@ module IntrinsicFunctions =
 
             Some (functionName, Set.ofList extensions)
 
-        | Method(name, ((SamplerType(dim, isArray, isShadow, isMS, valueType)::_) as args)) ->
+        | Method(name, (((SamplerType(dim, isArray, isShadow, isMS, valueType)) as sam ::_) as args)) when mi.DeclaringType = sam ->
             let coordComponents =
                 match dim with
                     | SamplerDimension.Sampler1d -> 1

@@ -51,6 +51,22 @@ module private Samplers =
     let samCubeShadow      = samplerCubeShadow { texture uniform?DiffuseTexture }
     let samCubeArrayShadow = samplerCubeArrayShadow { texture uniform?DiffuseTexture }
 
+
+[<ReflectedDefinition>]
+let getColor (sampler : Sampler2d) (coord : V2d) =
+    sampler.Sample coord
+
+[<Test>]
+let ``Sampler Argument``() =
+    Setup.Run()
+
+    let frag (v : Vertex) =
+        fragment {
+            return getColor sam2D v.pos.XY
+        }
+
+    GLSL.shouldCompile [ Effect.ofFunction (frag) ]
+
 [<Test>]
 let ``Array Samplers`` () =
     Setup.Run()
