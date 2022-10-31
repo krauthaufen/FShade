@@ -1,3 +1,6 @@
+### 5.3.1
+* Fixed issue with reflected functions using sampler types as parameters
+
 ### 5.3.0
 * Removed unused / unnecessary image and sampler types
 * Remove unused image formats
