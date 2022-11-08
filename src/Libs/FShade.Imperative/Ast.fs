@@ -358,7 +358,7 @@ type CExpr =
     | CVecItem of CType * CExpr * CExpr
     | CMatrixElement of t : CType * m : CExpr * r : int * c : int
     | CConvertMatrix of t : CType * m : CExpr
-    | CNewVector of t : CType * d : int * components : list<CExpr>
+    | CNewVector of t : CType * components : list<CExpr>
 
     | CNewMatrix of t : CType * elements : list<CExpr>
     | CMatrixFromRows of t : CType * rows : list<CExpr>
@@ -431,7 +431,7 @@ type CExpr =
             | CVecItem(t,_,_) -> t
             | CMatrixElement(t,_,_,_) -> t
             | CConvertMatrix(t,_) -> t
-            | CNewVector(t,_,_) -> t
+            | CNewVector(t,_) -> t
 
             | CNewMatrix(t,_) -> t
             | CMatrixFromRows(t,_) -> t
@@ -549,7 +549,7 @@ module CExpr =
                 used.AddType t
                 visit used m
 
-            | CNewVector(t,_,c) ->
+            | CNewVector(t, c) ->
                 used.AddType t
                 for c in c do visit used c
 

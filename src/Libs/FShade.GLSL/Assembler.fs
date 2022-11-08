@@ -1032,7 +1032,7 @@ module Assembler =
                     return sprintf "%s[%s]" v i
                     
 
-                | CNewVector(r, _, args) ->
+                | CNewVector(r, args) ->
                     let! args = assembleExprsS ", " args
                     let t = assembleType config.reverseMatrixLogic r
                     return sprintf "%s(%s)" t.Name args

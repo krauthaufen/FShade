@@ -1047,7 +1047,7 @@ module Assembler =
                     yield OpVectorExtractDynamic(tid, id, v, i)
                     return id
 
-                | CNewVector(t, d, args) ->
+                | CNewVector(t, args) ->
                     let! args = args |> List.mapS assembleExpr
                     let! id = SpirV.id
                     yield OpCompositeConstruct(tid, id, List.toArray args)
@@ -1431,7 +1431,7 @@ module Assembler =
                 | CValue(t,v) ->
                     return! assembleLiteral t v
 
-                | CNewVector(t, d, comp) ->
+                | CNewVector(t, comp) ->
                     let! tid = assembleType t
                     let! comp = comp |> List.mapS assembleConstantExpr
                     let! id = SpirV.id

@@ -205,7 +205,6 @@ let layoutGLSLang (b : GLSLUniformBuffer) =
                         CRExpr.ofExpr (
                             CExpr.CNewVector(
                                 CType.CVector(CType.CFloat(32), 4),
-                                4,
                                 [
                                     firstField
                                     firstField
