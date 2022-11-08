@@ -1,3 +1,8 @@
+### 5.3.2
+* Added simple hash based id to RaytracingEffect
+* Added matrix transform intrinsics
+* Removed redundant dimension parameter in CNewVector
+
 ### 5.3.1
 * Fixed issue with reflected functions using sampler types as parameters
 
