@@ -750,27 +750,125 @@ let ``Transpose``() =
 
     GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["transpose"]
 
+
+[<ReflectedDefinition>]
+let assertV2d (v : V2d) = v
+
+[<ReflectedDefinition>]
+let assertV3d (v : V3d) = v
+
+[<ReflectedDefinition>]
+let assertV4d (v : V4d) = v
+
 [<Test>]
-let ``Transform``() =
+let ``Transform 2x2``() =
     Setup.Run()
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Mat.transformDir (M44d(v.c.X)) v.c.XYZ
-            let _ = Mat.TransformDir(M44d(v.c.X), v.c.XYZ)
-            let _ = Mat.TransformDir(M33d(v.c.X), v.c.XY)
-            let _ = Mat.TransformDir(M34d(v.c.X), v.c.XYZ)
-            let _ = Mat.TransformDir(M23d(v.c.X), v.c.XY)
-            let _ = Mat.transformPos (M44d(v.c.X)) v.c.XYZ
-            let _ = Mat.TransformPos(M44d(v.c.X), v.c.XYZ)
-            let _ = Mat.TransformPos(M34d(v.c.X), v.c.XYZ)
-            let _ = Mat.TransformPos(M33d(v.c.X), v.c.XY)
-            let _ = Mat.TransformPos(M23d(v.c.X), v.c.XY)
-            let _ = Mat.TransposedTransformDir(M44d(v.c.X), v.c.XYZ)
-            let _ = Mat.TransposedTransformDir(M33d(v.c.X), v.c.XY)
-            let _ = Mat.TransposedTransformPos(M44d(v.c.X), v.c.XYZ)
-            let _ = Mat.TransposedTransformPos(M33d(v.c.X), v.c.XY)
-            return v.pos
+            let _ = assertV2d <| Mat.transform (M22d(v.c.X)) V2d.Zero
+            let _ = assertV2d <| Mat.Transform(M22d(v.c.X), V2d.Zero)
+            let _ = assertV2d <| Mat.TransposedTransform(M22d(v.c.X), V2d.Zero)
+
+            return 0.0
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction shader]
+
+[<Test>]
+let ``Transform 2x3``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = assertV2d <| Mat.transform (M23d(v.c.X)) V3d.Zero
+            let _ = assertV2d <| Mat.Transform(M23d(v.c.X), V3d.Zero)
+            let _ = assertV3d <| Mat.TransposedTransform(M23d(v.c.X), V2d.Zero)
+
+            let _ = assertV2d <| Mat.transformDir (M23d(v.c.X)) v.c.XY
+            let _ = assertV2d <| Mat.TransformDir(M23d(v.c.X), v.c.XY)
+
+            let _ = assertV2d <| Mat.transformPos (M23d(v.c.X)) v.c.XY
+            let _ = assertV2d <| Mat.TransformPos(M23d(v.c.X), v.c.XY)
+
+            return 0.0
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction shader]
+
+[<Test>]
+let ``Transform 3x3``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = assertV3d <| Mat.transform (M33d(v.c.X)) V3d.Zero
+            let _ = assertV3d <| Mat.Transform(M33d(v.c.X), V3d.Zero)
+            let _ = assertV3d <| Mat.TransposedTransform(M33d(v.c.X), V3d.Zero)
+
+            let _ = assertV2d <| Mat.transformDir (M33d(v.c.X)) v.c.XY
+            let _ = assertV2d <| Mat.TransformDir(M33d(v.c.X), v.c.XY)
+            let _ = assertV2d <| Mat.TransposedTransformDir(M33d(v.c.X), v.c.XY)
+
+            let _ = assertV2d <| Mat.transformPos (M33d(v.c.X)) v.c.XY
+            let _ = assertV2d <| Mat.TransformPos(M33d(v.c.X), v.c.XY)
+            let _ = assertV2d <| Mat.TransposedTransformPos(M33d(v.c.X), v.c.XY)
+
+            let _ = assertV2d <| Mat.TransformPosProj(M33d(v.c.X), v.c.XY)
+            let _ = assertV3d <| Mat.TransformPosProjFull(M33d(v.c.X), v.c.XY)
+            let _ = assertV2d <| Mat.TransposedTransformProj(M33d(v.c.X), v.c.XY)
+            let _ = assertV3d <| Mat.TransposedTransformProjFull(M33d(v.c.X), v.c.XY)
+
+            return 0.0
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction shader]
+
+[<Test>]
+let ``Transform 3x4``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = assertV3d <| Mat.transform (M34d(v.c.X)) V4d.Zero
+            let _ = assertV3d <| Mat.Transform(M34d(v.c.X), V4d.Zero)
+            let _ = assertV4d <| Mat.TransposedTransform(M34d(v.c.X), V3d.Zero)
+
+            let _ = assertV3d <| Mat.transformDir (M34d(v.c.X)) v.c.XYZ
+            let _ = assertV3d <| Mat.TransformDir(M34d(v.c.X), v.c.XYZ)
+
+            let _ = assertV3d <| Mat.transformPos (M34d(v.c.X)) v.c.XYZ
+            let _ = assertV3d <| Mat.TransformPos(M34d(v.c.X), v.c.XYZ)
+
+            return 0.0
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction shader]
+
+[<Test>]
+let ``Transform 4x4``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = assertV4d <| Mat.transform (M44d(v.c.X)) V4d.Zero
+            let _ = assertV4d <| Mat.Transform(M44d(v.c.X), V4d.Zero)
+            let _ = assertV4d <| Mat.TransposedTransform(M44d(v.c.X), V4d.Zero)
+
+            let _ = assertV3d <| Mat.transformDir (M44d(v.c.X)) v.c.XYZ
+            let _ = assertV3d <| Mat.TransformDir(M44d(v.c.X), v.c.XYZ)
+            let _ = assertV3d <| Mat.TransposedTransformDir(M44d(v.c.X), v.c.XYZ)
+
+            let _ = assertV3d <| Mat.transformPos (M44d(v.c.X)) v.c.XYZ
+            let _ = assertV3d <| Mat.TransformPos(M44d(v.c.X), v.c.XYZ)
+            let _ = assertV3d <| Mat.TransposedTransformPos(M44d(v.c.X), v.c.XYZ)
+
+            let _ = assertV3d <| Mat.TransformPosProj(M44d(v.c.X), v.c.XYZ)
+            let _ = assertV4d <| Mat.TransformPosProjFull(M44d(v.c.X), v.c.XYZ)
+            let _ = assertV3d <| Mat.TransposedTransformProj(M44d(v.c.X), v.c.XYZ)
+            let _ = assertV4d <| Mat.TransposedTransformProjFull(M44d(v.c.X), v.c.XYZ)
+
+            return 0.0
         }
 
     GLSL.shouldCompile [Effect.ofFunction shader]

@@ -491,6 +491,20 @@ module Preprocessor =
             | _ ->
                 None
 
+        let (|TransformPosProj|_|) (e : Expr) =
+            match e with
+            | Call(_, MethodQuote <@ Mat.transformPosProj : M44d -> V3d -> V3d @> _, [m; VectorExpr(v, d, _)]) ->
+                Some (d, false, [m; v])
+
+            | Call(_, (Method("TransformPosProj", _) as mi), [m; VectorExpr(v, d, _)]) when mi.DeclaringType = typeof<Mat> ->
+                Some (d, false, [m; v])
+
+            | Call(_, (Method("TransposedTransformProj", _) as mi), [m; VectorExpr(v, d, _)]) when mi.DeclaringType = typeof<Mat> ->
+                Some (d, true, [m; v])
+
+            | _ ->
+                None
+
     // Used to determine which preprocess function to call
     [<RequireQualifiedAccess>]
     type ShaderExpressionType =
@@ -1177,6 +1191,29 @@ module Preprocessor =
                     ])
 
                 return! preprocessNormalS expr
+
+            | TransformPosProj (dim, transposed, [m; v]) ->
+                let! m = preprocessNormalS m
+                let! v = preprocessNormalS v
+
+                let transform =
+                    if transposed then
+                        typeof<Mat>.GetMethod("TransposedTransformProjFull", [| m.Type; v.Type |])
+                    else
+                        typeof<Mat>.GetMethod("TransformPosProjFull", [| m.Type; v.Type |])
+
+                let tmp = Var("tmp", transform.ReturnType)
+
+                let first, last =
+                    if dim = 2 then tmp.Type.GetProperty("XY"), tmp.Type.GetField("Z")
+                    elif dim = 3 then tmp.Type.GetProperty("XYZ"), tmp.Type.GetField("W")
+                    else failwithf "[FShade] Encountered transform of %d-dimensional vector" dim
+
+                // Multiply and then divide by last component
+                return Expr.Let(
+                    tmp, Expr.Call(transform, [m; v]),
+                    Expr.Division(Expr.PropertyGet(Expr.Var tmp, first), Expr.FieldGet(Expr.Var tmp, last))
+                )
 
             | Call(None, mi, [ExprValue v]) when mi.Name = "op_Splice" || mi.Name = "op_SpliceUntyped" ->
                 if v.Type = e.Type then

@@ -466,6 +466,16 @@ module Compiler =
                 | Method("Cross", [VectorOf _; VectorOf _]), [l;r] ->
                     CCross(ct, l, r) |> Some
 
+                // transform
+                | MethodQuote <@ Mat.transform : M44d -> V4d -> V4d @> _, [m;v]
+                | Method("Transform", [MatrixOf _; VectorOf _]), [m;v] ->
+                    match m.ctype, v.ctype with
+                    | CMatrix(_, _, cols), CVector(_, dim) when cols = dim ->
+                        let res = CMulMatVec(v.ctype, m, v) |> Simplification.simplifyMatrixTerm
+                        Some res
+                    | _ ->
+                        None
+
                 // transformDir
                 | MethodQuote <@ Mat.transformDir : M44d -> V3d -> V3d @> _, [m;v]
                 | Method("TransformDir", [MatrixOf _; VectorOf _]), [m;v] ->
@@ -486,6 +496,24 @@ module Compiler =
                         | _ ->
                             None
 
+                // transformPosProjFull
+                | Method("TransformPosProjFull", [MatrixOf _; VectorOf _]), [m; v] ->
+                    match m.ctype, v.ctype with
+                    | CMatrix(_, r, c), CVector(t, d) when r = c && d = c - 1 ->
+                        let res = CMulMatVec(CVector(t, d + 1), m, CNewVector(CVector(t, d + 1), d + 1, [v; one t])) |> Simplification.simplifyMatrixTerm
+                        Some res
+                    | _ ->
+                        None
+
+                // transposedTransform
+                | Method("TransposedTransform", [MatrixOf _; VectorOf _]), [m;v] ->
+                    match m.ctype, v.ctype with
+                    | CMatrix(_, rows, _), CVector(_, dim) when rows = dim ->
+                        let res = CMulVecMat(v.ctype, v, m) |> Simplification.simplifyMatrixTerm
+                        Some res
+                    | _ ->
+                        None
+
                 // transposedTransformDir
                 | Method("TransposedTransformDir", [MatrixOf _; VectorOf _]), [m;v] ->
                     match ct, v.ctype with
@@ -504,8 +532,15 @@ module Compiler =
                         | _ ->
                             None
 
-                
-                
+                // transposedTransformProjFull
+                | Method("TransposedTransformProjFull", [MatrixOf _; VectorOf _]), [m;v] ->
+                    match m.ctype, v.ctype with
+                    | CMatrix(_, r, c), CVector(t, d) when r = c && d = c - 1 ->
+                        let res = CMulVecMat(CVector(t, d + 1), CNewVector(CVector(t, d + 1), d + 1, [v; one t]), m) |> Simplification.simplifyMatrixTerm
+                        Some res
+                    | _ ->
+                        None
+
                 | MethodQuote <@ m22d : M22f -> _ @> _, [m] 
                 | MethodQuote <@ m23d : M22f -> _ @> _, [m] 
                 | MethodQuote <@ m33d : M33f -> _ @> _, [m] 
