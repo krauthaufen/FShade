@@ -1,3 +1,6 @@
+### 5.3.3
+* Fixed issue with deserialization of raytracing interfaces
+
 ### 5.3.2
 * Added simple hash based id to RaytracingEffect
 * Added matrix transform intrinsics
