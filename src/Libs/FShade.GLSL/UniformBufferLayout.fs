@@ -1607,7 +1607,7 @@ module GLSLProgramInterface =
                         let cnt = src.ReadInt32()
                         let group =
                             List.init cnt (fun _ ->
-                                let n = src.ReadString() |> Symbol.Create
+                                let rayType = src.ReadString() |> Symbol.Create
 
                                 let anyHit =
                                     match src.ReadByte() with
@@ -1624,7 +1624,7 @@ module GLSLProgramInterface =
                                     | 0uy -> None
                                     | _ -> GLSLShaderInterface.deserializeInternal src |> add |> Some
 
-                                name, {
+                                rayType, {
                                     anyHitShader = anyHit
                                     closestHitShader = closestHit
                                     intersectionShader = intersectionShader
