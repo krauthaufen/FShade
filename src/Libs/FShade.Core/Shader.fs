@@ -505,6 +505,23 @@ module Preprocessor =
             | _ ->
                 None
 
+        let (|IsInfinitySigned|_|) (e : Expr) =
+            match e with
+            | Call(_, MethodQuote<@ isPositiveInfinity : float -> bool @> _, [value]) ->
+                Some (true, value)
+
+            | Call(_, (Method("IsPositiveInfinity", _) as mi), [value]) when mi.DeclaringType = typeof<Fun> ->
+                Some (true, value)
+
+            | Call(_, MethodQuote<@ isNegativeInfinity : float -> bool @> _, [value]) ->
+                Some (false, value)
+
+            | Call(_, (Method("IsNegativeInfinity", _) as mi), [value]) when mi.DeclaringType = typeof<Fun> ->
+                Some (false, value)
+
+            | _ ->
+                None
+
     // Used to determine which preprocess function to call
     [<RequireQualifiedAccess>]
     type ShaderExpressionType =
@@ -796,6 +813,9 @@ module Preprocessor =
 
         let op_subtraction = getMethodInfo <@ (-) : float -> float -> float @>
         let op_division    = getMethodInfo <@ (/) : float -> float -> float @>
+        let op_logicalAnd  = getMethodInfo <@ (&&) : bool -> bool -> bool @>
+        let op_lessThan    = getMethodInfo <@ (<) : float -> float -> bool @>
+        let op_greaterThan = getMethodInfo <@ (>) : float -> float -> bool @>
 
         let defaultOf = getMethodInfo <@ Unchecked.defaultof<int> @>
         let reportIntersection = getMethodInfo <@ reportIntersection @>
@@ -850,6 +870,25 @@ module Preprocessor =
                     let tf = toFloat.MakeGenericMethod expr.Type
                     Expr.Call(tf, [expr])
 
+            static member And(a : Expr, b : Expr) =
+                Expr.Call(MethodInfo.op_logicalAnd, [a; b])
+
+            static member LessThan(a : Expr, b : Expr) =
+                let mi = MethodInfo.op_lessThan.MakeGenericMethod(a.Type)
+                Expr.Call(mi, [a; b])
+
+            static member GreaterThan(a : Expr, b : Expr) =
+                let mi = MethodInfo.op_greaterThan.MakeGenericMethod(a.Type)
+                Expr.Call(mi, [a; b])
+
+            static member Zero(t : Type) =
+                match t with
+                | TypeInfo.Patterns.Int32 -> Expr.Value 0
+                | TypeInfo.Patterns.UInt32 -> Expr.Value 0u
+                | TypeInfo.Patterns.Float32 -> Expr.Value 0.0f
+                | TypeInfo.Patterns.Float64 -> Expr.Value 0.0
+                | _ ->
+                    failwithf "[FShade] Expr.Zero not implemented for type %s" t.FullName
 
     let rec preprocessRaytracingS (stage : ShaderStage) (e : Expr) : Preprocess<Expr> =
         state {
@@ -1213,6 +1252,25 @@ module Preprocessor =
                 return Expr.Let(
                     tmp, Expr.Call(transform, [m; v]),
                     Expr.Division(Expr.PropertyGet(Expr.Var tmp, first), Expr.FieldGet(Expr.Var tmp, last))
+                )
+
+            | IsInfinitySigned (isPositive, v) ->
+                let! v = preprocessNormalS v
+
+                let isInfinity =
+                    typeof<Fun>.GetMethod("IsInfinity", [| v.Type |])
+
+                let tmp = Var("tmp", v.Type)
+
+                return Expr.Let(
+                    tmp, v,
+                    Expr.And(
+                        Expr.Call(isInfinity, [Expr.Var tmp]),
+                        if isPositive then
+                            Expr.GreaterThan(Expr.Var tmp, Expr.Zero(tmp.Type))
+                        else
+                            Expr.LessThan(Expr.Var tmp, Expr.Zero(tmp.Type))
+                    )
                 )
 
             | Call(None, mi, [ExprValue v]) when mi.Name = "op_Splice" || mi.Name = "op_SpliceUntyped" ->

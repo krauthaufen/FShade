@@ -985,6 +985,21 @@ let ``IsInfinity``() =
     GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["isinf"]
 
 [<Test>]
+let ``IsInfinity (signed)``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = isPositiveInfinity (getVec().X)
+            let _ = isNegativeInfinity (getVec().X)
+            let _ = Fun.IsPositiveInfinity (getVec().X)
+            let _ = Fun.IsNegativeInfinity (getVec().X)
+            return v.pos
+        }
+
+    GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader] ["getVec", 5]
+
+[<Test>]
 let ``IsNaN``() =
     Setup.Run()
 
