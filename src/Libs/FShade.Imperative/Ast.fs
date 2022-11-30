@@ -363,8 +363,8 @@ type CExpr =
     | CNewMatrix of t : CType * elements : list<CExpr>
     | CMatrixFromRows of t : CType * rows : list<CExpr>
     | CMatrixFromCols of t : CType * cols : list<CExpr>
-    | CMatrixRow of t : CType * mat : CExpr * row : int
-    | CMatrixCol of t : CType * mat : CExpr * col : int
+    | CMatrixRow of t : CType * mat : CExpr * row : CExpr
+    | CMatrixCol of t : CType * mat : CExpr * col : CExpr
 
     | CVecLength of t : CType * v : CExpr
 
@@ -562,9 +562,10 @@ module CExpr =
                 used.AddType t
                 for r in r do visit used r
 
-            | CMatrixRow(t,m,_) | CMatrixCol(t,m,_) ->
+            | CMatrixRow(t,m,i) | CMatrixCol(t,m,i) ->
                 used.AddType t
                 visit used m
+                visit used i
 
             | CAnd(l,r) | COr(l,r)
             | CLess(l,r) | CLequal(l,r) | CGreater(l,r) | CGequal(l,r) | CEqual(l,r) | CNotEqual(l,r) ->

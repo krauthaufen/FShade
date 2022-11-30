@@ -21,6 +21,15 @@ type UniformScope with
 let getVec() =
     V4d(uniform.SomeUniform, 1.0)
 
+[<ReflectedDefinition>]
+let assertV2d (v : V2d) = v
+
+[<ReflectedDefinition>]
+let assertV3d (v : V3d) = v
+
+[<ReflectedDefinition>]
+let assertV4d (v : V4d) = v
+
 [<Test>]
 let ``Matrix Constructors``() =
     Setup.Run()
@@ -35,6 +44,27 @@ let ``Matrix Constructors``() =
 
     GLSL.shouldCompile [Effect.ofFunction shader]
 
+[<Test>]
+let ``Matrix dynamic columns / rows``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let m33 = M33d(v.pos.X)
+            let m34 = M34d(v.pos.X)
+            let m44 = M44d(m33)
+            let _ = assertV3d <| m33.C0
+            let _ = assertV3d <| m33.Column(v.what.X)
+            let _ = assertV3d <| m34.C1
+            let _ = assertV3d <| m34.Column(v.what.X)
+            let _ = assertV4d <| m34.R2
+            let _ = assertV4d <| m34.Row(v.what.X)
+            let _ = assertV4d <| m44.R3
+            let _ = assertV4d <| m44.Row(v.what.X)
+            return v.pos
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction shader]
 
 [<Test>]
 let ``Vector Constructors``() =
@@ -749,16 +779,6 @@ let ``Transpose``() =
         }
 
     GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["transpose"]
-
-
-[<ReflectedDefinition>]
-let assertV2d (v : V2d) = v
-
-[<ReflectedDefinition>]
-let assertV3d (v : V3d) = v
-
-[<ReflectedDefinition>]
-let assertV4d (v : V4d) = v
 
 [<Test>]
 let ``Transform 2x2``() =

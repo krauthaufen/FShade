@@ -617,29 +617,35 @@ module Compiler =
                 | Method("FromCols", _), rows -> CMatrixFromCols(ct, rows) |> Some
 
                 // matrix swizzles
-                | Method("get_R0", [MatrixOf _]), [m] -> 
-                    CMatrixRow(ct, m, 0) |> Some
+                | Method("Row", [MatrixOf _; Int32]), [m; i] ->
+                    CMatrixRow(ct, m, i) |> Some
+
+                | Method("Column", [MatrixOf _; Int32]), [m; i] ->
+                    CMatrixCol(ct, m, i) |> Some
+
+                | Method("get_R0", [MatrixOf _]), [m] ->         
+                    CMatrixRow(ct, m, CValue(CType.CInt(true, 32), CIntegral 0L)) |> Some
 
                 | Method("get_R1", [MatrixOf _]), [m] -> 
-                    CMatrixRow(ct, m, 1) |> Some
+                    CMatrixRow(ct, m, CValue(CType.CInt(true, 32), CIntegral 1L)) |> Some
 
                 | Method("get_R2", [MatrixOf _]), [m] -> 
-                    CMatrixRow(ct, m, 2) |> Some
+                    CMatrixRow(ct, m, CValue(CType.CInt(true, 32), CIntegral 2L)) |> Some
                     
                 | Method("get_R3", [MatrixOf _]), [m] -> 
-                    CMatrixRow(ct, m, 3) |> Some
+                    CMatrixRow(ct, m, CValue(CType.CInt(true, 32), CIntegral 3L)) |> Some
 
                 | Method("get_C0", [MatrixOf _]), [m] -> 
-                    CMatrixCol(ct, m, 0) |> Some
+                    CMatrixCol(ct, m, CValue(CType.CInt(true, 32), CIntegral 0L)) |> Some
 
                 | Method("get_C1", [MatrixOf _]), [m] -> 
-                    CMatrixCol(ct, m, 1) |> Some
+                    CMatrixCol(ct, m, CValue(CType.CInt(true, 32), CIntegral 1L)) |> Some
 
                 | Method("get_C2", [MatrixOf _]), [m] -> 
-                    CMatrixCol(ct, m, 2) |> Some
+                    CMatrixCol(ct, m, CValue(CType.CInt(true, 32), CIntegral 2L)) |> Some
 
                 | Method("get_C3", [MatrixOf _]), [m] -> 
-                    CMatrixCol(ct, m, 3) |> Some
+                    CMatrixCol(ct, m, CValue(CType.CInt(true, 32), CIntegral 3L)) |> Some
 
 
                 | Method("op_BooleanAnd", _), [l;r]         -> CExpr.CAnd(l, r) |> Some

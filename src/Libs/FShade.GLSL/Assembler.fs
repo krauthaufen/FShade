@@ -1182,12 +1182,13 @@ module Assembler =
                     match t with
                         | CVector(_,d) ->
                             let! m = assembleExprS m
+                            let! row = assembleExprS row
                             let! rev = AssemblerState.reverseMatrixLogic
                             if rev then 
-                                return sprintf "%s[%d]" m row
+                                return sprintf "%s[%s]" m row
                             else 
                                 let t = assembleType rev t
-                                let args = List.init d (fun i -> sprintf "%s[%d][%d]" m i row)
+                                let args = List.init d (fun i -> sprintf "%s[%d][%s]" m i row)
                                 return sprintf "%s(%s)" t.Name (String.concat ", " args)
                         | _ ->
                             return failwith "sadsadsad"
@@ -1196,13 +1197,14 @@ module Assembler =
                     match t with
                         | CVector(_,d) ->
                             let! m = assembleExprS m
+                            let! col = assembleExprS col
                             let! rev = AssemblerState.reverseMatrixLogic
                             if rev then 
                                 let t = assembleType rev t
-                                let args = List.init d (fun i -> sprintf "%s[%d][%d]" m i col)
+                                let args = List.init d (fun i -> sprintf "%s[%d][%s]" m i col)
                                 return sprintf "%s(%s)" t.Name (String.concat ", " args)
                             else
-                                return sprintf "%s[%d]" m col
+                                return sprintf "%s[%s]" m col
                         | _ ->
                             return failwith "sadsadsad"
 
