@@ -356,7 +356,7 @@ type CExpr =
     | CCross of CType * CExpr * CExpr
     | CVecSwizzle of CType * CExpr * list<CVecComponent>
     | CVecItem of CType * CExpr * CExpr
-    | CMatrixElement of t : CType * m : CExpr * r : int * c : int
+    | CMatrixElement of t : CType * m : CExpr * r : CExpr * c : CExpr
     | CConvertMatrix of t : CType * m : CExpr
     | CNewVector of t : CType * components : list<CExpr>
 
@@ -448,6 +448,23 @@ type CExpr =
             | CItem(t,_,_) -> t
 
             | CDebugPrintf _ -> CType.CVoid
+
+[<AutoOpen>]
+module internal CExprExtensions =
+
+    type CExpr with
+        static member MatrixRow(t : CType, m : CExpr, r : int) =
+            CMatrixRow(t, m, CValue(CType.CInt(true, 32), CIntegral (int64 r)))
+
+        static member MatrixCol(t : CType, m : CExpr, c : int) =
+            CMatrixCol(t, m, CValue(CType.CInt(true, 32), CIntegral (int64 c)))
+
+        static member MatrixElement(t : CType, m : CExpr, r : int, c : int) =
+            CMatrixElement(
+                t, m,
+                CValue(CType.CInt(true, 32), CIntegral (int64 r)),
+                CValue(CType.CInt(true, 32), CIntegral (int64 c))
+            )
 
 type internal Used() =
     let types = System.Collections.Generic.HashSet<CType>()
@@ -545,9 +562,11 @@ module CExpr =
                 visit used e
                 visit used i
 
-            | CMatrixElement(t, m, _, _) ->
+            | CMatrixElement(t, m, r, c) ->
                 used.AddType t
                 visit used m
+                visit used r
+                visit used c
 
             | CNewVector(t, c) ->
                 used.AddType t
@@ -620,7 +639,7 @@ type CLExpr =
     | CLItem of CType * CExpr * CExpr
     | CLPtr of CType * CExpr
     | CLVecSwizzle of CType * CLExpr * list<CVecComponent>
-    | CLMatrixElement of t : CType * m : CLExpr * r : int * c : int
+    | CLMatrixElement of t : CType * m : CLExpr * r : CExpr * c : CExpr
     | CLInput of kind : ParameterKind * ctype : CType * name : string * index : Option<CExpr>
 
     member x.ctype =

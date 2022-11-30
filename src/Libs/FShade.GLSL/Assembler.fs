@@ -998,8 +998,10 @@ module Assembler =
                 | CMatrixElement(_, m, r, c) ->
                     let! reverse = AssemblerState.reverseMatrixLogic
                     let! m = assembleExprS m
-                    if reverse then return sprintf "%s[%d][%d]" m r c
-                    else return sprintf "%s[%d][%d]" m c r
+                    let! r = assembleExprS r
+                    let! c = assembleExprS c
+                    if reverse then return sprintf "%s[%s][%s]" m r c
+                    else return sprintf "%s[%s][%s]" m c r
 
                 | CConvertMatrix(t, m) ->
                     let t = assembleType config.reverseMatrixLogic t

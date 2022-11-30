@@ -165,7 +165,7 @@ let layoutGLSLang (b : GLSLUniformBuffer) =
                 | CType.CInt _ -> CExpr.CConvert(CType.CFloat 32, e)
                 | CType.CFloat _ -> e
                 | CType.CVector(b,_) -> CExpr.CVecSwizzle(b, e, [CVecComponent.X]) |> getFloat
-                | CType.CMatrix(b,_,_) -> CExpr.CMatrixElement(b, e, 0, 0) |> getFloat
+                | CType.CMatrix(b,_,_) -> CExpr.CMatrixElement(b, e, CValue(CInt(true, 32), CIntegral 0L), CValue(CInt(true, 32), CIntegral 0L)) |> getFloat
                 | CType.CStruct(_,fields,_) ->
                     let (t,n) = fields |> List.head 
                     CExpr.CField(t, e, n) |> getFloat

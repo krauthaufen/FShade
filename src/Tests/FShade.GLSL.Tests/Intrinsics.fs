@@ -31,7 +31,7 @@ let assertV3d (v : V3d) = v
 let assertV4d (v : V4d) = v
 
 [<Test>]
-let ``Matrix Constructors``() =
+let ``Matrix constructors``() =
     Setup.Run()
 
     let shader (v : Vertex) =
@@ -45,7 +45,31 @@ let ``Matrix Constructors``() =
     GLSL.shouldCompile [Effect.ofFunction shader]
 
 [<Test>]
-let ``Matrix dynamic columns / rows``() =
+let ``Matrix elements``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let m22 = M22d(v.pos.X)
+            let m23 = M23d(v.pos.X)
+            let m33 = M33d(v.pos.X)
+            let m34 = M34d(v.pos.X)
+            let m44 = M44d(m33)
+            let _ = m22.[v.what.X, v.what.Y]
+            let _ = m23.[v.what.X, v.what.Y]
+            let _ = m33.[v.what.X, v.what.Y]
+            let _ = m34.[v.what.X, v.what.Y]
+            let _ = m44.[v.what.X, v.what.Y]
+            let _ = m44.M03
+            let _ = m44.M13
+            let _ = m44.M23
+            return v.pos
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction shader]
+
+[<Test>]
+let ``Matrix columns / rows``() =
     Setup.Run()
 
     let shader (v : Vertex) =
@@ -67,7 +91,7 @@ let ``Matrix dynamic columns / rows``() =
     GLSL.shouldCompile [Effect.ofFunction shader]
 
 [<Test>]
-let ``Vector Constructors``() =
+let ``Vector constructors``() =
     Setup.Run()
 
     let shader (v : Vertex) =
@@ -84,7 +108,7 @@ let ``Vector Constructors``() =
     GLSL.shouldCompile [Effect.ofFunction shader]
 
 [<Test>]
-let ``Vector Conversion``() =
+let ``Vector conversion``() =
     Setup.Run()
 
     let fs (v : Vertex) =

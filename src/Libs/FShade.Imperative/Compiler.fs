@@ -617,6 +617,9 @@ module Compiler =
                 | Method("FromCols", _), rows -> CMatrixFromCols(ct, rows) |> Some
 
                 // matrix swizzles
+                | Method("get_Item", [MatrixOf _; Int32; Int32]), [m;r;c] ->
+                    CMatrixElement(ct, m, r, c) |> Some
+
                 | Method("Row", [MatrixOf _; Int32]), [m; i] ->
                     CMatrixRow(ct, m, i) |> Some
 
@@ -624,28 +627,28 @@ module Compiler =
                     CMatrixCol(ct, m, i) |> Some
 
                 | Method("get_R0", [MatrixOf _]), [m] ->         
-                    CMatrixRow(ct, m, CValue(CType.CInt(true, 32), CIntegral 0L)) |> Some
+                    CExpr.MatrixRow(ct, m, 0) |> Some
 
                 | Method("get_R1", [MatrixOf _]), [m] -> 
-                    CMatrixRow(ct, m, CValue(CType.CInt(true, 32), CIntegral 1L)) |> Some
+                    CExpr.MatrixRow(ct, m, 1) |> Some
 
                 | Method("get_R2", [MatrixOf _]), [m] -> 
-                    CMatrixRow(ct, m, CValue(CType.CInt(true, 32), CIntegral 2L)) |> Some
+                    CExpr.MatrixRow(ct, m, 2) |> Some
                     
                 | Method("get_R3", [MatrixOf _]), [m] -> 
-                    CMatrixRow(ct, m, CValue(CType.CInt(true, 32), CIntegral 3L)) |> Some
+                    CExpr.MatrixRow(ct, m, 3) |> Some
 
                 | Method("get_C0", [MatrixOf _]), [m] -> 
-                    CMatrixCol(ct, m, CValue(CType.CInt(true, 32), CIntegral 0L)) |> Some
+                    CExpr.MatrixCol(ct, m, 0) |> Some
 
                 | Method("get_C1", [MatrixOf _]), [m] -> 
-                    CMatrixCol(ct, m, CValue(CType.CInt(true, 32), CIntegral 1L)) |> Some
+                    CExpr.MatrixCol(ct, m, 1) |> Some
 
                 | Method("get_C2", [MatrixOf _]), [m] -> 
-                    CMatrixCol(ct, m, CValue(CType.CInt(true, 32), CIntegral 2L)) |> Some
+                    CExpr.MatrixCol(ct, m, 2) |> Some
 
                 | Method("get_C3", [MatrixOf _]), [m] -> 
-                    CMatrixCol(ct, m, CValue(CType.CInt(true, 32), CIntegral 3L)) |> Some
+                    CExpr.MatrixCol(ct, m, 3) |> Some
 
 
                 | Method("op_BooleanAnd", _), [l;r]         -> CExpr.CAnd(l, r) |> Some
@@ -715,22 +718,22 @@ module Compiler =
                 | VectorOf _, "Z" -> CVecSwizzle(ct, arg, [CVecComponent.Z]) |> Some
                 | VectorOf _, "W" -> CVecSwizzle(ct, arg, [CVecComponent.W]) |> Some
 
-                | MatrixOf _, "M00" -> CMatrixElement(ct, arg, 0, 0) |> Some
-                | MatrixOf _, "M01" -> CMatrixElement(ct, arg, 0, 1) |> Some
-                | MatrixOf _, "M02" -> CMatrixElement(ct, arg, 0, 2) |> Some
-                | MatrixOf _, "M03" -> CMatrixElement(ct, arg, 0, 3) |> Some
-                | MatrixOf _, "M10" -> CMatrixElement(ct, arg, 1, 0) |> Some
-                | MatrixOf _, "M11" -> CMatrixElement(ct, arg, 1, 1) |> Some
-                | MatrixOf _, "M12" -> CMatrixElement(ct, arg, 1, 2) |> Some
-                | MatrixOf _, "M13" -> CMatrixElement(ct, arg, 1, 3) |> Some
-                | MatrixOf _, "M20" -> CMatrixElement(ct, arg, 2, 0) |> Some
-                | MatrixOf _, "M21" -> CMatrixElement(ct, arg, 2, 1) |> Some
-                | MatrixOf _, "M22" -> CMatrixElement(ct, arg, 2, 2) |> Some
-                | MatrixOf _, "M23" -> CMatrixElement(ct, arg, 2, 3) |> Some
-                | MatrixOf _, "M30" -> CMatrixElement(ct, arg, 3, 0) |> Some
-                | MatrixOf _, "M31" -> CMatrixElement(ct, arg, 3, 1) |> Some
-                | MatrixOf _, "M32" -> CMatrixElement(ct, arg, 3, 2) |> Some
-                | MatrixOf _, "M33" -> CMatrixElement(ct, arg, 3, 3) |> Some
+                | MatrixOf _, "M00" -> CExpr.MatrixElement(ct, arg, 0, 0) |> Some
+                | MatrixOf _, "M01" -> CExpr.MatrixElement(ct, arg, 0, 1) |> Some
+                | MatrixOf _, "M02" -> CExpr.MatrixElement(ct, arg, 0, 2) |> Some
+                | MatrixOf _, "M03" -> CExpr.MatrixElement(ct, arg, 0, 3) |> Some
+                | MatrixOf _, "M10" -> CExpr.MatrixElement(ct, arg, 1, 0) |> Some
+                | MatrixOf _, "M11" -> CExpr.MatrixElement(ct, arg, 1, 1) |> Some
+                | MatrixOf _, "M12" -> CExpr.MatrixElement(ct, arg, 1, 2) |> Some
+                | MatrixOf _, "M13" -> CExpr.MatrixElement(ct, arg, 1, 3) |> Some
+                | MatrixOf _, "M20" -> CExpr.MatrixElement(ct, arg, 2, 0) |> Some
+                | MatrixOf _, "M21" -> CExpr.MatrixElement(ct, arg, 2, 1) |> Some
+                | MatrixOf _, "M22" -> CExpr.MatrixElement(ct, arg, 2, 2) |> Some
+                | MatrixOf _, "M23" -> CExpr.MatrixElement(ct, arg, 2, 3) |> Some
+                | MatrixOf _, "M30" -> CExpr.MatrixElement(ct, arg, 3, 0) |> Some
+                | MatrixOf _, "M31" -> CExpr.MatrixElement(ct, arg, 3, 1) |> Some
+                | MatrixOf _, "M32" -> CExpr.MatrixElement(ct, arg, 3, 2) |> Some
+                | MatrixOf _, "M33" -> CExpr.MatrixElement(ct, arg, 3, 3) |> Some
 
                 | _ -> None
 
