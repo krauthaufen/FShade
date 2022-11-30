@@ -1406,7 +1406,22 @@ module IntrinsicFunctions =
                 exactly <@ fun (v : V2d) -> v.IsNaN @>
                 exactly <@ fun (v : V3d) -> v.IsNaN @>
                 exactly <@ fun (v : V4d) -> v.IsNaN @>
+                exactly <@ fun (v : V2f) -> v.AnyNaN @>
+                exactly <@ fun (v : V3f) -> v.AnyNaN @>
+                exactly <@ fun (v : V4f) -> v.AnyNaN @>
+                exactly <@ fun (v : V2d) -> v.AnyNaN @>
+                exactly <@ fun (v : V3d) -> v.AnyNaN @>
+                exactly <@ fun (v : V4d) -> v.AnyNaN @>
                 generic <@ isNaN : float -> _ @>
+            ]
+
+            CIntrinsic.tagged "all(isnan({0}))", [
+                exactly <@ fun (v : V2f) -> v.AllNaN @>
+                exactly <@ fun (v : V3f) -> v.AllNaN @>
+                exactly <@ fun (v : V4f) -> v.AllNaN @>
+                exactly <@ fun (v : V2d) -> v.AllNaN @>
+                exactly <@ fun (v : V3d) -> v.AllNaN @>
+                exactly <@ fun (v : V4d) -> v.AllNaN @>
             ]
 
             CIntrinsic.simple "isinf", [
@@ -1431,7 +1446,22 @@ module IntrinsicFunctions =
                 exactly <@ fun (v : V2d) -> v.IsInfinity @>
                 exactly <@ fun (v : V3d) -> v.IsInfinity @>
                 exactly <@ fun (v : V4d) -> v.IsInfinity @>
+                exactly <@ fun (v : V2f) -> v.AnyInfinity @>
+                exactly <@ fun (v : V3f) -> v.AnyInfinity @>
+                exactly <@ fun (v : V4f) -> v.AnyInfinity @>
+                exactly <@ fun (v : V2d) -> v.AnyInfinity @>
+                exactly <@ fun (v : V3d) -> v.AnyInfinity @>
+                exactly <@ fun (v : V4d) -> v.AnyInfinity @>
                 generic <@ isInfinity : float -> _ @>
+            ]
+
+            CIntrinsic.tagged "all(isinf({0}))", [
+                exactly <@ fun (v : V2f) -> v.AllInfinity @>
+                exactly <@ fun (v : V3f) -> v.AllInfinity @>
+                exactly <@ fun (v : V4f) -> v.AllInfinity @>
+                exactly <@ fun (v : V2d) -> v.AllInfinity @>
+                exactly <@ fun (v : V3d) -> v.AllInfinity @>
+                exactly <@ fun (v : V4d) -> v.AllInfinity @>
             ]
 
             // ==========================================================================

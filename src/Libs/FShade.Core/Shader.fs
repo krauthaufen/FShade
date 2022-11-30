@@ -437,6 +437,11 @@ module Preprocessor =
             | VectorOf(d, t) -> Some (e, d, t)
             | _ -> None
 
+        let private (|MatrixExpr|_|) (e : Expr) =
+            match e.Type with
+            | MatrixOf(d, t) -> Some (e, d, t)
+            | _ -> None
+
         let private (|Property|_|) (pi : PropertyInfo) =
             Some pi.Name
 
@@ -505,19 +510,101 @@ module Preprocessor =
             | _ ->
                 None
 
+        // returns (matrixExpr, matrixDimension, isAllQuantifier, propertyFunctionName)
+        let (|IsMatrixSpecialFloatingPointWithQuantifier|_|) (e : Expr) =
+            match e with
+
+            // Infinity
+            | Call(_, MethodQuote <@ isInfinity : float -> bool @> _, [MatrixExpr(m, d, _)])
+            | PropertyGet (Some (MatrixExpr(m, d, _)), Property("IsInfinity"), _)
+            | PropertyGet (Some (MatrixExpr(m, d, _)), Property("AnyInfinity"), _) ->
+                Some (m, d, false, "Infinity")
+
+            | PropertyGet (Some (MatrixExpr(m, d, _)), Property("AllInfinity"), _) ->
+                Some (m, d, true, "Infinity")
+
+            | Call(_, (Method("IsInfinity", _) as mi), [MatrixExpr(m, d, _)]) when mi.DeclaringType = typeof<Fun> ->
+                Some (m, d, false, "Infinity")
+
+            // PositiveInfinity
+            | Call(_, MethodQuote <@ isPositiveInfinity : float -> bool @> _, [MatrixExpr(m, d, _)])
+            | PropertyGet (Some (MatrixExpr(m, d, _)), Property("IsPositiveInfinity"), _)
+            | PropertyGet (Some (MatrixExpr(m, d, _)), Property("AnyPositiveInfinity"), _) ->
+                Some (m, d, false, "PositiveInfinity")
+
+            | PropertyGet (Some (MatrixExpr(m, d, _)), Property("AllPositiveInfinity"), _) ->
+                Some (m, d, true, "PositiveInfinity")
+
+            | Call(_, (Method("IsPositiveInfinity", _) as mi), [MatrixExpr(m, d, _)]) when mi.DeclaringType = typeof<Fun> ->
+                Some (m, d, false, "PositiveInfinity")
+
+            // NegativeInfinity
+            | Call(_, MethodQuote <@ isNegativeInfinity : float -> bool @> _, [MatrixExpr(m, d, _)])
+            | PropertyGet (Some (MatrixExpr(m, d, _)), Property("IsNegativeInfinity"), _)
+            | PropertyGet (Some (MatrixExpr(m, d, _)), Property("AnyNegativeInfinity"), _) ->
+                Some (m, d, false, "NegativeInfinity")
+
+            | PropertyGet (Some (MatrixExpr(m, d, _)), Property("AllNegativeInfinity"), _) ->
+                Some (m, d, true, "NegativeInfinity")
+
+            | Call(_, (Method("IsNegativeInfinity", _) as mi), [MatrixExpr(m, d, _)]) when mi.DeclaringType = typeof<Fun> ->
+                Some (m, d, false, "NegativeInfinity")
+
+            // NaN
+            | Call(_, MethodQuote <@ isNaN : float -> bool @> _, [MatrixExpr(m, d, _)])
+            | PropertyGet (Some (MatrixExpr(m, d, _)), Property("IsNaN"), _)
+            | PropertyGet (Some (MatrixExpr(m, d, _)), Property("AnyNaN"), _) ->
+                Some (m, d, false, "NaN")
+
+            | PropertyGet (Some (MatrixExpr(m, d, _)), Property("AllNaN"), _) ->
+                Some (m, d, true, "NaN")
+
+            | Call(_, (Method("IsNaN", _) as mi), [MatrixExpr(m, d, _)]) when mi.DeclaringType = typeof<Fun> ->
+                Some (m, d, false, "NaN")
+
+            | _ ->
+                None
+
+        // returns (expression, dimension, isAllQuantifier, propertyFunctionName)
+        let (|IsVectorInfinitySignedWithQuantifier|_|) (e : Expr) =
+            match e with
+            | Call(_, MethodQuote <@ isPositiveInfinity : float -> bool @> _, [VectorExpr(v, d, _)])
+            | PropertyGet (Some (VectorExpr(v, d, _)), Property("AnyPositiveInfinity"), _) ->
+                Some (v, d, false, "IsPositiveInfinity")
+
+            | PropertyGet (Some (VectorExpr(v, d, _)), Property("AllPositiveInfinity"), _) ->
+                Some (v, d, true, "IsPositiveInfinity")
+
+            | Call(_, (Method("IsPositiveInfinity", _) as mi), [VectorExpr(v, d, _)]) when mi.DeclaringType = typeof<Fun> ->
+                Some (v, d, false, "IsPositiveInfinity")
+
+            | Call(_, MethodQuote <@ isNegativeInfinity : float -> bool @> _, [VectorExpr(v, d, _)])
+            | PropertyGet (Some (VectorExpr(v, d, _)), Property("AnyNegativeInfinity"), _) ->
+                Some (v, d, false, "IsNegativeInfinity")
+
+            | PropertyGet (Some (VectorExpr(v, d, _)), Property("AllNegativeInfinity"), _) ->
+                Some (v, d, true, "IsNegativeInfinity")
+
+            | Call(_, (Method("IsNegativeInfinity", _) as mi), [VectorExpr(v, d, _)]) when mi.DeclaringType = typeof<Fun> ->
+                Some (v, d, false, "IsNegativeInfinity")
+
+            | _ ->
+                None
+
+        // returns (expression, isPositive)
         let (|IsInfinitySigned|_|) (e : Expr) =
             match e with
-            | Call(_, MethodQuote<@ isPositiveInfinity : float -> bool @> _, [value]) ->
-                Some (true, value)
+            | Call(_, MethodQuote <@ isPositiveInfinity : float -> bool @> _, [value]) ->
+                Some (value, true)
 
             | Call(_, (Method("IsPositiveInfinity", _) as mi), [value]) when mi.DeclaringType = typeof<Fun> ->
-                Some (true, value)
+                Some (value, true)
 
-            | Call(_, MethodQuote<@ isNegativeInfinity : float -> bool @> _, [value]) ->
-                Some (false, value)
+            | Call(_, MethodQuote <@ isNegativeInfinity : float -> bool @> _, [value]) ->
+                Some (value, false)
 
             | Call(_, (Method("IsNegativeInfinity", _) as mi), [value]) when mi.DeclaringType = typeof<Fun> ->
-                Some (false, value)
+                Some (value, false)
 
             | _ ->
                 None
@@ -814,6 +901,7 @@ module Preprocessor =
         let op_subtraction = getMethodInfo <@ (-) : float -> float -> float @>
         let op_division    = getMethodInfo <@ (/) : float -> float -> float @>
         let op_logicalAnd  = getMethodInfo <@ (&&) : bool -> bool -> bool @>
+        let op_logicalOr   = getMethodInfo <@ (||) : bool -> bool -> bool @>
         let op_lessThan    = getMethodInfo <@ (<) : float -> float -> bool @>
         let op_greaterThan = getMethodInfo <@ (>) : float -> float -> bool @>
 
@@ -872,6 +960,9 @@ module Preprocessor =
 
             static member And(a : Expr, b : Expr) =
                 Expr.Call(MethodInfo.op_logicalAnd, [a; b])
+
+            static member Or(a : Expr, b : Expr) =
+                Expr.Call(MethodInfo.op_logicalOr, [a; b])
 
             static member LessThan(a : Expr, b : Expr) =
                 let mi = MethodInfo.op_lessThan.MakeGenericMethod(a.Type)
@@ -1254,16 +1345,73 @@ module Preprocessor =
                     Expr.Division(Expr.PropertyGet(Expr.Var tmp, first), Expr.FieldGet(Expr.Var tmp, last))
                 )
 
-            | IsInfinitySigned (isPositive, v) ->
-                let! v = preprocessNormalS v
+            | IsMatrixSpecialFloatingPointWithQuantifier (m, d, all, name) ->
+                // Column access is easier in GLSL but we usually have reverse matrix logic
+                let getRow =
+                    typeof<Mat>.GetMethod("Row", [| m.Type; typeof<int> |])
 
-                let isInfinity =
-                    typeof<Fun>.GetMethod("IsInfinity", [| v.Type |])
+                let isSpecialFloatingPoint =
+                    getRow.ReturnType.GetProperty((if all then "All" else "Any") + name)
+
+                let tmp = Var("tmp", m.Type)
+
+                let expr =
+                    List.init d.Y (fun i ->
+                        Expr.PropertyGet(
+                            Expr.Call(getRow, [Expr.Var tmp; Expr.Value i]),
+                            isSpecialFloatingPoint
+                        )
+                    )
+                    |> List.reduce (fun l r ->
+                        if all then
+                            Expr.And(l, r)
+                        else
+                            Expr.Or(l, r)  
+                    )
+
+                return! preprocessNormalS <| Expr.Let(
+                    tmp, m,
+                    expr
+                )
+
+            | IsVectorInfinitySignedWithQuantifier (v, d, all, name) ->
+                let getElement =
+                    v.Type.GetProperty("Item", [| typeof<int> |])
+
+                let isInfinitySigned =
+                    typeof<Fun>.GetMethod(name, [| getElement.Type |])
 
                 let tmp = Var("tmp", v.Type)
 
-                return Expr.Let(
+                let expr =
+                    List.init d (fun i ->
+                        Expr.Call(
+                            isInfinitySigned,
+                            [ Expr.PropertyGet(Expr.Var tmp, getElement, [Expr.Value i]) ]
+                        )
+                    )
+                    |> List.reduce (fun l r ->
+                        if all then
+                            Expr.And(l, r)
+                        else
+                            Expr.Or(l, r)  
+                    )
+
+                return! preprocessNormalS <| Expr.Let(
                     tmp, v,
+                    expr
+                )
+
+            | IsInfinitySigned (e, isPositive) ->
+                let! e = preprocessNormalS e
+
+                let isInfinity =
+                    typeof<Fun>.GetMethod("IsInfinity", [| e.Type |])
+
+                let tmp = Var("tmp", e.Type)
+
+                return Expr.Let(
+                    tmp, e,
                     Expr.And(
                         Expr.Call(isInfinity, [Expr.Var tmp]),
                         if isPositive then

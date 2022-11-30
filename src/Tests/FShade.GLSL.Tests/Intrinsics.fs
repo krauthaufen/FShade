@@ -1014,6 +1014,116 @@ let ``Constant swizzles``() =
     GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader] ["getVec", 7]
 
 [<Test>]
+let ``Matrix AnyInfinity``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let m = M34d(v.c.X)
+            let _ = m.IsInfinity
+            let _ = m.AnyInfinity
+            let _ = isInfinity m
+            let _ = Fun.IsInfinity m
+            return v.pos
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["isinf"; "||"]
+
+[<Test>]
+let ``Matrix AllInfinity``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let m = M34d(v.c.X)
+            let _ = m.AllInfinity
+            return v.pos
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["isinf"; "&&"]
+
+[<Test>]
+let ``Matrix AnyPositiveInfinity``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let m = M34d(v.c.X)
+            let _ = m.AnyPositiveInfinity
+            return v.pos
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["isinf"; "||"]
+
+[<Test>]
+let ``Matrix AllPositiveInfinity``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let m = M34d(v.c.X)
+            let _ = m.AllPositiveInfinity
+            return v.pos
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["isinf"; "&&"]
+
+[<Test>]
+let ``Matrix AnyNegativeInfinity``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let m = M34d(v.c.X)
+            let _ = m.AnyNegativeInfinity
+            return v.pos
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["isinf"; "||"]
+
+[<Test>]
+let ``Matrix AllNegativeInfinity``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let m = M34d(v.c.X)
+            let _ = m.AllNegativeInfinity
+            return v.pos
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["isinf"; "&&"]
+
+[<Test>]
+let ``Matrix AnyNaN``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let m = M34d(v.c.X)
+            let _ = m.IsNaN
+            let _ = m.AnyNaN
+            let _ = isNaN m
+            let _ = Fun.IsNaN m
+            return v.pos
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["isnan"; "||"]
+
+[<Test>]
+let ``Matrix AllNaN``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let m = M34d(v.c.X)
+            let _ = m.AllNaN
+            return v.pos
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["isnan"; "&&"]
+
+[<Test>]
 let ``IsInfinity``() =
     Setup.Run()
 
