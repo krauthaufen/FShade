@@ -432,8 +432,9 @@ module Preprocessor =
         let private zeroOneVecProperty =
             System.Text.RegularExpressions.Regex @"^([XYZW]*[OINP]+[XYZW]*)+$"
 
-        let private specialFloatingPointCheck =
-            System.Text.RegularExpressions.Regex @"^([iI]s|Any|All)(Infinity|PositiveInfinity|NegativeInfinity|NaN|Finite)$"
+        let private quantifiedBooleanOperations =
+            System.Text.RegularExpressions.Regex
+                @"^([iI]s|[aA]ny|[aA]ll)(Infinity|PositiveInfinity|NegativeInfinity|NaN|Finite|Equal|Different|Smaller|Greater|SmallerOrEqual|GreaterOrEqual)$"
 
         // These require the input expression to be duplicated and must be handled differently.
         let private emulatedSpecialFloatingPointCheck =
@@ -522,16 +523,26 @@ module Preprocessor =
             | _ ->
                 None
 
-        // returns (matrixExpr, matrixDimension, isAllQuantifier, propertyFunctionName)
-        let (|MatrixSpecialFloatingPointCheck|_|) (e : Expr) =
+        // returns (arguments, typ, dimension, isAllQuantifier, name)
+        let (|MatrixQuantifiedBooleanOperation|_|) (e : Expr) =
             match e with
-            | Call(_, Method(name, _), [MatrixExpr(mat, dim, _)])
-            | PropertyGet (Some (MatrixExpr(mat, dim, _)), Property(name), _) ->
-                let m = specialFloatingPointCheck.Match name
+            | Call(_, Method(name, _), ([MatrixExpr(mat, dim, _)] as args))
+            | Call(_, Method(name, _), ([MatrixExpr(mat, dim, _); _] as args))
+            | Call(_, Method(name, _), ([_; MatrixExpr(mat, dim, _)] as args))
+            | PropertyGet (Some (MatrixExpr(mat, dim, _)), Property(name), args) ->
+                let m = quantifiedBooleanOperations.Match name
                 if m.Success then
-                    let isAllQuantifier = (m.Groups.[1].Value = "All")
-                    let propertyName = m.Groups.[2].Value
-                    Some (mat, dim, isAllQuantifier, propertyName)
+                    let all = (m.Groups.[1].Value.ToLower() = "all")
+                    let name = m.Groups.[2].Value
+
+                    match name, all with
+                    | "Equal", true | "Different", false -> None  // trivial equality
+                    | _ ->
+                        let args =
+                            if args.Length = 0 then [mat]
+                            else args
+
+                        Some (args, mat.Type, dim, all, name)
                 else
                     None
             | _ ->
@@ -1327,22 +1338,39 @@ module Preprocessor =
                     Expr.Division(Expr.PropertyGet(Expr.Var tmp, first), Expr.FieldGet(Expr.Var tmp, last))
                 )
 
-            | MatrixSpecialFloatingPointCheck (m, d, all, name) ->
+            | MatrixQuantifiedBooleanOperation (args, typ, dim, all, name) ->
                 // Column access is easier in GLSL but we usually have reverse matrix logic
                 let getRow =
-                    typeof<Mat>.GetMethod("Row", [| m.Type; typeof<int> |])
+                    typeof<Mat>.GetMethod("Row", [| typ; typeof<int> |])
 
-                let isSpecialFloatingPoint =
-                    getRow.ReturnType.GetProperty((if all then "All" else "Any") + name)
-
-                let tmp = Var("tmp", m.Type)
-
-                let expr =
-                    List.init d.Y (fun i ->
-                        Expr.PropertyGet(
-                            Expr.Call(getRow, [Expr.Var tmp; Expr.Value i]),
-                            isSpecialFloatingPoint
+                let operation =
+                    let parameterTypes =
+                        args |> List.map (fun a ->
+                            if a.Type = typ then getRow.ReturnType  // Matrix row
+                            else a.Type                             // Scalar
                         )
+
+                    typeof<Vec>.GetMethod(
+                        (if all then "All" else "Any") + name,
+                        List.toArray parameterTypes
+                    )
+
+                let tmps =
+                    args |> List.mapi (fun i a ->
+                        Var($"tmp{i}", a.Type)
+                    )
+
+                let body =
+                    List.init dim.Y (fun row ->
+                        let parameters =
+                            args |> List.mapi (fun i a ->
+                                if a.Type = typ then
+                                    Expr.Call(getRow, [Expr.Var tmps.[i]; Expr.Value row])
+                                else
+                                    a
+                            )
+
+                        Expr.Call(operation, parameters)
                     )
                     |> List.reduce (fun l r ->
                         if all then
@@ -1351,10 +1379,15 @@ module Preprocessor =
                             Expr.Or(l, r)
                     )
 
-                return! preprocessNormalS <| Expr.Let(
-                    tmp, m,
-                    expr
-                )
+                let expr =
+                    let bindings =
+                        (tmps, args) ||> List.zip
+
+                    (bindings, body) ||> List.foldBack (fun (t, a) s ->
+                        Expr.Let(t, a, s)
+                    )
+
+                return! preprocessNormalS expr
 
             // Non-native floating point checks for vectors with ANY quantifier have
             // to be transformed into ORed checks for each component.

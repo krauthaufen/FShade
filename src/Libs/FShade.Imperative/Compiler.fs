@@ -714,6 +714,23 @@ module Compiler =
                     | _, (CVector _ as vt) -> CVecAllGequal(CNewVector(vt, [x]), y) |> Some
                     | _ -> None
 
+                // matrix relations
+                | (MethodQuote <@ Mat.allEqual : M22d -> M22d -> bool @> _), [x; y]
+                | MatMethod("AllEqual", _), [x; y] ->
+                    match x.ctype, y.ctype with
+                    | CMatrix _, CMatrix _ -> CEqual(x, y) |> Some
+                    | CMatrix _ as mt, _   -> CEqual(x, CNewMatrix(mt, [y])) |> Some
+                    | _, (CMatrix _ as mt) -> CEqual(CNewMatrix(mt, [x]), y) |> Some
+                    | _ -> None
+
+                | (MethodQuote <@ Mat.anyDifferent : M22d -> M22d -> bool @> _), [x; y]
+                | MatMethod("AnyDifferent", _), [x; y] ->
+                    match x.ctype, y.ctype with
+                    | CMatrix _, CMatrix _ -> CNotEqual(x, y) |> Some
+                    | CMatrix _ as vt, _   -> CNotEqual(x, CNewMatrix(vt, [y])) |> Some
+                    | _, (CMatrix _ as vt) -> CNotEqual(CNewMatrix(vt, [x]), y) |> Some
+                    | _ -> None
+
                 // matrix creation
                 | Method("FromRows", _), rows -> CMatrixFromRows(ct, rows) |> Some
                 | Method("FromCols", _), rows -> CMatrixFromCols(ct, rows) |> Some

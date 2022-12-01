@@ -1418,6 +1418,222 @@ let ``Vector AllNaN``() =
     GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["isnan"; "all"]
 
 [<Test>]
+let ``Matrix AnyEqual``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Mat.AnyEqual((M34d(v.c.X)), (M34d(v.c.X)))
+            let _ = (M34d(v.c.X)).AnyEqual((M34d(v.c.X)))
+            let _ = Mat.AnyEqual((M34d(v.c.X)), 0.0)
+            let _ = Mat.AnyEqual(0.0, (M34d(v.c.X)))
+            let _ = Mat.anyEqual (M34d(v.c.X)) (M34d(v.c.X))
+            let _ = Mat.anyEqual (M34d(v.c.X)) 0.0
+            let _ = Mat.anyEqual 0.0 (M34d(v.c.X))
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["equal"; "any"]
+
+[<Test>]
+let ``Matrix AllEqual``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Mat.AllEqual((M34d(v.c.X)), (M34d(v.c.X)))
+            let _ = (M34d(v.c.X)).AllEqual((M34d(v.c.X)))
+            let _ = Mat.AllEqual((M34d(v.c.X)), 0.0)
+            let _ = Mat.AllEqual(0.0, (M34d(v.c.X)))
+            let _ = Mat.allEqual (M34d(v.c.X)) (M34d(v.c.X))
+            let _ = Mat.allEqual (M34d(v.c.X)) 0.0
+            let _ = Mat.allEqual 0.0 (M34d(v.c.X))
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["=="]
+
+[<Test>]
+let ``Matrix AnyDifferent``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Mat.AnyDifferent((M34d(v.c.X)), (M34d(v.c.X)))
+            let _ = (M34d(v.c.X)).AnyDifferent((M34d(v.c.X)))
+            let _ = Mat.AnyDifferent((M34d(v.c.X)), 0.0)
+            let _ = Mat.AnyDifferent(0.0, (M34d(v.c.X)))
+            let _ = Mat.anyDifferent (M34d(v.c.X)) (M34d(v.c.X))
+            let _ = Mat.anyDifferent (M34d(v.c.X)) 0.0
+            let _ = Mat.anyDifferent 0.0 (M34d(v.c.X))
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["!="]
+
+[<Test>]
+let ``Matrix AllDifferent``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Mat.AllDifferent((M34d(v.c.X)), (M34d(v.c.X)))
+            let _ = (M34d(v.c.X)).AllDifferent((M34d(v.c.X)))
+            let _ = Mat.AllDifferent((M34d(v.c.X)), 0.0)
+            let _ = Mat.AllDifferent(0.0, (M34d(v.c.X)))
+            let _ = Mat.allDifferent (M34d(v.c.X)) (M34d(v.c.X))
+            let _ = Mat.allDifferent (M34d(v.c.X)) 0.0
+            let _ = Mat.allDifferent 0.0 (M34d(v.c.X))
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["all"; "notEqual"]
+
+[<Test>]
+let ``Matrix AnySmaller``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Mat.AnySmaller((M34d(v.c.X)), (M34d(v.c.Y)))
+            let _ = (M34d(v.c.X)).AnySmaller((M34d(v.c.Y)))
+            let _ = Mat.AnySmaller((M34d(v.c.X)), 0.0)
+            let _ = Mat.AnySmaller(0.0, (M34d(v.c.X)))
+            let _ = Mat.anySmaller (M34d(v.c.X)) (M34d(v.c.Y))
+            let _ = Mat.anySmaller (M34d(v.c.X)) 0.0
+            let _ = Mat.anySmaller 0.0 (M34d(v.c.X))
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["any"; "lessThan"]
+
+[<Test>]
+let ``Matrix AllSmaller``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Mat.AllSmaller((M34d(v.c.X)), (M34d(v.c.X)))
+            let _ = (M34d(v.c.X)).AllSmaller((M34d(v.c.X)))
+            let _ = Mat.AllSmaller((M34d(v.c.X)), 0.0)
+            let _ = Mat.AllSmaller(0.0, (M34d(v.c.X)))
+            let _ = Mat.allSmaller (M34d(v.c.X)) (M34d(v.c.X))
+            let _ = Mat.allSmaller (M34d(v.c.X)) 0.0
+            let _ = Mat.allSmaller 0.0 (M34d(v.c.X))
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["all"; "lessThan"]
+
+[<Test>]
+let ``Matrix AnySmallerOrEqual``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Mat.AnySmallerOrEqual((M34d(v.c.X)), (M34d(v.c.X)))
+            let _ = (M34d(v.c.X)).AnySmallerOrEqual((M34d(v.c.X)))
+            let _ = Mat.AnySmallerOrEqual((M34d(v.c.X)), 0.0)
+            let _ = Mat.AnySmallerOrEqual(0.0, (M34d(v.c.X)))
+            let _ = Mat.anySmallerOrEqual (M34d(v.c.X)) (M34d(v.c.X))
+            let _ = Mat.anySmallerOrEqual (M34d(v.c.X)) 0.0
+            let _ = Mat.anySmallerOrEqual 0.0 (M34d(v.c.X))
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["any"; "lessThanEqual"]
+
+[<Test>]
+let ``Matrix AllSmallerOrEqual``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Mat.AllSmallerOrEqual((M34d(v.c.X)), (M34d(v.c.X)))
+            let _ = (M34d(v.c.X)).AllSmallerOrEqual((M34d(v.c.X)))
+            let _ = Mat.AllSmallerOrEqual((M34d(v.c.X)), 0.0)
+            let _ = Mat.AllSmallerOrEqual(0.0, (M34d(v.c.X)))
+            let _ = Mat.allSmallerOrEqual (M34d(v.c.X)) (M34d(v.c.X))
+            let _ = Mat.allSmallerOrEqual (M34d(v.c.X)) 0.0
+            let _ = Mat.allSmallerOrEqual 0.0 (M34d(v.c.X))
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["all"; "lessThanEqual"]
+
+[<Test>]
+let ``Matrix AnyGreater``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Mat.AnyGreater((M34d(v.c.X)), (M34d(v.c.X)))
+            let _ = (M34d(v.c.X)).AnyGreater((M34d(v.c.X)))
+            let _ = Mat.AnyGreater((M34d(v.c.X)), 0.0)
+            let _ = Mat.AnyGreater(0.0, (M34d(v.c.X)))
+            let _ = Mat.anyGreater (M34d(v.c.X)) (M34d(v.c.X))
+            let _ = Mat.anyGreater (M34d(v.c.X)) 0.0
+            let _ = Mat.anyGreater 0.0 (M34d(v.c.X))
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["any"; "greaterThan"]
+
+[<Test>]
+let ``Matrix AllGreater``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Mat.AllGreater((M34d(v.c.X)), (M34d(v.c.X)))
+            let _ = (M34d(v.c.X)).AllGreater((M34d(v.c.X)))
+            let _ = Mat.AllGreater((M34d(v.c.X)), 0.0)
+            let _ = Mat.AllGreater(0.0, (M34d(v.c.X)))
+            let _ = Mat.allGreater (M34d(v.c.X)) (M34d(v.c.X))
+            let _ = Mat.allGreater (M34d(v.c.X)) 0.0
+            let _ = Mat.allGreater 0.0 (M34d(v.c.X))
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["all"; "greaterThan"]
+
+[<Test>]
+let ``Matrix AnyGreaterOrEqual``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Mat.AnyGreaterOrEqual((M34d(v.c.X)), (M34d(v.c.X)))
+            let _ = (M34d(v.c.X)).AnyGreaterOrEqual((M34d(v.c.X)))
+            let _ = Mat.AnyGreaterOrEqual((M34d(v.c.X)), 0.0)
+            let _ = Mat.AnyGreaterOrEqual(0.0, (M34d(v.c.X)))
+            let _ = Mat.anyGreaterOrEqual (M34d(v.c.X)) (M34d(v.c.X))
+            let _ = Mat.anyGreaterOrEqual (M34d(v.c.X)) 0.0
+            let _ = Mat.anyGreaterOrEqual 0.0 (M34d(v.c.X))
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["any"; "greaterThanEqual"]
+
+[<Test>]
+let ``Matrix AllGreaterOrEqual``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Mat.AllGreaterOrEqual((M34d(v.c.X)), (M34d(v.c.X)))
+            let _ = (M34d(v.c.X)).AllGreaterOrEqual((M34d(v.c.X)))
+            let _ = Mat.AllGreaterOrEqual((M34d(v.c.X)), 0.0)
+            let _ = Mat.AllGreaterOrEqual(0.0, (M34d(v.c.X)))
+            let _ = Mat.allGreaterOrEqual (M34d(v.c.X)) (M34d(v.c.X))
+            let _ = Mat.allGreaterOrEqual (M34d(v.c.X)) 0.0
+            let _ = Mat.allGreaterOrEqual 0.0 (M34d(v.c.X))
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["all"; "greaterThanEqual"]
+
+[<Test>]
 let ``Matrix AnyInfinity``() =
     Setup.Run()
 
