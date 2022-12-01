@@ -289,6 +289,10 @@ module CVecComponent =
     let private all = [CVecComponent.X; CVecComponent.Y; CVecComponent.Z; CVecComponent.W]
     let first (n : int) = List.take n all
 
+    let x = [CVecComponent.X]
+    let y = [CVecComponent.Y]
+    let z = [CVecComponent.Z]
+    let w = [CVecComponent.W]
     let xy = [CVecComponent.X; CVecComponent.Y]
     let yz = [CVecComponent.Y; CVecComponent.Z]
     let zw = [CVecComponent.Z; CVecComponent.W]

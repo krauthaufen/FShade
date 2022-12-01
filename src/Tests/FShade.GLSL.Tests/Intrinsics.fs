@@ -1014,6 +1014,27 @@ let ``Constant swizzles``() =
     GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader] ["getVec", 7]
 
 [<Test>]
+let ``Vector swizzles``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Vec.x v.c
+            let _ = Vec.y v.c.XYZ
+            let _ = Vec.z v.c
+            // TODO: Uncomment for Aardvark.Base >= 5.2.17
+            //let _ = Vec.w v.w
+            let _ = Vec.xy v.c
+            let _ = Vec.yz v.c.XYZ
+            let _ = Vec.zw v.c
+            let _ = Vec.xyz v.c
+            let _ = Vec.yzw v.c
+            return v
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction shader]
+
+[<Test>]
 let ``Vector AnyInfinity``() =
     Setup.Run()
 
