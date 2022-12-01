@@ -1400,6 +1400,12 @@ module IntrinsicFunctions =
                 exactly <@ Fun.IsNaN : V2d -> bool @>
                 exactly <@ Fun.IsNaN : V3d -> bool @>
                 exactly <@ Fun.IsNaN : V4d -> bool @>
+                exactly <@ Vec.AnyNaN : V2f -> bool @>
+                exactly <@ Vec.AnyNaN : V3f -> bool @>
+                exactly <@ Vec.AnyNaN : V4f -> bool @>
+                exactly <@ Vec.AnyNaN : V2d -> bool @>
+                exactly <@ Vec.AnyNaN : V3d -> bool @>
+                exactly <@ Vec.AnyNaN : V4d -> bool @>
                 exactly <@ fun (v : V2f) -> v.IsNaN @>
                 exactly <@ fun (v : V3f) -> v.IsNaN @>
                 exactly <@ fun (v : V4f) -> v.IsNaN @>
@@ -1416,6 +1422,12 @@ module IntrinsicFunctions =
             ]
 
             CIntrinsic.tagged "all(isnan({0}))", [
+                exactly <@ Vec.AllNaN : V2f -> bool @>
+                exactly <@ Vec.AllNaN : V3f -> bool @>
+                exactly <@ Vec.AllNaN : V4f -> bool @>
+                exactly <@ Vec.AllNaN : V2d -> bool @>
+                exactly <@ Vec.AllNaN : V3d -> bool @>
+                exactly <@ Vec.AllNaN : V4d -> bool @>
                 exactly <@ fun (v : V2f) -> v.AllNaN @>
                 exactly <@ fun (v : V3f) -> v.AllNaN @>
                 exactly <@ fun (v : V4f) -> v.AllNaN @>
@@ -1440,6 +1452,12 @@ module IntrinsicFunctions =
                 exactly <@ Fun.IsInfinity : V2d -> bool @>
                 exactly <@ Fun.IsInfinity : V3d -> bool @>
                 exactly <@ Fun.IsInfinity : V4d -> bool @>
+                exactly <@ Vec.AnyInfinity : V2f -> bool @>
+                exactly <@ Vec.AnyInfinity : V3f -> bool @>
+                exactly <@ Vec.AnyInfinity : V4f -> bool @>
+                exactly <@ Vec.AnyInfinity : V2d -> bool @>
+                exactly <@ Vec.AnyInfinity : V3d -> bool @>
+                exactly <@ Vec.AnyInfinity : V4d -> bool @>
                 exactly <@ fun (v : V2f) -> v.IsInfinity @>
                 exactly <@ fun (v : V3f) -> v.IsInfinity @>
                 exactly <@ fun (v : V4f) -> v.IsInfinity @>
@@ -1456,6 +1474,12 @@ module IntrinsicFunctions =
             ]
 
             CIntrinsic.tagged "all(isinf({0}))", [
+                exactly <@ Vec.AllInfinity : V2f -> bool @>
+                exactly <@ Vec.AllInfinity : V3f -> bool @>
+                exactly <@ Vec.AllInfinity : V4f -> bool @>
+                exactly <@ Vec.AllInfinity : V2d -> bool @>
+                exactly <@ Vec.AllInfinity : V3d -> bool @>
+                exactly <@ Vec.AllInfinity : V4d -> bool @>
                 exactly <@ fun (v : V2f) -> v.AllInfinity @>
                 exactly <@ fun (v : V3f) -> v.AllInfinity @>
                 exactly <@ fun (v : V4f) -> v.AllInfinity @>
