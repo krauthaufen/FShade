@@ -211,6 +211,11 @@ module ReflectionPatterns =
             | Enum -> Some ()
             | _ -> None
 
+    let (|VecMethod|_|) (mi : MethodInfo) =
+        match mi with
+        | Method(name, args) when mi.DeclaringType = typeof<Vec> -> Some (name, args)
+        | _ -> None
+
 [<AutoOpen>]
 module ExprExtensions =
 

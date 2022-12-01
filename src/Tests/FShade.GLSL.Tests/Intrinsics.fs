@@ -12,6 +12,7 @@ type Vertex =
         [<Color>] c : V4d
         foo : V4d
         what : V4i
+        whatu : V4ui
     }
 
 type UniformScope with
@@ -1033,6 +1034,239 @@ let ``Vector swizzles``() =
         }
 
     GLSL.shouldCompile [Effect.ofFunction shader]
+
+[<Test>]
+let ``Vector AnyEqual``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Vec.AnyEqual(v.c, v.c)
+            let _ = v.c.AnyEqual(v.c)
+            let _ = Vec.AnyEqual(v.c, 0.0)
+            let _ = Vec.AnyEqual(0.0, v.c)
+            let _ = Vec.anyEqual v.c v.c
+            let _ = Vec.anyEqual v.c 0.0
+            let _ = Vec.anyEqual 0.0 v.c
+
+            let _ = Vec.AnyEqual(v.what, v.what)
+            let _ = v.what.AnyEqual(v.what)
+            let _ = Vec.AnyEqual(v.what, 0)
+            let _ = Vec.AnyEqual(0, v.what)
+            let _ = Vec.anyEqual v.what v.what
+            let _ = Vec.anyEqual v.what 0
+            let _ = Vec.anyEqual 0 v.what
+
+            let _ = Vec.AnyEqual(v.whatu, v.whatu)
+            let _ = v.whatu.AnyEqual(v.whatu)
+            let _ = Vec.AnyEqual(v.whatu, 0u)
+            let _ = Vec.AnyEqual(0u, v.whatu)
+            let _ = Vec.anyEqual v.whatu v.whatu
+            let _ = Vec.anyEqual v.whatu 0u
+            let _ = Vec.anyEqual 0u v.whatu
+
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["equal"; "any"]
+
+[<Test>]
+let ``Vector AllEqual``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Vec.AllEqual(v.c, v.c)
+            let _ = v.c.AllEqual(v.c)
+            let _ = Vec.AllEqual(v.c, 0.0)
+            let _ = Vec.AllEqual(0.0, v.c)
+            let _ = Vec.allEqual v.c v.c
+            let _ = Vec.allEqual v.c 0.0
+            let _ = Vec.allEqual 0.0 v.c
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["=="]
+
+[<Test>]
+let ``Vector AnyDifferent``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Vec.AnyDifferent(v.c, v.c)
+            let _ = v.c.AnyDifferent(v.c)
+            let _ = Vec.AnyDifferent(v.c, 0.0)
+            let _ = Vec.AnyDifferent(0.0, v.c)
+            let _ = Vec.anyDifferent v.c v.c
+            let _ = Vec.anyDifferent v.c 0.0
+            let _ = Vec.anyDifferent 0.0 v.c
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["!="]
+
+[<Test>]
+let ``Vector AllDifferent``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Vec.AllDifferent(v.c, v.c)
+            let _ = v.c.AllDifferent(v.c)
+            let _ = Vec.AllDifferent(v.c, 0.0)
+            let _ = Vec.AllDifferent(0.0, v.c)
+            let _ = Vec.allDifferent v.c v.c
+            let _ = Vec.allDifferent v.c 0.0
+            let _ = Vec.allDifferent 0.0 v.c
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["all"; "notEqual"]
+
+[<Test>]
+let ``Vector AnySmaller``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Vec.AnySmaller(v.c, v.c)
+            let _ = v.c.AnySmaller(v.c)
+            let _ = Vec.AnySmaller(v.c, 0.0)
+            let _ = Vec.AnySmaller(0.0, v.c)
+            let _ = Vec.anySmaller v.c v.c
+            let _ = Vec.anySmaller v.c 0.0
+            let _ = Vec.anySmaller 0.0 v.c
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["any"; "lessThan"]
+
+[<Test>]
+let ``Vector AllSmaller``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Vec.AllSmaller(v.c, v.c)
+            let _ = v.c.AllSmaller(v.c)
+            let _ = Vec.AllSmaller(v.c, 0.0)
+            let _ = Vec.AllSmaller(0.0, v.c)
+            let _ = Vec.allSmaller v.c v.c
+            let _ = Vec.allSmaller v.c 0.0
+            let _ = Vec.allSmaller 0.0 v.c
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["all"; "lessThan"]
+
+[<Test>]
+let ``Vector AnySmallerOrEqual``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Vec.AnySmallerOrEqual(v.c, v.c)
+            let _ = v.c.AnySmallerOrEqual(v.c)
+            let _ = Vec.AnySmallerOrEqual(v.c, 0.0)
+            let _ = Vec.AnySmallerOrEqual(0.0, v.c)
+            let _ = Vec.anySmallerOrEqual v.c v.c
+            let _ = Vec.anySmallerOrEqual v.c 0.0
+            let _ = Vec.anySmallerOrEqual 0.0 v.c
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["any"; "lessThanEqual"]
+
+[<Test>]
+let ``Vector AllSmallerOrEqual``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Vec.AllSmallerOrEqual(v.c, v.c)
+            let _ = v.c.AllSmallerOrEqual(v.c)
+            let _ = Vec.AllSmallerOrEqual(v.c, 0.0)
+            let _ = Vec.AllSmallerOrEqual(0.0, v.c)
+            let _ = Vec.allSmallerOrEqual v.c v.c
+            let _ = Vec.allSmallerOrEqual v.c 0.0
+            let _ = Vec.allSmallerOrEqual 0.0 v.c
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["all"; "lessThanEqual"]
+
+[<Test>]
+let ``Vector AnyGreater``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Vec.AnyGreater(v.c, v.c)
+            let _ = v.c.AnyGreater(v.c)
+            let _ = Vec.AnyGreater(v.c, 0.0)
+            let _ = Vec.AnyGreater(0.0, v.c)
+            let _ = Vec.anyGreater v.c v.c
+            let _ = Vec.anyGreater v.c 0.0
+            let _ = Vec.anyGreater 0.0 v.c
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["any"; "greaterThan"]
+
+[<Test>]
+let ``Vector AllGreater``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Vec.AllGreater(v.c, v.c)
+            let _ = v.c.AllGreater(v.c)
+            let _ = Vec.AllGreater(v.c, 0.0)
+            let _ = Vec.AllGreater(0.0, v.c)
+            let _ = Vec.allGreater v.c v.c
+            let _ = Vec.allGreater v.c 0.0
+            let _ = Vec.allGreater 0.0 v.c
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["all"; "greaterThan"]
+
+[<Test>]
+let ``Vector AnyGreaterOrEqual``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Vec.AnyGreaterOrEqual(v.c, v.c)
+            let _ = v.c.AnyGreaterOrEqual(v.c)
+            let _ = Vec.AnyGreaterOrEqual(v.c, 0.0)
+            let _ = Vec.AnyGreaterOrEqual(0.0, v.c)
+            let _ = Vec.anyGreaterOrEqual v.c v.c
+            let _ = Vec.anyGreaterOrEqual v.c 0.0
+            let _ = Vec.anyGreaterOrEqual 0.0 v.c
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["any"; "greaterThanEqual"]
+
+[<Test>]
+let ``Vector AllGreaterOrEqual``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = Vec.AllGreaterOrEqual(v.c, v.c)
+            let _ = v.c.AllGreaterOrEqual(v.c)
+            let _ = Vec.AllGreaterOrEqual(v.c, 0.0)
+            let _ = Vec.AllGreaterOrEqual(0.0, v.c.XY)
+            let _ = Vec.allGreaterOrEqual v.c v.c
+            let _ = Vec.allGreaterOrEqual v.c 0.0
+            let _ = Vec.allGreaterOrEqual 0.0 v.c
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["all"; "greaterThanEqual"]
 
 [<Test>]
 let ``Vector AnyInfinity``() =

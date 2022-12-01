@@ -384,6 +384,16 @@ type CExpr =
     | CLeftShift of CType * CExpr * CExpr
     | CRightShift of CType * CExpr * CExpr
 
+    | CVecAnyEqual of CExpr * CExpr
+    | CVecAllNotEqual of CExpr * CExpr
+    | CVecAnyLess of CExpr * CExpr
+    | CVecAllLess of CExpr * CExpr
+    | CVecAnyLequal of CExpr * CExpr
+    | CVecAllLequal of CExpr * CExpr
+    | CVecAnyGreater of CExpr * CExpr
+    | CVecAllGreater of CExpr * CExpr
+    | CVecAnyGequal of CExpr * CExpr
+    | CVecAllGequal of CExpr * CExpr
 
     | CLess of CExpr * CExpr
     | CLequal of CExpr * CExpr
@@ -421,6 +431,12 @@ type CExpr =
             | CBitNot(t,_) -> t
             | CLeftShift(t,_,_) -> t
             | CRightShift(t,_,_) -> t
+
+            | CVecAnyLess _ | CVecAllLess _
+            | CVecAnyLequal _ | CVecAllLequal _
+            | CVecAnyGreater _ | CVecAllGreater _
+            | CVecAnyGequal _ | CVecAllGequal _
+            | CVecAnyEqual _ | CVecAllNotEqual _ -> CType.CBool
 
             | CLess _ | CLequal _ | CGreater _ | CGequal _ -> CType.CBool
             | CEqual _ | CNotEqual _ -> CType.CBool
@@ -590,6 +606,11 @@ module CExpr =
                 visit used m
                 visit used i
 
+            | CVecAnyEqual(l,r) | CVecAllNotEqual(l,r)
+            | CVecAnyLess(l,r) | CVecAllLess(l,r)
+            | CVecAnyLequal(l,r) | CVecAllLequal(l,r)
+            | CVecAnyGreater(l,r) | CVecAllGreater(l,r)
+            | CVecAnyGequal(l,r) | CVecAllGequal(l,r)
             | CAnd(l,r) | COr(l,r)
             | CLess(l,r) | CLequal(l,r) | CGreater(l,r) | CGequal(l,r) | CEqual(l,r) | CNotEqual(l,r) ->
                 used.AddType CType.CBool
