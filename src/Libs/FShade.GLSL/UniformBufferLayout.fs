@@ -494,7 +494,6 @@ module private Tools =
 [<CustomEquality; NoComparison>]
 type GLSLShaderInterface =
     {
-        program                      : GLSLProgramInterface
         shaderStage                  : ShaderStage
         shaderEntry                  : string
         shaderInputs                 : list<GLSLParameter>
@@ -823,8 +822,6 @@ module GLSLShaderInterface =
             ret = GLSLType.Void
         }
 
-
-    let inline program (i : GLSLShaderInterface) = i.program
     let inline stage (i : GLSLShaderInterface) = i.shaderStage
     let inline entry (i : GLSLShaderInterface) = i.shaderEntry
     let inline inputs (i : GLSLShaderInterface) = i.shaderInputs
@@ -1027,7 +1024,6 @@ module GLSLShaderInterface =
             |> MapExt.ofList
 
         {
-            program                      = Unchecked.defaultof<_>
             shaderStage                  = stage
             shaderEntry                  = entry
             shaderInputs                 = input
@@ -1308,22 +1304,6 @@ module GLSLProgramInterface =
                 MaxLod = maxLod
                 MinLod = minLod
                 MipLodBias = mipLodBias
-            }
-
-    module private Reflection =
-        open System.Reflection
-        open Aardvark.Base.IL
-
-        let setShaderParent : GLSLShaderInterface -> GLSLProgramInterface -> unit =
-            let tShader = typeof<GLSLShaderInterface>
-            let fParent = tShader.GetField("program@", System.Reflection.BindingFlags.NonPublic ||| System.Reflection.BindingFlags.Instance)
-            if isNull fParent then
-                failwith "[FShade] internal error: cannot get parent field for GLSLShaderInterface"
-            cil {
-                do! IL.ldarg 0
-                do! IL.ldarg 1
-                do! IL.stfld fParent
-                do! IL.ret
             }
 
     let internal serializeInternal (dst : BinaryWriter) (program : GLSLProgramInterface) =
@@ -1655,10 +1635,6 @@ module GLSLProgramInterface =
                 shaders = shaders
                 accelerationStructures = accelerationStructures
             }
-
-        for s in allShaders do 
-            Reflection.setShaderParent s result
-
 
         result
 

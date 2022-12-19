@@ -399,7 +399,6 @@ module Interface =
 
     let private emptyShader =
         {
-            program                         = Unchecked.defaultof<_>
             shaderStage                     = ShaderStage.Compute
             shaderEntry                     = ""
 
@@ -1954,25 +1953,6 @@ module Assembler =
             | CStructDef(name, fields) ->
                 let fields = fields |> List.map (fun (t, n) -> sprintf "%s %s;" (assembleType rev t).Name (glslName n).Name) |> String.concat "\r\n"
                 sprintf "struct %s\r\n{\r\n%s\r\n};" (glslName name).Name (String.indent fields)
-    
-    module private Reflection =
-        open System.Reflection
-        open Aardvark.Base.IL
-
-        let setShaderParent : GLSLShaderInterface -> GLSLProgramInterface -> unit =
-            let tShader = typeof<GLSLShaderInterface>
-            let fParent = tShader.GetField("program@", System.Reflection.BindingFlags.NonPublic ||| System.Reflection.BindingFlags.Instance)
-            if isNull fParent then
-                failwith "[FShade] internal error: cannot get parent field for GLSLShaderInterface"
-            cil {
-                do! IL.ldarg 0
-                do! IL.ldarg 1
-                do! IL.stfld fParent
-                do! IL.ret
-            }
-
-
-
 
     let assemble (backend : Backend) (m : CModule) =
         
@@ -2070,10 +2050,5 @@ module Assembler =
 
         let code = definitions.Run(&state) |> String.concat "\r\n\r\n"
         let iface = LayoutStd140.apply state.ifaceNew
-
-        // unsafely mutate the shader's parent
-        iface.shaders |> GLSLProgramShaders.iter (fun shader ->
-            Reflection.setShaderParent shader iface
-        )
 
         { code = code; iface = iface }
