@@ -133,7 +133,7 @@ let ``[Serializer] instance field get``() =
             return V4d(v.pos.X)
         }
 
-    bla |> roundtrip "ZKYVV9FXCKYqaTHYinvUeR4mpXM="
+    bla |> roundtrip "DCv1azx4RLpvpq2wjhVDMT8+Zns="
 
 [<Test>]
 let ``[Serializer] instance field set and get``() =
@@ -145,7 +145,7 @@ let ``[Serializer] instance field set and get``() =
             return res
         }
 
-    bla |> roundtrip "R7ppsFFGJn6+Ek0AEDhEUCpHMCs="
+    bla |> roundtrip "m6EfMsKRtQIaYL3oKes/a2lQoPg="
 
 type SomeFuncs() =
 
@@ -198,7 +198,7 @@ let ``[Serializer] reflected function``() =
             return V4d(SomeFuncs.Hehe v.pos, 0.0)
         }
 
-    bla |> roundtrip "53q9keXrHst6opl6uBYEOJaruVA="
+    bla |> roundtrip "HSV9Bs7pYBI7eCCVwRZqiRZ05tk="
 
 [<Test>]
 let ``[Serializer] reflected generic function``() =
@@ -208,7 +208,7 @@ let ``[Serializer] reflected generic function``() =
             return V4d(SomeFuncs.Hehe(v.pos.XYZ, 3) + SomeFuncs.Hehe(v.pos.XYZ, v.tc, 3), 0.0)
         }
 
-    bla |> roundtrip "/Gdj9LJ8I3E+Om7xSWyNsc/vBaA="
+    bla |> roundtrip "kXS5ZykIckcdE7Mo0n/iODYl0W8="
 
 [<Test>]
 let ``[Serializer] static call``() =
@@ -218,7 +218,7 @@ let ``[Serializer] static call``() =
             return V4d(SomeFuncs.Haha v.pos, 0.0)
         }
 
-    bla |> roundtrip "EyFZGQY69k9P1/t0WIoHM51F0NI="
+    bla |> roundtrip "j/im0yqw4G9YnJV5Xa8vRKpaFh4="
 
 [<Test>]
 let ``[Serializer] static generic call``() =
@@ -228,7 +228,7 @@ let ``[Serializer] static generic call``() =
             return V4d(SomeFuncs.Haha(v.pos.XYZ, 3) + SomeFuncs.Haha(v.pos.XYZ, v.tc, 3), 0.0)
         }
 
-    bla |> roundtrip "T/SgCTOXRbXVL23mPYu5m2VKOq4="
+    bla |> roundtrip "jZHIIvwGiXBWGX2/rkBc645hXPA="
 
 [<Test>]
 let ``[Serializer] instance call``() =
@@ -239,7 +239,7 @@ let ``[Serializer] instance call``() =
             return V4d(funcs.Hihi v.pos, 0.0)
         }
 
-    bla |> roundtrip "RnGvWDgPOPyruyzqDfwDhDhc1k8="
+    bla |> roundtrip "LdQZKI0BV19HadpFKBz48vOFS7Q="
 
 [<Test>]
 let ``[Serializer] instance generic call``() =
@@ -250,7 +250,7 @@ let ``[Serializer] instance generic call``() =
             return V4d(funcs.Hihi(v.pos.XYZ, 3) + funcs.Hihi(v.pos.XYZ, v.tc, 3), 0.0)
         }
 
-    bla |> roundtrip "bO0+aiV6RH0aFhjETLoUjIrUPYY="
+    bla |> roundtrip "yr+7sLte0QF1u77SC8tSXa+R6hU="
 
 
 [<Test>]
@@ -311,6 +311,8 @@ let ``[Hashing] intrinsic hashes on target-function``() =
     e1.Id |> should equal e2.Id
 
 
+// Note: Hashes depend on assembly version
+// -> unit tests containing hard coded hashes must be fixed for each new major version
 [<Test>]
 let ``[Hashing] deterministic uniforms``() =
     let subScopes = [ "Bla"; "Blurg"; "Blubber" ].RandomOrder() |> Seq.toList
@@ -318,7 +320,7 @@ let ``[Hashing] deterministic uniforms``() =
 
     let e1 = Effect.ofFunction Shader6.shader
 
-    e1.Id |> should equal "WwnIq7ZKhwyUc8NOsxHgGVoDeVg="
+    e1.Id |> should equal "0lhtS6x7oVav/FgQUaj9lVV6Djs="
 
 
 [<Test>]
