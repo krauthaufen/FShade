@@ -2009,55 +2009,64 @@ module Assembler =
 
         let mutable state = AssemblerState.ofConfig c
 
-        match m.cuserData with  
-            | :? Effect as e ->
-                state <- 
-                    { state with 
-                        textureInfos =
-                            e.Uniforms |> Map.choose (fun name p ->
-                                match p.uniformValue with
-                                    | UniformValue.Sampler(name, s) -> Some [name, s]
-                                    | UniformValue.SamplerArray arr -> Some (Array.toList arr)
-                                    | _ -> None
-                            )
-                    }
+        match m.cuserData with
+        | :? (obj * EffectInputLayout) as (_, layout) ->
+            state <-
+                { state with
+                    textureInfos =
+                        layout.Uniforms |> MapExt.map (fun _ u -> u.Textures)
+                        |> MapExt.toList
+                        |> Map.ofList
+                }
 
-            | :? RaytracingEffect as e ->
-                state <-
-                    { state with 
-                        textureInfos =
-                            e.Uniforms |> Map.choose (fun name p ->
-                                match p.uniformValue with
-                                    | UniformValue.Sampler(name, s) -> Some [name, s]
-                                    | UniformValue.SamplerArray arr -> Some (Array.toList arr)
-                                    | _ -> None
-                            )
-                    }
+        | :? Effect as e ->
+            state <- 
+                { state with 
+                    textureInfos =
+                        e.Uniforms |> Map.choose (fun name p ->
+                            match p.uniformValue with
+                            | UniformValue.Sampler(name, s) -> Some [name, s]
+                            | UniformValue.SamplerArray arr -> Some (Array.toList arr)
+                            | _ -> None
+                        )
+                }
 
-            | :? ComputeShader as c ->
-                let res = 
-                    c.csSamplerStates |> Map.toList |> List.map (fun ((samName,index), state) ->
-                        let texName =
-                            match Map.tryFind (samName,index) c.csTextureNames with
-                                | Some name -> name
-                                | None -> samName
+        | :? RaytracingEffect as e ->
+            state <-
+                { state with 
+                    textureInfos =
+                        e.Uniforms |> Map.choose (fun name p ->
+                            match p.uniformValue with
+                            | UniformValue.Sampler(name, s) -> Some [name, s]
+                            | UniformValue.SamplerArray arr -> Some (Array.toList arr)
+                            | _ -> None
+                        )
+                }
+
+        | :? ComputeShader as c ->
+            let res = 
+                c.csSamplerStates |> Map.toList |> List.map (fun ((samName,index), state) ->
+                    let texName =
+                        match Map.tryFind (samName,index) c.csTextureNames with
+                        | Some name -> name
+                        | None -> samName
                                 
-                        (samName, (index, texName, state))
-                    )
-                    |> List.groupBy fst
-                    |> List.map (fun (samName, elements) ->
-                        let elems = 
-                            elements
-                            |> List.sortBy (fun (_,(i,_,_)) -> i)
-                            |> List.map (fun (_,(_,n,s)) -> n,s)
-                        samName, elems
-                    )
-                    |> Map.ofList
+                    (samName, (index, texName, state))
+                )
+                |> List.groupBy fst
+                |> List.map (fun (samName, elements) ->
+                    let elems = 
+                        elements
+                        |> List.sortBy (fun (_,(i,_,_)) -> i)
+                        |> List.map (fun (_,(_,n,s)) -> n,s)
+                    samName, elems
+                )
+                |> Map.ofList
 
-                state <- { state with textureInfos = res }
+            state <- { state with textureInfos = res }
                 
-            | _ ->
-                ()
+        | _ ->
+            ()
 
         let code = definitions.Run(&state) |> String.concat "\r\n\r\n"
         let iface = LayoutStd140.apply state.ifaceNew
