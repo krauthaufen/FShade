@@ -1086,6 +1086,56 @@ module Assembler =
                     let! r = assembleExprS r
                     return sprintf "(%s >> %s)" l r
 
+                | CVecAnyEqual(l, r) ->
+                    let! l = assembleExprS l
+                    let! r = assembleExprS r
+                    return sprintf "any(equal(%s, %s))" l r
+
+                | CVecAllNotEqual(l, r) ->
+                    let! l = assembleExprS l
+                    let! r = assembleExprS r
+                    return sprintf "all(notEqual(%s, %s))" l r
+
+                | CVecAnyLess(l, r) ->
+                    let! l = assembleExprS l
+                    let! r = assembleExprS r
+                    return sprintf "any(lessThan(%s, %s))" l r
+
+                | CVecAllLess(l, r) ->
+                    let! l = assembleExprS l
+                    let! r = assembleExprS r
+                    return sprintf "all(lessThan(%s, %s))" l r
+
+                | CVecAnyLequal(l, r) ->
+                    let! l = assembleExprS l
+                    let! r = assembleExprS r
+                    return sprintf "any(lessThanEqual(%s, %s))" l r
+
+                | CVecAllLequal(l, r) ->
+                    let! l = assembleExprS l
+                    let! r = assembleExprS r
+                    return sprintf "all(lessThanEqual(%s, %s))" l r
+
+                | CVecAnyGreater(l, r) ->
+                    let! l = assembleExprS l
+                    let! r = assembleExprS r
+                    return sprintf "any(greaterThan(%s, %s))" l r
+
+                | CVecAllGreater(l, r) ->
+                    let! l = assembleExprS l
+                    let! r = assembleExprS r
+                    return sprintf "all(greaterThan(%s, %s))" l r
+
+                | CVecAnyGequal(l, r) ->
+                    let! l = assembleExprS l
+                    let! r = assembleExprS r
+                    return sprintf "any(greaterThanEqual(%s, %s))" l r
+
+                | CVecAllGequal(l, r) ->
+                    let! l = assembleExprS l
+                    let! r = assembleExprS r
+                    return sprintf "all(greaterThanEqual(%s, %s))" l r
+
                 | CLess(l, r) ->
                     let! l = assembleExprS l
                     let! r = assembleExprS r

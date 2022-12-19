@@ -1080,6 +1080,13 @@ module Assembler =
 
                     return id
 
+                | CVecAnyLess(l, r) | CVecAllLess(l, r)
+                | CVecAnyLequal(l, r) | CVecAllLequal(l, r)
+                | CVecAnyGreater(l, r) | CVecAllGreater(l, r)
+                | CVecAnyGequal(l, r) | CVecAllGequal(l, r)
+                | CVecAnyEqual(l, r) | CVecAllNotEqual(l, r) ->
+                    return failwith "not implemented"
+
                 | CLess(l, r) -> 
                     let! lid = assembleExpr l
                     let! rid = assembleExpr r
