@@ -595,8 +595,7 @@ module Compiler =
                 | (MethodQuote <@ Vec.x : V4d -> float @> _ ), [v] -> CVecSwizzle(ct, v, CVecComponent.x) |> Some
                 | (MethodQuote <@ Vec.y : V4d -> float @> _ ), [v] -> CVecSwizzle(ct, v, CVecComponent.y) |> Some
                 | (MethodQuote <@ Vec.z : V4d -> float @> _ ), [v] -> CVecSwizzle(ct, v, CVecComponent.z) |> Some
-                // TODO: Uncomment for Aardvark.Base >= 5.2.17
-                //| (MethodQuote <@ Vec.w : V4d -> float @> _ ), [v] -> CVecSwizzle(ct, v, CVecComponent.w) |> Some
+                | (MethodQuote <@ Vec.w : V4d -> float @> _ ), [v] -> CVecSwizzle(ct, v, CVecComponent.w) |> Some
                 | (MethodQuote <@ Vec.xy : V4d -> V2d @> _ ), [v] -> CVecSwizzle(ct, v, CVecComponent.xy) |> Some
                 | (MethodQuote <@ Vec.yz : V4d -> V2d @> _), [v] -> CVecSwizzle(ct, v, CVecComponent.yz) |> Some
                 | (MethodQuote <@ Vec.zw : V4d -> V2d @> _), [v] -> CVecSwizzle(ct, v, CVecComponent.zw) |> Some
