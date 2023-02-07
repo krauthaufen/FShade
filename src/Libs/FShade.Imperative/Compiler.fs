@@ -455,7 +455,9 @@ module Compiler =
                 // length
                 | MethodQuote <@ Vec.length : V4d -> float @> _, [v]
                 | Method("Length", [VectorOf _]), [v]
-                | Method("get_Length", [VectorOf _]), [v] ->
+                | Method("Norm2", [VectorOf _]), [v]
+                | Method("get_Length", [VectorOf _]), [v]
+                | Method("get_Norm2", [VectorOf _]), [v] ->
                     CVecLength(ct, v) |> Some
 
                 | Method("get_Length", [ArrOf(l,_)]), [a] ->
