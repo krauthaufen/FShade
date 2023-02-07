@@ -710,6 +710,28 @@ let ``Length``() =
             let _ = Vec.Length v.what
             let _ = Vec.Length v.what.XYZ
             let _ = Vec.Length v.what.XY
+
+            let _ = v.c.Length
+            let _ = v.c.XYZ.Length
+            let _ = v.c.XY.Length
+            let _ = v.what.Length
+            let _ = v.what.XYZ.Length
+            let _ = v.what.XY.Length
+
+            let _ = v.c.Norm2
+            let _ = v.c.XYZ.Norm2
+            let _ = v.c.XY.Norm2
+            let _ = v.what.Norm2
+            let _ = v.what.XYZ.Norm2
+            let _ = v.what.XY.Norm2
+
+            let _ = Vec.Norm2 v.c
+            let _ = Vec.Norm2 v.c.XYZ
+            let _ = Vec.Norm2 v.c.XY
+            let _ = Vec.Norm2 v.what
+            let _ = Vec.Norm2 v.what.XYZ
+            let _ = Vec.Norm2 v.what.XY
+
             return v.pos
         }
 
