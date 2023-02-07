@@ -474,6 +474,14 @@ module Preprocessor =
             | _ ->
                 None
 
+        let (|DistanceSquared|_|) (e : Expr) =
+            match e with
+            | Call(_, MethodQuote <@ Vec.distanceSquared : V4d -> V4d -> float @> _, [VectorExpr (a, _, _); VectorExpr (b, _, _)])
+            | Call(_, Method("DistanceSquared", _), [VectorExpr (a, _, _); VectorExpr (b, _, _)]) ->
+                Some (a, b)
+            | _ ->
+                None
+
         let (|MinMaxElement|_|) (e : Expr) =
             match e with
             | Call(_, Method("MinElement", _), [VectorExpr (v, d, ft)])
@@ -882,6 +890,7 @@ module Preprocessor =
 
     module private MethodInfo =
 
+        let op_addition    = getMethodInfo <@ (+) : float -> float -> float @>
         let op_subtraction = getMethodInfo <@ (-) : float -> float -> float @>
         let op_division    = getMethodInfo <@ (/) : float -> float -> float @>
         let op_logicalAnd  = getMethodInfo <@ (&&) : bool -> bool -> bool @>
@@ -912,6 +921,15 @@ module Preprocessor =
             | _ -> None
 
         type Expr with
+            static member Addition(a : Expr, b : Expr) =
+                match a, b with
+                | TensorOp t ->
+                    let mi = t.GetMethod("op_Addition", [| a.Type; b.Type |])
+                    Expr.Call(mi, [a; b])
+                | _ ->
+                    let mi = MethodInfo.op_addition.MakeGenericMethod(a.Type, b.Type, b.Type)
+                    Expr.Call(mi, [a; b])
+
             static member Subtract(a : Expr, b : Expr) =
                 match a, b with
                 | TensorOp t ->
@@ -1266,6 +1284,16 @@ module Preprocessor =
                 return Expr.Let(tmp, v,
                     Expr.Call(dot, [Expr.Var tmp; Expr.Var tmp])
                 )
+
+            | DistanceSquared (a, b) ->
+                let lengthSquared = typeof<Vec>.GetMethod("LengthSquared", [| a.Type |])
+
+                let expr =
+                    Expr.Call(lengthSquared, [
+                        Expr.Subtract(a, b)
+                    ])
+
+                return! preprocessNormalS expr
 
             | MinMaxElement(v, name, fieldType, fields) ->
                 let mi = typeof<Fun>.GetMethod(name, [| fieldType; fieldType |])
