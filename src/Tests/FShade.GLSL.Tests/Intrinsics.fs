@@ -23,6 +23,10 @@ let getVec() =
     V4d(uniform.SomeUniform, 1.0)
 
 [<ReflectedDefinition>]
+let getVeci() =
+    V4i(V3i uniform.SomeUniform, 1)
+
+[<ReflectedDefinition>]
 let assertV2d (v : V2d) = v
 
 [<ReflectedDefinition>]
@@ -30,6 +34,12 @@ let assertV3d (v : V3d) = v
 
 [<ReflectedDefinition>]
 let assertV4d (v : V4d) = v
+
+[<ReflectedDefinition>]
+let assertDbl (d : float) = d
+
+[<ReflectedDefinition>]
+let assertInt (i : int) = i
 
 [<Test>]
 let ``Matrix constructors``() =
@@ -743,21 +753,21 @@ let ``LengthSquared``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Vec.lengthSquared v.c
-            let _ = Vec.LengthSquared v.c
-            let _ = Vec.LengthSquared v.c.XYZ
-            let _ = Vec.LengthSquared v.c.XY
-            let _ = Vec.LengthSquared v.what
-            let _ = Vec.LengthSquared v.what.XYZ
-            let _ = Vec.LengthSquared v.what.XY
+            let _ = assertDbl <| Vec.lengthSquared v.c
+            let _ = assertDbl <| Vec.LengthSquared v.c
+            let _ = assertDbl <| Vec.LengthSquared v.c.XYZ
+            let _ = assertDbl <| Vec.LengthSquared v.c.XY
+            let _ = assertDbl <| Vec.LengthSquared v.what
+            let _ = assertDbl <| Vec.LengthSquared v.what.XYZ
+            let _ = assertDbl <| Vec.LengthSquared v.what.XY
 
-            let _ = Vec.lengthSquared <| getVec()
-            let _ = Vec.LengthSquared(getVec())
-            let _ = Vec.LengthSquared(getVec().XYZ)
-            let _ = Vec.LengthSquared(getVec().XY)
-            let _ = getVec().LengthSquared
-            let _ = getVec().XYZ.LengthSquared
-            let _ = getVec().XY.LengthSquared
+            let _ = assertDbl <| Vec.lengthSquared (getVec())
+            let _ = assertDbl <| Vec.LengthSquared(getVec())
+            let _ = assertDbl <| Vec.LengthSquared(getVec().XYZ)
+            let _ = assertDbl <| Vec.LengthSquared(getVec().XY)
+            let _ = assertDbl <| getVec().LengthSquared
+            let _ = assertDbl <| getVec().XYZ.LengthSquared
+            let _ = assertDbl <| getVec().XY.LengthSquared
 
             return v.pos
         }
@@ -770,18 +780,18 @@ let ``DistanceSquared``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Vec.distanceSquared v.c v.c
-            let _ = Vec.DistanceSquared(v.c, v.c)
-            let _ = Vec.DistanceSquared(v.c.XYZ, v.c.XYZ)
-            let _ = Vec.DistanceSquared(v.c.XY, v.c.XY)
-            let _ = Vec.DistanceSquared(v.what, v.what)
-            let _ = Vec.DistanceSquared(v.what.XYZ, v.what.XYZ)
-            let _ = Vec.DistanceSquared(v.what.XY, v.what.XY)
+            let _ = assertDbl <| Vec.distanceSquared v.c v.c
+            let _ = assertDbl <| Vec.DistanceSquared(v.c, v.c)
+            let _ = assertDbl <| Vec.DistanceSquared(v.c.XYZ, v.c.XYZ)
+            let _ = assertDbl <| Vec.DistanceSquared(v.c.XY, v.c.XY)
+            let _ = assertInt <| Vec.DistanceSquared(v.what, v.what)
+            let _ = assertInt <| Vec.DistanceSquared(v.what.XYZ, v.what.XYZ)
+            let _ = assertInt <| Vec.DistanceSquared(v.what.XY, v.what.XY)
 
-            let _ = Vec.distanceSquared (getVec()) (getVec())
-            let _ = Vec.DistanceSquared(getVec(), getVec())
-            let _ = Vec.DistanceSquared(getVec().XYZ, getVec().XYZ)
-            let _ = Vec.DistanceSquared(getVec().XY, getVec().XY)
+            let _ = assertDbl <| Vec.distanceSquared (getVec()) (getVec())
+            let _ = assertDbl <| Vec.DistanceSquared(getVec(), getVec())
+            let _ = assertDbl <| Vec.DistanceSquared(getVec().XYZ, getVec().XYZ)
+            let _ = assertDbl <| Vec.DistanceSquared(getVec().XY, getVec().XY)
 
             return v.pos
         }
@@ -809,17 +819,29 @@ let ``Dot``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Vec.dot v.c v.c
-            let _ = Vec.Dot(v.c, v.c)
-            let _ = Vec.Dot(v.c.XYZ, v.c.XYZ)
-            let _ = Vec.Dot(v.c.XY, v.c.XY)
-            let _ = Vec.Dot(v.what, v.what)
-            let _ = Vec.Dot(v.what.XYZ, v.what.XYZ)
-            let _ = Vec.Dot(v.what.XY, v.what.XY)
+            let _ = assertDbl <| Vec.dot v.c v.c
+            let _ = assertDbl <| Vec.Dot(v.c, v.c)
+            let _ = assertDbl <| Vec.Dot(v.c.XYZ, v.c.XYZ)
+            let _ = assertDbl <| Vec.Dot(v.c.XY, v.c.XY)
             return v.pos
         }
 
     GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["dot"]
+
+[<Test>]
+let ``Dot (int)``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = assertInt <| Vec.dot (getVeci()) v.what
+            let _ = assertInt <| Vec.Dot(getVeci(), v.what)
+            let _ = assertInt <| Vec.Dot(getVeci().XYZ, v.what.XYZ)
+            let _ = assertInt <| Vec.Dot(getVeci().XY, v.what.XY)
+            return v.pos
+        }
+
+    GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader] ["getVeci", 5; "\*", 13]
 
 [<Test>]
 let ``Cross``() =
