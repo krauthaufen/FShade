@@ -465,6 +465,14 @@ module Preprocessor =
             | _ ->
                 None
 
+        let (|DotInt|_|) (e : Expr) =
+            match e with
+            | Call(_, MethodQuote <@ Vec.dot : V4d -> V4d -> float @> _, [VectorExpr (a, d, Integral); VectorExpr (b, _, _)])
+            | Call(_, Method("Dot", _), [VectorExpr (a, d, Integral); VectorExpr (b, _, _)]) ->
+                Some (a, b, vectorFields |> List.take d)
+            | _ ->
+                None
+
         let (|LengthSquared|_|) (e : Expr) =
             match e with
             | Call(_, MethodQuote <@ Vec.lengthSquared : V4d -> float @> _, [VectorExpr (v, d, ft)])
@@ -476,8 +484,8 @@ module Preprocessor =
 
         let (|DistanceSquared|_|) (e : Expr) =
             match e with
-            | Call(_, MethodQuote <@ Vec.distanceSquared : V4d -> V4d -> float @> _, [VectorExpr (a, _, _); VectorExpr (b, _, _)])
-            | Call(_, Method("DistanceSquared", _), [VectorExpr (a, _, _); VectorExpr (b, _, _)]) ->
+            | Call(_, MethodQuote <@ Vec.distanceSquared : V4d -> V4d -> float @> _, [VectorExpr (a, _, aft); VectorExpr (b, _, bft)])
+            | Call(_, Method("DistanceSquared", _), [VectorExpr (a, _, aft); VectorExpr (b, _, bft)]) when aft = bft ->
                 Some (a, b)
             | _ ->
                 None
@@ -892,6 +900,7 @@ module Preprocessor =
 
         let op_addition    = getMethodInfo <@ (+) : float -> float -> float @>
         let op_subtraction = getMethodInfo <@ (-) : float -> float -> float @>
+        let op_multiply    = getMethodInfo <@ (*) : float -> float -> float @>
         let op_division    = getMethodInfo <@ (/) : float -> float -> float @>
         let op_logicalAnd  = getMethodInfo <@ (&&) : bool -> bool -> bool @>
         let op_logicalOr   = getMethodInfo <@ (||) : bool -> bool -> bool @>
@@ -921,7 +930,7 @@ module Preprocessor =
             | _ -> None
 
         type Expr with
-            static member Addition(a : Expr, b : Expr) =
+            static member Add(a : Expr, b : Expr) =
                 match a, b with
                 | TensorOp t ->
                     let mi = t.GetMethod("op_Addition", [| a.Type; b.Type |])
@@ -937,6 +946,15 @@ module Preprocessor =
                     Expr.Call(mi, [a; b])
                 | _ ->
                     let mi = MethodInfo.op_subtraction.MakeGenericMethod(a.Type, b.Type, b.Type)
+                    Expr.Call(mi, [a; b])
+
+            static member Multiply(a : Expr, b : Expr) =
+                match a, b with
+                | TensorOp t ->
+                    let mi = t.GetMethod("op_Multiply", [| a.Type; b.Type |])
+                    Expr.Call(mi, [a; b])
+                | _ ->
+                    let mi = MethodInfo.op_multiply.MakeGenericMethod(a.Type, b.Type, b.Type)
                     Expr.Call(mi, [a; b])
 
             static member Division(a : Expr, b : Expr) =
@@ -1276,22 +1294,44 @@ module Preprocessor =
                         )
                     )
 
+            // GLSL dot always returns floating point...
+            | DotInt (a, b, fields) ->
+                let ta = Var("ta", a.Type)
+                let tb = Var("tb", b.Type)
+
+                let expr =
+                    fields |> List.map (fun f ->
+                        Expr.Multiply(
+                            Expr.FieldGet(Expr.Var ta, a.Type.GetField f),
+                            Expr.FieldGet(Expr.Var tb, b.Type.GetField f)
+                        )
+                    )
+                    |> List.reduce (fun x y -> Expr.Add(x, y))
+
+                let! a = preprocessNormalS a
+                let! b = preprocessNormalS b
+                return Expr.Let(ta, a, Expr.Let(tb, b, expr))
+
             | LengthSquared v ->
                 let dot = typeof<Vec>.GetMethod("Dot", [| v.Type; v.Type |])
 
                 let tmp = Var("tmp", v.Type)
                 let! v = preprocessNormalS v
                 return Expr.Let(tmp, v,
-                    Expr.Call(dot, [Expr.Var tmp; Expr.Var tmp])
+                    Expr.ToFloat(
+                        Expr.Call(dot, [Expr.Var tmp; Expr.Var tmp])
+                    )
                 )
 
             | DistanceSquared (a, b) ->
-                let lengthSquared = typeof<Vec>.GetMethod("LengthSquared", [| a.Type |])
+                let dot = typeof<Vec>.GetMethod("Dot", [| a.Type; a.Type |])
 
+                let tmp = Var("tmp", a.Type)
                 let expr =
-                    Expr.Call(lengthSquared, [
-                        Expr.Subtract(a, b)
-                    ])
+                    Expr.Let(tmp,
+                        Expr.Subtract(a, b),
+                        Expr.Call(dot, [Expr.Var tmp; Expr.Var tmp])
+                    )
 
                 return! preprocessNormalS expr
 
