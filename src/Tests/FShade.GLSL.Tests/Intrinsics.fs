@@ -799,6 +799,32 @@ let ``DistanceSquared``() =
     GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader] ["getVec", 9]
 
 [<Test>]
+let ``Distance1``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = assertDbl <| Vec.Distance1(v.c, v.c)
+            let _ = assertDbl <| Vec.Distance1(v.c.XYZ, v.c.XYZ)
+            let _ = assertDbl <| Vec.Distance1(v.c.XY, v.c.XY)
+            let _ = assertInt <| Vec.Distance1(v.what, v.what)
+            let _ = assertInt <| Vec.Distance1(v.what.XYZ, v.what.XYZ)
+            let _ = assertInt <| Vec.Distance1(v.what.XY, v.what.XY)
+
+            let _ = assertDbl <| Vec.Distance1(getVec(), getVec())
+            let _ = assertDbl <| Vec.Distance1(getVec().XYZ, getVec().XYZ)
+            let _ = assertDbl <| Vec.Distance1(getVec().XY, getVec().XY)
+
+            return v.pos
+        }
+
+    GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader]
+        [
+            "getVec", 7
+            "\(\(tmp[0-9]*\.x \+ tmp[0-9]*\.y\) \+ tmp[0-9]*\.z\) \+ tmp[0-9]*\.w\)", 3
+        ]
+
+[<Test>]
 let ``Reflect / refract``() =
     Setup.Run()
 

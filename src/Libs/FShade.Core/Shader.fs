@@ -490,6 +490,13 @@ module Preprocessor =
             | _ ->
                 None
 
+        let (|Distance1|_|) (e : Expr) =
+            match e with
+            | Call(_, Method("Distance1", _), [VectorExpr (a, d, aft); VectorExpr (b, _, bft)]) when aft = bft ->
+                Some (a, b, vectorFields |> List.take d)
+            | _ ->
+                None
+
         let (|MinMaxElement|_|) (e : Expr) =
             match e with
             | Call(_, Method("MinElement", _), [VectorExpr (v, d, ft)])
@@ -1335,13 +1342,23 @@ module Preprocessor =
 
                 return! preprocessNormalS expr
 
+            | Distance1 (a, b, fields) ->
+                let abs = typeof<Fun>.GetMethod("Abs", [| a.Type |])
+
+                let tmp = Var("tmp", a.Type)
+
+                let sumExpr =
+                    fields |> List.map (fun f ->
+                        Expr.FieldGet(Expr.Var tmp, a.Type.GetField f)
+                    )
+                    |> List.reduce (fun x y -> Expr.Add(x, y))
+
+                let! a = preprocessNormalS a
+                let! b = preprocessNormalS b
+                return Expr.Let(tmp, Expr.Call(abs, [Expr.Subtract(a, b)]), sumExpr)
+
             | MinMaxElement(v, name, fieldType, fields) ->
                 let mi = typeof<Fun>.GetMethod(name, [| fieldType; fieldType |])
-
-                let rec getMinMaxExpr = function
-                    | a::b::tail -> getMinMaxExpr (Expr.Call(mi, [a; b])::tail)
-                    | [e] -> e
-                    | _ -> failwith "[FShade] Encountered min / max element call without arguments"
 
                 let tmp = Var("tmp", v.Type)
 
@@ -1350,7 +1367,7 @@ module Preprocessor =
                     |> List.map (fun f ->
                         Expr.FieldGet(Expr.Var tmp, v.Type.GetField f)
                     )
-                    |> getMinMaxExpr
+                    |> List.reduce (fun a b -> Expr.Call(mi, [a; b]))
 
                 let! v = preprocessNormalS v
                 return Expr.Let(tmp, v, minMaxExpr)
