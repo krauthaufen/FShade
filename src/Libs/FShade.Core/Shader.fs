@@ -497,6 +497,15 @@ module Preprocessor =
             | _ ->
                 None
 
+        let (|DistanceMinMax|_|) (e : Expr) =
+            match e with
+            | Call(_, Method("DistanceMin", _), [VectorExpr (a, d, aft); VectorExpr (b, _, bft)]) when aft = bft ->
+                Some (a, b, "Min")
+            | Call(_, Method("DistanceMax", _), [VectorExpr (a, d, aft); VectorExpr (b, _, bft)]) when aft = bft ->
+                Some (a, b, "Max")
+            | _ ->
+                None
+
         let (|MinMaxElement|_|) (e : Expr) =
             match e with
             | Call(_, Method("MinElement", _), [VectorExpr (v, d, ft)])
@@ -1356,6 +1365,17 @@ module Preprocessor =
                 let! a = preprocessNormalS a
                 let! b = preprocessNormalS b
                 return Expr.Let(tmp, Expr.Call(abs, [Expr.Subtract(a, b)]), sumExpr)
+
+            | DistanceMinMax (a, b, name) ->
+                let abs = typeof<Fun>.GetMethod("Abs", [| a.Type |])
+                let minMax = typeof<Vec>.GetMethod(name + "Element", [| a.Type |])
+
+                let expr =
+                    Expr.Call(minMax, [
+                        Expr.Call(abs, [Expr.Subtract(a, b)])
+                    ])
+
+                return! preprocessNormalS expr
 
             | MinMaxElement(v, name, fieldType, fields) ->
                 let mi = typeof<Fun>.GetMethod(name, [| fieldType; fieldType |])
