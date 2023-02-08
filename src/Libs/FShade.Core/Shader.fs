@@ -506,6 +506,23 @@ module Preprocessor =
             | _ ->
                 None
 
+        let (|Norm|_|) (e : Expr) =
+            match e with
+            | Call(_, Method("Norm1", _), [VectorExpr (v, _, _)])
+            | PropertyGet(Some (VectorExpr (v, _, _)), Property "Norm1", _) ->
+                Some (v, "1")
+
+            | Call(_, Method("NormMin", _), [VectorExpr (v, _, _)])
+            | PropertyGet(Some (VectorExpr (v, _, _)), Property "NormMin", _) ->
+                Some (v, "Min")
+
+            | Call(_, Method("NormMax", _), [VectorExpr (v, _, _)])
+            | PropertyGet(Some (VectorExpr (v, _, _)), Property "NormMax", _) ->
+                Some (v, "Max")
+
+            | _ ->
+                None
+
         let (|MinMaxElement|_|) (e : Expr) =
             match e with
             | Call(_, Method("MinElement", _), [VectorExpr (v, d, ft)])
@@ -1374,6 +1391,18 @@ module Preprocessor =
                     Expr.Call(minMax, [
                         Expr.Call(abs, [Expr.Subtract(a, b)])
                     ])
+
+                return! preprocessNormalS expr
+
+            | Norm (v, name) ->
+                let expr =
+                    if name = "Min" || name = "Max" then
+                        let abs = typeof<Fun>.GetMethod("Abs", [| v.Type |])
+                        let minMax = typeof<Vec>.GetMethod(name + "Element", [| v.Type |])
+                        Expr.Call(minMax, [Expr.Call(abs, [v])])
+                    else
+                        let dist = typeof<Vec>.GetMethod("Distance" + name, [| v.Type; v.Type |])
+                        Expr.Call(dist, [v; Expr.Zero v.Type])
 
                 return! preprocessNormalS expr
 
