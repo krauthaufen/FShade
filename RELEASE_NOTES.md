@@ -1,3 +1,12 @@
+### 5.3.4
+* Added intrinsics for dynamically accessing matrix rows and columns (matrix.Row() / matrix.Column())
+* Added intrinsics for dynamically accessing matrix elements (matrix.[x, y])
+* Added missing intrinsics for special floating point checks (NaN, +-infinity)
+* Added missing intrinsics for vector swizzles in Vec module
+* Added and improved intrinsics for vector and matrix relations (AllEqual, AllDifferent, ...)
+* Added intrinsics for DistanceSquared, Distance1, DistanceMin, DistanceMax, Norm1, Norm2, NormMin, NormMax
+* Fixed return type for dot product of integer vectors
+
 ### 5.3.3
 * Fixed issue with deserialization of raytracing interfaces
 
