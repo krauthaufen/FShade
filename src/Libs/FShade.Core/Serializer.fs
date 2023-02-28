@@ -393,6 +393,10 @@ module Serializer =
             | :? V3d as o -> dst.Write o.X; dst.Write o.Y; dst.Write o.Z
             | :? V4d as o -> dst.Write o.X; dst.Write o.Y; dst.Write o.Z; dst.Write o.W
 
+            | :? ISemanticValue as sem ->
+                sem.Scope |> serialize dst typeof<UniformScope>
+                sem.Semantic |> serialize dst typeof<string>
+
             | :? UniformScope as o ->
                 let rec all (acc : list<string>) (u : UniformScope) =
                     match u.Parent with

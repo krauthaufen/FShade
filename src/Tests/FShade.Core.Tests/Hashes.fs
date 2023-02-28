@@ -301,6 +301,34 @@ let ``[Hashing] SamplerState hash is structural``() =
 
     e1.Id |> should equal e2.Id
 
+module SamplerShader =
+    let private sampler =
+        sampler2d {
+            texture uniform?texture
+        }
+
+    let shader (v : Vertex) =
+        fragment {
+            return sampler.Sample(v.tc)
+        }
+
+module SamplerShader2 =
+    let private sampler =
+        sampler2d {
+            texture uniform?texture2
+        }
+
+    let shader (v : Vertex) =
+        fragment {
+            return sampler.Sample(v.tc)
+        }
+
+[<Test>]
+let ``[Hashing] sampler includes texture name``() =
+    let e1 = Effect.ofFunction SamplerShader.shader
+    let e2 = Effect.ofFunction SamplerShader2.shader
+
+    e1.Id |> should not' (equal e2.Id)
 
 [<Test>]
 let ``[Hashing] intrinsic hashes on target-function``() =
