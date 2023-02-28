@@ -799,6 +799,108 @@ let ``DistanceSquared``() =
     GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader] ["getVec", 9]
 
 [<Test>]
+let ``Distance1``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = assertDbl <| Vec.Distance1(v.c, v.c)
+            let _ = assertDbl <| Vec.Distance1(v.c.XYZ, v.c.XYZ)
+            let _ = assertDbl <| Vec.Distance1(v.c.XY, v.c.XY)
+            let _ = assertInt <| Vec.Distance1(v.what, v.what)
+            let _ = assertInt <| Vec.Distance1(v.what.XYZ, v.what.XYZ)
+            let _ = assertInt <| Vec.Distance1(v.what.XY, v.what.XY)
+
+            let _ = assertDbl <| Vec.Distance1(getVec(), getVec())
+            let _ = assertDbl <| Vec.Distance1(getVec().XYZ, getVec().XYZ)
+            let _ = assertDbl <| Vec.Distance1(getVec().XY, getVec().XY)
+
+            return v.pos
+        }
+
+    GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader]
+        [
+            "getVec", 7
+            "\(\(tmp[0-9]*\.x \+ tmp[0-9]*\.y\) \+ tmp[0-9]*\.z\) \+ tmp[0-9]*\.w\)", 3
+        ]
+
+[<Test>]
+let ``Norm1``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = assertInt <| v.what.Norm1
+            let _ = assertInt <| Vec.Norm1(v.what)
+            let _ = assertDbl <| getVec().Norm1
+            let _ = assertDbl <| Vec.Norm1(getVec())
+
+            return v.pos
+        }
+
+    GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader] [ "getVec", 3 ]
+
+[<Test>]
+let ``DistanceMin /-Max``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = assertDbl <| Vec.DistanceMin(v.c, v.c)
+            let _ = assertDbl <| Vec.DistanceMin(v.c.XYZ, v.c.XYZ)
+            let _ = assertDbl <| Vec.DistanceMin(v.c.XY, v.c.XY)
+            let _ = assertInt <| Vec.DistanceMin(v.what, v.what)
+            let _ = assertInt <| Vec.DistanceMin(v.what.XYZ, v.what.XYZ)
+            let _ = assertInt <| Vec.DistanceMin(v.what.XY, v.what.XY)
+
+            let _ = assertDbl <| Vec.DistanceMin(getVec(), getVec())
+            let _ = assertDbl <| Vec.DistanceMin(getVec().XYZ, getVec().XYZ)
+            let _ = assertDbl <| Vec.DistanceMin(getVec().XY, getVec().XY)
+
+            let _ = assertDbl <| Vec.DistanceMax(v.c, v.c)
+            let _ = assertDbl <| Vec.DistanceMax(v.c.XYZ, v.c.XYZ)
+            let _ = assertDbl <| Vec.DistanceMax(v.c.XY, v.c.XY)
+            let _ = assertInt <| Vec.DistanceMax(v.what, v.what)
+            let _ = assertInt <| Vec.DistanceMax(v.what.XYZ, v.what.XYZ)
+            let _ = assertInt <| Vec.DistanceMax(v.what.XY, v.what.XY)
+
+            let _ = assertDbl <| Vec.DistanceMax(getVec(), getVec())
+            let _ = assertDbl <| Vec.DistanceMax(getVec().XYZ, getVec().XYZ)
+            let _ = assertDbl <| Vec.DistanceMax(getVec().XY, getVec().XY)
+
+            return v.pos
+        }
+
+    GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader]
+        [
+            "getVec", 13
+            "abs\(.*\)", 18
+            "min\(.*\)", 9
+            "max\(.*\)", 9
+        ]
+
+[<Test>]
+let ``NormMin / -Max``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = assertInt <| v.what.NormMin
+            let _ = assertInt <| Vec.NormMin(v.what)
+            let _ = assertDbl <| getVec().NormMin
+            let _ = assertDbl <| Vec.NormMin(getVec())
+
+            let _ = assertInt <| v.what.NormMax
+            let _ = assertInt <| Vec.NormMax(v.what)
+            let _ = assertDbl <| getVec().NormMax
+            let _ = assertDbl <| Vec.NormMax(getVec())
+
+            return v.pos
+        }
+
+    GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader] [ "getVec", 5 ]
+
+[<Test>]
 let ``Reflect / refract``() =
     Setup.Run()
 

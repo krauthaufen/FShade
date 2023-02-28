@@ -490,6 +490,39 @@ module Preprocessor =
             | _ ->
                 None
 
+        let (|Distance1|_|) (e : Expr) =
+            match e with
+            | Call(_, Method("Distance1", _), [VectorExpr (a, d, aft); VectorExpr (b, _, bft)]) when aft = bft ->
+                Some (a, b, vectorFields |> List.take d)
+            | _ ->
+                None
+
+        let (|DistanceMinMax|_|) (e : Expr) =
+            match e with
+            | Call(_, Method("DistanceMin", _), [VectorExpr (a, d, aft); VectorExpr (b, _, bft)]) when aft = bft ->
+                Some (a, b, "Min")
+            | Call(_, Method("DistanceMax", _), [VectorExpr (a, d, aft); VectorExpr (b, _, bft)]) when aft = bft ->
+                Some (a, b, "Max")
+            | _ ->
+                None
+
+        let (|Norm|_|) (e : Expr) =
+            match e with
+            | Call(_, Method("Norm1", _), [VectorExpr (v, _, _)])
+            | PropertyGet(Some (VectorExpr (v, _, _)), Property "Norm1", _) ->
+                Some (v, "1")
+
+            | Call(_, Method("NormMin", _), [VectorExpr (v, _, _)])
+            | PropertyGet(Some (VectorExpr (v, _, _)), Property "NormMin", _) ->
+                Some (v, "Min")
+
+            | Call(_, Method("NormMax", _), [VectorExpr (v, _, _)])
+            | PropertyGet(Some (VectorExpr (v, _, _)), Property "NormMax", _) ->
+                Some (v, "Max")
+
+            | _ ->
+                None
+
         let (|MinMaxElement|_|) (e : Expr) =
             match e with
             | Call(_, Method("MinElement", _), [VectorExpr (v, d, ft)])
@@ -1335,13 +1368,46 @@ module Preprocessor =
 
                 return! preprocessNormalS expr
 
+            | Distance1 (a, b, fields) ->
+                let abs = typeof<Fun>.GetMethod("Abs", [| a.Type |])
+
+                let tmp = Var("tmp", a.Type)
+
+                let sumExpr =
+                    fields |> List.map (fun f ->
+                        Expr.FieldGet(Expr.Var tmp, a.Type.GetField f)
+                    )
+                    |> List.reduce (fun x y -> Expr.Add(x, y))
+
+                let! a = preprocessNormalS a
+                let! b = preprocessNormalS b
+                return Expr.Let(tmp, Expr.Call(abs, [Expr.Subtract(a, b)]), sumExpr)
+
+            | DistanceMinMax (a, b, name) ->
+                let abs = typeof<Fun>.GetMethod("Abs", [| a.Type |])
+                let minMax = typeof<Vec>.GetMethod(name + "Element", [| a.Type |])
+
+                let expr =
+                    Expr.Call(minMax, [
+                        Expr.Call(abs, [Expr.Subtract(a, b)])
+                    ])
+
+                return! preprocessNormalS expr
+
+            | Norm (v, name) ->
+                let expr =
+                    if name = "Min" || name = "Max" then
+                        let abs = typeof<Fun>.GetMethod("Abs", [| v.Type |])
+                        let minMax = typeof<Vec>.GetMethod(name + "Element", [| v.Type |])
+                        Expr.Call(minMax, [Expr.Call(abs, [v])])
+                    else
+                        let dist = typeof<Vec>.GetMethod("Distance" + name, [| v.Type; v.Type |])
+                        Expr.Call(dist, [v; Expr.Zero v.Type])
+
+                return! preprocessNormalS expr
+
             | MinMaxElement(v, name, fieldType, fields) ->
                 let mi = typeof<Fun>.GetMethod(name, [| fieldType; fieldType |])
-
-                let rec getMinMaxExpr = function
-                    | a::b::tail -> getMinMaxExpr (Expr.Call(mi, [a; b])::tail)
-                    | [e] -> e
-                    | _ -> failwith "[FShade] Encountered min / max element call without arguments"
 
                 let tmp = Var("tmp", v.Type)
 
@@ -1350,7 +1416,7 @@ module Preprocessor =
                     |> List.map (fun f ->
                         Expr.FieldGet(Expr.Var tmp, v.Type.GetField f)
                     )
-                    |> getMinMaxExpr
+                    |> List.reduce (fun a b -> Expr.Call(mi, [a; b]))
 
                 let! v = preprocessNormalS v
                 return Expr.Let(tmp, v, minMaxExpr)
