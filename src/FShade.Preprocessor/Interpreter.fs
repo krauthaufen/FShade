@@ -125,8 +125,8 @@ module Patterns =
         else None
        
     let (|Ldloc|_|) (i : Instruction) =
-        if i.OpCode = OpCodes.Ldloc then Some (System.Convert.ToInt32 i.Operand)
-        elif i.OpCode = OpCodes.Ldloc_S then Some (System.Convert.ToInt32 i.Operand)
+        if i.OpCode = OpCodes.Ldloc then Some (i.Operand :?> VariableDefinition).Index
+        elif i.OpCode = OpCodes.Ldloc_S then Some (i.Operand :?> VariableDefinition).Index
         elif i.OpCode = OpCodes.Ldloc_0 then Some 0
         elif i.OpCode = OpCodes.Ldloc_1 then Some 1
         elif i.OpCode = OpCodes.Ldloc_2 then Some 2
@@ -134,8 +134,8 @@ module Patterns =
         else None
         
     let (|Stloc|_|) (i : Instruction) =
-        if i.OpCode = OpCodes.Stloc then Some (System.Convert.ToInt32 i.Operand)
-        elif i.OpCode = OpCodes.Stloc_S then Some (System.Convert.ToInt32 i.Operand)
+        if i.OpCode = OpCodes.Stloc then Some (i.Operand :?> VariableDefinition).Index
+        elif i.OpCode = OpCodes.Stloc_S then Some (i.Operand :?> VariableDefinition).Index
         elif i.OpCode = OpCodes.Stloc_0 then Some 0
         elif i.OpCode = OpCodes.Stloc_1 then Some 1
         elif i.OpCode = OpCodes.Stloc_2 then Some 2
