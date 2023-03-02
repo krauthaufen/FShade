@@ -18,6 +18,9 @@
     <Compile Include="Utilities.fs" />
     <Compile Include="ConstantFolding.fs" />
     <Compile Include="SimpleTests.fs" />
+    <Compile Include="Intrinsics.fs" />
+    <Compile Include="Samplers.fs" />
+    <Compile Include="Images.fs" />
     <Compile Include="Raytracing.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

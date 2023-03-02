@@ -417,7 +417,7 @@ module IntrinsicFunctions =
                 exactly <@ Fun.PowerOfTwo : V3d -> V3d @>
                 exactly <@ Fun.PowerOfTwo : V4f -> V4f @>
                 exactly <@ Fun.PowerOfTwo : V4d -> V4d @>
-                
+                generic <@ exp2 : float -> float @>
             ]
 
             CIntrinsic.simple "exp", [
@@ -1031,72 +1031,6 @@ module IntrinsicFunctions =
                 exactly <@ max : float   -> V4d -> V4d @>
             ]
 
-            CIntrinsic.tagged "min({0}.x, {0}.y)", [
-                exactly <@ Vec.MinElement : V2i -> int32 @>
-                exactly <@ Vec.MinElement : V2l -> int64 @>
-                exactly <@ Vec.MinElement : V2f -> float32 @>
-                exactly <@ Vec.MinElement : V2d -> float @>
-                exactly <@ fun (v : V2i) -> v.MinElement @>
-                exactly <@ fun (v : V2l) -> v.MinElement @>
-                exactly <@ fun (v : V2f) -> v.MinElement @>
-                exactly <@ fun (v : V2d) -> v.MinElement @>
-            ]
-
-            CIntrinsic.tagged "min(min({0}.x, {0}.y), {0}.z)", [
-                exactly <@ Vec.MinElement : V3i -> int32 @>
-                exactly <@ Vec.MinElement : V3l -> int64 @>
-                exactly <@ Vec.MinElement : V3f -> float32 @>
-                exactly <@ Vec.MinElement : V3d -> float @>
-                exactly <@ fun (v : V3i) -> v.MinElement @>
-                exactly <@ fun (v : V3l) -> v.MinElement @>
-                exactly <@ fun (v : V3f) -> v.MinElement @>
-                exactly <@ fun (v : V3d) -> v.MinElement @>
-            ]
-
-            CIntrinsic.tagged "min(min(min({0}.x, {0}.y), {0}.z), {0}.w)", [
-                exactly <@ Vec.MinElement : V4i -> int32 @>
-                exactly <@ Vec.MinElement : V4l -> int64 @>
-                exactly <@ Vec.MinElement : V4f -> float32 @>
-                exactly <@ Vec.MinElement : V4d -> float @>
-                exactly <@ fun (v : V4i) -> v.MinElement @>
-                exactly <@ fun (v : V4l) -> v.MinElement @>
-                exactly <@ fun (v : V4f) -> v.MinElement @>
-                exactly <@ fun (v : V4d) -> v.MinElement @>
-            ]
-
-            CIntrinsic.tagged "max({0}.x, {0}.y)", [
-                exactly <@ Vec.MaxElement : V2i -> int32 @>
-                exactly <@ Vec.MaxElement : V2l -> int64 @>
-                exactly <@ Vec.MaxElement : V2f -> float32 @>
-                exactly <@ Vec.MaxElement : V2d -> float @>
-                exactly <@ fun (v : V2i) -> v.MaxElement @>
-                exactly <@ fun (v : V2l) -> v.MaxElement @>
-                exactly <@ fun (v : V2f) -> v.MaxElement @>
-                exactly <@ fun (v : V2d) -> v.MaxElement @>
-            ]
-
-            CIntrinsic.tagged "max(max({0}.x, {0}.y), {0}.z)", [
-                exactly <@ Vec.MaxElement : V3i -> int32 @>
-                exactly <@ Vec.MaxElement : V3l -> int64 @>
-                exactly <@ Vec.MaxElement : V3f -> float32 @>
-                exactly <@ Vec.MaxElement : V3d -> float @>
-                exactly <@ fun (v : V3i) -> v.MaxElement @>
-                exactly <@ fun (v : V3l) -> v.MaxElement @>
-                exactly <@ fun (v : V3f) -> v.MaxElement @>
-                exactly <@ fun (v : V3d) -> v.MaxElement @>
-            ]
-
-            CIntrinsic.tagged "max(max(max({0}.x, {0}.y), {0}.z), {0}.w)", [
-                exactly <@ Vec.MaxElement : V4i -> int32 @>
-                exactly <@ Vec.MaxElement : V4l -> int64 @>
-                exactly <@ Vec.MaxElement : V4f -> float32 @>
-                exactly <@ Vec.MaxElement : V4d -> float @>
-                exactly <@ fun (v : V4i) -> v.MaxElement @>
-                exactly <@ fun (v : V4l) -> v.MaxElement @>
-                exactly <@ fun (v : V4f) -> v.MaxElement @>
-                exactly <@ fun (v : V4d) -> v.MaxElement @>
-            ]
-
             CIntrinsic.custom "clamp" [2; 0; 1], [
                 generic <@ clamp : float -> float -> float -> _ @>
             ]
@@ -1211,6 +1145,27 @@ module IntrinsicFunctions =
                 generic <@ saturate : V4d -> _ @>
             ]
 
+            CIntrinsic.custom "step" [1; 0], [
+                exactly <@ Fun.Step : float32 * float32 -> _ @>
+                exactly <@ Fun.Step : float * float -> _ @>
+                exactly <@ Fun.Step : V2f * V2f -> V2f @>
+                exactly <@ Fun.Step : V2f * float32 -> V2f @>
+                exactly <@ Fun.Step : V2d * V2d -> V2d @>
+                exactly <@ Fun.Step : V2d * float -> V2d @>
+                exactly <@ Fun.Step : V3f * V3f -> V3f @>
+                exactly <@ Fun.Step : V3f * float32 -> V3f @>
+                exactly <@ Fun.Step : V3d * V3d -> V3d @>
+                exactly <@ Fun.Step : V3d * float -> V3d @>
+                exactly <@ Fun.Step : V4f * V4f -> V4f @>
+                exactly <@ Fun.Step : V4f * float32 -> V4f @>
+                exactly <@ Fun.Step : V4d * V4d -> V4d @>
+                exactly <@ Fun.Step : V4d * float -> V4d @>
+            ]
+
+            CIntrinsic.simple "step", [
+                generic <@ step : float -> float -> _ @>
+            ]
+
             CIntrinsic.custom "smoothstep" [1; 2; 0], [
                 exactly <@ Fun.Smoothstep : float32 * float32 * float32 -> _ @>
                 exactly <@ Fun.Smoothstep : float * float * float -> _ @>
@@ -1232,79 +1187,6 @@ module IntrinsicFunctions =
                 generic <@ smoothstep : float -> float -> V2d -> V2d @>
             ]
 
-            CIntrinsic.tagged "(float({1}) - float({0})) / (float({1}) - float({2}))", [
-                exactly <@ Fun.InvLerp : int8  * int8  * int8 ->  float @>
-                exactly <@ Fun.InvLerp : int16 * int16 * int16 -> float @>
-                exactly <@ Fun.InvLerp : int32 * int32 * int32 -> float @>
-                exactly <@ Fun.InvLerp : int64 * int64 * int64 -> float @>
-                exactly <@ Fun.InvLerp : uint8  * uint8  * uint8 ->  float @>
-                exactly <@ Fun.InvLerp : uint16 * uint16 * uint16 -> float @>
-                exactly <@ Fun.InvLerp : uint32 * uint32 * uint32 -> float @>
-                exactly <@ Fun.InvLerp : uint64 * uint64 * uint64 -> float @>
-            ]
-
-            CIntrinsic.tagged "(float({0}) - float({2})) / (float({0}) - float({1}))", [
-                exactly <@ invLerp : int8  -> int8  -> int8 ->  float @>
-                exactly <@ invLerp : int16 -> int16 -> int16 -> float @>
-                exactly <@ invLerp : int32 -> int32 -> int32 -> float @>
-                exactly <@ invLerp : int64 -> int64 -> int64 -> float @>
-                exactly <@ invLerp : uint8  -> uint8  -> uint8 ->  float @>
-                exactly <@ invLerp : uint16 -> uint16 -> uint16 -> float @>
-                exactly <@ invLerp : uint32 -> uint32 -> uint32 -> float @>
-                exactly <@ invLerp : uint64 -> uint64 -> uint64 -> float @>
-            ]
-
-            CIntrinsic.tagged "({1} - {0}) / ({1} - {2})", [
-                exactly <@ Fun.InvLerp : float32 * float32 * float32 -> float32 @>
-                exactly <@ Fun.InvLerp : float * float * float -> float @>
-                exactly <@ Fun.InvLerp : V2f * V2f * V2f -> V2f @>
-                exactly <@ Fun.InvLerp : V2d * V2d * V2d -> V2d @>
-                exactly <@ Fun.InvLerp : V3f * V3f * V3f -> V3f @>
-                exactly <@ Fun.InvLerp : V3d * V3d * V3d -> V3d @>
-                exactly <@ Fun.InvLerp : V4f * V4f * V4f -> V4f @>
-                exactly <@ Fun.InvLerp : V4d * V4d * V4d -> V4d @>
-            ]
-
-            CIntrinsic.tagged "({0} - {2}) / ({0} - {1})", [
-                exactly <@ invLerp : float32 -> float32 -> float32 -> float32 @>
-                exactly <@ invLerp : float -> float -> float -> float @>
-                exactly <@ invLerp : V2f -> V2f -> V2f -> V2f @>
-                exactly <@ invLerp : V2d -> V2d -> V2d -> V2d @>
-                exactly <@ invLerp : V3f -> V3f -> V3f -> V3f @>
-                exactly <@ invLerp : V3d -> V3d -> V3d -> V3d @>
-                exactly <@ invLerp : V4f -> V4f -> V4f -> V4f @>
-                exactly <@ invLerp : V4d -> V4d -> V4d -> V4d @>
-            ]
-
-            CIntrinsic.tagged "(vec2({1}) - vec2({0})) / (vec2({1}) - vec2({2}))", [
-                exactly <@ Fun.InvLerp : V2i * V2i * V2i -> V2d @>
-                exactly <@ Fun.InvLerp : V2l * V2l * V2l -> V2d @>
-            ]
-
-            CIntrinsic.tagged "(vec2({0}) - vec2({2})) / (vec2({0}) - vec2({1}))", [
-                exactly <@ invLerp : V2i -> V2i -> V2i -> V2d @>
-                exactly <@ invLerp : V2l -> V2l -> V2l -> V2d @>
-            ]
-
-            CIntrinsic.tagged "(vec3({1}) - vec3({0})) / (vec3({1}) - vec3({2}))", [
-                exactly <@ Fun.InvLerp : V3i * V3i * V3i -> V3d @>
-                exactly <@ Fun.InvLerp : V3l * V3l * V3l -> V3d @>
-            ]
-
-            CIntrinsic.tagged "(vec3({0}) - vec3({2})) / (vec3({0}) - vec3({1}))", [
-                exactly <@ invLerp : V3i -> V3i -> V3i -> V3d @>
-                exactly <@ invLerp : V3l -> V3l -> V3l -> V3d @>
-            ]
-
-            CIntrinsic.tagged "(vec4({1}) - vec4({0})) / (vec4({1}) - vec4({2}))", [
-                exactly <@ Fun.InvLerp : V4i * V4i * V4i -> V4d @>
-                exactly <@ Fun.InvLerp : V4l * V4l * V4l -> V4d @>
-            ]
-
-            CIntrinsic.tagged "(vec4({0}) - vec4({2})) / (vec4({0}) - vec4({1}))", [
-                exactly <@ invLerp : V4i -> V4i -> V4i -> V4d @>
-                exactly <@ invLerp : V4l -> V4l -> V4l -> V4d @>
-            ]
 
             CIntrinsic.tagged "int(round(mix({1}, {2}, {0})))", [
                 exactly <@ Fun.Lerp : float32 * int8    * int8 -> _ @>
@@ -1518,13 +1400,40 @@ module IntrinsicFunctions =
                 exactly <@ Fun.IsNaN : V2d -> bool @>
                 exactly <@ Fun.IsNaN : V3d -> bool @>
                 exactly <@ Fun.IsNaN : V4d -> bool @>
+                exactly <@ Vec.AnyNaN : V2f -> bool @>
+                exactly <@ Vec.AnyNaN : V3f -> bool @>
+                exactly <@ Vec.AnyNaN : V4f -> bool @>
+                exactly <@ Vec.AnyNaN : V2d -> bool @>
+                exactly <@ Vec.AnyNaN : V3d -> bool @>
+                exactly <@ Vec.AnyNaN : V4d -> bool @>
                 exactly <@ fun (v : V2f) -> v.IsNaN @>
                 exactly <@ fun (v : V3f) -> v.IsNaN @>
                 exactly <@ fun (v : V4f) -> v.IsNaN @>
                 exactly <@ fun (v : V2d) -> v.IsNaN @>
                 exactly <@ fun (v : V3d) -> v.IsNaN @>
                 exactly <@ fun (v : V4d) -> v.IsNaN @>
+                exactly <@ fun (v : V2f) -> v.AnyNaN @>
+                exactly <@ fun (v : V3f) -> v.AnyNaN @>
+                exactly <@ fun (v : V4f) -> v.AnyNaN @>
+                exactly <@ fun (v : V2d) -> v.AnyNaN @>
+                exactly <@ fun (v : V3d) -> v.AnyNaN @>
+                exactly <@ fun (v : V4d) -> v.AnyNaN @>
                 generic <@ isNaN : float -> _ @>
+            ]
+
+            CIntrinsic.tagged "all(isnan({0}))", [
+                exactly <@ Vec.AllNaN : V2f -> bool @>
+                exactly <@ Vec.AllNaN : V3f -> bool @>
+                exactly <@ Vec.AllNaN : V4f -> bool @>
+                exactly <@ Vec.AllNaN : V2d -> bool @>
+                exactly <@ Vec.AllNaN : V3d -> bool @>
+                exactly <@ Vec.AllNaN : V4d -> bool @>
+                exactly <@ fun (v : V2f) -> v.AllNaN @>
+                exactly <@ fun (v : V3f) -> v.AllNaN @>
+                exactly <@ fun (v : V4f) -> v.AllNaN @>
+                exactly <@ fun (v : V2d) -> v.AllNaN @>
+                exactly <@ fun (v : V3d) -> v.AllNaN @>
+                exactly <@ fun (v : V4d) -> v.AllNaN @>
             ]
 
             CIntrinsic.simple "isinf", [
@@ -1543,216 +1452,40 @@ module IntrinsicFunctions =
                 exactly <@ Fun.IsInfinity : V2d -> bool @>
                 exactly <@ Fun.IsInfinity : V3d -> bool @>
                 exactly <@ Fun.IsInfinity : V4d -> bool @>
+                exactly <@ Vec.AnyInfinity : V2f -> bool @>
+                exactly <@ Vec.AnyInfinity : V3f -> bool @>
+                exactly <@ Vec.AnyInfinity : V4f -> bool @>
+                exactly <@ Vec.AnyInfinity : V2d -> bool @>
+                exactly <@ Vec.AnyInfinity : V3d -> bool @>
+                exactly <@ Vec.AnyInfinity : V4d -> bool @>
                 exactly <@ fun (v : V2f) -> v.IsInfinity @>
                 exactly <@ fun (v : V3f) -> v.IsInfinity @>
                 exactly <@ fun (v : V4f) -> v.IsInfinity @>
                 exactly <@ fun (v : V2d) -> v.IsInfinity @>
                 exactly <@ fun (v : V3d) -> v.IsInfinity @>
                 exactly <@ fun (v : V4d) -> v.IsInfinity @>
+                exactly <@ fun (v : V2f) -> v.AnyInfinity @>
+                exactly <@ fun (v : V3f) -> v.AnyInfinity @>
+                exactly <@ fun (v : V4f) -> v.AnyInfinity @>
+                exactly <@ fun (v : V2d) -> v.AnyInfinity @>
+                exactly <@ fun (v : V3d) -> v.AnyInfinity @>
+                exactly <@ fun (v : V4d) -> v.AnyInfinity @>
                 generic <@ isInfinity : float -> _ @>
             ]
 
-            // ==========================================================================
-            // VECTOR relations
-            // ==========================================================================
-            CIntrinsic.tagged "any(lessThan({0},{1}))", [
-                exactly <@ fun (u : V2d) (v : V2d) -> u.AnySmaller(v) @>
-                exactly <@ Vec.AnySmaller : V2d * V2d -> bool @>
-                exactly <@ fun (u : V3d) (v : V3d) -> u.AnySmaller(v) @>
-                exactly <@ Vec.AnySmaller : V3d * V3d -> bool @>
-                exactly <@ fun (u : V4d) (v : V4d) -> u.AnySmaller(v) @>
-                exactly <@ Vec.AnySmaller : V4d * V4d -> bool @>
-
-                exactly <@ fun (u : V2i) (v : V2i) -> u.AnySmaller(v) @>
-                exactly <@ Vec.AnySmaller : V2i * V2i -> bool @>
-                exactly <@ fun (u : V3i) (v : V3i) -> u.AnySmaller(v) @>
-                exactly <@ Vec.AnySmaller : V3i * V3i -> bool @>
-                exactly <@ fun (u : V4i) (v : V4i) -> u.AnySmaller(v) @>
-                exactly <@ Vec.AnySmaller : V4i * V4i -> bool @>
-                generic <@ Vec.anySmaller : V4i -> V4i -> bool @>
-            ]
-
-            CIntrinsic.tagged "all(lessThan({0},{1}))", [
-                exactly <@ fun (u : V2d) (v : V2d) -> u.AllSmaller(v) @>
-                exactly <@ Vec.AllSmaller : V2d * V2d -> bool @>
-                exactly <@ fun (u : V3d) (v : V3d) -> u.AllSmaller(v) @>
-                exactly <@ Vec.AllSmaller : V3d * V3d -> bool @>
-                exactly <@ fun (u : V4d) (v : V4d) -> u.AllSmaller(v) @>
-                exactly <@ Vec.AllSmaller : V4d * V4d -> bool @>
-
-                exactly <@ fun (u : V2i) (v : V2i) -> u.AllSmaller(v) @>
-                exactly <@ Vec.AllSmaller : V2i * V2i -> bool @>
-                exactly <@ fun (u : V3i) (v : V3i) -> u.AllSmaller(v) @>
-                exactly <@ Vec.AllSmaller : V3i * V3i -> bool @>
-                exactly <@ fun (u : V4i) (v : V4i) -> u.AllSmaller(v) @>
-                exactly <@ Vec.AllSmaller : V4i * V4i -> bool @>
-                generic <@ Vec.allSmaller : V4i -> V4i -> bool @>
-            ]
-
-            CIntrinsic.tagged "any(lessThanEqual({0},{1}))", [
-                exactly <@ fun (u : V2d) (v : V2d) -> u.AnySmallerOrEqual(v) @>
-                exactly <@ Vec.AnySmallerOrEqual : V2d * V2d -> bool @>
-                exactly <@ fun (u : V3d) (v : V3d) -> u.AnySmallerOrEqual(v) @>
-                exactly <@ Vec.AnySmallerOrEqual : V3d * V3d -> bool @>
-                exactly <@ fun (u : V4d) (v : V4d) -> u.AnySmallerOrEqual(v) @>
-                exactly <@ Vec.AnySmallerOrEqual : V4d * V4d -> bool @>
-
-                exactly <@ fun (u : V2i) (v : V2i) -> u.AnySmallerOrEqual(v) @>
-                exactly <@ Vec.AnySmallerOrEqual : V2i * V2i -> bool @>
-                exactly <@ fun (u : V3i) (v : V3i) -> u.AnySmallerOrEqual(v) @>
-                exactly <@ Vec.AnySmallerOrEqual : V3i * V3i -> bool @>
-                exactly <@ fun (u : V4i) (v : V4i) -> u.AnySmallerOrEqual(v) @>
-                exactly <@ Vec.AnySmallerOrEqual : V4i * V4i -> bool @>
-                generic <@ Vec.anySmallerOrEqual : V4i -> V4i -> bool @>
-            ]
-
-            CIntrinsic.tagged "all(lessThanEqual({0},{1}))", [
-                exactly <@ fun (u : V2d) (v : V2d) -> u.AllSmallerOrEqual(v) @>
-                exactly <@ Vec.AllSmallerOrEqual : V2d * V2d -> bool @>
-                exactly <@ fun (u : V3d) (v : V3d) -> u.AllSmallerOrEqual(v) @>
-                exactly <@ Vec.AllSmallerOrEqual : V3d * V3d -> bool @>
-                exactly <@ fun (u : V4d) (v : V4d) -> u.AllSmallerOrEqual(v) @>
-                exactly <@ Vec.AllSmallerOrEqual : V4d * V4d -> bool @>
-
-                exactly <@ fun (u : V2i) (v : V2i) -> u.AllSmallerOrEqual(v) @>
-                exactly <@ Vec.AllSmallerOrEqual : V2i * V2i -> bool @>
-                exactly <@ fun (u : V3i) (v : V3i) -> u.AllSmallerOrEqual(v) @>
-                exactly <@ Vec.AllSmallerOrEqual : V3i * V3i -> bool @>
-                exactly <@ fun (u : V4i) (v : V4i) -> u.AllSmallerOrEqual(v) @>
-                exactly <@ Vec.AllSmallerOrEqual : V4i * V4i -> bool @>
-                generic <@ Vec.allSmallerOrEqual : V4i -> V4i -> bool @>
-            ]
-
-            CIntrinsic.tagged "any(greaterThan({0},{1}))", [
-                exactly <@ fun (u : V2d) (v : V2d) -> u.AnyGreater(v) @>
-                exactly <@ Vec.AnyGreater : V2d * V2d -> bool @>
-                exactly <@ fun (u : V3d) (v : V3d) -> u.AnyGreater(v) @>
-                exactly <@ Vec.AnyGreater : V3d * V3d -> bool @>
-                exactly <@ fun (u : V4d) (v : V4d) -> u.AnyGreater(v) @>
-                exactly <@ Vec.AnyGreater : V4d * V4d -> bool @>
-
-                exactly <@ fun (u : V2i) (v : V2i) -> u.AnyGreater(v) @>
-                exactly <@ Vec.AnyGreater : V2i * V2i -> bool @>
-                exactly <@ fun (u : V3i) (v : V3i) -> u.AnyGreater(v) @>
-                exactly <@ Vec.AnyGreater : V3i * V3i -> bool @>
-                exactly <@ fun (u : V4i) (v : V4i) -> u.AnyGreater(v) @>
-                exactly <@ Vec.AnyGreater : V4i * V4i -> bool @>
-                generic <@ Vec.anyGreater : V4i -> V4i -> bool @>
-            ]
-
-            CIntrinsic.tagged "all(greaterThan({0},{1}))", [
-                exactly <@ fun (u : V2d) (v : V2d) -> u.AllGreater(v) @>
-                exactly <@ Vec.AllGreater : V2d * V2d -> bool @>
-                exactly <@ fun (u : V3d) (v : V3d) -> u.AllGreater(v) @>
-                exactly <@ Vec.AllGreater : V3d * V3d -> bool @>
-                exactly <@ fun (u : V4d) (v : V4d) -> u.AllGreater(v) @>
-                exactly <@ Vec.AllGreater : V4d * V4d -> bool @>
-
-                exactly <@ fun (u : V2i) (v : V2i) -> u.AllGreater(v) @>
-                exactly <@ Vec.AllGreater : V2i * V2i -> bool @>
-                exactly <@ fun (u : V3i) (v : V3i) -> u.AllGreater(v) @>
-                exactly <@ Vec.AllGreater : V3i * V3i -> bool @>
-                exactly <@ fun (u : V4i) (v : V4i) -> u.AllGreater(v) @>
-                exactly <@ Vec.AllGreater : V4i * V4i -> bool @>
-                generic <@ Vec.allGreater : V4i -> V4i -> bool @>
-            ]
-
-            CIntrinsic.tagged "any(greaterThanEqual({0},{1}))", [
-                exactly <@ fun (u : V2d) (v : V2d) -> u.AnyGreaterOrEqual(v) @>
-                exactly <@ Vec.AnyGreaterOrEqual : V2d * V2d -> bool @>
-                exactly <@ fun (u : V3d) (v : V3d) -> u.AnyGreaterOrEqual(v) @>
-                exactly <@ Vec.AnyGreaterOrEqual : V3d * V3d -> bool @>
-                exactly <@ fun (u : V4d) (v : V4d) -> u.AnyGreaterOrEqual(v) @>
-                exactly <@ Vec.AnyGreaterOrEqual : V4d * V4d -> bool @>
-
-                exactly <@ fun (u : V2i) (v : V2i) -> u.AnyGreaterOrEqual(v) @>
-                exactly <@ Vec.AnyGreaterOrEqual : V2i * V2i -> bool @>
-                exactly <@ fun (u : V3i) (v : V3i) -> u.AnyGreaterOrEqual(v) @>
-                exactly <@ Vec.AnyGreaterOrEqual : V3i * V3i -> bool @>
-                exactly <@ fun (u : V4i) (v : V4i) -> u.AnyGreaterOrEqual(v) @>
-                exactly <@ Vec.AnyGreaterOrEqual : V4i * V4i -> bool @>
-                generic <@ Vec.anyGreaterOrEqual : V4i -> V4i -> bool @>
-            ]
-
-            CIntrinsic.tagged "all(greaterThanEqual({0},{1}))", [
-                exactly <@ fun (u : V2d) (v : V2d) -> u.AllGreaterOrEqual(v) @>
-                exactly <@ Vec.AllGreaterOrEqual : V2d * V2d -> bool @>
-                exactly <@ fun (u : V3d) (v : V3d) -> u.AllGreaterOrEqual(v) @>
-                exactly <@ Vec.AllGreaterOrEqual : V3d * V3d -> bool @>
-                exactly <@ fun (u : V4d) (v : V4d) -> u.AllGreaterOrEqual(v) @>
-                exactly <@ Vec.AllGreaterOrEqual : V4d * V4d -> bool @>
-
-                exactly <@ fun (u : V2i) (v : V2i) -> u.AllGreaterOrEqual(v) @>
-                exactly <@ Vec.AllGreaterOrEqual : V2i * V2i -> bool @>
-                exactly <@ fun (u : V3i) (v : V3i) -> u.AllGreaterOrEqual(v) @>
-                exactly <@ Vec.AllGreaterOrEqual : V3i * V3i -> bool @>
-                exactly <@ fun (u : V4i) (v : V4i) -> u.AllGreaterOrEqual(v) @>
-                exactly <@ Vec.AllGreaterOrEqual : V4i * V4i -> bool @>
-                generic <@ Vec.allGreaterOrEqual : V4i -> V4i -> bool @>
-            ]
-
-            CIntrinsic.tagged "any(equal({0},{1}))", [
-                exactly <@ fun (u : V2d) (v : V2d) -> u.AnyEqual(v) @>
-                exactly <@ Vec.AnyEqual : V2d * V2d -> bool @>
-                exactly <@ fun (u : V3d) (v : V3d) -> u.AnyEqual(v) @>
-                exactly <@ Vec.AnyEqual : V3d * V3d -> bool @>
-                exactly <@ fun (u : V4d) (v : V4d) -> u.AnyEqual(v) @>
-                exactly <@ Vec.AnyEqual : V4d * V4d -> bool @>
-
-                exactly <@ fun (u : V2i) (v : V2i) -> u.AnyEqual(v) @>
-                exactly <@ Vec.AnyEqual : V2i * V2i -> bool @>
-                exactly <@ fun (u : V3i) (v : V3i) -> u.AnyEqual(v) @>
-                exactly <@ Vec.AnyEqual : V3i * V3i -> bool @>
-                exactly <@ fun (u : V4i) (v : V4i) -> u.AnyEqual(v) @>
-                exactly <@ Vec.AnyEqual : V4i * V4i -> bool @>
-            ]
-
-            CIntrinsic.tagged "all(equal({0},{1}))", [
-                exactly <@ fun (u : V2d) (v : V2d) -> u.AllEqual(v) @>
-                exactly <@ Vec.AllEqual : V2d * V2d -> bool @>
-                exactly <@ fun (u : V3d) (v : V3d) -> u.AllEqual(v) @>
-                exactly <@ Vec.AllEqual : V3d * V3d -> bool @>
-                exactly <@ fun (u : V4d) (v : V4d) -> u.AllEqual(v) @>
-                exactly <@ Vec.AllEqual : V4d * V4d -> bool @>
-
-                exactly <@ fun (u : V2i) (v : V2i) -> u.AllEqual(v) @>
-                exactly <@ Vec.AllEqual : V2i * V2i -> bool @>
-                exactly <@ fun (u : V3i) (v : V3i) -> u.AllEqual(v) @>
-                exactly <@ Vec.AllEqual : V3i * V3i -> bool @>
-                exactly <@ fun (u : V4i) (v : V4i) -> u.AllEqual(v) @>
-                exactly <@ Vec.AllEqual : V4i * V4i -> bool @>
-            ]
-
-            CIntrinsic.tagged "any(notEqual({0},{1}))", [
-                exactly <@ fun (u : V2d) (v : V2d) -> u.AnyDifferent(v) @>
-                exactly <@ Vec.AnyDifferent : V2d * V2d -> bool @>
-                exactly <@ fun (u : V3d) (v : V3d) -> u.AnyDifferent(v) @>
-                exactly <@ Vec.AnyDifferent : V3d * V3d -> bool @>
-                exactly <@ fun (u : V4d) (v : V4d) -> u.AnyDifferent(v) @>
-                exactly <@ Vec.AnyDifferent : V4d * V4d -> bool @>
-
-                exactly <@ fun (u : V2i) (v : V2i) -> u.AnyDifferent(v) @>
-                exactly <@ Vec.AnyDifferent : V2i * V2i -> bool @>
-                exactly <@ fun (u : V3i) (v : V3i) -> u.AnyDifferent(v) @>
-                exactly <@ Vec.AnyDifferent : V3i * V3i -> bool @>
-                exactly <@ fun (u : V4i) (v : V4i) -> u.AnyDifferent(v) @>
-                exactly <@ Vec.AnyDifferent : V4i * V4i -> bool @>
-            ]
-
-            CIntrinsic.tagged "all(notEqual({0},{1}))", [
-                exactly <@ fun (u : V2d) (v : V2d) -> u.AllDifferent(v) @>
-                exactly <@ Vec.AllDifferent : V2d * V2d -> bool @>
-                exactly <@ fun (u : V3d) (v : V3d) -> u.AllDifferent(v) @>
-                exactly <@ Vec.AllDifferent : V3d * V3d -> bool @>
-                exactly <@ fun (u : V4d) (v : V4d) -> u.AllDifferent(v) @>
-                exactly <@ Vec.AllDifferent : V4d * V4d -> bool @>
-
-                exactly <@ fun (u : V2i) (v : V2i) -> u.AllDifferent(v) @>
-                exactly <@ Vec.AllDifferent : V2i * V2i -> bool @>
-                exactly <@ fun (u : V3i) (v : V3i) -> u.AllDifferent(v) @>
-                exactly <@ Vec.AllDifferent : V3i * V3i -> bool @>
-                exactly <@ fun (u : V4i) (v : V4i) -> u.AllDifferent(v) @>
-                exactly <@ Vec.AllDifferent : V4i * V4i -> bool @>
+            CIntrinsic.tagged "all(isinf({0}))", [
+                exactly <@ Vec.AllInfinity : V2f -> bool @>
+                exactly <@ Vec.AllInfinity : V3f -> bool @>
+                exactly <@ Vec.AllInfinity : V4f -> bool @>
+                exactly <@ Vec.AllInfinity : V2d -> bool @>
+                exactly <@ Vec.AllInfinity : V3d -> bool @>
+                exactly <@ Vec.AllInfinity : V4d -> bool @>
+                exactly <@ fun (v : V2f) -> v.AllInfinity @>
+                exactly <@ fun (v : V3f) -> v.AllInfinity @>
+                exactly <@ fun (v : V4f) -> v.AllInfinity @>
+                exactly <@ fun (v : V2d) -> v.AllInfinity @>
+                exactly <@ fun (v : V3d) -> v.AllInfinity @>
+                exactly <@ fun (v : V4d) -> v.AllInfinity @>
             ]
 
             // ==========================================================================
@@ -1831,22 +1564,6 @@ module IntrinsicFunctions =
             // ==========================================================================
             // MATRIX
             // ==========================================================================
-
-            CIntrinsic.simple "transpose", [
-                exactly <@ Mat.Transposed : M22f -> _ @>
-                exactly <@ Mat.Transposed : M33f -> _ @>
-                exactly <@ Mat.Transposed : M44f -> _ @>
-                exactly <@ Mat.Transposed : M22d -> _ @>
-                exactly <@ Mat.Transposed : M33d -> _ @>
-                exactly <@ Mat.Transposed : M44d -> _ @>
-                exactly <@ fun (v : M22f) -> v.Transposed @>
-                exactly <@ fun (v : M33f) -> v.Transposed @>
-                exactly <@ fun (v : M44f) -> v.Transposed @>
-                exactly <@ fun (v : M22d) -> v.Transposed @>
-                exactly <@ fun (v : M33d) -> v.Transposed @>
-                exactly <@ fun (v : M44d) -> v.Transposed @>
-                generic <@ Mat.transpose : M22d -> M22d @>
-            ]
 
             CIntrinsic.simple "determinant", [
                 exactly <@ Mat.Determinant : M22f -> _ @>
@@ -1987,126 +1704,181 @@ module IntrinsicFunctions =
 
     let (|TextureLookup|_|) (mi : MethodInfo) =
         match mi with
-            | Method(name, ((ImageType(_, dim, isArray, isMS, valueType)::_) as args)) ->
+        | Method(name, (((ImageType(_, dim, isArray, isMS, valueType)) as img ::_) as args)) when mi.DeclaringType = img ->
 
-                let plainArgs(skip : int) =
-                    args |> List.skip skip |> List.mapi (fun i _ -> sprintf "{%d}" (skip + i)) |> String.concat ", "
+            let plainArgs(skip : int) =
+                args |> List.skip skip |> List.mapi (fun i _ -> sprintf "{%d}" (skip + i)) |> String.concat ", "
 
-                let argCount = List.length args - 1
+            let coordComponents =
+                match dim with
+                | SamplerDimension.Sampler1d -> 1
+                | SamplerDimension.Sampler2d -> 2
+                | SamplerDimension.Sampler3d -> 3
+                | SamplerDimension.SamplerCube -> 2
+                | _ -> failwithf "unknown sampler dimension: %A" dim
 
-                let functionName =
-                    match name with
-                        | "get_Size" -> "imageSize({0})"
-                        | "get_Item" when argCount = 1 -> sprintf "imageLoad(%s)" (plainArgs 0)
-                        | "set_Item" when argCount = 2 -> sprintf "imageStore(%s)" (plainArgs 0)
-                        | "get_Item" -> sprintf "imageLoad({0}, ivec%d(%s), 0)" argCount (plainArgs 1)
-                        | "AtomicCompareExchange" -> sprintf "imageAtomicCompSwap(%s)" (plainArgs 0)
-                        | "AtomicAdd" -> sprintf "imageAtomicAdd(%s)" (plainArgs 0)
+            let loadStoreArgs() =
+                let consumedArgs, reshapedArgs =
+                    if isArray || dim = SamplerDimension.SamplerCube then
+                        3, sprintf "{0}, ivec%d({1}, {2})" (coordComponents + 1)
+                    else
+                        1, "{0}"
 
+                let args = List.skip consumedArgs args
 
+                let rest =
+                    match args with
+                    | [] -> ""
+                    | _ ->
+                        args |> List.mapi (fun i _ -> sprintf "{%d}" (i + consumedArgs)) |> String.concat ", " |> sprintf ", %s"
 
-                        | _ ->failwithf "unknown image function %A" name
+                reshapedArgs + rest
 
-                Some functionName
-
-            | Method(name, ((SamplerType(dim, isArray, isShadow, isMS, valueType)::_) as args)) ->
-                let coordComponents =
-                    match dim with
-                        | SamplerDimension.Sampler1d -> 1
-                        | SamplerDimension.Sampler2d -> 2
-                        | SamplerDimension.Sampler3d -> 3
-                        | SamplerDimension.SamplerCube -> 3
-                        | _ -> failwithf "unknown sampler dimension: %A" dim
-
-                let fetchArgs() =
-                    let consumedArgs, sampleArgs =
-                        match isArray with
-                            | true -> 3, sprintf "{0}, ivec%d({1}, {2})" (coordComponents + 1)
-                            | false -> 2, "{0}, {1}"
-
-                    let args = List.skip consumedArgs args
-
-                    let rest =
-                        match args with
-                            | [] ->
-                                ", 0"
-                            | _ ->
-                                args |> List.mapi (fun i _ -> sprintf "{%d}" (i + consumedArgs)) |> String.concat ", " |> sprintf ", %s"
-
-
-                    sampleArgs + rest
-
-                let sampleArgs() =
-                    let consumedArgs, sampleArgs =
-                        match isArray, isShadow with
-                            | true, true -> 4, sprintf "{0}, vec%d({1}, {2}, {3})" (coordComponents + 2)
-                            | true, false -> 3, sprintf "{0}, vec%d({1}, {2})" (coordComponents + 1)
-                            | false, true -> 3, sprintf "{0}, vec%d({1}, {2})" (coordComponents + 1)
-                            | false, false -> 2, "{0}, {1}"
-
-                    let args = List.skip consumedArgs args
-
-                    let rest =
-                        match args with
-                            | [] -> ""
-                            | _ ->
-                                args |> List.mapi (fun i _ -> sprintf "{%d}" (i + consumedArgs)) |> String.concat ", " |> sprintf ", %s"
-
-
-                    sampleArgs + rest
-                let projArgs() =
-                    let consumedArgs, sampleArgs =
-                        match isArray, isShadow with
-                            | true, true -> 4, sprintf "{0}, vec%d({1}, {2}, {3})" (coordComponents + 3)
-                            | true, false -> 3, sprintf "{0}, vec%d({1}, {2})" (coordComponents + 2)
-                            | false, true -> 3, sprintf "{0}, vec%d({1}, {2})" (coordComponents + 2)
-                            | false, false -> 2, "{0}, {1}"
-
-                    let args = List.skip consumedArgs args
-
-                    let rest =
-                        match args with
-                            | [] -> ""
-                            | _ ->
-                                args |> List.mapi (fun i _ -> sprintf "{%d}" (i + consumedArgs)) |> String.concat ", " |> sprintf ", %s"
-
-
-                    sampleArgs + rest
-
-                let plainArgs(skip : int) =
-                    args |> List.skip skip |> List.mapi (fun i _ -> sprintf "{%d}" (skip + i)) |> String.concat ", "
-
-
-                let argCount = List.length args - 1
-
+            let functionName =
                 match name with
-                    | "get_Size" ->
-                        if isMS then Some "textureSize({0})"
-                        else Some "textureSize({0}, 0)"
+                | "get_Size" -> "imageSize({0})"
+                | "get_Samples" -> "imageSamples({0})"
+                | "Load" | "get_Item" -> sprintf "imageLoad(%s)" (loadStoreArgs())
+                | "Store" | "set_Item" -> sprintf "imageStore(%s)" (loadStoreArgs())
+                | "AtomicAdd" -> sprintf "imageAtomicAdd(%s)" (loadStoreArgs())
+                | "AtomicMin" -> sprintf "imageAtomicMin(%s)" (loadStoreArgs())
+                | "AtomicMax" -> sprintf "imageAtomicMax(%s)" (loadStoreArgs())
+                | "AtomicAnd" -> sprintf "imageAtomicAnd(%s)" (loadStoreArgs())
+                | "AtomicOr" -> sprintf "imageAtomicOr(%s)" (loadStoreArgs())
+                | "AtomicXor" -> sprintf "imageAtomicXor(%s)" (loadStoreArgs())
+                | "AtomicExchange" -> sprintf "imageAtomicExchange(%s)" (loadStoreArgs())
+                | "AtomicCompareExchange" -> sprintf "imageAtomicCompSwap(%s)" (loadStoreArgs())
+                | _ -> failwithf "unknown image function %s" name
 
-                    | "get_MipMapLevels" ->
-                        if isMS then Some "1"
-                        else Some "textureQueryLevels({0})"
+            let extensions =
+                match name with
+                | "get_Samples" -> ["GL_ARB_shader_texture_image_samples"]
+                | _ -> []
 
-                    | "GetSize" ->
-                        if isMS then Some "textureSize({0})"
-                        else Some "textureSize({0}, {1})"
+            Some (functionName, Set.ofList extensions)
+
+        | Method(name, (((SamplerType(dim, isArray, isShadow, isMS, valueType)) as sam ::_) as args)) when mi.DeclaringType = sam ->
+            let coordComponents =
+                match dim with
+                    | SamplerDimension.Sampler1d -> 1
+                    | SamplerDimension.Sampler2d -> 2
+                    | SamplerDimension.Sampler3d -> 3
+                    | SamplerDimension.SamplerCube -> 3
+                    | _ -> failwithf "unknown sampler dimension: %A" dim
+
+            let fetchArgs() =
+                let consumedArgs, sampleArgs =
+                    match isArray with
+                        | true -> 3, sprintf "{0}, ivec%d({1}, {2})" (coordComponents + 1)
+                        | false -> 2, "{0}, {1}"
+
+                let args = List.skip consumedArgs args
+
+                let rest =
+                    match args with
+                    | [] ->
+                        ""
+                    | _ ->
+                        args |> List.mapi (fun i _ -> sprintf "{%d}" (i + consumedArgs)) |> String.concat ", " |> sprintf ", %s"
 
 
-                    | "Sample" -> sprintf "texture(%s)" (sampleArgs()) |> Some
-                    | "SampleOffset" -> sprintf "textureOffset(%s)" (sampleArgs()) |> Some
-                    | "SampleProj" -> sprintf "textureProj(%s)" (projArgs()) |> Some
-                    | "SampleLevel" -> sprintf "textureLod(%s)" (sampleArgs()) |> Some
-                    | "SampleGrad" -> sprintf "textureGrad(%s)" (sampleArgs()) |> Some
-                    | "Gather" -> sprintf "textureGather(%s)" (plainArgs 0) |> Some
-                    | "GatherOffset" -> sprintf "textureGatherOffset(%s)" (plainArgs 0) |> Some
+                sampleArgs + rest
 
-                    | "Read" -> sprintf "texelFetch(%s)" (fetchArgs()) |> Some
-                    | "get_Item" -> sprintf "texelFetch(%s)" (fetchArgs()) |> Some
+            let sampleArgs (separateCmpArg : bool) =
+                let consumedArgs, sampleArgs =
+                    match isArray, isShadow && not separateCmpArg with
+                    | true, true ->
+                        if coordComponents = 3 then
+                            4, "{0}, vec4({1}, {2}), {3}" // Cube array shadow sampler has separate cmp argument
+                        else
+                            4, sprintf "{0}, vec%d({1}, {2}, {3})" (coordComponents + 2)
 
-                    | "QueryLod" -> sprintf "textureQueryLod(%s)" (plainArgs 0) |> Some
+                    | true, false ->
+                        3, sprintf "{0}, vec%d({1}, {2})" (coordComponents + 1)
 
-                    | name -> None
-            | _ ->
-                None
+                    | false, true ->
+                        if coordComponents = 1 then
+                            3, "{0}, vec3({1}, 0, {2})" // 1D shadow sampler has unused 2nd component
+                        else
+                            3, sprintf "{0}, vec%d({1}, {2})" (coordComponents + 1)
+
+                    | false, false ->
+                        2, "{0}, {1}"
+
+                let args = List.skip consumedArgs args
+
+                let rest =
+                    match args with
+                        | [] -> ""
+                        | _ ->
+                            args |> List.mapi (fun i _ -> sprintf "{%d}" (i + consumedArgs)) |> String.concat ", " |> sprintf ", %s"
+
+                sampleArgs + rest
+
+
+            let projArgs() =
+                let consumedArgs, sampleArgs =
+                    if isShadow then
+                        if coordComponents = 1 then
+                            3, "{0}, vec4({1}, {2}, 0).xwzy"
+                        else
+                            3, "{0}, vec4({1}, {2}).xywz"
+                    else
+                        2, "{0}, {1}"
+
+                let args = List.skip consumedArgs args
+
+                let rest =
+                    match args with
+                        | [] -> ""
+                        | _ ->
+                            args |> List.mapi (fun i _ -> sprintf "{%d}" (i + consumedArgs)) |> String.concat ", " |> sprintf ", %s"
+
+                sampleArgs + rest
+
+
+            let plainArgs(skip : int) =
+                args |> List.skip skip |> List.mapi (fun i _ -> sprintf "{%d}" (skip + i)) |> String.concat ", "
+
+            let functionName =
+                match name with
+                | "get_Size" ->
+                    if isMS then "textureSize({0})"
+                    else "textureSize({0}, 0)"
+
+                | "get_MipMapLevels" ->
+                    if isMS then "1"
+                    else "textureQueryLevels({0})"
+
+                | "GetSize" ->
+                    if isMS then "textureSize({0})"
+                    else "textureSize({0}, {1})"
+
+                | "get_Samples" ->
+                    "textureSamples({0})"
+
+                | "Sample" -> sprintf "texture(%s)" (sampleArgs false)
+                | "SampleOffset" -> sprintf "textureOffset(%s)" (sampleArgs false)
+                | "SampleProj" -> sprintf "textureProj(%s)" (projArgs())
+                | "SampleLevel" -> sprintf "textureLod(%s)" (sampleArgs false)
+                | "SampleLevelOffset" -> sprintf "textureLodOffset(%s)" (sampleArgs false)
+                | "SampleGrad" -> sprintf "textureGrad(%s)" (sampleArgs false)
+                | "Gather" -> sprintf "textureGather(%s)" (sampleArgs true)
+                | "GatherOffset" -> sprintf "textureGatherOffset(%s)" (sampleArgs true)
+
+                | "Read" -> sprintf "texelFetch(%s)" (fetchArgs())
+                | "get_Item" -> sprintf "texelFetch(%s)" (fetchArgs())
+
+                | "QueryLod" -> sprintf "textureQueryLod(%s)" (plainArgs 0)
+
+                | _ -> failwithf "unknown sampler function %s" name
+
+            let extensions =
+                match name with
+                | "get_Samples" -> ["GL_ARB_shader_texture_image_samples"]
+                | _ -> []
+
+            Some (functionName, Set.ofList extensions)
+        | _ ->
+            None
 

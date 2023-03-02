@@ -122,12 +122,12 @@ module ImageFormatExtensions =
                 typeof<r16>, ImageFormat.R16
                 typeof<r8>, ImageFormat.R8
 
-                typeof<rgba16_snorm>, ImageFormat.Rgba16
-                typeof<rgba8_snorm>, ImageFormat.Rgba8
-                typeof<rg16_snorm>, ImageFormat.Rg16
-                typeof<rg8_snorm>, ImageFormat.Rg8
-                typeof<r16_snorm>, ImageFormat.R16
-                typeof<r8_snorm>, ImageFormat.R8
+                typeof<rgba16_snorm>, ImageFormat.Rgba16Snorm
+                typeof<rgba8_snorm>, ImageFormat.Rgba8Snorm
+                typeof<rg16_snorm>, ImageFormat.Rg16Snorm
+                typeof<rg8_snorm>, ImageFormat.Rg8Snorm
+                typeof<r16_snorm>, ImageFormat.R16Snorm
+                typeof<r8_snorm>, ImageFormat.R8Snorm
 
                 typeof<rgba32ui>, ImageFormat.Rgba32ui
                 typeof<rgba16ui>, ImageFormat.Rgba16ui
@@ -170,6 +170,12 @@ module ImageFormatExtensions =
                 ImageFormat.R16, typeof<r16>
                 ImageFormat.R8, typeof<r8>
 
+                ImageFormat.Rgba16Snorm, typeof<rgba16_snorm>
+                ImageFormat.Rgba8Snorm, typeof<rgba8_snorm>
+                ImageFormat.Rg16Snorm, typeof<rg16_snorm>
+                ImageFormat.Rg8Snorm, typeof<rg8_snorm>
+                ImageFormat.R16Snorm, typeof<r16_snorm>
+                ImageFormat.R8Snorm, typeof<r8_snorm>
 
                 ImageFormat.Rgba32ui, typeof<rgba32ui>
                 ImageFormat.Rgba16ui, typeof<rgba16ui>

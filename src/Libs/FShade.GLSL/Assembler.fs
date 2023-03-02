@@ -139,7 +139,7 @@ type Backend private(config : Config) =
     override x.TryGetIntrinsicMethod (c : MethodInfo) =
         match c with
             | IntrinsicFunction f -> Some f
-            | TextureLookup fmt -> Some (CIntrinsic.tagged fmt)
+            | TextureLookup (fmt, exts) -> Some ({ CIntrinsic.tagged fmt with additional = exts })
             | _ -> c.Intrinsic<GLSLIntrinsicAttribute>()
 
     override x.TryGetIntrinsicCtor (c : ConstructorInfo) =
@@ -161,6 +161,7 @@ type Backend private(config : Config) =
                 let typePrefix = 
                     match valueType.Name with
                         | "V4i" -> "i"
+                        | "V4ui" -> "u"
                         | _ -> ""
 
                 let name = 
@@ -195,6 +196,7 @@ type Backend private(config : Config) =
                 let typePrefix = 
                     match valueType.Name with
                         | "V4i" -> "i"
+                        | "V4ui" -> "u"
                         | _ -> ""
 
                 let fmt = tFmt.Name
@@ -384,7 +386,11 @@ module AssemblerState =
                     
         )
 
-    
+    let useExtension (extensionName : string) =
+        State.modify (fun s ->
+            { s with requiredExtensions = s.requiredExtensions |> Set.add extensionName }
+        )
+  
 module Interface =
     let private modify (f : AssemblerState -> GLSLProgramInterface -> GLSLProgramInterface) =
         State.modify (fun (s : AssemblerState) ->
@@ -811,6 +817,7 @@ module Assembler =
             | CType.CFloat(32 | 64)                     -> "float" |> Identifier
                 
             | CType.CVector(CType.CInt(true, (8 | 16 | 32 | 64)), d)   -> "ivec" + string d |> Identifier
+            | CType.CVector(CType.CInt(false, (8 | 16 | 32 | 64)), d)  -> "uvec" + string d |> Identifier
             | CType.CVector(CType.CFloat(32 | 64), d)   -> "vec" + string d |> Identifier
             | CType.CMatrix(CType.CFloat(32 | 64), r,c) -> 
                 if rev then "mat" + string r + "x" + string c |> Identifier
@@ -991,8 +998,10 @@ module Assembler =
                 | CMatrixElement(_, m, r, c) ->
                     let! reverse = AssemblerState.reverseMatrixLogic
                     let! m = assembleExprS m
-                    if reverse then return sprintf "%s[%d][%d]" m r c
-                    else return sprintf "%s[%d][%d]" m c r
+                    let! r = assembleExprS r
+                    let! c = assembleExprS c
+                    if reverse then return sprintf "%s[%s][%s]" m r c
+                    else return sprintf "%s[%s][%s]" m c r
 
                 | CConvertMatrix(t, m) ->
                     let t = assembleType config.reverseMatrixLogic t
@@ -1025,7 +1034,7 @@ module Assembler =
                     return sprintf "%s[%s]" v i
                     
 
-                | CNewVector(r, _, args) ->
+                | CNewVector(r, args) ->
                     let! args = assembleExprsS ", " args
                     let t = assembleType config.reverseMatrixLogic r
                     return sprintf "%s(%s)" t.Name args
@@ -1077,6 +1086,56 @@ module Assembler =
                     let! l = assembleExprS l
                     let! r = assembleExprS r
                     return sprintf "(%s >> %s)" l r
+
+                | CVecAnyEqual(l, r) ->
+                    let! l = assembleExprS l
+                    let! r = assembleExprS r
+                    return sprintf "any(equal(%s, %s))" l r
+
+                | CVecAllNotEqual(l, r) ->
+                    let! l = assembleExprS l
+                    let! r = assembleExprS r
+                    return sprintf "all(notEqual(%s, %s))" l r
+
+                | CVecAnyLess(l, r) ->
+                    let! l = assembleExprS l
+                    let! r = assembleExprS r
+                    return sprintf "any(lessThan(%s, %s))" l r
+
+                | CVecAllLess(l, r) ->
+                    let! l = assembleExprS l
+                    let! r = assembleExprS r
+                    return sprintf "all(lessThan(%s, %s))" l r
+
+                | CVecAnyLequal(l, r) ->
+                    let! l = assembleExprS l
+                    let! r = assembleExprS r
+                    return sprintf "any(lessThanEqual(%s, %s))" l r
+
+                | CVecAllLequal(l, r) ->
+                    let! l = assembleExprS l
+                    let! r = assembleExprS r
+                    return sprintf "all(lessThanEqual(%s, %s))" l r
+
+                | CVecAnyGreater(l, r) ->
+                    let! l = assembleExprS l
+                    let! r = assembleExprS r
+                    return sprintf "any(greaterThan(%s, %s))" l r
+
+                | CVecAllGreater(l, r) ->
+                    let! l = assembleExprS l
+                    let! r = assembleExprS r
+                    return sprintf "all(greaterThan(%s, %s))" l r
+
+                | CVecAnyGequal(l, r) ->
+                    let! l = assembleExprS l
+                    let! r = assembleExprS r
+                    return sprintf "any(greaterThanEqual(%s, %s))" l r
+
+                | CVecAllGequal(l, r) ->
+                    let! l = assembleExprS l
+                    let! r = assembleExprS r
+                    return sprintf "all(greaterThanEqual(%s, %s))" l r
 
                 | CLess(l, r) ->
                     let! l = assembleExprS l
@@ -1175,12 +1234,13 @@ module Assembler =
                     match t with
                         | CVector(_,d) ->
                             let! m = assembleExprS m
+                            let! row = assembleExprS row
                             let! rev = AssemblerState.reverseMatrixLogic
                             if rev then 
-                                return sprintf "%s[%d]" m row
+                                return sprintf "%s[%s]" m row
                             else 
                                 let t = assembleType rev t
-                                let args = List.init d (fun i -> sprintf "%s[%d][%d]" m i row)
+                                let args = List.init d (fun i -> sprintf "%s[%d][%s]" m i row)
                                 return sprintf "%s(%s)" t.Name (String.concat ", " args)
                         | _ ->
                             return failwith "sadsadsad"
@@ -1189,17 +1249,28 @@ module Assembler =
                     match t with
                         | CVector(_,d) ->
                             let! m = assembleExprS m
+                            let! col = assembleExprS col
                             let! rev = AssemblerState.reverseMatrixLogic
                             if rev then 
                                 let t = assembleType rev t
-                                let args = List.init d (fun i -> sprintf "%s[%d][%d]" m i col)
+                                let args = List.init d (fun i -> sprintf "%s[%d][%s]" m i col)
                                 return sprintf "%s(%s)" t.Name (String.concat ", " args)
                             else
-                                return sprintf "%s[%d]" m col
+                                return sprintf "%s[%s]" m col
                         | _ ->
                             return failwith "sadsadsad"
-                    
 
+                | CDebugPrintf(fmt, values) ->
+                    do! AssemblerState.useExtension "GL_EXT_debug_printf"
+
+                    let! fmt = assembleExprS fmt
+                    let! values = values |> Array.mapS assembleExprS
+
+                    if values.Length = 0 then
+                        return sprintf "debugPrintfEXT(%s)" fmt
+                    else
+                        let values = values |> String.concat ", "
+                        return sprintf "debugPrintfEXT(%s, %s)" fmt values
         }
     
     and assembleExprsS (join : string) (args : seq<CExpr>) =
@@ -1590,6 +1661,11 @@ module Assembler =
             | DepthWriteMode.OnlyGreater -> "depth_greater"
             | _ -> "depth_any"
 
+    let assembleInterpolationMode (mode : InterpolationMode) =
+        [ if mode.HasFlag InterpolationMode.Centroid then "centroid"
+          if mode.HasFlag InterpolationMode.Flat then "flat"
+          if mode.HasFlag InterpolationMode.NoPerspective then "noperspective"
+          if mode.HasFlag InterpolationMode.Sample then "sample" ]
 
     let assembleEntryParameterS (kind : ParameterKind) (p : CEntryParameter) =
         state {
@@ -1606,12 +1682,6 @@ module Assembler =
                 | Some name -> 
                     do! Interface.useBuiltIn kind name p.cParamType
 
-                    let interpolation = 
-                        if kind = ParameterKind.Input && stages.Stage = ShaderStage.Fragment then
-                            p.cParamDecorations |> Seq.tryPick (function ParameterDecoration.Interpolation i -> Some i | _ -> None)
-                        else
-                            None
-
                     if name = "gl_FragDepth" && depthWrite <> DepthWriteMode.None then
                         if config.depthWriteMode then
                             let mode = assembleDepthWriteMode depthWrite
@@ -1619,24 +1689,7 @@ module Assembler =
                         else 
                             return None
                     else
-                        match interpolation with
-                        | Some i ->
-                            let mode =
-                                match i with
-                                | InterpolationMode.Centroid -> Some "centroid"
-                                | InterpolationMode.Flat -> Some "flat"
-                                | InterpolationMode.NoPerspective -> Some "noperspective"
-                                | InterpolationMode.Perspective -> Some "perspective"
-                                | InterpolationMode.Sample -> Some "sample"
-                                | _ -> None
-                            match mode with
-                            | Some m ->
-                                let t = assembleType config.reverseMatrixLogic p.cParamType
-                                return Some (sprintf "%s in %s %s;" m t.Name name)
-                            | None ->
-                                return None
-                        | None -> 
-                            return None
+                        return None
 
                 | None ->
                     let! set = 
@@ -1649,14 +1702,14 @@ module Assembler =
                     let! decorations =
                         p.cParamDecorations 
                         |> Set.toList
-                        |> List.chooseS (fun d ->
+                        |> List.collectS (fun d ->
                             state {
                                 match d with
                                 | ParameterDecoration.DepthWrite _ ->
-                                    return None
+                                    return []
 
                                 | ParameterDecoration.Const -> 
-                                    return Some "const"
+                                    return ["const"]
 
                                 | ParameterDecoration.Interpolation m ->
                                         
@@ -1669,15 +1722,9 @@ module Assembler =
                                         (selfStage = ShaderStage.TessControl && kind = ParameterKind.Output)
 
                                     match isTessPatch, isFragmentInput, m with
-                                        | _, true, InterpolationMode.Centroid -> return Some "centroid"
-                                        | _, true, InterpolationMode.Flat -> return Some "flat"
-                                        | _, true, InterpolationMode.NoPerspective -> return Some "noperspective"
-                                        | _, true, InterpolationMode.Perspective -> return Some "perspective"
-                                        | _, true, InterpolationMode.Sample -> return Some "sample"
-
-                                        | true, _, InterpolationMode.PerPatch -> return Some "patch"
-
-                                        | _ -> return None
+                                        | _, true, mode -> return assembleInterpolationMode mode
+                                        | true, _, mode when mode.HasFlag InterpolationMode.PerPatch -> return ["patch"]
+                                        | _ -> return []
 
                                 | ParameterDecoration.StorageBuffer(read, write) ->
                                     let! binding = AssemblerState.newBinding InputKind.StorageBuffer 1
@@ -1703,13 +1750,13 @@ module Assembler =
 //                                                | true, false -> " readonly"
 //                                                | _ -> ""
 
-                                    return Some (sprintf "layout(%s) buffer%s " args rw + (p.cParamSemantic + "_ssb"))
+                                    return [sprintf "layout(%s) buffer%s " args rw + (p.cParamSemantic + "_ssb")]
 
                                 | ParameterDecoration.Shared -> 
-                                    return Some "shared"
+                                    return ["shared"]
 
                                 | ParameterDecoration.Memory _ | ParameterDecoration.Slot _ ->
-                                    return None
+                                    return []
                             }
 
                         )

@@ -145,6 +145,9 @@ type RaytracingEffectState =
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module internal RaytracingEffectState =
+    open System
+    open System.IO
+    open System.Security.Cryptography
 
     let empty (raygen : Shader) =
         {
@@ -171,6 +174,42 @@ module internal RaytracingEffectState =
           CallableShaders = s.CallableShaders |> Map.map (fun n -> mapping (ShaderSlot.Callable n))
           HitGroups       = s.HitGroups |> Map.map (fun n -> HitGroup.map n mapping) }
 
+    let computeHash (s : RaytracingEffectState) =
+        use hash = SHA1.Create()
+        use ms = new MemoryStream()
+        use h = new CryptoStream(ms, hash, CryptoStreamMode.Write)
+        use w = new BinaryWriter(h, System.Text.Encoding.UTF8, true)
+        let state = Expr.SerializerState true
+
+        let serializeName (name : Symbol) =
+            name |> string |> Value.serialize w typeof<string>
+
+        let serializeShader (s : Shader) =
+            s.shaderStage |> int |> Value.serialize w typeof<int>
+            s.shaderBody |> Expr.serializeInternal state w
+
+        serializeShader s.RaygenShader
+
+        for (KeyValue(n, s)) in s.MissShaders do
+            serializeName n
+            serializeShader s
+
+        for (KeyValue(n, s)) in s.CallableShaders do
+            serializeName n
+            serializeShader s
+
+        for (KeyValue(n, g)) in s.HitGroups do
+            serializeName n
+
+            for (KeyValue(n, s)) in g.PerRayType do
+                serializeName n
+                s.AnyHit |> Option.iter serializeShader
+                s.ClosestHit |> Option.iter serializeShader
+                s.Intersection |> Option.iter serializeShader
+
+        h.FlushFinalBlock()
+        hash.Hash |> Convert.ToBase64String
+
 type RaytracingEffect internal(state : RaytracingEffectState) =
 
     let shaderBindingTableLayout =
@@ -190,6 +229,13 @@ type RaytracingEffect internal(state : RaytracingEffectState) =
         lazy (
             state |> RaytracingEffectState.map (prepareShader shaderBindingTableLayout.Value)
         )
+
+    let id =
+        lazy (
+            state.Value |> RaytracingEffectState.computeHash
+        )
+
+    member x.Id = id.Value
 
     member x.ShaderBindingTableLayout =
         shaderBindingTableLayout.Value
@@ -246,7 +292,7 @@ module RaytracingEffect =
             |> List.concat
 
         {
-            hash = effect |> hash |> string
+            hash = effect.Id
             userData = effect
             entries = entryPoints
             tryGetOverrideCode = Shader.tryGetOverrideCode V3i.Zero

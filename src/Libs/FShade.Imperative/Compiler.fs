@@ -318,7 +318,7 @@ module Compiler =
                 | CType.CBool       -> CValue(t, CLiteral.CBool false)
                 | CInt _            -> CValue(t, CIntegral 0L)
                 | CFloat _          -> CValue(t, CFractional 0.0)
-                | CVector(bt, d)    -> CNewVector(t, d, List.replicate d (zero bt))
+                | CVector(bt, d)    -> CNewVector(t, List.replicate d (zero bt))
                 | CMatrix(bt, r, c) -> CMatrixFromRows(t, zero (CVector(bt, c)) |> List.replicate r)
                 | _                 -> failwithf "[FShade] cannot create zero-value for type %A" t
 
@@ -327,7 +327,7 @@ module Compiler =
                 | CType.CBool       -> CValue(t, CLiteral.CBool true)
                 | CInt _            -> CValue(t, CIntegral 1L)
                 | CFloat _          -> CValue(t, CFractional 1.0)
-                | CVector(bt, d)    -> CNewVector(t, d, List.replicate d (one bt))
+                | CVector(bt, d)    -> CNewVector(t, List.replicate d (one bt))
                 | _                 -> failwithf "[FShade] cannot create one-value for type %A" t
 
         module private Generators =         
@@ -397,17 +397,6 @@ module Compiler =
                     | _ ->
                         e
 
-        let private (|Transpose|_|) (mi : MethodInfo) (args : list<CExpr>) =
-            match mi, args with
-            | MethodQuote <@ Mat.transpose : M44d -> M44d @> _, [m]    
-            | MethodQuote <@ Mat.Transposed : M44d -> M44d @> _, [m]    
-            | Method("Transpose", [MatrixOf _]) , [m]
-            | Method("get_Transposed", _), [m] -> 
-                Some m
-            | _ ->
-                None
-
-                
         let private vecSwizzleRx = System.Text.RegularExpressions.Regex @"get_([XYZW]+)"
         let rec tryGetBuiltInMethod (b : IBackend) (mi : MethodInfo) (args : list<CExpr>) =
             let ct = CType.ofType b mi.ReturnType
@@ -448,8 +437,8 @@ module Compiler =
 
                 // transpose
                 | MethodQuote <@ Mat.transpose : M44d -> M44d @> _, [m]    
-                | MethodQuote <@ Mat.Transposed : M44d -> M44d @> _, [m]    
                 | Method("Transpose", [MatrixOf _]) , [m]
+                | Method("Transposed", [MatrixOf _]) , [m]
                 | Method("get_Transposed", _), [m] -> 
                     match m with
                     | CTranspose(_, m) -> Some m
@@ -458,91 +447,119 @@ module Compiler =
                         | CMatrix(b,r,c) -> CTranspose(CMatrix(b,c,r), m) |> Some
                         | _ -> None
                    
-                // dot         
+                // dot
                 | MethodQuote <@ Vec.dot : V4d -> V4d -> float @> _, [l;r]
-                | MethodQuote <@ Vec.Dot : V4d * V4d -> float @> _, [l;r]
                 | Method("Dot", [VectorOf _; VectorOf _]), [l;r] ->
                     CDot(ct, l, r) |> Some
               
-                // length         
+                // length
                 | MethodQuote <@ Vec.length : V4d -> float @> _, [v]
-                | MethodQuote <@ Vec.Length : V4d -> float @> _, [v]
-                | Method("get_Length", [VectorOf _]), [v] ->
+                | Method("Length", [VectorOf _]), [v]
+                | Method("Norm2", [VectorOf _]), [v]
+                | Method("get_Length", [VectorOf _]), [v]
+                | Method("get_Norm2", [VectorOf _]), [v] ->
                     CVecLength(ct, v) |> Some
 
                 | Method("get_Length", [ArrOf(l,_)]), [a] ->
                     CValue(CType.CInt(true, 32), CIntegral (int64 l)) |> Some
 
-                 // lengthSquared     
-                | MethodQuote <@ Vec.lengthSquared : V4d -> float @> _, [v]
-                | MethodQuote <@ Vec.LengthSquared : V4d -> float @> _, [v]
-                | Method("get_LengthSquared", [VectorOf _]), [v] ->
-                    CDot(ct, v, v) |> Some
-                               
-
                 // cross              
                 | MethodQuote <@ Vec.cross : V3d -> V3d -> V3d @> _, [l;r]
-                | MethodQuote <@ Vec.Cross : V3d * V3d -> V3d @> _, [l;r]
                 | Method("Cross", [VectorOf _; VectorOf _]), [l;r] ->
                     CCross(ct, l, r) |> Some
 
+                // transform
+                | MethodQuote <@ Mat.transform : M44d -> V4d -> V4d @> _, [m;v]
+                | Method("Transform", [MatrixOf _; VectorOf _]), [m;v] ->
+                    match m.ctype, v.ctype with
+                    | CMatrix(_, _, cols), CVector(_, dim) when cols = dim ->
+                        let res = CMulMatVec(v.ctype, m, v) |> Simplification.simplifyMatrixTerm
+                        Some res
+                    | _ ->
+                        None
+
                 // transformDir
                 | MethodQuote <@ Mat.transformDir : M44d -> V3d -> V3d @> _, [m;v]
-                | MethodQuote <@ Mat.TransformDir : M44d * V3d -> V3d @> _, [m;v]
                 | Method("TransformDir", [MatrixOf _; VectorOf _]), [m;v] ->
                     match ct, v.ctype with
-                        | CVector(rt, rd), CVector(t, d) ->
-                            let res = CMulMatVec(CVector(rt, rd + 1), m, CNewVector(CVector(t, d + 1), d, [v; zero t])) |> Simplification.simplifyMatrixTerm
-                            CVecSwizzle(ct, res, CVecComponent.first rd) |> Some
-                        | _ ->
-                            None
+                    | CVector(rt, rd), CVector(t, d) ->
+                        let res = CMulMatVec(CVector(rt, rd + 1), m, CNewVector(CVector(t, d + 1), [v; zero t])) |> Simplification.simplifyMatrixTerm
+                        CVecSwizzle(ct, res, CVecComponent.first rd) |> Some
+                    | _ ->
+                        None
 
                 // transformPos
                 | MethodQuote <@ Mat.transformPos : M44d -> V3d -> V3d @> _, [m;v] 
-                | MethodQuote <@ Mat.TransformPos : M44d * V3d -> V3d @> _, [m;v] 
                 | Method("TransformPos", [MatrixOf _; VectorOf _]), [m;v] ->
                     match ct, v.ctype with
                         | CVector(rt, rd), CVector(t, d) ->
-                            let res = CMulMatVec(CVector(rt, rd + 1), m, CNewVector(CVector(t, d + 1), d, [v; one t])) |> Simplification.simplifyMatrixTerm
+                            let res = CMulMatVec(CVector(rt, rd + 1), m, CNewVector(CVector(t, d + 1), [v; one t])) |> Simplification.simplifyMatrixTerm
                             CVecSwizzle(ct, res, CVecComponent.first rd) |> Some
                         | _ ->
                             None
 
+                // transformPosProjFull
+                | Method("TransformPosProjFull", [MatrixOf _; VectorOf _]), [m; v] ->
+                    match m.ctype, v.ctype with
+                    | CMatrix(_, r, c), CVector(t, d) when r = c && d = c - 1 ->
+                        let res = CMulMatVec(CVector(t, d + 1), m, CNewVector(CVector(t, d + 1), [v; one t])) |> Simplification.simplifyMatrixTerm
+                        Some res
+                    | _ ->
+                        None
+
+                // transposedTransform
+                | Method("TransposedTransform", [MatrixOf _; VectorOf _]), [m;v] ->
+                    match m.ctype, v.ctype with
+                    | CMatrix(_, rows, _), CVector(_, dim) when rows = dim ->
+                        let res = CMulVecMat(v.ctype, v, m) |> Simplification.simplifyMatrixTerm
+                        Some res
+                    | _ ->
+                        None
+
                 // transposedTransformDir
-                | MethodQuote <@ Mat.TransposedTransformDir : M44d * V3d -> V3d @> _, [m; v]
                 | Method("TransposedTransformDir", [MatrixOf _; VectorOf _]), [m;v] ->
                     match ct, v.ctype with
                         | CVector(rt, rd), CVector(t, d) ->
-                            let res = CMulVecMat(CVector(rt, rd + 1), CNewVector(CVector(t, d + 1), d, [v; zero t]), m) |> Simplification.simplifyMatrixTerm
+                            let res = CMulVecMat(CVector(rt, rd + 1), CNewVector(CVector(t, d + 1), [v; zero t]), m) |> Simplification.simplifyMatrixTerm
                             CVecSwizzle(ct, res, CVecComponent.first rd) |> Some
                         | _ ->
                             None
 
-                // transposedTransformDir
-                | MethodQuote <@ Mat.TransposedTransformPos : M44d * V3d -> V3d @> _, [m; v]
+                // transposedTransformPos
                 | Method("TransposedTransformPos", [MatrixOf _; VectorOf _]), [m;v] ->
                     match ct, v.ctype with
                         | CVector(rt, rd), CVector(t, d) ->
-                            let res = CMulVecMat(CVector(rt, rd + 1), CNewVector(CVector(t, d + 1), d, [v; one t]), m) |> Simplification.simplifyMatrixTerm
+                            let res = CMulVecMat(CVector(rt, rd + 1), CNewVector(CVector(t, d + 1), [v; one t]), m) |> Simplification.simplifyMatrixTerm
                             CVecSwizzle(ct, res, CVecComponent.first rd) |> Some
                         | _ ->
                             None
 
-                
-                
+                // transposedTransformProjFull
+                | Method("TransposedTransformProjFull", [MatrixOf _; VectorOf _]), [m;v] ->
+                    match m.ctype, v.ctype with
+                    | CMatrix(_, r, c), CVector(t, d) when r = c && d = c - 1 ->
+                        let res = CMulVecMat(CVector(t, d + 1), CNewVector(CVector(t, d + 1), [v; one t]), m) |> Simplification.simplifyMatrixTerm
+                        Some res
+                    | _ ->
+                        None
+
                 | MethodQuote <@ m22d : M22f -> _ @> _, [m] 
+                | MethodQuote <@ m23d : M22f -> _ @> _, [m] 
                 | MethodQuote <@ m33d : M33f -> _ @> _, [m] 
                 | MethodQuote <@ m34d : M34f -> _ @> _, [m] 
                 | MethodQuote <@ m44d : M44f -> _ @> _, [m] 
                 | MethodQuote <@ m22f : M22d -> _ @> _, [m] 
+                | MethodQuote <@ m23f : M22d -> _ @> _, [m] 
                 | MethodQuote <@ m33f : M33d -> _ @> _, [m] 
                 | MethodQuote <@ m34f : M34d -> _ @> _, [m] 
-                | MethodQuote <@ m44f : M44d -> _ @> _, [m] 
+                | MethodQuote <@ m44f : M44d -> _ @> _, [m]
                 | MethodQuote <@ m22i : M22d -> _ @> _, [m] 
+                | MethodQuote <@ m23i : M22d -> _ @> _, [m] 
                 | MethodQuote <@ m33i : M33d -> _ @> _, [m] 
                 | MethodQuote <@ m34i : M34d -> _ @> _, [m] 
                 | MethodQuote <@ m44i : M44d -> _ @> _, [m] 
                 | MethodQuote <@ m22l : M22d -> _ @> _, [m] 
+                | MethodQuote <@ m23l : M22d -> _ @> _, [m] 
                 | MethodQuote <@ m33l : M33d -> _ @> _, [m] 
                 | MethodQuote <@ m34l : M34d -> _ @> _, [m] 
                 | MethodQuote <@ m44l : M44d -> _ @> _, [m] 
@@ -552,10 +569,36 @@ module Compiler =
                         | CMatrix(et, r, c) ->
                             CConvertMatrix(ct, m) |> Some
                         | _ ->
-                            None 
+                            None
 
+                | MethodQuote <@ v2d : V4d -> _ @> _, args
+                | MethodQuote <@ v3d : V4d -> _ @> _, args
+                | MethodQuote <@ v4d : V4d -> _ @> _, args
+                | MethodQuote <@ v2f : V4d -> _ @> _, args
+                | MethodQuote <@ v3f : V4d -> _ @> _, args
+                | MethodQuote <@ v4f : V4d -> _ @> _, args
+                | MethodQuote <@ v2l : V4d -> _ @> _, args
+                | MethodQuote <@ v3l : V4d -> _ @> _, args
+                | MethodQuote <@ v4l : V4d -> _ @> _, args
+                | MethodQuote <@ v2i : V4d -> _ @> _, args
+                | MethodQuote <@ v3i : V4d -> _ @> _, args
+                | MethodQuote <@ v4i : V4d -> _ @> _, args
+                | MethodQuote <@ v2ui : V4d -> _ @> _, args
+                | MethodQuote <@ v3ui : V4d -> _ @> _, args
+                | MethodQuote <@ v4ui : V4d -> _ @> _, args
+                | Method("op_Explicit", [VectorOf _]), args ->
+                    match ct with
+                    | CVector(_, _) ->
+                        CNewVector(ct, args) |> Some
+                    | _ ->
+                        None
 
                 // vector swizzles
+                | (MethodQuote <@ Vec.x : V4d -> float @> _ ), [v] -> CVecSwizzle(ct, v, CVecComponent.x) |> Some
+                | (MethodQuote <@ Vec.y : V4d -> float @> _ ), [v] -> CVecSwizzle(ct, v, CVecComponent.y) |> Some
+                | (MethodQuote <@ Vec.z : V4d -> float @> _ ), [v] -> CVecSwizzle(ct, v, CVecComponent.z) |> Some
+                // TODO: Uncomment for Aardvark.Base >= 5.2.17
+                //| (MethodQuote <@ Vec.w : V4d -> float @> _ ), [v] -> CVecSwizzle(ct, v, CVecComponent.w) |> Some
                 | (MethodQuote <@ Vec.xy : V4d -> V2d @> _ ), [v] -> CVecSwizzle(ct, v, CVecComponent.xy) |> Some
                 | (MethodQuote <@ Vec.yz : V4d -> V2d @> _), [v] -> CVecSwizzle(ct, v, CVecComponent.yz) |> Some
                 | (MethodQuote <@ Vec.zw : V4d -> V2d @> _), [v] -> CVecSwizzle(ct, v, CVecComponent.zw) |> Some
@@ -575,35 +618,158 @@ module Compiler =
                             | c -> failwithf "bad regex match: %A" m
                         )
                     CVecSwizzle(ct, v, components) |> Some
-                
+
+                // vector relations
+                | (MethodQuote <@ Vec.anyEqual : V2d -> V2d -> bool @> _), [x; y]
+                | VecMethod("AnyEqual", _), [x; y] ->
+                    match x.ctype, y.ctype with
+                    | CVector _, CVector _ -> CVecAnyEqual(x, y) |> Some
+                    | CVector _ as vt, _   -> CVecAnyEqual(x, CNewVector(vt, [y])) |> Some
+                    | _, (CVector _ as vt) -> CVecAnyEqual(CNewVector(vt, [x]), y) |> Some
+                    | _ -> None
+
+                | (MethodQuote <@ Vec.allEqual : V2d -> V2d -> bool @> _), [x; y]
+                | VecMethod("AllEqual", _), [x; y] ->
+                    match x.ctype, y.ctype with
+                    | CVector _, CVector _ -> CEqual(x, y) |> Some
+                    | CVector _ as vt, _   -> CEqual(x, CNewVector(vt, [y])) |> Some
+                    | _, (CVector _ as vt) -> CEqual(CNewVector(vt, [x]), y) |> Some
+                    | _ -> None
+
+                | (MethodQuote <@ Vec.anyDifferent : V2d -> V2d -> bool @> _), [x; y]
+                | VecMethod("AnyDifferent", _), [x; y] ->
+                    match x.ctype, y.ctype with
+                    | CVector _, CVector _ -> CNotEqual(x, y) |> Some
+                    | CVector _ as vt, _   -> CNotEqual(x, CNewVector(vt, [y])) |> Some
+                    | _, (CVector _ as vt) -> CNotEqual(CNewVector(vt, [x]), y) |> Some
+                    | _ -> None
+
+                | (MethodQuote <@ Vec.allDifferent : V2d -> V2d -> bool @> _), [x; y]
+                | VecMethod("AllDifferent", _), [x; y] ->
+                    match x.ctype, y.ctype with
+                    | CVector _, CVector _ -> CVecAllNotEqual(x, y) |> Some
+                    | CVector _ as vt, _   -> CVecAllNotEqual(x, CNewVector(vt, [y])) |> Some
+                    | _, (CVector _ as vt) -> CVecAllNotEqual(CNewVector(vt, [x]), y) |> Some
+                    | _ -> None
+
+                | (MethodQuote <@ Vec.anySmaller : V2d -> V2d -> bool @> _), [x; y]
+                | VecMethod("AnySmaller", _), [x; y] ->
+                    match x.ctype, y.ctype with
+                    | CVector _, CVector _ -> CVecAnyLess(x, y) |> Some
+                    | CVector _ as vt, _   -> CVecAnyLess(x, CNewVector(vt, [y])) |> Some
+                    | _, (CVector _ as vt) -> CVecAnyLess(CNewVector(vt, [x]), y) |> Some
+                    | _ -> None
+
+                | (MethodQuote <@ Vec.allSmaller : V2d -> V2d -> bool @> _), [x; y]
+                | VecMethod("AllSmaller", _), [x; y] ->
+                    match x.ctype, y.ctype with
+                    | CVector _, CVector _ -> CVecAllLess(x, y) |> Some
+                    | CVector _ as vt, _   -> CVecAllLess(x, CNewVector(vt, [y])) |> Some
+                    | _, (CVector _ as vt) -> CVecAllLess(CNewVector(vt, [x]), y) |> Some
+                    | _ -> None
+
+                | (MethodQuote <@ Vec.anySmallerOrEqual : V2d -> V2d -> bool @> _), [x; y]
+                | VecMethod("AnySmallerOrEqual", _), [x; y] ->
+                    match x.ctype, y.ctype with
+                    | CVector _, CVector _ -> CVecAnyLequal(x, y) |> Some
+                    | CVector _ as vt, _   -> CVecAnyLequal(x, CNewVector(vt, [y])) |> Some
+                    | _, (CVector _ as vt) -> CVecAnyLequal(CNewVector(vt, [x]), y) |> Some
+                    | _ -> None
+
+                | (MethodQuote <@ Vec.allSmallerOrEqual : V2d -> V2d -> bool @> _), [x; y]
+                | VecMethod("AllSmallerOrEqual", _), [x; y] ->
+                    match x.ctype, y.ctype with
+                    | CVector _, CVector _ -> CVecAllLequal(x, y) |> Some
+                    | CVector _ as vt, _   -> CVecAllLequal(x, CNewVector(vt, [y])) |> Some
+                    | _, (CVector _ as vt) -> CVecAllLequal(CNewVector(vt, [x]), y) |> Some
+                    | _ -> None
+
+                | (MethodQuote <@ Vec.anyGreater : V2d -> V2d -> bool @> _), [x; y]
+                | VecMethod("AnyGreater", _), [x; y] ->
+                    match x.ctype, y.ctype with
+                    | CVector _, CVector _ -> CVecAnyGreater(x, y) |> Some
+                    | CVector _ as vt, _   -> CVecAnyGreater(x, CNewVector(vt, [y])) |> Some
+                    | _, (CVector _ as vt) -> CVecAnyGreater(CNewVector(vt, [x]), y) |> Some
+                    | _ -> None
+
+                | (MethodQuote <@ Vec.allGreater : V2d -> V2d -> bool @> _), [x; y]
+                | VecMethod("AllGreater", _), [x; y] ->
+                    match x.ctype, y.ctype with
+                    | CVector _, CVector _ -> CVecAllGreater(x, y) |> Some
+                    | CVector _ as vt, _   -> CVecAllGreater(x, CNewVector(vt, [y])) |> Some
+                    | _, (CVector _ as vt) -> CVecAllGreater(CNewVector(vt, [x]), y) |> Some
+                    | _ -> None
+
+                | (MethodQuote <@ Vec.anyGreaterOrEqual : V2d -> V2d -> bool @> _), [x; y]
+                | VecMethod("AnyGreaterOrEqual", _), [x; y] ->
+                    match x.ctype, y.ctype with
+                    | CVector _, CVector _ -> CVecAnyGequal(x, y) |> Some
+                    | CVector _ as vt, _   -> CVecAnyGequal(x, CNewVector(vt, [y])) |> Some
+                    | _, (CVector _ as vt) -> CVecAnyGequal(CNewVector(vt, [x]), y) |> Some
+                    | _ -> None
+
+                | (MethodQuote <@ Vec.allGreaterOrEqual : V2d -> V2d -> bool @> _), [x; y]
+                | VecMethod("AllGreaterOrEqual", _), [x; y] ->
+                    match x.ctype, y.ctype with
+                    | CVector _, CVector _ -> CVecAllGequal(x, y) |> Some
+                    | CVector _ as vt, _   -> CVecAllGequal(x, CNewVector(vt, [y])) |> Some
+                    | _, (CVector _ as vt) -> CVecAllGequal(CNewVector(vt, [x]), y) |> Some
+                    | _ -> None
+
+                // matrix relations
+                | (MethodQuote <@ Mat.allEqual : M22d -> M22d -> bool @> _), [x; y]
+                | MatMethod("AllEqual", _), [x; y] ->
+                    match x.ctype, y.ctype with
+                    | CMatrix _, CMatrix _ -> CEqual(x, y) |> Some
+                    | CMatrix _ as mt, _   -> CEqual(x, CNewMatrix(mt, [y])) |> Some
+                    | _, (CMatrix _ as mt) -> CEqual(CNewMatrix(mt, [x]), y) |> Some
+                    | _ -> None
+
+                | (MethodQuote <@ Mat.anyDifferent : M22d -> M22d -> bool @> _), [x; y]
+                | MatMethod("AnyDifferent", _), [x; y] ->
+                    match x.ctype, y.ctype with
+                    | CMatrix _, CMatrix _ -> CNotEqual(x, y) |> Some
+                    | CMatrix _ as vt, _   -> CNotEqual(x, CNewMatrix(vt, [y])) |> Some
+                    | _, (CMatrix _ as vt) -> CNotEqual(CNewMatrix(vt, [x]), y) |> Some
+                    | _ -> None
+
                 // matrix creation
                 | Method("FromRows", _), rows -> CMatrixFromRows(ct, rows) |> Some
                 | Method("FromCols", _), rows -> CMatrixFromCols(ct, rows) |> Some
 
                 // matrix swizzles
-                | Method("get_R0", [MatrixOf _]), [m] -> 
-                    CMatrixRow(ct, m, 0) |> Some
+                | Method("get_Item", [MatrixOf _; Int32; Int32]), [m;r;c] ->
+                    CMatrixElement(ct, m, r, c) |> Some
+
+                | Method("Row", [MatrixOf _; Int32]), [m; i] ->
+                    CMatrixRow(ct, m, i) |> Some
+
+                | Method("Column", [MatrixOf _; Int32]), [m; i] ->
+                    CMatrixCol(ct, m, i) |> Some
+
+                | Method("get_R0", [MatrixOf _]), [m] ->         
+                    CExpr.MatrixRow(ct, m, 0) |> Some
 
                 | Method("get_R1", [MatrixOf _]), [m] -> 
-                    CMatrixRow(ct, m, 1) |> Some
+                    CExpr.MatrixRow(ct, m, 1) |> Some
 
                 | Method("get_R2", [MatrixOf _]), [m] -> 
-                    CMatrixRow(ct, m, 2) |> Some
+                    CExpr.MatrixRow(ct, m, 2) |> Some
                     
                 | Method("get_R3", [MatrixOf _]), [m] -> 
-                    CMatrixRow(ct, m, 3) |> Some
+                    CExpr.MatrixRow(ct, m, 3) |> Some
 
                 | Method("get_C0", [MatrixOf _]), [m] -> 
-                    CMatrixCol(ct, m, 0) |> Some
+                    CExpr.MatrixCol(ct, m, 0) |> Some
 
                 | Method("get_C1", [MatrixOf _]), [m] -> 
-                    CMatrixCol(ct, m, 1) |> Some
+                    CExpr.MatrixCol(ct, m, 1) |> Some
 
                 | Method("get_C2", [MatrixOf _]), [m] -> 
-                    CMatrixCol(ct, m, 2) |> Some
+                    CExpr.MatrixCol(ct, m, 2) |> Some
 
                 | Method("get_C3", [MatrixOf _]), [m] -> 
-                    CMatrixCol(ct, m, 3) |> Some
+                    CExpr.MatrixCol(ct, m, 3) |> Some
 
 
                 | Method("op_BooleanAnd", _), [l;r]         -> CExpr.CAnd(l, r) |> Some
@@ -623,8 +789,8 @@ module Compiler =
                 | Method("get_Item", [ArrOf(_,_); _]), [arr; index]
                 | Method("GetArray", _), [arr; index] -> 
                     CExpr.CItem(ct, arr, index) |> Some
-                    
-                
+
+
 
                 | ConversionMethod(_,o), [arg]              -> CExpr.CConvert(CType.ofType b o, arg) |> Some
                 | _ -> None
@@ -653,7 +819,7 @@ module Compiler =
                         else
                             args
 
-                    CNewVector(CType.ofType b ctor.DeclaringType, d, args) |> Some
+                    CNewVector(CType.ofType b ctor.DeclaringType, args) |> Some
 
                 | MatrixOf(s, _) ->
                     let l = List.length args
@@ -673,22 +839,22 @@ module Compiler =
                 | VectorOf _, "Z" -> CVecSwizzle(ct, arg, [CVecComponent.Z]) |> Some
                 | VectorOf _, "W" -> CVecSwizzle(ct, arg, [CVecComponent.W]) |> Some
 
-                | MatrixOf _, "M00" -> CMatrixElement(ct, arg, 0, 0) |> Some
-                | MatrixOf _, "M01" -> CMatrixElement(ct, arg, 0, 1) |> Some
-                | MatrixOf _, "M02" -> CMatrixElement(ct, arg, 0, 2) |> Some
-                | MatrixOf _, "M03" -> CMatrixElement(ct, arg, 0, 3) |> Some
-                | MatrixOf _, "M10" -> CMatrixElement(ct, arg, 1, 0) |> Some
-                | MatrixOf _, "M11" -> CMatrixElement(ct, arg, 1, 1) |> Some
-                | MatrixOf _, "M12" -> CMatrixElement(ct, arg, 1, 2) |> Some
-                | MatrixOf _, "M13" -> CMatrixElement(ct, arg, 1, 3) |> Some
-                | MatrixOf _, "M20" -> CMatrixElement(ct, arg, 2, 0) |> Some
-                | MatrixOf _, "M21" -> CMatrixElement(ct, arg, 2, 1) |> Some
-                | MatrixOf _, "M22" -> CMatrixElement(ct, arg, 2, 2) |> Some
-                | MatrixOf _, "M23" -> CMatrixElement(ct, arg, 2, 3) |> Some
-                | MatrixOf _, "M30" -> CMatrixElement(ct, arg, 3, 0) |> Some
-                | MatrixOf _, "M31" -> CMatrixElement(ct, arg, 3, 1) |> Some
-                | MatrixOf _, "M32" -> CMatrixElement(ct, arg, 3, 2) |> Some
-                | MatrixOf _, "M33" -> CMatrixElement(ct, arg, 3, 3) |> Some
+                | MatrixOf _, "M00" -> CExpr.MatrixElement(ct, arg, 0, 0) |> Some
+                | MatrixOf _, "M01" -> CExpr.MatrixElement(ct, arg, 0, 1) |> Some
+                | MatrixOf _, "M02" -> CExpr.MatrixElement(ct, arg, 0, 2) |> Some
+                | MatrixOf _, "M03" -> CExpr.MatrixElement(ct, arg, 0, 3) |> Some
+                | MatrixOf _, "M10" -> CExpr.MatrixElement(ct, arg, 1, 0) |> Some
+                | MatrixOf _, "M11" -> CExpr.MatrixElement(ct, arg, 1, 1) |> Some
+                | MatrixOf _, "M12" -> CExpr.MatrixElement(ct, arg, 1, 2) |> Some
+                | MatrixOf _, "M13" -> CExpr.MatrixElement(ct, arg, 1, 3) |> Some
+                | MatrixOf _, "M20" -> CExpr.MatrixElement(ct, arg, 2, 0) |> Some
+                | MatrixOf _, "M21" -> CExpr.MatrixElement(ct, arg, 2, 1) |> Some
+                | MatrixOf _, "M22" -> CExpr.MatrixElement(ct, arg, 2, 2) |> Some
+                | MatrixOf _, "M23" -> CExpr.MatrixElement(ct, arg, 2, 3) |> Some
+                | MatrixOf _, "M30" -> CExpr.MatrixElement(ct, arg, 3, 0) |> Some
+                | MatrixOf _, "M31" -> CExpr.MatrixElement(ct, arg, 3, 1) |> Some
+                | MatrixOf _, "M32" -> CExpr.MatrixElement(ct, arg, 3, 2) |> Some
+                | MatrixOf _, "M33" -> CExpr.MatrixElement(ct, arg, 3, 3) |> Some
 
                 | _ -> None
 
@@ -1290,7 +1456,32 @@ module Compiler =
                             let! def = FunctionDefinition.Utility f |> CompilerState.useGlobalFunction f.uniqueName
                             return CCall(def, List.toArray args)
 
-                
+                | Call(None, (Method("Printf", _) as mi), [fmt; values]) when mi.DeclaringType.Name = "Debug" ->
+                    let fmt =
+                        match Expr.TryEval fmt with
+                        | Some (:? string as fmt) -> CExpr.CValue(CType.CVoid, CLiteral.CString fmt)
+                        | _ -> failwithf "[FShade] Failed to evaluate format expression"
+
+                    let removeCoerce = function
+                        | Coerce(e, _) -> e
+                        | e -> e
+
+                    let values =
+                        match values with
+                        | NewArray(_, values)
+                        | NewFixedArray(_, _, values) ->
+                            values |> List.toArray |> Array.map removeCoerce
+
+                        | Value((:? array<obj> as arr), _) ->
+                            arr |> Array.map (fun e -> Expr.Value(e, e.GetType()))
+
+                        | _ ->
+                            failwithf "[FShade] Unknown arguments for Debug.Printf (%A)" values
+
+                    let! values =
+                        values |> Array.mapS toCExprS
+
+                    return CDebugPrintf(fmt, values)
 
                 | Call(None, mi, t :: args) | Call(Some t, mi, args) ->
                     let args = t :: args

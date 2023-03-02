@@ -152,22 +152,35 @@ module GLSL =
         let glsl, res = compileRaytracing e
         printResults res glsl
 
-    let shouldContainRegex (shader : GLSLShader) (regexList : list<string>) = 
+    let shouldContainRegex (shader : GLSLShader) (regexList : list<string * Option<int>>) =
+        regexList |> List.iter (fun (regex, count) ->
+            match count with
+            | Some n ->
+                let actual = Regex.Matches(shader.code, regex).Count
 
-        let notContained = regexList |> List.filter (fun s ->
-                if Regex.Match(shader.code, s).Success then
-                    false
-                else 
-                    true
-            )
+                if n <> actual then
+                    failwithf "ERROR: Expected compiled shader to contain '%s' %d times (encountered %d times)" regex n actual
 
-        if List.length notContained = 0 then
-            ()
-        else 
-            failwithf "ERROR: Compiled shader did not contain %A" notContained
+            | _ ->
+                if not <| Regex.Match(shader.code, regex).Success then
+                    failwithf "ERROR: Compiled shader did not contain '%s'" regex
+        )
 
     let shouldCompileAndContainRegex (e : list<Effect>) (s : list<string>) =
         let glsl, res = compile e
+        let s = s |> List.map (fun s -> s, None)
+        
+        Console.WriteLine("{0}", glsl.code)
+        for (stage, r) in res do
+            Console.WriteLine("{0}: {1}", stage, sprintf "%A" r)
+            match r with
+                | Success -> shouldContainRegex glsl s
+                | Warning w -> shouldContainRegex glsl s
+                | Error e -> failwithf "ERROR: %A" e
+
+    let shouldCompileAndContainRegexWithCount (e : list<Effect>) (s : list<string * int>) =
+        let glsl, res = compile e
+        let s = s |> List.map (fun (s, n) -> s, Some n)
         
         Console.WriteLine("{0}", glsl.code)
         for (stage, r) in res do
@@ -179,6 +192,7 @@ module GLSL =
 
     let shouldCompileRaytracingAndContainRegex (e : RaytracingEffect) (s : list<string>) =
         let glsl, res = compileRaytracing e
+        let s = s |> List.map (fun s -> s, None)
         
         Console.WriteLine("{0}", glsl.code)
         for (stage, r) in res do

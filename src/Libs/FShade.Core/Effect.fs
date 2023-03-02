@@ -1098,7 +1098,12 @@ module Effect =
                             match idx with
                             | Value((:? int as i), _) ->
                                 let name = sprintf "%s_%d" name i
-                                inputs <- Map.add name { paramType = typ; paramInterpolation = InterpolationMode.Flat } inputs
+                                let interp =
+                                    Map.tryFind name inputs
+                                    |> Option.map ParameterDescription.paramInterpolation
+                                    |> Option.defaultValue InterpolationMode.Default
+
+                                inputs <- Map.add name { paramType = typ; paramInterpolation = interp ||| InterpolationMode.Flat } inputs
                                 Some (Expr.ReadInput(kind, typ, name))
                             | _ ->
                                 failwith "non-constant input access"

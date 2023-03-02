@@ -1,5 +1,6 @@
 ﻿namespace FShade
 
+open System
 open Aardvark.Base
 
 type DepthWriteMode =
@@ -9,20 +10,21 @@ type DepthWriteMode =
     | OnlyGreater   = 3
     | OnlyLess      = 4
 
+[<Flags>]
 type InterpolationMode =
     | Default           = 0
-    | Perspective       = 1
-    | NoPerspective     = 2
-    | Flat              = 3
+    | NoPerspective     = 1
+    | Flat              = 2
     | Centroid          = 4
-    | Sample            = 5
-    | PerPatch          = 6
+    | Sample            = 8
+    | PerPatch          = 16
 
 type MemoryType =
     | None = 0
     | Global = 1
     | Local = 2
 
+[<Flags>]
 type RayFlags =
     | None                     = 0
     | Opaque                   = 1

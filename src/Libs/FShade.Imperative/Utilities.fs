@@ -77,6 +77,7 @@ module ReflectionPatterns =
             getMethodInfo <@ uint16 @>  
             getMethodInfo <@ int @> 
             getMethodInfo <@ int32 @> 
+            getMethodInfo <@ uint @> 
             getMethodInfo <@ uint32 @> 
             getMethodInfo <@ int64 @> 
             getMethodInfo <@ uint64 @> 
@@ -170,6 +171,9 @@ module ReflectionPatterns =
             | :? V2i as v -> Some (typeof<int>, [| v.X :> obj; v.Y :> obj|])
             | :? V3i as v -> Some (typeof<int>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
             | :? V4i as v -> Some (typeof<int>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
+            | :? V2ui as v -> Some (typeof<uint>, [| v.X :> obj; v.Y :> obj|])
+            | :? V3ui as v -> Some (typeof<uint>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
+            | :? V4ui as v -> Some (typeof<uint>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
             | :? V2l as v -> Some (typeof<int64>, [| v.X :> obj; v.Y :> obj|])
             | :? V3l as v -> Some (typeof<int64>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
             | :? V4l as v -> Some (typeof<int64>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
@@ -206,6 +210,16 @@ module ReflectionPatterns =
             | Integral 
             | Enum -> Some ()
             | _ -> None
+
+    let (|VecMethod|_|) (mi : MethodInfo) =
+        match mi with
+        | Method(name, args) when mi.DeclaringType = typeof<Vec> -> Some (name, args)
+        | _ -> None
+
+    let (|MatMethod|_|) (mi : MethodInfo) =
+        match mi with
+        | Method(name, args) when mi.DeclaringType = typeof<Mat> -> Some (name, args)
+        | _ -> None
 
 [<AutoOpen>]
 module ExprExtensions =

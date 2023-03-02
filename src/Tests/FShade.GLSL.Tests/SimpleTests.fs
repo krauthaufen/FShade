@@ -11,7 +11,18 @@ type Vertex =
     {
         [<Position>] pos : V4d
         [<Color>] c : V4d
+        [<Interpolation(InterpolationMode.NoPerspective ||| InterpolationMode.Sample)>] hugo : V3d
+        [<Interpolation(InterpolationMode.Flat ||| InterpolationMode.PerPatch)>] hugo2 : V3d
         foo : V4d
+        what : V4i
+        [<Semantic("Id")>] id : int
+        [<PrimitiveId>] primId : int
+        [<Semantic("uid")>] uid : uint
+    }
+
+type IntVertex =
+    {
+        [<Color>] c : int
     }
 
 
@@ -37,319 +48,6 @@ let ``Reserved Names``() =
         }
 
     GLSL.shouldCompile [Effect.ofFunction shader]
-
-[<Test>]
-let ``Constructors Matrix``() =
-    Setup.Run()
-
-    let shader (v : Vertex) =
-        vertex {
-            let m33 = M33d(v.pos.X)
-            let m44 = M44d(m33)
-            let _ = M33d(m44)
-            return v.pos
-        }
-
-    GLSL.shouldCompile [Effect.ofFunction shader]
-
-
-[<Test>]
-let ``Constructors Vector``() =
-    Setup.Run()
-
-    let shader (v : Vertex) =
-        vertex {
-            let _ = V3d(v.pos.X)
-            let _ = V4d(v.pos.XY, v.pos.ZW)
-            let _ = V4d(v.pos.X, v.pos.YZW)
-            let _ = V4d(v.pos.XYZ)
-            let _ = V4d(v.pos.XY)
-            let _ = V2d(v.pos.XYZ)
-            return v.pos
-        }
-
-    GLSL.shouldCompile [Effect.ofFunction shader]
-
-[<Test>]
-let ``Inverse lerp``() =
-    Setup.Run()
-
-    let shader (v : Vertex) =
-        vertex {
-            let mutable a = 0.0
-            a <- a + Fun.InvLerp(int8  v.c.X, int8  v.c.Y, int8  v.c.Z)
-            a <- a + Fun.InvLerp(int16 v.c.X, int16 v.c.Y, int16 v.c.Z)
-            a <- a + Fun.InvLerp(int32 v.c.X, int32 v.c.Y, int32 v.c.Z)
-            a <- a + Fun.InvLerp(v.c.X - v.c.Y, v.c.Y, v.c.Z)
-            a <- a + invLerp (int8  v.c.Y) (int8  v.c.Z) (int8  v.c.X)
-            a <- a + invLerp (int16 v.c.Y) (int16 v.c.Z) (int16 v.c.X)
-            a <- a + invLerp (int32 v.c.Y) (int32 v.c.Z) (int32 v.c.X)
-            a <- a + invLerp v.c.Y v.c.Z (v.c.X - v.c.Y)
-            let _ = a
-
-            let mutable a = V2d.Zero
-            a <- a + Fun.InvLerp(V2i v.c.XY, V2i v.c.YZ, V2i v.c.XZ)
-            a <- a + Fun.InvLerp(V2d v.c.XY, V2d v.c.YZ, V2d v.c.XZ)
-            a <- a + invLerp (V2i v.c.YZ) (V2i v.c.XZ) (V2i v.c.XY)
-            a <- a + invLerp (V2d v.c.YZ) (V2d v.c.XZ) (V2d v.c.XY)
-            let _ = a
-
-            let mutable a = V3d.Zero
-            a <- a + Fun.InvLerp(V3i v.c.XYZ, V3i v.pos.XYZ, V3i v.foo.XYZ)
-            a <- a + Fun.InvLerp(V3d v.c.XYZ, V3d v.pos.XYZ, V3d v.foo.XYZ)
-            a <- a + invLerp (V3i v.pos.XYZ) (V3i v.foo.XYZ) (V3i v.c.XYZ)
-            a <- a + invLerp (V3d v.pos.XYZ) (V3d v.foo.XYZ) (V3d v.c.XYZ)
-            let _ = a
-
-            let mutable a = V4d.Zero
-            a <- a + Fun.InvLerp(V4i v.c, V4i v.pos, V4i v.foo)
-            a <- a + Fun.InvLerp(v.c, v.pos, v.foo)
-            a <- a + invLerp (V4i v.pos) (V4i v.foo) (V4i v.c)
-            a <- a + invLerp v.pos v.foo v.c
-            let _ = a
-
-            let mutable a = 0.0f
-            a <- a + Fun.InvLerp(float32 v.c.X, float32 v.c.Y, float32 v.c.Z)
-            a <- a + invLerp (float32 v.c.Y) (float32 v.c.Z) (float32 v.c.X)
-            let _ = a
-
-            let mutable a = V2f.Zero
-            a <- a + Fun.InvLerp(V2f v.c.XY, V2f v.pos.XY, V2f v.foo.XY)
-            a <- a + invLerp (V2f v.pos.XY) (V2f v.foo.XY) (V2f v.c.XY)
-            let _ = a
-
-            let mutable a = V3f.Zero
-            a <- a + Fun.InvLerp(V3f v.c.XYZ, V3f v.pos.XYZ, V3f v.foo.XYZ)
-            a <- a + invLerp (V3f v.pos.XYZ) (V3f v.foo.XYZ) (V3f v.c.XYZ)
-            let _ = a
-
-            let mutable a = V4f.Zero
-            a <- a + Fun.InvLerp(V4f v.c, V4f v.pos, V4f v.foo)
-            a <- a + invLerp (V4f v.pos) (V4f v.foo) (V4f v.c)
-            let _ = a
-
-            return v.pos
-        }
-
-    GLSL.shouldCompile [Effect.ofFunction shader]
-
-
-[<Test>]
-let ``Lerp integer overloads``() =
-    Setup.Run()
-
-    let shader (v : Vertex) =
-        vertex {
-            let mutable a = int8 0
-            a <- a + Fun.Lerp(v.c.X, int8 v.c.X, int8 v.c.X)
-            a <- a + Fun.Lerp(float32 v.c.X, int8 v.c.X, int8 v.c.X)
-            a <- a + lerp (int8 v.c.X) (int8 v.c.X) v.c.X
-            a <- a + lerp (int8 v.c.X) (int8 v.c.X) (float32 v.c.X)
-            let _ = a
-
-            let mutable a = int16 0
-            a <- a + Fun.Lerp(v.c.X, int16 v.c.X, int16 v.c.X)
-            a <- a + Fun.Lerp(float32 v.c.X, int16 v.c.X, int16 v.c.X)
-            a <- a + lerp (int16 v.c.X) (int16 v.c.X) v.c.X
-            a <- a + lerp (int16 v.c.X) (int16 v.c.X) (float32 v.c.X)
-            let _ = a
-
-            let mutable a = int32 0
-            a <- a + Fun.Lerp(v.c.X, int32 v.c.X, int32 v.c.X)
-            a <- a + Fun.Lerp(float32 v.c.X, int32 v.c.X, int32 v.c.X)
-            a <- a + lerp (int32 v.c.X) (int32 v.c.X) v.c.X
-            a <- a + lerp (int32 v.c.X) (int32 v.c.X) (float32 v.c.X)
-            let _ = a
-
-            let mutable a = uint8 0
-            a <- a + Fun.Lerp(v.c.X, uint8 v.c.X, uint8 v.c.X)
-            a <- a + Fun.Lerp(float32 v.c.X, uint8 v.c.X, uint8 v.c.X)
-            a <- a + lerp (uint8 v.c.X) (uint8 v.c.X) v.c.X
-            a <- a + lerp (uint8 v.c.X) (uint8 v.c.X) (float32 v.c.X)
-            let _ = a
-
-            let mutable a = uint16 0
-            a <- a + Fun.Lerp(v.c.X, uint16 v.c.X, uint16 v.c.X)
-            a <- a + Fun.Lerp(float32 v.c.X, uint16 v.c.X, uint16 v.c.X)
-            a <- a + lerp (uint16 v.c.X) (uint16 v.c.X) v.c.X
-            a <- a + lerp (uint16 v.c.X) (uint16 v.c.X) (float32 v.c.X)
-            let _ = a
-
-            let mutable a = uint32 0
-            a <- a + Fun.Lerp(v.c.X, uint32 v.c.X, uint32 v.c.X)
-            a <- a + Fun.Lerp(float32 v.c.X, uint32 v.c.X, uint32 v.c.X)
-            a <- a + lerp (uint32 v.c.X) (uint32 v.c.X) v.c.X
-            a <- a + lerp (uint32 v.c.X) (uint32 v.c.X) (float32 v.c.X)
-            let _ = a
-
-            let mutable a = V2i.Zero
-            a <- a + Fun.Lerp(v.c.X, V2i(v.c.XY), V2i(v.c.XY))
-            a <- a + Fun.Lerp(float32 v.c.X, V2i(v.c.XY), V2i(v.c.XY))
-            a <- a + Fun.Lerp(v.c.XY, V2i(v.c.XY), V2i(v.c.XY))
-            a <- a + Fun.Lerp(V2f(v.c.XY), V2i(v.c.XY), V2i(v.c.XY))
-            a <- a + lerp (V2i(v.c.XY)) (V2i(v.c.XY)) v.c.X
-            a <- a + lerp (V2i(v.c.XY)) (V2i(v.c.XY)) (float32 v.c.X)
-            a <- a + lerp (V2i(v.c.XY)) (V2i(v.c.XY)) v.c.XY
-            a <- a + lerp (V2i(v.c.XY)) (V2i(v.c.XY)) (V2f(v.c.XY))
-            let _ = a
-
-            let mutable a = V3i.Zero
-            a <- a + Fun.Lerp(v.c.X, V3i(v.c.XYZ), V3i(v.c.XYZ))
-            a <- a + Fun.Lerp(float32 v.c.X, V3i(v.c.XYZ), V3i(v.c.XYZ))
-            a <- a + Fun.Lerp(v.c.XYZ, V3i(v.c.XYZ), V3i(v.c.XYZ))
-            a <- a + Fun.Lerp(V3f(v.c.XYZ), V3i(v.c.XYZ), V3i(v.c.XYZ))
-            a <- a + lerp (V3i(v.c.XYZ)) (V3i(v.c.XYZ)) v.c.X
-            a <- a + lerp (V3i(v.c.XYZ)) (V3i(v.c.XYZ)) (float32 v.c.X)
-            a <- a + lerp (V3i(v.c.XYZ)) (V3i(v.c.XYZ)) v.c.XYZ
-            a <- a + lerp (V3i(v.c.XYZ)) (V3i(v.c.XYZ)) (V3f(v.c.XYZ))
-            let _ = a
-
-            let mutable a = V4i.Zero
-            a <- a + Fun.Lerp(v.c.X, V4i(v.c), V4i(v.c))
-            a <- a + Fun.Lerp(float32 v.c.X, V4i(v.c), V4i(v.c))
-            a <- a + Fun.Lerp(v.c, V4i(v.c), V4i(v.c))
-            a <- a + Fun.Lerp(V4f(v.c), V4i(v.c), V4i(v.c))
-            a <- a + lerp (V4i(v.c)) (V4i(v.c)) v.c.X
-            a <- a + lerp (V4i(v.c)) (V4i(v.c)) (float32 v.c.X)
-            a <- a + lerp (V4i(v.c)) (V4i(v.c)) v.c
-            a <- a + lerp (V4i(v.c)) (V4i(v.c)) (V4f(v.c))
-            let _ = a
-
-            return v.pos
-        }
-
-    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["mix"; "round"; "\+ 0\.5"]
-
-[<Test>]
-let ``New Intrinsics``() =
-    Setup.Run()
-
-    let shader (v : Vertex) =
-        vertex {
-            let _ = Fun.Lerp(float32 v.c.X, V2f.Zero, V2f.One)
-            let _ = Fun.Lerp(v.c.X, V2d.Zero, V2d.One)
-            let _ = Fun.Lerp(float32 v.c.X, V2f.Zero, V2f.One)
-            let _ = Fun.Lerp(float32 v.c.X, V3f.Zero, V3f.One)
-            let _ = Fun.Lerp(v.c.X, V3d.Zero, V3d.One)
-            let _ = Fun.Lerp(float32 v.c.X, V3f.Zero, V3f.One)
-            let _ = Fun.Lerp(float32 v.c.X, V4f.Zero, V4f.One)
-            let _ = Fun.Lerp(v.c.X, V4d.Zero, V4d.One)
-            let _ = Fun.Lerp(float32 v.c.X, V4f.Zero, V4f.One)
-            let _ = Fun.Exp(v.c.XY)
-            let _ = Fun.Exp(V2f(v.c.XY))
-            let _ = Fun.Exp(v.c.XYZ)
-            let _ = Fun.Exp(V3f(v.c.XYZ))
-            let _ = Fun.Exp(v.c)
-            let _ = Fun.Exp(V4f(v.c))
-            let _ = exp v.c
-            let _ = Fun.Log(v.c.XY)
-            let _ = Fun.Log(V2f(v.c.XY))
-            let _ = Fun.Log(v.c.XYZ)
-            let _ = Fun.Log(V3f(v.c.XYZ))
-            let _ = Fun.Log(v.c)
-            let _ = Fun.Log(V4f(v.c))
-            let _ = Fun.Pow(v.c.XY, V2d.II)
-            let _ = Fun.Pow(V2f(v.c.XY), V2f.II)
-            let _ = Fun.Pow(v.c.XY, v.c.XY)
-            let _ = Fun.Pow(V2f(v.c.XY), V2f(v.c.XY))
-            let _ = Fun.Pow(v.c.XYZ, V3d.III)
-            let _ = Fun.Pow(V3f(v.c.XYZ), V3f.III)
-            let _ = Fun.Pow(v.c.XYZ, v.c.XYZ)
-            let _ = Fun.Pow(V3f(v.c.XYZ), V3f(v.c.XYZ))
-            let _ = Fun.Pow(v.c, V4d.IIII)
-            let _ = Fun.Pow(V4f(v.c), V4f.IIII)
-            let _ = Fun.Pow(v.c, v.c)
-            let _ = Fun.Pow(V4f(v.c), V4f(v.c))
-            let _ = Fun.Pow(v.c, 1.0);
-            let _ = Fun.Pow(1.0, v.c);
-            let _ = Fun.Pown(v.c.X, int32 v.c.Y);
-            let _ = Fun.Pown(1, V4i(v.c));
-            let _ = Fun.Pown(V2f(v.c.XY), 1);
-            let _ = Fun.Pown(V2i(v.c.XY), 1);
-            let _ = Fun.Pow(V2i(v.c.XY), V2f(v.c.XY))
-            let _ = pow v.c 2.0
-            let _ = pow v.c v.c
-            let _ = v.c ** 2.0
-            let _ = v.c ** v.c
-            let _ = pown v.c 2
-            let _ = pown v.c (V4i(v.c))
-            let _ = sqrt v.c
-            let _ = Fun.Sqrt (V2i(v.c.XY))
-            let _ = signum v.c
-            let _ = signumi v.c
-            let _ = v.c |> floor |> truncate |> ceil |> round
-            let _ = sqr v.c
-            let _ = sqr (V4i v.c)
-            let _ = cbrt v.c
-            let _ = v.c.Abs()
-            let _ = Fun.Min(v.c, 1.0)
-            let _ = Fun.Min(1.0, v.c)
-            let _ = v.c |> min 1.0
-            let _ = v.c |> min v.c
-            let _ = v.c |> clamp 1.0 v.c
-            let _ = v.c.XYZ |> clamp v.c.XYZ 1.0
-            let _ = Fun.Clamp(v.c.XY, 0.0, 1.0)
-            let _ = v.c |> smoothstep v.c v.c
-            let _ = v.c |> smoothstep 0.0 1.0
-            let _ = Fun.Smoothstep(v.c, 0.0, 1.0)
-            let _ = Fun.Smoothstep(v.c, v.c, v.c)
-            let _ = lerp V2i.Zero V2i.One v.c.XY
-            let _ = Fun.Lerp(v.c.X, 0, 1)
-            let _ = Fun.Lerp(v.c, V4i(v.c), V4i(v.c))
-            let _ = asinh (V4f(v.c))
-            let _ = madd v.c v.c v.c
-            let _ = madd v.c v.c.X v.c
-            let _ = madd v.c.X v.c.X v.c.X
-            let _ = madd (V4i(v.c)) 2 (V4i(v.c))
-            let _ = Fun.MultiplyAdd(v.c.X, v.c, v.c)
-            let _ = Fun.MultiplyAdd(v.c, v.c.X, v.c)
-            let _ = Fun.MultiplyAdd(v.c, v.c, v.c)
-            let _ = Fun.MultiplyAdd(v.c.X, v.c.Y, v.c.Z)
-            let _ = degrees v.c
-            let _ = degrees v.c.X
-            let _ = v.c.DegreesFromRadians()
-            let _ = isInfinity v.c
-            let _ = isInfinity v.c.X
-            let _ = Vec.reflect v.c v.c
-            let _ = Vec.refract 0.5 v.c v.c
-            let _ = v.c.X.DegreesFromRadians()
-            let _ = Vec.length v.c
-            let _ = Vec.Length v.c
-            let _ = Vec.lengthSquared v.c
-            let _ = Vec.LengthSquared v.c
-            let _ = Vec.dot v.c v.c
-            let _ = Vec.Dot(v.c, v.c)
-            let _ = Vec.cross v.c.XYZ v.c.XYZ
-            let _ = Vec.Cross(v.c.XYZ, v.c.XYZ)
-            let _ = Mat.transpose <| M33d(v.c.X)
-            let _ = Mat.Transposed(M33d(v.c.X))
-            let _ = Mat.transformDir (M44d(v.c.X)) v.c.XYZ
-            let _ = Mat.TransformDir(M44d(v.c.X), v.c.XYZ)
-            let _ = Mat.transformPos (M44d(v.c.X)) v.c.XYZ
-            let _ = Mat.TransformPos(M44d(v.c.X), v.c.XYZ)
-            let _ = Mat.TransposedTransformDir(M44d(v.c.X), v.c.XYZ)
-            let _ = Mat.TransposedTransformPos(M44d(v.c.X), v.c.XYZ)
-            let _ = Mat.det <| M44d(v.c.X)
-            let _ = Mat.Determinant(M44d(v.c.X))
-            let _ = Vec.MinElement(v.c.XY)
-            let _ = Vec.MinElement(v.c.XYZ)
-            let _ = Vec.MinElement(v.c)
-            let _ = v.c.XY.MinElement
-            let _ = v.c.XYZ.MinElement
-            let _ = v.c.MinElement
-            let _ = Vec.MaxElement(v.c.XY)
-            let _ = Vec.MaxElement(v.c.XYZ)
-            let _ = Vec.MaxElement(v.c)
-            let _ = v.c.XY.MaxElement
-            let _ = v.c.XYZ.MaxElement
-            let _ = v.c.MaxElement
-            let normalized = Vec.Normalized (V4i(v.c))
-            let added = normalized + (Vec.normalize V4d.Half)
-
-            return added
-        }
-
-    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["mix"; "exp"; "log"; "pow"; "sign"; "sqrt"; "length"]
 
 [<Test>]
 let ``Broken GLSL Shader``() =
@@ -899,54 +597,6 @@ let ``Unroll Match`` () =
 
     GLSL.shouldCompile [ Effect.ofFunction (frag 1) ] // should not contain "0 == 0", "0 == 1", "0 == 2", ...
 
-let private arraySampler =
-    sampler2dArray {
-        texture uniform?TextureArray
-        filter Filter.MinMagLinear
-        addressU WrapMode.Clamp
-        addressV WrapMode.Clamp
-    }
-
-let private simpleSampler =
-    sampler2d {
-        texture uniform?Simple
-        filter Filter.MinMagLinear
-        addressU WrapMode.Clamp
-        addressV WrapMode.Clamp
-    }
-
-[<Test>]
-let ``Array Samplers`` () =
-    Setup.Run()
-
-    let frag (v : Vertex) =
-        fragment {
-            let lc = v.pos.XY
-            let mutable sum = V4d.Zero
-            for i in 0..uniform?TextureCount-1 do
-                let layer = arraySampler.Read(V2i(int lc.X, int lc.Y), i, 0)
-                sum <- sum + layer
-
-            return sum
-        }
-
-    GLSL.shouldCompile [ Effect.ofFunction (frag) ]
-
-[<Test>]
-let ``Simple Fetch`` () =
-    Setup.Run()
-
-    let frag (v : Vertex) =
-        fragment {
-            let a = simpleSampler.[V2i.IO]
-            let b = simpleSampler.[V2i.OI, 1]
-            let c = simpleSampler.Read(V2i.II, 7)
-
-            return a + b + c
-        }
-
-    GLSL.shouldCompile [ Effect.ofFunction (frag) ]
-
 type Fragment =
     {
         [<Color>] c : V4d
@@ -1165,22 +815,6 @@ let ``GS Composition with Layer2`` () =
 
     GLSL.shouldCompile [ Effect.ofFunction gs1; Effect.ofFunction gs2; Effect.ofFunction frag ]
 
-let intergerSampler =
-    intSampler2d {
-        texture uniform?IntTexture
-    }
-
-[<Test>]
-let ``IntSampler`` () =
-    Setup.Run()
-
-    let ps (v : Vertex) =
-        fragment {
-            let value = intergerSampler.Sample(v.pos.XY).X
-            return V4d(value, 1, 1, 1)
-        }
-
-    GLSL.shouldCompile [ Effect.ofFunction ps; ]
 
 [<Test>]
 let ``GLSLTypesToString`` () =
@@ -1354,37 +988,135 @@ let ``Reflected function with constant array``() =
     ]
 
 [<Test>]
-let ``Non-static sampler``() =
+let ``Multiple interpolation qualifiers``() =
     Setup.Run()
-
-    let textureDiffuse =
-        sampler2d {
-            texture uniform?DiffuseTexture
-            filter Filter.MinMagMipLinear
-            addressU WrapMode.Wrap
-            addressV WrapMode.Wrap
-        }
 
     let fs (v : Vertex) =
         fragment {
-            return textureDiffuse.Sample(V2d.Zero)
+            return v.hugo + v.hugo2
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction fs] ["flat"; "noperspective sample"]
+
+[<Test>]
+let ``Integer with implicit flat interpolation``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            return V3d v.what
         }
 
     GLSL.shouldCompile [Effect.ofFunction fs]
 
-//[<EntryPoint>]
-//let main args =
-//    ``New Intrinsics``()
-    //``GS Composition with Layer2``()
-    //``GS Composition with Layer``()
-    //``GS PrimitiveId``()
-    //``DuplicateId``()
-    //``ClipDistance Pass-Through``()
-    //``Variable Declaration``()
-    //``Fill Array with Inline Function``()
-    //``Tuple Inline``()
-    //``Helper with duplicate names``()
-    //``Bad Helpers``()
-    //``Helper with duplicate names``()
-    //``Unroll Match``()
-    //``Array Samplers``()
+[<Test>]
+let ``Integer with implicit flat interpolation 2``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            let _ = v.what
+            let _ = v.uid
+            return v.c
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs]
+
+[<Test>]
+let ``Integer fragment output``() =
+    Setup.Run()
+
+    let fs (v : IntVertex) =
+        fragment {
+            return V2i(v.c + 1, 0)
+        }
+
+    let fs2 (v : IntVertex) =
+        fragment {
+            return v.c + 2
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs; Effect.ofFunction fs2]
+
+[<Test>]
+let ``Integer vertex field output``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            return { v with c = v.c + 1.0 }
+        }
+
+    let fs2 (v : Vertex) =
+        fragment {
+            return { v with id = int v.id; uid = uint v.id}
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs; Effect.ofFunction fs2]
+
+[<Test>]
+let ``Output type conversions``() =
+    Setup.Run()
+
+    let fs1 (v : Vertex) =
+        fragment {
+            return v.c + 1.0
+        }
+
+    let fs2 (v : Vertex) =
+        fragment {
+            return v.c.ZXY + 2.0
+        }
+
+    let fs3 (v : Vertex) =
+        fragment {
+            return v.c.WX + 3.0
+        }
+
+    GLSL.shouldCompile [
+        Effect.ofFunction fs1
+        Effect.ofFunction fs2
+        Effect.ofFunction fs3
+    ]
+
+[<Test>]
+let ``Primitive id``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            return v3ui <| V4i(v.primId)
+        }
+
+    GLSL.shouldCompile [
+        Effect.ofFunction fs
+    ]
+
+[<Test>]
+let ``Debug output``() =
+    Setup.Run()
+
+    let formatStr = "This is a format string"
+
+    let fs (v : Vertex) =
+        fragment {
+            Debug.Printf("Hello" + " my " +  "World!")
+            Debug.Printf(formatStr)
+            Debug.Printf("Hello, look at my float: %f", 0.0)
+            Debug.Printf("Hello, look at my float: %f", 0.0)
+            Debug.Printf("Hello, look at my float: %f", v.c.X)
+            Debug.Printf("Hello, look at my vector: %v4f", v.c)
+
+            Debug.Printfn("Hello" + " my " +  "World!")
+            Debug.Printfn(formatStr)
+            Debug.Printfn("Hello, look at my float: %f", 0.0)
+            Debug.Printfn("Hello, look at my float: %f", 0.0)
+            Debug.Printfn("Hello, look at my float: %f", v.c.X)
+            Debug.Printfn("Hello, look at my vector: %v4f", v.c)
+
+            return V4i.Zero
+        }
+
+    GLSL.shouldCompile [
+        Effect.ofFunction fs
+    ]

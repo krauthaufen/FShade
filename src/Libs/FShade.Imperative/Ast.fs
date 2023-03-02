@@ -289,6 +289,10 @@ module CVecComponent =
     let private all = [CVecComponent.X; CVecComponent.Y; CVecComponent.Z; CVecComponent.W]
     let first (n : int) = List.take n all
 
+    let x = [CVecComponent.X]
+    let y = [CVecComponent.Y]
+    let z = [CVecComponent.Z]
+    let w = [CVecComponent.W]
     let xy = [CVecComponent.X; CVecComponent.Y]
     let yz = [CVecComponent.Y; CVecComponent.Z]
     let zw = [CVecComponent.Z; CVecComponent.W]
@@ -356,15 +360,15 @@ type CExpr =
     | CCross of CType * CExpr * CExpr
     | CVecSwizzle of CType * CExpr * list<CVecComponent>
     | CVecItem of CType * CExpr * CExpr
-    | CMatrixElement of t : CType * m : CExpr * r : int * c : int
+    | CMatrixElement of t : CType * m : CExpr * r : CExpr * c : CExpr
     | CConvertMatrix of t : CType * m : CExpr
-    | CNewVector of t : CType * d : int * components : list<CExpr>
+    | CNewVector of t : CType * components : list<CExpr>
 
     | CNewMatrix of t : CType * elements : list<CExpr>
     | CMatrixFromRows of t : CType * rows : list<CExpr>
     | CMatrixFromCols of t : CType * cols : list<CExpr>
-    | CMatrixRow of t : CType * mat : CExpr * row : int
-    | CMatrixCol of t : CType * mat : CExpr * col : int
+    | CMatrixRow of t : CType * mat : CExpr * row : CExpr
+    | CMatrixCol of t : CType * mat : CExpr * col : CExpr
 
     | CVecLength of t : CType * v : CExpr
 
@@ -380,6 +384,16 @@ type CExpr =
     | CLeftShift of CType * CExpr * CExpr
     | CRightShift of CType * CExpr * CExpr
 
+    | CVecAnyEqual of CExpr * CExpr
+    | CVecAllNotEqual of CExpr * CExpr
+    | CVecAnyLess of CExpr * CExpr
+    | CVecAllLess of CExpr * CExpr
+    | CVecAnyLequal of CExpr * CExpr
+    | CVecAllLequal of CExpr * CExpr
+    | CVecAnyGreater of CExpr * CExpr
+    | CVecAllGreater of CExpr * CExpr
+    | CVecAnyGequal of CExpr * CExpr
+    | CVecAllGequal of CExpr * CExpr
 
     | CLess of CExpr * CExpr
     | CLequal of CExpr * CExpr
@@ -390,7 +404,9 @@ type CExpr =
 
     | CAddressOf of t : CType * target : CExpr
     | CField of t : CType * target : CExpr * fieldName : string
-    | CItem of t : CType * target : CExpr * index : CExpr 
+    | CItem of t : CType * target : CExpr * index : CExpr
+
+    | CDebugPrintf of format : CExpr * values : CExpr[]
 
     member x.ctype =
         match x with
@@ -416,6 +432,12 @@ type CExpr =
             | CLeftShift(t,_,_) -> t
             | CRightShift(t,_,_) -> t
 
+            | CVecAnyLess _ | CVecAllLess _
+            | CVecAnyLequal _ | CVecAllLequal _
+            | CVecAnyGreater _ | CVecAllGreater _
+            | CVecAnyGequal _ | CVecAllGequal _
+            | CVecAnyEqual _ | CVecAllNotEqual _ -> CType.CBool
+
             | CLess _ | CLequal _ | CGreater _ | CGequal _ -> CType.CBool
             | CEqual _ | CNotEqual _ -> CType.CBool
 
@@ -429,7 +451,7 @@ type CExpr =
             | CVecItem(t,_,_) -> t
             | CMatrixElement(t,_,_,_) -> t
             | CConvertMatrix(t,_) -> t
-            | CNewVector(t,_,_) -> t
+            | CNewVector(t,_) -> t
 
             | CNewMatrix(t,_) -> t
             | CMatrixFromRows(t,_) -> t
@@ -445,6 +467,24 @@ type CExpr =
             | CField(t,_,_) -> t
             | CItem(t,_,_) -> t
 
+            | CDebugPrintf _ -> CType.CVoid
+
+[<AutoOpen>]
+module internal CExprExtensions =
+
+    type CExpr with
+        static member MatrixRow(t : CType, m : CExpr, r : int) =
+            CMatrixRow(t, m, CValue(CType.CInt(true, 32), CIntegral (int64 r)))
+
+        static member MatrixCol(t : CType, m : CExpr, c : int) =
+            CMatrixCol(t, m, CValue(CType.CInt(true, 32), CIntegral (int64 c)))
+
+        static member MatrixElement(t : CType, m : CExpr, r : int, c : int) =
+            CMatrixElement(
+                t, m,
+                CValue(CType.CInt(true, 32), CIntegral (int64 r)),
+                CValue(CType.CInt(true, 32), CIntegral (int64 c))
+            )
 
 type internal Used() =
     let types = System.Collections.Generic.HashSet<CType>()
@@ -542,11 +582,13 @@ module CExpr =
                 visit used e
                 visit used i
 
-            | CMatrixElement(t, m, _, _) ->
+            | CMatrixElement(t, m, r, c) ->
                 used.AddType t
                 visit used m
+                visit used r
+                visit used c
 
-            | CNewVector(t,_,c) ->
+            | CNewVector(t, c) ->
                 used.AddType t
                 for c in c do visit used c
 
@@ -559,10 +601,16 @@ module CExpr =
                 used.AddType t
                 for r in r do visit used r
 
-            | CMatrixRow(t,m,_) | CMatrixCol(t,m,_) ->
+            | CMatrixRow(t,m,i) | CMatrixCol(t,m,i) ->
                 used.AddType t
                 visit used m
+                visit used i
 
+            | CVecAnyEqual(l,r) | CVecAllNotEqual(l,r)
+            | CVecAnyLess(l,r) | CVecAllLess(l,r)
+            | CVecAnyLequal(l,r) | CVecAllLequal(l,r)
+            | CVecAnyGreater(l,r) | CVecAllGreater(l,r)
+            | CVecAnyGequal(l,r) | CVecAllGequal(l,r)
             | CAnd(l,r) | COr(l,r)
             | CLess(l,r) | CLequal(l,r) | CGreater(l,r) | CGequal(l,r) | CEqual(l,r) | CNotEqual(l,r) ->
                 used.AddType CType.CBool
@@ -577,6 +625,11 @@ module CExpr =
                 used.AddType t
                 visit used target
                 visit used index
+
+            | CDebugPrintf(fmt, values) ->
+                visit used fmt
+                for v in values do
+                    visit used v
 
 /// represents a c-style rhs-expression
 type CRExpr =
@@ -611,7 +664,7 @@ type CLExpr =
     | CLItem of CType * CExpr * CExpr
     | CLPtr of CType * CExpr
     | CLVecSwizzle of CType * CLExpr * list<CVecComponent>
-    | CLMatrixElement of t : CType * m : CLExpr * r : int * c : int
+    | CLMatrixElement of t : CType * m : CLExpr * r : CExpr * c : CExpr
     | CLInput of kind : ParameterKind * ctype : CType * name : string * index : Option<CExpr>
 
     member x.ctype =

@@ -58,20 +58,14 @@ module GLSLType =
                 (false, false, false, SamplerDimension.Sampler2d), typedefof<Image2d<_>>
                 (false, false, false, SamplerDimension.Sampler3d), typedefof<Image3d<_>>
                 (false, false, false, SamplerDimension.SamplerCube), typedefof<ImageCube<_>>
-                 
+
                 (false, true, false, SamplerDimension.Sampler1d), typedefof<Image1dArray<_>>
                 (false, true, false, SamplerDimension.Sampler2d), typedefof<Image2dArray<_>>
                 (false, true, false, SamplerDimension.SamplerCube), typedefof<ImageCubeArray<_>>
-                 
-                (false, false, true, SamplerDimension.Sampler1d), typedefof<Image1dMS<_>>
+
                 (false, false, true, SamplerDimension.Sampler2d), typedefof<Image2dMS<_>>
-                (false, false, true, SamplerDimension.Sampler3d), typedefof<Image3dMS<_>>
-                (false, false, true, SamplerDimension.SamplerCube), typedefof<ImageCubeMS<_>>
-                 
-                (false, true, true, SamplerDimension.Sampler1d), typedefof<Image1dArrayMS<_>>
                 (false, true, true, SamplerDimension.Sampler2d), typedefof<Image2dArrayMS<_>>
-                (false, true, true, SamplerDimension.SamplerCube), typedefof<ImageCubeArrayMS<_>>
-                    
+
                 (true, false, false, SamplerDimension.Sampler1d), typedefof<IntImage1d<_>>
                 (true, false, false, SamplerDimension.Sampler2d), typedefof<IntImage2d<_>>
                 (true, false, false, SamplerDimension.Sampler3d), typedefof<IntImage3d<_>>
@@ -81,15 +75,8 @@ module GLSLType =
                 (true, true, false, SamplerDimension.Sampler2d), typedefof<IntImage2dArray<_>>
                 (true, true, false, SamplerDimension.SamplerCube), typedefof<IntImageCubeArray<_>>
 
-                (true, false, true, SamplerDimension.Sampler1d), typedefof<IntImage1dMS<_>>
                 (true, false, true, SamplerDimension.Sampler2d), typedefof<IntImage2dMS<_>>
-                (true, false, true, SamplerDimension.Sampler3d), typedefof<IntImage3dMS<_>>
-                (true, false, true, SamplerDimension.SamplerCube), typedefof<IntImageCubeMS<_>>
-
-                (true, true, true, SamplerDimension.Sampler1d), typedefof<IntImage1dArrayMS<_>>
                 (true, true, true, SamplerDimension.Sampler2d), typedefof<IntImage2dArrayMS<_>>
-                (true, true, true, SamplerDimension.SamplerCube), typedefof<IntImageCubeArrayMS<_>>
-
             ]
 
         // integral, isArray, isMS, isShadow
@@ -102,20 +89,10 @@ module GLSLType =
 
                 (false, false, false, true, SamplerDimension.Sampler1d), typeof<Sampler1dShadow>
                 (false, false, false, true, SamplerDimension.Sampler2d), typeof<Sampler2dShadow>
-                (false, false, false, true, SamplerDimension.Sampler3d), typeof<Sampler3dShadow>
                 (false, false, false, true, SamplerDimension.SamplerCube), typeof<SamplerCubeShadow>
 
-                (false, false, true, false, SamplerDimension.Sampler1d), typeof<Sampler1dMS>
                 (false, false, true, false, SamplerDimension.Sampler2d), typeof<Sampler2dMS>
-                (false, false, true, false, SamplerDimension.Sampler3d), typeof<Sampler3dMS>
-                (false, false, true, false, SamplerDimension.SamplerCube), typeof<SamplerCubeMS>
 
-                (false, false, true, true, SamplerDimension.Sampler1d), typeof<Sampler1dShadowMS>
-                (false, false, true, true, SamplerDimension.Sampler2d), typeof<Sampler2dShadowMS>
-                (false, false, true, true, SamplerDimension.Sampler3d), typeof<Sampler3dShadowMS>
-                (false, false, true, true, SamplerDimension.SamplerCube), typeof<SamplerCubeShadowMS>
-
-                
                 (false, true, false, false, SamplerDimension.Sampler1d), typeof<Sampler1dArray>
                 (false, true, false, false, SamplerDimension.Sampler2d), typeof<Sampler2dArray>
                 (false, true, false, false, SamplerDimension.SamplerCube), typeof<SamplerCubeArray>
@@ -124,33 +101,20 @@ module GLSLType =
                 (false, true, false, true, SamplerDimension.Sampler2d), typeof<Sampler2dArrayShadow>
                 (false, true, false, true, SamplerDimension.SamplerCube), typeof<SamplerCubeArrayShadow>
 
-                (false, true, true, false, SamplerDimension.Sampler1d), typeof<Sampler1dArrayMS>
                 (false, true, true, false, SamplerDimension.Sampler2d), typeof<Sampler2dArrayMS>
-                (false, true, true, false, SamplerDimension.SamplerCube), typeof<SamplerCubeArrayMS>
 
-                (false, true, true, true, SamplerDimension.Sampler1d), typeof<Sampler1dArrayShadowMS>
-                (false, true, true, true, SamplerDimension.Sampler2d), typeof<Sampler2dArrayShadowMS>
-                (false, true, true, true, SamplerDimension.SamplerCube), typeof<SamplerCubeArrayShadowMS>
-
-                
                 (true, false, false, false, SamplerDimension.Sampler1d), typeof<IntSampler1d>
                 (true, false, false, false, SamplerDimension.Sampler2d), typeof<IntSampler2d>
                 (true, false, false, false, SamplerDimension.Sampler3d), typeof<IntSampler3d>
                 (true, false, false, false, SamplerDimension.SamplerCube), typeof<IntSamplerCube>
 
-                (true, false, true, false, SamplerDimension.Sampler1d), typeof<IntSampler1dMS>
                 (true, false, true, false, SamplerDimension.Sampler2d), typeof<IntSampler2dMS>
-                (true, false, true, false, SamplerDimension.Sampler3d), typeof<IntSampler3dMS>
-                (true, false, true, false, SamplerDimension.SamplerCube), typeof<IntSamplerCubeMS>
 
                 (true, true, false, false, SamplerDimension.Sampler1d), typeof<IntSampler1dArray>
                 (true, true, false, false, SamplerDimension.Sampler2d), typeof<IntSampler2dArray>
                 (true, true, false, false, SamplerDimension.SamplerCube), typeof<IntSamplerCubeArray>
 
-                (true, true, true, false, SamplerDimension.Sampler1d), typeof<IntSampler1dArrayMS>
                 (true, true, true, false, SamplerDimension.Sampler2d), typeof<IntSampler2dArrayMS>
-                (true, true, true, false, SamplerDimension.SamplerCube), typeof<IntSamplerCubeArrayMS>
-
             ]
             
 
@@ -1643,7 +1607,7 @@ module GLSLProgramInterface =
                         let cnt = src.ReadInt32()
                         let group =
                             List.init cnt (fun _ ->
-                                let n = src.ReadString() |> Symbol.Create
+                                let rayType = src.ReadString() |> Symbol.Create
 
                                 let anyHit =
                                     match src.ReadByte() with
@@ -1660,7 +1624,7 @@ module GLSLProgramInterface =
                                     | 0uy -> None
                                     | _ -> GLSLShaderInterface.deserializeInternal src |> add |> Some
 
-                                name, {
+                                rayType, {
                                     anyHitShader = anyHit
                                     closestHitShader = closestHit
                                     intersectionShader = intersectionShader
