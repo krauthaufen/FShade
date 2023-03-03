@@ -555,7 +555,20 @@ let main argv =
                                                     match result with
                                                     | Some (id, binary) ->
                                                         Log.line "patching %s.%s: { Id = %A }" meth.DeclaringType.Name meth.Name id
-                                                        
+
+                                                        // cleanup old call: also remove "tail." instruction if one exists
+                                                        let isTail = idx > 0 && body.[idx - 1].OpCode = OpCodes.Tail
+                                                        if isTail then
+                                                            body.[idx - 1] <- Instruction.Create(OpCodes.Nop)
+
+                                                        match call with
+                                                        | Some call ->
+                                                            let call = mod_.ImportReference call
+                                                            body.[idx] <- Instruction.Create(OpCodes.Call, call)
+                                                        | None ->
+                                                            body.[idx] <- Instruction.Create(OpCodes.Nop)
+
+
                                                         let replacement =
                                                             [
                                                                 Instruction.Create(OpCodes.Pop)
@@ -572,19 +585,12 @@ let main argv =
                                                                     
                                                             ]
 
+                                                        // insert replacement
                                                         let mutable pi = pushIndex
                                                         for inst in replacement do
                                                             body.Insert(pi, inst)
                                                             pi <- pi + 1
                                                             idx <- idx + 1
-
-                                                    
-                                                        match call with
-                                                        | Some call ->
-                                                            let call = mod_.ImportReference call
-                                                            body.[idx] <- Instruction.Create(OpCodes.Call, call)
-                                                        | None ->
-                                                            body.[idx] <- Instruction.Create(OpCodes.Nop)
 
                                                 
                                                         changed <- changed + 1
