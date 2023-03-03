@@ -90,7 +90,7 @@ module EffectInputLayout =
         let mutable uniforms        = MapExt.empty
         let mutable textureInfos    = MapExt.empty
 
-        for e in m.entries do
+        for e in m.entries.Value do
             let prev = e.decorations |> List.tryPick (function EntryDecoration.Stages s -> Some s.Previous | _ -> None)
 
             match prev with
@@ -149,26 +149,28 @@ module EffectInputLayout =
     let ofModules (m : seq<Module>) =
         m |> Seq.map ofModule |> Seq.fold unify empty
 
-    let apply (layout : EffectInputLayout) (m : Module) =
+    let apply (layout : EffectInputLayout) (m : Module) : Module =
         let decorations (t : Type) =            
             match t with
                 | ImageType(fmt,_,_,_,_) -> [Imperative.UniformDecoration.Format fmt]
                 | _ -> []
 
         { m with
-            entries =
-                m.entries |> List.map (fun e ->
-                    let prev = e.decorations |> List.tryPick (function EntryDecoration.Stages s -> Some s.Previous | _ -> None)
+            entries = 
+                lazy (
+                    m.entries.Value |> List.map (fun e ->
+                        let prev = e.decorations |> List.tryPick (function EntryDecoration.Stages s -> Some s.Previous | _ -> None)
             
-                    let e = EntryPoint.setUniforms decorations layout.eUniforms layout.eUniformBuffers e
+                        let e = EntryPoint.setUniforms decorations layout.eUniforms layout.eUniformBuffers e
 
-                    match prev with
-                        | Some None -> 
-                            EntryPoint.setInputs layout.eInputs e
-                        | None ->
-                            Log.warn "[FShade] cannot determine stage for EntryPoint"
-                            e
-                        | Some _ ->
-                            e
+                        match prev with
+                            | Some None -> 
+                                EntryPoint.setInputs layout.eInputs e
+                            | None ->
+                                Log.warn "[FShade] cannot determine stage for EntryPoint"
+                                e
+                            | Some _ ->
+                                e
+                    )
                 )
         }

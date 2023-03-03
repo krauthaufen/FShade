@@ -301,6 +301,6 @@ module ComputeShader =
         {
             hash = shader.csId
             userData = shader
-            entries = [ toEntryPoint shader ]
+            entries = lazy ([ toEntryPoint shader ])
             tryGetOverrideCode = Shader.tryGetOverrideCode shader.csLocalSize
         }
