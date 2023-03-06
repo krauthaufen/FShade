@@ -278,6 +278,25 @@ let ``[Serializer] utility function generic call``() =
     shader.shaderBody |> roundtripExpr "cH0b4Q0FVt0FkN1wVQpQQ+6CPqI="
 
 [<Test>]
+let ``[Serializer] sampler arrays``() =
+
+    let samplerArray = 
+        sampler2d {
+            textureArray uniform?MyTextures 12
+        }
+
+    let shader (v : Vertex) =
+        fragment {
+            let mutable color = V4d.Zero
+            let cnt : int = uniform?TextureCount
+            for i in 0..cnt-1 do
+                color <- color + samplerArray.[i].Sample(v.tc)
+            return color
+        }
+
+    shader |> roundtrip "8SWo75CH6kBKXsLBVwjoxK5cRWQ="
+
+[<Test>]
 let ``[Hashing] includes SamplerState``() =
 
     let e1 = Effect.ofFunction (Shader1.shader)
