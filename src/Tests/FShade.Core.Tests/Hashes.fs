@@ -294,7 +294,8 @@ let ``[Serializer] sampler arrays``() =
             return color
         }
 
-    shader |> roundtrip "8SWo75CH6kBKXsLBVwjoxK5cRWQ="
+    let fx = shader |> Shader.ofFunction |> List.head
+    fx.shaderBody |> roundtripExpr "8wGbEa9+PUZEmkCyhwKiFZESaes="
 
 [<Test>]
 let ``[Hashing] includes SamplerState``() =
