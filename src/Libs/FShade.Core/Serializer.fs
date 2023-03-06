@@ -279,7 +279,10 @@ module Serializer =
                 | TypeId.Array ->
                     let rank = src.ReadByte() |> int
                     let element = deserializeInternal state src
-                    element.MakeArrayType(rank)
+                    if rank = 1 then
+                        element.MakeArrayType()
+                    else
+                        element.MakeArrayType(rank)
                 | TypeId.ByRef ->
                     let element = deserializeInternal state src
                     element.MakeByRefType()
