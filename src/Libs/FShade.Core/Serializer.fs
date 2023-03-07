@@ -1819,9 +1819,7 @@ module Serializer =
                     let list =
                         let rec toList (s : UniformScope) =
                             match s.Parent with
-                            | None -> 
-                                if System.String.IsNullOrWhiteSpace s.Name then []
-                                else [s.Name]
+                            | None -> [] // Global
                             | Some p -> toList p @ [s.Name]
                         toList scope
 
