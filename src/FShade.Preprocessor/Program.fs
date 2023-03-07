@@ -484,7 +484,8 @@ let main argv =
                     for meth in typ.Methods do
                         try
                             let body = meth.Body.Instructions
-                        
+
+                            let mutable bodyChanged = false  
                             let mutable idx = 0
                             let mutable found = false
                             while idx < body.Count do
@@ -592,7 +593,7 @@ let main argv =
                                                             pi <- pi + 1
                                                             idx <- idx + 1
 
-                                                
+                                                        bodyChanged <- true
                                                         changed <- changed + 1
 
                                                     | None ->
@@ -608,6 +609,25 @@ let main argv =
                                         ()
                             
                                 idx <- idx + 1
+
+                            // fix _S jumps that now might be larger than +127/-128
+                            if bodyChanged then
+                                for i in 0..body.Count-1 do
+                                    let op = body.[i].OpCode
+                                    if op = OpCodes.Br_S then body[i] <- Instruction.Create(OpCodes.Br, body[i].Operand :?> Instruction)
+                                    elif op = OpCodes.Beq_S then body[i] <- Instruction.Create(OpCodes.Beq, body[i].Operand :?> Instruction)
+                                    elif op = OpCodes.Bge_S then body[i] <- Instruction.Create(OpCodes.Bge, body[i].Operand :?> Instruction)
+                                    elif op = OpCodes.Bge_Un_S then body[i] <- Instruction.Create(OpCodes.Bge_Un, body[i].Operand :?> Instruction)
+                                    elif op = OpCodes.Bgt_S then body[i] <- Instruction.Create(OpCodes.Bgt, body[i].Operand :?> Instruction)
+                                    elif op = OpCodes.Bgt_Un_S then body[i] <- Instruction.Create(OpCodes.Bgt_Un, body[i].Operand :?> Instruction)
+                                    elif op = OpCodes.Ble_S then body[i] <- Instruction.Create(OpCodes.Ble, body[i].Operand :?> Instruction)
+                                    elif op = OpCodes.Ble_Un_S then body[i] <- Instruction.Create(OpCodes.Ble_Un, body[i].Operand :?> Instruction)
+                                    elif op = OpCodes.Blt_S then body[i] <- Instruction.Create(OpCodes.Blt, body[i].Operand :?> Instruction)
+                                    elif op = OpCodes.Blt_Un_S then body[i] <- Instruction.Create(OpCodes.Blt_Un, body[i].Operand :?> Instruction)
+                                    elif op = OpCodes.Bne_Un_S then body[i] <- Instruction.Create(OpCodes.Bne_Un, body[i].Operand :?> Instruction)
+                                    elif op = OpCodes.Brfalse_S then body[i] <- Instruction.Create(OpCodes.Brfalse, body[i].Operand :?> Instruction)
+                                    elif op = OpCodes.Brtrue_S then body[i] <- Instruction.Create(OpCodes.Brtrue, body[i].Operand :?> Instruction)
+
                             ()
                         with _ ->
                             ()
