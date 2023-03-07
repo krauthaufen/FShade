@@ -1,12 +1,8 @@
 {
   "profiles": {
-    "FShade.Preprocessor": {
-      "commandName": "Project",
-      "commandLineArgs": "\"C:\\Users\\Schorsch\\Development\\Aardvark.Blazor\\src\\Aardvark.Blazor.Core\\bin\\Debug\\net6.0\\Aardvark.Rendering.dll\""
-    },
     "Profile 1": {
       "commandName": "Project",
-      "commandLineArgs": "-s \"C:\\Users\\Schorsch\\Development\\FShade\\bin\\Debug\\netcoreapp3.1\\FShade.GLSL.Tests.dll\""
+      "commandLineArgs": "--verbose \"C:\\Users\\Schorsch\\Development\\PRo3D\\bin\\Release\\net6.0\\PRo3D.Viewer.dll\""
     }
   }
 }
