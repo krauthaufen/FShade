@@ -149,7 +149,7 @@ module EffectInputLayout =
                 e.decorations |> List.pick (function EntryDecoration.Stages s -> Some s | _ -> None)
 
             let first =
-                module_.entries |> List.find (fun e ->
+                module_.entries.Value |> List.find (fun e ->
                     let desc = getStageDescription e
                     desc.Previous = None
                 )
@@ -160,7 +160,7 @@ module EffectInputLayout =
                 |> MapExt.ofList
 
             let uniforms =
-                module_.entries |> List.map (fun e ->
+                module_.entries.Value |> List.map (fun e ->
                     let desc = getStageDescription e
 
                     e.uniforms |> List.map (fun u ->
@@ -186,18 +186,20 @@ module EffectInputLayout =
 
         | _ ->
             let entries =
-                module_.entries |> List.map (fun e ->
-                    let prev = e.decorations |> List.tryPick (function EntryDecoration.Stages s -> Some s.Previous | _ -> None)
+                lazy (
+                    module_.entries.Value |> List.map (fun e ->
+                        let prev = e.decorations |> List.tryPick (function EntryDecoration.Stages s -> Some s.Previous | _ -> None)
 
-                    let e = EntryPoint.setUniforms layout.Uniforms e
+                        let e = EntryPoint.setUniforms layout.Uniforms e
 
-                    match prev with
-                    | Some None ->  EntryPoint.setInputs layout.Inputs e
-                    | None ->
-                        Log.warn "[FShade] cannot determine stage for EntryPoint"
-                        e
-                    | _ ->
-                        e
+                        match prev with
+                        | Some None ->  EntryPoint.setInputs layout.Inputs e
+                        | None ->
+                            Log.warn "[FShade] cannot determine stage for EntryPoint"
+                            e
+                        | _ ->
+                            e
+                    )
                 )
 
             let userData =

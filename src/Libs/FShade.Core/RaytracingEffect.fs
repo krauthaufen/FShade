@@ -284,12 +284,14 @@ module RaytracingEffect =
                 slot name, shader
             )
 
-        let entryPoints =
-            [ toEntryPoints [ShaderSlot.RayGeneration, effect.RayGenerationShader]
-              toEntryPoints (effect.MissShaders |> toList ShaderSlot.Miss)
-              toEntryPoints (effect.CallableShaders |> toList ShaderSlot.Callable)
-              toEntryPoints hitGroups ]
-            |> List.concat
+        let entryPoints = 
+            lazy (
+                [ toEntryPoints [ShaderSlot.RayGeneration, effect.RayGenerationShader]
+                  toEntryPoints (effect.MissShaders |> toList ShaderSlot.Miss)
+                  toEntryPoints (effect.CallableShaders |> toList ShaderSlot.Callable)
+                  toEntryPoints hitGroups ]
+                |> List.concat
+            )
 
         {
             hash = effect.Id

@@ -301,7 +301,7 @@ module ModuleCompiler =
         let ofModule (backend : Backend) (m : Module) =
             let compile =
                 state {
-                    let! nodes = m.entries |> List.mapS ofEntry
+                    let! nodes = m.entries.Value |> List.mapS ofEntry
                     return nodes
                 }
 
