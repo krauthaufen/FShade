@@ -1,3 +1,11 @@
+### 5.4.0-prerelease0002
+* Preprocessor: merge aot2 + bugfixes
+* Lazy modules entries
+* Effect serialization bugfixes: array deserialization, uniform scopes
+* Fixed issue with return type for integer vector dot product
+* Include sampler texture name in hash
+* Added support for float32-based vertex types
+
 ### 5.4.0-prerelease0001
 * Initial prerelease version for 5.4
 
