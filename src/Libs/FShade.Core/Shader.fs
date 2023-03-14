@@ -1300,11 +1300,13 @@ module Preprocessor =
                         | 'W' -> Expr.FieldGet(Expr.Var tmp, v.Type.GetField "W")
                         | 'I' | 'P' ->
                             if baseType = typeof<int> then Expr.Value 1
+                            elif baseType = typeof<uint32> then Expr.Value 1u
                             elif baseType = typeof<float32> then Expr.Value 1.0f
                             elif baseType = typeof<double> then Expr.Value 1.0
                             else failwith "not implemented"
                         | 'O' ->
                             if baseType = typeof<int> then Expr.Value 0
+                            elif baseType = typeof<uint32> then Expr.Value 0u
                             elif baseType = typeof<float32> then Expr.Value 0.0f
                             elif baseType = typeof<double> then Expr.Value 0.0
                             else failwith "not implemented"

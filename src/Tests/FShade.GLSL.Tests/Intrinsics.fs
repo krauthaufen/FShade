@@ -1179,6 +1179,13 @@ let ``Constant swizzles``() =
             let _ = getVec().ZYXN
             let _ = getVec().OXOX
             let _ = getVec().XOOO
+
+            let _ = V3ui(v.whatu.X, 2u, 3u).XYOI
+            let _ = V3ui(v.whatu.X, 2u, 3u).OXXX
+            let _ = V3ui(v.whatu.X, 2u, 3u).ZIXO
+            let _ = V3ui(v.whatu.X, 2u, 3u).OXOX
+            let _ = V3ui(v.whatu.X, 2u, 3u).XOOO
+
             return v.pos
         }
 
