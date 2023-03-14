@@ -2047,8 +2047,8 @@ module Preprocessor =
     and getOutputValues (sem : string) (value : Expr) : Preprocess<list<string * Option<Expr> * Expr>> =
         state {
             match value.Type with
-            | TypeInfo.Patterns.VectorOf (_, (TypeInfo.Patterns.Float64 | TypeInfo.Patterns.Int32 | TypeInfo.Patterns.UInt32))
-            | TypeInfo.Patterns.Float64 | TypeInfo.Patterns.Int32 | TypeInfo.Patterns.UInt32 ->
+            | TypeInfo.Patterns.VectorOf (_, (TypeInfo.Patterns.Float32 | TypeInfo.Patterns.Float64 | TypeInfo.Patterns.Int32 | TypeInfo.Patterns.UInt32))
+            | TypeInfo.Patterns.Float32 | TypeInfo.Patterns.Float64 | TypeInfo.Patterns.Int32 | TypeInfo.Patterns.UInt32 ->
                 let! value = preprocessS value
                 do! State.writeOutput sem { paramType = value.Type; paramInterpolation = InterpolationMode.Default }
                 return [sem, None, value]
@@ -2923,7 +2923,34 @@ module Shader =
 
     let private typeConversions =
         LookupTable.lookupTable' [
-            // Float
+            // Float32
+            (typeof<V2f>, typeof<float32>), fun value -> <@@ (%%value : V2f).X @@>
+
+            (typeof<V3f>, typeof<float32>), fun value -> <@@ (%%value : V3f).X @@>
+            (typeof<V3f>, typeof<V2f>),     fun value -> <@@ (%%value : V3f).XY @@>
+            (typeof<V3f>, typeof<V4f>),     fun value -> <@@ V4f((%%value : V3f), 1.0f) @@>
+
+            (typeof<V4f>, typeof<float32>), fun value -> <@@ (%%value : V4f).X @@>
+            (typeof<V4f>, typeof<V2f>),     fun value -> <@@ (%%value : V4f).XY @@>
+            (typeof<V4f>, typeof<V3f>),     fun value -> <@@ (%%value : V4f).XYZ @@>
+
+            // Float32 -> Float64
+            (typeof<float32>, typeof<float>), fun value -> <@@ float (%%value : float32) @@>
+
+            (typeof<V2f>, typeof<float>),     fun value -> <@@ float (%%value : V2f).X @@>
+            (typeof<V2f>, typeof<V2d>),       fun value -> <@@ V2d (%%value : V2f) @@>
+
+            (typeof<V3f>, typeof<float>),     fun value -> <@@ float (%%value : V3f).X @@>
+            (typeof<V3f>, typeof<V2d>),       fun value -> <@@ V2d(%%value : V3f).XY @@>
+            (typeof<V3f>, typeof<V3d>),       fun value -> <@@ V3d(%%value : V3f) @@>
+            (typeof<V3f>, typeof<V4d>),       fun value -> <@@ V4d((%%value : V3f), 1.0f) @@>
+
+            (typeof<V4f>, typeof<float>),     fun value -> <@@ float (%%value : V4f).X @@>
+            (typeof<V4f>, typeof<V2d>),       fun value -> <@@ V2d(%%value : V4f).XY @@>
+            (typeof<V4f>, typeof<V3d>),       fun value -> <@@ V3d(%%value : V4f).XYZ @@>
+            (typeof<V4f>, typeof<V4d>),       fun value -> <@@ V4d(%%value : V4f) @@>
+
+            // Float64
             (typeof<V2d>, typeof<float>), fun value -> <@@ (%%value : V2d).X @@>
 
             (typeof<V3d>, typeof<float>), fun value -> <@@ (%%value : V3d).X @@>
@@ -2933,6 +2960,22 @@ module Shader =
             (typeof<V4d>, typeof<float>), fun value -> <@@ (%%value : V4d).X @@>
             (typeof<V4d>, typeof<V2d>),   fun value -> <@@ (%%value : V4d).XY @@>
             (typeof<V4d>, typeof<V3d>),   fun value -> <@@ (%%value : V4d).XYZ @@>
+
+            // Float64 -> Float32
+            (typeof<float>, typeof<float32>), fun value -> <@@ float32 (%%value : float) @@>
+
+            (typeof<V2d>, typeof<float32>),   fun value -> <@@ float32 (%%value : V2d).X @@>
+            (typeof<V2d>, typeof<V2f>),       fun value -> <@@ V2f (%%value : V2d) @@>
+
+            (typeof<V3d>, typeof<float32>),   fun value -> <@@ float32 (%%value : V3d).X @@>
+            (typeof<V3d>, typeof<V2f>),       fun value -> <@@ V2f(%%value : V3d).XY @@>
+            (typeof<V3d>, typeof<V3f>),       fun value -> <@@ V3f(%%value : V3d) @@>
+            (typeof<V3d>, typeof<V4f>),       fun value -> <@@ V4f((%%value : V3d), 1.0) @@>
+
+            (typeof<V4d>, typeof<float32>),   fun value -> <@@ float32 (%%value : V4d).X @@>
+            (typeof<V4d>, typeof<V2f>),       fun value -> <@@ V2f(%%value : V4d).XY @@>
+            (typeof<V4d>, typeof<V3f>),       fun value -> <@@ V3f(%%value : V4d).XYZ @@>
+            (typeof<V4d>, typeof<V4f>),       fun value -> <@@ V4f(%%value : V4d) @@>
 
             // Int32
             (typeof<V2i>, typeof<int32>), fun value -> <@@ (%%value : V2i).X @@>
