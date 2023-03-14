@@ -1120,3 +1120,14 @@ let ``Debug output``() =
     GLSL.shouldCompile [
         Effect.ofFunction fs
     ]
+
+[<Test>]
+let ``UInt32 literals``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            return V3ui(0xFFFFFFFFu)
+        }
+
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction fs ] [ $"{UInt32.MaxValue}u" ]
