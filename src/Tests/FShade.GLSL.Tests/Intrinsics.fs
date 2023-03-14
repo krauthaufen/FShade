@@ -126,12 +126,23 @@ let ``Vector conversion``() =
         fragment {
             let _ = v2d v.what
             let _ = v3d v.what
+            let _ = v3d v.what.XY
             let _ = v4d v.what
+            let _ = v4d v.what.XY
+            let _ = v4d v.what.XYZ
             let _ = V4d.op_Explicit v.what
             let _ = v4d v.c
             let _ = v2i v.c
             let _ = v3i v.c
             let _ = v4i v.c
+            let _ = v2i v.c
+            let _ = v3i v.c.XY
+            let _ = v4i v.c.XY
+            let _ = V4i.op_Explicit v.what.XY
+            let _ = v2ui v.c
+            let _ = v3ui v.c.XY
+            let _ = v4ui v.c.XY
+            let _ = V4ui.op_Explicit v.what.XY
             return v.c
         }
 

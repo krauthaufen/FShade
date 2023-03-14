@@ -397,6 +397,32 @@ module Compiler =
                     | _ ->
                         e
 
+        // Builds a new vector from the given arguments.
+        // If not enough arguments are provided, zeros are filled in.
+        let private constructVector (elementType : CType) (dimension : int) (args : CExpr list) =
+
+            // Check if the provided args are sufficient for the dimension
+            let providedDim =
+                args |> List.sumBy (fun expr ->
+                    match expr.ctype with
+                    | CVector(_, d) -> d
+                    | _ -> 1
+                )
+
+            // Fill in zeros for the missing dimensions
+            let args =
+                if providedDim > 1 && providedDim < dimension then
+                    let newArgs =
+                        List.init (dimension - providedDim) (fun _ ->
+                            CValue(elementType, CIntegral 0L)
+                        )
+
+                    args @ newArgs
+                else
+                    args
+
+            CNewVector(CType.CVector(elementType, dimension), args)
+
         let private vecSwizzleRx = System.Text.RegularExpressions.Regex @"get_([XYZW]+)"
         let rec tryGetBuiltInMethod (b : IBackend) (mi : MethodInfo) (args : list<CExpr>) =
             let ct = CType.ofType b mi.ReturnType
@@ -588,8 +614,8 @@ module Compiler =
                 | MethodQuote <@ v4ui : V4d -> _ @> _, args
                 | Method("op_Explicit", [VectorOf _]), args ->
                     match ct with
-                    | CVector(_, _) ->
-                        CNewVector(ct, args) |> Some
+                    | CVector(et, dim) ->
+                        constructVector et dim args |> Some
                     | _ ->
                         None
 
@@ -798,28 +824,8 @@ module Compiler =
         let rec tryGetBuiltInCtor (b : IBackend) (ctor : ConstructorInfo) (args : list<CExpr>) =
             match ctor.DeclaringType with
                 | VectorOf(d, t) ->
-
-                    // Check if the provided args are sufficient for the dimension
-                    let providedDim =
-                        args |> List.sumBy (fun expr ->
-                            match expr.ctype with
-                            | CVector(_, d) -> d
-                            | _ -> 1
-                        )
-
-                    // Fill in zeros for the missing dimensions
-                    let args =
-                        if providedDim > 1 && providedDim < d then
-                            let newArgs =
-                                List.init (d - providedDim) (fun _ ->
-                                    CValue(CType.ofType b t, CIntegral 0L)
-                                )
-
-                            args @ newArgs
-                        else
-                            args
-
-                    CNewVector(CType.ofType b ctor.DeclaringType, args) |> Some
+                    let et = CType.ofType b t
+                    constructVector et d args |> Some
 
                 | MatrixOf(s, _) ->
                     let l = List.length args
