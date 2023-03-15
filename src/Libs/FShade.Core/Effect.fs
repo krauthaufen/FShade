@@ -116,9 +116,18 @@ type Effect(id : string, shaders : Lazy<Map<ShaderStage, Shader>>, composedOf : 
 
 type EffectConfig =
     {
+        /// Target depth range for optional depth range mapping.
+        /// The final depth will be mapped from [-1, 1] to the target range.
+        /// If the target range is [-1, 1] no mapping will be performed.
         depthRange          : Range1d
+
+        /// Indicates whether the y-component of vertex clip cooridnates is to be inverted.
         flipHandedness      : bool
+
+        /// Stage of the last shader in the effect.
         lastStage           : ShaderStage
+
+        /// Type and slot for each output.
         outputs             : Map<string, Type * int>
     }
 
