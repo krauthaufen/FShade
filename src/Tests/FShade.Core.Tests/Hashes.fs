@@ -125,6 +125,22 @@ module private Utilities =
         let expr = func Unchecked.defaultof<_>
         roundtripExpr expected expr
 
+    let roundtripEffect (input : Effect) =
+        use memory = new MemoryStream()
+
+        input |> Effect.serialize memory
+        
+        memory.Position <- 0L
+        let output = Effect.deserialize memory
+
+        input.Id |> should equal output.Id
+        input.Inputs |> should equal output.Inputs
+        input.Outputs |> should equal output.Outputs
+        //input.Shaders |> should equal output.Shaders // NOTE: cannot be compared this way -> Exrp.Var does not have suitable equality (always false)
+        input.Uniforms |> should equal output.Uniforms
+        
+
+
 [<Test>]
 let ``[Serializer] instance field get``() =
 
@@ -276,6 +292,42 @@ let ``[Serializer] utility function generic call``() =
 
     let shader = Shader.ofFunction bla |> List.head
     shader.shaderBody |> roundtripExpr "cH0b4Q0FVt0FkN1wVQpQQ+6CPqI="
+
+[<Test>]
+let ``[Serializer] sampler arrays``() =
+
+    let samplerArray = 
+        sampler2d {
+            textureArray uniform?MyTextures 12
+        }
+
+    let shader (v : Vertex) =
+        fragment {
+            let mutable color = V4d.Zero
+            let cnt : int = uniform?TextureCount
+            for i in 0..cnt-1 do
+                color <- color + samplerArray.[i].Sample(v.tc)
+            return color
+        }
+
+    let fx = shader |> Shader.ofFunction |> List.head
+    fx.shaderBody |> roundtripExpr "8wGbEa9+PUZEmkCyhwKiFZESaes="
+
+[<Test>]
+let ``[Serializer] storage buffers``() =
+
+    let shader (v : Vertex) =
+        fragment {
+            let mutable color = V4d.Zero
+            let buf : V4d[] = uniform?StorageBuffer?buffy
+            let cnt : int = uniform?BufferLength
+            for i in 0..cnt-1 do
+                color <- color + buf.[i]
+            return color
+        }
+
+    let fx = shader |> Effect.ofFunction
+    fx |> roundtripEffect
 
 [<Test>]
 let ``[Hashing] includes SamplerState``() =

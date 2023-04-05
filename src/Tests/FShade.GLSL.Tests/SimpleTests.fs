@@ -20,6 +20,12 @@ type Vertex =
         [<Semantic("uid")>] uid : uint
     }
 
+type F32Vertex =
+    {
+        [<Color>] c : V4f
+        whatever : float32
+    }
+
 type IntVertex =
     {
         [<Color>] c : int
@@ -1119,4 +1125,46 @@ let ``Debug output``() =
 
     GLSL.shouldCompile [
         Effect.ofFunction fs
+    ]
+
+[<Test>]
+let ``UInt32 literals``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            return V3ui(0xFFFFFFFFu)
+        }
+
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction fs ] [ $"{UInt32.MaxValue}u" ]
+
+[<Test>]
+let ``Float32 vertex types``() =
+    Setup.Run()
+
+    let fs1 (v : F32Vertex) =
+        fragment {
+            return v.c + V4f.XAxis
+        }
+
+    let fs2 (v : Vertex) =
+        fragment {
+            return v.c.YXZW + (V4d.YAxis * 2.0)
+        }
+
+    let fs3 (v : F32Vertex) =
+        fragment {
+            return {| whatever = float (v.c.XYZ + 2.0f).Y |}
+        }
+
+    let fs4 (v : F32Vertex) =
+        fragment {
+            return v.whatever - 1.0f
+        }
+
+    GLSL.shouldCompile [
+        Effect.ofFunction fs1
+        Effect.ofFunction fs2
+        Effect.ofFunction fs3
+        Effect.ofFunction fs4
     ]

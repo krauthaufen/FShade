@@ -859,17 +859,24 @@ module Assembler =
         let name = glslName s.name
         sprintf "%s %s(%s)" ret.Name name.Name args
 
-    let assembleLiteral (l : CLiteral) =
+    let assembleLiteral (t : CType) (l : CLiteral) =
         match l with
-            | CLiteral.CBool v -> if v then "true" else "false"
-            | CLiteral.Null -> "null"
-            | CLiteral.CIntegral v -> string v
-            | CLiteral.CFractional v -> 
-                let str = v.ToString(System.Globalization.CultureInfo.InvariantCulture)
-                if str.Contains "." || str.Contains "E" || str.Contains "e" then str
-                else str + ".0"
+        | CLiteral.CBool v -> if v then "true" else "false"
+        | CLiteral.Null -> "null"
+        | CLiteral.CIntegral v ->
+            let suffix =
+                match t with
+                | CType.CInt(false, _) -> "u"
+                | _ -> ""
 
-            | CLiteral.CString v -> "\"" + v + "\""        
+            string v + suffix
+
+        | CLiteral.CFractional v ->
+            let str = v.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            if str.Contains "." || str.Contains "E" || str.Contains "e" then str
+            else str + ".0"
+
+        | CLiteral.CString v -> "\"" + v + "\""
 
     let rec assembleVecSwizzle (c : list<CVecComponent>) =
         match c with
@@ -887,8 +894,8 @@ module Assembler =
                     let name = glslName v.name
                     return name.Name
 
-                | CValue(_, v) ->
-                    return assembleLiteral v
+                | CValue(t, v) ->
+                    return assembleLiteral t v
 
                 | CCall(func, args) ->
                     do! Interface.callFunction func

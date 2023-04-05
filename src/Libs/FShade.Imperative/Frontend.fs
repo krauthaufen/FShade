@@ -565,7 +565,7 @@ type Module =
     { 
         hash : string
         userData : obj
-        entries : list<EntryPoint>
+        entries : Lazy<list<EntryPoint>>
         tryGetOverrideCode : MethodBase -> Option<Expr> 
     }
        

@@ -312,17 +312,43 @@ module Effect =
 
         let shaders =
             lazy (
-                use ms = new MemoryStream(src)
-                use src = new BinaryReader(ms, System.Text.Encoding.UTF8, true)
-                let state = Shader.DeserializerState()
-                let _id = src.ReadString()
-                let cnt = src.ReadInt32()
-                List.init cnt (fun _ ->
-                    let stage = src.ReadInt32() |> unbox<ShaderStage>
-                    let shader = Shader.deserializeInternal state src
-                    stage, shader
-                )
-                |> Map.ofList
+                try
+                    use ms = new MemoryStream(src)
+                    use src = new BinaryReader(ms, System.Text.Encoding.UTF8, true)
+                    let state = Shader.DeserializerState()
+                    let _id = src.ReadString()
+                    let cnt = src.ReadInt32()
+                    List.init cnt (fun _ ->
+                        let stage = src.ReadInt32() |> unbox<ShaderStage>
+                        let shader = Shader.deserializeInternal state src
+                        stage, shader
+                    )
+                    |> Map.ofList
+                with _ ->
+                    let b64 = System.Convert.ToBase64String src
+                    failwithf "Failed to read effect base64: \"%s\"" b64
+            )
+
+        Effect(id, shaders, [])
+
+    let unpickleWithId (id : string) (data : string) =
+        let shaders =
+            lazy (
+                try
+                    let binary = System.Convert.FromBase64String data
+                    use ms = new MemoryStream(binary)
+                    use src = new BinaryReader(ms, System.Text.Encoding.UTF8, true)
+                    let state = Shader.DeserializerState()
+                    let _id = src.ReadString()
+                    let cnt = src.ReadInt32()
+                    List.init cnt (fun _ ->
+                        let stage = src.ReadInt32() |> unbox<ShaderStage>
+                        let shader = Shader.deserializeInternal state src
+                        stage, shader
+                    )
+                    |> Map.ofList
+                with e ->
+                    failwithf "Failed to read effect base64: \"%s\"" data
             )
 
         Effect(id, shaders, [])
@@ -722,79 +748,85 @@ module Effect =
     /// creates a Module for the given effect which can be used for compilation.              
     let toModule (config : EffectConfig) (effect : Effect) =
         Serializer.Init()
-        let effectLinked =
-            effect
-                |> link config.lastStage (Map.map (fun _ -> fst) config.outputs)
-                |> withDepthRange config.flipHandedness config.depthRange
+        
+        let entries = 
+            lazy (
+                let effectLinked =
+                    effect
+                        |> link config.lastStage (Map.map (fun _ -> fst) config.outputs)
+                        |> withDepthRange config.flipHandedness config.depthRange
                 
 
-        let rec entryPoints (last : Option<Shader>) (lastStage : Option<Shader>) (shaders : list<Shader>) =
-            match shaders with
-                | [] -> 
-                    []
+                let rec entryPoints (last : Option<Shader>) (lastStage : Option<Shader>) (shaders : list<Shader>) =
+                    match shaders with
+                        | [] -> 
+                            []
 
-                | [shader] -> 
+                        | [shader] -> 
                     
-                    let inputs =
-                        match last with
-                            | Some last -> 
-                                shader.shaderInputs |> Map.map (fun sem i ->
-                                    if i.paramInterpolation = InterpolationMode.Default then
-                                        match Map.tryFind sem last.shaderOutputs with
-                                            | Some { paramInterpolation = outMode } ->
-                                                { i with paramInterpolation = outMode }
-                                            | _ ->
+                            let inputs =
+                                match last with
+                                    | Some last -> 
+                                        shader.shaderInputs |> Map.map (fun sem i ->
+                                            if i.paramInterpolation = InterpolationMode.Default then
+                                                match Map.tryFind sem last.shaderOutputs with
+                                                    | Some { paramInterpolation = outMode } ->
+                                                        { i with paramInterpolation = outMode }
+                                                    | _ ->
+                                                        i
+                                            else
                                                 i
-                                    else
-                                        i
-                                )
-                            | None ->
-                                shader.shaderInputs
+                                        )
+                                    | None ->
+                                        shader.shaderInputs
 
-                    let entry = Shader.toEntryPoint lastStage { shader with shaderInputs = inputs } None
+                            let entry = Shader.toEntryPoint lastStage { shader with shaderInputs = inputs } None
 
-                    let mutable free = Set.ofList (entry.outputs |> List.mapi (fun i _ -> i))
+                            let mutable free = Set.ofList (entry.outputs |> List.mapi (fun i _ -> i))
 
-                    let outputs = 
-                        entry.outputs
-                            |> List.map (fun o -> 
-                                let slot = 
-                                    match Map.tryFind o.paramName config.outputs with
-                                        | Some(_,slot) -> slot
-                                        | None -> Seq.head free
-                                let o = { o with paramDecorations = Set.add (ParameterDecoration.Slot slot) o.paramDecorations }
-                                free <- Set.remove slot free
-                                (slot, o)
-                            )
-                            |> List.sortBy fst
-                            |> List.map snd
+                            let outputs = 
+                                entry.outputs
+                                    |> List.map (fun o -> 
+                                        let slot = 
+                                            match Map.tryFind o.paramName config.outputs with
+                                                | Some(_,slot) -> slot
+                                                | None -> Seq.head free
+                                        let o = { o with paramDecorations = Set.add (ParameterDecoration.Slot slot) o.paramDecorations }
+                                        free <- Set.remove slot free
+                                        (slot, o)
+                                    )
+                                    |> List.sortBy fst
+                                    |> List.map snd
                             
-                    [ { entry with outputs = outputs } ]
+                            [ { entry with outputs = outputs } ]
 
-                | shader :: next :: after ->
+                        | shader :: next :: after ->
 
-                    let outputs =
-                        shader.shaderOutputs |> Map.map (fun sem o ->
-                            if o.paramInterpolation = InterpolationMode.Default then
-                                match Map.tryFind sem next.shaderInputs with
-                                    | Some { paramInterpolation = inMode } ->
-                                        { o with paramInterpolation = inMode }
-                                    | _ ->
+                            let outputs =
+                                shader.shaderOutputs |> Map.map (fun sem o ->
+                                    if o.paramInterpolation = InterpolationMode.Default then
+                                        match Map.tryFind sem next.shaderInputs with
+                                            | Some { paramInterpolation = inMode } ->
+                                                { o with paramInterpolation = inMode }
+                                            | _ ->
+                                                o
+                                    else
                                         o
-                            else
-                                o
-                        )
-                    let shader = { shader with shaderOutputs = outputs }
+                                )
+                            let shader = { shader with shaderOutputs = outputs }
 
-                    let shaderEntry = Shader.toEntryPoint lastStage shader (Some next) 
-                    shaderEntry :: entryPoints (Some shader) (Some shader) (next :: after)
+                            let shaderEntry = Shader.toEntryPoint lastStage shader (Some next) 
+                            shaderEntry :: entryPoints (Some shader) (Some shader) (next :: after)
 
-        let shaders = toList effectLinked
+                let shaders = toList effectLinked
+
+                entryPoints None None shaders
+            )
 
         {
             hash = effect.Id
             userData = effect
-            entries = entryPoints None None shaders
+            entries = entries
             tryGetOverrideCode = Shader.tryGetOverrideCode V3i.Zero 
         }
 

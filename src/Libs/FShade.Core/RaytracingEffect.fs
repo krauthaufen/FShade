@@ -262,34 +262,37 @@ module RaytracingEffect =
     let toModule (effect : RaytracingEffect) =
         Serializer.Init()
 
-        let toEntryPoints (shaders : List<ShaderSlot * Shader>) =
-            shaders |> List.map (fun (slot, shader) ->
-                Shader.toEntryPointRaytracing slot shader
+        let entryPoints = 
+            lazy (
+            
+                let toEntryPoints (shaders : List<ShaderSlot * Shader>) =
+                    shaders |> List.map (fun (slot, shader) ->
+                        Shader.toEntryPointRaytracing slot shader
+                    )
+
+                let hitGroups =
+                    effect.HitGroups |> Map.toList |> List.collect (fun (name, group) ->
+                        group.PerRayType |> Map.toList |> List.collect (fun (ray, entry) ->
+                            let select slot = Option.map (fun s -> slot (name, ray), s)
+
+                            [ entry.AnyHit |> select ShaderSlot.AnyHit
+                              entry.ClosestHit |> select ShaderSlot.ClosestHit
+                              entry.Intersection |> select ShaderSlot.Intersection ]
+                            |> List.choose id
+                        )
+                    )
+
+                let toList (slot : Symbol -> ShaderSlot) (map : Map<Symbol, Shader>) =
+                    map |> Map.toList |> List.map (fun (name, shader) ->
+                        slot name, shader
+                    )
+
+                [ toEntryPoints [ShaderSlot.RayGeneration, effect.RayGenerationShader]
+                  toEntryPoints (effect.MissShaders |> toList ShaderSlot.Miss)
+                  toEntryPoints (effect.CallableShaders |> toList ShaderSlot.Callable)
+                  toEntryPoints hitGroups ]
+                |> List.concat
             )
-
-        let hitGroups =
-            effect.HitGroups |> Map.toList |> List.collect (fun (name, group) ->
-                group.PerRayType |> Map.toList |> List.collect (fun (ray, entry) ->
-                    let select slot = Option.map (fun s -> slot (name, ray), s)
-
-                    [ entry.AnyHit |> select ShaderSlot.AnyHit
-                      entry.ClosestHit |> select ShaderSlot.ClosestHit
-                      entry.Intersection |> select ShaderSlot.Intersection ]
-                    |> List.choose id
-                )
-            )
-
-        let toList (slot : Symbol -> ShaderSlot) (map : Map<Symbol, Shader>) =
-            map |> Map.toList |> List.map (fun (name, shader) ->
-                slot name, shader
-            )
-
-        let entryPoints =
-            [ toEntryPoints [ShaderSlot.RayGeneration, effect.RayGenerationShader]
-              toEntryPoints (effect.MissShaders |> toList ShaderSlot.Miss)
-              toEntryPoints (effect.CallableShaders |> toList ShaderSlot.Callable)
-              toEntryPoints hitGroups ]
-            |> List.concat
 
         {
             hash = effect.Id
