@@ -61,8 +61,8 @@ let ``Reflected functions``() =
     let effect =
          let hitgroupMain =
              hitgroup {
-                closestHit ("1", chitShader)
-                closestHit ("2", chitShader)
+                closestHit "1" chitShader
+                closestHit "2" chitShader
             }
 
          let hitgroupShadow =
@@ -70,8 +70,8 @@ let ``Reflected functions``() =
 
          raytracingEffect {
              raygen raygenShader
-             hitgroup ("Main", hitgroupMain)
-             hitgroup ("Shadow", hitgroupShadow)
+             hitgroup "Main" hitgroupMain
+             hitgroup "Shadow" hitgroupShadow
          }
 
     let regex = "helper\(vec3 WorldRayDirection, vec3 WorldRayOrigin\)"
@@ -100,8 +100,8 @@ let ``Simple uniform access in reflected function``() =
 
          raytracingEffect {
              raygen raygenShader
-             hitgroup ("1", hitgroup1)
-             hitgroup ("2", hitgroup2)
+             hitgroup "1" hitgroup1
+             hitgroup "2" hitgroup2
          }
 
     GLSL.shouldCompileRaytracing effect
@@ -138,7 +138,7 @@ let ``Helper with PrimitiveId``() =
 
          raytracingEffect {
              raygen raygenShader
-             hitgroup ("1", hitgroup1)
+             hitgroup "1" hitgroup1
          }
 
     GLSL.shouldCompileRaytracing effect
@@ -166,7 +166,7 @@ let ``Callable shader``() =
     let effect =
          raytracingEffect {
              raygen raygenShader
-             callable (someName, callableShader)
+             callable someName callableShader
          }
 
     GLSL.shouldCompileRaytracing effect

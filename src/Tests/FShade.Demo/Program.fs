@@ -510,7 +510,7 @@ let main args =
 
         raytracingEffect {
             raygen raygenShader
-            hitgroup defaultHitGroup
+            hitgroup "Main" defaultHitGroup
             miss missShader
             callable callableShader
         }

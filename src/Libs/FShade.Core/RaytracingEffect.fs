@@ -301,6 +301,7 @@ module RaytracingEffect =
 
 [<AutoOpen>]
 module RaytracingBuilders =
+    open System
 
     type HitGroupBuilder() =
         do Serializer.Init()
@@ -312,117 +313,213 @@ module RaytracingBuilders =
             { s with PerRayType = s.PerRayType |> Map.add rayId (f entry)}
 
         [<CustomOperation("anyHit")>]
-        member x.AnyHit(s : HitGroup, (rayId, shader) : Symbol * Shader) =
+        member x.AnyHit(s : HitGroup, rayId : Symbol, shader : Shader) =
             match shader.shaderStage with
             | ShaderStage.AnyHit ->
                 x.UpdateEntry(s, rayId, fun e -> { e with AnyHit = Some shader })
             | _ ->
                 failwithf "[FShade] Expected any hit shader but got %A" shader.shaderStage
 
-        member x.AnyHit(s : HitGroup, (rayId, e) : Symbol * Expr<'a>) =
+        [<CustomOperation("anyHit")>]
+        member inline x.AnyHit(s : HitGroup, rayId : Symbol, e : Expr<'a>) =
             let shaders = Shader.ofExpr [] e
-            x.AnyHit(s, (rayId, shaders.Head))
+            x.AnyHit(s, rayId, shaders.Head)
 
-        member x.AnyHit(s : HitGroup, (rayId, f) : Symbol * ('a -> 'b)) =
+        [<CustomOperation("anyHit")>]
+        member inline x.AnyHit(s : HitGroup, rayId : Symbol, f : ('a -> 'b)) =
             let shaders = Shader.ofRaytracingFunction f
-            x.AnyHit(s, (rayId, shaders.Head))
+            x.AnyHit(s, rayId, shaders.Head)
 
-        member x.AnyHit(s : HitGroup, (rayId, shader) : string * Shader) =
-             x.AnyHit(s, (Sym.ofString rayId, shader))
+        [<CustomOperation("anyHit")>]
+        member inline x.AnyHit(s : HitGroup, rayId : string, shader : Shader) =
+            x.AnyHit(s, Sym.ofString rayId, shader)
 
-         member x.AnyHit(s : HitGroup, (rayId, e) : string * Expr<'a>) =
-             x.AnyHit(s, (Sym.ofString rayId, e))
+        [<CustomOperation("anyHit")>]
+        member inline x.AnyHit(s : HitGroup, rayId : string, e : Expr<'a>) =
+            x.AnyHit(s, Sym.ofString rayId, e)
 
-         member x.AnyHit(s : HitGroup, (rayId, f) : string * ('a -> 'b)) =
-             x.AnyHit(s, (Sym.ofString rayId, f))
+        [<CustomOperation("anyHit")>]
+        member inline x.AnyHit(s : HitGroup, rayId : string, f : ('a -> 'b)) =
+            x.AnyHit(s, Sym.ofString rayId, f)
 
-        member x.AnyHit(s : HitGroup, shader : Shader) =
-            x.AnyHit(s, (Identifier.Default, shader))
+        [<CustomOperation("anyHit"); Obsolete("Use overload with untupled arguments.")>]
+        member x.AnyHit(s : HitGroup, (rayId, shader) : Symbol * Shader) =
+            x.AnyHit(s, rayId, shader)
 
-        member x.AnyHit(s : HitGroup, e : Expr<'a>) =
-            x.AnyHit(s, (Identifier.Default, e))
+        [<CustomOperation("anyHit"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.AnyHit(s : HitGroup, (rayId, e) : Symbol * Expr<'a>) =
+            x.AnyHit(s, rayId, e)
 
-        member x.AnyHit(s : HitGroup, f : 'a -> 'b) =
-            x.AnyHit(s, (Identifier.Default, f))
+        [<CustomOperation("anyHit"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.AnyHit(s : HitGroup, (rayId, f) : Symbol * ('a -> 'b)) =
+            x.AnyHit(s, rayId, f)
+
+        [<CustomOperation("anyHit"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.AnyHit(s : HitGroup, (rayId, shader) : string * Shader) =
+            x.AnyHit(s, rayId, shader)
+
+        [<CustomOperation("anyHit"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.AnyHit(s : HitGroup, (rayId, e) : string * Expr<'a>) =
+            x.AnyHit(s, rayId, e)
+
+        [<CustomOperation("anyHit"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.AnyHit(s : HitGroup, (rayId, f) : string * ('a -> 'b)) =
+            x.AnyHit(s, rayId, f)
+
+        [<CustomOperation("anyHit")>]
+        member inline x.AnyHit(s : HitGroup, shader : Shader) =
+            x.AnyHit(s, Identifier.Default, shader)
+
+        [<CustomOperation("anyHit")>]
+        member inline x.AnyHit(s : HitGroup, e : Expr<'a>) =
+            x.AnyHit(s, Identifier.Default, e)
+
+        [<CustomOperation("anyHit")>]
+        member inline x.AnyHit(s : HitGroup, f : 'a -> 'b) =
+            x.AnyHit(s, Identifier.Default, f)
 
 
         [<CustomOperation("closestHit")>]
-        member x.ClosestHit(s : HitGroup, (rayId, shader) : Symbol * Shader) =
+        member x.ClosestHit(s : HitGroup, rayId : Symbol, shader : Shader) =
             match shader.shaderStage with
             | ShaderStage.ClosestHit ->
                 x.UpdateEntry(s, rayId, fun e -> { e with ClosestHit = Some shader })
             | _ ->
                 failwithf "[FShade] Expected closest hit shader but got %A" shader.shaderStage
 
-        member x.ClosestHit(s : HitGroup, (rayId, e) : Symbol * Expr<'a>) =
+        [<CustomOperation("closestHit")>]
+        member inline x.ClosestHit(s : HitGroup, rayId : Symbol, e : Expr<'a>) =
             let shaders = Shader.ofExpr [] e
-            x.ClosestHit(s, (rayId, shaders.Head))
+            x.ClosestHit(s, rayId, shaders.Head)
 
-        member x.ClosestHit(s : HitGroup, (rayId, f) : Symbol * ('a -> 'b)) =
+        [<CustomOperation("closestHit")>]
+        member inline x.ClosestHit(s : HitGroup, rayId : Symbol, f : ('a -> 'b)) =
             let shaders = Shader.ofRaytracingFunction f
-            x.ClosestHit(s, (rayId, shaders.Head))
+            x.ClosestHit(s, rayId, shaders.Head)
 
-        member x.ClosestHit(s : HitGroup, (rayId, shader) : string * Shader) =
-            x.ClosestHit(s, (Sym.ofString rayId, shader))
+        [<CustomOperation("closestHit")>]
+        member inline x.ClosestHit(s : HitGroup, rayId : string, shader : Shader) =
+            x.ClosestHit(s, Sym.ofString rayId, shader)
 
-        member x.ClosestHit(s : HitGroup, (rayId, e) : string * Expr<'a>) =
-            x.ClosestHit(s, (Sym.ofString rayId, e))
+        [<CustomOperation("closestHit")>]
+        member inline x.ClosestHit(s : HitGroup, rayId : string, e : Expr<'a>) =
+            x.ClosestHit(s, Sym.ofString rayId, e)
 
-        member x.ClosestHit(s : HitGroup, (rayId, f) : string * ('a -> 'b)) =
-            x.ClosestHit(s, (Sym.ofString rayId, f))
+        [<CustomOperation("closestHit")>]
+        member inline x.ClosestHit(s : HitGroup, rayId : string, f : ('a -> 'b)) =
+            x.ClosestHit(s, Sym.ofString rayId, f)
 
-        member x.ClosestHit(s : HitGroup, shader : Shader) =
-            x.ClosestHit(s, (Identifier.Default, shader))
+        [<CustomOperation("closestHit"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.ClosestHit(s : HitGroup, (rayId, shader) : Symbol * Shader) =
+            x.ClosestHit(s, rayId, shader)
 
-        member x.ClosestHit(s : HitGroup, e : Expr<'a>) =
-            x.ClosestHit(s, (Identifier.Default, e))
+        [<CustomOperation("closestHit"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.ClosestHit(s : HitGroup, (rayId, e) : Symbol * Expr<'a>) =
+            x.ClosestHit(s, rayId, e)
 
-        member x.ClosestHit(s : HitGroup, f : 'a -> 'b) =
-            x.ClosestHit(s, (Identifier.Default, f))
+        [<CustomOperation("closestHit"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.ClosestHit(s : HitGroup, (rayId, f) : Symbol * ('a -> 'b)) =
+            x.ClosestHit(s, rayId, f)
+
+        [<CustomOperation("closestHit"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.ClosestHit(s : HitGroup, (rayId, shader) : string * Shader) =
+            x.ClosestHit(s, rayId, shader)
+
+        [<CustomOperation("closestHit"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.ClosestHit(s : HitGroup, (rayId, e) : string * Expr<'a>) =
+            x.ClosestHit(s, rayId, e)
+
+        [<CustomOperation("closestHit"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.ClosestHit(s : HitGroup, (rayId, f) : string * ('a -> 'b)) =
+            x.ClosestHit(s, rayId, f)
+
+        [<CustomOperation("closestHit")>]
+        member inline x.ClosestHit(s : HitGroup, shader : Shader) =
+            x.ClosestHit(s, Identifier.Default, shader)
+
+        [<CustomOperation("closestHit")>]
+        member inline x.ClosestHit(s : HitGroup, e : Expr<'a>) =
+            x.ClosestHit(s, Identifier.Default, e)
+
+        [<CustomOperation("closestHit")>]
+        member inline x.ClosestHit(s : HitGroup, f : 'a -> 'b) =
+            x.ClosestHit(s, Identifier.Default, f)
 
 
         [<CustomOperation("intersection")>]
-        member x.Intersection(s : HitGroup, (rayId, shader) : Symbol * Shader) =
+        member x.Intersection(s : HitGroup, rayId : Symbol, shader : Shader) =
             match shader.shaderStage with
             | ShaderStage.Intersection ->
                 x.UpdateEntry(s, rayId, fun e -> { e with Intersection = Some shader })
             | _ ->
                 failwithf "[FShade] Expected intersection shader but got %A" shader.shaderStage
 
-        member x.Intersection(s : HitGroup, (rayId, e) : Symbol * Expr<'a>) =
+        [<CustomOperation("intersection")>]
+        member inline x.Intersection(s : HitGroup, rayId : Symbol, e : Expr<'a>) =
             let shaders = Shader.ofExpr [] e
-            x.Intersection(s, (rayId, shaders.Head))
+            x.Intersection(s, rayId, shaders.Head)
 
-        member x.Intersection(s : HitGroup, (rayId, f) : Symbol * ('a -> 'b)) =
+        [<CustomOperation("intersection")>]
+        member inline x.Intersection(s : HitGroup, rayId : Symbol, f : ('a -> 'b)) =
             let shaders = Shader.ofRaytracingFunction f
-            x.Intersection(s, (rayId, shaders.Head))
+            x.Intersection(s, rayId, shaders.Head)
 
-        member x.Intersection(s : HitGroup, (rayId, shader) : string * Shader) =
-            x.Intersection(s, (Sym.ofString rayId, shader))
+        [<CustomOperation("intersection")>]
+        member inline x.Intersection(s : HitGroup, rayId : string, shader : Shader) =
+            x.Intersection(s, Sym.ofString rayId, shader)
 
-        member x.Intersection(s : HitGroup, (rayId, e) : string * Expr<'a>) =
-            x.Intersection(s, (Sym.ofString rayId, e))
+        [<CustomOperation("intersection")>]
+        member inline x.Intersection(s : HitGroup, rayId : string, e : Expr<'a>) =
+            x.Intersection(s, Sym.ofString rayId, e)
 
-        member x.Intersection(s : HitGroup, (rayId, f) : string * ('a -> 'b)) =
-            x.Intersection(s, (Sym.ofString rayId, f))
+        [<CustomOperation("intersection")>]
+        member inline x.Intersection(s : HitGroup, rayId : string, f : ('a -> 'b)) =
+            x.Intersection(s, Sym.ofString rayId, f)
 
-        member x.Intersection(s : HitGroup, shader : Shader) =
-            x.Intersection(s, (Identifier.Default, shader))
+        [<CustomOperation("intersection"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.Intersection(s : HitGroup, (rayId, shader) : Symbol * Shader) =
+            x.Intersection(s, rayId, shader)
 
-        member x.Intersection(s : HitGroup, e : Expr<'a>) =
-            x.Intersection(s, (Identifier.Default, e))
+        [<CustomOperation("intersection"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.Intersection(s : HitGroup, (rayId, e) : Symbol * Expr<'a>) =
+            x.Intersection(s, rayId, e)
 
-        member x.Intersection(s : HitGroup, f : 'a -> 'b) =
-            x.Intersection(s, (Identifier.Default, f))
+        [<CustomOperation("intersection"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.Intersection(s : HitGroup, (rayId, f) : Symbol * ('a -> 'b)) =
+            x.Intersection(s, rayId, f)
+
+        [<CustomOperation("intersection"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.Intersection(s : HitGroup, (rayId, shader) : string * Shader) =
+            x.Intersection(s, rayId, shader)
+
+        [<CustomOperation("intersection"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.Intersection(s : HitGroup, (rayId, e) : string * Expr<'a>) =
+            x.Intersection(s, rayId, e)
+
+        [<CustomOperation("intersection"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.Intersection(s : HitGroup, (rayId, f) : string * ('a -> 'b)) =
+            x.Intersection(s, rayId, f)
+
+        [<CustomOperation("intersection")>]
+        member inline x.Intersection(s : HitGroup, shader : Shader) =
+            x.Intersection(s, Identifier.Default, shader)
+
+        [<CustomOperation("intersection")>]
+        member inline x.Intersection(s : HitGroup, e : Expr<'a>) =
+            x.Intersection(s, Identifier.Default, e)
+
+        [<CustomOperation("intersection")>]
+        member inline x.Intersection(s : HitGroup, f : 'a -> 'b) =
+            x.Intersection(s, Identifier.Default, f)
 
     type RayGenerationShaderMustBeSpecified = RayGenerationShaderMustBeSpecified
 
     type RaytracingEffectBuilder() =
         do Serializer.Init()
 
-        member x.Yield(_) = RayGenerationShaderMustBeSpecified
+        member inline x.Yield(_) = RayGenerationShaderMustBeSpecified
 
-        member x.Delay f = f()
+        member inline x.Delay f = f()
 
         member x.Run(s : RaytracingEffectState) =
             RaytracingEffect(s)
@@ -435,94 +532,166 @@ module RaytracingBuilders =
             | _ ->
                 failwithf "[FShade] Expected ray generation shader but got %A" shader.shaderStage
 
-        member x.Raygen(s : RayGenerationShaderMustBeSpecified, e : Expr<'a>) =
+        [<CustomOperation("raygen")>]
+        member inline x.Raygen(s : RayGenerationShaderMustBeSpecified, e : Expr<'a>) =
             let shaders = Shader.ofExpr [] e
             x.Raygen(s, shaders.Head)
 
-        member x.Raygen(s : RayGenerationShaderMustBeSpecified, f : ('a -> 'b)) =
+        [<CustomOperation("raygen")>]
+        member inline x.Raygen(s : RayGenerationShaderMustBeSpecified, f : ('a -> 'b)) =
             let shaders = Shader.ofRaytracingFunction f
             x.Raygen(s, shaders.Head)
 
 
         [<CustomOperation("miss")>]
-        member x.Miss(s : RaytracingEffectState, (name, shader) : Symbol * Shader) =
+        member inline x.Miss(s : RaytracingEffectState, name : Symbol, shader : Shader) =
             match shader.shaderStage with
             | ShaderStage.Miss ->
                 { s with MissShaders = s.MissShaders |> Map.add name shader }
             | _ ->
                 failwithf "[FShade] Expected miss shader but got %A" shader.shaderStage
 
-        member x.Miss(s : RaytracingEffectState, (name, e) : Symbol * Expr<'a>) =
+        [<CustomOperation("miss")>]
+        member inline x.Miss(s : RaytracingEffectState, name : Symbol, e : Expr<'a>) =
             let shaders = Shader.ofExpr [] e
-            x.Miss(s, (name, shaders.Head))
+            x.Miss(s, name, shaders.Head)
 
-        member x.Miss(s : RaytracingEffectState, (name, f) : Symbol * ('a -> 'b)) =
+        [<CustomOperation("miss")>]
+        member inline x.Miss(s : RaytracingEffectState, name : Symbol, f : ('a -> 'b)) =
             let shaders = Shader.ofRaytracingFunction f
-            x.Miss(s, (name, shaders.Head))
+            x.Miss(s, name, shaders.Head)
 
-        member x.Miss(s : RaytracingEffectState, (name, shader) : string * Shader) =
-            x.Miss(s, (Sym.ofString name, shader))
+        [<CustomOperation("miss")>]
+        member inline x.Miss(s : RaytracingEffectState, name : string, shader : Shader) =
+            x.Miss(s, Sym.ofString name, shader)
 
-        member x.Miss(s : RaytracingEffectState, (name, e) : string * Expr<'a>) =
-            x.Miss(s, (Sym.ofString name, e))
+        [<CustomOperation("miss")>]
+        member inline x.Miss(s : RaytracingEffectState, name : string, e : Expr<'a>) =
+            x.Miss(s, Sym.ofString name, e)
 
-        member x.Miss(s : RaytracingEffectState, (name, f) : string * ('a -> 'b)) =
-            x.Miss(s, (Sym.ofString name, f))
+        [<CustomOperation("miss")>]
+        member inline x.Miss(s : RaytracingEffectState, name : string, f : ('a -> 'b)) =
+            x.Miss(s, Sym.ofString name, f)
 
-        member x.Miss(s : RaytracingEffectState, shader : Shader) =
-            x.Miss(s, (Identifier.Default, shader))
+        [<CustomOperation("miss"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.Miss(s : RaytracingEffectState, (name, shader) : Symbol * Shader) =
+            x.Miss(s, name, shader)
 
-        member x.Miss(s : RaytracingEffectState, e : Expr<'a>) =
-            x.Miss(s, (Identifier.Default, e))
+        [<CustomOperation("miss"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.Miss(s : RaytracingEffectState, (name, e) : Symbol * Expr<'a>) =
+            x.Miss(s, name, e)
 
-        member x.Miss(s : RaytracingEffectState, f : 'a -> 'b) =
-            x.Miss(s, (Identifier.Default, f))
+        [<CustomOperation("miss"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.Miss(s : RaytracingEffectState, (name, f) : Symbol * ('a -> 'b)) =
+            x.Miss(s, name, f)
+
+        [<CustomOperation("miss"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.Miss(s : RaytracingEffectState, (name, shader) : string * Shader) =
+           x.Miss(s, name, shader)
+
+        [<CustomOperation("miss"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.Miss(s : RaytracingEffectState, (name, e) : string * Expr<'a>) =
+            x.Miss(s, name, e)
+
+        [<CustomOperation("miss"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.Miss(s : RaytracingEffectState, (name, f) : string * ('a -> 'b)) =
+            x.Miss(s, name, f)
+
+        [<CustomOperation("miss")>]
+        member inline x.Miss(s : RaytracingEffectState, shader : Shader) =
+            x.Miss(s, Identifier.Default, shader)
+
+        [<CustomOperation("miss")>]
+        member inline x.Miss(s : RaytracingEffectState, e : Expr<'a>) =
+            x.Miss(s, Identifier.Default, e)
+
+        [<CustomOperation("miss")>]
+        member inline x.Miss(s : RaytracingEffectState, f : 'a -> 'b) =
+            x.Miss(s, Identifier.Default, f)
 
 
         [<CustomOperation("callable")>]
-        member x.Callable(s : RaytracingEffectState, (name, shader) : Symbol * Shader) =
+        member inline x.Callable(s : RaytracingEffectState, name : Symbol, shader : Shader) =
             match shader.shaderStage with
             | ShaderStage.Callable ->
                 { s with CallableShaders = s.CallableShaders |> Map.add name shader }
             | _ ->
                 failwithf "[FShade] Expected callable shader but got %A" shader.shaderStage
 
-        member x.Callable(s : RaytracingEffectState, (name, e) : Symbol * Expr<'a>) =
+        [<CustomOperation("callable")>]
+        member inline x.Callable(s : RaytracingEffectState, name : Symbol, e : Expr<'a>) =
             let shaders = Shader.ofExpr [] e
-            x.Callable(s, (name, shaders.Head))
+            x.Callable(s, name, shaders.Head)
 
-        member x.Callable(s : RaytracingEffectState, (name, f) : Symbol * ('a -> 'b)) =
+        [<CustomOperation("callable")>]
+        member inline x.Callable(s : RaytracingEffectState, name : Symbol, f : ('a -> 'b)) =
             let shaders = Shader.ofRaytracingFunction f
-            x.Callable(s, (name, shaders.Head))
+            x.Callable(s, name, shaders.Head)
 
-        member x.Callable(s : RaytracingEffectState, (name, shader) : string * Shader) =
-            x.Callable(s, (Sym.ofString name, shader))
+        [<CustomOperation("callable")>]
+        member inline x.Callable(s : RaytracingEffectState, name : string, shader : Shader) =
+            x.Callable(s, Sym.ofString name, shader)
 
-        member x.Callable(s : RaytracingEffectState, (name, e) : string * Expr<'a>) =
-            x.Callable(s, (Sym.ofString name, e))
+        [<CustomOperation("callable")>]
+        member inline x.Callable(s : RaytracingEffectState, name : string, e : Expr<'a>) =
+            x.Callable(s, Sym.ofString name, e)
 
-        member x.Callable(s : RaytracingEffectState, (name, f) : string * ('a -> 'b)) =
-            x.Callable(s, (Sym.ofString name, f))
+        [<CustomOperation("callable")>]
+        member inline x.Callable(s : RaytracingEffectState, name : string , f : ('a -> 'b)) =
+            x.Callable(s, Sym.ofString name, f)
 
-        member x.Callable(s : RaytracingEffectState, shader : Shader) =
-            x.Callable(s, (Identifier.Default, shader))
+        [<CustomOperation("callable"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.Callable(s : RaytracingEffectState, (name, shader) : Symbol * Shader) =
+            x.Callable(s, name, shader)
 
-        member x.Callable(s : RaytracingEffectState, e : Expr<'a>) =
-            x.Callable(s, (Identifier.Default, e))
+        [<CustomOperation("callable"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.Callable(s : RaytracingEffectState, (name, e) : Symbol * Expr<'a>) =
+            x.Callable(s, name, e)
 
-        member x.Callable(s : RaytracingEffectState, f : 'a -> 'b) =
-            x.Callable(s, (Identifier.Default, f))
+        [<CustomOperation("callable"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.Callable(s : RaytracingEffectState, (name, f) : Symbol * ('a -> 'b)) =
+            x.Callable(s, name, f)
+
+        [<CustomOperation("callable"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.Callable(s : RaytracingEffectState, (name, shader) : string * Shader) =
+            x.Callable(s, name, shader)
+
+        [<CustomOperation("callable"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.Callable(s : RaytracingEffectState, (name, e) : string * Expr<'a>) =
+            x.Callable(s, name, e)
+
+        [<CustomOperation("callable"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.Callable(s : RaytracingEffectState, (name, f) : string * ('a -> 'b)) =
+            x.Callable(s, name, f)
+
+        [<CustomOperation("callable")>]
+        member inline x.Callable(s : RaytracingEffectState, shader : Shader) =
+            x.Callable(s, Identifier.Default, shader)
+
+        [<CustomOperation("callable")>]
+        member inline x.Callable(s : RaytracingEffectState, e : Expr<'a>) =
+            x.Callable(s, Identifier.Default, e)
+
+        [<CustomOperation("callable")>]
+        member inline x.Callable(s : RaytracingEffectState, f : 'a -> 'b) =
+            x.Callable(s, Identifier.Default, f)
 
 
         [<CustomOperation("hitgroup")>]
-        member x.HitGroup(s : RaytracingEffectState, (name, hitGroup) : Symbol * HitGroup) =
-            { s with HitGroups = s.HitGroups |> Map.add name hitGroup}
+        member inline x.HitGroup(s : RaytracingEffectState, name : Symbol, hitGroup : HitGroup) =
+            { s with HitGroups = s.HitGroups |> Map.add name hitGroup }
 
-        member x.HitGroup(s : RaytracingEffectState, (name, hitGroup) : string * HitGroup) =
-            x.HitGroup(s, (Sym.ofString name, hitGroup))
+        [<CustomOperation("hitgroup")>]
+        member inline x.HitGroup(s : RaytracingEffectState, name : string, hitGroup : HitGroup) =
+            x.HitGroup(s, Sym.ofString name, hitGroup)
 
-        member x.HitGroup(s : RaytracingEffectState, hitGroup : HitGroup) =
-            x.HitGroup(s, (Identifier.Default, hitGroup))
+        [<CustomOperation("hitgroup"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.HitGroup(s : RaytracingEffectState, (name, hitGroup) : Symbol * HitGroup) =
+            x.HitGroup(s, name, hitGroup)
+
+        [<CustomOperation("hitgroup"); Obsolete("Use overload with untupled arguments.")>]
+        member inline x.HitGroup(s : RaytracingEffectState, (name, hitGroup) : string * HitGroup) =
+            x.HitGroup(s, name, hitGroup)
 
 
     let hitgroup = HitGroupBuilder()
