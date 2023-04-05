@@ -294,12 +294,7 @@ module RaytracingEffect =
                 |> List.concat
             )
 
-        {
-            hash = effect.Id
-            userData = effect
-            entries = entryPoints
-            tryGetOverrideCode = Shader.tryGetOverrideCode V3i.Zero
-        }
+        Module(effect.Id, effect, entryPoints, Shader.tryGetOverrideCode V3i.Zero)
 
 
 [<AutoOpen>]

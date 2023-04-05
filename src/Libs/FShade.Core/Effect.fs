@@ -823,12 +823,7 @@ module Effect =
                 entryPoints None None shaders
             )
 
-        {
-            hash = effect.Id
-            userData = effect
-            entries = entries
-            tryGetOverrideCode = Shader.tryGetOverrideCode V3i.Zero 
-        }
+        Module(effect.Id, effect, entries, Shader.tryGetOverrideCode V3i.Zero)
 
     let inputsToUniforms (scopes : Map<string, UniformScope>) (effect : Effect) =
         Serializer.Init()

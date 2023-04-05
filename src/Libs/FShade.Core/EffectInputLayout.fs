@@ -142,14 +142,14 @@ module EffectInputLayout =
 
     /// Returns the input layout of the given module.
     let ofModule (module_ : Module) =
-        match module_.userData with
+        match module_.UserData with
         | :? (obj * EffectInputLayout) as (_, layout) -> layout
         | _ ->
             let getStageDescription (e : EntryPoint) =
                 e.decorations |> List.pick (function EntryDecoration.Stages s -> Some s | _ -> None)
 
             let first =
-                module_.entries.Value |> List.find (fun e ->
+                module_.Entries |> List.find (fun e ->
                     let desc = getStageDescription e
                     desc.Previous = None
                 )
@@ -160,7 +160,7 @@ module EffectInputLayout =
                 |> MapExt.ofList
 
             let uniforms =
-                module_.entries.Value |> List.map (fun e ->
+                module_.Entries |> List.map (fun e ->
                     let desc = getStageDescription e
 
                     e.uniforms |> List.map (fun u ->
@@ -180,14 +180,14 @@ module EffectInputLayout =
 
     /// Applies the given input layout to the given module.
     let apply (layout : EffectInputLayout) (module_ : Module) =
-        match module_.userData with
+        match module_.UserData with
         | :? (obj * EffectInputLayout) as (_, curr) when curr = layout ->
             module_
 
         | _ ->
             let entries =
                 lazy (
-                    module_.entries.Value |> List.map (fun e ->
+                    module_.Entries |> List.map (fun e ->
                         let prev = e.decorations |> List.tryPick (function EntryDecoration.Stages s -> Some s.Previous | _ -> None)
 
                         let e = EntryPoint.setUniforms layout.Uniforms e
@@ -204,15 +204,13 @@ module EffectInputLayout =
 
             let userData =
                 let original =
-                    match module_.userData with
+                    match module_.UserData with
                     | :? (obj * EffectInputLayout) as (original, _)
                     | original -> original
 
                 original, layout
 
-            { module_ with
-                entries = entries
-                userData = userData }
+            Module(module_.Hash, userData, entries, module_.TryGetOverrideCode)
 
 
 [<Extension; Sealed; AbstractClass>]
@@ -263,8 +261,8 @@ type ModuleHashingExtensions() =
     /// Computes the hash of the module, taking applied input layouts into consideration.
     [<Extension>]
     static member ComputeHash(this : Module) =
-        match this.userData with
+        match this.UserData with
         | :? (obj * EffectInputLayout) as (_, layout) ->
-            this.hash + layout.ComputeHash()
+            this.Hash + layout.ComputeHash()
         | _ ->
-            this.hash
+            this.Hash

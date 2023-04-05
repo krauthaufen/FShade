@@ -301,7 +301,7 @@ module ModuleCompiler =
         let ofModule (backend : Backend) (m : Module) =
             let compile =
                 state {
-                    let! nodes = m.entries.Value |> List.mapS ofEntry
+                    let! nodes = m.Entries |> List.mapS ofEntry
                     return nodes
                 }
 
@@ -315,7 +315,7 @@ module ModuleCompiler =
                             globalFunctions     = HashMap.empty
                             globalConstants     = HashMap.empty
                             globalParameters    = Set.empty
-                            tryGetOverrideCode  = m.tryGetOverrideCode
+                            tryGetOverrideCode  = m.TryGetOverrideCode
                             globalNameIndices   = Map.empty
                         }
                     cache = Dictionary() 
@@ -440,7 +440,7 @@ module ModuleCompiler =
         let types = TypeCompiler.ofTypes types
 
         {
-            CModule.cuserData = m.userData
+            CModule.cuserData = m.UserData
             CModule.types = types
             CModule.values = values
         }

@@ -298,9 +298,5 @@ module ComputeShader =
         }
 
     let toModule (shader : ComputeShader) : Module =
-        {
-            hash = shader.csId
-            userData = shader
-            entries = lazy ([ toEntryPoint shader ])
-            tryGetOverrideCode = Shader.tryGetOverrideCode shader.csLocalSize
-        }
+        let entries = lazy ([ toEntryPoint shader ])
+        Module(shader.csId, shader, entries, Shader.tryGetOverrideCode shader.csLocalSize)

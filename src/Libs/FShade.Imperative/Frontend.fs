@@ -560,15 +560,20 @@ module EntryPoint =
             decorations = []
         }
 
+type Module =
+    val private entries : Lazy<EntryPoint list>
+    val Hash : string
+    val UserData : obj
+    val TryGetOverrideCode : MethodBase -> Expr option
 
-type Module = 
-    { 
-        hash : string
-        userData : obj
-        entries : Lazy<list<EntryPoint>>
-        tryGetOverrideCode : MethodBase -> Option<Expr> 
-    }
-       
+    new (hash : string, userData : obj, entries : Lazy<EntryPoint list>, tryGetOverrideCode : MethodBase -> Expr option) =
+        { entries = entries
+          Hash = hash
+          UserData = userData
+          TryGetOverrideCode = tryGetOverrideCode }
+
+    member x.Entries = x.entries.Value
+
 //[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 //module Module =
 

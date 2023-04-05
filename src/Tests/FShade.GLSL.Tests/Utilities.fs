@@ -120,7 +120,7 @@ module GLSL =
         let glsl = ModuleCompiler.compileGLSL430 module_
         
         glsl,
-        module_.entries.Value |> List.map (fun e ->
+        module_.Entries |> List.map (fun e ->
             let stage = e.decorations |> List.tryPick (function FShade.Imperative.EntryDecoration.Stages s -> Some s.Stage | _ -> None) |> Option.get
             
             let res = glslang stage glsl.code
