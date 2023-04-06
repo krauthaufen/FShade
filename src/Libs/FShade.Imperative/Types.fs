@@ -36,6 +36,11 @@ type RayFlags =
     | CullOpaque               = 64
     | CullNoOpaque             = 128
 
+type RayHitKind =
+    | Default             = 0
+    | FrontFacingTriangle = 0xFE
+    | BackFacingTriangle  = 0xFF
+
 type ShaderStage =
     | Vertex        = 0
     | TessControl   = 1

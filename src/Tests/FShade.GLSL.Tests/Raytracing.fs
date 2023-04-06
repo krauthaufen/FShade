@@ -170,3 +170,31 @@ let ``Callable shader``() =
          }
 
     GLSL.shouldCompileRaytracing effect
+
+type RayHitKind with
+    static member SomeWeirdStuff = unbox<RayHitKind> 1234
+
+[<Test>]
+let ``Intersection shader with custom hit kind``() =
+    Setup.Run()
+
+    let raygenShader =
+        raygen {
+            ()
+        }
+
+    let intersectionShader (input : RayIntersectionInput)=
+        intersection {
+            Intersection.Report(0.5, RayHitKind.SomeWeirdStuff) |> ignore
+        }
+
+    let hitgroupMain =
+        hitgroup { intersection intersectionShader }
+
+    let effect =
+        raytracingEffect {
+            raygen raygenShader
+            hitgroup "Main" hitgroupMain
+        }
+
+    GLSL.shouldCompileRaytracingAndContainRegex effect [ "1234" ]

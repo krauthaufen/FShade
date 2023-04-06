@@ -299,7 +299,7 @@ module Primitives =
     let barrier() : unit = onlyInShaderCode "barrier"
     let allocateShared<'a when 'a : unmanaged> (size : int) : 'a[] =  onlyInShaderCode "allocateShared"
 
-    let reportIntersection(t : float, hitKind : int32) : bool = onlyInShaderCode "reportIntersection"
+    let reportIntersection(t : float, hitKind : RayHitKind) : bool = onlyInShaderCode "reportIntersection"
     let ignoreIntersection() : unit = onlyInShaderCode "ignoreIntersection"
     let terminateRay() : unit = onlyInShaderCode "terminateRay"
 

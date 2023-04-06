@@ -1,12 +1,7 @@
 ﻿namespace FShade
 
-open System
-open System.Reflection
-
 open Aardvark.Base
-
 open FShade
-
 
 module Intrinsics =
 
@@ -193,7 +188,7 @@ module RaytracingInputTypes =
             [<WorldRayDirection>] direction : V3d
             [<RayTmin>]           minT      : float
             [<RayTmax>]           maxT      : float
-            [<IncomingRayFlags>]  flags     : uint32
+            [<IncomingRayFlags>]  flags     : RayFlags
         }
 
     type ObjectSpace =
@@ -207,7 +202,7 @@ module RaytracingInputTypes =
     type RayHit<'T> =
         {
             [<HitT>]         t          : float
-            [<HitKind>]      kind       : uint32
+            [<HitKind>]      kind       : RayHitKind
             [<HitAttribute>] attribute  : 'T
         }
 

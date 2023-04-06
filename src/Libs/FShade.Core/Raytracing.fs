@@ -33,19 +33,11 @@ type Callable private() =
 
 [<AbstractClass; Sealed>]
 type Intersection private() =
-    static member Report(t : float, [<Optional; DefaultParameterValue(0)>] hitKind : int32) : bool =
+    static member Report(t : float, [<Optional; DefaultParameterValue(RayHitKind.Default)>] hitKind : RayHitKind) : bool =
         onlyInShaderCode "Intersection.Report"
 
-    static member Report(t : float, attribute : 'T, [<Optional; DefaultParameterValue(0)>] hitKind : int32) : bool =
+    static member Report(t : float, attribute : 'T, [<Optional; DefaultParameterValue(RayHitKind.Default)>] hitKind : RayHitKind) : bool =
         onlyInShaderCode "Intersection.Report"
-
-module HitKind =
-    [<Literal>]
-    let FrontFacingTriangle = 0xFE
-
-    [<Literal>]
-    let BackFacingTriangle = 0xFF
-
 
 type IAccelerationStructure = interface end
 

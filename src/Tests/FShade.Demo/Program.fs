@@ -400,7 +400,7 @@ module RaytracingTest =
 
     let intersectionShader (input : RayIntersectionInput) =
         intersection {
-            Intersection.Report(0.5, true, HitKind.FrontFacingTriangle) |> ignore
+            Intersection.Report(0.5, true, RayHitKind.FrontFacingTriangle) |> ignore
         }
 
     let missShader (input : RayMissInput<Payload>) =
