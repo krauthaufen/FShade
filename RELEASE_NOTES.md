@@ -1,3 +1,11 @@
+### 5.4.0-prerelease0003
+* [RTX] Added builder operation overloads with untupled arguments
+* [RTX] Added RayHitKind enum
+* [RTX] Ray flags and hit kind inputs use enums now
+* Turned Module into a class to hide laziness of entries
+* Added support for enums with arbitrary underlying type
+* Added config for reversing tesselation winding order
+
 ### 5.4.0-prerelease0002
 * Preprocessor: merge aot2 + bugfixes
 * Lazy modules entries
