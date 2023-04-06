@@ -12,6 +12,7 @@
     <Copyright>The Aardvark Platform Team</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/krauthaufen/FShade</PackageProjectUrl>
+    <Description>Ahead-of-time compiler for FShade.</Description>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/krauthaufen/FShade</RepositoryUrl>
   </PropertyGroup>
