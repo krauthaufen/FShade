@@ -107,17 +107,17 @@ module CType =
         else
             typeCache b t (fun b t ->
                 match b.TryGetIntrinsic t with
-                    | Some i -> CIntrinsic i
-                    | None -> 
-                        let seen = HashSet.add t seen 
-                        match t with
-                            | Enum              -> CInt(true, 32)
-                            | VectorOf(d, t)    -> CVector(ofTypeInternal seen b t, d)
-                            | MatrixOf(s, t)    -> CMatrix(ofTypeInternal seen b t, s.Y, s.X)
-                            | ArrOf(len, t)     -> CArray(ofTypeInternal seen b t, len)
-                            | Ref t             -> ofTypeInternal seen b t
-                            | t when t.IsArray  -> CType.CPointer(CPointerModifier.None, ofTypeInternal seen b (t.GetElementType()))
-                            | t                 -> ofCustomType seen b t
+                | Some i -> CIntrinsic i
+                | None ->
+                    let seen = HashSet.add t seen
+                    match t with
+                    | Enum              -> t.GetEnumUnderlyingType() |> ofTypeInternal seen b
+                    | VectorOf(d, t)    -> CVector(ofTypeInternal seen b t, d)
+                    | MatrixOf(s, t)    -> CMatrix(ofTypeInternal seen b t, s.Y, s.X)
+                    | ArrOf(len, t)     -> CArray(ofTypeInternal seen b t, len)
+                    | Ref t             -> ofTypeInternal seen b t
+                    | t when t.IsArray  -> CType.CPointer(CPointerModifier.None, ofTypeInternal seen b (t.GetElementType()))
+                    | t                 -> ofCustomType seen b t
             )
 
     /// creates a struct representation for a given system type

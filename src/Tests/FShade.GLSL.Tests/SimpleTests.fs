@@ -7,6 +7,10 @@ open NUnit.Framework
 open FsUnit
 open FShade.Tests
 
+type MyEnum =
+    | A = 1234us
+    | B = 4321us
+
 type Vertex =
     {
         [<Position>] pos : V4d
@@ -18,6 +22,7 @@ type Vertex =
         [<Semantic("Id")>] id : int
         [<PrimitiveId>] primId : int
         [<Semantic("uid")>] uid : uint
+        myenum : MyEnum
     }
 
 type F32Vertex =
@@ -1168,3 +1173,14 @@ let ``Float32 vertex types``() =
         Effect.ofFunction fs3
         Effect.ofFunction fs4
     ]
+
+[<Test>]
+let ``Enum with non-int32 underlying type``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            return V2ui(uint32 v.myenum, uint32 MyEnum.A)
+        }
+
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction fs ] [ "uint fs_myenum"; "1234u" ]

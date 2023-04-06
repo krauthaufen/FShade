@@ -202,6 +202,7 @@ module Preprocessor =
 
         let rec (|Integral|_|) (t : Type) =
             match t with
+            | TypeInfo.Patterns.Enum
             | TypeInfo.Patterns.Integral
             | TypeInfo.Patterns.VectorOf(_, Integral) -> Some ()
             | TypeInfo.Patterns.MatrixOf(_, Integral) -> Some ()

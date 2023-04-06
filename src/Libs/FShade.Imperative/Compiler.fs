@@ -274,7 +274,14 @@ module Compiler =
     module Helpers = 
         let rec tryDeconstructValue (t : Type) (v : obj) =
             if t.IsEnum then
-                Expr.Value(unbox<int> v, t) |> Some
+                match t.GetEnumUnderlyingType() with
+                | SByte  -> Expr.Value(unbox<int8> v, t) |> Some
+                | Byte   -> Expr.Value(unbox<uint8> v, t) |> Some
+                | Int16  -> Expr.Value(unbox<int16> v, t) |> Some
+                | UInt16 -> Expr.Value(unbox<uint16> v, t) |> Some
+                | Int32  -> Expr.Value(unbox<int32> v, t) |> Some
+                | UInt32 -> Expr.Value(unbox<uint32> v, t) |> Some
+                | _ -> None
 
             elif FSharpType.IsTuple t then
                 let elements = FSharpType.GetTupleElements t |> Array.toList
