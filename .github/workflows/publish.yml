@@ -20,19 +20,12 @@ jobs:
         uses: actions/setup-dotnet@v3
         with:
           global-json-file: global.json
-      - name: Restore Tools
-        run: dotnet tool restore
-      - name: Restore
-        run: dotnet paket restore
-      - name: Build
-        shell: cmd
-        run: dotnet build -c Release src/FShade.sln
       - name: Pack
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: dotnet aardpack src/FShade.sln --notag 
+        run: .\pack.cmd
       - name: Upload Packages
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: packages
           path: bin\pack
