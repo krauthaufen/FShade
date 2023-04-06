@@ -9,87 +9,92 @@ open FShade.GLSL
 module Backends =
     let glsl410 =
         Backend.Create {
-            version                 = GLSLVersion(4,1,0)
-            enabledExtensions       = Set.ofList [ ]
-            createUniformBuffers    = true
-            bindingMode             = BindingMode.PerKind
-            createDescriptorSets    = false
-            stepDescriptorSets      = false
-            createInputLocations    = true
-            createOutputLocations   = true
-            createPassingLocations  = true
-            createPerStageUniforms  = false
-            reverseMatrixLogic      = true
-            depthWriteMode          = false
-            useInOut                = true
+            version                     = GLSLVersion(4,1,0)
+            enabledExtensions           = Set.ofList [ ]
+            createUniformBuffers        = true
+            bindingMode                 = BindingMode.PerKind
+            createDescriptorSets        = false
+            stepDescriptorSets          = false
+            createInputLocations        = true
+            createOutputLocations       = true
+            createPassingLocations      = true
+            createPerStageUniforms      = false
+            reverseMatrixLogic          = true
+            reverseTessellationWinding  = false
+            depthWriteMode              = false
+            useInOut                    = true
         }
 
     let glsl430 =
         Backend.Create {
-            version                 = GLSLVersion(4,3,0)
-            enabledExtensions       = Set.ofList [ ]
-            createUniformBuffers    = true
-            bindingMode             = BindingMode.PerKind
-            createDescriptorSets    = false
-            stepDescriptorSets      = false
-            createInputLocations    = true
-            createOutputLocations   = true
-            createPassingLocations  = true
-            createPerStageUniforms  = false
-            reverseMatrixLogic      = true
-            depthWriteMode          = true
-            useInOut                = true
+            version                     = GLSLVersion(4,3,0)
+            enabledExtensions           = Set.ofList [ ]
+            createUniformBuffers        = true
+            bindingMode                 = BindingMode.PerKind
+            createDescriptorSets        = false
+            stepDescriptorSets          = false
+            createInputLocations        = true
+            createOutputLocations       = true
+            createPassingLocations      = true
+            createPerStageUniforms      = false
+            reverseMatrixLogic          = true
+            reverseTessellationWinding  = false
+            depthWriteMode              = true
+            useInOut                    = true
         }
 
     let glsl120 =
         Backend.Create {
-            version                 = GLSLVersion(1,2,0)
-            enabledExtensions       = Set.empty
-            createUniformBuffers    = false
-            bindingMode             = BindingMode.None
-            createDescriptorSets    = false
-            stepDescriptorSets      = false
-            createInputLocations    = false
-            createOutputLocations   = false
-            createPassingLocations  = false
-            createPerStageUniforms  = false
-            reverseMatrixLogic      = true
-            depthWriteMode          = false
-            useInOut                = false
+            version                     = GLSLVersion(1,2,0)
+            enabledExtensions           = Set.empty
+            createUniformBuffers        = false
+            bindingMode                 = BindingMode.None
+            createDescriptorSets        = false
+            stepDescriptorSets          = false
+            createInputLocations        = false
+            createOutputLocations       = false
+            createPassingLocations      = false
+            createPerStageUniforms      = false
+            reverseMatrixLogic          = true
+            reverseTessellationWinding  = false
+            depthWriteMode              = false
+            useInOut                    = false
         }
 
     let glslVulkan =
         Backend.Create {
-            version                 = GLSLVersion(4,5,0)
-            enabledExtensions       = Set.ofList [ "GL_ARB_tessellation_shader"; "GL_ARB_separate_shader_objects"; "GL_ARB_shading_language_420pack" ]
-            createUniformBuffers    = true
-            bindingMode             = BindingMode.Global
-            createDescriptorSets    = true
-            stepDescriptorSets      = false
-            createInputLocations    = true
-            createOutputLocations   = true
-            createPassingLocations  = true
-            createPerStageUniforms  = true
-            reverseMatrixLogic      = true
-            depthWriteMode          = true
-            useInOut                = true
+            version                     = GLSLVersion(4,5,0)
+            enabledExtensions           = Set.ofList [ "GL_ARB_tessellation_shader"; "GL_ARB_separate_shader_objects"; "GL_ARB_shading_language_420pack" ]
+            createUniformBuffers        = true
+            bindingMode                 = BindingMode.Global
+            createDescriptorSets        = true
+            stepDescriptorSets          = false
+            createInputLocations        = true
+            createOutputLocations       = true
+            createPassingLocations      = true
+            createPerStageUniforms      = true
+            reverseMatrixLogic          = true
+            reverseTessellationWinding  = true
+            depthWriteMode              = true
+            useInOut                    = true
         }
 
     let glslRaytracing =
         Backend.Create {
-            version                 = GLSLVersion(4,6,0)
-            enabledExtensions       = Set.ofList [ "GL_EXT_ray_tracing"; "GL_EXT_nonuniform_qualifier"]
-            createUniformBuffers    = true
-            bindingMode             = BindingMode.Global
-            createDescriptorSets    = true
-            stepDescriptorSets      = false
-            createInputLocations    = true
-            createOutputLocations   = true
-            createPassingLocations  = true
-            createPerStageUniforms  = false
-            reverseMatrixLogic      = true
-            depthWriteMode          = true
-            useInOut                = true
+            version                     = GLSLVersion(4,6,0)
+            enabledExtensions           = Set.ofList [ "GL_EXT_ray_tracing"; "GL_EXT_nonuniform_qualifier"]
+            createUniformBuffers        = true
+            bindingMode                 = BindingMode.Global
+            createDescriptorSets        = true
+            stepDescriptorSets          = false
+            createInputLocations        = true
+            createOutputLocations       = true
+            createPassingLocations      = true
+            createPerStageUniforms      = false
+            reverseMatrixLogic          = true
+            reverseTessellationWinding  = true
+            depthWriteMode              = true
+            useInOut                    = true
         }
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]

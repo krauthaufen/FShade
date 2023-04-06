@@ -54,22 +54,22 @@ type GLSLVersion(major : int, minor : int, patch : int, suffix : string) =
 
 type Config =
     {
-        version                 : GLSLVersion
-        enabledExtensions       : Set<string>
-        createUniformBuffers    : bool
+        version                     : GLSLVersion
+        enabledExtensions           : Set<string>
+        createUniformBuffers        : bool
 
-       
-        bindingMode             : BindingMode
-        createDescriptorSets    : bool
-        stepDescriptorSets      : bool
-        createInputLocations    : bool
-        createOutputLocations   : bool
-        createPassingLocations  : bool
-        createPerStageUniforms  : bool
-        reverseMatrixLogic      : bool
+        bindingMode                 : BindingMode
+        createDescriptorSets        : bool
+        stepDescriptorSets          : bool
+        createInputLocations        : bool
+        createOutputLocations       : bool
+        createPassingLocations      : bool
+        createPerStageUniforms      : bool
+        reverseMatrixLogic          : bool
+        reverseTessellationWinding  : bool
 
-        depthWriteMode          : bool
-        useInOut                : bool
+        depthWriteMode              : bool
+        useInOut                    : bool
     }
 
 type GLSLShader =
@@ -1877,7 +1877,8 @@ module Assembler =
             do! Interface.newShader entryName.Name 
             do! Interface.addDecorations stages.Stage e.cDecorations
 
-            
+            let! config = AssemblerState.config
+
             let prefix = 
                 match stages.Stage with
                     | ShaderStage.Geometry -> 
@@ -1935,8 +1936,12 @@ module Assembler =
                                 | InputTopology.Patch 4 -> "quads"
                                 | t -> failwithf "[FShade] TessEvalShader cannot have %A inputs" t
 
+                        let winding =
+                            if config.reverseTessellationWinding then "cw"
+                            else "ccw"
+
                         [
-                            sprintf "layout(%s, equal_spacing, ccw) in;" inputTop
+                            sprintf "layout(%s, equal_spacing, %s) in;" inputTop winding
                         ]
 
 
@@ -1955,8 +1960,7 @@ module Assembler =
             let! outputs = e.cOutputs |> List.chooseS (assembleEntryParameterS ParameterKind.Output)
             let! args = e.cArguments |> List.chooseS (assembleEntryParameterS ParameterKind.Argument)
             let! body = assembleStatementS false e.cBody
-            let! config = AssemblerState.config
-            
+
             return 
                 String.concat "\r\n" [
                     yield! prefix
