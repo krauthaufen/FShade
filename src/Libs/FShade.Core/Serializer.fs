@@ -1734,6 +1734,9 @@ module Serializer =
                 match s.Filter with
                 | Some v -> dst.Write 1uy; dst.Write (int v)
                 | None -> dst.Write 0uy
+                match s.FilterReduction with
+                | Some v -> dst.Write 1uy; dst.Write (int v)
+                | None -> dst.Write 0uy
                 match s.Comparison with
                 | Some v -> dst.Write 1uy; dst.Write (int v)
                 | None -> dst.Write 0uy
@@ -1770,6 +1773,10 @@ module Serializer =
                     match src.ReadByte() with
                     | 0uy -> None
                     | _ -> Some (src.ReadInt32() |> unbox<Filter>)
+                let filterReduction = 
+                    match src.ReadByte() with
+                    | 0uy -> None
+                    | _ -> Some (src.ReadInt32() |> unbox<FilterReduction>)
                 let comparison = 
                     match src.ReadByte() with
                     | 0uy -> None
@@ -1800,6 +1807,7 @@ module Serializer =
                     AddressV = addressV
                     AddressW = addressW
                     Filter = filter
+                    FilterReduction = filterReduction
                     Comparison = comparison
                     BorderColor = borderColor
                     MaxAnisotropy = maxAnisotropy

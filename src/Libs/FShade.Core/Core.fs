@@ -276,6 +276,9 @@ type SamplerBaseBuilder() =
     [<CustomOperation("filter")>]
     member x.Filter((t, h : SamplerState), f : Filter) = t,{ h with Filter = Some f }
 
+    [<CustomOperation("filterReduction")>]
+    member x.FilterReduction((t, h : SamplerState), r : FilterReduction) = t,{ h with FilterReduction = Some r }
+
     [<CustomOperation("comparison")>]
     member x.Comparison((t, h : SamplerState), f : ComparisonFunction) = t,{ h with Comparison = Some f }
 
