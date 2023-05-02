@@ -1,3 +1,6 @@
+### 5.4.0-prerelease0004
+* Added sampler filter reduction mode
+
 ### 5.4.0-prerelease0003
 * [RTX] Added builder operation overloads with untupled arguments
 * [RTX] Added RayHitKind enum
