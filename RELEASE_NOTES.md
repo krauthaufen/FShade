@@ -1,3 +1,18 @@
+### 5.4.0
+* Added sampler filter reduction mode
+* [RTX] Added builder operation overloads with untupled arguments
+* [RTX] Added RayHitKind enum
+* [RTX] Ray flags and hit kind inputs use enums now
+* Turned Module into a class to hide laziness of entries
+* Added support for enums with arbitrary underlying type
+* Added config for reversing tesselation winding order
+* Preprocessor: merge aot2 + bugfixes
+* Lazy modules entries
+* Effect serialization bugfixes: array deserialization, uniform scopes
+* Fixed issue with return type for integer vector dot product
+* Include sampler texture name in hash
+* Added support for float32-based vertex types
+
 ### 5.4.0-prerelease0004
 * Added sampler filter reduction mode
 
