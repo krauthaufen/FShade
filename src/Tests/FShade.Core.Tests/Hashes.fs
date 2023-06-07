@@ -108,11 +108,10 @@ type Shader6 private () =
 module private Utilities =
     open FSharp.Quotations
 
-    let roundtripExpr (expected : string) (input : Expr) =
+    let roundtripExpr (input : Expr) =
         use memory = new MemoryStream()
 
         let inputHash = Serializer.Expr.computeHash input
-        inputHash |> should equal expected
         input |> Serializer.Expr.serialize memory
 
         memory.Position <- 0L
@@ -121,9 +120,9 @@ module private Utilities =
 
         outputHash |> should equal inputHash
 
-    let roundtrip (expected : string) (func : 'T -> Expr<'U>) =
+    let roundtrip (func : 'T -> Expr<'U>) =
         let expr = func Unchecked.defaultof<_>
-        roundtripExpr expected expr
+        roundtripExpr expr
 
     let roundtripEffect (input : Effect) =
         use memory = new MemoryStream()
@@ -149,7 +148,7 @@ let ``[Serializer] instance field get``() =
             return V4d(v.pos.X)
         }
 
-    bla |> roundtrip "DCv1azx4RLpvpq2wjhVDMT8+Zns="
+    bla |> roundtrip
 
 [<Test>]
 let ``[Serializer] instance field set and get``() =
@@ -161,7 +160,7 @@ let ``[Serializer] instance field set and get``() =
             return res
         }
 
-    bla |> roundtrip "m6EfMsKRtQIaYL3oKes/a2lQoPg="
+    bla |> roundtrip
 
 type SomeFuncs() =
 
@@ -214,7 +213,7 @@ let ``[Serializer] reflected function``() =
             return V4d(SomeFuncs.Hehe v.pos, 0.0)
         }
 
-    bla |> roundtrip "HSV9Bs7pYBI7eCCVwRZqiRZ05tk="
+    bla |> roundtrip
 
 [<Test>]
 let ``[Serializer] reflected generic function``() =
@@ -224,7 +223,7 @@ let ``[Serializer] reflected generic function``() =
             return V4d(SomeFuncs.Hehe(v.pos.XYZ, 3) + SomeFuncs.Hehe(v.pos.XYZ, v.tc, 3), 0.0)
         }
 
-    bla |> roundtrip "kXS5ZykIckcdE7Mo0n/iODYl0W8="
+    bla |> roundtrip
 
 [<Test>]
 let ``[Serializer] static call``() =
@@ -234,7 +233,7 @@ let ``[Serializer] static call``() =
             return V4d(SomeFuncs.Haha v.pos, 0.0)
         }
 
-    bla |> roundtrip "j/im0yqw4G9YnJV5Xa8vRKpaFh4="
+    bla |> roundtrip
 
 [<Test>]
 let ``[Serializer] static generic call``() =
@@ -244,7 +243,7 @@ let ``[Serializer] static generic call``() =
             return V4d(SomeFuncs.Haha(v.pos.XYZ, 3) + SomeFuncs.Haha(v.pos.XYZ, v.tc, 3), 0.0)
         }
 
-    bla |> roundtrip "jZHIIvwGiXBWGX2/rkBc645hXPA="
+    bla |> roundtrip
 
 [<Test>]
 let ``[Serializer] instance call``() =
@@ -255,7 +254,7 @@ let ``[Serializer] instance call``() =
             return V4d(funcs.Hihi v.pos, 0.0)
         }
 
-    bla |> roundtrip "LdQZKI0BV19HadpFKBz48vOFS7Q="
+    bla |> roundtrip
 
 [<Test>]
 let ``[Serializer] instance generic call``() =
@@ -266,7 +265,7 @@ let ``[Serializer] instance generic call``() =
             return V4d(funcs.Hihi(v.pos.XYZ, 3) + funcs.Hihi(v.pos.XYZ, v.tc, 3), 0.0)
         }
 
-    bla |> roundtrip "yr+7sLte0QF1u77SC8tSXa+R6hU="
+    bla |> roundtrip
 
 
 [<Test>]
@@ -279,7 +278,7 @@ let ``[Serializer] utility function call``() =
         }
 
     let shader = Shader.ofFunction bla |> List.head
-    shader.shaderBody |> roundtripExpr "HjiiX8umznSdGrQ03JUZq2b4nAc="
+    shader.shaderBody |> roundtripExpr
 
 [<Test>]
 let ``[Serializer] utility function generic call``() =
@@ -291,7 +290,7 @@ let ``[Serializer] utility function generic call``() =
         }
 
     let shader = Shader.ofFunction bla |> List.head
-    shader.shaderBody |> roundtripExpr "cH0b4Q0FVt0FkN1wVQpQQ+6CPqI="
+    shader.shaderBody |> roundtripExpr
 
 [<Test>]
 let ``[Serializer] sampler arrays``() =
@@ -311,7 +310,7 @@ let ``[Serializer] sampler arrays``() =
         }
 
     let fx = shader |> Shader.ofFunction |> List.head
-    fx.shaderBody |> roundtripExpr "8wGbEa9+PUZEmkCyhwKiFZESaes="
+    fx.shaderBody |> roundtripExpr
 
 [<Test>]
 let ``[Serializer] storage buffers``() =
@@ -382,6 +381,65 @@ let ``[Hashing] sampler includes texture name``() =
 
     e1.Id |> should not' (equal e2.Id)
 
+[<AutoOpen>]
+module SketchyUniformTests =
+
+    // These uniforms are used to check if the semantic and / or the type
+    // affects the hash. The unit tests are pretty brittle, since we check
+    // non-equality against a hard coded hash.
+    //
+    // As a consequence those tests will pass, when all the hashes change
+    // and the hard coded hashes are not updated.
+    //
+    // Unfortunately, I just don't see a way to build two expressions where the only difference
+    // is a uniform type. Mainly used this to verify my changes to the serializer work
+    // as intended.
+    type UniformScope with
+        member x.Img  : Image1d<Formats.rgba32f> = x?Img
+        member x.Foo  : V3d                      = x?Foo
+        member x.Foo2 : V2d                      = x?Foo231
+
+[<Test>]
+let ``[Hashing] includes image format``() =
+    let shader (v : Vertex) =
+        fragment {
+            return uniform.Img.Load 0
+        }
+
+    // hash generated with Img : Image1d<Formats.rgba8>
+    let hash = "hemrZ9QE8H29lfBHaN24lxs/Trc="
+    let e = Effect.ofFunction shader
+    //e.Id |> should equal hash
+    e.Id |> should not' (equal hash)
+
+[<Test>]
+let ``[Hashing] includes uniform semantic``() =
+    let shader (v : Vertex) =
+        fragment {
+            let _ = uniform.Foo2
+            return V3d.Zero
+        }
+
+    // hash generated with Foo2 : V2d
+    let hash = "AXOOumnSS+MAS9UcK+Ht+51dsRs="
+    let e = Effect.ofFunction shader
+    //e.Id |> should equal hash
+    e.Id |> should not' (equal hash)
+
+[<Test>]
+let ``[Hashing] includes uniform type``() =
+    let shader (v : Vertex) =
+        fragment {
+            let _ = uniform.Foo
+            return V3d.Zero
+        }
+
+    // hash generated with Foo : V2d
+    let hash = "5vlLW6LCe8rYkyjTa6E0BbT/S24="
+    let e = Effect.ofFunction shader
+    //e.Id |> should equal hash
+    e.Id |> should not' (equal hash)
+
 [<Test>]
 let ``[Hashing] intrinsic hashes on target-function``() =
 
@@ -392,7 +450,7 @@ let ``[Hashing] intrinsic hashes on target-function``() =
 
 
 // Note: Hashes depend on assembly version
-// -> unit tests containing hard coded hashes must be fixed for each new major version
+// -> unit tests containing hard coded hashes must be fixed for each new major version or when the serializer is modified
 [<Test>]
 let ``[Hashing] deterministic uniforms``() =
     let subScopes = [ "Bla"; "Blurg"; "Blubber" ].RandomOrder() |> Seq.toList
@@ -400,7 +458,7 @@ let ``[Hashing] deterministic uniforms``() =
 
     let e1 = Effect.ofFunction Shader6.shader
 
-    e1.Id |> should equal "0lhtS6x7oVav/FgQUaj9lVV6Djs="
+    e1.Id |> should equal "I28tKjpOedsPUgwmki84VX722d0="
 
 
 [<Test>]

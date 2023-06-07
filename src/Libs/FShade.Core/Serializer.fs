@@ -396,10 +396,6 @@ module Serializer =
             | :? V3d as o -> dst.Write o.X; dst.Write o.Y; dst.Write o.Z
             | :? V4d as o -> dst.Write o.X; dst.Write o.Y; dst.Write o.Z; dst.Write o.W
 
-            | :? ISemanticValue as sem ->
-                sem.Scope |> serialize dst typeof<UniformScope>
-                sem.Semantic |> serialize dst typeof<string>
-
             | :? UniformScope as o ->
                 let rec all (acc : list<string>) (u : UniformScope) =
                     match u.Parent with
@@ -886,6 +882,11 @@ module Serializer =
 
                 for a in args do
                     serializeInternal state dst a
+
+            | Uniform u when state.IsHash ->
+                dst.Write u.uniformName
+                Type.serializeInternal state.TypeState dst u.uniformType
+                Value.serialize dst typeof<UniformValue> u.uniformValue
 
             | Patterns.ReflectedCall(isInline, mi, def, args) ->
                 dst.Write (byte ExprId.ReflectedCall)
