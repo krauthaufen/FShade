@@ -149,39 +149,45 @@ module EffectDebugger =
 
                 pdb.MethodDebugInformation |> Seq.tryPick (fun m ->
                     try
-                        let info = pdb.GetMethodDebugInformation(m)
-                        let doc = pdb.GetDocument(info.Document)
-                        let str = pdb.GetString doc.Name
-                        if str = file then
-                            info.GetSequencePoints() |> Seq.tryPick (fun p ->
-                                let dy = abs (p.StartLine - startLine)
-                                let dx = abs (p.StartColumn - startCol)
-                                if dx <= 3 && dy = 0 then
-                                    let def = dll.GetMethodDefinition(m.ToDefinitionHandle())
-                                    let name = dll.GetString def.Name
-                                    let parent = dll.GetTypeDefinition(def.GetDeclaringType())
+                        if m.IsNil then
+                            None
+                        else
+                            let info = pdb.GetMethodDebugInformation(m)
 
-                                    let rec getFullName (t : TypeDefinition) =
-                                        let name = dll.GetString t.Name
-                                        
-                                        if t.IsNested then
-                                            let p = dll.GetTypeDefinition(t.GetDeclaringType())
-                                            sprintf "%s+%s" (getFullName p) name
+                            if info.Document.IsNil then
+                                None
+                            else
+                                let doc = pdb.GetDocument(info.Document)
+                                let str = pdb.GetString doc.Name
+                                if str = file then
+                                    info.GetSequencePoints() |> Seq.tryPick (fun p ->
+                                        let dy = abs (p.StartLine - startLine)
+                                        let dx = abs (p.StartColumn - startCol)
+                                        if dx <= 3 && dy = 0 then
+                                            let def = dll.GetMethodDefinition(m.ToDefinitionHandle())
+                                            let name = dll.GetString def.Name
+                                            let parent = dll.GetTypeDefinition(def.GetDeclaringType())
+
+                                            let rec getFullName (t : TypeDefinition) =
+                                                let name = dll.GetString t.Name
+
+                                                if t.IsNested then
+                                                    let p = dll.GetTypeDefinition(t.GetDeclaringType())
+                                                    sprintf "%s+%s" (getFullName p) name
+                                                else
+                                                    let ns = dll.GetString t.Namespace
+                                                    if String.IsNullOrWhiteSpace ns then name
+                                                    else sprintf "%s.%s" ns name
+
+                                            let tname = getFullName parent
+
+                                            Some(tname, name)
+
                                         else
-                                            let ns = dll.GetString t.Namespace
-                                            if String.IsNullOrWhiteSpace ns then name
-                                            else sprintf "%s.%s" ns name
-                                            
-
-                                    let tname = getFullName parent
-
-                                    Some(tname, name)
-
+                                            None
+                                    )
                                 else
                                     None
-                            )
-                        else
-                            None
                     with _ ->
                         None
                 )
@@ -517,16 +523,23 @@ module EffectDebugger =
                 |> Seq.map (fun (KeyValue(a, p)) -> installWatcher (fun f -> callback p f) p)
                 |> Seq.toArray
 
-            tryRegister
+            tryRegister, subscriptions
             
     let attach() =
         match EffectDebugger.registerFun with
-        | Some _ -> ()
+        | Some _ -> Disposable.empty
         | None ->
-            let register = start()
+            let register, watchers = start()
             EffectDebugger.registerFun <- Some (fun e -> register e :> obj)
             EffectDebugger.isAttached <- true
             EffectDebugger.saveCode <- fun _ _ -> ()
+
+            { new IDisposable with
+                member x.Dispose() =
+                    for w in watchers do w.Dispose()
+                    EffectDebugger.registerFun <- None
+                    EffectDebugger.isAttached <- false
+            }
 
 
 
