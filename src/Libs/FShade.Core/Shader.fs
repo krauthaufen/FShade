@@ -777,17 +777,26 @@ module Preprocessor =
                         let interp = odesc.paramInterpolation ||| desc.paramInterpolation ||| implicitInterp
                         { s with State.inputs = Map.add name { desc with paramInterpolation = interp } s.inputs }
                     else
-                        failwithf "[FShade] conflicting input types for %s: %A vs %A" name odesc.paramType desc.paramType
+                        failwithf "[FShade] input '%s' has conflicting types %s and %s." name odesc.paramType.Name desc.paramType.Name
                 | None ->
                     let desc = { desc with paramInterpolation = desc.paramInterpolation ||| implicitInterp }
                     { s with State.inputs = Map.add name desc s.inputs }
             )
 
-        let readUniform (p : UniformParameter) = 
+        let readUniform (validateCompatibility : bool) (p : UniformParameter) =
             State.modify (fun s ->
                 match Map.tryFind p.uniformName s.uniforms with
-                    | Some u -> s
-                    | None -> { s with State.uniforms = Map.add p.uniformName p s.uniforms }
+                | Some _ when not validateCompatibility ->
+                    s
+                | Some { uniformType = otype; uniformValue = ovalue } ->
+                    if p.uniformType <> otype then
+                        failwithf "[FShade] uniform '%s' has conflicting types %s and %s." p.uniformName otype.Name p.uniformType.Name
+                    elif p.uniformValue <> ovalue then
+                        failwithf "[FShade] uniform '%s' has conflicting values %A and %A." p.uniformName ovalue p.uniformValue
+                    else
+                        s
+                | None ->
+                    { s with State.uniforms = Map.add p.uniformName p s.uniforms }
             )
 
         let writeOutput (name : string) (desc : ParameterDescription) = 
@@ -825,7 +834,7 @@ module Preprocessor =
 
         let readAccelerationStructure (uniform : UniformParameter) =
             state {
-                do! readUniform uniform
+                do! uniform |> readUniform true
                 return Expr.ReadInput(ParameterKind.Uniform, typeof<Scene>, uniform.uniformName)
             }
 
@@ -1264,7 +1273,8 @@ module Preprocessor =
 
 
                             let b = substitute b
-                            do! State.readUniform { uniformName = name; uniformType = t; uniformValue = UniformValue.Attribute(uniform?SharedMemory, name) }
+                            let u = { uniformName = name; uniformType = t; uniformValue = UniformValue.Attribute(uniform?SharedMemory, name) }
+                            do! u |> State.readUniform true
 
                             return! preprocessComputeS b
 
@@ -1631,7 +1641,8 @@ module Preprocessor =
                 | ParameterKind.Input -> 
                     do! State.readInput name { paramType = paramType; paramInterpolation = InterpolationMode.Default }
                 | ParameterKind.Uniform ->
-                    do! State.readUniform { uniformType = paramType; uniformName = name; uniformValue = UniformValue.Attribute(uniform, name) }
+                    let u = { uniformType = paramType; uniformName = name; uniformValue = UniformValue.Attribute(uniform, name) }
+                    do! u |> State.readUniform false // optimizer uses this to see which uniforms are used, scope is potentially wrong here so don't validate
                 | _ ->
                     ()
 
@@ -1773,7 +1784,7 @@ module Preprocessor =
                     
 
             | Uniform u ->
-                do! State.readUniform u
+                do! u |> State.readUniform true
                 return Expr.ReadInput(ParameterKind.Uniform, e.Type, u.uniformName)
 
             | Let(var, Call(None, mi, []), b) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = MethodInfo.defaultOf ->

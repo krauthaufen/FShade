@@ -381,64 +381,92 @@ let ``[Hashing] sampler includes texture name``() =
 
     e1.Id |> should not' (equal e2.Id)
 
-[<AutoOpen>]
-module SketchyUniformTests =
-
-    // These uniforms are used to check if the semantic and / or the type
-    // affects the hash. The unit tests are pretty brittle, since we check
-    // non-equality against a hard coded hash.
-    //
-    // As a consequence those tests will pass, when all the hashes change
-    // and the hard coded hashes are not updated.
-    //
-    // Unfortunately, I just don't see a way to build two expressions where the only difference
-    // is a uniform type. Mainly used this to verify my changes to the serializer work
-    // as intended.
-    type UniformScope with
-        member x.Img  : Image1d<Formats.rgba32f> = x?Img
-        member x.Foo  : V3d                      = x?Foo
-        member x.Foo2 : V2d                      = x?Foo231
+type UniformScope with
+    member x.Img  : Image1d<Formats.rgba8>   = x?Img
+    member x.Img2 : Image1d<Formats.rgba8>   = x?Img
+    member x.Img3 : Image1d<Formats.rgba32f> = x?Img
+    member x.Foo  : V3d                      = x?Foo
+    member x.Foo2 : V3d                      = x?Foo
+    member x.Foo3 : V3d                      = x?Foo3
+    member x.Foo4 : V2d                      = x?Foo
 
 [<Test>]
 let ``[Hashing] includes image format``() =
-    let shader (v : Vertex) =
+    let s1 (v : Vertex) =
         fragment {
             return uniform.Img.Load 0
         }
 
-    // hash generated with Img : Image1d<Formats.rgba8>
-    let hash = "hemrZ9QE8H29lfBHaN24lxs/Trc="
-    let e = Effect.ofFunction shader
-    //e.Id |> should equal hash
-    e.Id |> should not' (equal hash)
+    let s2 (v : Vertex) =
+        fragment {
+            return uniform.Img2.Load 0
+        }
+
+    let s3 (v : Vertex) =
+        fragment {
+            return uniform.Img3.Load 0
+        }
+
+    let e1 = Effect.ofFunction s1
+    let e2 = Effect.ofFunction s2
+    let e3 = Effect.ofFunction s3
+
+    e1.Id |> should equal e2.Id
+    e1.Id |> should not' (equal e3.Id)
 
 [<Test>]
 let ``[Hashing] includes uniform semantic``() =
-    let shader (v : Vertex) =
-        fragment {
-            let _ = uniform.Foo2
-            return V3d.Zero
-        }
-
-    // hash generated with Foo2 : V2d
-    let hash = "AXOOumnSS+MAS9UcK+Ht+51dsRs="
-    let e = Effect.ofFunction shader
-    //e.Id |> should equal hash
-    e.Id |> should not' (equal hash)
-
-[<Test>]
-let ``[Hashing] includes uniform type``() =
-    let shader (v : Vertex) =
+    let s1 (v : Vertex) =
         fragment {
             let _ = uniform.Foo
             return V3d.Zero
         }
 
-    // hash generated with Foo : V2d
-    let hash = "5vlLW6LCe8rYkyjTa6E0BbT/S24="
-    let e = Effect.ofFunction shader
-    //e.Id |> should equal hash
-    e.Id |> should not' (equal hash)
+    let s2 (v : Vertex) =
+        fragment {
+            let _ = uniform.Foo2
+            return V3d.Zero
+        }
+
+    let s3 (v : Vertex) =
+        fragment {
+            let _ = uniform.Foo3
+            return V3d.Zero
+        }
+
+    let e1 = Effect.ofFunction s1
+    let e2 = Effect.ofFunction s2
+    let e3 = Effect.ofFunction s3
+
+    e1.Id |> should equal e2.Id
+    e1.Id |> should not' (equal e3.Id)
+
+[<Test>]
+let ``[Hashing] includes uniform type``() =
+    let s1 (v : Vertex) =
+        fragment {
+            let _ = uniform.Foo
+            return V3d.Zero
+        }
+
+    let s2 (v : Vertex) =
+        fragment {
+            let _ = uniform.Foo2
+            return V3d.Zero
+        }
+
+    let s3 (v : Vertex) =
+        fragment {
+            let _ = uniform.Foo4
+            return V3d.Zero
+        }
+
+    let e1 = Effect.ofFunction s1
+    let e2 = Effect.ofFunction s2
+    let e3 = Effect.ofFunction s3
+
+    e1.Id |> should equal e2.Id
+    e1.Id |> should not' (equal e3.Id)
 
 [<Test>]
 let ``[Hashing] intrinsic hashes on target-function``() =

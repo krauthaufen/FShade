@@ -1184,3 +1184,54 @@ let ``Enum with non-int32 underlying type``() =
         }
 
     GLSL.shouldCompileAndContainRegex [ Effect.ofFunction fs ] [ "uint fs_myenum"; "1234u" ]
+
+type UniformScope with
+    member x.SomeVector : V3d = x?Foo?Bar?MyVector
+    member x.SomeVector2 : V3d = x?Foo?Bar?MyVector
+    member x.BadVector : float = x?Foo?Bar?MyVector
+    member x.BadVector2 : V3d = x?MyBuff?Yea?MyVector
+
+[<Test>]
+let ``Uniform alias``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            return uniform.SomeVector + uniform.SomeVector2
+        }
+
+    GLSL.shouldCompile [ Effect.ofFunction fs ]
+
+[<Test>]
+let ``Uniform alias with mismatching type``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            return uniform.SomeVector + V3d(uniform.BadVector, 0.0, 0.0)
+        }
+
+    let exn =
+        Assert.Throws(fun () ->
+            let e = Effect.ofFunction fs
+            e.Shaders |> ignore
+        )
+
+    Assert.That(exn.Message, Does.Contain "has conflicting types")
+
+[<Test>]
+let ``Uniform alias with mismatching scope``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            return uniform.SomeVector + uniform.BadVector2
+        }
+
+    let exn =
+        Assert.Throws(fun () ->
+            let e = Effect.ofFunction fs
+            e.Shaders |> ignore
+        )
+
+    Assert.That(exn.Message, Does.Contain "has conflicting values")

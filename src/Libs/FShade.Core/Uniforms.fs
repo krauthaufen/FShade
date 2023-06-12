@@ -42,6 +42,8 @@ type UniformScope private(parent : Option<UniformScope>, name : string) =
 
         build "" x
 
+    override x.ToString() = x.FullName
+
     member x.GetChildScope(n : string) =
         lock childScopes (fun () ->
             match childScopes.TryGetValue n with
