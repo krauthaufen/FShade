@@ -1,3 +1,7 @@
+### 5.4.1
+* Added validation for uniform aliases
+* Serializer includes uniform semantic and type for hashing
+
 ### 5.4.0
 * Added sampler filter reduction mode
 * [RTX] Added builder operation overloads with untupled arguments
