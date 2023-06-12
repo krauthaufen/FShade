@@ -790,7 +790,7 @@ module Preprocessor =
                     s
                 | Some { uniformType = otype; uniformValue = ovalue } ->
                     if p.uniformType <> otype then
-                        failwithf "[FShade] uniform '%s' has conflicting types %s and %s." p.uniformName otype.Name p.uniformType.Name
+                        failwithf "[FShade] uniform '%s' has conflicting types %A and %A." p.uniformName otype p.uniformType
                     elif p.uniformValue <> ovalue then
                         failwithf "[FShade] uniform '%s' has conflicting values %A and %A." p.uniformName ovalue p.uniformValue
                     else
