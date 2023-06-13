@@ -2,35 +2,29 @@
 
 open System.IO
 open Aardvark.Base
-open FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler.CodeAnalysis
+open FSharp.Compiler.Diagnostics
 open FSharp.Data.Adaptive
 open FShade.Debug.ProjectInfo
 
 module EffectDebugger =
     open System
     open System.Collections.Generic
-    open System.IO
-    open FSharp.Data.Adaptive
 
     open System.Reflection
     open System.Reflection.PortableExecutable
     open System.Reflection.Metadata
-    open FSharp.Compiler.SourceCodeServices
-    open FSharp.Compiler.Range
-    open FSharp.Compiler.Ast
-    open FSharp.Compiler.Text
-    open FShade
     open System.Threading
 
     [<AutoOpen>]
-    module private Helpers = 
+    module private Helpers =
         let projectFileExtensions =
             Set.ofList [
                 ".fsproj"
                 ".csproj"
                 ".vbproj"
             ]
-            
+
         let assemblyRedirects = ConcurrentDict<string, string>(Dict())
         let projectAssemblies = ConcurrentDict<string, Assembly>(Dict())
         let checker = FSharpChecker.Create()
@@ -47,150 +41,101 @@ module EffectDebugger =
                     tryFindProject parent
                 else
                     None
-            
 
-        let tryGetProjectLocation(location : string) : option<string> =
-            try
-                let loc = Path.ChangeExtension(location, ".pdb")
-                if File.Exists loc then
-                    use s = File.OpenRead loc
-                    use r = MetadataReaderProvider.FromPortablePdbStream(s, MetadataStreamOptions.PrefetchMetadata)
-                    let reader = r.GetMetadataReader()
+        let tryGetProjectLocation (assemblyPath : string) : option<string> =
+            let pdbPath = Path.ChangeExtension(assemblyPath, ".pdb")
+            if File.Exists pdbPath then
+                try
+                    use file = File.OpenRead pdbPath
+                    use provider = MetadataReaderProvider.FromPortablePdbStream(file, MetadataStreamOptions.PrefetchMetadata)
+                    let reader = provider.GetMetadataReader()
 
-                    reader.MethodDebugInformation |> Seq.tryPick (fun m ->
-                        try
-                            let info = reader.GetMethodDebugInformation(m)
-                            let doc = reader.GetDocument(info.Document)
-                            let str = reader.GetString doc.Name
-                            if File.Exists str then
-                                tryFindProject (Path.GetDirectoryName str)
-                            else
+                    reader.Documents |> Seq.tryPick (fun d ->
+                        if d.IsNil then None
+                        else
+                            try
+                                let doc = reader.GetDocument d
+
+                                if doc.Name.IsNil then None
+                                else
+                                    let name = reader.GetString doc.Name
+
+                                    if File.Exists name then
+                                        tryFindProject (Path.GetDirectoryName name)
+                                    else
+                                        None
+                            with _ ->
                                 None
+                    )
+                with _ ->
+                    None
+            else
+                None
+
+        let tryGetMethod (assemblyPath : string) (sourceFile : string) (startLine : int) (startCol : int) =
+            let pdbPath = Path.ChangeExtension(assemblyPath, ".pdb")
+
+            if File.Exists pdbPath then
+                try
+                    use stream = File.OpenRead pdbPath
+                    use provider = MetadataReaderProvider.FromPortablePdbStream(stream, MetadataStreamOptions.PrefetchMetadata)
+                    let pdb = provider.GetMetadataReader()
+
+                    use rd = new PEReader(File.OpenRead assemblyPath, PEStreamOptions.PrefetchMetadata)
+                    let dll =
+                        let m = rd.GetMetadata()
+                        MetadataReader(m.Pointer, m.Length)
+
+                    pdb.MethodDebugInformation |> Seq.tryPick (fun m ->
+                        try
+                            if m.IsNil then
+                                None
+                            else
+                                let info = pdb.GetMethodDebugInformation(m)
+
+                                if info.Document.IsNil then
+                                    None
+                                else
+                                    let doc = pdb.GetDocument(info.Document)
+
+                                    if doc.Name.IsNil then
+                                        None
+                                    else
+                                        if pdb.GetString doc.Name = sourceFile && not info.SequencePointsBlob.IsNil then
+                                            info.GetSequencePoints() |> Seq.tryPick (fun p ->
+                                                let dy = abs (p.StartLine - startLine)
+                                                let dx = abs (p.StartColumn - startCol)
+
+                                                if dx <= 3 && dy = 0 then
+                                                    let def = dll.GetMethodDefinition(m.ToDefinitionHandle())
+                                                    let name = dll.GetString def.Name
+                                                    let parent = dll.GetTypeDefinition(def.GetDeclaringType())
+
+                                                    let rec getFullName (t : TypeDefinition) =
+                                                        let name = dll.GetString t.Name
+
+                                                        if t.IsNested then
+                                                            let p = dll.GetTypeDefinition(t.GetDeclaringType())
+                                                            sprintf "%s+%s" (getFullName p) name
+                                                        else
+                                                            let ns = dll.GetString t.Namespace
+                                                            if String.IsNullOrWhiteSpace ns then name
+                                                            else sprintf "%s.%s" ns name
+
+                                                    let tname = getFullName parent
+
+                                                    Some(tname, name)
+
+                                                else
+                                                    None
+                                            )
+                                        else
+                                            None
                         with _ ->
                             None
                     )
-                else
+                with _ ->
                     None
-            with _ ->
-                None
-
-       
-        let tryGetMethod(location : string) (file : string) (startLine : int) (startCol : int) =
-            //let task =
-            //    parsedFile.GetOrAdd(file, fun file ->
-            //        checker.ParseFile(file, SourceText.ofString (File.readAllText file), FSharpParsingOptions.Default) |> Async.StartAsTask
-            //    )
-            //let result = task.Result
-
-            //let contains (r : range) =
-            //    (r.StartLine = startLine && (r.StartColumn <= startCol) || r.StartLine < startLine) &&
-            //    r.EndLine >= startLine
-
-            //let rec find (path : string) (decls : SynModuleDecls) =
-            //    decls |> List.tryPick (fun d ->
-            //        match d with
-            //        | SynModuleDecl.NestedModule(ComponentInfo(_,_,_,id,_,_,_,_),_,decls, _, _) ->
-            //            let name = path :: (id |> List.map (fun i -> i.idText)) |> String.concat "+"
-            //            find name decls
-            //        | SynModuleDecl.Types(types, _) ->
-            //            types |> List.tryPick (fun (TypeDefn(_,_,members,_)) ->
-            //                members |> List.tryPick (fun m ->
-            //                    Log.warn "todo"
-            //                    None
-            //                )
-            //            )
-            //        | SynModuleDecl.Let(_, bindings, range) ->
-            //            bindings |> List.tryPick (fun (Binding(_,k,_,_,_,_,v,pat,_,_,range,_))->
-            //                match k with
-            //                | SynBindingKind.NormalBinding ->
-            //                    if contains range then
-            //                        SynPat.
-                                
-            //                    None
-            //                | _ ->
-            //                    None
-            //            )
-
-            //        | _ -> 
-            //            None
-                        
-            //        )
-
-            //let foobar = 
-            //    match result.ParseTree with
-            //    | Some (ParsedInput.ImplFile(ParsedImplFileInput(fileName, isScript, _, _, _, modules, _))) ->
-            //        modules |> List.tryPick (fun (SynModuleOrNamespace(id, _, kind, decls, _, _, _, _)) ->
-            //            decls |> List.tryPick (fun d ->
-            //                match d with
-            //                | SynModuleDecl.Types(types, _) ->
-            //                    types |> List.tryPick (fun (TypeDefn(_,_,members,_)) ->
-            //                        members |> List.tryPick (fun m ->
-            //                            m.Range
-            //                        )
-            //                        None
-            //                    )
-            //                | _ -> 
-            //                    None
-                        
-            //            )
-            //        )
-            //    | _ ->
-            //        None
-            let loc = Path.ChangeExtension(location, ".pdb")
-            if File.Exists loc then
-                use s = File.OpenRead loc
-                use r = MetadataReaderProvider.FromPortablePdbStream(s, MetadataStreamOptions.PrefetchMetadata)
-                let pdb = r.GetMetadataReader()
-
-                use rd = new PEReader(File.OpenRead location, PEStreamOptions.PrefetchMetadata)
-                let dll = 
-                    let m = rd.GetMetadata()
-                    new MetadataReader(m.Pointer, m.Length)
-
-                pdb.MethodDebugInformation |> Seq.tryPick (fun m ->
-                    try
-                        if m.IsNil then
-                            None
-                        else
-                            let info = pdb.GetMethodDebugInformation(m)
-
-                            if info.Document.IsNil then
-                                None
-                            else
-                                let doc = pdb.GetDocument(info.Document)
-                                let str = pdb.GetString doc.Name
-                                if str = file then
-                                    info.GetSequencePoints() |> Seq.tryPick (fun p ->
-                                        let dy = abs (p.StartLine - startLine)
-                                        let dx = abs (p.StartColumn - startCol)
-                                        if dx <= 3 && dy = 0 then
-                                            let def = dll.GetMethodDefinition(m.ToDefinitionHandle())
-                                            let name = dll.GetString def.Name
-                                            let parent = dll.GetTypeDefinition(def.GetDeclaringType())
-
-                                            let rec getFullName (t : TypeDefinition) =
-                                                let name = dll.GetString t.Name
-
-                                                if t.IsNested then
-                                                    let p = dll.GetTypeDefinition(t.GetDeclaringType())
-                                                    sprintf "%s+%s" (getFullName p) name
-                                                else
-                                                    let ns = dll.GetString t.Namespace
-                                                    if String.IsNullOrWhiteSpace ns then name
-                                                    else sprintf "%s.%s" ns name
-
-                                            let tname = getFullName parent
-
-                                            Some(tname, name)
-
-                                        else
-                                            None
-                                    )
-                                else
-                                    None
-                    with _ ->
-                        None
-                )
             else
                 None
 
@@ -199,7 +144,7 @@ module EffectDebugger =
             let references =
                 info.references |> List.map (fun r ->
                     match assemblyRedirects.TryGetValue r with
-                    | (true, n) -> 
+                    | (true, n) ->
                         Log.line "override %s: %s" (Path.GetFileName r) n
                         n
                     | _ -> r
@@ -208,7 +153,7 @@ module EffectDebugger =
             let ninfo = { info with references = references }
 
             let args = List.toArray ("fsc.exe" :: ProjectInfo.toFscArgs ninfo)
-            checker.Compile(args)   
+            checker.Compile(args)
 
         let tryGetProjectForAssembly (a : Assembly) =
             let location =
@@ -219,7 +164,7 @@ module EffectDebugger =
             | Some location ->
                 assemblyProjects.GetOrAdd(location, fun location ->
                     match tryGetProjectLocation location with
-                    | Some file -> 
+                    | Some file ->
                         match ProjectInfo.tryOfProject ["Configuration", "Debug"] file with
                         | Result.Ok info ->
                             Some info
@@ -257,50 +202,47 @@ module EffectDebugger =
                     for w in watchers do w.Dispose()
             }
 
-
-
-
-        let start () =  
-        
+        let start () =
             let coreLib = typeof<FShade.Effect>.Assembly.GetName().Name
-            let allAssemblies = 
-                Introspection.AllAssemblies 
+
+            let allAssemblies =
+                Introspection.AllAssemblies
                 |> Seq.filter (fun a -> a.GetReferencedAssemblies() |> Array.exists (fun r -> r.Name = coreLib))
                 |> Seq.toArray
 
             Log.startTimed "resolving referenced projects"
-        
+
             let assemblyLocations = Dict<Assembly, string>()
             let projectForAssembly = Dict<string, ProjectInfo>()
             let projectForProj = Dict<string, ProjectInfo>()
 
             for a in allAssemblies do
                 match tryGetProjectForAssembly a with
-                | Some info -> 
+                | Some info ->
                     projectAssemblies.[info.project] <- a
                     match info.output with
-                    | Some o -> 
+                    | Some o ->
                         projectForAssembly.[o] <- info
                         assemblyLocations.[a] <- o
-                    | None -> 
+                    | None ->
                         projectForAssembly.[a.Location] <- info
                         assemblyLocations.[a] <- a.Location
 
                     projectForProj.[info.project] <- info
                     Log.line "found %s" (Path.GetFileName info.project)
-                | None -> 
+                | None ->
                     ()
 
             Log.stop()
 
-            let dependent, buildOrder = 
+            let dependent, buildOrder =
                 let mutable dependent = HashMap.empty
                 let mutable dependencies = HashMap.empty
                 for KeyValue(path, project) in projectForAssembly do
                     for r in project.projects do
                         match projectForProj.TryGetValue r with
                         | (true, otherProject) ->
-                            dependent <- 
+                            dependent <-
                                 dependent |> HashMap.alter otherProject.project (Option.defaultValue Set.empty >> Set.add project.project >> Some)
 
                             dependencies <-
@@ -313,7 +255,7 @@ module EffectDebugger =
 
                 let buildOrder =
                     let res = List<Set<string>>()
-            
+
                     let mutable all = Set.ofSeq projectForProj.Keys
                     let mutable dependencies = dependencies
                     let nodependencies () =
@@ -322,7 +264,7 @@ module EffectDebugger =
                     while not (Set.isEmpty all) do
                         let current = nodependencies()
                         res.Add current
-                        dependencies <- 
+                        dependencies <-
                             dependencies |> HashMap.choose (fun _ d ->
                                 let n = Set.difference d current
                                 if Set.isEmpty n then None
@@ -335,7 +277,7 @@ module EffectDebugger =
                 dependent, buildOrder
 
             let getAffected(projs : #seq<string>) =
-                let rec all (p : string) =  
+                let rec all (p : string) =
                     match HashMap.tryFind p dependent with
                     | Some d ->
                         d |> Seq.map all |> Set.unionMany |> Set.add p
@@ -343,7 +285,7 @@ module EffectDebugger =
                         Set.singleton p
 
                 let all = projs |> Seq.collect all |>  Set.ofSeq
-                buildOrder |> Array.choose (fun s -> 
+                buildOrder |> Array.choose (fun s ->
                     let r = Set.intersect s all
                     if Set.isEmpty r then None
                     else Some r
@@ -353,13 +295,13 @@ module EffectDebugger =
                 match e.SourceDefintion with
                 | Some (d, _) ->
                     match d.DebugRange with
-                    | Some (srcFile, startLine, startCol, endLine, endCol) -> 
+                    | Some (srcFile, startLine, startCol, endLine, endCol) ->
                         projectForProj |> Seq.tryPick (fun (KeyValue(file, info)) ->
-                            if List.exists (fun f -> f = srcFile) info.files then 
-                            
+                            if List.exists (fun f -> f = srcFile) info.files then
+
                                 match tryGetMethod info.output.Value srcFile startLine startCol with
                                 | Some (typeName, methName) ->
-                                
+
                                     let resolve (ass : Assembly) =
                                         let typ = ass.GetType typeName
                                         if isNull typ then None
@@ -367,16 +309,16 @@ module EffectDebugger =
                                             let m = typ.GetMethod(methName, BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Static)
                                             if isNull m then None
                                             else Some m
-                                
+
                                     Some(file, resolve)
 
-                                
+
                                 | None ->
                                     None
-                            else 
+                            else
                                 None
                         )
-                    | None -> 
+                    | None ->
                         None
                 | None ->
                     None
@@ -393,7 +335,7 @@ module EffectDebugger =
 
                 let leaves = getLeaves effect
 
-                let result = 
+                let result =
                     leaves |> List.map (fun effect ->
                         match tryGetEffectProject effect with
                         | Some(projFile, resolve) ->
@@ -408,16 +350,16 @@ module EffectDebugger =
                                     with e ->
                                         Log.warn "failed: %A" e
                                         effect
-                                | None -> 
+                                | None ->
                                     effect
-                            
+
 
                             let cell, change =
                                 leafCache.GetOrCreate(effect.Id, fun _ ->
                                     let c = cval effect
                                     let change (a : Assembly) =
                                         match resolve a with
-                                        | Some mi -> 
+                                        | Some mi ->
                                             try
                                                 let p = mi.GetParameters().[0].ParameterType
                                                 let test = mi.Invoke(null, [| null |]) |> unbox<_>
@@ -450,8 +392,8 @@ module EffectDebugger =
 
             let lockObj = obj()
             let mutable dirty = Set.empty
-            let thread =    
-                let tick () = 
+            let thread =
+                let tick () =
                     lock lockObj (fun () ->
                         while Set.isEmpty dirty do
                             Monitor.Wait lockObj |> ignore
@@ -481,9 +423,9 @@ module EffectDebugger =
                                     let info = { info with output = Some tmp }
                                     let (errors, _ret) = compile info |> Async.RunSynchronously
 
-                                    let critical = errors |> Array.filter (fun e -> e.Severity = FSharpErrorSeverity.Error)
+                                    let critical = errors |> Array.filter (fun e -> e.Severity = FSharpDiagnosticSeverity.Error)
 
-                                    if critical.Length = 0 && File.Exists tmp then 
+                                    if critical.Length = 0 && File.Exists tmp then
                                         Report.End(": success") |> ignore
 
                                         assemblyRedirects.[outFile] <- tmp
@@ -493,10 +435,10 @@ module EffectDebugger =
                                             transact (fun () ->
                                                 for r in reg do r ass
                                             )
-                                        | _ ->  
+                                        | _ ->
                                             ()
                                     else
-                                        for e in critical do 
+                                        for e in critical do
                                             Report.ErrorNoPrefix(sprintf "%A" e)
                                         Log.stop()
                                 | _ ->
@@ -507,7 +449,7 @@ module EffectDebugger =
                 startThread <| fun () ->
                     while true do
                         tick()
-                    
+
 
 
             let callback  (project : ProjectInfo) (file : string) =
@@ -524,7 +466,7 @@ module EffectDebugger =
                 |> Seq.toArray
 
             tryRegister, subscriptions
-            
+
     let attach() =
         match EffectDebugger.registerFun with
         | Some _ -> Disposable.empty
@@ -540,6 +482,3 @@ module EffectDebugger =
                     EffectDebugger.registerFun <- None
                     EffectDebugger.isAttached <- false
             }
-
-
-

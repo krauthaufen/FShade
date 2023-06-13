@@ -4,16 +4,18 @@ source https://api.nuget.org/v3/index.json
 // for dev packages not yet published to nuget
 source https://vrvis.myget.org/F/aardvark_public/api/v2
 
-nuget FSharp.Core                           >= 5.0.0 lowest_matching: true
+nuget FSharp.Core                           ~> 6.0.0
 nuget Aardvark.Build                        ~> 1.0.19
 nuget Aardvark.Base                         ~> 5.2.19
 nuget Aardvark.Base.FSharp                  ~> 5.2.19
 nuget Aardvark.Base.Incremental             ~> 5.2.19
 
-nuget BlackFox.VsWhere                      ~> 1.0.0
-nuget Dotnet.ProjInfo                       ~> 0.36.0
-nuget Dotnet.ProjInfo.Workspace             ~> 0.36.0
-nuget FSharp.Compiler.Service               ~> 34.1.1
+nuget BlackFox.VsWhere                      ~> 1.1.0
+nuget Dotnet.ProjInfo                       ~> 0.40.0
+nuget Dotnet.ProjInfo.Workspace             ~> 0.40.0
+nuget FSharp.Compiler.Service               ~> 41.0.7
+nuget Microsoft.Build.Framework             ~> 17.2.2  // .NET 6
+nuget System.Reflection.Metadata            ~> 6.0.0
 
 nuget FsPickler                             ~> 5.3.2
 

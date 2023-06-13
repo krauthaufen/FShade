@@ -8,3 +8,6 @@ Dotnet.ProjInfo.Workspace
 FSharp.Compiler.Service
 BlackFox.VsWhere
 Aardvark.Build
+
+Microsoft.Build.Framework
+System.Reflection.Metadata

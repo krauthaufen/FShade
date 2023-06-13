@@ -1,17 +1,14 @@
 ﻿module internal FShade.Debug.ProjectInfo
 
-
 open System.IO
 open Aardvark.Base
-open FSharp.Compiler.SourceCodeServices
 open Dotnet.ProjInfo
 open Dotnet.ProjInfo.Inspect
 open Dotnet.ProjInfo.Workspace
 open FSharp.Data.Adaptive
 
-
 [<RequireQualifiedAccess>]
-type Target =   
+type Target =
     | Exe
     | Library
     | WinExe
@@ -38,8 +35,35 @@ type ProjectInfo =
         debug       : DebugType
     }
 
-
 module ProjectInfo =
+
+    module private Utils =
+        open System.Diagnostics
+
+        let runProcess (log : string -> unit) (workingDir : string) (exePath : string) (args : string) =
+            let psi = ProcessStartInfo()
+            psi.FileName <- exePath
+            psi.WorkingDirectory <- workingDir
+            psi.RedirectStandardOutput <- true
+            psi.RedirectStandardError <- true
+            psi.Arguments <- args
+            psi.CreateNoWindow <- true
+            psi.UseShellExecute <- false
+
+            use p = new Process()
+            p.StartInfo <- psi
+            p.OutputDataReceived.Add(fun ea -> log (ea.Data))
+            p.ErrorDataReceived.Add(fun ea -> log (ea.Data))
+
+            p.Start() |> ignore
+            p.BeginOutputReadLine()
+            p.BeginErrorReadLine()
+            p.WaitForExit()
+
+            let exitCode = p.ExitCode
+
+            exitCode, (workingDir, exePath, args)
+
 
     let ofFscArgs (isNewStyle : bool) (path : string) (projects : list<string>) (args : list<string>) =
         let mutable parsed = Set.empty
@@ -50,10 +74,9 @@ module ProjectInfo =
             if Path.IsPathRooted str then str
             else Path.Combine(dir, str)
 
-
         let removeArg (a : string) = parsed <- Set.add a parsed
 
-        let references = 
+        let references =
             args |> List.choose (fun a ->
                 if a.StartsWith "-r:" then removeArg a; Some (full (a.Substring 3))
                 elif a.StartsWith "--reference:" then removeArg a; Some (full (a.Substring 12))
@@ -61,7 +84,7 @@ module ProjectInfo =
             )
 
         let files =
-            args |> List.choose (fun a -> 
+            args |> List.choose (fun a ->
                 if not (a.StartsWith "-") then
                     let isAssemblyInfo = (Path.GetFileName(a).ToLower().EndsWith "assemblyinfo.fs")
                     removeArg a
@@ -71,7 +94,7 @@ module ProjectInfo =
                         None
                 else
                     None
-            ) 
+            )
 
         let output =
             args |> List.tryPick (fun a ->
@@ -104,11 +127,11 @@ module ProjectInfo =
 
         let hasDebug =
             args |> List.tryPick (fun a ->
-                let rest = 
+                let rest =
                     if a.StartsWith "-g" then Some (a.Substring(2).Replace(" ", ""))
                     elif a.StartsWith "--debug" then Some (a.Substring(7).Replace(" ", ""))
                     else None
-                        
+
                 match rest with
                 | Some "" | Some "+" -> removeArg a; Some true
                 | Some "-" -> removeArg a; Some false
@@ -117,11 +140,11 @@ module ProjectInfo =
 
         let debugType =
             args |> List.tryPick (fun a ->
-                let rest = 
+                let rest =
                     if a.StartsWith "-g" then Some (a.Substring(2).Replace(" ", ""))
                     elif a.StartsWith "--debug" then Some (a.Substring(7).Replace(" ", ""))
                     else None
-                        
+
                 match rest with
                 | Some ":full" -> removeArg a; Some DebugType.Full
                 | Some ":pdbonly" -> removeArg a; Some DebugType.PdbOnly
@@ -136,7 +159,7 @@ module ProjectInfo =
             match hasDebug with
             | Some true -> defaultArg debugType DebugType.Full
             | Some false -> DebugType.Off
-            | None -> defaultArg debugType DebugType.Full 
+            | None -> defaultArg debugType DebugType.Full
 
         {
             isNewStyle  = isNewStyle
@@ -161,16 +184,16 @@ module ProjectInfo =
             match info.debug with
             | DebugType.Off ->
                 ()
-            | DebugType.Full -> 
+            | DebugType.Full ->
                 yield "-g"
                 yield "--debug:full"
-            | DebugType.Portable -> 
+            | DebugType.Portable ->
                 yield "-g"
                 yield "--debug:portable"
-            | DebugType.PdbOnly -> 
+            | DebugType.PdbOnly ->
                 yield "-g"
                 yield "--debug:pdbonly"
-                
+
             match info.target with
             | Target.Exe -> yield "--target:exe"
             | Target.Library -> yield "--target:library"
@@ -181,9 +204,11 @@ module ProjectInfo =
                 yield sprintf "-d:%s" d
 
             yield "--nowin32manifest"
+
             for a in info.additional do
-                yield a
-                
+                if not <| a.StartsWith "--doc:" then
+                    yield a
+
             for r in info.references do
                 yield sprintf "-r:%s" r
 
@@ -227,14 +252,14 @@ module ProjectInfo =
             else "oldstyle"
         )
         w.WriteLine "references"
-        for r in List.sort info.references do 
+        for r in List.sort info.references do
             let fileInfo = FileInfo r
             if fileInfo.Exists then
                 w.WriteLine(fileInfo.LastWriteTimeUtc.ToString("o"))
             w.WriteLine(relativePath r)
 
         w.WriteLine "files"
-        for f in info.files do 
+        for f in info.files do
             w.WriteLine(relativePath f)
 
         w.WriteLine "defines"
@@ -262,7 +287,7 @@ module ProjectInfo =
         System.Guid hash |> string
 
     [<AutoOpen>]
-    module private PickleHelpers = 
+    module private PickleHelpers =
         let pickleTarget (t : Target) =
             match t with
             | Target.Exe -> 0
@@ -290,14 +315,11 @@ module ProjectInfo =
             | 3 -> DebugType.Full
             | _ -> DebugType.Off
 
-
-
-
     let tryUnpickleOf (stream : Stream) =
         let p = stream.Position
         try
             use r = new BinaryReader(stream, System.Text.Encoding.UTF8, true)
-        
+
             let project = r.ReadString()
             let isNewStyle = r.ReadBoolean()
 
@@ -306,10 +328,10 @@ module ProjectInfo =
 
             let c = r.ReadInt32()
             let references = List.init c (fun _ -> r.ReadString())
-        
+
             let c = r.ReadInt32()
             let files = List.init c (fun _ -> r.ReadString())
-        
+
             let c = r.ReadInt32()
             let defines = List.init c (fun _ -> r.ReadString())
 
@@ -317,13 +339,13 @@ module ProjectInfo =
 
             let has = r.ReadBoolean()
             let output = if has then r.ReadString() |> Some else None
-        
+
             let c = r.ReadInt32()
             let additional = List.init c (fun _ -> r.ReadString())
 
             let debug = r.ReadInt32() |> unpickleDebugType
 
-            let project = 
+            let project =
                 normalize {
                     isNewStyle  = isNewStyle
                     project     = project
@@ -362,7 +384,7 @@ module ProjectInfo =
         w.Write (pickleTarget info.target)
 
         match info.output with
-        | Some o -> 
+        | Some o ->
             w.Write(true)
             w.Write(o)
         | None ->
@@ -383,24 +405,24 @@ module ProjectInfo =
         use ms = new System.IO.MemoryStream(arr)
         tryUnpickleOf ms
 
-    let rec private projInfo additionalMSBuildProps (file : string) =
+    let rec private projInfo (additionalMSBuildProps : list<string * string>) (file : string) =
 
         let projDir = Path.GetDirectoryName file
         let runCmd exePath args = Utils.runProcess ignore projDir exePath (args |> String.concat " ")
-    
+
         let netcore =
-            match file with
-            | ProjectRecognizer.NetCoreSdk -> true
+            match ProjectRecognizer.kindOfProjectSdk file with
+            | Some ProjectRecognizer.ProjectSdkKind.DotNetSdk -> true
             | _ -> false
-    
+
         let projectAssetsJsonPath = Path.Combine(projDir, "obj", "project.assets.json")
         if netcore && not(File.Exists(projectAssetsJsonPath)) then
             let (s, a) = runCmd "dotnet" ["restore"; sprintf "\"%s\"" file]
-            if s <> 0 then 
+            if s <> 0 then
                 failwithf "Cannot find restored info for project %s" file
-    
-        let getFscArgs = 
-            
+
+        let getFscArgs =
+
             if netcore then
                 Dotnet.ProjInfo.Inspect.getFscArgs
             else
@@ -413,8 +435,8 @@ module ProjectInfo =
             let msbuildExec =
                 let msbuildPath =
                     if netcore then Dotnet.ProjInfo.Inspect.MSBuildExePath.DotnetMsbuild "dotnet"
-                    else 
-                        let all = 
+                    else
+                        let all =
                             BlackFox.VsWhere.VsInstances.getWithPackage "Microsoft.Component.MSBuild" true
 
                         let probes =
@@ -435,6 +457,7 @@ module ProjectInfo =
                         match msbuild with
                         | Some msbuild -> Dotnet.ProjInfo.Inspect.MSBuildExePath.Path msbuild
                         | None -> failwith "no msbuild"
+
                 Dotnet.ProjInfo.Inspect.msbuild msbuildPath runCmd
 
             let additionalArgs = additionalMSBuildProps |> List.map (Dotnet.ProjInfo.Inspect.MSBuild.MSbuildCli.Property)
@@ -465,7 +488,7 @@ module ProjectInfo =
                     | Result.Error err ->
                         errors <- err :: errors
                         []
-                    
+
                 )
 
             let projects =
@@ -476,14 +499,14 @@ module ProjectInfo =
                     match res with
                     | Result.Ok res ->
                         match res with
-                        | GetResult.Properties args -> 
+                        | GetResult.Properties args ->
                             args |> List.tryPick (function (k,v) when k = "OutputPath" -> Some v | _ -> None)
                         | _ -> None
                     | Result.Error _err ->
                         None
                 )
 
-            let fscArgs = 
+            let fscArgs =
                 info |> List.tryPick (fun res ->
                     match res with
                     | Result.Ok res ->
@@ -495,16 +518,16 @@ module ProjectInfo =
                 )
 
             match fscArgs with
-            | Some args -> 
+            | Some args ->
                 match args with
-                | Result.Ok args -> 
+                | Result.Ok args ->
                     let res = ofFscArgs netcore file projects args
                     match outputPath with
                     | Some path ->
                         let dllName =
                             match res.output with
                             | Some o -> Path.GetFileName o
-                            | None -> 
+                            | None ->
                                 let ext =
                                     match res.target with
                                     | Target.Library -> ".dll"
@@ -514,11 +537,11 @@ module ProjectInfo =
                                 Path.ChangeExtension(Path.GetFileName(file), ext)
                         let realPath = Path.Combine(Path.GetDirectoryName file, path, dllName) |> Path.GetFullPath
                         Result.Ok { res with output = Some realPath }
-                    | None -> 
+                    | None ->
                         Result.Ok res
                 | Result.Error e -> Result.Error [sprintf "%A" e]
-            | None -> 
-                let errors = 
+            | None ->
+                let errors =
                     errors |> List.map (fun e ->
                         match e with
                         | MSBuildFailed (code, err) ->
