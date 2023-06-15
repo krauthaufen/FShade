@@ -6,7 +6,7 @@ open Aardvark.Base
 
 #nowarn "44"
 
-[<Obsolete("Use ShaderDebugger instead.")>]
+[<Obsolete("Use ShaderDebugSystem instead.")>]
 module EffectDebugger =
 
     let mutable isAttached = false
@@ -20,7 +20,7 @@ module EffectDebugger =
             | Some f -> Some (f e)
             | _ -> None
 
-module ShaderDebugger =
+module ShaderDebugSystem =
 
     type IShaderDebugger =
         inherit IDisposable
@@ -64,7 +64,7 @@ module ShaderDebugger =
             | _ -> None
         )
 
-    let isAttached() =
+    let isInitialized() =
         lock lockObj (fun _ ->
             instance.IsSome
         )

@@ -1,8 +1,9 @@
-﻿namespace FShade
+﻿namespace FShade.Debug
 
+open FShade
 open Aardvark.Base
 open FSharp.Data.Adaptive
-open FShade.Debug.ProjectInfo
+open ProjectInfo
 
 open System
 open System.IO
@@ -354,7 +355,7 @@ module ShaderDebugger =
                 None
 
     let attach() =
-        ShaderDebugger.initialize (fun _ ->
+        ShaderDebugSystem.initialize (fun _ ->
             Log.startTimed "resolving projects for shader debugger"
 
             let coreLib = typeof<FShade.Effect>.Assembly.GetName().Name
@@ -447,7 +448,7 @@ module ShaderDebugger =
                     )
                 )
 
-            { new ShaderDebugger.IShaderDebugger with
+            { new ShaderDebugSystem.IShaderDebugger with
                 member x.TryRegisterEffect(effect) = tryRegisterEffect effect
                 member x.Dispose() =
                     FileWatchers.dispose()
