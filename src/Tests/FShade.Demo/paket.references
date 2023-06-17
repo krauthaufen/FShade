@@ -4,8 +4,3 @@ Aardvark.Base.Incremental
 FSharp.Core
 FsPickler
 GLSLangSharp
-
-Dotnet.ProjInfo
-Dotnet.ProjInfo.Workspace
-FSharp.Compiler.Service
-BlackFox.VsWhere

@@ -1,13 +1,5 @@
+Aardvark.Build
 Aardvark.Base
 Aardvark.Base.FSharp
 FSharp.Core
 FSharp.Data.Adaptive
-
-Dotnet.ProjInfo
-Dotnet.ProjInfo.Workspace
-FSharp.Compiler.Service
-BlackFox.VsWhere
-Aardvark.Build
-
-Microsoft.Build.Framework
-System.Reflection.Metadata

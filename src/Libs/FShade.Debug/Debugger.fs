@@ -3,10 +3,8 @@
 open FShade
 open Aardvark.Base
 open FSharp.Data.Adaptive
-open ProjectInfo
 
 open System
-open System.IO
 open System.Threading
 open System.Collections.Generic
 open System.Reflection
@@ -15,8 +13,11 @@ module ShaderDebugger =
 
     type private Project =
         {
-            // Info about the project
-            Info : ProjectInfo
+            // Metadata about the project
+            Data : ProjectData
+
+            // Original assembly of the project
+            Assembly : Assembly
 
             // Callbacks to be invoked when the project is rebuilt
             Callbacks : List<Assembly -> unit>
@@ -38,207 +39,6 @@ module ShaderDebugger =
     // Only projects that reference FShade are regarded.
     let private projects = Dictionary<string, Project>()
 
-    // Utilities for probing assemblies
-    module private Assembly =
-        open System.Reflection.Metadata
-        open System.Reflection.PortableExecutable
-
-        [<AutoOpen>]
-        module private ProjectHelpers =
-
-            let rec private tryFindProject (dir : string) =
-                let project =
-                    Directory.GetFiles dir
-                    |> Array.tryFind (fun f ->
-                        Path.GetExtension(f).ToLower() = ".fsproj"
-                    )
-
-                if project.IsNone then
-                    let parent = Path.GetDirectoryName dir
-                    if not (isNull parent) then
-                        tryFindProject parent
-                    else
-                        None
-                else
-                    project
-
-            let tryFindProjectLocation (assemblyPath : string) : option<string> =
-                let pdbPath = Path.ChangeExtension(assemblyPath, ".pdb")
-
-                if File.Exists pdbPath then
-                    try
-                        use file = File.OpenRead pdbPath
-                        use provider = MetadataReaderProvider.FromPortablePdbStream(file, MetadataStreamOptions.PrefetchMetadata)
-                        let reader = provider.GetMetadataReader()
-
-                        reader.Documents |> Seq.tryPick (fun d ->
-                            if d.IsNil then None
-                            else
-                                try
-                                    let doc = reader.GetDocument d
-
-                                    if doc.Name.IsNil then None
-                                    else
-                                        let name = reader.GetString doc.Name
-
-                                        if File.Exists name then
-                                            tryFindProject (Path.GetDirectoryName name)
-                                        else
-                                            None
-                                with _ ->
-                                    None
-                        )
-                    with _ ->
-                        None
-                else
-                    None
-
-        let tryGetProjectInfo =
-            let cache = Dictionary<string, ProjectInfo option>()
-
-            fun (assembly : Assembly) ->
-                let location =
-                    try Path.GetFullPath assembly.Location |> Some
-                    with _ -> None
-
-                match location with
-                | Some location ->
-                    match cache.TryGetValue location with
-                    | (true, info) -> info
-                    | _ ->
-                        match tryFindProjectLocation location with
-                        | Some projectFile ->
-                            let result =
-                                match projectFile |> ProjectInfo.tryOfProject ["Configuration", "Debug"] with
-                                | Result.Ok info -> Some info
-                                | Result.Error errors ->
-                                    for err in errors do Log.warn "%s: %s" projectFile err
-                                    None
-
-                            cache.[location] <- result
-                            result
-
-                        | None ->
-                            None
-                | None ->
-                    None
-
-        let tryGetMethodName (sourceFile : string) (startLine : int) (startColumn : int) (assemblyPath : string) =
-            let pdbPath = Path.ChangeExtension(assemblyPath, ".pdb")
-
-            if File.Exists pdbPath then
-                try
-                    use stream = File.OpenRead pdbPath
-                    use provider = MetadataReaderProvider.FromPortablePdbStream(stream, MetadataStreamOptions.PrefetchMetadata)
-                    let pdb = provider.GetMetadataReader()
-
-                    use rd = new PEReader(File.OpenRead assemblyPath, PEStreamOptions.PrefetchMetadata)
-                    let dll =
-                        let m = rd.GetMetadata()
-                        MetadataReader(m.Pointer, m.Length)
-
-                    let rec getFullName (t : TypeDefinition) =
-                          let name = dll.GetString t.Name
-
-                          if t.IsNested then
-                              let p = dll.GetTypeDefinition(t.GetDeclaringType())
-                              sprintf "%s+%s" (getFullName p) name
-                          else
-                              let ns = dll.GetString t.Namespace
-                              if String.IsNullOrWhiteSpace ns then name
-                              else sprintf "%s.%s" ns name
-
-                    pdb.MethodDebugInformation |> Seq.tryPick (fun m ->
-                        try
-                            if m.IsNil then
-                                None
-                            else
-                                let info = pdb.GetMethodDebugInformation(m)
-
-                                if info.Document.IsNil then
-                                    None
-                                else
-                                    let doc = pdb.GetDocument(info.Document)
-
-                                    if doc.Name.IsNil then
-                                        None
-                                    else
-                                        if pdb.GetString doc.Name = sourceFile && not info.SequencePointsBlob.IsNil then
-                                            info.GetSequencePoints() |> Seq.tryPick (fun p ->
-                                                let dy = p.StartLine - startLine
-                                                let dx = p.StartColumn - startColumn
-
-                                                if dy = 0 && abs dx <= 3 then
-                                                    let def = dll.GetMethodDefinition(m.ToDefinitionHandle())
-                                                    let name = dll.GetString def.Name
-                                                    let parent = dll.GetTypeDefinition(def.GetDeclaringType())
-                                                    Some(getFullName parent, name)
-                                                else
-                                                    None
-                                            )
-                                        else
-                                            None
-                        with _ ->
-                            None
-                    )
-                with _ ->
-                    None
-            else
-                None
-
-        let tryGetMethod (typeName : string) (methodName : string) (assembly : Assembly) =
-            let typ = assembly.GetType typeName
-            if isNull typ then None
-            else
-                let mi = typ.GetMethod(methodName, BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Static)
-                if isNull mi then None
-                else Some mi
-
-    module private Compiler =
-        open FSharp.Compiler.CodeAnalysis
-        open FSharp.Compiler.Diagnostics
-
-        let private checker = FSharpChecker.Create()
-
-        let compile (info : ProjectInfo) =
-            let args = List.toArray ("fsc.exe" :: ProjectInfo.toFscArgs info)
-            let output, _ = checker.Compile args |> Async.RunSynchronously
-
-            output |> Array.choose (fun e ->
-                if e.Severity = FSharpDiagnosticSeverity.Error then
-                    Some <| sprintf "%A" e
-                else
-                    None
-            )
-
-    module private FileWatchers =
-
-        let private watchers = Dictionary<string, FileSystemWatcher>()
-
-        let install (callback : string -> unit) (info : ProjectInfo) =
-            let filesToWatch =
-                info.files
-                |> List.groupBy Path.GetDirectoryName
-                |> List.map (fun (dir, files) -> dir, Set.ofList files)
-                |> HashMap.ofList
-
-            for (dir, files) in filesToWatch do
-                let watcher =
-                    match watchers.TryGetValue dir with
-                    | (true, w) -> w
-                    | _ ->
-                        let w = new FileSystemWatcher(dir)
-                        w.EnableRaisingEvents <- true
-                        watchers.[dir] <- w
-                        w
-
-                watcher.Changed.Add (fun e -> if Set.contains e.FullPath files then callback e.FullPath)
-                watcher.Renamed.Add (fun e -> if Set.contains e.FullPath files then callback e.FullPath)
-                watcher.Created.Add (fun e -> if Set.contains e.FullPath files then callback e.FullPath)
-
-        let dispose() =
-            for w in watchers.Values do w.Dispose()
-            watchers.Clear()
 
     module private EffectDefinition =
         open FSharp.Quotations
@@ -249,10 +49,10 @@ module ShaderDebugger =
                 let parameters = mi.GetParameters()
 
                 if not <| typeof<Expr>.IsAssignableFrom mi.ReturnType then
-                    Result.Error $"method has an invalid return type of {mi.ReturnType}"
+                    Result.Error $"Method has an invalid return type of {mi.ReturnType}."
 
                 elif parameters.Length <> 1 then
-                    Result.Error $"effect must have a single parameter (but has {parameters.Length})"
+                    Result.Error $"Effect must have a single parameter (but has {parameters.Length})."
 
                 else
                     let paramType = parameters.[0].ParameterType
@@ -265,7 +65,7 @@ module ShaderDebugger =
                     with exn ->
                         Result.Error (string exn)
             | _ ->
-                Result.Error $"failed to resolve effect method {definition.TypeName}.{definition.MethodName}"
+                Result.Error $"Failed to resolve effect method {definition.TypeName}.{definition.MethodName}."
 
         let ofEffect =
             let cache = Dictionary<string, EffectDefinition>()
@@ -282,11 +82,11 @@ module ShaderDebugger =
                     match debugRange with
                     | Some (srcFile, startLine, startCol, _endLine, _endCol) ->
                         projects.Values |> Seq.tryPick (fun p ->
-                            if p.Info.files |> List.contains srcFile then
-                                match p.Info.output.Value |> Assembly.tryGetMethodName srcFile startLine startCol with
+                            if p.Data.Files |> List.contains srcFile then
+                                match p.Assembly |> Assembly.tryGetMethodName srcFile startLine startCol with
                                 | Some (typeName, methodName) ->
                                     Some {
-                                        Project = p.Info.project
+                                        Project = p.Data.Path
                                         TypeName = typeName
                                         MethodName = methodName
                                     }
@@ -312,6 +112,8 @@ module ShaderDebugger =
 
         fun (effect : FShade.Effect) ->
             let mutable success = true
+
+            Log.startTimed "registering effect for debugging"
 
             let leaves =
                 getLeaves effect
@@ -343,15 +145,17 @@ module ShaderDebugger =
                 )
 
             if success then
+                Log.stop(": success")
+
                 Some <| AVal.custom (fun t ->
                     try
                         leaves |> List.map (fun r -> r.GetValue t) |> Effect.compose
                     with exn ->
-                        Log.error "[ShaderDebugger] failed to compose effect %s: %A" effect.Id exn
+                        Log.error "failed to compose modified effect %s: %A" effect.Id exn
                         effect
                 )
             else
-                Log.warn "[ShaderDebugger] failed to register effect %s" effect.Id
+                Log.stop(": failed")
                 None
 
     let attach() =
@@ -364,13 +168,10 @@ module ShaderDebugger =
                 let refs = assembly.GetReferencedAssemblies()
 
                 if refs |> Array.exists (fun r -> r.Name = coreLib) then
-                    match Assembly.tryGetProjectInfo assembly with
-                    | Some info when info.output.IsSome ->
-                        projects.[info.project] <- { Info = info; Callbacks = List() }
-                        Log.line "found %s" (Path.GetFileName info.project)
-
-                    | Some info ->
-                        Report.WarnNoPrefix($"{info.project}: could not determine output file")
+                    match Assembly.tryGetProjectData assembly with
+                    | Some data ->
+                        projects.[data.Path] <- { Data = data; Assembly = assembly; Callbacks = List() }
+                        Log.line "found %s" data.Name
 
                     | None ->
                         ()
@@ -394,28 +195,30 @@ module ShaderDebugger =
 
                         for projectFile in pending do
                             let project = projects.[projectFile]
-                            let projectName = Path.GetFileName projectFile
 
-                            Log.startTimed "[ShaderDebugger] rebuild %s" projectName
+                            Log.startTimed "recompiling shaders of %s" project.Data.Name
 
-                            let tmp = Path.ChangeExtension(Path.GetTempFileName(), Path.GetExtension project.Info.output.Value)
-                            let errors = Compiler.compile { project.Info with output = Some tmp }
+                            try
+                                let result = Compiler.build project.Data
 
-                            if errors.Length = 0 && File.Exists tmp then
-                                let assembly = Assembly.LoadFile tmp
+                                match result with
+                                | Result.Ok output ->
+                                    let assembly = Assembly.LoadFile output
 
-                                try
                                     transact (fun () ->
                                         for update in project.Callbacks do
                                             update assembly
                                     )
-                                with exn ->
-                                    Report.ErrorNoPrefix(string exn)
-                            else
-                                for e in errors do
-                                    Report.ErrorNoPrefix e
 
-                            Log.stop()
+                                    Log.stop(": success")
+
+                                | Result.Error error ->
+                                    Report.ErrorNoPrefix error
+                                    Log.stop(": failed")
+
+                            with exn ->
+                                Report.ErrorNoPrefix(string exn)
+                                Log.stop(": failed")
 
                     let run() =
                         while running do
@@ -441,9 +244,9 @@ module ShaderDebugger =
 
             // Install file watchers
             for p in projects.Values do
-                p.Info |> FileWatchers.install (fun _ ->
+                p.Data |> FileWatchers.install (fun _ ->
                     lock dirty (fun () ->
-                        if p.Callbacks.Count > 0 && dirty.Add p.Info.project then
+                        if p.Callbacks.Count > 0 && dirty.Add p.Data.Path then
                             Monitor.PulseAll dirty
                     )
                 )

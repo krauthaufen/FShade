@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFrameworks>netstandard2.0; net6.0</TargetFrameworks>
     <AssemblyName>FShade.Debug</AssemblyName>
     <OutputType>Library</OutputType>
     <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
@@ -14,7 +14,13 @@
     <OutputPath>..\..\..\bin\Release</OutputPath>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="ProjectInfo.fs" />
+    <None Include="paket.references" />
+    <None Include="paket.template" />
+    <Compile Include="Framework.fs" />
+    <Compile Include="ProjectData.fs" />
+    <Compile Include="Compiler.fs" />
+    <Compile Include="Assembly.fs" />
+    <Compile Include="FileWatchers.fs" />
     <Compile Include="Debugger.fs" />
   </ItemGroup>
   <ItemGroup>
