@@ -85,7 +85,7 @@ module internal Compiler =
                     found <- true
 
             if not found then
-                Log.warn "cannot find assembly for %s" name
+                Log.warn "Cannot find assembly for %s" name
 
         let buildResult =
             Process.run "dotnet" [

@@ -63,7 +63,7 @@ module internal Framework =
         match tryParse desc with
         | Some f -> f
         | _ ->
-            Log.warn "failed to parse .NET framework description '%s'" desc
+            Log.warn "Failed to parse .NET framework description '%s'" desc
             Framework.NetCore 600
 
     // Determines if the current runtime supports the given target.

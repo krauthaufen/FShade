@@ -72,7 +72,7 @@ module ShaderDebugger =
 
             fun (effect : FShade.Effect) ->
                 match cache.TryGetValue effect.Id with
-                | (true, def) -> Some def
+                | (true, def) -> Result.Ok def
                 | _ ->
                     let debugRange =
                         match effect.SourceDefintion with
@@ -81,23 +81,31 @@ module ShaderDebugger =
 
                     match debugRange with
                     | Some (srcFile, startLine, startCol, _endLine, _endCol) ->
-                        projects.Values |> Seq.tryPick (fun p ->
-                            if p.Data.Files |> List.contains srcFile then
-                                match p.Assembly |> Assembly.tryGetMethodName srcFile startLine startCol with
-                                | Some (typeName, methodName) ->
-                                    Some {
-                                        Project = p.Data.Path
-                                        TypeName = typeName
-                                        MethodName = methodName
-                                    }
+                        let result =
+                            projects.Values |> Seq.tryPick (fun p ->
+                                if p.Data.Files |> List.contains srcFile then
+                                    match p.Assembly |> Assembly.tryGetMethodName srcFile startLine startCol with
+                                    | Some (typeName, methodName) ->
+                                        Some {
+                                            Project = p.Data.Path
+                                            TypeName = typeName
+                                            MethodName = methodName
+                                        }
 
-                                | None ->
+                                    | None ->
+                                        None
+                                else
                                     None
-                            else
-                                None
-                        )
+                            )
+
+                        match result with
+                        | Some def ->
+                            Result.Ok def
+                        | _ ->
+                            Result.Error $"Cannot find effect definition for '{srcFile}' (Line {startLine}, Column {startCol})."
+
                     | None ->
-                        None
+                        Result.Error $"Effect {effect.Id} is missing debug information."
 
     // Tries to register an effect to be updated automatically when the corresponding project changes.
     // Note: Only the individual shaders may change, the composition is fixed.
@@ -111,20 +119,23 @@ module ShaderDebugger =
             | many -> List.collect getLeaves many
 
         fun (effect : FShade.Effect) ->
-            let mutable success = true
+            let mutable success = false
 
-            Log.startTimed "registering effect for debugging"
+            Log.startTimed "Registering effect for debugging"
 
-            let leaves =
+            let leaves : aval<Effect> list =
                 getLeaves effect
-                |> List.choose (fun effect ->
+                |> List.map (fun effect ->
                     let id = effect.Id
 
                     match cache.TryGetValue id with
-                    | (true, effect) -> Some effect
+                    | (true, effect) ->
+                        success <- true
+                        effect
+
                     | _ ->
                         match EffectDefinition.ofEffect effect with
-                        | Some def ->
+                        | Result.Ok def ->
                             let cval = cval effect
 
                             let update (assembly : Assembly) =
@@ -135,13 +146,14 @@ module ShaderDebugger =
                                 | Result.Error error ->
                                     Report.ErrorNoPrefix($"{error} (effect {id})")
 
+                            success <- true
                             projects.[def.Project].Callbacks.Add update
                             cache.[id] <- cval
-                            Some cval
+                            cval
 
-                        | None ->
-                            success <- false
-                            None
+                        | Result.Error error ->
+                            Report.Warn error
+                            AVal.constant effect
                 )
 
             if success then
@@ -151,7 +163,7 @@ module ShaderDebugger =
                     try
                         leaves |> List.map (fun r -> r.GetValue t) |> Effect.compose
                     with exn ->
-                        Log.error "failed to compose modified effect %s: %A" effect.Id exn
+                        Log.error "Failed to compose modified effect %s: %A" effect.Id exn
                         effect
                 )
             else
@@ -160,7 +172,7 @@ module ShaderDebugger =
 
     let attach() =
         ShaderDebugSystem.initialize (fun _ ->
-            Log.startTimed "resolving projects for shader debugger"
+            Log.startTimed "Resolving projects for shader debugger"
 
             let coreLib = typeof<FShade.Effect>.Assembly.GetName().Name
 
@@ -171,7 +183,7 @@ module ShaderDebugger =
                     match Assembly.tryGetProjectData assembly with
                     | Some data ->
                         projects.[data.Path] <- { Data = data; Assembly = assembly; Callbacks = List() }
-                        Log.line "found %s" data.Name
+                        Log.line "Found %s" data.Name
 
                     | None ->
                         ()
@@ -196,7 +208,7 @@ module ShaderDebugger =
                         for projectFile in pending do
                             let project = projects.[projectFile]
 
-                            Log.startTimed "recompiling shaders of %s" project.Data.Name
+                            Log.startTimed "Recompiling shaders of %s" project.Data.Name
 
                             try
                                 let result = Compiler.build project.Data
