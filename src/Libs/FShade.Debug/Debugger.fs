@@ -20,8 +20,16 @@ module ShaderDebugger =
             Assembly : Assembly
 
             // Callbacks to be invoked when the project is rebuilt
-            Callbacks : List<Assembly -> unit>
+            Callbacks : List<Assembly -> bool>
         }
+
+    type private SourceLocation =
+        { File   : string
+          Line   : int
+          Column : int }
+
+        override x.ToString() =
+            $"{x.File} ({x.Line},{x.Column})"
 
     type private EffectDefinition =
         {
@@ -33,7 +41,13 @@ module ShaderDebugger =
 
             // The method of the effect
             MethodName : string
+
+            // Location of the original effect
+            Location : SourceLocation
         }
+
+        override x.ToString() =
+            $"{x.TypeName}.{x.MethodName}()"
 
     // Contains all found projects stored with project file path as key.
     // Only projects that reference FShade are regarded.
@@ -49,10 +63,10 @@ module ShaderDebugger =
                 let parameters = mi.GetParameters()
 
                 if not <| typeof<Expr>.IsAssignableFrom mi.ReturnType then
-                    Result.Error $"Method has an invalid return type of {mi.ReturnType}."
+                    Result.Error $"Effect {definition} has an invalid return type of {mi.ReturnType}."
 
                 elif parameters.Length <> 1 then
-                    Result.Error $"Effect must have a single parameter (but has {parameters.Length})."
+                    Result.Error $"Effect {definition} has {parameters.Length} parameters (should be 1)."
 
                 else
                     let paramType = parameters.[0].ParameterType
@@ -65,7 +79,7 @@ module ShaderDebugger =
                     with exn ->
                         Result.Error (string exn)
             | _ ->
-                Result.Error $"Failed to resolve effect method {definition.TypeName}.{definition.MethodName}."
+                Result.Error $"Failed to resolve effect {definition}."
 
         let ofEffect =
             let cache = Dictionary<string, EffectDefinition>()
@@ -81,6 +95,8 @@ module ShaderDebugger =
 
                     match debugRange with
                     | Some (srcFile, startLine, startCol, _endLine, _endCol) ->
+                        let location = { File = srcFile; Line = startLine; Column = startCol }
+
                         let result =
                             projects.Values |> Seq.tryPick (fun p ->
                                 if p.Data.Files |> List.contains srcFile then
@@ -90,6 +106,7 @@ module ShaderDebugger =
                                             Project = p.Data.Path
                                             TypeName = typeName
                                             MethodName = methodName
+                                            Location = location
                                         }
 
                                     | None ->
@@ -99,10 +116,10 @@ module ShaderDebugger =
                             )
 
                         match result with
-                        | Some def ->
-                            Result.Ok def
+                        | Some definition ->
+                            Result.Ok definition
                         | _ ->
-                            Result.Error $"Cannot find effect definition for '{srcFile}' (Line {startLine}, Column {startCol})."
+                            Result.Error $"Cannot find effect definition for {location}."
 
                     | None ->
                         Result.Error $"Effect {effect.Id} is missing debug information."
@@ -110,7 +127,7 @@ module ShaderDebugger =
     // Tries to register an effect to be updated automatically when the corresponding project changes.
     // Note: Only the individual shaders may change, the composition is fixed.
     let private tryRegisterEffect =
-        let cache = Dictionary<string, cval<Effect>>()
+        let cache = Dictionary<string, EffectDefinition * cval<Effect>>()
 
         let rec getLeaves (e : FShade.Effect) =
             match e.ComposedOf with
@@ -129,26 +146,31 @@ module ShaderDebugger =
                     let id = effect.Id
 
                     match cache.TryGetValue id with
-                    | (true, effect) ->
+                    | (true, (definition, effect)) ->
+                        Report.Line(2, $"{definition} - {definition.Location}")
                         success <- true
                         effect
 
                     | _ ->
                         match EffectDefinition.ofEffect effect with
-                        | Result.Ok def ->
+                        | Result.Ok definition ->
                             let cval = cval effect
 
                             let update (assembly : Assembly) =
-                                match def |> EffectDefinition.tryResolve assembly with
+                                match definition |> EffectDefinition.tryResolve assembly with
                                 | Result.Ok effect ->
                                     cval.Value <- effect
+                                    true
 
                                 | Result.Error error ->
-                                    Report.ErrorNoPrefix($"{error} (effect {id})")
+                                    Report.ErrorNoPrefix error
+                                    false
+
+                            Report.Line(2, $"{definition} - {definition.Location}")
 
                             success <- true
-                            projects.[def.Project].Callbacks.Add update
-                            cache.[id] <- cval
+                            projects.[definition.Project].Callbacks.Add update
+                            cache.[id] <- (definition, cval)
                             cval
 
                         | Result.Error error ->
@@ -217,12 +239,21 @@ module ShaderDebugger =
                                 | Result.Ok output ->
                                     let assembly = Assembly.LoadFile output
 
-                                    transact (fun () ->
-                                        for update in project.Callbacks do
-                                            update assembly
-                                    )
+                                    let success =
+                                        transact (fun () ->
+                                            let mutable success = true
 
-                                    Log.stop(": success")
+                                            for update in project.Callbacks do
+                                                let ret = update assembly
+                                                success <- success && ret
+
+                                            success
+                                        )
+
+                                    if success then
+                                        Log.stop(": success")
+                                    else
+                                        Log.stop(": failed")
 
                                 | Result.Error error ->
                                     Report.ErrorNoPrefix error
