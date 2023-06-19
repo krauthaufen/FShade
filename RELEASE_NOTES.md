@@ -1,3 +1,6 @@
+### 5.3.5
+* merged v52 (containing improved AOT)
+
 ### 5.3.4
 * Added intrinsics for dynamically accessing matrix rows and columns (matrix.Row() / matrix.Column())
 * Added intrinsics for dynamically accessing matrix elements (matrix.[x, y])
