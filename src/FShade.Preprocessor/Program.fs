@@ -467,20 +467,23 @@ let main argv =
                 if not (isNull r) then
                     let d = r.Resolve()
                     
-                    let unpickleInternal = d.Methods |> Seq.tryFind (fun m -> m.Name = "unpickleInternal")
-
-                    match unpickleInternal with
-                    | Some m -> Some (Choice1Of3 m)
+                    let unpickleResource = d.Methods |> Seq.tryFind (fun m -> m.Name = "unpickleResource")
+                    match unpickleResource with
+                    | Some m -> Some (Choice1Of4 m)
                     | None ->
-                        let unpickleWithId = d.Methods |> Seq.tryFind (fun m -> m.Name = "unpickleWithId")
-                        match unpickleWithId with
-                        | Some m -> Some (Choice2Of3 m)
+                        let unpickleInternal = d.Methods |> Seq.tryFind (fun m -> m.Name = "unpickleInternal")
+                        match unpickleInternal with
+                        | Some m -> Some (Choice2Of4 m)
                         | None ->
-                            let read = d.Methods |> Seq.tryFind (fun m -> m.Name = "read")
-                            match read with
-                            | Some r -> Some (Choice3Of3 r)
-                            | None -> None
-                
+                            let unpickleWithId = d.Methods |> Seq.tryFind (fun m -> m.Name = "unpickleWithId")
+                            match unpickleWithId with
+                            | Some m -> Some (Choice3Of4 m)
+                            | None ->
+                                let read = d.Methods |> Seq.tryFind (fun m -> m.Name = "read")
+                                match read with
+                                | Some r -> Some (Choice4Of4 r)
+                                | None -> None
+                    
                 else
                     None
             )
@@ -526,21 +529,22 @@ let main argv =
         
         let changedAssemblies = System.Collections.Generic.List<string * AssemblyDefinition>()
         
-        for (path, def) in allDefs do
-            Log.start "%s" def.Name.Name
+        for (path, assdef) in allDefs do
+            Log.start "%s" assdef.Name.Name
         
             let mutable changed = 0
         
-            for mod_ in def.Modules do
+            for mod_ in assdef.Modules do
                 let fromBase64 =
                     lazy (mod_.ImportReference(fromBase64))
                 
                 let read = 
                     lazy (
                         match read with
-                        | Choice1Of3 r -> Choice1Of3(mod_.ImportReference r)
-                        | Choice2Of3 r -> Choice2Of3(mod_.ImportReference r)
-                        | Choice3Of3 r -> Choice3Of3(mod_.ImportReference r)
+                        | Choice1Of4 r -> Choice1Of4(mod_.ImportReference r)
+                        | Choice2Of4 r -> Choice2Of4(mod_.ImportReference r)
+                        | Choice3Of4 r -> Choice3Of4(mod_.ImportReference r)
+                        | Choice4Of4 r -> Choice4Of4(mod_.ImportReference r)
                     )
                 
                 //let reportLine =
@@ -630,24 +634,46 @@ let main argv =
                                                     match result with
                                                     | Some (id, binary) ->
                                                         Log.line "patching %s.%s: { Id = %A }" meth.DeclaringType.Name meth.Name id
-                                                        
+
+                                                        // cleanup old call: also remove "tail." instruction if one exists
+                                                        let isTail = idx > 0 && body.[idx - 1].OpCode = OpCodes.Tail
+                                                        if isTail then
+                                                            body.[idx - 1] <- Instruction.Create(OpCodes.Nop)
+
+                                                        match call with
+                                                        | Some call ->
+                                                            let call = mod_.ImportReference call
+                                                            body.[idx] <- Instruction.Create(OpCodes.Call, call)
+                                                        | None ->
+                                                            body.[idx] <- Instruction.Create(OpCodes.Nop)
+
+
+                                                        // mod_.Resources.Add(new EmbeddedResource(id, ManifestResourceAttributes.Public, binary))
+
                                                         let replacement =
                                                             [
                                                                 match read.Value with
-                                                                | Choice1Of3 read ->
+                                                                | Choice1Of4 read ->
+                                                                    // unpickleResource
+                                                                    mod_.Resources.Add(new EmbeddedResource(id, ManifestResourceAttributes.Public, binary))
+                                                                    Instruction.Create(OpCodes.Ldstr, id)
+                                                                    Instruction.Create(OpCodes.Ldstr, assdef.FullName)
+                                                                    Instruction.Create(OpCodes.Call, read)
+
+                                                                | Choice2Of4 read ->
                                                                     // unpickleInternal
                                                                     Instruction.Create(OpCodes.Ldstr, id)
                                                                     Instruction.Create(OpCodes.Ldstr, System.Convert.ToBase64String binary)
                                                                     Instruction.Create(OpCodes.Call, read)
                                                                     
-                                                                | Choice2Of3 read ->
+                                                                | Choice3Of4 read ->
                                                                     // unpickleWithId
                                                                     Instruction.Create(OpCodes.Pop)
                                                                     Instruction.Create(OpCodes.Ldstr, id)
                                                                     Instruction.Create(OpCodes.Ldstr, System.Convert.ToBase64String binary)
                                                                     Instruction.Create(OpCodes.Call, read)
                                                             
-                                                                | Choice3Of3 read -> 
+                                                                | Choice4Of4 read -> 
                                                                     // read
                                                                     Instruction.Create(OpCodes.Pop)                                                          
                                                                     Instruction.Create(OpCodes.Ldstr, System.Convert.ToBase64String binary)
@@ -692,7 +718,7 @@ let main argv =
                             
             if changed > 0 then
                 Log.line "patched %d effect-creations" changed
-                changedAssemblies.Add (path, def)
+                changedAssemblies.Add (path, assdef)
             else
                 Log.line "no patchable effect-creations found"
             Log.stop()

@@ -1,3 +1,6 @@
+### 5.3.6
+* fshadeaot using resources instead of literal strings
+
 ### 5.3.5
 * merged v52 (containing improved AOT)
 
