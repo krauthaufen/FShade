@@ -44,10 +44,13 @@ module ShaderDebugger =
 
             // Location of the original effect
             Location : SourceLocation
+
+            // Arguments of the effect function
+            Arguments : obj list
         }
 
         override x.ToString() =
-            $"{x.TypeName}.{x.MethodName}()"
+            $"{x.TypeName}.{x.MethodName}"
 
     // Contains all found projects stored with project file path as key.
     // Only projects that reference FShade are regarded.
@@ -61,23 +64,31 @@ module ShaderDebugger =
             match assembly |> Assembly.tryGetMethod definition.TypeName definition.MethodName with
             | Some mi ->
                 let parameters = mi.GetParameters()
+                let argumentCount = parameters.Length - 1
 
                 if not <| typeof<Expr>.IsAssignableFrom mi.ReturnType then
                     Result.Error $"Effect {definition} has an invalid return type of {mi.ReturnType}."
 
-                elif parameters.Length <> 1 then
-                    Result.Error $"Effect {definition} has {parameters.Length} parameters (should be 1)."
+                elif parameters.Length = 0 then
+                    Result.Error $"Effect {definition} does not have parameters."
+
+                elif argumentCount > definition.Arguments.Length then
+                    Result.Error $"Effect {definition} expects {argumentCount} arguments but only {definition.Arguments.Length} are known."
 
                 else
-                    let paramType = parameters.[0].ParameterType
+                    let inputType = (Array.last parameters).ParameterType
+
+                    let arguments =
+                        let args = definition.Arguments |> List.take argumentCount
+                        args @ [ null ] |> Array.ofList
 
                     try
-                        let expr = mi.Invoke(null, [| null |]) |> unbox<Expr>
-                        let effect = expr |> Effect.ofExpr paramType
+                        let expr = mi.Invoke(null, arguments) |> unbox<Expr>
+                        let effect = expr |> Effect.ofExpr inputType
                         Result.Ok effect
 
                     with exn ->
-                        Result.Error (string exn)
+                        Result.Error $"Failed to resolve effect {definition}: {exn.Message}"
             | _ ->
                 Result.Error $"Failed to resolve effect {definition}."
 
@@ -88,10 +99,10 @@ module ShaderDebugger =
                 match cache.TryGetValue effect.Id with
                 | (true, def) -> Result.Ok def
                 | _ ->
-                    let debugRange =
-                        match effect.SourceDefintion with
-                        | Some (expr, _) -> expr.DebugRange
-                        | _ -> None
+                    let debugRange, arguments =
+                        match effect.SourceDefinition with
+                        | Some (expr, args) -> expr.DebugRange, args
+                        | _ -> None, []
 
                     match debugRange with
                     | Some (srcFile, startLine, startCol, _endLine, _endCol) ->
@@ -107,6 +118,7 @@ module ShaderDebugger =
                                             TypeName = typeName
                                             MethodName = methodName
                                             Location = location
+                                            Arguments = arguments
                                         }
 
                                     | None ->
@@ -140,7 +152,7 @@ module ShaderDebugger =
 
             Log.startTimed "Registering effect for debugging"
 
-            let leaves : aval<Effect> list =
+            let leaves : (string * aval<Effect>) list =
                 getLeaves effect
                 |> List.map (fun effect ->
                     let id = effect.Id
@@ -149,7 +161,7 @@ module ShaderDebugger =
                     | (true, (definition, effect)) ->
                         Report.Line(2, $"{definition} - {definition.Location}")
                         success <- true
-                        effect
+                        string definition, effect
 
                     | _ ->
                         match EffectDefinition.ofEffect effect with
@@ -171,21 +183,27 @@ module ShaderDebugger =
                             success <- true
                             projects.[definition.Project].Callbacks.Add update
                             cache.[id] <- (definition, cval)
-                            cval
+                            string definition, cval
 
                         | Result.Error error ->
                             Report.Warn error
-                            AVal.constant effect
+                            id, AVal.constant effect
                 )
 
             if success then
                 Log.stop(": success")
 
+                let names, effects =
+                    let n, e = leaves |> List.unzip
+                    n |> String.concat "; ", e
+
                 Some <| AVal.custom (fun t ->
+                    Report.Line(2, $"Updating [{names}].")
+
                     try
-                        leaves |> List.map (fun r -> r.GetValue t) |> Effect.compose
+                        effects |> List.map (fun r -> r.GetValue t) |> Effect.compose
                     with exn ->
-                        Log.error "Failed to compose modified effect %s: %A" effect.Id exn
+                        Log.error "%s" exn.Message
                         effect
                 )
             else
@@ -193,7 +211,7 @@ module ShaderDebugger =
                 None
 
     let attach() =
-        ShaderDebugSystem.initialize (fun _ ->
+        ShaderDebugger.initialize (fun _ ->
             Log.startTimed "Resolving projects for shader debugger"
 
             let coreLib = typeof<FShade.Effect>.Assembly.GetName().Name
@@ -294,7 +312,7 @@ module ShaderDebugger =
                     )
                 )
 
-            { new ShaderDebugSystem.IShaderDebugger with
+            { new ShaderDebugger.IShaderDebugger with
                 member x.TryRegisterEffect(effect) = tryRegisterEffect effect
                 member x.Dispose() =
                     FileWatchers.dispose()

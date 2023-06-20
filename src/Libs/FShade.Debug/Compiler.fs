@@ -3,6 +3,7 @@
 open System
 open System.IO
 open System.Diagnostics
+open System.Collections.Generic
 open Aardvark.Base
 
 module internal Compiler =
@@ -50,14 +51,25 @@ module internal Compiler =
 
                 Log.line "%s %s" path arguments
 
+                let output = List<string>()
+
+                p.OutputDataReceived.Add (fun args ->
+                    if not <| String.IsNullOrWhiteSpace args.Data then
+                        lock output (fun _ -> output.Add args.Data)
+                )
+                p.ErrorDataReceived.Add ignore
+
                 p.Start() |> ignore
+                p.BeginOutputReadLine()
+                p.BeginErrorReadLine()
                 p.WaitForExit()
 
                 if p.ExitCode = 0 then
                     Result.Ok ()
                 else
                     let output =
-                        p.StandardOutput.ReadToEnd()
+                        output
+                        |> String.concat Environment.NewLine
                         |> String.indent 1
 
                     Report.Line(2, Environment.NewLine + output)

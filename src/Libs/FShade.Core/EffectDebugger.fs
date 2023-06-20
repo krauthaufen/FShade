@@ -6,7 +6,7 @@ open Aardvark.Base
 
 #nowarn "44"
 
-[<Obsolete("Use ShaderDebugSystem instead.")>]
+[<Obsolete("Use ShaderDebugger instead.")>]
 module EffectDebugger =
 
     let mutable isAttached = false
@@ -20,7 +20,7 @@ module EffectDebugger =
             | Some f -> Some (f e)
             | _ -> None
 
-module ShaderDebugSystem =
+module ShaderDebugger =
 
     type IShaderDebugger =
         inherit IDisposable
