@@ -46,6 +46,7 @@ module ShaderDebugger =
             Location : SourceLocation
 
             // Number of inputs of the shader function
+            // Note: Compute shaders may have multiple inputs.
             Inputs : int
 
             // Arguments of the shader function
@@ -92,7 +93,7 @@ module ShaderDebugger =
 
                     try
                         let expr = mi.Invoke(null, arguments) |> unbox<Expr>
-                        Result.Ok (expr, inputTypes)
+                        Result.Ok (expr, inputTypes, mi)
 
                     with exn ->
                         Result.Error $"Failed to resolve shader {definition}: {exn.Message}"
@@ -102,15 +103,28 @@ module ShaderDebugger =
         let tryResolveEffect (assembly : Assembly) (definition : ShaderDefinition) =
             definition
             |> tryResolve assembly
-            |> Result.map (fun (expr, inputTypes) ->
+            |> Result.map (fun (expr, inputTypes, _) ->
                 expr |> Effect.ofExpr inputTypes.Head
             )
 
         let tryResolveRaytracingShader (assembly : Assembly) (definition : ShaderDefinition) =
             definition
             |> tryResolve assembly
-            |> Result.map (fun (expr, inputTypes) ->
+            |> Result.map (fun (expr, inputTypes, _) ->
                 expr |> RaytracingShader.ofExpr inputTypes
+            )
+
+        let tryResolveComputeShader (assembly : Assembly) (definition : ShaderDefinition) =
+            definition
+            |> tryResolve assembly
+            |> Result.bind (fun (expr, _, mi) ->
+                match Seq.tryHead <| mi.GetCustomAttributes<LocalSizeAttribute>() with
+                | Some att ->
+                    let localSize = V3i(att.X, att.Y, att.Z)
+                    Result.Ok <| ComputeShader.ofExpr localSize expr
+
+                | _ ->
+                    Result.Error $"Could not determine local size for {definition}."
             )
 
         let ofSourceDefinition =
@@ -163,6 +177,9 @@ module ShaderDebugger =
             match shader.SourceDefinition with
             | Some def -> def |> ofSourceDefinition shader.Id
             | _ -> Result.Error $"Raytracing shader {id} is missing a source definition."
+
+        let ofComputeShader (shader : ComputeShader) =
+            shader.csSourceDefinition |> ofSourceDefinition shader.csId
 
 
     let private tryRegister<'Effect, 'Shader, 'Slot when 'Slot : comparison>
@@ -291,6 +308,16 @@ module ShaderDebugger =
                     ShaderDefinition.tryResolveRaytracingShader
                     (fun shaders -> RaytracingEffect shaders)
 
+    let private tryRegisterComputeShader : ComputeShader -> aval<ComputeShader> option =
+        tryRegister<ComputeShader, ComputeShader, int>
+                    "compute shader"
+                    (fun shader -> shader.csId)
+                    (fun shader -> shader.csId)
+                    (fun shader -> Map.ofList [0, shader])
+                    ShaderDefinition.ofComputeShader
+                    ShaderDefinition.tryResolveComputeShader
+                    (Map.values >> Seq.head)
+
     let attach() =
         ShaderDebugger.initialize (fun _ ->
             Log.startTimed "Resolving projects for shader debugger"
@@ -396,6 +423,7 @@ module ShaderDebugger =
             { new ShaderDebugger.IShaderDebugger with
                 member x.TryRegisterEffect(effect) = tryRegisterEffect effect
                 member x.TryRegisterRaytracingEffect(effect) = tryRegisterRaytracingEffect effect
+                member x.TryRegisterComputeShader(shader) = tryRegisterComputeShader shader
                 member x.Dispose() =
                     FileWatchers.dispose()
                     worker.Dispose()

@@ -48,8 +48,7 @@ type internal ComputeShaderData =
         csBody          : Expr
     }
 
-type ComputeShader internal(id : string, method : MethodBase, localSize : V3i, data : Lazy<ComputeShaderData>) =
-    
+type ComputeShader internal(id : string, method : MethodBase, localSize : V3i, data : Lazy<ComputeShaderData>, definition : SourceDefinition) =
     member x.csId = id
     member x.csMethod = method
     member x.csLocalSize = localSize
@@ -60,11 +59,12 @@ type ComputeShader internal(id : string, method : MethodBase, localSize : V3i, d
     member x.csUniforms = data.Value.csUniforms
     member x.csShared = data.Value.csShared
     member x.csBody = data.Value.csBody
+    member x.csSourceDefinition = definition
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module ComputeShader =
 
-    let private ofExprInternal (meth : MethodBase) (hash : string) (localSize : V3i) (body0 : Expr) =
+    let private ofExprInternal (meth : MethodBase) (hash : string) (localSize : V3i) (definition : SourceDefinition) (body0 : Expr) =
         let data =
             lazy (
                 let body1, state = Preprocessor.preprocess localSize body0
@@ -171,7 +171,7 @@ module ComputeShader =
             )
         
 
-        ComputeShader(hash, meth, localSize, data)
+        ComputeShader(hash, meth, localSize, data, definition)
 
     let private cache = System.Collections.Concurrent.ConcurrentDictionary<string * V3i, ComputeShader>()
     
@@ -184,12 +184,14 @@ module ComputeShader =
                 match body.Method with
                     | Some mb -> mb
                     | None -> null
-            ofExprInternal meth hash localSize body
+
+            let definition = body |> SourceDefinition.ofExpr []
+            ofExprInternal meth hash localSize definition body
         )
 
     let ofFunction (maxLocalSize : V3i) (f : 'a -> 'b) : ComputeShader =
         match Shader.Utils.tryExtractExpr f with
-            | Some (body, _) ->
+            | Some (body, inputs) ->
                 Serializer.Init()
 
                 let localSize, meth =
@@ -216,7 +218,8 @@ module ComputeShader =
                             (if localSize.Z = MaxLocalSize then maxLocalSize.Z else localSize.Z)
                         )
 
-                    ofExprInternal meth hash localSize body
+                    let definition = body |> SourceDefinition.create inputs f
+                    ofExprInternal meth hash localSize definition body
                 )
             | None ->
                 failwithf "[FShade] cannot create compute shader using function: %A" f

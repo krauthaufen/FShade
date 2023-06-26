@@ -46,7 +46,7 @@ module SourceDefinition =
             else None
 
     // Gets the applied arguments from a shader function with parameters
-    let private getArguments (shaderFunction : 'a -> Expr<'b>) =
+    let private getArguments (shaderFunction : 'a -> 'b) =
 
         let rec get (accum : obj list) (func : obj) =
             let typ = func.GetType()
@@ -72,7 +72,7 @@ module SourceDefinition =
             Log.warn "[FShade] Failed to retrieve arguments of shader function: %s" exn.Message
             []
 
-    let create (inputs : Type list) (shaderFunc : 'a -> Expr<'b>) (expr : Expr) =
+    let create (inputs : Type list) (shaderFunc : 'a -> 'b) (expr : Expr) =
         let arguments = getArguments shaderFunc
         { Expression = expr; Inputs = inputs; Arguments = arguments }
 

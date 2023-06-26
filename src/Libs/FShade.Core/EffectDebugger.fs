@@ -26,6 +26,7 @@ module ShaderDebugger =
         inherit IDisposable
         abstract member TryRegisterEffect : Effect -> aval<Effect> option
         abstract member TryRegisterRaytracingEffect : RaytracingEffect -> aval<RaytracingEffect> option
+        abstract member TryRegisterComputeShader : ComputeShader -> aval<ComputeShader> option
 
     let private lockObj = obj()
     let mutable private instance : Option<IShaderDebugger> = None
@@ -69,6 +70,13 @@ module ShaderDebugger =
         lock lockObj (fun _ ->
             match instance with
             | Some inst -> inst.TryRegisterRaytracingEffect effect
+            | _ -> None
+        )
+
+    let tryRegisterComputeShader (shader : ComputeShader) =
+        lock lockObj (fun _ ->
+            match instance with
+            | Some inst -> inst.TryRegisterComputeShader shader
             | _ -> None
         )
 
