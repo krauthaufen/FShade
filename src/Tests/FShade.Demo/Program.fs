@@ -532,15 +532,9 @@ let main args =
         Log.line "%s: %s" i l
     Log.stop()
 
-
-    let compile (name : Option<string>) (shader : Shader) =
-        let def =
-            match name with
-            | Some n -> sprintf "%A_%s" shader.shaderStage n
-            | _ -> sprintf "%A" shader.shaderStage
-
-        Log.start "Compiling %s"def
-        let res = GLSL.glslangWithTarget GLSLang.Target.SPIRV_1_4 shader.shaderStage [def] glsl.code
+    let compile (slot : ShaderSlot) (shader : RaytracingShader) =
+        Log.start "Compiling %s" slot.Conditional
+        let res = GLSL.glslangWithTarget GLSLang.Target.SPIRV_1_4 shader.Stage [slot.Conditional] glsl.code
 
         match res with
         | Warning w ->
@@ -551,20 +545,8 @@ let main args =
 
         Log.stop()
 
-    compile None effect.RayGenerationShader
-
-    for (KeyValue(name, shader)) in effect.MissShaders do
-        compile (name |> string |> Some) shader
-
-    for (KeyValue(name, shader)) in effect.CallableShaders do
-        compile (name |> string |> Some) shader
-
-    for (KeyValue(groupName, hitgroup)) in effect.HitGroups do
-        for (KeyValue(rayName, entry)) in hitgroup.PerRayType do
-            let name = Some <| sprintf "%A_%A" groupName rayName
-            entry.AnyHit |> Option.iter (compile name)
-            entry.ClosestHit |> Option.iter (compile name)
-            entry.Intersection |> Option.iter (compile name)
+    for KeyValue(slot, shader) in effect.Shaders do
+        compile slot shader
 
     0
 

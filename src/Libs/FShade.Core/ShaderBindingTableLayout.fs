@@ -25,9 +25,9 @@ type ShaderBindingTableLayout =
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module internal ShaderBindingTableLayout =
 
-    let generate (shaders : Shader[]) =
+    let generate (shaders : RaytracingShader[]) =
 
-        let makeMap (f : Shader -> Set<Symbol>) =
+        let makeMap (f : RaytracingShader -> Set<Symbol>) =
             shaders
             |> Array.collect (f >> Set.toArray)
             |> Array.distinct
@@ -35,7 +35,7 @@ module internal ShaderBindingTableLayout =
             |> Map.ofArray
 
         {
-            RayOffsets = makeMap (fun s -> s.shaderRayTypes)
-            MissIndices = makeMap (fun s -> s.shaderMissShaders)
-            CallableIndices = makeMap (fun s -> s.shaderCallableShaders)
+            RayOffsets = makeMap (fun s -> s.RayTypes)
+            MissIndices = makeMap (fun s -> s.MissShaders)
+            CallableIndices = makeMap (fun s -> s.CallableShaders)
         }

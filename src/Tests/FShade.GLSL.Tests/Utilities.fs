@@ -69,35 +69,14 @@ module GLSL =
         let module_ = effect |> RaytracingEffect.toModule
         let glsl = module_ |> ModuleCompiler.compileGLSLRaytracing
 
-        let compile (name : Option<string>) (shader : Shader) =
-            let def =
-                match name with
-                | Some n -> sprintf "%A_%s" shader.shaderStage n
-                | _ -> sprintf "%A" shader.shaderStage
-
-            shader.shaderStage,
-            glslangWithTarget GLSLang.Target.SPIRV_1_4 shader.shaderStage [def] glsl.code
-
-        let compileOpt (name : Option<string>) (shader : Option<Shader>) =
-            shader |> Option.map (compile name) |> Option.toList
+        let compile (slot : ShaderSlot) (shader : RaytracingShader) =
+            let result = glslangWithTarget GLSLang.Target.SPIRV_1_4 shader.Stage [slot.Conditional] glsl.code
+            shader.Stage, result
 
         let results =
-            [
-                compile None effect.RayGenerationShader
-
-                for (KeyValue(name, shader)) in effect.MissShaders do
-                    compile (name |> string |> Some) shader
-
-                for (KeyValue(name, shader)) in effect.CallableShaders do
-                    compile (name |> string |> Some) shader
-
-                for (KeyValue(groupName, hitgroup)) in effect.HitGroups do
-                    for (KeyValue(rayName, entry)) in hitgroup.PerRayType do
-                        let name = Some <| sprintf "%A_%A" groupName rayName
-                        yield! entry.AnyHit |> compileOpt name
-                        yield! entry.ClosestHit |> compileOpt name
-                        yield! entry.Intersection |> compileOpt name
-            ]
+            effect.Shaders
+            |> Map.toList
+            |> List.map (fun (slot, shader) -> compile slot shader)
 
         glsl, results
 

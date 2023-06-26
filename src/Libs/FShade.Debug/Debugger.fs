@@ -31,21 +31,24 @@ module ShaderDebugger =
         override x.ToString() =
             $"{x.File} ({x.Line},{x.Column})"
 
-    type private EffectDefinition =
+    type private ShaderDefinition =
         {
-            // The project in which the effect is defined
+            // The project in which the shader is defined
             Project : string
 
             // The name of the declaring type
             TypeName : string
 
-            // The method of the effect
+            // The method of the shader
             MethodName : string
 
-            // Location of the original effect
+            // Location of the original shader
             Location : SourceLocation
 
-            // Arguments of the effect function
+            // Number of inputs of the shader function
+            Inputs : int
+
+            // Arguments of the shader function
             Arguments : obj list
         }
 
@@ -57,54 +60,67 @@ module ShaderDebugger =
     let private projects = Dictionary<string, Project>()
 
 
-    module private EffectDefinition =
+    module private ShaderDefinition =
         open FSharp.Quotations
 
-        let tryResolve (assembly : Assembly) (definition : EffectDefinition) =
+        let tryResolve (assembly : Assembly) (definition : ShaderDefinition) =
             match assembly |> Assembly.tryGetMethod definition.TypeName definition.MethodName with
             | Some mi ->
                 let parameters = mi.GetParameters()
-                let argumentCount = parameters.Length - 1
+                let argumentCount = parameters.Length - definition.Inputs
 
                 if not <| typeof<Expr>.IsAssignableFrom mi.ReturnType then
-                    Result.Error $"Effect {definition} has an invalid return type of {mi.ReturnType}."
+                    Result.Error $"Shader {definition} has an invalid return type of {mi.ReturnType}."
 
-                elif parameters.Length = 0 then
-                    Result.Error $"Effect {definition} does not have parameters."
+                elif argumentCount < 0 then
+                    Result.Error $"Shader {definition} has {parameters.Length} parameters but {definition.Inputs} inputs are expected."
 
                 elif argumentCount > definition.Arguments.Length then
-                    Result.Error $"Effect {definition} expects {argumentCount} arguments but only {definition.Arguments.Length} are known."
+                    Result.Error $"Shader {definition} expects {argumentCount} arguments but only {definition.Arguments.Length} are known."
 
                 else
-                    let inputType = (Array.last parameters).ParameterType
+                    let inputTypes =
+                        parameters
+                        |> Array.skip argumentCount
+                        |> Array.map (fun p -> p.ParameterType)
+                        |> List.ofArray
 
                     let arguments =
                         let args = definition.Arguments |> List.take argumentCount
-                        args @ [ null ] |> Array.ofList
+                        let inputs = List.replicate inputTypes.Length null
+                        args @ inputs |> Array.ofList
 
                     try
                         let expr = mi.Invoke(null, arguments) |> unbox<Expr>
-                        let effect = expr |> Effect.ofExpr inputType
-                        Result.Ok effect
+                        Result.Ok (expr, inputTypes)
 
                     with exn ->
-                        Result.Error $"Failed to resolve effect {definition}: {exn.Message}"
+                        Result.Error $"Failed to resolve shader {definition}: {exn.Message}"
             | _ ->
-                Result.Error $"Failed to resolve effect {definition}."
+                Result.Error $"Failed to resolve shader {definition}."
 
-        let ofEffect =
-            let cache = Dictionary<string, EffectDefinition>()
+        let tryResolveEffect (assembly : Assembly) (definition : ShaderDefinition) =
+            definition
+            |> tryResolve assembly
+            |> Result.map (fun (expr, inputTypes) ->
+                expr |> Effect.ofExpr inputTypes.Head
+            )
 
-            fun (effect : FShade.Effect) ->
-                match cache.TryGetValue effect.Id with
+        let tryResolveRaytracingShader (assembly : Assembly) (definition : ShaderDefinition) =
+            definition
+            |> tryResolve assembly
+            |> Result.map (fun (expr, inputTypes) ->
+                expr |> RaytracingShader.ofExpr inputTypes
+            )
+
+        let ofSourceDefinition =
+            let cache = Dictionary<string, ShaderDefinition>()
+
+            fun (id : string) (definition : SourceDefinition) ->
+                match cache.TryGetValue id with
                 | (true, def) -> Result.Ok def
                 | _ ->
-                    let debugRange, arguments =
-                        match effect.SourceDefinition with
-                        | Some (expr, args) -> expr.DebugRange, args
-                        | _ -> None, []
-
-                    match debugRange with
+                    match definition.Expression.DebugRange with
                     | Some (srcFile, startLine, startCol, _endLine, _endCol) ->
                         let location = { File = srcFile; Line = startLine; Column = startCol }
 
@@ -118,7 +134,8 @@ module ShaderDebugger =
                                             TypeName = typeName
                                             MethodName = methodName
                                             Location = location
-                                            Arguments = arguments
+                                            Inputs = definition.Inputs.Length
+                                            Arguments = definition.Arguments
                                         }
 
                                     | None ->
@@ -129,79 +146,101 @@ module ShaderDebugger =
 
                         match result with
                         | Some definition ->
+                            cache.[id] <- definition
                             Result.Ok definition
                         | _ ->
-                            Result.Error $"Cannot find effect definition for {location}."
+                            Result.Error $"Cannot find shader definition for {location}."
 
                     | None ->
-                        Result.Error $"Effect {effect.Id} is missing debug information."
+                        Result.Error $"Shader {id} is missing debug information."
 
-    // Tries to register an effect to be updated automatically when the corresponding project changes.
-    // Note: Only the individual shaders may change, the composition is fixed.
-    let private tryRegisterEffect =
-        let cache = Dictionary<string, EffectDefinition * cval<Effect>>()
+        let ofEffect (effect : Effect) =
+            match effect.SourceDefinition with
+            | Some def -> def |> ofSourceDefinition effect.Id
+            | _ -> Result.Error $"Effect {id} is missing a source definition."
 
-        let rec getLeaves (e : FShade.Effect) =
-            match e.ComposedOf with
-            | [] -> [e]
-            | [e] -> getLeaves e
-            | many -> List.collect getLeaves many
+        let ofRaytracingShader (shader : RaytracingShader) =
+            match shader.SourceDefinition with
+            | Some def -> def |> ofSourceDefinition shader.Id
+            | _ -> Result.Error $"Raytracing shader {id} is missing a source definition."
 
-        fun (effect : FShade.Effect) ->
+
+    let private tryRegister<'Effect, 'Shader, 'Slot when 'Slot : comparison>
+                            (description : string)
+                            (getEffectId : 'Effect -> string)
+                            (getShaderId : 'Shader -> string)
+                            (getShaders : 'Effect -> Map<'Slot,'Shader>)
+                            (getDefinition : 'Shader -> Result<ShaderDefinition, string>)
+                            (tryResolveDefinition : Assembly -> ShaderDefinition -> Result<'Shader, string>)
+                            (compose : Map<'Slot, 'Shader> -> 'Effect) =
+        let shaderCache = Dictionary<string, ShaderDefinition * aval<'Shader>>()
+
+        let tryHook (effect : 'Effect) =
             let mutable success = false
 
-            Log.startTimed "Registering effect for debugging"
+            Log.startTimed $"Registering {description} for debugging"
 
-            let leaves : (string * aval<Effect>) list =
-                getLeaves effect
-                |> List.map (fun effect ->
-                    let id = effect.Id
+            let shaders =
+                getShaders effect
+                |> Map.map (fun _ shader ->
+                    let id = getShaderId shader
 
-                    match cache.TryGetValue id with
+                    match shaderCache.TryGetValue id with
                     | (true, (definition, effect)) ->
                         Report.Line(2, $"{definition} - {definition.Location}")
                         success <- true
                         string definition, effect
 
                     | _ ->
-                        match EffectDefinition.ofEffect effect with
+                        match getDefinition shader with
                         | Result.Ok definition ->
-                            let cval = cval effect
+                            let assembly = projects.[definition.Project].Assembly
 
-                            let update (assembly : Assembly) =
-                                match definition |> EffectDefinition.tryResolve assembly with
-                                | Result.Ok effect ->
-                                    cval.Value <- effect
-                                    true
+                            match definition |> tryResolveDefinition assembly with
+                            | Result.Ok _ ->
+                                let cval = cval shader
 
-                                | Result.Error error ->
-                                    Report.ErrorNoPrefix error
-                                    false
+                                let update (assembly : Assembly) =
+                                    match definition |> tryResolveDefinition assembly with
+                                    | Result.Ok shader ->
+                                        cval.Value <- shader
+                                        true
 
-                            Report.Line(2, $"{definition} - {definition.Location}")
+                                    | Result.Error error ->
+                                        Report.ErrorNoPrefix error
+                                        false
 
-                            success <- true
-                            projects.[definition.Project].Callbacks.Add update
-                            cache.[id] <- (definition, cval)
-                            string definition, cval
+                                Report.Line(2, $"{definition} - {definition.Location}")
 
+                                success <- true
+                                projects.[definition.Project].Callbacks.Add update
+                                shaderCache.[id] <- (definition, cval)
+                                string definition, cval
+
+                            // Failed to resolve definition in original assembly, use shader as-is with definition as name
+                            | Result.Error error ->
+                                Report.Warn $"{error} ({definition.Location})"
+                                string definition, AVal.constant shader
+
+                        // Failed to get definition, just use shader as-is with id as name
                         | Result.Error error ->
                             Report.Warn error
-                            id, AVal.constant effect
+                            id, AVal.constant shader
                 )
 
             if success then
                 Log.stop(": success")
 
-                let names, effects =
-                    let n, e = leaves |> List.unzip
-                    n |> String.concat "; ", e
+                let names =
+                    Map.values shaders
+                    |> Seq.map fst
+                    |> String.concat "; "
 
                 Some <| AVal.custom (fun t ->
                     Report.Line(2, $"Updating [{names}].")
 
                     try
-                        effects |> List.map (fun r -> r.GetValue t) |> Effect.compose
+                        shaders |> Map.map (fun _ (_, s) -> s.GetValue t) |> compose
                     with exn ->
                         Log.error "%s" exn.Message
                         effect
@@ -209,6 +248,48 @@ module ShaderDebugger =
             else
                 Log.stop(": failed")
                 None
+
+        // Cache results for overall effects as well
+        let effectCache = Dictionary<string, aval<'Effect> option>()
+
+        fun (effect : 'Effect) ->
+            let id = getEffectId effect
+
+            match effectCache.TryGetValue id with
+            | (true, result) -> result
+            | _ ->
+                let result = tryHook effect
+                effectCache.[id] <- result
+                result
+
+
+    // Tries to register an effect to be updated automatically when the corresponding project changes.
+    // Note: Only the individual shaders may change, the composition is fixed.
+    let private tryRegisterEffect : Effect -> aval<Effect> option =
+        let rec getLeaves (e : FShade.Effect) =
+            match e.ComposedOf with
+            | [] -> [e]
+            | [e] -> getLeaves e
+            | many -> List.collect getLeaves many
+
+        tryRegister<Effect, Effect, int>
+                    "effect"
+                    Effect.id
+                    Effect.id
+                    (getLeaves >> List.indexed >> Map.ofList) // Use indices as map keys to retain order
+                    ShaderDefinition.ofEffect
+                    ShaderDefinition.tryResolveEffect
+                    (Map.values >> Effect.compose)
+
+    let private tryRegisterRaytracingEffect : RaytracingEffect -> aval<RaytracingEffect> option =
+        tryRegister<RaytracingEffect, RaytracingShader, ShaderSlot>
+                    "raytracing effect"
+                    (fun effect -> effect.Id)
+                    (fun shader -> shader.Id)
+                    (fun effect -> effect.Shaders)
+                    ShaderDefinition.ofRaytracingShader
+                    ShaderDefinition.tryResolveRaytracingShader
+                    (fun shaders -> RaytracingEffect shaders)
 
     let attach() =
         ShaderDebugger.initialize (fun _ ->
@@ -314,6 +395,7 @@ module ShaderDebugger =
 
             { new ShaderDebugger.IShaderDebugger with
                 member x.TryRegisterEffect(effect) = tryRegisterEffect effect
+                member x.TryRegisterRaytracingEffect(effect) = tryRegisterRaytracingEffect effect
                 member x.Dispose() =
                     FileWatchers.dispose()
                     worker.Dispose()

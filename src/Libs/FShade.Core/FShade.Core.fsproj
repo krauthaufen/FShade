@@ -24,8 +24,10 @@
     <Compile Include="Intrinsics.fs" />
     <Compile Include="Frontend.fs" />
     <Compile Include="Optimizer.fs" />
+    <Compile Include="SourceDefinition.fs" />
     <Compile Include="Shader.fs" />
     <Compile Include="Serializer.fs" />
+    <Compile Include="RaytracingShader.fs" />
     <Compile Include="ShaderBindingTableLayout.fs" />
     <Compile Include="RaytracingEffect.fs" />
     <Compile Include="EffectInputLayout.fs" />

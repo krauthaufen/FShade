@@ -777,7 +777,7 @@ module Preprocessor =
                         let interp = odesc.paramInterpolation ||| desc.paramInterpolation ||| implicitInterp
                         { s with State.inputs = Map.add name { desc with paramInterpolation = interp } s.inputs }
                     else
-                        failwithf "[FShade] input '%s' has conflicting types %s and %s." name odesc.paramType.Name desc.paramType.Name
+                        failwithf "[FShade] input '%s' has conflicting types %A and %A." name odesc.paramType desc.paramType
                 | None ->
                     let desc = { desc with paramInterpolation = desc.paramInterpolation ||| implicitInterp }
                     { s with State.inputs = Map.add name desc s.inputs }
@@ -3193,13 +3193,6 @@ module Shader =
 
         ofExpr [typeof<'a>] expression
 
-    let ofRaytracingFunction (shaderFunction : 'a -> 'b) =
-        match Utils.tryExtractExpr shaderFunction with
-        | Some (expr, types) ->
-            ofExpr types expr
-        | _ ->
-            failwithf "[FShade] cannot create compute shader using function: %A" shaderFunction
-
     let withBody (newBody : Expr) (shader : Shader) =
         let newBody, state = newBody |> Preprocessor.preprocess V3i.Zero
         let io = Preprocessor.computeIO V3i.Zero newBody
@@ -3609,71 +3602,6 @@ module Shader =
                         | ShaderOutputVertices.Unknown -> ()
                         | ShaderOutputVertices.Computed v | ShaderOutputVertices.UserGiven v ->
                             yield EntryDecoration.OutputVertices v
-                ]
-        }
-
-    let toEntryPointRaytracing (slot : ShaderSlot) (s : Shader) =
-        let ofMap kind =
-            Map.toList >> List.map (fun (name, (typ, location)) ->
-                {
-                    rtdataName = name
-                    rtdataType = typ
-                    rtdataKind = kind location
-                }
-            )
-
-        let ofOption kind =
-            Option.toList >> List.map (fun (name, typ) ->
-                {
-                    rtdataName = name
-                    rtdataType = typ
-                    rtdataKind = kind
-                }
-            )
-
-        let raytracingData =
-            let payloads       = s.shaderPayloads       |> ofMap    RaytracingDataKind.RayPayload
-            let payloadIn      = s.shaderPayloadIn      |> ofOption RaytracingDataKind.RayPayloadIn
-            let callableData   = s.shaderCallableData   |> ofMap    RaytracingDataKind.CallableData
-            let callableDataIn = s.shaderCallableDataIn |> ofOption RaytracingDataKind.CallableDataIn
-            let hitAttribute   = s.shaderHitAttribute   |> ofOption RaytracingDataKind.HitAttribute
-            payloads @ payloadIn @ callableData @ callableDataIn @ hitAttribute
-
-        let uniforms =
-            s.shaderUniforms |> Map.toList |> List.map (fun (n, u) ->
-                let uniformBuffer = 
-                    match u.uniformValue with
-                        | Attribute(scope, name) -> Some scope.FullName
-                        | _ -> None
-
-                let textureInfos =
-                    match u.uniformValue with
-                        | UniformValue.Sampler (n,s) -> [n,s :> obj]
-                        | UniformValue.SamplerArray arr -> Array.toList arr |> List.map (fun (n,s) -> n, s :> obj)
-                        | _ -> []
-
-                {
-                    uniformName = u.uniformName
-                    uniformType = u.uniformType
-                    uniformBuffer = uniformBuffer
-                    uniformDecorations = u.decorations
-                    uniformTextureInfo = textureInfos
-                }
-            )
-
-        {
-            conditional    = Some slot.Conditional
-            entryName      = "main"
-            inputs         = List.empty
-            outputs        = List.empty
-            uniforms       = uniforms
-            raytracingData = raytracingData
-            arguments      = []
-            body           = s.shaderBody
-            decorations =
-                [
-                    yield EntryDecoration.Stages (ShaderStageDescription.Raytracing slot)
-                    yield EntryDecoration.Invocations s.shaderInvocations
                 ]
         }
 

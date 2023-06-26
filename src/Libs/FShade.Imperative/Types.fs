@@ -134,15 +134,10 @@ type ShaderSlot =
         | Intersection _ -> ShaderStage.Intersection
 
     member x.Conditional =
-        let tokens =
-            match x with
-            | Miss n | Callable n -> [n]
-            | AnyHit (n, r) | ClosestHit (n, r) | Intersection (n, r) -> [n; r]
-            | _ -> []
-
-        match tokens |> List.map string with
-        | [] -> sprintf "%A" x.Stage
-        | ts -> sprintf "%A_%s" x.Stage (ts |> String.concat "_")
+        match x with
+        | Miss n | Callable n -> $"{x.Stage}_{n}"
+        | AnyHit (n, r) | ClosestHit (n, r) | Intersection (n, r) -> $"{x.Stage}_{n}_{r}"
+        | _ -> $"{x.Stage}"
 
 [<RequireQualifiedAccess>]
 type OutputTopology = 

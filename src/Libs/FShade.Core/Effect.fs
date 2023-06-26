@@ -22,7 +22,7 @@ type WithEffectAttribute() =
 
 /// Effect encapsulates a set of shaders for the various ShaderStages defined by FShade.
 type Effect(id : string, shaders : Lazy<Map<ShaderStage, Shader>>, composedOf : list<Effect>) =
-    let mutable sourceDefinition : Option<Expr * List<obj>> = None
+    let mutable sourceDefinition : SourceDefinition option = None
 
     let inputToplogy =
         lazy (
@@ -496,7 +496,7 @@ module Effect =
     let ofExpr (inputType : Type) (e : Expr) =
         match e with
         | Patterns.WithValue(:? Effect as effect, _, _) when UsePrecompiled ->
-            effect.SourceDefinition <- Some (e, [])
+            effect.SourceDefinition <- Some <| SourceDefinition.ofExpr [inputType] e
             effect
         | _ ->
             let e =
@@ -521,62 +521,9 @@ module Effect =
             effectCache.GetOrAdd(hash, fun hash ->
                 let map = lazy (Shader.ofExpr [inputType] e |> List.map (fun s -> s.shaderStage, s) |> Map.ofList)
                 let effect = Effect(hash, map, [])
-                effect.SourceDefinition <- Some (e, [])
+                effect.SourceDefinition <- Some <| SourceDefinition.ofExpr [inputType] e
                 effect
             )
-
-    [<AutoOpen>]
-    module private ClosureUtilities =
-
-        let private closureTypes =
-            [| typedefof<OptimizedClosures.FSharpFunc<_, _, _>>
-               typedefof<OptimizedClosures.FSharpFunc<_, _, _, _>>
-               typedefof<OptimizedClosures.FSharpFunc<_, _, _, _, _>>
-               typedefof<OptimizedClosures.FSharpFunc<_, _, _, _, _>>
-               typedefof<OptimizedClosures.FSharpFunc<_, _, _, _, _, _>> |]
-
-        let (|Closure|_|) ((field, value) : FieldInfo * obj) =
-            let ft = field.Type
-
-            if ft.IsGenericType then
-                let def = ft.GetGenericTypeDefinition()
-                if closureTypes |> Array.contains def then
-                    Some value
-                else
-                    None
-            else
-                None
-
-        let (|Self|_|) (field : FieldInfo) =
-            if field.Name = "self@" then Some ()
-            else None
-
-    // Gets the applied arguments from a shader function with parameters
-    let private getArguments (shaderFunction : 'a -> Expr<'b>) =
-
-        let rec get (accum : obj list) (func : obj) =
-            let typ = func.GetType()
-
-            let arguments =
-                typ.GetFields(BindingFlags.Public ||| BindingFlags.Instance)
-                |> List.ofArray
-                |> List.map (fun f ->
-                    f, f.GetValue func
-                )
-
-            match arguments with
-            | [Closure c; (_, arg)] ->
-                get (arg :: accum) c
-
-            | (Self, _) :: args | args ->
-                (args |> List.map snd) @ accum
-
-        try
-            get [] shaderFunction
-        with
-        | exn ->
-            Log.warn "[FShade] Failed to retrieve arguments of shader function: %s" exn.Message
-            []
 
     /// creates an effect from a shader-function
     let ofFunction (shaderFunction : 'a -> Expr<'b>) =
@@ -621,7 +568,7 @@ module Effect =
                     )
 
                 let effect = Effect(hash, map, [])
-                effect.SourceDefinition <- Some (expression, getArguments shaderFunction)
+                effect.SourceDefinition <- Some <| SourceDefinition.create [typeof<'a>] shaderFunction expression
                 effect
             )
 
