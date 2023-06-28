@@ -1631,8 +1631,13 @@ module Optimizer =
                             | AllConstant values ->
                                 try
                                     let ws = witnesses |> List.map compileWitness
-                                    let value = meth.Invoke(null, List.toArray (ws @ values))
-                                    return Expr.Value(value, e.Type)
+                                    let result = meth.TryInvoke(null, List.toArray (ws @ values))
+
+                                    match result with
+                                    | Some value ->
+                                        return Expr.Value(value, e.Type)
+                                    | _ ->
+                                        return Expr.CallWithWitnesses(original, meth, witnesses, args)
                                 with _ ->
                                     return Expr.CallWithWitnesses(original, meth, witnesses, args)
                             | _ ->
@@ -1651,8 +1656,13 @@ module Optimizer =
                                 | AllConstant values ->
                                     try
                                         let ws = witnesses |> List.map compileWitness
-                                        let value = meth.Invoke(targetValue, List.toArray (ws @ values))
-                                        return Expr.Value(value, e.Type)
+                                        let result = meth.TryInvoke(targetValue, List.toArray (ws @ values))
+
+                                        match result with
+                                        | Some value ->
+                                            return Expr.Value(value, e.Type)
+                                        | _ ->
+                                            return Expr.CallWithWitnesses(target, original, meth, witnesses, args)
                                     with _ ->
                                         return Expr.CallWithWitnesses(target, original, meth, witnesses, args)
                                 | _ ->
@@ -1675,12 +1685,11 @@ module Optimizer =
                                             return Expr.Value(f values, e.Type)
                                         | _ -> 
                                             let value = 
-                                                try mi.Invoke(null, values |> List.toArray) |> Some
-                                                with 
-                                                    | ShaderOnlyExn _ -> None
-                                                    | _ -> 
-                                                        Log.warn "[FShade] could not evaluate: %A" mi
-                                                        None
+                                                try mi.TryInvoke(null, values |> List.toArray)
+                                                with
+                                                | _ ->
+                                                    Log.warn "[FShade] could not evaluate: %A" mi
+                                                    None
 
                                             match value with
                                                 | Some v -> return Expr.Value(v, e.Type)
@@ -1700,12 +1709,11 @@ module Optimizer =
                                 | Value(tv,_), AllConstant values -> 
                                     
                                     let value = 
-                                        try mi.Invoke(tv, values |> List.toArray) |> Some
-                                        with 
-                                            | ShaderOnlyExn _ -> None
-                                            | _ -> 
-                                                Log.warn "[FShade] could not evaluate: %A" mi
-                                                None
+                                        try mi.TryInvoke(tv, values |> List.toArray)
+                                        with
+                                        | _ ->
+                                            Log.warn "[FShade] could not evaluate: %A" mi
+                                            None
                                     match value with    
                                         | Some v -> return Expr.Value(v, e.Type)
                                         | None -> return Expr.Call(t, mi, args)
@@ -1828,12 +1836,11 @@ module Optimizer =
                         match indices with
                             | AllConstant indexValues when not n ->
                                 let value = 
-                                    try pi.GetValue(null, List.toArray indexValues) |> Some
-                                    with 
-                                        | ShaderOnlyExn _ -> None
-                                        | _ -> 
-                                            Log.warn "[FShade] could not evaluate: %A" pi
-                                            None
+                                    try pi.TryGetValue(null, List.toArray indexValues)
+                                    with
+                                    | _ ->
+                                        Log.warn "[FShade] could not evaluate: %A" pi
+                                        None
                                 match value with
                                     | Some value -> return Expr.Value(value, e.Type)
                                     | None -> return Expr.PropertyGet(pi, indices)
@@ -1847,13 +1854,12 @@ module Optimizer =
                         let! n = State.needsProperty pi
                         match t, indices with
                             | Value(tv,_), AllConstant indexValues when not n && not (isNull tv)->
-                                let value = 
-                                    try pi.GetValue(tv, List.toArray indexValues) |> Some
-                                    with 
-                                        | ShaderOnlyExn _ -> None
-                                        | _ -> 
-                                            Log.warn "[FShade] could not evaluate: %A" pi
-                                            None
+                                let value =
+                                    try pi.TryGetValue(tv, List.toArray indexValues)
+                                    with
+                                    | _ ->
+                                        Log.warn "[FShade] could not evaluate: %A" pi
+                                        None
 
                                 match value with
                                     | Some value -> return Expr.Value(value, e.Type)

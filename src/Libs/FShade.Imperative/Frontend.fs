@@ -2,44 +2,14 @@
 
 open System
 open System.Reflection
-open System.Collections.Generic
-open System.Runtime.CompilerServices
-open System.Runtime.InteropServices
 
 open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Quotations.Patterns
 open Microsoft.FSharp.Quotations.DerivedPatterns
 open Microsoft.FSharp.Quotations.ExprShape
-open Microsoft.FSharp.Reflection
 
 open Aardvark.Base
 open FShade
-
-
-exception FShadeOnlyInShaderCodeException of string 
-
-[<AutoOpen>]
-module FShadeOnlyInShaderCodeExceptionPattern =
-    let rec (|ShaderOnlyExn|_|) (e : Exception) =
-        match e with
-            | FShadeOnlyInShaderCodeException n -> 
-                Some n
-
-            | :? TargetInvocationException as e ->
-                match e.InnerException with
-                    | ShaderOnlyExn n -> Some n 
-                    | _ -> None
-
-            | :? AggregateException as a ->
-                match Seq.toList a.InnerExceptions with
-                    | [ ShaderOnlyExn n ] -> Some n 
-                    | _ -> None
-                
-
-            | _ ->
-                None
-
-
 
 [<RequireQualifiedAccess>]
 type ParameterDecoration =
@@ -197,16 +167,16 @@ module ExpressionExtensions =
         static member internal UnsafeWriteMeth = unsafeWrite
 
         static member ReadInput<'a>(kind : ParameterKind, name : string, slot : Option<ShaderSlot>) : 'a =
-            raise <| FShadeOnlyInShaderCodeException "ReadInput"
+            onlyInShaderCode "ReadInput"
 
         static member ReadInput<'a>(kind : ParameterKind, name : string, index : int, slot : Option<ShaderSlot>) : 'a =
-            raise <| FShadeOnlyInShaderCodeException "ReadInput"
+            onlyInShaderCode "ReadInput"
 
         static member WriteOutputs(values : array<string * int * obj>) : unit =
-            raise <| FShadeOnlyInShaderCodeException "WriteOutputs"
+            onlyInShaderCode "WriteOutputs"
 
         static member UnsafeWrite(dst : 'a, value : 'a) : unit =
-            raise <| FShadeOnlyInShaderCodeException "UnsafeWrite"
+            onlyInShaderCode "UnsafeWrite"
 
     type Expr with
 

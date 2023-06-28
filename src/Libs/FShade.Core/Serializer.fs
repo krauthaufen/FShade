@@ -813,16 +813,24 @@ module Serializer =
             let (|SimpleValue|_|) (e : Expr) =
                 try
                     match e with
-                        | FieldGet(None, f) -> Some (f.Name, f.GetValue(null))
-                        | PropertyGet(None, pi, []) -> 
-                            System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(pi.DeclaringType.TypeHandle)
+                    | FieldGet(None, f) ->
+                        f.TryGetValue(null) |> Option.map (fun res -> f.Name, res)
 
-                            Some (pi.Name, pi.GetValue(null))
-                        | Call(None, mi, []) -> Some (mi.Name, mi.Invoke(null, [||]))
-                        | NewObject(ctor, []) -> Some (ctor.DeclaringType.Name, ctor.Invoke([||]))
-                        | _ -> None
+                    | PropertyGet(None, pi, []) ->
+                        System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(pi.DeclaringType.TypeHandle)
+                        pi.TryGetValue(null) |> Option.map (fun res -> pi.Name, res)
+
+                    | Call(None, mi, []) ->
+                        mi.TryInvoke(null, [||]) |> Option.map (fun res -> mi.Name, res)
+
+                    | NewObject(ctor, []) ->
+                        Some (ctor.DeclaringType.Name, ctor.Invoke([||]))
+
+                    | _ ->
+                        None
                 with _ ->
                     None
+
             let (|ReflectedCall|_|) (e : Expr) =
                 match e with
                     | Call(t,mi,args) ->

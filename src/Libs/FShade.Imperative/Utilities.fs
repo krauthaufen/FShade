@@ -1,6 +1,7 @@
 ﻿namespace FShade
 
 open System
+open System.Threading
 open System.Reflection
 
 open Microsoft.FSharp.Reflection
@@ -11,7 +12,60 @@ open Microsoft.FSharp.Quotations.ExprShape
 
 open Aardvark.Base
 
-#nowarn "8989"
+exception FShadeOnlyInShaderCodeException of string
+
+[<AutoOpen>]
+module DynamicHostInvocation =
+
+    let rec (|ShaderOnlyExn|_|) (e : Exception) =
+        match e with
+        | FShadeOnlyInShaderCodeException n ->
+            Some n
+
+        | :? TargetInvocationException as e ->
+            match e.InnerException with
+            | ShaderOnlyExn n -> Some n
+            | _ -> None
+
+        | :? AggregateException as a ->
+            match Seq.toList a.InnerExceptions with
+            | [ ShaderOnlyExn n ] -> Some n
+            | _ -> None
+
+        | _ ->
+            None
+
+    let private invalidHostInvocation = new ThreadLocal<bool>(fun _ -> false)
+
+    /// Returns a default value and sets a flag to indicate that it must not be used by the optimizer.
+    let onlyInShaderCode<'T> (_name : string) : 'T =
+        invalidHostInvocation.Value <- true
+        Unchecked.defaultof<'T>
+
+    let inline private tryInvoke (f : unit -> 'T) =
+        try
+            invalidHostInvocation.Value <- false
+            let result = f()
+            if invalidHostInvocation.Value then None
+            else Some result
+        with ShaderOnlyExn _ ->
+            None
+
+    type MethodInfo with
+        member x.TryInvoke(obj : obj, parameters : obj[]) =
+            tryInvoke (fun _ -> x.Invoke(obj, parameters))
+
+    type FieldInfo with
+        member x.TryGetValue(obj : obj) =
+            tryInvoke (fun _ -> x.GetValue(obj))
+
+    type PropertyInfo with
+        member x.TryGetValue(obj : obj) =
+            tryInvoke (fun _ -> x.GetValue(obj))
+
+        member x.TryGetValue(obj : obj, index : obj[]) =
+            tryInvoke (fun _ -> x.GetValue(obj, index))
+
 
 module ExprWorkardound = 
     let lockObj = obj()
@@ -419,17 +473,13 @@ module ExprExtensions =
                             let args = args |> List.map Expr.TryEval |> List.toArray
                             let t = Expr.TryEval t
                             match t, args |> reduce with
-                                | Some t, Some args -> 
-                                    try mi.Invoke(t, args) |> Some
-                                    with _ -> None
+                                | Some t, Some args -> mi.TryInvoke(t, args)
                                 | _ -> None
 
                         | None -> 
                             let args = args |> List.map Expr.TryEval |> List.toArray
                             match args |> reduce with
-                            | Some args -> 
-                                try mi.Invoke(null, args) |> Some
-                                with _ -> None
+                            | Some args -> mi.TryInvoke(null, args)
                             | _ -> None
 
                 | Patterns.Let(var,value,body) ->

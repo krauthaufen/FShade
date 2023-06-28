@@ -27,10 +27,6 @@ type GLSLIntrinsicAttribute private(format : string, requiredExtensions : Set<st
 [<AutoOpen>]
 module ``Reflection Helpers`` =
 
-    let inline onlyInShaderCode<'a> (name : string) : 'a =
-        let msg = sprintf "[FShade] %s can only be called in shaders" name
-        raise <| FShadeOnlyInShaderCodeException msg
-
     type System.Reflection.MethodBase with
         member x.Intrinsic<'a when 'a :> IntrinsicAttribute>() =
             let att = x.GetCustomAttributes(typeof<'a>, true) |> Seq.map unbox<IntrinsicAttribute> |> Seq.toList

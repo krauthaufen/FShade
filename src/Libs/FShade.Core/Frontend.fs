@@ -407,18 +407,18 @@ module ShaderBuilders =
 
         member x.Size = size
 
-        member x.Yield(v : 'a) : seq<Primitive<'a>> = 
-            onlyInShaderCode ""
+        member x.Yield(v : 'a) : seq<Primitive<'a>> =
+            raise <| FShadeOnlyInShaderCodeException ""
 
         member x.For(p : Primitive<'a>, f : 'a -> seq<Primitive<'b>>) : seq<Primitive<'b>> =
-            onlyInShaderCode ""
+            raise <| FShadeOnlyInShaderCodeException ""
 
         member x.Delay(f : unit -> 'a) = f()
 
         member x.Quote() = ()
 
         member x.Combine(l : seq<Primitive<'a>>, r : seq<Primitive<'a>>) : seq<Primitive<'a>> =
-            onlyInShaderCode ""
+            raise <| FShadeOnlyInShaderCodeException ""
 
         member x.Zero() : seq<Primitive<'a>> = 
             Seq.empty
@@ -431,7 +431,7 @@ module ShaderBuilders =
     type TessBuilder() =
         inherit BaseBuilder()
         member x.Bind(t : TessCoord<'c>, f : 'c -> 'a) : 'a =
-            onlyInShaderCode ""
+            raise <| FShadeOnlyInShaderCodeException ""
 
         member x.Return(v) = v
 
