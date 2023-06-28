@@ -1113,7 +1113,7 @@ module Optimizer =
 
             table
 
-        let operators =
+        let private operators =
             functionTable [
                 "op_UnaryNegation", ((~-) : int8 -> int8) :> obj
                 "op_UnaryNegation", ((~-) : int16 -> int16) :> obj
@@ -1449,10 +1449,64 @@ module Optimizer =
                 "ToDouble", (float : float32 -> _) :> obj
                 "ToDouble", (float : float -> _) :> obj
                 "ToDouble", (float : decimal -> _) :> obj
-
-
             ]
 
+        let private (|Operator|_|) (mi : MethodInfo) =
+            let parameters =
+                mi.GetParameters()
+                |> Array.toList
+                |> List.map (fun p -> p.ParameterType)
+
+            match operators.TryGetValue((mi.Name, parameters)) with
+            | (true, f) -> Some f
+            | _ -> None
+
+        // Invoking these operators for enum types will
+        // throw a TargetInvocationException, even with a witness.
+        // Handle those explicitly instead.
+        let private bitwiseOps =
+            LookupTable.lookupTable' [
+                "op_BitwiseOr",   ((|||) : int -> int -> int)
+                "op_BitwiseAnd",  ((&&&) : int -> int -> int)
+                "op_ExclusiveOr", ((^^^) : int -> int -> int)
+                "op_LeftShift",   ((<<<) : int -> int -> int)
+                "op_RightShift",  ((>>>) : int -> int -> int)
+            ]
+
+        let private (|BitwiseOp|_|) (mi : MethodInfo) =
+            bitwiseOps mi.Name
+
+        let inline private isEnum (t : Type) =
+            t.IsEnum && t.GetEnumUnderlyingType() = typeof<int>
+
+        let private (|EnumBitwiseOp|_|) (mi : MethodInfo) =
+            match mi with
+            | BitwiseOp f ->
+                let arguments = mi.GetGenericArguments()
+
+                if arguments.Length = 1 then
+                    if isEnum arguments.[0] then
+                        Some (f, arguments.[0])
+                    else
+                        None
+                else
+                    None
+            | _ ->
+                None
+
+        let private (|EnumToInt|_|) (mi : MethodInfo) =
+            if mi.Name = "ToInt" then
+                let parameters = mi.GetParameters()
+
+                if parameters.Length = 1 then
+                    if isEnum parameters.[0].ParameterType then
+                        Some ()
+                    else
+                        None
+                else
+                    None
+            else
+                None
 
         let rec (|SeqCons|_|) (e : Expr) =
             match e with
@@ -1619,7 +1673,7 @@ module Optimizer =
                                 return ve
                             | _ -> 
                                 return Expr.Call(mi, [v])
-       
+
 
                     | CallWithWitnesses(None, original, meth, witnesses, args) ->
                         let! needed = State.needsCall original
@@ -1629,20 +1683,35 @@ module Optimizer =
                         else
                             match args with
                             | AllConstant values ->
-                                try
-                                    let ws = witnesses |> List.map compileWitness
-                                    let result = meth.TryInvoke(null, List.toArray (ws @ values))
+                                match original, values with
+                                | Operator f, _ ->
+                                    return Expr.Value(f values, e.Type)
 
-                                    match result with
-                                    | Some value ->
-                                        return Expr.Value(value, e.Type)
-                                    | _ ->
+                                | EnumBitwiseOp (f, enumType), [l; r] ->
+                                    let x = Convert.ChangeType(l, typeof<int>) |> unbox<int>
+                                    let y = Convert.ChangeType(r, typeof<int>) |> unbox<int>
+                                    let z = Enum.ToObject(enumType, f x y)
+                                    return Expr.Value(z, enumType)
+
+                                | EnumToInt, [x] ->
+                                    let i = Convert.ChangeType(x, typeof<int>)
+                                    return Expr.Value(i, typeof<int>)
+
+                                | _ ->
+                                    try
+                                        let ws = witnesses |> List.map compileWitness
+                                        let result = meth.TryInvoke(null, List.toArray (ws @ values))
+
+                                        match result with
+                                        | Some value ->
+                                            return Expr.Value(value, e.Type)
+                                        | _ ->
+                                            return Expr.CallWithWitnesses(original, meth, witnesses, args)
+                                    with _ ->
                                         return Expr.CallWithWitnesses(original, meth, witnesses, args)
-                                with _ ->
-                                    return Expr.CallWithWitnesses(original, meth, witnesses, args)
                             | _ ->
                                 return Expr.CallWithWitnesses(original, meth, witnesses, args)
-                            
+
                     | CallWithWitnesses(Some target, original, meth, witnesses, args) ->
                         let! needed = State.needsCall original
                         let! target = evaluateConstantsS target
@@ -1678,24 +1747,34 @@ module Optimizer =
                             return Expr.Call(mi, args)
                         else
                             match args with
-                                | AllConstant values ->
-                                    let key = mi.Name, args |> List.map (fun v -> v.Type)
-                                    match operators.TryGetValue key with
-                                        | (true, f) -> 
-                                            return Expr.Value(f values, e.Type)
-                                        | _ -> 
-                                            let value = 
-                                                try mi.TryInvoke(null, values |> List.toArray)
-                                                with
-                                                | _ ->
-                                                    Log.warn "[FShade] could not evaluate: %A" mi
-                                                    None
+                            | AllConstant values ->
+                                match mi, values with
+                                | Operator f, _ ->
+                                    return Expr.Value(f values, e.Type)
 
-                                            match value with
-                                                | Some v -> return Expr.Value(v, e.Type)
-                                                | None -> return Expr.Call(mi, args)
+                                | EnumBitwiseOp (f, enumType), [l; r] ->
+                                    let x = Convert.ChangeType(l, typeof<int>) |> unbox<int>
+                                    let y = Convert.ChangeType(r, typeof<int>) |> unbox<int>
+                                    let z = Enum.ToObject(enumType, f x y)
+                                    return Expr.Value(z, enumType)
+
+                                | EnumToInt, [x] ->
+                                    let i = Convert.ChangeType(x, typeof<int>)
+                                    return Expr.Value(i, typeof<int>)
+
                                 | _ ->
-                                    return Expr.Call(mi, args) 
+                                    let value =
+                                        try mi.TryInvoke(null, values |> List.toArray)
+                                        with
+                                        | _ ->
+                                            Log.warn "[FShade] could not evaluate: %A" mi
+                                            None
+
+                                    match value with
+                                    | Some v -> return Expr.Value(v, e.Type)
+                                    | None -> return Expr.Call(mi, args)
+                            | _ ->
+                                return Expr.Call(mi, args) 
 
                     | Call(Some t, mi, args) ->
                         let! needed = State.needsCall mi
