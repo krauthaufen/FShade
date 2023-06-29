@@ -45,13 +45,18 @@ module ShaderDebugger =
             // Location of the original shader
             Location : SourceLocation
 
-            // Number of inputs of the shader function
+            // Input types of the shader function
             // Note: Compute shaders may have multiple inputs.
-            Inputs : int
+            Inputs : Type list
 
             // Arguments of the shader function
             Arguments : obj list
         }
+
+        member x.InputCount =
+            // If there is a single unit input, the respective function will have no parameters -> treat as zero inputs
+            if x.Inputs = [typeof<unit>] then 0
+            else x.Inputs.Length
 
         override x.ToString() =
             $"{x.TypeName}.{x.MethodName}"
@@ -68,7 +73,7 @@ module ShaderDebugger =
             match assembly |> Assembly.tryGetMethod definition.TypeName definition.MethodName with
             | Some mi ->
                 let parameters = mi.GetParameters()
-                let argumentCount = parameters.Length - definition.Inputs
+                let argumentCount = parameters.Length - definition.InputCount
 
                 if not <| typeof<Expr>.IsAssignableFrom mi.ReturnType then
                     Result.Error $"Shader {definition} has an invalid return type of {mi.ReturnType}."
@@ -148,7 +153,7 @@ module ShaderDebugger =
                                             TypeName = typeName
                                             MethodName = methodName
                                             Location = location
-                                            Inputs = definition.Inputs.Length
+                                            Inputs = definition.Inputs
                                             Arguments = definition.Arguments
                                         }
 
