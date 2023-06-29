@@ -198,3 +198,42 @@ let ``Intersection shader with custom hit kind``() =
         }
 
     GLSL.shouldCompileRaytracingAndContainRegex effect [ "1234" ]
+
+[<Flags>]
+type MyEnum =
+    | None = 0
+    | A = 1
+    | B = 2
+    | C = 4
+
+[<Test>]
+let ``Ray type based on enum``() =
+    Setup.Run()
+
+    let raygenShader (input : MyEnum) =
+        raygen {
+            scene.TraceRay<int>(V3d.Zero, V3d.ZAxis, ray = if int (input &&& MyEnum.A) <> 123 then "Yay" else "Nay") |> ignore
+        }
+
+    let effect =
+        raytracingEffect {
+            raygen (raygenShader (MyEnum.A ||| MyEnum.B))
+        }
+
+    GLSL.shouldCompileRaytracing effect
+
+[<Test>]
+let ``Ray type based on SRTP``() =
+    Setup.Run()
+
+    let raygenShader =
+        raygen {
+            scene.TraceRay<int>(V3d.Zero, V3d.ZAxis, ray = if atanh 0.0 = 0.0 then "Yay" else "Nay") |> ignore
+        }
+
+    let effect =
+        raytracingEffect {
+            raygen raygenShader
+        }
+
+    GLSL.shouldCompileRaytracing effect

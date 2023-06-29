@@ -419,3 +419,124 @@ let ``Sepp``() =
     
     input |> Opt.run |> printfn "%A"
     
+
+[<System.Flags>]
+type MyEnum =
+    | A  = 1
+    | B  = 2
+    | C  = 4
+
+module MyEnum =
+
+    [<Literal>]
+    let AB = MyEnum.A ||| MyEnum.B
+
+[<Test>]
+let ``[Constant] enum bitwise or``() =
+    let input    = <@ keep (MyEnum.A ||| MyEnum.B) @>
+    let expected = <@ keep MyEnum.AB @>
+    input |> Opt.run |> should exprEqual expected
+
+[<Test>]
+let ``[Constant] enum bitwise and``() =
+    let input    = <@ keep ((MyEnum.A ||| MyEnum.B) &&& MyEnum.A) @>
+    let expected = <@ keep MyEnum.A @>
+    input |> Opt.run |> should exprEqual expected
+
+[<Test>]
+let ``[Constant] enum bitwise xor``() =
+    let input    = <@ keep ((MyEnum.A ||| MyEnum.B) ^^^ MyEnum.A) @>
+    let expected = <@ keep MyEnum.B @>
+    input |> Opt.run |> should exprEqual expected
+
+[<Test>]
+let ``[Constant] enum shift right``() =
+    let input    = <@ keep (MyEnum.B >>> 1) @>
+    let expected = <@ keep MyEnum.A @>
+    input |> Opt.run |> should exprEqual expected
+
+[<Test>]
+let ``[Constant] enum shift left``() =
+    let input    = <@ keep (MyEnum.A <<< 2) @>
+    let expected = <@ keep MyEnum.C @>
+    input |> Opt.run |> should exprEqual expected
+
+[<Test>]
+let ``[Constant] enum to int8``() =
+    let input    = <@ keep (int8 MyEnum.C) @>
+    let expected = <@ keep 4y @>
+    input |> Opt.run |> should exprEqual expected
+
+[<Test>]
+let ``[Constant] enum to uint8``() =
+    let input    = <@ keep (uint8 MyEnum.C) @>
+    let expected = <@ keep 4uy @>
+    input |> Opt.run |> should exprEqual expected
+
+[<Test>]
+let ``[Constant] enum to int16``() =
+    let input    = <@ keep (int16 MyEnum.C) @>
+    let expected = <@ keep 4s @>
+    input |> Opt.run |> should exprEqual expected
+
+[<Test>]
+let ``[Constant] enum to uint16``() =
+    let input    = <@ keep (uint16 MyEnum.C) @>
+    let expected = <@ keep 4us @>
+    input |> Opt.run |> should exprEqual expected
+
+[<Test>]
+let ``[Constant] enum to int32``() =
+    let input    = <@ keep (int32 MyEnum.C) @>
+    let expected = <@ keep 4 @>
+    input |> Opt.run |> should exprEqual expected
+
+[<Test>]
+let ``[Constant] enum to uint32``() =
+    let input    = <@ keep (uint32 MyEnum.C) @>
+    let expected = <@ keep 4u @>
+    input |> Opt.run |> should exprEqual expected
+
+[<Test>]
+let ``[Constant] enum to int64``() =
+    let input    = <@ keep (int64 MyEnum.C) @>
+    let expected = <@ keep 4L @>
+    input |> Opt.run |> should exprEqual expected
+
+[<Test>]
+let ``[Constant] enum to uint64``() =
+    let input    = <@ keep (uint64 MyEnum.C) @>
+    let expected = <@ keep 4UL @>
+    input |> Opt.run |> should exprEqual expected
+
+[<Test>]
+let ``[Constant] enum to nativeint``() =
+    let input = <@ keep (nativeint MyEnum.C) @>
+
+    let expected =
+        let mi = getMethodInfo <@ keep : int -> _ @>
+        Expr.Call(mi.MakeGenericMethod [| typeof<nativeint> |], [Expr.Value 4n])
+
+    input |> Opt.run |> should exprEqual expected
+
+[<Test>]
+let ``[Constant] enum to unativeint``() =
+    let input = <@ keep (unativeint MyEnum.C) @>
+
+    let expected =
+        let mi = getMethodInfo <@ keep : int -> _ @>
+        Expr.Call(mi.MakeGenericMethod [| typeof<unativeint> |], [Expr.Value 4un])
+
+    input |> Opt.run |> should exprEqual expected
+
+[<Test>]
+let ``[Constant] enum to float``() =
+    let input    = <@ keep (float MyEnum.C) @>
+    let expected = <@ keep 4.0 @>
+    input |> Opt.run |> should exprEqual expected
+
+[<Test>]
+let ``[Constant] enum to float32``() =
+    let input    = <@ keep (float32 MyEnum.C) @>
+    let expected = <@ keep 4.0f @>
+    input |> Opt.run |> should exprEqual expected

@@ -55,6 +55,9 @@ module DynamicHostInvocation =
         member x.TryInvoke(obj : obj, parameters : obj[]) =
             tryInvoke (fun _ -> x.Invoke(obj, parameters))
 
+        member inline x.TryInvoke(obj : obj, parameters : obj list) =
+            x.TryInvoke(obj, Array.ofList parameters)
+
     type FieldInfo with
         member x.TryGetValue(obj : obj) =
             tryInvoke (fun _ -> x.GetValue(obj))
@@ -65,6 +68,9 @@ module DynamicHostInvocation =
 
         member x.TryGetValue(obj : obj, index : obj[]) =
             tryInvoke (fun _ -> x.GetValue(obj, index))
+
+        member inline x.TryGetValue(obj : obj, index : obj list) =
+            x.TryGetValue(obj, Array.ofList index)
 
 
 module ExprWorkardound = 
@@ -99,7 +105,6 @@ module Peano =
 module ReflectionPatterns =
     open Aardvark.Base.TypeInfo.Patterns
 
-
     type Type with
         member x.IsArr = x.IsGenericType && x.GetGenericTypeDefinition() = typedefof<Arr<_,_>>
         member x.IsRef = x.IsGenericType && x.GetGenericTypeDefinition() = typedefof<ref<_>>
@@ -122,6 +127,10 @@ module ReflectionPatterns =
         match tryGetMethodInfo e with
             | Some mi -> mi
             | None -> failwithf "[FShade] could not find a method-call in expression %A" e
+
+    let inline private getMethodDefinition (mi : MethodInfo) =
+        if mi.IsGenericMethod then mi.GetGenericMethodDefinition()
+        else mi
 
     let private conversionMethods =
         HashSet.ofList [
@@ -162,9 +171,8 @@ module ReflectionPatterns =
         else None
 
     let (|ConversionMethod|_|) (mi : MethodInfo) =
-        let meth = 
-            if mi.IsGenericMethod then mi.GetGenericMethodDefinition()
-            else mi
+        let meth = getMethodDefinition mi
+
         if conversionMethods.Contains meth then
             let input = mi.GetParameters().[0]
             let output = mi.ReturnType
@@ -275,6 +283,66 @@ module ReflectionPatterns =
         | Method(name, args) when mi.DeclaringType = typeof<Mat> -> Some (name, args)
         | _ -> None
 
+    // Invoking these operators for enum types will
+    // throw a TargetInvocationException, even with a witness.
+    // Handle those explicitly instead.
+    let private bitwiseOps =
+        LookupTable.lookupTable' [
+            getMethodInfo <@ (|||) : int -> int -> int @>, ((|||) : int -> int -> int)
+            getMethodInfo <@ (&&&) : int -> int -> int @>, ((&&&) : int -> int -> int)
+            getMethodInfo <@ (^^^) : int -> int -> int @>, ((^^^) : int -> int -> int)
+            getMethodInfo <@ (<<<) : int -> int -> int @>, ((<<<) : int -> int -> int)
+            getMethodInfo <@ (>>>) : int -> int -> int @>, ((>>>) : int -> int -> int)
+        ]
+
+    let inline private isEnum (t : Type) =
+        t.IsEnum && t.GetEnumUnderlyingType() = typeof<int>
+
+    let (|EnumBitwiseOp|_|) (mi : MethodInfo) =
+        let mdef = getMethodDefinition mi
+
+        match bitwiseOps mdef with
+        | Some op ->
+            let typ = mi.GetGenericArguments().[0]
+            if isEnum typ then
+                Some (op, typ)
+            else
+                None
+        | _ ->
+            None
+
+    let intConversionMethods =
+        let make f = fun (i : int) -> box (f i)
+
+        LookupTable.lookupTable' [
+            typeof<int8>,       make int8
+            typeof<uint8>,      make uint8
+            typeof<int16>,      make int16
+            typeof<uint16>,     make uint16
+            typeof<int32>,      make int32
+            typeof<uint32>,     make uint32
+            typeof<int64>,      make int64
+            typeof<uint64>,     make uint64
+            typeof<nativeint>,  make nativeint
+            typeof<unativeint>, make unativeint
+            typeof<float32>,    make float32
+            typeof<float>,      make float
+        ]
+
+    let (|EnumConversion|_|) (mi : MethodInfo) =
+        let mdef = getMethodDefinition mi
+
+        if conversionMethods.Contains mdef then
+            let typ = mi.GetGenericArguments().[0]
+            if isEnum typ then
+                match intConversionMethods mi.ReturnType with
+                | Some f -> Some (f, mi.ReturnType)
+                | _ -> None
+            else
+                None
+        else
+            None
+
 [<AutoOpen>]
 module ExprExtensions =
 
@@ -304,6 +372,29 @@ module ExprExtensions =
             for a in args do
                 res <- Map.union res (namedValues a)
             res
+
+    module private Witness =
+        open System.Collections.Concurrent
+
+        let private buildFun =
+            match <@ FunctionReflection.buildFunction null null : int -> int @> with
+            | Patterns.Call(None, mi, _) ->
+                mi.GetGenericMethodDefinition()
+            | _ ->
+                failwith "bad"
+
+        let private witnessTable =
+            ConcurrentDictionary<MethodInfo, obj>()
+
+        let compile (e : Expr) =
+            match e with
+            | DerivedPatterns.Lambdas(_, Patterns.Call(None, mi, _)) ->
+                witnessTable.GetOrAdd(mi, fun mi ->
+                    let m = buildFun.MakeGenericMethod [|e.Type|]
+                    m.Invoke(null, [|null; mi|])
+                )
+            | _ ->
+                failwith "bad witness"
 
     type Expr with
     
@@ -435,73 +526,112 @@ module ExprExtensions =
                         inputSequence, seq, 
                         Expr.ForEach(v, Expr.Var inputSequence, body)
                     )
-                            
+
+        static member CompileWitness(e : Expr) =
+            Witness.compile e
+
+        /// tries to evaluate the supplied expressions and returns their values on success
+        static member TryEval(e : Expr list) =
+            let values = e |> List.map Expr.TryEval
+            if values |> List.forall Option.isSome then
+                values |> List.map Option.get |> Some
+            else
+                None
 
         /// tries to evaluate the supplied expression and returns its value on success
         static member TryEval(e : Expr) =
-            let reduce (a : Option<obj>[]) =
-                match a |> Array.forall(fun o -> o.IsSome) with
-                    | true -> a |> Array.map (fun o -> o.Value) |> Some
-                    | false -> None
-
             match e with
-                | Patterns.PropertyGet(t , p, args) ->
-                    match t with
-                        | Some(t) -> 
-                            let args = args |> List.map Expr.TryEval |> List.toArray
-                            match Expr.TryEval t, args |> reduce with
-                                | Some t, Some args -> p.GetValue(t, args) |> Some
-                                | _ -> None
-                        | None -> 
-                            let args = args |> List.map Expr.TryEval |> List.toArray
-                            match args |> reduce with
-                                | Some args -> p.GetValue(null, args) |> Some
-                                | _ -> None
-
-                | Patterns.FieldGet(t,f) ->
-                    match t with
-                        | Some(t) -> 
-                            match Expr.TryEval t with
-                                | Some t -> f.GetValue(t) |> Some
-                                | None -> None
-                        | None -> 
-                            f.GetValue(null) |> Some
-
-                | Patterns.Call(t, mi, args) ->
-                    match t with
-                        | Some(t) -> 
-                            let args = args |> List.map Expr.TryEval |> List.toArray
-                            let t = Expr.TryEval t
-                            match t, args |> reduce with
-                                | Some t, Some args -> mi.TryInvoke(t, args)
-                                | _ -> None
-
-                        | None -> 
-                            let args = args |> List.map Expr.TryEval |> List.toArray
-                            match args |> reduce with
-                            | Some args -> mi.TryInvoke(null, args)
-                            | _ -> None
-
-                | Patterns.Let(var,value,body) ->
-                    let value = Expr.TryEval value
-                    match value with
-                        | Some value ->
-                            let body = body.Substitute(fun vi -> if vi = var then Expr.Value(value, vi.Type) |> Some else None)
-                            Expr.TryEval body
-                        | None -> None
-
-                | Patterns.IfThenElse (condition, a, b) ->
-                    match Expr.TryEval condition with
-                    | Some (:? bool as flag) -> Expr.TryEval (if flag then a else b)
+            | Patterns.PropertyGet(t , p, args) ->
+                match t with
+                | Some t ->
+                    match Expr.TryEval t, Expr.TryEval args with
+                    | Some t, Some args -> p.TryGetValue(t, args)
+                    | _ -> None
+                | None ->
+                    match Expr.TryEval args with
+                    | Some args -> p.TryGetValue(null, args)
                     | _ -> None
 
-                | Patterns.Value(v,_) ->
-                    v |> Some
+            | Patterns.FieldGet(t,f) ->
+                match t with
+                | Some t ->
+                    match Expr.TryEval t with
+                    | Some t -> f.TryGetValue t
+                    | None -> None
+                | None ->
+                    f.TryGetValue(null)
 
-                | Patterns.DefaultValue t ->
-                    Activator.CreateInstance(t) |> Some
+            | Patterns.Call(None, EnumBitwiseOp (op, enumType), [l; r]) ->
+                match Expr.TryEval l, Expr.TryEval r with
+                | Some l, Some r ->
+                    let x = Convert.ChangeType(l, typeof<int>) |> unbox<int>
+                    let y = Convert.ChangeType(r, typeof<int>) |> unbox<int>
+                    Some <| Enum.ToObject(enumType, op x y)
+                | _ ->
+                    None
 
+            | Patterns.Call(None, EnumConversion (fromInt, _), [x]) ->
+                match Expr.TryEval x with
+                | Some x ->
+                    let xi = Convert.ChangeType(x, typeof<int>) |> unbox<int>
+                    Some <| fromInt xi
+                | _ ->
+                    None
+
+            | Patterns.CallWithWitnesses(t, _, mi, witnesses, args) ->
+                match t with
+                | Some t ->
+                    match Expr.TryEval t, Expr.TryEval args with
+                    | Some t, Some args ->
+                        try
+                            let ws = witnesses |> List.map Expr.CompileWitness
+                            mi.TryInvoke(t, ws @ args)
+                        with _ ->
+                            None
+                    | _ -> None
+
+                | None ->
+                    match Expr.TryEval args with
+                    | Some args ->
+                        try
+                            let ws = witnesses |> List.map Expr.CompileWitness
+                            mi.TryInvoke(null, ws @ args)
+                        with _ ->
+                            None
+                    | _ -> None
+
+            | Patterns.Call(t, mi, args) ->
+                match t with
+                | Some t ->
+                    match Expr.TryEval t, Expr.TryEval args with
+                    | Some t, Some args -> mi.TryInvoke(t, args)
+                    | _ -> None
+
+                | None ->
+                    match Expr.TryEval args with
+                    | Some args -> mi.TryInvoke(null, args)
+                    | _ -> None
+
+            | Patterns.Let(var,value,body) ->
+                let value = Expr.TryEval value
+                match value with
+                | Some value ->
+                    let body = body.Substitute(fun vi -> if vi = var then Expr.Value(value, vi.Type) |> Some else None)
+                    Expr.TryEval body
+                | None -> None
+
+            | Patterns.IfThenElse (condition, a, b) ->
+                match Expr.TryEval condition with
+                | Some (:? bool as flag) -> Expr.TryEval (if flag then a else b)
                 | _ -> None
+
+            | Patterns.Value(v,_) ->
+                v |> Some
+
+            | Patterns.DefaultValue t ->
+                Activator.CreateInstance(t) |> Some
+
+            | _ -> None
 
     let (|Seq|_|) (e : Expr) =
         let rec all (e : Expr) =
