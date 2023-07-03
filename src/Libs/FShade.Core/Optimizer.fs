@@ -1600,26 +1600,38 @@ module Optimizer =
                             | _ -> 
                                 return Expr.Call(mi, [v])
 
-                    | Call(None, (EnumBitwiseOp (op, enumType) as mi), [l; r]) ->
+                    | Call(None, (EnumBitwiseOp (enumType, baseType, op) as mi), [l; r]) ->
                         let! l = evaluateConstantsS l
                         let! r = evaluateConstantsS r
 
                         match l, r with
                         | Value(l, _), Value(r, _) ->
-                            let x = Convert.ChangeType(l, typeof<int>) |> unbox<int>
-                            let y = Convert.ChangeType(r, typeof<int>) |> unbox<int>
+                            let x = Convert.ChangeType(l, baseType)
+                            let y = Convert.ChangeType(r, baseType)
                             let z = Enum.ToObject(enumType, op x y)
                             return Expr.Value(z, enumType)
                         | _ ->
                             return Expr.Call(mi, [l; r])
 
-                    | Call(None, (EnumConversion (fromInt, outputType) as mi), [x]) ->
+                    | Call(None, (EnumShiftOp (enumType, baseType, op) as mi), [l; r]) ->
+                        let! l = evaluateConstantsS l
+                        let! r = evaluateConstantsS r
+
+                        match l, r with
+                        | Value(l, _), Value(:? int32 as shift, _) ->
+                            let x = Convert.ChangeType(l, baseType)
+                            let y = Enum.ToObject(enumType, op x shift)
+                            return Expr.Value(y, enumType)
+                        | _ ->
+                            return Expr.Call(mi, [l; r])
+
+                    | Call(None, (EnumConversion (fromInt, intType) as mi), [x]) ->
                         let! x = evaluateConstantsS x
 
                         match x with
                         | Value(x, _) ->
-                            let xi = Convert.ChangeType(x, typeof<int>) |> unbox<int>
-                            return Expr.Value(fromInt xi, outputType)
+                            let xi = Convert.ChangeType(x, intType)
+                            return Expr.Value(fromInt xi, mi.ReturnType)
                         | _ ->
                             return Expr.Call(mi, [x])
 

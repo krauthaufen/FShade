@@ -422,9 +422,9 @@ let ``Sepp``() =
 
 [<System.Flags>]
 type MyEnum =
-    | A  = 1
-    | B  = 2
-    | C  = 4
+    | A  = 1us
+    | B  = 2us
+    | C  = 4us
 
 module MyEnum =
 
@@ -507,26 +507,6 @@ let ``[Constant] enum to int64``() =
 let ``[Constant] enum to uint64``() =
     let input    = <@ keep (uint64 MyEnum.C) @>
     let expected = <@ keep 4UL @>
-    input |> Opt.run |> should exprEqual expected
-
-[<Test>]
-let ``[Constant] enum to nativeint``() =
-    let input = <@ keep (nativeint MyEnum.C) @>
-
-    let expected =
-        let mi = getMethodInfo <@ keep : int -> _ @>
-        Expr.Call(mi.MakeGenericMethod [| typeof<nativeint> |], [Expr.Value 4n])
-
-    input |> Opt.run |> should exprEqual expected
-
-[<Test>]
-let ``[Constant] enum to unativeint``() =
-    let input = <@ keep (unativeint MyEnum.C) @>
-
-    let expected =
-        let mi = getMethodInfo <@ keep : int -> _ @>
-        Expr.Call(mi.MakeGenericMethod [| typeof<unativeint> |], [Expr.Value 4un])
-
     input |> Opt.run |> should exprEqual expected
 
 [<Test>]

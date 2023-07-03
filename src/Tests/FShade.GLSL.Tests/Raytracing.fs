@@ -201,10 +201,10 @@ let ``Intersection shader with custom hit kind``() =
 
 [<Flags>]
 type MyEnum =
-    | None = 0
-    | A = 1
-    | B = 2
-    | C = 4
+    | None = 0u
+    | A = 1u
+    | B = 2u
+    | C = 4u
 
 [<Test>]
 let ``Ray type based on enum``() =
@@ -212,7 +212,8 @@ let ``Ray type based on enum``() =
 
     let raygenShader (input : MyEnum) =
         raygen {
-            scene.TraceRay<int>(V3d.Zero, V3d.ZAxis, ray = if int (input &&& MyEnum.A) <> 123 then "Yay" else "Nay") |> ignore
+            scene.TraceRay<int>(V3d.Zero, V3d.ZAxis, ray = if float ((input &&& MyEnum.A) <<< 2) <> 123.0 then "Yay" else "Nay") |> ignore
+            scene.TraceRay<int>(V3d.Zero, V3d.ZAxis, ray = if uint8 ((input ^^^ MyEnum.A) >>> 2) <> 123uy then "Nay" else "Yay") |> ignore
         }
 
     let effect =

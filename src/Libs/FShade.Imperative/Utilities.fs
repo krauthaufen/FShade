@@ -286,17 +286,87 @@ module ReflectionPatterns =
     // Invoking these operators for enum types will
     // throw a TargetInvocationException, even with a witness.
     // Handle those explicitly instead.
-    let private bitwiseOps =
+    let private bitwiseOps : MethodInfo -> Option<Type -> obj -> obj -> obj> =
+        let make op = (fun (x : obj) (y : obj) -> box (op (unbox x) (unbox y)))
+
+        let bitwiseOr =
+            LookupTable.lookupTable [
+                typeof<int8>,   make ((|||) : int8 -> _ -> _)
+                typeof<uint8>,  make ((|||) : uint8 -> _ -> _)
+                typeof<int16>,  make ((|||) : int16 -> _ -> _)
+                typeof<uint16>, make ((|||) : uint16 -> _ -> _)
+                typeof<int32>,  make ((|||) : int32 -> _ -> _)
+                typeof<uint32>, make ((|||) : uint32 -> _ -> _)
+                typeof<int64>,  make ((|||) : int64 -> _ -> _)
+                typeof<uint64>, make ((|||) : uint64 -> _ -> _)
+            ]
+
+        let bitwiseAnd =
+            LookupTable.lookupTable [
+                typeof<int8>,   make ((&&&) : int8 -> _ -> _)
+                typeof<uint8>,  make ((&&&) : uint8 -> _ -> _)
+                typeof<int16>,  make ((&&&) : int16 -> _ -> _)
+                typeof<uint16>, make ((&&&) : uint16 -> _ -> _)
+                typeof<int32>,  make ((&&&) : int32 -> _ -> _)
+                typeof<uint32>, make ((&&&) : uint32 -> _ -> _)
+                typeof<int64>,  make ((&&&) : int64 -> _ -> _)
+                typeof<uint64>, make ((&&&) : uint64 -> _ -> _)
+            ]
+
+        let bitwiseXor =
+            LookupTable.lookupTable [
+                typeof<int8>,   make ((^^^) : int8 -> _ -> _)
+                typeof<uint8>,  make ((^^^) : uint8 -> _ -> _)
+                typeof<int16>,  make ((^^^) : int16 -> _ -> _)
+                typeof<uint16>, make ((^^^) : uint16 -> _ -> _)
+                typeof<int32>,  make ((^^^) : int32 -> _ -> _)
+                typeof<uint32>, make ((^^^) : uint32 -> _ -> _)
+                typeof<int64>,  make ((^^^) : int64 -> _ -> _)
+                typeof<uint64>, make ((^^^) : uint64 -> _ -> _)
+            ]
+
         LookupTable.lookupTable' [
-            getMethodInfo <@ (|||) : int -> int -> int @>, ((|||) : int -> int -> int)
-            getMethodInfo <@ (&&&) : int -> int -> int @>, ((&&&) : int -> int -> int)
-            getMethodInfo <@ (^^^) : int -> int -> int @>, ((^^^) : int -> int -> int)
-            getMethodInfo <@ (<<<) : int -> int -> int @>, ((<<<) : int -> int -> int)
-            getMethodInfo <@ (>>>) : int -> int -> int @>, ((>>>) : int -> int -> int)
+            getMethodInfo <@ (|||) : int -> int -> int @>, bitwiseOr
+            getMethodInfo <@ (&&&) : int -> int -> int @>, bitwiseAnd
+            getMethodInfo <@ (^^^) : int -> int -> int @>, bitwiseXor
         ]
 
-    let inline private isEnum (t : Type) =
-        t.IsEnum && t.GetEnumUnderlyingType() = typeof<int>
+    let private shiftOps : MethodInfo -> Option<Type -> obj -> int -> obj> =
+        let make op = (fun (x : obj) (y : obj) -> box (op (unbox x) (unbox y)))
+
+        let bitwiseLsh =
+            LookupTable.lookupTable [
+                typeof<int8>,   make ((<<<) : int8 -> _ -> _)
+                typeof<uint8>,  make ((<<<) : uint8 -> _ -> _)
+                typeof<int16>,  make ((<<<) : int16 -> _ -> _)
+                typeof<uint16>, make ((<<<) : uint16 -> _ -> _)
+                typeof<int32>,  make ((<<<) : int32 -> _ -> _)
+                typeof<uint32>, make ((<<<) : uint32 -> _ -> _)
+                typeof<int64>,  make ((<<<) : int64 -> _ -> _)
+                typeof<uint64>, make ((<<<) : uint64 -> _ -> _)
+            ]
+
+        let bitwiseRsh =
+            LookupTable.lookupTable [
+                typeof<int8>,   make ((>>>) : int8 -> _ -> _)
+                typeof<uint8>,  make ((>>>) : uint8 -> _ -> _)
+                typeof<int16>,  make ((>>>) : int16 -> _ -> _)
+                typeof<uint16>, make ((>>>) : uint16 -> _ -> _)
+                typeof<int32>,  make ((>>>) : int32 -> _ -> _)
+                typeof<uint32>, make ((>>>) : uint32 -> _ -> _)
+                typeof<int64>,  make ((>>>) : int64 -> _ -> _)
+                typeof<uint64>, make ((>>>) : uint64 -> _ -> _)
+            ]
+
+        LookupTable.lookupTable' [
+            getMethodInfo <@ (<<<) : int -> int -> int @>, bitwiseLsh
+            getMethodInfo <@ (>>>) : int -> int -> int @>, bitwiseRsh
+        ]
+
+
+    let private (|Enum|_|) (t : Type) =
+        if t.IsEnum then Some <| t.GetEnumUnderlyingType()
+        else None
 
     let (|EnumBitwiseOp|_|) (mi : MethodInfo) =
         let mdef = getMethodDefinition mi
@@ -304,41 +374,54 @@ module ReflectionPatterns =
         match bitwiseOps mdef with
         | Some op ->
             let typ = mi.GetGenericArguments().[0]
-            if isEnum typ then
-                Some (op, typ)
-            else
+            match typ with
+            | Enum baseType ->
+                Some (typ, baseType, op baseType)
+            | _ ->
                 None
         | _ ->
             None
 
-    let intConversionMethods =
-        let make f = fun (i : int) -> box (f i)
+    let (|EnumShiftOp|_|) (mi : MethodInfo) =
+        let mdef = getMethodDefinition mi
+
+        match shiftOps mdef with
+        | Some op ->
+            let typ = mi.GetGenericArguments().[0]
+            match typ with
+            | Enum baseType ->
+                Some (typ, baseType, op baseType)
+            | _ ->
+                None
+        | _ ->
+            None
+
+    let private converters : Type -> Option<obj -> obj> =
+        let make f = fun (i : obj) -> box (f i)
 
         LookupTable.lookupTable' [
-            typeof<int8>,       make int8
-            typeof<uint8>,      make uint8
-            typeof<int16>,      make int16
-            typeof<uint16>,     make uint16
-            typeof<int32>,      make int32
-            typeof<uint32>,     make uint32
-            typeof<int64>,      make int64
-            typeof<uint64>,     make uint64
-            typeof<nativeint>,  make nativeint
-            typeof<unativeint>, make unativeint
-            typeof<float32>,    make float32
-            typeof<float>,      make float
+            typeof<int8>,       make Convert.ToSByte
+            typeof<uint8>,      make Convert.ToByte
+            typeof<int16>,      make Convert.ToInt16
+            typeof<uint16>,     make Convert.ToUInt16
+            typeof<int32>,      make Convert.ToInt32
+            typeof<uint32>,     make Convert.ToUInt32
+            typeof<int64>,      make Convert.ToInt64
+            typeof<uint64>,     make Convert.ToUInt64
+            typeof<float32>,    make Convert.ToSingle
+            typeof<float>,      make Convert.ToDouble
         ]
 
     let (|EnumConversion|_|) (mi : MethodInfo) =
         let mdef = getMethodDefinition mi
 
         if conversionMethods.Contains mdef then
-            let typ = mi.GetGenericArguments().[0]
-            if isEnum typ then
-                match intConversionMethods mi.ReturnType with
-                | Some f -> Some (f, mi.ReturnType)
+            match mi.GetGenericArguments().[0] with
+            | Enum baseType ->
+                match converters mi.ReturnType with
+                | Some f -> Some (f, baseType)
                 | _ -> None
-            else
+            | _ ->
                 None
         else
             None
@@ -561,19 +644,27 @@ module ExprExtensions =
                 | None ->
                     f.TryGetValue(null)
 
-            | Patterns.Call(None, EnumBitwiseOp (op, enumType), [l; r]) ->
+            | Patterns.Call(None, EnumBitwiseOp (enumType, baseType, op), [l; r]) ->
                 match Expr.TryEval l, Expr.TryEval r with
                 | Some l, Some r ->
-                    let x = Convert.ChangeType(l, typeof<int>) |> unbox<int>
-                    let y = Convert.ChangeType(r, typeof<int>) |> unbox<int>
+                    let x = Convert.ChangeType(l, baseType)
+                    let y = Convert.ChangeType(r, baseType)
                     Some <| Enum.ToObject(enumType, op x y)
                 | _ ->
                     None
 
-            | Patterns.Call(None, EnumConversion (fromInt, _), [x]) ->
+            | Patterns.Call(None, EnumShiftOp (enumType, baseType, op), [l; r]) ->
+                match Expr.TryEval l, Expr.TryEval r with
+                | Some l, Some (:? int32 as shift) ->
+                    let x = Convert.ChangeType(l, baseType)
+                    Some <| Enum.ToObject(enumType, op x shift)
+                | _ ->
+                    None
+
+            | Patterns.Call(None, EnumConversion (fromInt, intType), [x]) ->
                 match Expr.TryEval x with
                 | Some x ->
-                    let xi = Convert.ChangeType(x, typeof<int>) |> unbox<int>
+                    let xi = Convert.ChangeType(x, intType)
                     Some <| fromInt xi
                 | _ ->
                     None
