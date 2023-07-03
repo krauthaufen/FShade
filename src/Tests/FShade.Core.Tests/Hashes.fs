@@ -328,6 +328,89 @@ let ``[Serializer] storage buffers``() =
     let fx = shader |> Effect.ofFunction
     fx |> roundtripEffect
 
+type EnumUint8  = | A = 255uy
+type EnumInt8   = | A = -128y
+type EnumUint16 = | A = 65535us
+type EnumInt16  = | A = -32768s
+type EnumUint32 = | A = 4294967295u
+type EnumInt32  = | A = -2147483648
+type EnumUint64 = | A = 18446744073709551615UL
+type EnumInt64  = | A = -9223372036854775808L
+
+type UniformScope with
+    member x.EnumUint8  : EnumUint8 = x?Foo
+    member x.EnumInt8   : EnumInt8 = x?Foo
+    member x.EnumUint16 : EnumUint16 = x?Foo
+    member x.EnumInt16  : EnumInt16 = x?Foo
+    member x.EnumUint32 : EnumUint32 = x?Foo
+    member x.EnumInt32  : EnumInt32 = x?Foo
+    member x.EnumUint64 : EnumUint64 = x?Foo
+    member x.EnumInt64  : EnumInt64 = x?Foo
+
+[<Test>]
+let ``[Serializer] enum uint8``() =
+    let shader (v : Vertex) =
+        fragment { return int (uniform.EnumUint8 + EnumUint8.A) }
+
+    let shader = Shader.ofFunction shader |> List.head
+    shader.shaderBody |> roundtripExpr
+
+[<Test>]
+let ``[Serializer] enum int8``() =
+    let shader (v : Vertex) =
+        fragment { return int (uniform.EnumInt8 + EnumInt8.A) }
+
+    let shader = Shader.ofFunction shader |> List.head
+    shader.shaderBody |> roundtripExpr
+
+[<Test>]
+let ``[Serializer] enum uint16``() =
+    let shader (v : Vertex) =
+        fragment { return int (uniform.EnumUint16 + EnumUint16.A) }
+
+    let shader = Shader.ofFunction shader |> List.head
+    shader.shaderBody |> roundtripExpr
+
+[<Test>]
+let ``[Serializer] enum int16``() =
+    let shader (v : Vertex) =
+        fragment { return int (uniform.EnumInt16 + EnumInt16.A) }
+
+    let shader = Shader.ofFunction shader |> List.head
+    shader.shaderBody |> roundtripExpr
+
+[<Test>]
+let ``[Serializer] enum uint32``() =
+    let shader (v : Vertex) =
+        fragment { return int (uniform.EnumUint32 + EnumUint32.A) }
+
+    let shader = Shader.ofFunction shader |> List.head
+    shader.shaderBody |> roundtripExpr
+
+[<Test>]
+let ``[Serializer] enum int32``() =
+    let shader (v : Vertex) =
+        fragment { return int (uniform.EnumInt32 + EnumInt32.A) }
+
+    let shader = Shader.ofFunction shader |> List.head
+    shader.shaderBody |> roundtripExpr
+
+[<Test>]
+let ``[Serializer] enum uint64``() =
+    let shader (v : Vertex) =
+        fragment { return int (uniform.EnumUint64 + EnumUint64.A) }
+
+    let shader = Shader.ofFunction shader |> List.head
+    shader.shaderBody |> roundtripExpr
+
+[<Test>]
+let ``[Serializer] enum int64``() =
+    let shader (v : Vertex) =
+        fragment { return int (uniform.EnumInt64 + EnumInt64.A) }
+
+    let shader = Shader.ofFunction shader |> List.head
+    shader.shaderBody |> roundtripExpr
+
 [<Test>]
 let ``[Hashing] includes SamplerState``() =
 

@@ -281,6 +281,8 @@ module Compiler =
                 | UInt16 -> Expr.Value(unbox<uint16> v, t) |> Some
                 | Int32  -> Expr.Value(unbox<int32> v, t) |> Some
                 | UInt32 -> Expr.Value(unbox<uint32> v, t) |> Some
+                | Int64  -> Expr.Value(unbox<int64> v, t) |> Some
+                | UInt64 -> Expr.Value(unbox<uint64> v, t) |> Some
                 | _ -> None
 
             elif FSharpType.IsTuple t then

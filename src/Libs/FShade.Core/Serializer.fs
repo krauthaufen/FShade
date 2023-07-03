@@ -409,9 +409,10 @@ module Serializer =
                 if typ = typeof<unit> then
                     ()
 
-                elif typ.IsEnum then 
-                    let o = Convert.ToInt32 o
-                    dst.Write o
+                elif typ.IsEnum then
+                    let intType = typ.GetEnumUnderlyingType()
+                    let o = Convert.ChangeType(o, intType)
+                    serialize dst intType o
 
                 elif typ.IsArray then
                     if isNull o then
@@ -539,7 +540,8 @@ module Serializer =
             | _ ->
 
                 if typ.IsEnum then
-                    let v = src.ReadInt32()
+                    let intType = typ.GetEnumUnderlyingType()
+                    let v = deserialize src intType
                     Enum.ToObject(typ, v)
             
                 elif typ.IsArray then
