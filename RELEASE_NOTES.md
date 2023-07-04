@@ -39,6 +39,12 @@
 ### 5.4.0-prerelease0001
 * Initial prerelease version for 5.4
 
+### 5.3.6
+* fshadeaot using resources instead of literal strings
+
+### 5.3.5
+* merged v52 (containing improved AOT)
+
 ### 5.3.4
 * Added intrinsics for dynamically accessing matrix rows and columns (matrix.Row() / matrix.Column())
 * Added intrinsics for dynamically accessing matrix elements (matrix.[x, y])

@@ -8,7 +8,6 @@ open Microsoft.FSharp.Quotations.Patterns
 open Microsoft.FSharp.Quotations.DerivedPatterns
 open Microsoft.FSharp.Quotations.ExprShape
 open Microsoft.FSharp.Reflection
-
 open Aardvark.Base
 open FShade.Imperative
 
@@ -1214,6 +1213,121 @@ module Effect =
                     e |> Some
             with _ ->
                 None
+
+    [<CompilerMessage("Use with caution", 1337, IsHidden = true)>]
+    let mutable UseAOT = true
+    
+    [<CompilerMessage("For Internal Use by fshadeaot", 1337, IsHidden = true)>]
+    let unpickleResource (lambda : obj) (id : string) (assemblyName : string) =
+        let shaders =
+            lazy (
+                let inline recreate() =
+                    if isNull lambda then
+                        None
+                    else
+                        let t = lambda.GetType()
+                        if FSharpType.IsFunction t then
+                            let (d, r) = FSharpType.GetFunctionElements(t)
+                            let tf = typedefof<FSharpFunc<_,_>>.MakeGenericType [|d; r|]
+                            let m = tf.GetMethod("Invoke", [| d |])
+                            if isNull m || not (typeof<Expr>.IsAssignableFrom r) then
+                                None
+                            else
+                                let arg = 
+                                    if d.IsValueType then Activator.CreateInstance(d)
+                                    else null
+                                let res = m.Invoke(lambda, [|arg|]) :?> Expr
+                                Some (ofExpr d res)
+                                    
+                        else
+                            None
+
+                if UseAOT then
+                    try
+                        let ass = System.Reflection.Assembly.Load(assemblyName)
+                        use ms = ass.GetManifestResourceStream(id)
+                        use src = new BinaryReader(ms, System.Text.Encoding.UTF8, true)
+                        let state = Shader.DeserializerState()
+                        let _id = src.ReadString()
+                        let cnt = src.ReadInt32()
+                        List.init cnt (fun _ ->
+                            let stage = src.ReadInt32() |> unbox<ShaderStage>
+                            let shader = Shader.deserializeInternal state src
+                            stage, shader
+                        )
+                        |> Map.ofList
+                    with e ->
+                        Report.Warn("[FShade] Effect deserialization failed, re-creating Effect using ofFunction: {0}", e)
+
+                        match recreate() with
+                        | Some e -> e.Shaders
+                        | None -> failwithf "Failed to create effect: \"%s\"" id
+                else
+                    Report.Warn("[FShade] Effect deserialization disabled, re-creating Effect using ofFunction")
+
+                    match recreate() with
+                    | Some e -> e.Shaders
+                    | None -> failwithf "Failed to create effect: \"%s\"" id
+
+            )
+        Effect(id, shaders, [])
+        
+    [<CompilerMessage("For Internal Use by fshadeaot", 1337, IsHidden = true)>]
+    let unpickleInternal (lambda : obj) (id : string) (data : string) =
+        let shaders =
+            lazy (
+
+                let inline recreate() =
+                    if isNull lambda then
+                        None
+                    else
+                        let t = lambda.GetType()
+                        if FSharpType.IsFunction t then
+                            let (d, r) = FSharpType.GetFunctionElements(t)
+                            let tf = typedefof<FSharpFunc<_,_>>.MakeGenericType [|d; r|]
+                            let m = tf.GetMethod("Invoke", [| d |])
+                            if isNull m || not (typeof<Expr>.IsAssignableFrom r) then
+                                None
+                            else
+                                let arg = 
+                                    if d.IsValueType then Activator.CreateInstance(d)
+                                    else null
+                                let res = m.Invoke(lambda, [|arg|]) :?> Expr
+                                Some (ofExpr d res)
+                                    
+                        else
+                            None
+                          
+                if UseAOT then
+                    try
+                        let binary = System.Convert.FromBase64String data
+                        use ms = new MemoryStream(binary)
+                        use src = new BinaryReader(ms, System.Text.Encoding.UTF8, true)
+                        let state = Shader.DeserializerState()
+                        let _id = src.ReadString()
+                        let cnt = src.ReadInt32()
+                        List.init cnt (fun _ ->
+                            let stage = src.ReadInt32() |> unbox<ShaderStage>
+                            let shader = Shader.deserializeInternal state src
+                            stage, shader
+                        )
+                        |> Map.ofList
+                    with e ->
+                        Report.Warn("[FShade] Effect deserialization failed, re-creating Effect using ofFunction: {0}", e)
+
+                        match recreate() with
+                        | Some e -> e.Shaders
+                        | None -> failwithf "Failed to read effect base64: \"%s\"" data
+                else
+                    Report.Warn("[FShade] Effect deserialization disabled, re-creating Effect using ofFunction")
+
+                    match recreate() with
+                    | Some e -> e.Shaders
+                    | None -> failwithf "Failed to read effect base64: \"%s\"" data
+                    
+            )
+
+        Effect(id, shaders, [])
 
 
 

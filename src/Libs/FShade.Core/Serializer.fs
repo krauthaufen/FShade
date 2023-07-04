@@ -33,6 +33,9 @@ module Serializer =
 
         type Type with
 
+            member x.SerializerName =
+                x.FullName + ", " + x.Assembly.GetName().Name
+
             member x.GetMethodEx(name : string, typeArguments : Type[], parameters : Type[],
                                  [<Optional; DefaultParameterValue(BindingFlags.Static ||| BindingFlags.Instance)>] flags : BindingFlags) =
 
@@ -47,7 +50,7 @@ module Serializer =
                     let expected = mi.GetParameters() |> Array.map (fun t -> t.ParameterType)
 
                     parameters.Length = expected.Length &&
-                    (parameters, expected) ||> Array.forall2 (=)
+                    (parameters, expected) ||> Array.forall2 (fun p e -> e.IsAssignableFrom p)
 
                 let candidates =
                     x.GetMember(name, MemberTypes.Method, flags ||| defaultFlags)
@@ -57,9 +60,11 @@ module Serializer =
                 if candidates.Length = 1 then
                     candidates.[0]
                 elif candidates.Length > 1 then
-                    raise <| AmbiguousMatchException($"Multiple matching methods with name {name} found.")
+                    Type.DefaultBinder.SelectMethod(flags ||| defaultFlags, Array.map unbox candidates, parameters, null)
+                    :?> MethodInfo
                 else
-                    raise <| ArgumentException($"Method with name {name} not found.")
+                    let ps = parameters |> Array.map (fun p -> p.FullName) |> String.concat ", "
+                    raise <| ArgumentException($"Method {name}({ps}) not found in type {x}.")
 
             member x.GetMethodEx(name : string, typeArguments : Type[], parameters : Expr list,
                                  [<Optional; DefaultParameterValue(BindingFlags.Static ||| BindingFlags.Instance)>] flags : BindingFlags) =
@@ -248,7 +253,7 @@ module Serializer =
 
                         dst.Write (byte TypeId.Generic)
                         dst.Write id
-                        dst.Write e.AssemblyQualifiedName
+                        dst.Write e.SerializerName
                     for tp in e.GetGenericArguments() do
                         serializeInternal state dst tp
                 else
@@ -262,7 +267,7 @@ module Serializer =
 
                         dst.Write (byte TypeId.Other)
                         dst.Write id
-                        dst.Write e.AssemblyQualifiedName
+                        dst.Write e.SerializerName
             ()
 
         type internal DeserializerState =
