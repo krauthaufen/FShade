@@ -6,20 +6,6 @@ open Aardvark.Base
 
 #nowarn "44"
 
-[<Obsolete("Use ShaderDebugger instead.")>]
-module EffectDebugger =
-
-    let mutable isAttached = false
-
-    // Effect -> IMod<Effect>
-    let mutable registerFun : Option<Effect -> obj> = None
-    let mutable saveCode : Effect -> string -> unit = fun _ _ -> ()
-
-    let register (e : Effect) =
-        match registerFun with
-            | Some f -> Some (f e)
-            | _ -> None
-
 module ShaderDebugger =
 
     type IShaderDebugger =
@@ -39,21 +25,10 @@ module ShaderDebugger =
                 let inst = f()
                 instance <- Some inst
 
-                EffectDebugger.isAttached <- true
-                EffectDebugger.registerFun <-
-                    Some (
-                        fun effect ->
-                            match inst.TryRegisterEffect effect with
-                            | Some res -> res :> obj
-                            | _ -> AVal.constant effect :> obj
-                    )
-
                 { new IDisposable with
                     member x.Dispose() =
                         lock lockObj (fun _ ->
                             instance <- None
-                            EffectDebugger.isAttached <- false
-                            EffectDebugger.registerFun <- None
                             inst.Dispose()
                         )
                 }
