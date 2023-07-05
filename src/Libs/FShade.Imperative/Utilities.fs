@@ -16,6 +16,7 @@ exception FShadeOnlyInShaderCodeException of string
 
 [<AutoOpen>]
 module DynamicHostInvocation =
+    open System.Collections.Generic
 
     let rec (|ShaderOnlyExn|_|) (e : Exception) =
         match e with
@@ -35,21 +36,46 @@ module DynamicHostInvocation =
         | _ ->
             None
 
-    let private invalidHostInvocation = new ThreadLocal<bool>(fun _ -> false)
+    let private invalidHostInvocation = new ThreadLocal<_>(fun _ -> Stack<bool>())
 
-    /// Returns a default value and sets a flag to indicate that it must not be used by the optimizer.
-    let onlyInShaderCode<'T> (_name : string) : 'T =
-        invalidHostInvocation.Value <- true
-        Unchecked.defaultof<'T>
+    /// <summary>
+    /// Returns a default value and signals that it must not be used by the optimizer.
+    /// </summary>
+    /// <exception cref="FShadeOnlyInShaderCodeException">Thrown when invoked directly.</exception>
+    let onlyInShaderCode<'T> (name : string) : 'T =
+        let invalid = invalidHostInvocation.Value
+
+        if invalid.Count = 0 then
+            raise <| FShadeOnlyInShaderCodeException name
+        else
+            // Replace the flag to indicate to the optimizer that the result is invalid.
+            // We use a stack rather than a simple flag to avoid potential issues with APC.
+            // See: https://stackoverflow.com/questions/8431221/why-did-entering-a-lock-on-a-ui-thread-trigger-an-onpaint-event
+            invalid.Pop() |> ignore
+            invalid.Push true
+            Unchecked.defaultof<'T>
 
     let inline private tryInvoke (f : unit -> 'T) =
+        let invalid = invalidHostInvocation.Value
+
         try
-            invalidHostInvocation.Value <- false
+            invalid.Push false
             let result = f()
-            if invalidHostInvocation.Value then None
+
+            if invalid.Count > 1 then
+                Log.warn "[FShade] Stack for invalid host invocations has %d values (should be 1)" invalid.Count
+
+            if invalid.Pop() then None
             else Some result
-        with ShaderOnlyExn _ ->
+
+        with
+        | ShaderOnlyExn _ ->
+            invalid.Pop() |> ignore
             None
+
+        | _ ->
+            invalid.Pop() |> ignore
+            reraise()
 
     type MethodInfo with
         member x.TryInvoke(obj : obj, parameters : obj[]) =

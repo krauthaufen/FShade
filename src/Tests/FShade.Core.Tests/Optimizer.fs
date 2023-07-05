@@ -520,3 +520,36 @@ let ``[Constant] enum to float32``() =
     let input    = <@ keep (float32 MyEnum.C) @>
     let expected = <@ keep 4.0f @>
     input |> Opt.run |> should exprEqual expected
+
+let private myCoolIntrinsic (_value : float) =
+    onlyInShaderCode<float> "myCoolIntrinsic"
+
+let private myCoolIntrinsic2 (_value : float) =
+    raise <| FShadeOnlyInShaderCodeException "myCoolIntrinsic"
+
+let private myCoolIntrinsic3 (value : float) =
+    value + 1.0
+
+let private myNotSoCoolIntrinsic (_value : float) =
+    raise <| System.ArgumentException()
+
+[<Test>]
+let ``[Constant] respect onlyInShaderCode``() =
+    let input    = <@ keep (myCoolIntrinsic 1.0) @>
+    input |> Opt.run |> should exprEqual input
+
+[<Test>]
+let ``[Constant] respect FShadeOnlyInShaderCodeException``() =
+    let input    = <@ keep (myCoolIntrinsic2 1.0) @>
+    input |> Opt.run |> should exprEqual input
+
+[<Test>]
+let ``[Constant] evaluate method``() =
+    let input    = <@ keep (myCoolIntrinsic3 1.0) @>
+    let expected = <@ keep 2.0 @>
+    input |> Opt.run |> should exprEqual expected
+
+[<Test>]
+let ``[Constant] evaluate throwing method``() =
+    let input    = <@ keep (myNotSoCoolIntrinsic 1.0) @>
+    input |> Opt.run |> should exprEqual input
