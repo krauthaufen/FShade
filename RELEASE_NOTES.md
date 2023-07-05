@@ -1,3 +1,8 @@
+### 5.5.0
+* Reworked shader debugger (see https://github.com/aardvark-platform/aardvark.docs/wiki/FShade-ShaderDebugger)
+* Reduced the number of OnlyInShaderCode exceptions thrown by the optimizer
+* Fixed constant folding of bitwise operations on enums
+
 ### 5.4.1
 * Added validation for uniform aliases
 * Serializer includes uniform semantic and type for hashing
