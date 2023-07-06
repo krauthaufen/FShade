@@ -1388,13 +1388,13 @@ module Compiler =
 
                 | NewTuple(fields) ->
                     let! s = State.get
-                    let! ctor = e.Type |> Constructors.tuple s.moduleState.backend |> CompilerState.useCtor e.Type
+                    let! ctor = e.Type |> Constructors.tuple s.moduleState.backend |> CompilerState.useCtor (typeName e.Type)
                     let! fields = fields |> List.mapS toCExprS |>> List.toArray
                     return CCall(ctor, fields)
 
                 | NewRecord(t, fields) ->
                     let! s = State.get
-                    let! ctor = t |> Constructors.record s.moduleState.backend |> CompilerState.useCtor t
+                    let! ctor = t |> Constructors.record s.moduleState.backend |> CompilerState.useCtor (typeName t)
                     let! fields = fields |> List.mapS toCExprS |>> List.toArray
                     return CCall(ctor, fields)
 

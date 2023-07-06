@@ -419,7 +419,21 @@ module ModuleCompiler =
                 let set = System.Collections.Generic.HashSet()
                 for t in graphs do visit set t
 
-                set |> Seq.toArray |> Array.sort |> Array.toList |> List.choose (fun t -> t.Definition)
+                set
+                |> Seq.toArray
+                |> Array.sort
+                |> Array.toList
+                |> List.choose (fun t -> t.Definition)
+                |> List.distinct
+                |> List.groupBy (fun (CStructDef(n, _)) -> n)
+                |> List.map (fun (n, defs) ->
+                    if defs.Length > 1 then
+                        let nl = Environment.NewLine
+                        let defs = defs |> List.map string |> String.concat nl
+                        failwithf $"[FShade] Multiple conflicting type definitions with name {n}:{nl}{defs}"
+                    else
+                        defs.Head
+                )
 
         let ofTypes (types : list<CType>) =
             let compile =
