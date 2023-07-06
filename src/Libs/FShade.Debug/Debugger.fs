@@ -235,7 +235,9 @@ module ShaderDebugger =
                                 Report.Line(2, $"{definition} - {definition.Location}")
 
                                 success <- true
-                                projects.[definition.Project].Callbacks.Add update
+                                let project = projects.[definition.Project]
+                                project.Callbacks.Add update
+                                FileWatchers.activate project.Data
                                 shaderCache.[id] <- (definition, cval)
                                 string definition, cval
 
