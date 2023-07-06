@@ -2,6 +2,7 @@
 
 open System.IO
 open System.Xml
+open System.Text.RegularExpressions
 open System.Collections.Generic
 open Aardvark.Base
 
@@ -27,6 +28,11 @@ module internal ProjectData =
 
     let private cache = Dictionary<string, ProjectData>()
 
+    // Replaces back and forward slashes in a path with environment's directory separator.
+    let private normalizePath (path : string) =
+        let separator = string Path.DirectorySeparatorChar
+        Regex.Replace(path, @"\\|\/", separator)
+
     let rec tryLoad (path : string) =
         match cache.TryGetValue path with
         | (true, result) ->
@@ -37,7 +43,7 @@ module internal ProjectData =
 
             if File.Exists path then
                 try
-                    let xml = new XmlDocument()
+                    let xml = XmlDocument()
                     xml.Load path
 
                     let rootDir = Path.GetDirectoryName path
@@ -45,7 +51,7 @@ module internal ProjectData =
                     let getFilePaths (xpath : string) =
                         xml.SelectNodes xpath
                         |> Seq.cast<XmlAttribute>
-                        |> Seq.map (fun attr -> Path.GetFullPath <| Path.Combine(rootDir, attr.Value))
+                        |> Seq.map (fun attr -> Path.GetFullPath <| Path.Combine(rootDir, normalizePath attr.Value))
                         |> Seq.toList
 
                     let files = getFilePaths "//Compile/@Include"
