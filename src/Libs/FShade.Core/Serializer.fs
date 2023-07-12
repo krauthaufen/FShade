@@ -209,10 +209,11 @@ module Serializer =
             d
 
         type internal SerializerState =
+            val mutable public IsHash : bool
             val mutable public Table : Dict<Type, int>
             val mutable public CurrentId : int
-            new() = { Table = Dict(); CurrentId = 0 }
-
+            new(hash) = { IsHash = hash; Table = Dict(); CurrentId = 0 }
+            new() = SerializerState false
 
         let rec internal serializeInternal (state : SerializerState) (dst : BinaryWriter) (e : Type) =
             match primitiveIds.TryGetValue e with
@@ -223,25 +224,56 @@ module Serializer =
                     dst.Write (byte TypeId.Array)
                     dst.Write (byte (e.GetArrayRank()))
                     serializeInternal state dst (e.GetElementType())
+
                 elif e.IsByRef then
                     dst.Write (byte TypeId.ByRef)
                     serializeInternal state dst (e.GetElementType())
+
                 elif e.IsPointer then
                     dst.Write (byte TypeId.Pointer)
                     serializeInternal state dst (e.GetElementType())
+
                 elif FSharpType.IsFunction e then
                     let (dom, img) = FSharpType.GetFunctionElements e
                     dst.Write (byte TypeId.Function)
                     serializeInternal state dst dom
                     serializeInternal state dst img
+
                 elif FSharpType.IsTuple e then
                     let els = FSharpType.GetTupleElements e
                     dst.Write (byte TypeId.Tuple)
                     dst.Write els.Length
                     for e in els do serializeInternal state dst e
+
+                elif FSharpType.IsRecord(e, true) && state.IsHash then
+                    dst.Write e.SerializerName
+
+                    for f in FSharpType.GetRecordFields(e, true) do
+                        dst.Write f.Name
+                        serializeInternal state dst f.Type
+
+                    if e.IsGenericType then
+                        for tp in e.GetGenericArguments() do
+                            serializeInternal state dst tp
+
+                elif FSharpType.IsUnion(e, true) && state.IsHash then
+                    dst.Write e.SerializerName
+
+                    for c in FSharpType.GetUnionCases(e, true) do
+                        dst.Write c.Tag
+                        dst.Write c.Name
+
+                        for f in c.GetFields() do
+                            serializeInternal state dst f.Type
+
+                    if e.IsGenericType then
+                        for tp in e.GetGenericArguments() do
+                            serializeInternal state dst tp
+
                 elif e.IsGenericParameter then
                     dst.Write (byte TypeId.TPar)
                     dst.Write e.GenericParameterPosition
+
                 elif e.IsGenericType then
                     match state.Table.TryGetValue e with
                     | (true, id) ->
@@ -256,6 +288,7 @@ module Serializer =
                         dst.Write e.SerializerName
                     for tp in e.GetGenericArguments() do
                         serializeInternal state dst tp
+
                 else
                     match state.Table.TryGetValue e with
                     | (true, id) ->
@@ -341,7 +374,7 @@ module Serializer =
   
         let serialize (dst : Stream) (t : Type) =
             use w = new BinaryWriter(dst, System.Text.Encoding.UTF8, true)
-            serializeInternal (SerializerState()) w t
+            serializeInternal (SerializerState false) w t
     
         let deserialize (src : Stream) =
             use r = new BinaryReader(src, System.Text.Encoding.UTF8, true)
@@ -709,7 +742,7 @@ module Serializer =
             val mutable public TypeState : Type.SerializerState
             val mutable public VariableId : int
             val mutable public VariableIds : Map<Var, int>
-            new(hash) = { IsHash = hash; TypeState = Type.SerializerState(); VariableId = 0; VariableIds = Map.empty }
+            new(hash) = { IsHash = hash; TypeState = Type.SerializerState hash; VariableId = 0; VariableIds = Map.empty }
 
 
         module private UtilityFunction =
@@ -757,6 +790,9 @@ module Serializer =
 
                 | _ ->
                     dst.Write 0uy
+
+                if state.IsHash then
+                    Type.serializeInternal state.TypeState dst u.returnType
 
                 dst.Write u.functionIsInline
 
@@ -918,6 +954,9 @@ module Serializer =
                 dst.Write args.Length
                 for a in args do serializeInternal state dst a
 
+                if state.IsHash then
+                    Type.serializeInternal state.TypeState dst mi.ReturnType
+
                 dst.Write isInline
                 serializeInternal state dst def
 
@@ -1028,6 +1067,9 @@ module Serializer =
                 dst.Write args.Length
                 for a in args do serializeInternal state dst a
 
+                if state.IsHash then
+                    Type.serializeInternal state.TypeState dst mi.ReturnType
+
             | Patterns.Coerce(e, t) ->
                 dst.Write (byte ExprId.Coerce)
                 serializeInternal state dst e
@@ -1047,6 +1089,9 @@ module Serializer =
                     Type.serializeInternal state.TypeState dst field.DeclaringType
 
                 dst.Write field.Name
+
+                if state.IsHash then
+                    Type.serializeInternal state.TypeState dst field.Type
 
             | Patterns.FieldSet(target, field, value) ->
                 match target with
@@ -1176,6 +1221,9 @@ module Serializer =
 
                 dst.Write prop.Name
                 for i in indices do serializeInternal state dst i
+
+                if state.IsHash then
+                    Type.serializeInternal state.TypeState dst prop.Type
             
             | Patterns.PropertySet(target, prop, indices, value) ->
                 match target with
