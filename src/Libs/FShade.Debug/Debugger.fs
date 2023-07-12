@@ -310,10 +310,10 @@ module ShaderDebugger =
                     "raytracing effect"
                     (fun effect -> effect.Id)
                     (fun shader -> shader.Id)
-                    (fun effect -> effect.Shaders)
+                    (fun effect -> effect.ShadersWithStubs)
                     ShaderDefinition.ofRaytracingShader
                     ShaderDefinition.tryResolveRaytracingShader
-                    (fun shaders -> RaytracingEffect shaders)
+                    RaytracingEffect.ofShaders
 
     let private tryRegisterComputeShader : ComputeShader -> aval<ComputeShader> option =
         tryRegister<ComputeShader, ComputeShader, int>

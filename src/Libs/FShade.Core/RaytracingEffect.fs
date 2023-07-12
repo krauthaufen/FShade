@@ -97,12 +97,13 @@ module private RaytracingUtilities =
             RebuildShapeCombination(o, args)
 
     let prepareShader (sbt : ShaderBindingTableLayout) (slot : ShaderSlot) (shader : RaytracingShader) =
-        let prepared =
+        let preparedBody =
             shader.Body
             |> substituteStubs sbt
             |> setShaderSlotForReads slot
 
-        shader.Body <- prepared
+        let prepared = { shader.Shader with shaderBody = preparedBody }
+        RaytracingShader(shader.Id, prepared, ?definition = shader.SourceDefinition)
 
     let computeHash (shaders : Map<ShaderSlot, RaytracingShader>) =
         use hash = SHA1.Create()
@@ -135,11 +136,9 @@ module private RaytracingUtilities =
         hash.Hash |> Convert.ToBase64String
 
 
-type RaytracingEffect(shaders : Map<ShaderSlot, RaytracingShader>) =
+type RaytracingEffect internal (id : string, shaders : Map<ShaderSlot, RaytracingShader>) =
     do for KeyValue(slot, shader) in shaders do
         if shader.Stage <> slot.Stage then raise <| ArgumentException($"Invalid {slot.Stage} shader in slot {slot}.")
-
-    let id = computeHash shaders
 
     let shaderBindingTableLayout =
         lazy (
@@ -154,14 +153,13 @@ type RaytracingEffect(shaders : Map<ShaderSlot, RaytracingShader>) =
             |> Array.fold Map.union Map.empty
         )
 
-    let shaders =
+    let preparedShaders =
         lazy (
             let sbt = shaderBindingTableLayout.Value
 
-            for KeyValue(slot, shader) in shaders do
+            shaders |> Map.map (fun slot shader ->
                 shader |> prepareShader sbt slot
-
-            shaders
+            )
         )
 
     member x.Id = id
@@ -170,13 +168,26 @@ type RaytracingEffect(shaders : Map<ShaderSlot, RaytracingShader>) =
         shaderBindingTableLayout.Value
 
     member x.Shaders =
-        shaders.Value
+        preparedShaders.Value
+
+    /// Returns the individual unprepared shaders, i.e. the shader binding layout of the effect has not been applied.
+    member x.ShadersWithStubs =
+        shaders
 
     member x.Uniforms =
         uniforms.Value
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module RaytracingEffect =
+    open System.Collections.Concurrent
+
+    let private cache = ConcurrentDictionary<string, RaytracingEffect>()
+
+    let ofShaders (shaders : Map<ShaderSlot, RaytracingShader>) =
+        let hash = computeHash shaders
+        cache.GetOrAdd(hash, fun hash ->
+            RaytracingEffect(hash, shaders)
+        )
 
     let toModule (effect : RaytracingEffect) =
         Serializer.Init()
@@ -409,7 +420,7 @@ module RaytracingBuilders =
         member inline x.Delay f = f()
 
         member x.Run(shaders : Map<ShaderSlot, RaytracingShader>) =
-            RaytracingEffect(shaders)
+            RaytracingEffect.ofShaders shaders
 
 
         member private x.SetRaygen(shader : RaytracingShader) =

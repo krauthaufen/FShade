@@ -4,20 +4,15 @@ open System
 open FSharp.Quotations
 open FShade.Imperative
 
-type RaytracingShader internal (shader : Shader, ?definition : SourceDefinition) =
-    static do Serializer.Init()
+type RaytracingShader internal (id : string, shader : Shader, ?definition : SourceDefinition) =
     do assert (ShaderStage.isRaytracing shader.shaderStage)
-
-    let id = Expr.ComputeHash shader.shaderBody
-    let mutable shader = shader
 
     member x.Id = id
     member x.Shader = shader
     member x.SourceDefinition = definition
 
-    member x.Body
-        with get() = shader.shaderBody
-        and internal set(e) = shader <- { shader with shaderBody = e }
+    member inline x.Body =
+        x.Shader.shaderBody
 
     member inline x.Stage =
         x.Shader.shaderStage
@@ -36,21 +31,39 @@ type RaytracingShader internal (shader : Shader, ?definition : SourceDefinition)
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module RaytracingShader =
+    open System.Collections.Concurrent
+
+    let private cache = ConcurrentDictionary<string, RaytracingShader>()
 
     let ofShader (shader : Shader) =
-        RaytracingShader shader
+        Serializer.Init()
+        let hash = Expr.ComputeHash shader.shaderBody
+
+        cache.GetOrAdd(hash, fun hash ->
+            RaytracingShader(hash, shader)
+        )
 
     let ofExpr (inputTypes : Type list) (expr : Expr) =
-        let shaders = expr |> Shader.ofExpr inputTypes
-        let definition = expr |> SourceDefinition.ofExpr inputTypes
-        RaytracingShader(shaders.Head, definition)
+        Serializer.Init()
+        let hash = Expr.ComputeHash expr
+
+        cache.GetOrAdd(hash, fun hash ->
+            let shaders = expr |> Shader.ofExpr inputTypes
+            let definition = expr |> SourceDefinition.ofExpr inputTypes
+            RaytracingShader(hash, shaders.Head, definition)
+        )
 
     let ofFunction (shaderFunction : 'a -> Expr<'b>) =
         match Shader.Utils.tryExtractExpr shaderFunction with
         | Some (expr, types) ->
-            let shader = expr |> Shader.ofExpr types |> List.head
-            let definition = expr |> SourceDefinition.create types shaderFunction
-            RaytracingShader(shader, definition)
+            Serializer.Init()
+            let hash = Expr.ComputeHash expr
+
+            cache.GetOrAdd(hash, fun hash ->
+                let shader = expr |> Shader.ofExpr types |> List.head
+                let definition = expr |> SourceDefinition.create types shaderFunction
+                RaytracingShader(hash, shader, definition)
+            )
         | _ ->
             failwithf "[FShade] cannot create raytracing shader using function: %A" shaderFunction
 
