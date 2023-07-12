@@ -173,17 +173,19 @@ module ComputeShader =
 
         ComputeShader(hash, meth, localSize, data, definition)
 
-    let private cache = System.Collections.Concurrent.ConcurrentDictionary<string * V3i, ComputeShader>()
+    let private cache = System.Collections.Concurrent.ConcurrentDictionary<string, ComputeShader>()
     
     let ofExpr (localSize : V3i) (body : Expr) =
         Serializer.Init()
-        let body = Expr.InlineSplices body
-        let hash = Expr.ComputeHash body
-        cache.GetOrAdd((hash, localSize), fun (signature, localSize) ->
+        let hash = $"{Expr.ComputeHash body}{localSize}"
+
+        cache.GetOrAdd(hash, fun _ ->
+            let body = Expr.InlineSplices body
+
             let meth =
                 match body.Method with
-                    | Some mb -> mb
-                    | None -> null
+                | Some mb -> mb
+                | None -> null
 
             let definition = body |> SourceDefinition.ofExpr []
             ofExprInternal meth hash localSize definition body
@@ -191,38 +193,35 @@ module ComputeShader =
 
     let ofFunction (maxLocalSize : V3i) (f : 'a -> 'b) : ComputeShader =
         match Shader.Utils.tryExtractExpr f with
-            | Some (body, inputs) ->
-                Serializer.Init()
+        | Some (body, inputs) ->
+            Serializer.Init()
 
-                let localSize, meth =
-                    match body.Method with
-                        | Some mb -> 
-                            match mb.GetCustomAttributes<LocalSizeAttribute>() |> Seq.tryHead with
-                                | Some att -> V3i(att.X, att.Y, att.Z), mb
-                                | _ -> 
-                                    Log.warn "[FShade] compute shader without local-size"
-                                    V3i(1,1,1), mb
-                        | None ->
-                            Log.warn "[FShade] compute shader without local-size"
-                            V3i(1,1,1), null
-
-                let hash = sprintf "%s%A" (Expr.ComputeHash body) localSize
-
-                cache.GetOrAdd((hash, localSize), fun (signature, localSize) ->
-                    let body = Expr.InlineSplices body
-
-                    let localSize =
+            let localSize, meth =
+                match body.Method with
+                | Some mb ->
+                    match mb.GetCustomAttributes<LocalSizeAttribute>() |> Seq.tryHead with
+                    | Some att ->
                         V3i(
-                            (if localSize.X = MaxLocalSize then maxLocalSize.X else localSize.X),
-                            (if localSize.Y = MaxLocalSize then maxLocalSize.Y else localSize.Y),
-                            (if localSize.Z = MaxLocalSize then maxLocalSize.Z else localSize.Z)
-                        )
+                            (if att.X = MaxLocalSize then maxLocalSize.X else att.X),
+                            (if att.Y = MaxLocalSize then maxLocalSize.Y else att.Y),
+                            (if att.Z = MaxLocalSize then maxLocalSize.Z else att.Z)
+                        ), mb
+                    | _ ->
+                        Log.warn "[FShade] compute shader without local-size"
+                        V3i.One, mb
+                | None ->
+                    Log.warn "[FShade] compute shader without local-size"
+                    V3i.One, null
 
-                    let definition = body |> SourceDefinition.create inputs f
-                    ofExprInternal meth hash localSize definition body
-                )
-            | None ->
-                failwithf "[FShade] cannot create compute shader using function: %A" f
+            let hash = $"{Expr.ComputeHash body}{localSize}"
+
+            cache.GetOrAdd(hash, fun _ ->
+                let body = Expr.InlineSplices body
+                let definition = body |> SourceDefinition.create inputs f
+                ofExprInternal meth hash localSize definition body
+            )
+        | None ->
+            failwithf "[FShade] cannot create compute shader using function: %A" f
 
     let toEntryPoint (s : ComputeShader) =
         let bufferArguments = 
