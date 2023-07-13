@@ -54,8 +54,8 @@ module ShaderDebugger =
         }
 
         member x.InputCount =
-            // If there is a single unit input, the respective function will have no parameters -> treat as zero inputs
-            if x.Inputs = [typeof<unit>] then 0
+            // If there is a single unit input and no applied arguments, the respective function will have no parameters -> treat as zero inputs
+            if x.Inputs = [typeof<unit>] && x.Arguments.IsEmpty then 0
             else x.Inputs.Length
 
         override x.ToString() =
