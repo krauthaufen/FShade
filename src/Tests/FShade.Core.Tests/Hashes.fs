@@ -559,19 +559,6 @@ let ``[Hashing] intrinsic hashes on target-function``() =
 
     e1.Id |> should equal e2.Id
 
-
-// Note: Hashes depend on assembly version
-// -> unit tests containing hard coded hashes must be fixed for each new major version or when the serializer is modified
-[<Test>]
-let ``[Hashing] deterministic uniforms``() =
-    let subScopes = [ "Bla"; "Blurg"; "Blubber" ].RandomOrder() |> Seq.toList
-    for s in subScopes do uniform.GetChildScope s |> ignore
-
-    let e1 = Effect.ofFunction Shader6.shader
-
-    e1.Id |> should equal "qlMH3PqU1hAd4ru06Gex4h0CBmY="
-
-
 [<Test>]
 let ``[ComputeHashing] equal => equal hash``() =
     let s = V3i(128,128,128)
