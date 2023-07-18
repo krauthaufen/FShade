@@ -1,3 +1,14 @@
+### 5.5.1
+* Removed warning on field set for storage buffers
+* Added caching for raytracing shaders and effects
+* Made hashes of compute shaders more consistent
+* Added check for type redefinitions in module compiler
+* [Debugger] Fixed issue with single unit input shader functions
+* [Debugger] Disabled symbol and other miscellaneous file generation on build
+* [Debugger] Enable file watchers on demand due to inotify limit on Linux
+* [Debugger] Fixed backslash handling in paths
+* [Serializer] Include more type information in hashes to avoid conflicts when using shader debugger
+
 ### 5.5.0
 * Reworked shader debugger (see https://github.com/aardvark-platform/aardvark.docs/wiki/FShade-ShaderDebugger)
 * Reduced the number of OnlyInShaderCode exceptions thrown by the optimizer
