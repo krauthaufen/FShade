@@ -696,7 +696,10 @@ module Optimizer =
 
                     // unknown side effects
                     | FieldSet(Some t, f, value) ->
-                        Log.warn "[FShade] found FieldSet on unknown expression: %A" t
+                        match t with
+                        | GetArray(ReadInputOrRaytracingData(ParameterKind.Uniform, _, _, _), _) -> ()
+                        | _ -> Log.warn "[FShade] found FieldSet on unknown expression: %A" t
+
                         let! value = eliminateDeadCodeS value
                         let! t = eliminateDeadCodeS t
                         return Expr.FieldSet(t, f, value)
@@ -711,13 +714,11 @@ module Optimizer =
                         let! t = eliminateDeadCodeS t
                         return Expr.PropertySet(t, pi, value, idx)
 
-                    | UnsafeWrite(ReadRaytracingData _ as t, value) ->
-                        let! value = eliminateDeadCodeS value
-                        let! t = eliminateDeadCodeS t
-                        return Expr.UnsafeWrite(t, value)
-
                     | UnsafeWrite(t, value) ->
-                        Log.warn "[FShade] found UnsafeWrite on unknown expression: %A" t
+                        match t with
+                        | ReadRaytracingData _ -> ()
+                        | _ -> Log.warn "[FShade] found UnsafeWrite on unknown expression: %A" t
+
                         let! value = eliminateDeadCodeS value
                         let! t = eliminateDeadCodeS t
                         return Expr.UnsafeWrite(t, value)
