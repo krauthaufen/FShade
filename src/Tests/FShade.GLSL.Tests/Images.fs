@@ -45,6 +45,45 @@ module ImageUniforms =
         member x.UIntImgCube      : UIntImageCube<Formats.r32ui> = x?UIntFooCube
         member x.UIntImgCubeArray : UIntImageCubeArray<Formats.r32ui> = x?UIntFooCubeArray
 
+        member x.Img_rgba32f        : Image1d<Formats.rgba32f>        = x?rgba32f
+        member x.Img_rgba16f        : Image1d<Formats.rgba16f>        = x?rgba16f
+        member x.Img_rg32f          : Image1d<Formats.rg32f>          = x?rg32f
+        member x.Img_rg16f          : Image1d<Formats.rg16f>          = x?rg16f
+        member x.Img_r11g11b10f     : Image1d<Formats.r11g11b10f>     = x?r11g11b10f
+        member x.Img_r32f           : Image1d<Formats.r32f>           = x?r32f
+        member x.Img_r16f           : Image1d<Formats.r16f>           = x?r16f
+        member x.Img_rgba16         : Image1d<Formats.rgba16>         = x?rgba16
+        member x.Img_rgb10a2        : Image1d<Formats.rgb10a2>        = x?rgb10a2
+        member x.Img_rgba8          : Image1d<Formats.rgba8>          = x?rgba8
+        member x.Img_rg16           : Image1d<Formats.rg16>           = x?rg16
+        member x.Img_rg8            : Image1d<Formats.rg8>            = x?rg8
+        member x.Img_r16            : Image1d<Formats.r16>            = x?r16
+        member x.Img_r8             : Image1d<Formats.r8>             = x?r8
+        member x.Img_rgba16_snorm   : Image1d<Formats.rgba16_snorm>   = x?rgba16_snorm
+        member x.Img_rgba8_snorm    : Image1d<Formats.rgba8_snorm>    = x?rgba8_snorm
+        member x.Img_rg16_snorm     : Image1d<Formats.rg16_snorm>     = x?rg16_snorm
+        member x.Img_rg8_snorm      : Image1d<Formats.rg8_snorm>      = x?rg8_snorm
+        member x.Img_r16_snorm      : Image1d<Formats.r16_snorm>      = x?r16_snorm
+        member x.Img_r8_snorm       : Image1d<Formats.r8_snorm>       = x?r8_snorm
+        member x.Img_rgba32ui       : UIntImage1d<Formats.rgba32ui>   = x?rgba32ui
+        member x.Img_rgba16ui       : UIntImage1d<Formats.rgba16ui>   = x?rgba16ui
+        member x.Img_rgb10a2ui      : UIntImage1d<Formats.rgb10a2ui>  = x?rgb10a2ui
+        member x.Img_rgba8ui        : UIntImage1d<Formats.rgba8ui>    = x?rgba8ui
+        member x.Img_rg32ui         : UIntImage1d<Formats.rg32ui>     = x?rg32ui
+        member x.Img_rg16ui         : UIntImage1d<Formats.rg16ui>     = x?rg16ui
+        member x.Img_rg8ui          : UIntImage1d<Formats.rg8ui>      = x?rg8ui
+        member x.Img_r32ui          : UIntImage1d<Formats.r32ui>      = x?r32ui
+        member x.Img_r16ui          : UIntImage1d<Formats.r16ui>      = x?r16ui
+        member x.Img_r8ui           : UIntImage1d<Formats.r8ui>       = x?r8ui
+        member x.Img_rgba32i        : IntImage1d<Formats.rgba32i>     = x?rgba32i
+        member x.Img_rgba16i        : IntImage1d<Formats.rgba16i>     = x?rgba16i
+        member x.Img_rgba8i         : IntImage1d<Formats.rgba8i>      = x?rgba8i
+        member x.Img_rg32i          : IntImage1d<Formats.rg32i>       = x?rg32i
+        member x.Img_rg16i          : IntImage1d<Formats.rg16i>       = x?rg16i
+        member x.Img_rg8i           : IntImage1d<Formats.rg8i>        = x?rg8i
+        member x.Img_r32i           : IntImage1d<Formats.r32i>        = x?r32i
+        member x.Img_r16i           : IntImage1d<Formats.r16i>        = x?r16i
+        member x.Img_r8i            : IntImage1d<Formats.r8i>         = x?r8i
 
 [<Test>]
 let ``Size``() =
@@ -465,6 +504,57 @@ let ``AtomicCompareExchange``() =
             let _ = uniform.UIntImgCubeArray.AtomicCompareExchange(V2i.Zero, 4, 42u, 0u)
             let _ = uniform.UIntImg2DMS.AtomicCompareExchange(V2i.Zero, 0, 42u, 0u)
             let _ = uniform.UIntImg2DArrayMS.AtomicCompareExchange(V2i.Zero, 1, 0, 42u, 0u)
+
+            return V3d.Zero
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction fs]
+
+[<Test>]
+let ``Formats``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            let _ = uniform.Img_rgba32f.Load 0
+            let _ = uniform.Img_rgba16f.Load 0
+            let _ = uniform.Img_rg32f.Load 0
+            let _ = uniform.Img_rg16f.Load 0
+            let _ = uniform.Img_r11g11b10f.Load 0
+            let _ = uniform.Img_r32f.Load 0
+            let _ = uniform.Img_r16f.Load 0
+            let _ = uniform.Img_rgba16.Load 0
+            let _ = uniform.Img_rgb10a2.Load 0
+            let _ = uniform.Img_rgba8.Load 0
+            let _ = uniform.Img_rg16.Load 0
+            let _ = uniform.Img_rg8.Load 0
+            let _ = uniform.Img_r16.Load 0
+            let _ = uniform.Img_r8.Load 0
+            let _ = uniform.Img_rgba16_snorm.Load 0
+            let _ = uniform.Img_rgba8_snorm.Load 0
+            let _ = uniform.Img_rg16_snorm.Load 0
+            let _ = uniform.Img_rg8_snorm.Load 0
+            let _ = uniform.Img_r16_snorm.Load 0
+            let _ = uniform.Img_r8_snorm.Load 0
+            let _ = uniform.Img_rgba32ui.Load 0
+            let _ = uniform.Img_rgba16ui.Load 0
+            let _ = uniform.Img_rgb10a2ui.Load 0
+            let _ = uniform.Img_rgba8ui.Load 0
+            let _ = uniform.Img_rg32ui.Load 0
+            let _ = uniform.Img_rg16ui.Load 0
+            let _ = uniform.Img_rg8ui.Load 0
+            let _ = uniform.Img_r32ui.Load 0
+            let _ = uniform.Img_r16ui.Load 0
+            let _ = uniform.Img_r8ui.Load 0
+            let _ = uniform.Img_rgba32i.Load 0
+            let _ = uniform.Img_rgba16i.Load 0
+            let _ = uniform.Img_rgba8i.Load 0
+            let _ = uniform.Img_rg32i.Load 0
+            let _ = uniform.Img_rg16i.Load 0
+            let _ = uniform.Img_rg8i.Load 0
+            let _ = uniform.Img_r32i.Load 0
+            let _ = uniform.Img_r16i.Load 0
+            let _ = uniform.Img_r8i.Load 0
 
             return V3d.Zero
         }

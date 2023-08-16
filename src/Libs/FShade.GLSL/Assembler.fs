@@ -199,9 +199,6 @@ type Backend private(config : Config) =
                         | "V4ui" -> "u"
                         | _ -> ""
 
-                let fmt = tFmt.Name
-
-
                 let name = 
                     if arr then sprintf "%simage%s%sArray" typePrefix dimStr msSuffix
                     else sprintf "%simage%s%s" typePrefix dimStr msSuffix 
@@ -1428,17 +1425,30 @@ module Assembler =
 
         }
 
+    let private imageFormat =
+        let lookup =
+            LookupTable.lookupTable' [
+                typeof<Formats.r11g11b10f>, "r11f_g11f_b10f"
+                typeof<Formats.rgb10a2>,    "rgb10_a2"
+                typeof<Formats.rgb10a2ui>,  "rgb10_a2ui"
+            ]
+
+        fun (t : Type) ->
+            match lookup t with
+            | Some fmt -> fmt
+            | _ -> t.Name
+
     let private uniformLayout (isUniformBuffer : bool) (decorations : list<UniformDecoration>) (set : int) (binding : int) =
 
         let decorations =
             decorations |> List.choose (fun d ->
                 match d with
-                    | UniformDecoration.Format t -> Some t.Name
-                    | UniformDecoration.BufferBinding _
-                    | UniformDecoration.BufferDescriptorSet _ 
-                    | UniformDecoration.FieldIndex _ -> None
+                | UniformDecoration.Format t -> Some <| imageFormat t
+                | UniformDecoration.BufferBinding _
+                | UniformDecoration.BufferDescriptorSet _
+                | UniformDecoration.FieldIndex _ -> None
             )
-            
+
         let decorations =
             if binding >= 0 then (sprintf "binding = %d" binding) :: decorations
             else decorations
