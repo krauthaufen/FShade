@@ -1,3 +1,6 @@
+### 5.5.2
+* [GLSL] Fixed issue with image format names containing underscores
+
 ### 5.5.1
 * Removed warning on field set for storage buffers
 * Added caching for raytracing shaders and effects
