@@ -221,10 +221,16 @@ module RaytracingBuilders =
             if shader.Stage <> stage then
                 failwithf "[FShade] Expected %A shader but got %A shader." stage shader.Stage
 
+            let add (map : Map<Symbol, RaytracingShader>) =
+                if map.ContainsKey rayType then
+                    failwithf "[FShade] Cannot set multiple %A shaders for ray type %A." stage rayType
+
+                map |> Map.add rayType shader
+
             match stage with
-            | ShaderStage.AnyHit     -> { group with AnyHit       = group.AnyHit       |> Map.add rayType shader }
-            | ShaderStage.ClosestHit -> { group with ClosestHit   = group.ClosestHit   |> Map.add rayType shader }
-            | _                      -> { group with Intersection = group.Intersection |> Map.add rayType shader }
+            | ShaderStage.AnyHit     -> { group with AnyHit       = add group.AnyHit }
+            | ShaderStage.ClosestHit -> { group with ClosestHit   = add group.ClosestHit }
+            | _                      -> { group with Intersection = add group.Intersection }
 
 
         [<CustomOperation("anyHit")>]
@@ -435,6 +441,9 @@ module RaytracingBuilders =
             if shader.Stage <> stage then
                 failwithf "[FShade] Expected %A shader but got %A shader." stage shader.Stage
 
+            if shaders.ContainsKey slot then
+                failwithf "[FShade] Cannot set multiple shaders for slot %A." slot
+
             shaders |> Map.add slot shader
 
         [<CustomOperation("raygen")>]
@@ -575,6 +584,13 @@ module RaytracingBuilders =
         [<CustomOperation("hitgroup")>]
         member x.HitGroup(shaders : Map<ShaderSlot, RaytracingShader>, name : Symbol, group : HitGroup) =
             let mutable shaders = shaders
+
+            for slot in Map.keys shaders do
+                match slot with
+                | ShaderSlot.AnyHit (group, _) | ShaderSlot.ClosestHit (group, _) | ShaderSlot.Intersection (group, _) when group = name ->
+                    failwithf "[FShade] Cannot set multiple hit groups with name %A." name
+                | _ ->
+                    ()
 
             for KeyValue(ray, shader) in group.AnyHit do
                 shaders <- shaders |> Map.add (ShaderSlot.AnyHit (name, ray)) shader
