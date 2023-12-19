@@ -1235,3 +1235,34 @@ let ``Uniform alias with mismatching scope``() =
         )
 
     Assert.That(exn.Message, Does.Contain "has conflicting values")
+
+[<Test>]
+let ``Uniform and storage buffers use std140 and std430 layout``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            return uniform.RegionBuffer.[0]
+        }
+
+    let fsu (v : Vertex) =
+        fragment {
+            return uniform.SomeUniformArr.[0]
+        }
+
+    let cs (mybuffer : int[]) =
+        compute {
+            let id = getGlobalId().XY
+            mybuffer.[id.X] <- id.Y
+        }
+
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction fs ] [ "std430" ]
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction fsu ] [ "std140" ]
+
+    let glsl =
+        cs
+        |> ComputeShader.ofFunction (V3i(128,128,128))
+        |> ComputeShader.toModule
+        |> ModuleCompiler.compileGLSL430
+
+    GLSL.shouldContainRegex glsl [ "std430", None ]

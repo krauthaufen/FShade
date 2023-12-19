@@ -1438,8 +1438,13 @@ module Assembler =
             | Some fmt -> fmt
             | _ -> t.Name
 
-    let private uniformLayout (isUniformBuffer : bool) (decorations : list<UniformDecoration>) (set : int) (binding : int) =
+    // For some reason we use std430 for storage buffers but std140 for uniform buffers
+    type private Layout =
+        | None = 0
+        | Std140 = 1
+        | Std430 = 2
 
+    let private uniformLayout (layout : Layout) (decorations : list<UniformDecoration>) (set : int) (binding : int) =
         let decorations =
             decorations |> List.choose (fun d ->
                 match d with
@@ -1458,8 +1463,13 @@ module Assembler =
             else decorations
 
         let decorations =
-            if isUniformBuffer then "std140" :: decorations
-            else decorations
+            let layout =
+                match layout with
+                | Layout.Std430 -> ["std430"]
+                | Layout.Std140 -> ["std140"]
+                | _ -> []
+
+            layout @ decorations
 
         match decorations with
             | [] -> ""
@@ -1529,7 +1539,7 @@ module Assembler =
                                     fields |> List.mapS (fun field ->
                                         state {
                                             let! binding = getBinding InputKind.StorageBuffer 1 [field]
-                                            let prefix = uniformLayout false [] set binding
+                                            let prefix = uniformLayout Layout.Std430 [] set binding
                                             let name = checkName field.cUniformName
 
                                             match field.cUniformType with
@@ -1559,7 +1569,7 @@ module Assembler =
                             | Some bufferName when config.createUniformBuffers ->
                                 let bufferName = checkName bufferName
                                 let! binding = getBinding InputKind.UniformBuffer 1 fields
-                                let prefix = uniformLayout true [] set binding
+                                let prefix = uniformLayout Layout.Std140 [] set binding
                             
                                 let fieldStr = 
                                     fields |> List.map (fun u -> 
@@ -1588,7 +1598,7 @@ module Assembler =
                                                 match t with
                                                     | GLSLTextureType.GLSLSampler samplerType -> 
                                                         let! binding = getBinding InputKind.Sampler cnt [u]
-                                                        prefix <- uniformLayout false u.cUniformDecorations set binding
+                                                        prefix <- uniformLayout Layout.None u.cUniformDecorations set binding
 
                                                         do! Interface.addSampler { 
                                                             samplerSet = set
@@ -1601,7 +1611,7 @@ module Assembler =
                                                            
                                                     | GLSLTextureType.GLSLImage imageType ->
                                                         let! binding = getBinding InputKind.Image cnt [u]
-                                                        prefix <- uniformLayout false u.cUniformDecorations set binding
+                                                        prefix <- uniformLayout Layout.None u.cUniformDecorations set binding
 
                                                         do! Interface.addImage { 
                                                             imageSet = set
@@ -1612,7 +1622,7 @@ module Assembler =
 
                                             | CAccelerationStructure ->
                                                 let! binding = getBinding InputKind.AccelerationStructure 1 [u]
-                                                prefix <- uniformLayout false u.cUniformDecorations set binding
+                                                prefix <- uniformLayout Layout.None u.cUniformDecorations set binding
 
                                                 do! Interface.addAccelerationStructure {
                                                     accelSet = set
@@ -1622,7 +1632,7 @@ module Assembler =
 
                                             | _ ->
                                                 let! binding = getBinding InputKind.UniformBuffer 1 [u]
-                                                prefix <- uniformLayout false u.cUniformDecorations set binding
+                                                prefix <- uniformLayout Layout.None u.cUniformDecorations set binding
 
                                                 ()
 
