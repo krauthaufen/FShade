@@ -108,10 +108,10 @@ module internal Compiler =
                 "--no-dependencies"
                 "--no-restore"
                 "--no-self-contained"
-                "--property:DebugSymbols=false"
-                "--property:DebugType=None"
-                "--property:SatelliteResourceLanguages=en"
-                "--property:GenerateDocumentationFile=false"
+                "-property:DebugSymbols=false"
+                "-property:DebugType=None"
+                "-property:SatelliteResourceLanguages=en"
+                "-property:GenerateDocumentationFile=false"
             ]
 
         match buildResult with
