@@ -1,3 +1,9 @@
+### 5.5.3
+* [Raytracing] Added duplication checks in effect builders
+* [Debugger] Fixed issue with compiler options not being recognized due to double hyphens
+* Added Effect.toLayered with custom semantic
+* Use std430 layout for all storage buffers
+
 ### 5.5.2
 * [GLSL] Fixed issue with image format names containing underscores
 
