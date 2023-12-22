@@ -6,12 +6,9 @@
 [![Discord](https://badgen.net/discord/online-members/UyecnhM)](https://discord.gg/UyecnhM)
 
 # FShade
-FShade is a Library allowing users to write Shaders in F# using code-quotations
+FShade is a library for writing Shaders in F# using code-quotations. 
  
-For further details see:
+The main documentation is located at:
 http://www.fshade.org/
 
-For real world examples see [Aardvark.Rendering](https://github.com/aardvark-platform/aardvark.rendering) where FShade shaders and compositions are heavily used.
-
-Some compute shader examples and a GPGPU jpeg compressor written in FShade can also be found in the [Aardvark.GPGPU](https://github.com/aardvark-platform/aardvark.rendering/tree/master/src/Aardvark.GPGPU) project.
-
+FShade is neatly integrated into [Aardvark.Rendering](https://github.com/aardvark-platform/aardvark.rendering), where example shaders and compositions are showcased. You can find compute shaders in [Aardvark.GPGPU](https://github.com/aardvark-platform/aardvark.rendering/tree/master/src/Aardvark.GPGPU). Supplementary documentation is in [this repository's wiki](https://github.com/krauthaufen/FShade/wiki).
