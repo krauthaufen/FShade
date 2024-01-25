@@ -360,6 +360,10 @@ let ``Bad Helpers``() =
 let util (a : ref<float>) =
     a := !a + 1.0
 
+[<ReflectedDefinition>]
+let util2 (a : ref<float>) =
+    a.Value <- a.Value + 1.0
+
 [<Test>]
 let ``Ref translated to inout``() =
     Setup.Run()
@@ -368,18 +372,19 @@ let ``Ref translated to inout``() =
         fragment {
             let a = ref v.pos.X
             util a
+            util2 a
             return !a * v.c
         }
 
-    let rx =
+    let rx name =
         String.concat "" [
-            "[ \t\r\n]*void[ \t]+(.*?)_util_(.*?)\(inout[ \t]+float[ \t]+a\)"
+            "[ \t\r\n]*void[ \t]+(.*?)_" + name + "_(.*?)\(inout[ \t]+float[ \t]+a\)"
             "[ \t\r\n]*\{"
             "[ \t\r\n]*a[ \t]+\=[ \t]+\(a[ \t]+\+[ \t]+1\.0\);"
             "[ \t\r\n]*\}"
         ]
 
-    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [rx]
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [rx "util"; rx "util2"]
 
 
 [<GLSLIntrinsic("atomicAdd({0}, {1})")>]

@@ -340,34 +340,42 @@ module ExpressionExtensions =
     let private deref = getMethodInfo <@ (!) @>
     let private setref = getMethodInfo <@ (:=) @>
 
+    let (|RefExpr|_|) (e : Expr) =
+        match e.Type with
+        | Ref inner -> Some inner
+        | _ -> None
 
     let (|RefOf|_|) (e : Expr) =
         match e with
-            | Call(None, mi, [v]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = refof ->
-                Some v
-            | _ ->
-                None
+        | Call(None, mi, [v]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = refof ->
+            Some v
+        | _ ->
+            None
 
     let (|NewRef|_|) (e : Expr) =
         match e with
-            | Call(None, mi, [v]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = newref ->
-                Some v
-            | _ ->
-                None
+        | Call(None, mi, [v]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = newref ->
+            Some v
+        | _ ->
+            None
 
     let (|DeRef|_|) (e : Expr) =
         match e with
-            | Call(None, mi, [v]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = deref ->
-                Some v
-            | _ ->
-                None
+        | Call(None, mi, [v]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = deref ->
+            Some v
+        | PropertyGet(Some (RefExpr _ as v), pi, []) when pi.Name = "Value" ->
+            Some v
+        | _ ->
+            None
 
     let (|SetRef|_|) (e : Expr) =
         match e with
-            | Call(None, mi, [r;v]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = setref ->
-                Some(r,v)
-            | _ ->
-                None
+        | Call(None, mi, [r;v]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = setref ->
+            Some(r, v)
+        | PropertySet(Some (RefExpr _ as r), pi, [], v) when pi.Name = "Value" ->
+            Some(r, v)
+        | _ ->
+            None
 
     type MethodInfo with
         static member WriteOutputs = ShaderIO.WriteOutputsMeth
