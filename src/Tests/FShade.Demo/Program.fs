@@ -480,26 +480,32 @@ module IOExtensions =
         member x.ReadSafe(buffer : 'a[], index : int, count : int) =
             x.ReadSafe(Span(buffer, index, count))
 
+module Bla =
+    open FShade
+    
+    type Vertex =
+        {
+            [<Position>] p : V4f
+            [<Color>] c : V4f
+            [<Semantic("Hans")>] h : V4d
+        }
+    
+    let test (v : Vertex) =
+        fragment {
+            
+            let res = float32 (Vec.dot v.h V4d.IOIO)
+            
+            return v.c * res
+        }
+
 
 [<EntryPoint>]
 let main args =
     Aardvark.Init()
 
-    let f = System.IO.Path.GetTempFileName()
-    do
-        use f = System.IO.File.OpenWrite f
-        f.Write (Span [|V3d.III; V3d.OIO; V3d.IIO|])
-
-
-    do 
-        use f = System.IO.File.OpenRead f
-        let arr = Array.zeroCreate<V3d> (int (f.Length / int64 sizeof<V3d>))
-        f.ReadSafe(Span arr)
-        printfn "%A" arr
+    Examples.UtiliyFunctions.print [] (Effect.ofFunction Bla.test)
 
     exit 0
-
-
     let effect =
         let defaultHitGroup =
             hitgroup {

@@ -22,6 +22,7 @@ module Backends =
             reverseMatrixLogic      = true
             depthWriteMode          = false
             useInOut                = true
+            doubleAsFloat           = true 
         }
 
     let glsl430 =
@@ -39,6 +40,7 @@ module Backends =
             reverseMatrixLogic      = true
             depthWriteMode          = true
             useInOut                = true
+            doubleAsFloat           = true 
         }
 
     let glsl120 =
@@ -56,6 +58,7 @@ module Backends =
             reverseMatrixLogic      = true
             depthWriteMode          = false
             useInOut                = false
+            doubleAsFloat           = true 
         }
 
     let glslVulkan =
@@ -73,6 +76,7 @@ module Backends =
             reverseMatrixLogic      = true
             depthWriteMode          = true
             useInOut                = true
+            doubleAsFloat           = true 
         }
 
     let glslRaytracing =
@@ -90,6 +94,7 @@ module Backends =
             reverseMatrixLogic      = true
             depthWriteMode          = true
             useInOut                = true
+            doubleAsFloat           = true 
         }
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]

@@ -126,22 +126,24 @@ module GLSLType =
             | Int _ -> true
             | _ -> false
 
-    let rec ofCType (rev : bool) (t : CType) =
+    let rec ofCType (doubleAsFloat : bool) (rev : bool) (t : CType) =
         match t with    
             | CType.CBool -> GLSLType.Bool
             | CType.CVoid -> GLSLType.Void
             | CType.CInt(signed, width) -> GLSLType.Int(signed, width)
 
-            | CType.CFloat 64 -> GLSLType.Float 32
+            | CType.CFloat 64 ->
+                if doubleAsFloat then GLSLType.Float 32
+                else GLSLType.Float 64
             | CType.CFloat(width) -> GLSLType.Float(width)
 
-            | CType.CVector(elem, dim) -> GLSLType.Vec(dim, ofCType rev elem)
+            | CType.CVector(elem, dim) -> GLSLType.Vec(dim, ofCType doubleAsFloat rev elem)
             | CType.CMatrix(elem, r, c) -> 
-                if rev then GLSLType.Mat(r, c, ofCType rev elem)
-                else GLSLType.Mat(c, r, ofCType rev elem)
+                if rev then GLSLType.Mat(r, c, ofCType doubleAsFloat rev elem)
+                else GLSLType.Mat(c, r, ofCType doubleAsFloat rev elem)
 
-            | CType.CArray(elem, len) -> GLSLType.Array(len, ofCType rev elem, -1)
-            | CType.CStruct(name, fields,_) -> GLSLType.Struct(name, fields |> List.map (fun (t, n) -> n, ofCType rev t, -1), -1)
+            | CType.CArray(elem, len) -> GLSLType.Array(len, ofCType doubleAsFloat rev elem, -1)
+            | CType.CStruct(name, fields,_) -> GLSLType.Struct(name, fields |> List.map (fun (t, n) -> n, ofCType doubleAsFloat rev t, -1), -1)
 
             | CType.CIntrinsic a ->
                 match a.tag with
@@ -152,7 +154,7 @@ module GLSLType =
                     | _ ->
                         GLSLType.Intrinsic a.intrinsicTypeName
 
-            | CType.CPointer(_,e) -> GLSLType.DynamicArray (ofCType rev e, -1)
+            | CType.CPointer(_,e) -> GLSLType.DynamicArray (ofCType doubleAsFloat rev e, -1)
 
     let rec internal serializeInternal (dst : BinaryWriter) (t : GLSLType) =
         match t with

@@ -191,6 +191,7 @@ module UtiliyFunctions =
                         reverseMatrixLogic      = true
                         depthWriteMode          = false
                         useInOut                = true
+                        doubleAsFloat           = true 
                     }
 
                 let glsl = 

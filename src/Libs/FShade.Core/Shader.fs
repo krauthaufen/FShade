@@ -2047,8 +2047,8 @@ module Preprocessor =
     and getOutputValues (sem : string) (value : Expr) : Preprocess<list<string * Option<Expr> * Expr>> =
         state {
             match value.Type with
-            | TypeInfo.Patterns.VectorOf (_, (TypeInfo.Patterns.Float64 | TypeInfo.Patterns.Int32 | TypeInfo.Patterns.UInt32))
-            | TypeInfo.Patterns.Float64 | TypeInfo.Patterns.Int32 | TypeInfo.Patterns.UInt32 ->
+            | TypeInfo.Patterns.VectorOf (_, (TypeInfo.Patterns.Float32 | TypeInfo.Patterns.Float64 | TypeInfo.Patterns.Int32 | TypeInfo.Patterns.UInt32))
+            | TypeInfo.Patterns.Float32 | TypeInfo.Patterns.Float64 | TypeInfo.Patterns.Int32 | TypeInfo.Patterns.UInt32 ->
                 let! value = preprocessS value
                 do! State.writeOutput sem { paramType = value.Type; paramInterpolation = InterpolationMode.Default }
                 return [sem, None, value]
