@@ -1,3 +1,7 @@
+### 5.5.4
+* [GLSL] Fixed issue with variable names containing @
+* [Raytracing] Fixed issue with callable data name indexing
+
 ### 5.5.3
 * [Raytracing] Added duplication checks in effect builders
 * [Debugger] Fixed issue with compiler options not being recognized due to double hyphens
