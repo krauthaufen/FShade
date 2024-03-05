@@ -94,7 +94,7 @@ module Module =
             let operands = i.Operands |> Seq.filter (not << isNull) |> Seq.map (sprintf "%A") |> String.concat " "
 
             match i with
-                | OpFunctionEnd _ -> indent <- indent.Substring 4
+                | OpFunctionEnd -> indent <- indent.Substring 4
                 | _ -> ()
 
             let line = 

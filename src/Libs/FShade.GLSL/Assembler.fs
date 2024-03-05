@@ -350,7 +350,7 @@ module AssemblerState =
             | CPointer(_,et) -> 
                 neededLocations rev et
 
-            | CType.CBool _ | CType.CFloat _ | CType.CInt _ ->
+            | CType.CBool | CType.CFloat _ | CType.CInt _ ->
                 1
 
             | CMatrix(et, rows, cols) ->
