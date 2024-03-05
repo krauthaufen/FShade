@@ -863,7 +863,7 @@ module Preprocessor =
                 match s.callableData |> HashMap.tryFind data with
                 | Some (var, index) -> s, (var, index)
                 | None ->
-                    let index = s.payloads.Count
+                    let index = s.callableData.Count
                     let name = sprintf "callableData%d" index
                     let s = { s with callableData = s.callableData |> HashMap.add data (name, index) }
                     s, (name, index)
