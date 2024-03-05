@@ -1913,11 +1913,6 @@ module Preprocessor =
                 let! e = preprocessNormalS e
                 return Expr.IfThenElse(cond, i, e)
 
-            | Let(v, e, b) ->
-                let! e = preprocessNormalS e
-                let! b = preprocessNormalS b
-                return Expr.Let(v, e, b)
-
             | CallFunction(utility, args) ->
                 let! args = args |> List.mapS preprocessNormalS
                 match utility.functionTag with

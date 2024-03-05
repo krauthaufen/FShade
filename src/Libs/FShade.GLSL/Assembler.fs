@@ -767,7 +767,7 @@ module Assembler =
         Identifier(name)
 
     let glslName (name : string) =
-        let name = name.Replace("__", "_")
+        let name = name.Replace("__", "_").Replace("@", "_AT_")
         if reservedNames.IsMatch name then
             Identifier("_" + name)
         else
