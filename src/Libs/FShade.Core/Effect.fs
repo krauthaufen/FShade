@@ -985,8 +985,8 @@ module Effect =
 
 
 
-    let toLayered (layerSemantic : string) (customLayerSemantic : string)
-                  (layers : int) (uniforms : Map<string, string>) (topology : InputTopology) (effect : Effect) =
+    let toLayeredEffect' (layerSemantic : string) (customLayerSemantic : string)
+                         (layers : int) (uniforms : Map<string, string>) (topology : InputTopology) (effect : Effect) =
         Serializer.Init()
 
         if effect.TessControlShader.IsSome || effect.TessEvalShader.IsSome then
@@ -1044,14 +1044,11 @@ module Effect =
         | None ->
             ofList [ geometryShader ]
 
-    let toLayeredEffect' (layerSemantic : string) (layers : int) (uniforms : Map<string, string>) (topology : InputTopology) (effect : Effect) =
-        toLayered layerSemantic layerSemantic layers uniforms topology effect
-
     let toLayeredEffect (layers : int) (uniforms : Map<string, string>) (topology : InputTopology) (effect : Effect) = 
-        toLayeredEffect' Intrinsics.Layer layers uniforms topology effect
+        toLayeredEffect' Intrinsics.Layer Intrinsics.Layer layers uniforms topology effect
 
     let toMultiViewportEffect (viewports : int) (uniforms : Map<string, string>) (topology : InputTopology) (effect : Effect) = 
-        toLayeredEffect' Intrinsics.ViewportIndex viewports uniforms topology effect
+        toLayeredEffect' Intrinsics.ViewportIndex Intrinsics.ViewportIndex viewports uniforms topology effect
 
 
 
