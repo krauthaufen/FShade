@@ -567,7 +567,8 @@ module Preprocessor =
             | Call(_, (Method("TransformPosProj", _) as mi), [m; VectorExpr(v, d, _)]) when mi.DeclaringType = typeof<Mat> ->
                 Some (d, false, [m; v])
 
-            | Call(_, (Method("TransposedTransformProj", _) as mi), [m; VectorExpr(v, d, _)]) when mi.DeclaringType = typeof<Mat> ->
+            | Call(_, (Method("TransposedTransformProj", _) as mi), [m; VectorExpr(v, d, _)])
+            | Call(_, (Method("TransposedTransformPosProj", _) as mi), [m; VectorExpr(v, d, _)]) when mi.DeclaringType = typeof<Mat> ->
                 Some (d, true, [m; v])
 
             | _ ->
@@ -1364,9 +1365,7 @@ module Preprocessor =
                 let tmp = Var("tmp", v.Type)
                 let! v = preprocessNormalS v
                 return Expr.Let(tmp, v,
-                    Expr.ToFloat(
-                        Expr.Call(dot, [Expr.Var tmp; Expr.Var tmp])
-                    )
+                    Expr.Call(dot, [Expr.Var tmp; Expr.Var tmp])
                 )
 
             | DistanceSquared (a, b) ->
@@ -1468,7 +1467,7 @@ module Preprocessor =
 
                 let transform =
                     if transposed then
-                        typeof<Mat>.GetMethod("TransposedTransformProjFull", [| m.Type; v.Type |])
+                        typeof<Mat>.GetMethod("TransposedTransformPosProjFull", [| m.Type; v.Type |])
                     else
                         typeof<Mat>.GetMethod("TransformPosProjFull", [| m.Type; v.Type |])
 

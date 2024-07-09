@@ -570,7 +570,8 @@ module Compiler =
                             None
 
                 // transposedTransformProjFull
-                | Method("TransposedTransformProjFull", [MatrixOf _; VectorOf _]), [m;v] ->
+                | Method("TransposedTransformProjFull", [MatrixOf _; VectorOf _]), [m;v]
+                | Method("TransposedTransformPosProjFull", [MatrixOf _; VectorOf _]), [m;v] ->
                     match m.ctype, v.ctype with
                     | CMatrix(_, r, c), CVector(t, d) when r = c && d = c - 1 ->
                         let res = CMulVecMat(CVector(t, d + 1), CNewVector(CVector(t, d + 1), [v; one t]), m) |> Simplification.simplifyMatrixTerm

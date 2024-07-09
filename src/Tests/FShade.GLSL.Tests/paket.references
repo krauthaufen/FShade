@@ -1,5 +1,5 @@
-Aardvark.Base
-Aardvark.Base.FSharp
+group Test
+
 FsUnit
 NUnit
 NUnit3TestAdapter

@@ -102,10 +102,9 @@ module ImageFormatExtensions =
     
     module ImageFormat =
         open Formats
-        open Aardvark.Base
 
         let ofFormatType =
-            ConversionHelpers.lookupTableOption [
+            LookupTable.lookupTable' [
                 typeof<rgba32f>, ImageFormat.Rgba32f
                 typeof<rgba16f>, ImageFormat.Rgba16f
                 typeof<rg32f>, ImageFormat.Rg32f
@@ -153,7 +152,7 @@ module ImageFormatExtensions =
 
 
         let toFormatType =
-            ConversionHelpers.lookupTable [
+            LookupTable.lookupTable [
                 ImageFormat.Rgba32f, typeof<rgba32f>
                 ImageFormat.Rgba16f, typeof<rgba16f>
                 ImageFormat.Rg32f, typeof<rg32f>

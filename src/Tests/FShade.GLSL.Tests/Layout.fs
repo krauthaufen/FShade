@@ -268,7 +268,7 @@ let validateLayout (b : GLSLUniformBuffer) =
         )
 
     if fieldsMatch then
-         Success glsl
+         Result.Ok glsl
     else
         let badFields = 
             fields |> List.filter (fun (lf,rf) ->
@@ -280,7 +280,7 @@ let validateLayout (b : GLSLUniformBuffer) =
                 badFields |> List.map (fun (l,r) -> sprintf "%s; %d vs. %d" l.ufName l.ufOffset r.ufOffset) 
             )
             
-        Error err
+        Result.Error err
 
 let randomHate() =
     Log.startTimed "testing layout"
@@ -288,8 +288,8 @@ let randomHate() =
     for i in 1 .. iter do  
         let b = randomBuffer()
         match validateLayout b with
-            | Success _ -> ()
-            | Error e -> 
+            | Result.Ok _ -> ()
+            | Result.Error e -> 
                 Log.warn "==========================================================="
                 Log.warn "BAD"
                 Log.warn "%A" b

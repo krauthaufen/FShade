@@ -768,9 +768,9 @@ let ``LengthSquared``() =
             let _ = assertDbl <| Vec.LengthSquared v.c
             let _ = assertDbl <| Vec.LengthSquared v.c.XYZ
             let _ = assertDbl <| Vec.LengthSquared v.c.XY
-            let _ = assertDbl <| Vec.LengthSquared v.what
-            let _ = assertDbl <| Vec.LengthSquared v.what.XYZ
-            let _ = assertDbl <| Vec.LengthSquared v.what.XY
+            let _ = assertInt <| Vec.LengthSquared v.what
+            let _ = assertInt <| Vec.LengthSquared v.what.XYZ
+            let _ = assertInt <| Vec.LengthSquared v.what.XY
 
             let _ = assertDbl <| Vec.lengthSquared (getVec())
             let _ = assertDbl <| Vec.LengthSquared(getVec())
@@ -1042,8 +1042,8 @@ let ``Transform 3x3``() =
 
             let _ = assertV2d <| Mat.TransformPosProj(M33d(v.c.X), v.c.XY)
             let _ = assertV3d <| Mat.TransformPosProjFull(M33d(v.c.X), v.c.XY)
-            let _ = assertV2d <| Mat.TransposedTransformProj(M33d(v.c.X), v.c.XY)
-            let _ = assertV3d <| Mat.TransposedTransformProjFull(M33d(v.c.X), v.c.XY)
+            let _ = assertV2d <| Mat.TransposedTransformPosProj(M33d(v.c.X), v.c.XY)
+            let _ = assertV3d <| Mat.TransposedTransformPosProjFull(M33d(v.c.X), v.c.XY)
 
             return 0.0
         }
@@ -1091,8 +1091,8 @@ let ``Transform 4x4``() =
 
             let _ = assertV3d <| Mat.TransformPosProj(M44d(v.c.X), v.c.XYZ)
             let _ = assertV4d <| Mat.TransformPosProjFull(M44d(v.c.X), v.c.XYZ)
-            let _ = assertV3d <| Mat.TransposedTransformProj(M44d(v.c.X), v.c.XYZ)
-            let _ = assertV4d <| Mat.TransposedTransformProjFull(M44d(v.c.X), v.c.XYZ)
+            let _ = assertV3d <| Mat.TransposedTransformPosProj(M44d(v.c.X), v.c.XYZ)
+            let _ = assertV4d <| Mat.TransposedTransformPosProjFull(M44d(v.c.X), v.c.XYZ)
 
             return 0.0
         }
