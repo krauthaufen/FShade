@@ -330,12 +330,12 @@ module SplicingExtensions =
     open Microsoft.FSharp.Quotations.Patterns
     open Microsoft.FSharp.Quotations.ExprShape
 
-
+    [<return: Struct>]
     let rec (|ExprValue|_|) (e : Expr) =
         match e with
-            | Coerce(ExprValue v, _) -> Some v
-            | Value((:? Expr as v),_) -> Some v
-            | _ -> None
+        | Coerce(ExprValue v, _) -> ValueSome v
+        | Value((:? Expr as v),_) -> ValueSome v
+        | _ -> ValueNone
 
     let rec private removeValueNames (e : Expr) =
         match e with

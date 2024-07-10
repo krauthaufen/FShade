@@ -100,33 +100,36 @@ let getFieldInfo (ctx : AssemblyLoadContext) (m : FieldReference) =
 
 module Patterns =
 
+    [<return: Struct>]
     let (|Call|_|) (ctx : AssemblyLoadContext)  (i : Instruction) =
         match i.OpCode.Code with
-        | Code.Call | Code.Callvirt -> Some (getMethodBase ctx (i.Operand :?> MethodReference) :?> MethodInfo)
-        | _ -> None
+        | Code.Call | Code.Callvirt -> ValueSome (getMethodBase ctx (i.Operand :?> MethodReference) :?> MethodInfo)
+        | _ -> ValueNone
         
+    [<return: Struct>]
     let (|NewObj|_|) (ctx : AssemblyLoadContext)  (i : Instruction) =
         match i.OpCode.Code with
-        | Code.Newobj -> Some (getMethodBase ctx (i.Operand :?> MethodReference) :?> ConstructorInfo)
-        | _ -> None
+        | Code.Newobj -> ValueSome (getMethodBase ctx (i.Operand :?> MethodReference) :?> ConstructorInfo)
+        | _ -> ValueNone
 
+    [<return: Struct>]
     let (|Ldc|_|) (ctx : AssemblyLoadContext) (i : Instruction) =
-        if i.OpCode = OpCodes.Ldc_I4 then Some (System.Convert.ToInt32 i.Operand :> obj)
-        elif i.OpCode = OpCodes.Ldc_I4_S then Some (System.Convert.ToInt32 i.Operand :> obj)
-        elif i.OpCode = OpCodes.Ldc_I4_0 then Some (0 :> obj)
-        elif i.OpCode = OpCodes.Ldc_I4_1 then Some (1 :> obj)
-        elif i.OpCode = OpCodes.Ldc_I4_2 then Some (2 :> obj)
-        elif i.OpCode = OpCodes.Ldc_I4_3 then Some (3 :> obj)
-        elif i.OpCode = OpCodes.Ldc_I4_4 then Some (4 :> obj)
-        elif i.OpCode = OpCodes.Ldc_I4_5 then Some (5 :> obj)
-        elif i.OpCode = OpCodes.Ldc_I4_6 then Some (6 :> obj)
-        elif i.OpCode = OpCodes.Ldc_I4_7 then Some (7 :> obj)
-        elif i.OpCode = OpCodes.Ldc_I4_8 then Some (8 :> obj)
-        elif i.OpCode = OpCodes.Ldc_I4_M1 then Some (-1 :> obj)
-        elif i.OpCode = OpCodes.Ldc_I8 then Some (System.Convert.ToInt64 i.Operand)
-        elif i.OpCode = OpCodes.Ldc_R4 then Some (System.Convert.ToSingle i.Operand)
-        elif i.OpCode = OpCodes.Ldc_R8 then Some (System.Convert.ToDouble i.Operand)
-        elif i.OpCode = OpCodes.Ldstr then Some (System.Convert.ToString i.Operand)
+        if i.OpCode = OpCodes.Ldc_I4 then ValueSome (System.Convert.ToInt32 i.Operand :> obj)
+        elif i.OpCode = OpCodes.Ldc_I4_S then ValueSome (System.Convert.ToInt32 i.Operand :> obj)
+        elif i.OpCode = OpCodes.Ldc_I4_0 then ValueSome (0 :> obj)
+        elif i.OpCode = OpCodes.Ldc_I4_1 then ValueSome (1 :> obj)
+        elif i.OpCode = OpCodes.Ldc_I4_2 then ValueSome (2 :> obj)
+        elif i.OpCode = OpCodes.Ldc_I4_3 then ValueSome (3 :> obj)
+        elif i.OpCode = OpCodes.Ldc_I4_4 then ValueSome (4 :> obj)
+        elif i.OpCode = OpCodes.Ldc_I4_5 then ValueSome (5 :> obj)
+        elif i.OpCode = OpCodes.Ldc_I4_6 then ValueSome (6 :> obj)
+        elif i.OpCode = OpCodes.Ldc_I4_7 then ValueSome (7 :> obj)
+        elif i.OpCode = OpCodes.Ldc_I4_8 then ValueSome (8 :> obj)
+        elif i.OpCode = OpCodes.Ldc_I4_M1 then ValueSome (-1 :> obj)
+        elif i.OpCode = OpCodes.Ldc_I8 then ValueSome (System.Convert.ToInt64 i.Operand)
+        elif i.OpCode = OpCodes.Ldc_R4 then ValueSome (System.Convert.ToSingle i.Operand)
+        elif i.OpCode = OpCodes.Ldc_R8 then ValueSome (System.Convert.ToDouble i.Operand)
+        elif i.OpCode = OpCodes.Ldstr then ValueSome (System.Convert.ToString i.Operand)
         elif i.OpCode = OpCodes.Ldtoken then
             let value = 
                 match i.Operand with
@@ -134,138 +137,159 @@ module Patterns =
                 | :? FieldReference as m -> getFieldInfo ctx m :> obj
                 | :? TypeReference as m -> getType ctx m :> obj
                 | _ -> null
-            Some ValueNone
+            ValueSome ValueNone
         else
-            None
-        
-    let (|Pop|_|) (i : Instruction) =
-        if i.OpCode = OpCodes.Pop then Some ()
-        else None
-        
-    let (|Nop|_|) (i : Instruction) =
-        if i.OpCode = OpCodes.Nop then Some ()
-        else None
-        
-    let (|Ceq|_|) (i : Instruction) =
-        if i.OpCode = OpCodes.Ceq then Some ()
-        else None
-    let (|Clt|_|) (i : Instruction) =
-        if i.OpCode = OpCodes.Clt then Some ()
-        else None
-    let (|Cgt|_|) (i : Instruction) =
-        if i.OpCode = OpCodes.Cgt then Some ()
-        else None
-    let (|CltUn|_|) (i : Instruction) =
-        if i.OpCode = OpCodes.Clt_Un then Some ()
-        else None
-    let (|CgtUn|_|) (i : Instruction) =
-        if i.OpCode = OpCodes.Cgt_Un then Some ()
-        else None
-        
-    let (|Ldnull|_|) (i : Instruction) =
-        if i.OpCode = OpCodes.Ldnull then Some ()
-        else None
+            ValueNone
 
+    [<return: Struct>]
+    let (|Pop|_|) (i : Instruction) =
+        if i.OpCode = OpCodes.Pop then ValueSome ()
+        else ValueNone
+
+    [<return: Struct>]
+    let (|Nop|_|) (i : Instruction) =
+        if i.OpCode = OpCodes.Nop then ValueSome ()
+        else ValueNone
+
+    [<return: Struct>]
+    let (|Ceq|_|) (i : Instruction) =
+        if i.OpCode = OpCodes.Ceq then ValueSome ()
+        else ValueNone
+
+    [<return: Struct>]
+    let (|Clt|_|) (i : Instruction) =
+        if i.OpCode = OpCodes.Clt then ValueSome ()
+        else ValueNone
+
+    [<return: Struct>]
+    let (|Cgt|_|) (i : Instruction) =
+        if i.OpCode = OpCodes.Cgt then ValueSome ()
+        else ValueNone
+
+    [<return: Struct>]
+    let (|CltUn|_|) (i : Instruction) =
+        if i.OpCode = OpCodes.Clt_Un then ValueSome ()
+        else ValueNone
+
+    [<return: Struct>]
+    let (|CgtUn|_|) (i : Instruction) =
+        if i.OpCode = OpCodes.Cgt_Un then ValueSome ()
+        else ValueNone
+        
+    [<return: Struct>]
+    let (|Ldnull|_|) (i : Instruction) =
+        if i.OpCode = OpCodes.Ldnull then ValueSome ()
+        else ValueNone
+
+    [<return: Struct>]
     let (|Ldfld|_|) (ctx : AssemblyLoadContext) (i : Instruction) =
-        if i.OpCode = OpCodes.Ldsfld || i.OpCode = OpCodes.Ldfld then Some (getFieldInfo ctx (i.Operand :?> FieldReference))
-        else None
+        if i.OpCode = OpCodes.Ldsfld || i.OpCode = OpCodes.Ldfld then ValueSome (getFieldInfo ctx (i.Operand :?> FieldReference))
+        else ValueNone
           
+    [<return: Struct>]
     let (|Stfld|_|) (ctx : AssemblyLoadContext) (i : Instruction) =
-        if i.OpCode = OpCodes.Stsfld || i.OpCode = OpCodes.Stfld then Some (getFieldInfo ctx (i.Operand :?> FieldReference))
-        else None
+        if i.OpCode = OpCodes.Stsfld || i.OpCode = OpCodes.Stfld then ValueSome (getFieldInfo ctx (i.Operand :?> FieldReference))
+        else ValueNone
        
+    [<return: Struct>]
     let (|Ldloc|_|) (i : Instruction) =
         if i.OpCode = OpCodes.Ldloc then 
             match i.Operand with
-            | :? VariableReference as v -> Some v.Index
-            | _ -> Some (System.Convert.ToInt32 i.Operand)
+            | :? VariableReference as v -> ValueSome v.Index
+            | _ -> ValueSome (System.Convert.ToInt32 i.Operand)
         elif i.OpCode = OpCodes.Ldloc_S then 
             match i.Operand with
-            | :? VariableReference as v -> Some v.Index
-            | _ -> Some (System.Convert.ToInt32 i.Operand)
-        elif i.OpCode = OpCodes.Ldloc_0 then Some 0
-        elif i.OpCode = OpCodes.Ldloc_1 then Some 1
-        elif i.OpCode = OpCodes.Ldloc_2 then Some 2
-        elif i.OpCode = OpCodes.Ldloc_3 then Some 3
-        else None
-        
+            | :? VariableReference as v -> ValueSome v.Index
+            | _ -> ValueSome (System.Convert.ToInt32 i.Operand)
+        elif i.OpCode = OpCodes.Ldloc_0 then ValueSome 0
+        elif i.OpCode = OpCodes.Ldloc_1 then ValueSome 1
+        elif i.OpCode = OpCodes.Ldloc_2 then ValueSome 2
+        elif i.OpCode = OpCodes.Ldloc_3 then ValueSome 3
+        else ValueNone
+
+    [<return: Struct>]        
     let (|Stloc|_|) (i : Instruction) =
         if i.OpCode = OpCodes.Stloc then 
             match i.Operand with
-            | :? VariableReference as v -> Some v.Index
-            | _ -> Some (System.Convert.ToInt32 i.Operand)
+            | :? VariableReference as v -> ValueSome v.Index
+            | _ -> ValueSome (System.Convert.ToInt32 i.Operand)
         elif i.OpCode = OpCodes.Stloc_S then 
             match i.Operand with
-            | :? VariableReference as v -> Some v.Index
-            | _ -> Some (System.Convert.ToInt32 i.Operand)
-        elif i.OpCode = OpCodes.Stloc_0 then Some 0
-        elif i.OpCode = OpCodes.Stloc_1 then Some 1
-        elif i.OpCode = OpCodes.Stloc_2 then Some 2
-        elif i.OpCode = OpCodes.Stloc_3 then Some 3
-        else None
-        
+            | :? VariableReference as v -> ValueSome v.Index
+            | _ -> ValueSome (System.Convert.ToInt32 i.Operand)
+        elif i.OpCode = OpCodes.Stloc_0 then ValueSome 0
+        elif i.OpCode = OpCodes.Stloc_1 then ValueSome 1
+        elif i.OpCode = OpCodes.Stloc_2 then ValueSome 2
+        elif i.OpCode = OpCodes.Stloc_3 then ValueSome 3
+        else ValueNone
+
+    [<return: Struct>]        
     let (|Conv|_|) (i : Instruction) =
         if i.OpCode = OpCodes.Conv_I || i.OpCode = OpCodes.Conv_Ovf_I then 
             let conv =
                 if sizeof<nativeint> = 8 then fun (o : obj) -> System.Convert.ToInt64(o) |> nativeint :> obj
                 else fun (o : obj) -> System.Convert.ToInt32(o) |> nativeint :> obj
-            Some conv
+            ValueSome conv
         elif i.OpCode = OpCodes.Conv_U ||i.OpCode = OpCodes.Conv_Ovf_U then 
             let conv =
                 if sizeof<nativeint> = 8 then fun (o : obj) -> System.Convert.ToInt64(o) |> unativeint :> obj
                 else fun (o : obj) -> System.Convert.ToInt32(o) |> unativeint :> obj
-            Some conv
+            ValueSome conv
             
         elif i.OpCode = OpCodes.Conv_I1 || i.OpCode = OpCodes.Conv_Ovf_I1 then 
-            Some (fun (o : obj) -> System.Convert.ToSByte o :> obj)
+            ValueSome (fun (o : obj) -> System.Convert.ToSByte o :> obj)
         elif i.OpCode = OpCodes.Conv_I2 || i.OpCode = OpCodes.Conv_Ovf_I2 then 
-            Some (fun (o : obj) -> System.Convert.ToInt16 o :> obj)
+            ValueSome (fun (o : obj) -> System.Convert.ToInt16 o :> obj)
         elif i.OpCode = OpCodes.Conv_I4 || i.OpCode = OpCodes.Conv_Ovf_I4 then 
-            Some (fun (o : obj) -> System.Convert.ToInt32 o :> obj)
+            ValueSome (fun (o : obj) -> System.Convert.ToInt32 o :> obj)
         elif i.OpCode = OpCodes.Conv_I8 || i.OpCode = OpCodes.Conv_Ovf_I8 then 
-            Some (fun (o : obj) -> System.Convert.ToInt64 o :> obj)
+            ValueSome (fun (o : obj) -> System.Convert.ToInt64 o :> obj)
             
         elif i.OpCode = OpCodes.Conv_U1 || i.OpCode = OpCodes.Conv_Ovf_U1 then 
-            Some (fun (o : obj) -> System.Convert.ToByte o :> obj)
+            ValueSome (fun (o : obj) -> System.Convert.ToByte o :> obj)
         elif i.OpCode = OpCodes.Conv_U2 || i.OpCode = OpCodes.Conv_Ovf_U2 then 
-            Some (fun (o : obj) -> System.Convert.ToUInt16 o :> obj)
+            ValueSome (fun (o : obj) -> System.Convert.ToUInt16 o :> obj)
         elif i.OpCode = OpCodes.Conv_U4 || i.OpCode = OpCodes.Conv_Ovf_U4 then 
-            Some (fun (o : obj) -> System.Convert.ToUInt32 o :> obj)
+            ValueSome (fun (o : obj) -> System.Convert.ToUInt32 o :> obj)
         elif i.OpCode = OpCodes.Conv_U8 || i.OpCode = OpCodes.Conv_Ovf_U8 then 
-            Some (fun (o : obj) -> System.Convert.ToUInt64 o :> obj)
+            ValueSome (fun (o : obj) -> System.Convert.ToUInt64 o :> obj)
 
             
         elif i.OpCode = OpCodes.Conv_R4 then 
-            Some (fun (o : obj) -> System.Convert.ToSingle o :> obj)
+            ValueSome (fun (o : obj) -> System.Convert.ToSingle o :> obj)
         elif i.OpCode = OpCodes.Conv_R8 then 
-            Some (fun (o : obj) -> System.Convert.ToDouble o :> obj)
+            ValueSome (fun (o : obj) -> System.Convert.ToDouble o :> obj)
             
         elif i.OpCode = OpCodes.Conv_Ovf_I then 
-            Some (fun (o : obj) -> System.Convert.ToSingle o :> obj)
+            ValueSome (fun (o : obj) -> System.Convert.ToSingle o :> obj)
         else
-            None
+            ValueNone
 
+    [<return: Struct>]
     let (|Tail|_|) (i : Instruction) =
-        if i.OpCode = OpCodes.Tail then Some ()
-        else None
+        if i.OpCode = OpCodes.Tail then ValueSome ()
+        else ValueNone
         
+    [<return: Struct>]
     let (|Volatile|_|) (i : Instruction) =
-        if i.OpCode = OpCodes.Volatile then Some ()
-        else None
+        if i.OpCode = OpCodes.Volatile then ValueSome ()
+        else ValueNone
         
+    [<return: Struct>]
     let (|Ldarg|_|) (i : Instruction) =
-        if i.OpCode = OpCodes.Ldarg then Some (System.Convert.ToInt32 i.Operand)
-        elif i.OpCode = OpCodes.Ldarg_S then Some (System.Convert.ToInt32 i.Operand)
-        elif i.OpCode = OpCodes.Ldarg_0 then Some 0
-        elif i.OpCode = OpCodes.Ldarg_1 then Some 1
-        elif i.OpCode = OpCodes.Ldarg_2 then Some 2
-        elif i.OpCode = OpCodes.Ldarg_3 then Some 3
-        elif i.OpCode = OpCodes.Ldarga_S then Some (System.Convert.ToInt32 i.Operand)
-        else None
+        if i.OpCode = OpCodes.Ldarg then ValueSome (System.Convert.ToInt32 i.Operand)
+        elif i.OpCode = OpCodes.Ldarg_S then ValueSome (System.Convert.ToInt32 i.Operand)
+        elif i.OpCode = OpCodes.Ldarg_0 then ValueSome 0
+        elif i.OpCode = OpCodes.Ldarg_1 then ValueSome 1
+        elif i.OpCode = OpCodes.Ldarg_2 then ValueSome 2
+        elif i.OpCode = OpCodes.Ldarg_3 then ValueSome 3
+        elif i.OpCode = OpCodes.Ldarga_S then ValueSome (System.Convert.ToInt32 i.Operand)
+        else ValueNone
         
+    [<return: Struct>]
     let (|Add|_|) (i : Instruction) =
-        if i.OpCode = OpCodes.Add then Some ()
-        else None
+        if i.OpCode = OpCodes.Add then ValueSome ()
+        else ValueNone
 
 type State(ctx : AssemblyLoadContext) =
     let cache = System.Collections.Generic.Dictionary<int * int, option<obj>>()

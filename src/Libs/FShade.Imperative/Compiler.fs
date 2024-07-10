@@ -1667,23 +1667,25 @@ module Compiler =
                     return CRExpr.ofExpr res |> Some
         }
 
+    [<return: Struct>]
     let rec private (|Seq|_|) (e : Expr) =
         match e with
-            | Sequential(Seq l, Seq r) ->
-                Some (l @ r)
-            | Sequential(l, Seq r) ->
-                Some (l :: r)
-            | Sequential(Seq l, r) ->
-                Some (l @ [r])
-            | _ ->
-                Some [e]
+        | Sequential(Seq l, Seq r) ->
+            ValueSome (l @ r)
+        | Sequential(l, Seq r) ->
+            ValueSome (l :: r)
+        | Sequential(Seq l, r) ->
+            ValueSome (l @ [r])
+        | _ ->
+            ValueSome [e]
 
+    [<return: Struct>]
     let rec private (|Cons|_|) (e : Expr) =
         match e with
-            | Seq (l :: rest) ->
-                Some (l, rest)
-            | e ->
-                Some(e, [])
+        | Seq (l :: rest) ->
+            ValueSome (l, rest)
+        | e ->
+            ValueSome(e, [])
 
 
     let rec toCStatementS (isLast : bool) (e : Expr) =

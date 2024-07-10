@@ -18,23 +18,24 @@ exception FShadeOnlyInShaderCodeException of string
 module DynamicHostInvocation =
     open System.Collections.Generic
 
+    [<return: Struct>]
     let rec (|ShaderOnlyExn|_|) (e : Exception) =
         match e with
         | FShadeOnlyInShaderCodeException n ->
-            Some n
+            ValueSome n
 
         | :? TargetInvocationException as e ->
             match e.InnerException with
-            | ShaderOnlyExn n -> Some n
-            | _ -> None
+            | ShaderOnlyExn n -> ValueSome n
+            | _ -> ValueNone
 
         | :? AggregateException as a ->
             match Seq.toList a.InnerExceptions with
-            | [ ShaderOnlyExn n ] -> Some n
-            | _ -> None
+            | [ ShaderOnlyExn n ] -> ValueSome n
+            | _ -> ValueNone
 
         | _ ->
-            None
+            ValueNone
 
     let private invalidHostInvocation = new ThreadLocal<_>(fun _ -> Stack<bool>())
 
@@ -175,58 +176,63 @@ module ReflectionPatterns =
             getMethodInfo <@ float @> 
             getMethodInfo <@ float32 @> 
         ]
-        
+
+    [<return: Struct>]
     let (|Ref|_|) (t : Type) =
         if t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<ref<_>> then
             let content = t.GetGenericArguments().[0]
-            Some(content)
+            ValueSome(content)
         else
-            None
+            ValueNone
 
+    [<return: Struct>]
     let (|ArrOf|_|) (t : Type) =
         if t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<Arr<_,_>> then
             let targs = t.GetGenericArguments()
             let len = targs.[0] |> Peano.getSize
             let content = targs.[1]
-            Some(len, content)
+            ValueSome(len, content)
         else
-            None
+            ValueNone
 
+    [<return: Struct>]
     let (|ArrayOf|_|) (t : Type) =
-        if t.IsArray then Some(t.GetElementType())
-        else None
+        if t.IsArray then ValueSome(t.GetElementType())
+        else ValueNone
 
+    [<return: Struct>]
     let (|ConversionMethod|_|) (mi : MethodInfo) =
         let meth = getMethodDefinition mi
 
         if conversionMethods.Contains meth then
             let input = mi.GetParameters().[0]
             let output = mi.ReturnType
-            Some(input.ParameterType, output)
+            ValueSome(input.ParameterType, output)
         else
-            None
+            ValueNone
 
-
+    [<return: Struct>]
     let (|EnumerableOf|_|) (t : Type) =
         if t.IsArray then
-            Some (t.GetElementType())
+            ValueSome (t.GetElementType())
 
         elif t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<seq<_>> then 
-            Some (t.GetGenericArguments().[0])
+            ValueSome (t.GetGenericArguments().[0])
 
         else
             let iface = t.GetInterface(typedefof<seq<_>>.Name)
             if isNull iface then
-                None
+                ValueNone
             else
-                Some (iface.GetGenericArguments().[0])
+                ValueSome (iface.GetGenericArguments().[0])
 
+    [<return: Struct>]
     let (|FSharpTypeProperty|_|) (pi : PropertyInfo) =
         if FSharpType.IsRecord(pi.DeclaringType, true) then 
             if FSharpType.GetRecordFields(pi.DeclaringType, true) |> Array.exists (fun p -> p = pi) then
-                Some ()
+                ValueSome ()
             else
-                None
+                ValueNone
 
         elif pi.DeclaringType.BaseType <> null && FSharpType.IsUnion(pi.DeclaringType.BaseType, true) then
             let isUnionField =
@@ -234,80 +240,86 @@ module ReflectionPatterns =
                     |> Seq.collect (fun c -> c.GetFields())
                     |> Seq.exists (fun p -> p = pi)
 
-            if isUnionField then Some ()
-            else None
+            if isUnionField then ValueSome ()
+            else ValueNone
 
         else
-            None
+            ValueNone
 
+    [<return: Struct>]
     let (|ArrayLengthProperty|_|) (pi : PropertyInfo) =
         if pi.Name = "Length" then
             match pi.DeclaringType with
-                | ArrOf _ | ArrayOf _ -> Some ()
-                | _ -> None
+                | ArrOf _ | ArrayOf _ -> ValueSome ()
+                | _ -> ValueNone
         else
-            None
+            ValueNone
 
+    [<return: Struct>]
     let (|VectorValue|_|) (v : obj) =
         match v with
-            | :? V2d as v -> Some (typeof<float>, [| v.X :> obj; v.Y :> obj|])
-            | :? V3d as v -> Some (typeof<float>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
-            | :? V4d as v -> Some (typeof<float>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
-            | :? V2f as v -> Some (typeof<float32>, [| v.X :> obj; v.Y :> obj|])
-            | :? V3f as v -> Some (typeof<float32>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
-            | :? V4f as v -> Some (typeof<float32>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
-            | :? V2i as v -> Some (typeof<int>, [| v.X :> obj; v.Y :> obj|])
-            | :? V3i as v -> Some (typeof<int>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
-            | :? V4i as v -> Some (typeof<int>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
-            | :? V2ui as v -> Some (typeof<uint>, [| v.X :> obj; v.Y :> obj|])
-            | :? V3ui as v -> Some (typeof<uint>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
-            | :? V4ui as v -> Some (typeof<uint>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
-            | :? V2l as v -> Some (typeof<int64>, [| v.X :> obj; v.Y :> obj|])
-            | :? V3l as v -> Some (typeof<int64>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
-            | :? V4l as v -> Some (typeof<int64>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
+        | :? V2d as v -> ValueSome (typeof<float>, [| v.X :> obj; v.Y :> obj|])
+        | :? V3d as v -> ValueSome (typeof<float>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
+        | :? V4d as v -> ValueSome (typeof<float>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
+        | :? V2f as v -> ValueSome (typeof<float32>, [| v.X :> obj; v.Y :> obj|])
+        | :? V3f as v -> ValueSome (typeof<float32>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
+        | :? V4f as v -> ValueSome (typeof<float32>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
+        | :? V2i as v -> ValueSome (typeof<int>, [| v.X :> obj; v.Y :> obj|])
+        | :? V3i as v -> ValueSome (typeof<int>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
+        | :? V4i as v -> ValueSome (typeof<int>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
+        | :? V2ui as v -> ValueSome (typeof<uint>, [| v.X :> obj; v.Y :> obj|])
+        | :? V3ui as v -> ValueSome (typeof<uint>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
+        | :? V4ui as v -> ValueSome (typeof<uint>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
+        | :? V2l as v -> ValueSome (typeof<int64>, [| v.X :> obj; v.Y :> obj|])
+        | :? V3l as v -> ValueSome (typeof<int64>, [| v.X :> obj; v.Y :> obj; v.Z :> obj|])
+        | :? V4l as v -> ValueSome (typeof<int64>, [| v.X :> obj; v.Y :> obj; v.Z :> obj; v.W :> obj|])
 
-            | :? C3b as v -> Some (typeof<uint8>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
-            | :? C4b as v -> Some (typeof<uint8>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
-            | :? C3us as v -> Some (typeof<uint16>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
-            | :? C4us as v -> Some (typeof<uint16>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
-            | :? C3ui as v -> Some (typeof<uint32>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
-            | :? C4ui as v -> Some (typeof<uint32>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
-            | :? C3f as v -> Some (typeof<float32>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
-            | :? C4f as v -> Some (typeof<float32>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
-            | :? C3d as v -> Some (typeof<float>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
-            | :? C4d as v -> Some (typeof<float>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
+        | :? C3b as v -> ValueSome (typeof<uint8>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
+        | :? C4b as v -> ValueSome (typeof<uint8>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
+        | :? C3us as v -> ValueSome (typeof<uint16>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
+        | :? C4us as v -> ValueSome (typeof<uint16>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
+        | :? C3ui as v -> ValueSome (typeof<uint32>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
+        | :? C4ui as v -> ValueSome (typeof<uint32>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
+        | :? C3f as v -> ValueSome (typeof<float32>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
+        | :? C4f as v -> ValueSome (typeof<float32>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
+        | :? C3d as v -> ValueSome (typeof<float>, [| v.R :> obj; v.G :> obj; v.B :> obj|])
+        | :? C4d as v -> ValueSome (typeof<float>, [| v.R :> obj; v.G :> obj; v.B :> obj; v.A :> obj|])
 
-            | _ -> None
+        | _ -> ValueNone
 
+    [<return: Struct>]
     let (|MatrixValue|_|) (v : obj) =
         match v with
-            | :? IMatrix as m ->
-                let values =
-                    [|
-                        for r in 0 .. int m.Dim.Y - 1 do
-                            for c in 0 .. int m.Dim.X - 1 do
-                                yield m.GetValue(int64 c, int64 r)
-                    |]
-                let bt = values.[0].GetType()
-                Some (bt, values)
-            | _ -> 
-                None
+        | :? IMatrix as m ->
+            let values =
+                [|
+                    for r in 0 .. int m.Dim.Y - 1 do
+                        for c in 0 .. int m.Dim.X - 1 do
+                            yield m.GetValue(int64 c, int64 r)
+                |]
+            let bt = values.[0].GetType()
+            ValueSome (bt, values)
+        | _ -> 
+            ValueNone
 
+    [<return: Struct>]
     let (|SwitchableType|_|) (t : Type) =
         match t with
-            | Integral 
-            | Enum -> Some ()
-            | _ -> None
+        | Integral 
+        | Enum -> ValueSome ()
+        | _ -> ValueNone
 
+    [<return: Struct>]
     let (|VecMethod|_|) (mi : MethodInfo) =
         match mi with
-        | Method(name, args) when mi.DeclaringType = typeof<Vec> -> Some (name, args)
-        | _ -> None
+        | Method(name, args) when mi.DeclaringType = typeof<Vec> -> ValueSome (name, args)
+        | _ -> ValueNone
 
+    [<return: Struct>]
     let (|MatMethod|_|) (mi : MethodInfo) =
         match mi with
-        | Method(name, args) when mi.DeclaringType = typeof<Mat> -> Some (name, args)
-        | _ -> None
+        | Method(name, args) when mi.DeclaringType = typeof<Mat> -> ValueSome (name, args)
+        | _ -> ValueNone
 
     // Invoking these operators for enum types will
     // throw a TargetInvocationException, even with a witness.
@@ -389,11 +401,12 @@ module ReflectionPatterns =
             getMethodInfo <@ (>>>) : int -> int -> int @>, bitwiseRsh
         ]
 
-
+    [<return: Struct>]
     let private (|Enum|_|) (t : Type) =
-        if t.IsEnum then Some <| t.GetEnumUnderlyingType()
-        else None
+        if t.IsEnum then ValueSome <| t.GetEnumUnderlyingType()
+        else ValueNone
 
+    [<return: Struct>]
     let (|EnumBitwiseOp|_|) (mi : MethodInfo) =
         let mdef = getMethodDefinition mi
 
@@ -402,12 +415,13 @@ module ReflectionPatterns =
             let typ = mi.GetGenericArguments().[0]
             match typ with
             | Enum baseType ->
-                Some (typ, baseType, op baseType)
+                ValueSome (typ, baseType, op baseType)
             | _ ->
-                None
+                ValueNone
         | _ ->
-            None
+            ValueNone
 
+    [<return: Struct>]
     let (|EnumShiftOp|_|) (mi : MethodInfo) =
         let mdef = getMethodDefinition mi
 
@@ -416,11 +430,11 @@ module ReflectionPatterns =
             let typ = mi.GetGenericArguments().[0]
             match typ with
             | Enum baseType ->
-                Some (typ, baseType, op baseType)
+                ValueSome (typ, baseType, op baseType)
             | _ ->
-                None
+                ValueNone
         | _ ->
-            None
+            ValueNone
 
     let private converters : Type -> Option<obj -> obj> =
         let make f = fun (i : obj) -> box (f i)
@@ -438,6 +452,7 @@ module ReflectionPatterns =
             typeof<float>,      make Convert.ToDouble
         ]
 
+    [<return: Struct>]
     let (|EnumConversion|_|) (mi : MethodInfo) =
         let mdef = getMethodDefinition mi
 
@@ -445,12 +460,12 @@ module ReflectionPatterns =
             match mi.GetGenericArguments().[0] with
             | Enum baseType ->
                 match converters mi.ReturnType with
-                | Some f -> Some (f, baseType)
-                | _ -> None
+                | Some f -> ValueSome (f, baseType)
+                | _ -> ValueNone
             | _ ->
-                None
+                ValueNone
         else
-            None
+            ValueNone
 
 [<AutoOpen>]
 module ExprExtensions =
@@ -650,7 +665,7 @@ module ExprExtensions =
         /// tries to evaluate the supplied expression and returns its value on success
         static member TryEval(e : Expr) =
             match e with
-            | Patterns.PropertyGet(t , p, args) ->
+            | Patterns.PropertyGet(t, p, args) ->
                 match t with
                 | Some t ->
                     match Expr.TryEval t, Expr.TryEval args with
@@ -750,373 +765,388 @@ module ExprExtensions =
 
             | _ -> None
 
+    [<return: Struct>]
     let (|Seq|_|) (e : Expr) =
         let rec all (e : Expr) =
             match e with
-                | Sequential(l,r) -> all l @ all r
-                | Unit -> []
-                | e -> [e]
+            | Sequential(l,r) -> all l @ all r
+            | Unit -> []
+            | e -> [e]
 
         match e with
-            | Sequential(l, r) -> all l @ all r |> Some
-            | _ -> None
+        | Sequential(l, r) -> all l @ all r |> ValueSome
+        | _ -> ValueNone
 
+    [<return: Struct>]
     let (|NewFixedArray|_|) (e : Expr) =
         match e with
-            | NewObject(ctor, []) ->
-                let targs = ctor.DeclaringType.GetGenericArguments()
-                let len = Peano.getSize (targs.[0])
-                let et = targs.[1]
-                Some(len, et, [])
+        | NewObject(ctor, []) ->
+            let targs = ctor.DeclaringType.GetGenericArguments()
+            let len = Peano.getSize (targs.[0])
+            let et = targs.[1]
+            ValueSome(len, et, [])
 
-            | NewObject(ctor, [Coerce(NewArray(et, args),_)]) ->
-                if ctor.DeclaringType.IsGenericType && ctor.DeclaringType.GetGenericTypeDefinition() = typedefof<Arr<_,_>> then
-                    let len = Peano.getSize (ctor.DeclaringType.GetGenericArguments().[0])
-                    Some(len, et, args)
-                else 
-                    None
-            | _ ->
-                None
+        | NewObject(ctor, [Coerce(NewArray(et, args),_)]) ->
+            if ctor.DeclaringType.IsGenericType && ctor.DeclaringType.GetGenericTypeDefinition() = typedefof<Arr<_,_>> then
+                let len = Peano.getSize (ctor.DeclaringType.GetGenericArguments().[0])
+                ValueSome(len, et, args)
+            else 
+                ValueNone
+        | _ ->
+            ValueNone
 
     let rec private deconstructTuples x =
         match x with
-            | NewTuple(args) -> args |> List.collect deconstructTuples
-            | _ -> [x]
+        | NewTuple(args) -> args |> List.collect deconstructTuples
+        | _ -> [x]
 
     let rec private inlineUselessAbstractions(e : Expr) =
         match e with
-            | Application(Lambda(v,b),a) ->
-                let b = b.Substitute(fun vi -> if vi = v then Some a else None)
-                inlineUselessAbstractions b
+        | Application(Lambda(v,b),a) ->
+            let b = b.Substitute(fun vi -> if vi = v then Some a else None)
+            inlineUselessAbstractions b
 
-            | Application(Let(f,l0, b), a) ->
-                let b = b.Substitute(fun vi -> if vi = f then Some l0 else None)
-                inlineUselessAbstractions (Expr.Application(b,a))
-            | _ ->
-                    
-                e
+        | Application(Let(f,l0, b), a) ->
+            let b = b.Substitute(fun vi -> if vi = f then Some l0 else None)
+            inlineUselessAbstractions (Expr.Application(b,a))
+
+        | _ ->
+            e
 
     /// detects the type of an expression
     let (|ExprOf|) (e : Expr) =
         ExprOf(e.Type)
 
+    [<return: Struct>]
     let (|Ignore|_|) (e : Expr) =
         match e with
-            | Call(None, mi, [a]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = Methods.ignore ->
-                Some a
-            | _ ->
-                None
+        | Call(None, mi, [a]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = Methods.ignore ->
+            ValueSome a
+        | _ ->
+            ValueNone
 
+    [<return: Struct>]
     let (|GetArray|_|) (e : Expr) =
         match e with
-            | Call(None, mi, [arr;idx]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = Methods.getArray ->
-                Some(arr, idx)
-            | PropertyGet(Some arr, prop, [idx]) when prop.Name = "Item" && arr.Type.IsGenericType && arr.Type.GetGenericTypeDefinition() = typedefof<Arr<_,_>> ->
-                Some(arr, idx)
-            | _ ->
-                None
+        | Call(None, mi, [arr;idx]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = Methods.getArray ->
+            ValueSome(arr, idx)
+        | PropertyGet(Some arr, prop, [idx]) when prop.Name = "Item" && arr.Type.IsGenericType && arr.Type.GetGenericTypeDefinition() = typedefof<Arr<_,_>> ->
+            ValueSome(arr, idx)
+        | _ ->
+            ValueNone
 
+    [<return: Struct>]
     let (|SetArray|_|) (e : Expr) =
         match e with
-            | Call(None, mi, [arr;idx;value]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = Methods.setArray ->
-                Some(arr, idx, value)
+        | Call(None, mi, [arr;idx;value]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = Methods.setArray ->
+            ValueSome(arr, idx, value)
 
-            | PropertySet(Some arr, prop, [idx], value) when prop.Name = "Item" && arr.Type.IsGenericType && arr.Type.GetGenericTypeDefinition() = typedefof<Arr<_,_>> ->
-                Some(arr, idx, value)
+        | PropertySet(Some arr, prop, [idx], value) when prop.Name = "Item" && arr.Type.IsGenericType && arr.Type.GetGenericTypeDefinition() = typedefof<Arr<_,_>> ->
+            ValueSome(arr, idx, value)
 
-            | _ ->
-                None
+        | _ ->
+            ValueNone
 
     /// detects FieldGet and PropertyGet expressions having no indexers
+    [<return: Struct>]
     let (|MemberFieldGet|_|) (e : Expr) =
         match e with
-            | PropertyGet(Some t,p,[]) ->
-                Some(t, p :> MemberInfo)
-            | FieldGet(Some t, f) ->
-                Some(t, f :> MemberInfo)
-            | _ -> 
-                None
+        | PropertyGet(Some t,p,[]) ->
+            ValueSome(t, p :> MemberInfo)
+        | FieldGet(Some t, f) ->
+            ValueSome(t, f :> MemberInfo)
+        | _ -> 
+            ValueNone
                 
     /// detects FieldSet and PropertySet expressions having no indexers
+    [<return: Struct>]
     let (|MemberFieldSet|_|) (e : Expr) =
         match e with
-            | PropertySet(Some t,p,[] , v) ->
-                Some(t, p :> MemberInfo, v)
-            | FieldSet(Some t, f, v) ->
-                Some(t, f :> MemberInfo, v)
-            | _ ->
-                None
+        | PropertySet(Some t,p,[] , v) ->
+            ValueSome(t, p :> MemberInfo, v)
+        | FieldSet(Some t, f, v) ->
+            ValueSome(t, f :> MemberInfo, v)
+        | _ ->
+            ValueNone
                
     /// detects pipe-expressions like (a |> sin, a |> clamp 0 1, sin <| a + b, etc.)
+    [<return: Struct>]
     let (|Pipe|_|) (e : Expr) =
         match e with
-            | Call(None, Method("op_PipeLeft", _), [Lambda(v,l);r]) ->
-                let e = l.Substitute(fun vi -> if vi = v then Some r else None)
-                Pipe(e) |> Some
+        | Call(None, Method("op_PipeLeft", _), [Lambda(v,l);r]) ->
+            let e = l.Substitute(fun vi -> if vi = v then Some r else None)
+            Pipe(e) |> ValueSome
 
-            | Call(None, Method("op_PipeRight", _), [l;Lambda(v, r)]) ->
-                let e = r.Substitute(fun vi -> if vi = v then Some l else None)
-                Pipe(e) |> Some
+        | Call(None, Method("op_PipeRight", _), [l;Lambda(v, r)]) ->
+            let e = r.Substitute(fun vi -> if vi = v then Some l else None)
+            Pipe(e) |> ValueSome
 
-            | Call(None, Method("op_PipeLeft", _), [PropertyGet(t,p, []);r]) ->
-                let r = deconstructTuples r
-                match t with
-                    | None -> 
-                        let mi = p.DeclaringType.GetMethod(p.Name, r |> Seq.map (fun ai -> ai.Type) |> Seq.toArray)
-                        if mi <> null then(Expr.Call(mi, r)) |> Some
-                        else failwith "function is not a method"
-                    | Some t -> 
-                        failwith "function is not a method"
+        | Call(None, Method("op_PipeLeft", _), [PropertyGet(t,p, []);r]) ->
+            let r = deconstructTuples r
+            match t with
+            | None -> 
+                let mi = p.DeclaringType.GetMethod(p.Name, r |> Seq.map (fun ai -> ai.Type) |> Seq.toArray)
+                if mi <> null then(Expr.Call(mi, r)) |> ValueSome
+                else failwith "function is not a method"
+            | Some t -> 
+                failwith "function is not a method"
 
-            | Call(None, Method("op_PipeRight", _), [l;PropertyGet(t,p, [])]) ->
-                let l = deconstructTuples l
-                match t with
-                    | None -> 
-                        let mi = p.DeclaringType.GetMethod(p.Name, l |> Seq.map (fun ai -> ai.Type) |> Seq.toArray)
-                        if mi <> null then(Expr.Call(mi, l)) |> Some
-                        else failwith "function is not a method"
-                    | Some t -> 
-                        failwith "function is not a method"
+        | Call(None, Method("op_PipeRight", _), [l;PropertyGet(t,p, [])]) ->
+            let l = deconstructTuples l
+            match t with
+            | None -> 
+                let mi = p.DeclaringType.GetMethod(p.Name, l |> Seq.map (fun ai -> ai.Type) |> Seq.toArray)
+                if mi <> null then(Expr.Call(mi, l)) |> ValueSome
+                else failwith "function is not a method"
+            | Some t -> 
+                failwith "function is not a method"
 
-            | Call(None, Method("op_PipeLeft", _), [f;r]) ->
+        | Call(None, Method("op_PipeLeft", _), [f;r]) ->
+            let e = Expr.Application(f, r) |> inlineUselessAbstractions
+            Pipe(e) |> ValueSome
 
-                let e = Expr.Application(f, r) |> inlineUselessAbstractions
-                Pipe(e) |> Some
+        | Call(None, Method("op_PipeRight", _), [l;f]) ->
+            let e = Expr.Application(f, l) |> inlineUselessAbstractions
+            Pipe(e) |> ValueSome
 
-            | Call(None, Method("op_PipeRight", _), [l;f]) ->
-                let e = Expr.Application(f, l) |> inlineUselessAbstractions
-                Pipe(e) |> Some
-
-
-            | _ -> None
+        | _ -> ValueNone
 
     /// F# creates mutable copies for structs when accessing properties/methods
     /// since mutating the original is not possible (and not desired).
     /// since everything is mutable in C we don't care for those copies making the
     /// code less readable and more complicated
+    [<return: Struct>]
     let (|LetCopyOfStruct|_|) (e : Expr) =
         match e with
-            | Let(v, e, b) when v.Name = "copyOfStruct" && v.Type.IsValueType ->
-                // TODO: find a better way for detecting this
-                let mutable count = 0
-                let newBody = b.Substitute(fun vi -> if v = vi then count <- count + 1; Some e else None) 
-                if count = 0 then Some b
-                elif count = 1 then Some newBody
-                else None
-            | _ ->
-                None
+        | Let(v, e, b) when v.Name = "copyOfStruct" && v.Type.IsValueType ->
+            // TODO: find a better way for detecting this
+            let mutable count = 0
+            let newBody = b.Substitute(fun vi -> if v = vi then count <- count + 1; Some e else None) 
+            if count = 0 then ValueSome b
+            elif count = 1 then ValueSome newBody
+            else ValueNone
+        | _ ->
+            ValueNone
 
     /// detects a trivial (low runtime) expression like Var/Value/FieldGet/PropertyGet(for f# types)/etc.
+    [<return: Struct>]
     let rec (|Trivial|_|) (e : Expr) =
         match e with
-            | Var _ 
-            | Value _
-            | FieldGet(None, _)
-            | PropertyGet(None, _, [])
-            | TupleGet(Trivial, _)
-            | PropertyGet(Some Trivial, (FSharpTypeProperty | ArrayLengthProperty), [])
-            | FieldGet(Some Trivial, _) ->
-                Some ()
-            | _ ->
-                None
+        | Var _ 
+        | Value _
+        | FieldGet(None, _)
+        | PropertyGet(None, _, [])
+        | TupleGet(Trivial, _)
+        | PropertyGet(Some Trivial, (FSharpTypeProperty | ArrayLengthProperty), [])
+        | FieldGet(Some Trivial, _) ->
+            ValueSome ()
+        | _ ->
+            ValueNone
 
+    [<return: Struct>]
     let (|OperatorMethod|_|) (mi : MethodInfo) =
-        if mi.Name.StartsWith "op_" then Some ()
-        else None
+        if mi.Name.StartsWith "op_" then ValueSome ()
+        else ValueNone
 
 
 
     /// detects a trivial (low runtime) expression like (|Trivial|_|) but also allows for operator-calls
+    [<return: Struct>]
     let rec (|TrivialOp|_|) (e : Expr) =
         match e with
-            | Var _ 
-            | Value _
-            | FieldGet(None, _)
-            | PropertyGet(None, _, [])
-            | TupleGet(TrivialOp, _)
-            | PropertyGet(Some TrivialOp, (FSharpTypeProperty | ArrayLengthProperty), [])
-            | Call(None, OperatorMethod, [TrivialOp; TrivialOp])
-            | Call(None, OperatorMethod, [TrivialOp])
-            | FieldGet(Some TrivialOp, _) ->
-                Some ()
-            | _ ->
-                None
+        | Var _ 
+        | Value _
+        | FieldGet(None, _)
+        | PropertyGet(None, _, [])
+        | TupleGet(TrivialOp, _)
+        | PropertyGet(Some TrivialOp, (FSharpTypeProperty | ArrayLengthProperty), [])
+        | Call(None, OperatorMethod, [TrivialOp; TrivialOp])
+        | Call(None, OperatorMethod, [TrivialOp])
+        | FieldGet(Some TrivialOp, _) ->
+            ValueSome ()
+        | _ ->
+            ValueNone
 
 
-    let rec (|SaturatedLambda|_|) (e : Expr) : Option<list<Var * Expr> * Expr> =
+    [<return: Struct>]
+    let rec (|SaturatedLambda|_|) (e : Expr) : ValueOption<list<Var * Expr> * Expr> =
         match e with
-            | Application(Lambda(v,b), a) ->
-                Some ([v,a], b)
+        | Application(Lambda(v,b), a) ->
+            ValueSome ([v,a], b)
 
-            | Application(SaturatedLambda(bindings, Lambda(v,body)), a) ->
-                Some ((v,a) :: bindings, body)
+        | Application(SaturatedLambda(bindings, Lambda(v,body)), a) ->
+            ValueSome ((v,a) :: bindings, body)
 
-            | _ ->
-                None
+        | _ ->
+            ValueNone
 
     /// detects direct applications of lambdas and replaces them with let
     /// bindings or inlines the expression if either the argument is trivial or it occurs
     /// only once in the lambda-body
+    [<return: Struct>]
     let rec (|LambdaApp|_|) (e : Expr) =
         match e with
-            | SaturatedLambda(bindings, body) ->
-                let mutable b = body
+        | SaturatedLambda(bindings, body) ->
+            let mutable b = body
 
-                for (v,e) in bindings do
-                    let mutable cnt = 0
-                    let nb = b.Substitute(fun vi -> if vi = v then cnt <- cnt + 1; Some e else None)
+            for (v,e) in bindings do
+                let mutable cnt = 0
+                let nb = b.Substitute(fun vi -> if vi = v then cnt <- cnt + 1; Some e else None)
                     
-                    match e with
-                        | Trivial | _ when cnt <= 1 -> 
-                            b <- nb
-                        | _ ->
-                            b <- Expr.Let(v, e, b)
-                Some(b)
+                match e with
+                    | Trivial | _ when cnt <= 1 -> 
+                        b <- nb
+                    | _ ->
+                        b <- Expr.Let(v, e, b)
+            ValueSome(b)
                     
 
 //            | Application(Lambda(v,b), arg) ->
 //                let mutable cnt = 0
-//                let nb = b.Substitute(fun vi -> if vi = v then cnt <- cnt + 1; Some arg else None)
+//                let nb = b.Substitute(fun vi -> if vi = v then cnt <- cnt + 1; ValueSome arg else ValueNone)
 //                
 //                match arg with
 //                    | Trivial | _ when cnt <= 1 -> 
 //                        match nb with 
-//                            | LambdaApp(nb) -> Some nb
-//                            | _ -> Some nb
+//                            | LambdaApp(nb) -> ValueSome nb
+//                            | _ -> ValueSome nb
 //                    | _ ->  
 //                        match b with
-//                            | LambdaApp(b) -> Expr.Let(v, arg, b) |> Some
-//                            | _ -> Expr.Let(v, arg, b) |> Some
+//                            | LambdaApp(b) -> Expr.Let(v, arg, b) |> ValueSome
+//                            | _ -> Expr.Let(v, arg, b) |> ValueSome
 //
 //
 //            | Application(LambdaApp(Let(v,e,Lambda(vl,bl))), arg) ->
 //                let mutable cnt = 0
-//                let nb = bl.Substitute(fun vi -> if vi = vl then cnt <- cnt + 1; Some arg else None)
+//                let nb = bl.Substitute(fun vi -> if vi = vl then cnt <- cnt + 1; ValueSome arg else ValueNone)
 //                
 //                match arg with
-//                    | Trivial | _ when cnt <= 1 -> Expr.Let(v,e,nb) |> Some
-//                    | _ ->  Expr.Let(v, e, Expr.Let(vl, arg, bl)) |> Some
+//                    | Trivial | _ when cnt <= 1 -> Expr.Let(v,e,nb) |> ValueSome
+//                    | _ ->  Expr.Let(v, e, Expr.Let(vl, arg, bl)) |> ValueSome
 //                
 
-            | _ ->
-                None
+        | _ ->
+            ValueNone
 
     
 
     /// reduces an expression
+    [<return: Struct>]
     let (|ReducibleExpression|_|) (e : Expr) =
         match e with
-            | LetCopyOfStruct e     -> Some e
-            | Pipe e                -> Some e
-            | LambdaApp e           -> Some e
-            | Ignore e              -> Some e
+        | LetCopyOfStruct e     -> ValueSome e
+        | Pipe e                -> ValueSome e
+        | LambdaApp e           -> ValueSome e
+        | Ignore e              -> ValueSome e
 
-            | _                     -> None
+        | _                     -> ValueNone
 
+    [<return: Struct>]
     let (|OptionalCoerce|_|) (e : Expr) =
         match e with
-            | Coerce(e,t) -> Some(e,t)
-            | _ -> Some(e, e.Type)
+        | Coerce(e,t) -> ValueSome(e,t)
+        | _ -> ValueSome(e, e.Type)
 
     /// detects foreach expressions using the F# standard-layout
+    [<return: Struct>]
     let (|ForEach|_|) (e : Expr) =
         match e with
-            | Let(e, Call(Some(OptionalCoerce(seq,_)), Method("GetEnumerator",_), []),
-                    TryFinally(
-                        WhileLoop(Call(Some (Var e1), Method("MoveNext",_), []),
-                            Let(i, PropertyGet(Some (Var e2), current, []), b)
-                        ),
-                        IfThenElse(TypeTest(OptionalCoerce(Var e3, oType0), dType),
-                            Call(Some (Call(None, Method("UnboxGeneric",_), [OptionalCoerce(e4, oType1)])), Method("Dispose",_), []),
-                            Value(_)
-                        )
+        | Let(e, Call(Some(OptionalCoerce(seq,_)), Method("GetEnumerator",_), []),
+                TryFinally(
+                    WhileLoop(Call(Some (Var e1), Method("MoveNext",_), []),
+                        Let(i, PropertyGet(Some (Var e2), current, []), b)
+                    ),
+                    IfThenElse(TypeTest(OptionalCoerce(Var e3, oType0), dType),
+                        Call(Some (Call(None, Method("UnboxGeneric",_), [OptionalCoerce(e4, oType1)])), Method("Dispose",_), []),
+                        Value(_)
                     )
-                ) when e1 = e && e2 = e && e3 = e && current.Name = "Current" && oType0 = typeof<obj> && oType1 = typeof<obj> && dType = typeof<System.IDisposable> ->
-                Some(i, seq, b)
-            | _ -> 
-                None
+                )
+            ) when e1 = e && e2 = e && e3 = e && current.Name = "Current" && oType0 = typeof<obj> && oType1 = typeof<obj> && dType = typeof<System.IDisposable> ->
+            ValueSome(i, seq, b)
+        | _ -> 
+            ValueNone
 
+    [<return: Struct>]
     let (|CreateRange|_|) (e : Expr) =
         match e with
-            | Call(None, Method("op_RangeStep",_), [first; step; last]) -> Some(first, step, last)
-            | Call(None, Method("op_Range",_), [first; last]) -> Some(first, Expr.Value(1), last)
-            | _ -> None
+        | Call(None, Method("op_RangeStep",_), [first; step; last]) -> ValueSome(first, step, last)
+        | Call(None, Method("op_Range",_), [first; last]) -> ValueSome(first, Expr.Value(1), last)
+        | _ -> ValueNone
 
+    [<return: Struct>]
     let rec (|RangeSequence|_|) (e : Expr) =
         match e with
-            | Call(None, Method(("ToArray" | "ToList"), _), [RangeSequence(first, step, last)]) ->
-                Some(first, step, last)
+        | Call(None, Method(("ToArray" | "ToList"), _), [RangeSequence(first, step, last)]) ->
+            ValueSome(first, step, last)
 
-            | Call(None, Method("CreateSequence",_), [RangeSequence(first, step, last)]) ->
-                Some(first, step, last)
+        | Call(None, Method("CreateSequence",_), [RangeSequence(first, step, last)]) ->
+            ValueSome(first, step, last)
 
-            | CreateRange(first, step, last) ->
-                Some(first, step, last)
-                
+        | CreateRange(first, step, last) ->
+            ValueSome(first, step, last)
 
-            | _ -> 
-                None
+        | _ ->
+            ValueNone
 
-
+    [<return: Struct>]
     let (|ForInteger|_|) (e : Expr) =
         match e with
-            | ForIntegerRangeLoop(v,first,last,body) -> 
-                Some(v,first,Expr.Value(1),last,body)
+        | ForIntegerRangeLoop(v,first,last,body) -> 
+            ValueSome(v,first,Expr.Value(1),last,body)
 
+        | Let(seq, RangeSequence(first, step, last), ForEach(v, Var seq1, body)) when seq = seq1 ->
+            ValueSome(v, first, step, last, body)
 
+        | _ -> ValueNone
 
-            | Let(seq, RangeSequence(first, step, last), ForEach(v, Var seq1, body)) when seq = seq1 ->
-                Some(v, first, step, last, body)
-
-
-            | _ -> None
-
-    let rec private findSwitchCases (value : Expr) (label : Option<obj>) (e : Expr) =
+    let rec private findSwitchCases (value : Expr) (label : ValueOption<obj>) (e : Expr) =
         match label,e with
-            | None, IfThenElse(Call(None, Method("op_Equality", [SwitchableType; SwitchableType]), [a;Value(c,SwitchableType)]),ifTrue,ifFalse) when a = value -> 
-                    
-                let l = findSwitchCases value (Some c) ifTrue
-                let r = findSwitchCases value None ifFalse
-                match l,r with
-                    | Some l, Some r -> List.concat [l; r] |> Some
-                    | _ -> None
+        | ValueNone, IfThenElse(Call(None, Method("op_Equality", [SwitchableType; SwitchableType]), [a;Value(c,SwitchableType)]),ifTrue,ifFalse) when a = value -> 
+            let l = findSwitchCases value (ValueSome c) ifTrue
+            let r = findSwitchCases value ValueNone ifFalse
+            match l,r with
+                | ValueSome l, ValueSome r -> List.concat [l; r] |> ValueSome
+                | _ -> ValueNone
 
-            | Some l, e -> Some [(l,e)]
-            | None, e -> Some [(null,e)]
+        | ValueSome l, e -> ValueSome [(l,e)]
+        | ValueNone, e -> ValueSome [(null,e)]
 
     /// detects ifthenelse cascades which use only equality on integral types
+    [<return: Struct>]
     let (|Switch|_|) (e : Expr) =
         match e with
-            | IfThenElse(Call(None, Method("op_Equality", [SwitchableType; SwitchableType]), [a;Value(c,SwitchableType)]),_,_) -> 
-                match findSwitchCases a None e with
-                    | Some(cases) -> Switch(a, cases) |> Some
-                    | _ -> None
-            | _ -> None
+        | IfThenElse(Call(None, Method("op_Equality", [SwitchableType; SwitchableType]), [a;Value(c,SwitchableType)]),_,_) -> 
+            match findSwitchCases a ValueNone e with
+            | ValueSome(cases) -> Switch(a, cases) |> ValueSome
+            | _ -> ValueNone
+        | _ -> ValueNone
 
     let rec private findAlternatives (e : Expr) =
         match e with
-            | IfThenElse(c,i,e) ->
-                (Some c,i)::findAlternatives e
-            | _ -> 
-                [None,e]
+        | IfThenElse(c,i,e) ->
+            (ValueSome c,i)::findAlternatives e
+        | _ -> 
+            [ValueNone,e]
 
     /// detects ifthenelse cascades and returns them as list
+    [<return: Struct>]
     let (|Alternatives|_|) (e : Expr) =
         match e with
-            | IfThenElse(_, _, IfThenElse(_,_,_)) -> 
-                let alts = findAlternatives e
+        | IfThenElse(_, _, IfThenElse(_,_,_)) -> 
+            let alts = findAlternatives e
 
-                let e = alts |> List.filter(fun (c,_) -> c.IsNone) |> List.head |> snd
-                let c = alts |> List.choose(fun (c,b) -> match c with | Some c -> Some(c,b) | _ -> None)
+            let e = alts |> List.filter(fun (c,_) -> c.IsNone) |> List.head |> snd
+            let c = alts |> List.choose(fun (c,b) -> match c with | ValueSome c -> Some(c,b) | _ -> None)
 
-                Alternatives(c, e) |> Some
+            Alternatives(c, e) |> ValueSome
 
-            | _ -> None
+        | _ -> ValueNone
 
+    [<return: Struct>]
     let (|Unroll|_|) (e : Expr) =
         match e with
-            | Call(None, mi, []) when mi = Methods.unroll -> Some ()
-            | _ -> None
+        | Call(None, mi, []) when mi = Methods.unroll -> ValueSome ()
+        | _ -> ValueNone
 
     let (|Constant|_|) (e : Expr) =
         Expr.TryEval e

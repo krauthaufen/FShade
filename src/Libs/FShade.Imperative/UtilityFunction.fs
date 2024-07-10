@@ -118,16 +118,16 @@ module UtilityFunctionExpressionExtensions =
                 f.returnType
             )
 
-
+    [<return: Struct>]
     let (|CallFunction|_|) (e : Expr) =
         match e with
-            | Coerce(NewTuple [ String "__FUNCTIONCALL__"; Value((:? UtilityFunction as f), _); args], t) when t = f.returnType ->
-                match args with
-                    | Unit -> Some(f,[])
-                    | NewTuple args -> Some(f, args)
-                    | _ -> None
-            | _ ->
-                None
+        | Coerce(NewTuple [ String "__FUNCTIONCALL__"; Value((:? UtilityFunction as f), _); args], t) when t = f.returnType ->
+            match args with
+            | Unit -> ValueSome(f,[])
+            | NewTuple args -> ValueSome(f, args)
+            | _ -> ValueNone
+        | _ ->
+            ValueNone
 
 
 

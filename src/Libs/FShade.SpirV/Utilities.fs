@@ -149,19 +149,19 @@ module internal MethodTable =
         for (value, mis) in list do
             for mi in mis do
                 store.[mi] <- value
-            
+
         fun (mi : MethodInfo) ->
             match store.TryGetValue mi with
-                | (true, v) -> 
-                    Some v
+            | (true, v) -> 
+                ValueSome v
 
-                | _ ->
-                    if mi.IsGenericMethod then
-                        match store.TryGetValue (mi.GetGenericMethodDefinition()) with
-                            | (true, v) -> Some v
-                            | _ -> None
-                    else
-                        None
+            | _ ->
+                if mi.IsGenericMethod then
+                    match store.TryGetValue (mi.GetGenericMethodDefinition()) with
+                    | (true, v) -> ValueSome v
+                    | _ -> ValueNone
+                else
+                    ValueNone
 
 
 [<AutoOpen>]

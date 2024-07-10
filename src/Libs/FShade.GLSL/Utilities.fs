@@ -16,12 +16,12 @@ open FShade.Imperative
 module internal MethodTable =
     let rec tryGetMethod (e : Expr) =
         match e with
-            | Call(_,mi,_) -> Some mi
-            | PropertyGet(_,pi,_) -> Some pi.GetMethod
+        | Call(_,mi,_) -> Some mi
+        | PropertyGet(_,pi,_) -> Some pi.GetMethod
 
-            | ShapeVar _ -> None
-            | ShapeLambda(_,b) -> tryGetMethod b
-            | ShapeCombination(_,args) -> args |> List.tryPick tryGetMethod
+        | ShapeVar _ -> None
+        | ShapeLambda(_,b) -> tryGetMethod b
+        | ShapeCombination(_,args) -> args |> List.tryPick tryGetMethod
 
     let getMethod (e : Expr) =
         e |> tryGetMethod |> Option.get
@@ -35,16 +35,16 @@ module internal MethodTable =
             
         fun (mi : MethodInfo) ->
             match store.TryGetValue mi with
-                | (true, v) -> 
-                    Some v
+            | (true, v) -> 
+                ValueSome v
 
-                | _ ->
-                    if mi.IsGenericMethod then
-                        match store.TryGetValue (mi.GetGenericMethodDefinition()) with
-                            | (true, v) -> Some v
-                            | _ -> None
-                    else
-                        None
+            | _ ->
+                if mi.IsGenericMethod then
+                    match store.TryGetValue (mi.GetGenericMethodDefinition()) with
+                    | (true, v) -> ValueSome v
+                    | _ -> ValueNone
+                else
+                    ValueNone
 
 [<AutoOpen>]
 module internal Operators =

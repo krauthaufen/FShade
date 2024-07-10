@@ -170,19 +170,22 @@ module Primitives =
     let private emitVertexMeth = getMethodInfo <@ emitVertex() @>
     let private restartStripMeth = getMethodInfo <@ restartStrip() @>
     let private endPrimitiveMeth = getMethodInfo <@ endPrimitive() @>
+
+    [<return: Struct>]
     let (|EmitVertex|_|) (e : Microsoft.FSharp.Quotations.Expr) =
         match e with
         | Microsoft.FSharp.Quotations.Patterns.Call(None, mi, []) when mi = emitVertexMeth ->
-            Some ()
+            ValueSome ()
         | _ ->
-            None
-            
+            ValueNone
+
+    [<return: Struct>]
     let (|RestartStrip|_|) (e : Microsoft.FSharp.Quotations.Expr) =
         match e with
         | Microsoft.FSharp.Quotations.Patterns.Call(None, mi, []) when mi = restartStripMeth || mi = endPrimitiveMeth ->
-            Some ()
+            ValueSome ()
         | _ ->
-            None
+            ValueNone
 
 
 

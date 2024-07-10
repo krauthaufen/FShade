@@ -25,7 +25,7 @@ module private IntrinsicFunctions =
             CIntrinsic.tagged { compileFunction = create }
 
         let ofFunction (create : IdResultType -> IdRef[] -> SpirV<uint32>) =
-            CIntrinsic.tagged { compileFunction = create } |> Some
+            CIntrinsic.tagged { compileFunction = create } |> ValueSome
 
         let instr0 (code : Instruction) = 
             CIntrinsic.tagged
@@ -86,8 +86,9 @@ module private IntrinsicFunctions =
                         return id
                     }
                 }
-            
-    let (|InstrinsicFunction|_|) : MethodInfo -> Option<CIntrinsic> =
+
+    [<return: Struct>]
+    let (|InstrinsicFunction|_|) : MethodInfo -> ValueOption<CIntrinsic> =
         MethodTable.ofList [
             // ==========================================================================
             // TRIGONOMETRIC
@@ -1666,11 +1667,12 @@ module Assembler =
 module private TextureFunctions =
     open Aardvark.Base.TypeInfo.Patterns
 
-    let (|TextureLookup|_|) (mi : MethodInfo) : Option<CIntrinsic> =
+    [<return: Struct>]
+    let (|TextureLookup|_|) (mi : MethodInfo) : ValueOption<CIntrinsic> =
         match mi with
             | Method(name, ((ImageType(_, dim, isArray, isMS, valueType)::args))) ->
                 Log.warn "image functions not implemented"
-                None    
+                ValueNone    
 
             | Method(name, ((SamplerType(dim, isArray, isShadow, isMS, valueType)::args))) ->
                 let argCount = List.length args
@@ -1961,10 +1963,10 @@ module private TextureFunctions =
                         
 
                     | _ ->
-                        None
+                        ValueNone
 
             | _ ->
-                None
+                ValueNone
    
 
 

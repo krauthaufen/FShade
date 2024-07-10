@@ -73,207 +73,226 @@ module Preprocessor =
     [<AutoOpen>] 
     module BuilderPatterns = 
 
+        [<return: Struct>]
         let (|BuilderCombine|_|) (e : Expr) =
             match e with
-                | BuilderCall(b, Method("Combine",_), [l;r]) ->
-                    Some(b, l, r)
-                | _ ->
-                    None
+            | BuilderCall(b, Method("Combine",_), [l;r]) ->
+                ValueSome(b, l, r)
+            | _ ->
+                ValueNone
 
+        [<return: Struct>]
         let (|BuilderDelay|_|) (e : Expr) =
             match e with
-                | BuilderCall(b, Method("Delay",_), [Lambda(v,body)]) when v.Type = typeof<unit> ->
-                    Some(b, body)
-                | _ ->
-                    None
+            | BuilderCall(b, Method("Delay",_), [Lambda(v,body)]) when v.Type = typeof<unit> ->
+                ValueSome(b, body)
+            | _ ->
+                ValueNone
 
+        [<return: Struct>]
         let (|BuilderRun|_|) (e : Expr) =
             match e with
-                | BuilderCall(b, Method("Run",_), [e]) ->
-                    Some(b, e)
-                | _ ->
-                    None
-            
+            | BuilderCall(b, Method("Run",_), [e]) ->
+                ValueSome(b, e)
+            | _ ->
+                ValueNone
+
+        [<return: Struct>]
         let (|BuilderZero|_|) (e : Expr) =
             match e with
-                | BuilderCall(b, Method("Zero",_), []) ->
-                    Some(b)
-                | _ ->
-                    None
+            | BuilderCall(b, Method("Zero",_), []) ->
+                ValueSome(b)
+            | _ ->
+                ValueNone
 
+        [<return: Struct>]
         let (|BuilderFor|_|) (e : Expr) =
             match e with
-                | BuilderCall(b, Method("For",_) , [sequence; Lambda(v,body)]) ->
-                    match body with
-                        | Let(vi,Var(vo),body) when vo = v ->
-                            Some(b, vi, sequence, body)
-                        | _ ->
-                            Some(b, v, sequence, body)
-                            
+            | BuilderCall(b, Method("For",_) , [sequence; Lambda(v,body)]) ->
+                match body with
+                | Let(vi,Var(vo),body) when vo = v ->
+                    ValueSome(b, vi, sequence, body)
                 | _ ->
-                    None
+                    ValueSome(b, v, sequence, body)
+            | _ ->
+                ValueNone
 
+        [<return: Struct>]
         let (|BuilderWhile|_|) (e : Expr) =
             match e with
-                | BuilderCall(b, Method("While",_), [guard; body]) ->
-                    Some(b, guard, body)
-                | _ ->
-                    None
+            | BuilderCall(b, Method("While",_), [guard; body]) ->
+                ValueSome(b, guard, body)
+            | _ ->
+                ValueNone
 
+        [<return: Struct>]
         let (|BuilderYield|_|) (e : Expr) =
             match e with
-                | BuilderCall(b, mi, [v]) when mi.Name = "Yield" ->
-                    Some(b, mi, v)
-                | _ ->
-                    None
+            | BuilderCall(b, mi, [v]) when mi.Name = "Yield" ->
+                ValueSome(b, mi, v)
+            | _ ->
+                ValueNone
 
+        [<return: Struct>]
         let (|BuilderYieldFrom|_|) (e : Expr) =
             match e with
-                | BuilderCall(b, mi, [v]) when mi.Name = "YieldFrom" ->
-                    Some(b, mi, v)
-                | _ ->
-                    None
-            
+            | BuilderCall(b, mi, [v]) when mi.Name = "YieldFrom" ->
+                ValueSome(b, mi, v)
+            | _ ->
+                ValueNone
+
+        [<return: Struct>]
         let (|BuilderReturn|_|) (e : Expr) =
             match e with
-                | BuilderCall(b, mi, [v]) when mi.Name = "Return" ->
-                    Some(b, mi, v)
-                | _ ->
-                    None
+            | BuilderCall(b, mi, [v]) when mi.Name = "Return" ->
+                ValueSome(b, mi, v)
+            | _ ->
+                ValueNone
 
+        [<return: Struct>]
         let (|BuilderReturnFrom|_|) (e : Expr) =
             match e with
-                | BuilderCall(b, mi, [v]) when mi.Name = "ReturnFrom" ->
-                    Some(b, mi, v)
-                | _ ->
-                    None
+            | BuilderCall(b, mi, [v]) when mi.Name = "ReturnFrom" ->
+                ValueSome(b, mi, v)
+            | _ ->
+                ValueNone
 
+        [<return: Struct>]
         let (|BuilderBind|_|) (e : Expr) =
             match e with
-                | BuilderCall(b, Method("Bind",_), [e; Lambda(vv, c)]) ->
-                    match c with
-                        | Let(vi, Var ve, c) -> 
-                            Some(b, vi, e, c)
-                        | _ ->
-                            Some(b, vv, e, c)
+            | BuilderCall(b, Method("Bind",_), [e; Lambda(vv, c)]) ->
+                match c with
+                | Let(vi, Var ve, c) -> 
+                    ValueSome(b, vi, e, c)
                 | _ ->
-                    None
-        
+                    ValueSome(b, vv, e, c)
+            | _ ->
+                ValueNone
+
+        [<return: Struct>]
         let (|BuilderUsing|_|) (e : Expr) =
             match e with
-                | BuilderCall(b, Method("Using",_), [e; Lambda(v,body)]) ->
-                    match body with
-                        | Let(vi, Var vo, body) when vo = v -> Some(b, vi, e, b)
-                        | _ -> Some(b, v, e, body)
-                | _ ->
-                    None
+            | BuilderCall(b, Method("Using",_), [e; Lambda(v,body)]) ->
+                match body with
+                | Let(vi, Var vo, body) when vo = v -> ValueSome(b, vi, e, b)
+                | _ -> ValueSome(b, v, e, body)
+            | _ ->
+                ValueNone
 
+        [<return: Struct>]
         let rec private (|ShaderBuilder|_|) (e : Expr) =
             match e with
             | BuilderCall(b, _, _) ->
                 match Expr.TryEval b with
-                | Some (:? IShaderBuilder as sb) -> Some sb
-                | _ -> None
+                | Some (:? IShaderBuilder as sb) -> ValueSome sb
+                | _ -> ValueNone
 
             | ShapeLambda (_, ShaderBuilder sb) ->
-                Some sb
+                ValueSome sb
 
             | ShapeCombination(_, exprList) ->
                 exprList |> List.tryPick (function
                     | ShaderBuilder sb -> Some sb
                     | _ -> None
-                )
+                ) |> Option.toValueOption
 
-            | _ -> None
+            | _ -> ValueNone
 
+        [<return: Struct>]
         let (|ComputeBuilder|_|) (e : Expr) =
             match e with
-            | ShaderBuilder b when ShaderStage.isCompute b.ShaderStage -> Some b
-            | _ -> None
+            | ShaderBuilder b when ShaderStage.isCompute b.ShaderStage -> ValueSome b
+            | _ -> ValueNone
 
+        [<return: Struct>]
         let (|RaytracingBuilder|_|) (e : Expr) =
             match e with
-            | ShaderBuilder b when ShaderStage.isRaytracing b.ShaderStage -> Some b
-            | _ -> None
+            | ShaderBuilder b when ShaderStage.isRaytracing b.ShaderStage -> ValueSome b
+            | _ -> ValueNone
 
 
     [<AutoOpen>] 
     module OtherPatterns =
 
+        [<return: Struct>]
         let rec (|Integral|_|) (t : Type) =
             match t with
             | TypeInfo.Patterns.Enum
             | TypeInfo.Patterns.Integral
-            | TypeInfo.Patterns.VectorOf(_, Integral) -> Some ()
-            | TypeInfo.Patterns.MatrixOf(_, Integral) -> Some ()
-            | _ -> None
+            | TypeInfo.Patterns.VectorOf(_, Integral) -> ValueSome ()
+            | TypeInfo.Patterns.MatrixOf(_, Integral) -> ValueSome ()
+            | _ -> ValueNone
 
+        [<return: Struct>]
         let rec (|FloatingPoint|_|) (t : Type) =
             match t with
             | TypeInfo.Patterns.Float32
             | TypeInfo.Patterns.Float64
-            | TypeInfo.Patterns.VectorOf(_, (TypeInfo.Patterns.Float32 | TypeInfo.Patterns.Float64)) -> Some ()
-            | TypeInfo.Patterns.MatrixOf(_, (TypeInfo.Patterns.Float32 | TypeInfo.Patterns.Float64)) -> Some ()
-            | _ -> None
+            | TypeInfo.Patterns.VectorOf(_, (TypeInfo.Patterns.Float32 | TypeInfo.Patterns.Float64)) -> ValueSome ()
+            | TypeInfo.Patterns.MatrixOf(_, (TypeInfo.Patterns.Float32 | TypeInfo.Patterns.Float64)) -> ValueSome ()
+            | _ -> ValueNone
 
+        [<return: Struct>]
         let (|Primitive|_|) (e : Expr) =
             let iface = e.Type.GetInterface("Primitive`1")
             if isNull iface then
-                None
+                ValueNone
             else
                 let countProp = e.Type.GetProperty("VertexCount", BindingFlags.Static ||| BindingFlags.NonPublic ||| BindingFlags.Public)
                 let vertices = countProp.GetValue(null) |> unbox<int>
                 match e with
-                    | Value _ | Var _ | PropertyGet(None, _, []) -> Some(e, vertices)
-                    | _ -> None
+                | Value _ | Var _ | PropertyGet(None, _, []) -> ValueSome(e, vertices)
+                | _ -> ValueNone
 
+        [<return: Struct>]
         let (|PrimitiveVertexGet|_|) (e : Expr) =
             match e with
-                | PropertyGet(Some (Primitive(p,_)), pi, []) ->
-                    match pi.PrimitiveIndex with
-                        | Some index -> Some(p, Expr.Value index)
-                        | _ -> failwithf "[FShade] cannot get primitive-property %A" pi
+            | PropertyGet(Some (Primitive(p,_)), pi, []) ->
+                match pi.PrimitiveIndex with
+                | ValueSome index -> ValueSome(p, Expr.Value index)
+                | _ -> failwithf "[FShade] cannot get primitive-property %A" pi
 
-                | PropertyGet(Some (Primitive(p,_)), pi, [index]) when pi.Name = "Item" ->
-                    Some (p, index)
+            | PropertyGet(Some (Primitive(p,_)), pi, [index]) when pi.Name = "Item" ->
+                ValueSome (p, index)
 
-                | _ ->
-                    None
+            | _ ->
+                ValueNone
 
+        [<return: Struct>]
         let (|InputRead|_|) (vertexType : Type) (e : Expr) =
             match e with
-                | PropertyGet(Some vertex, field, []) when vertex.Type = vertexType ->
-                    let isRecordField = FSharpType.GetRecordFields(vertexType, true) |> Array.exists (fun pi -> pi = field)
-                    if isRecordField then 
-                        let parameter = { paramType = field.PropertyType; paramInterpolation = field.Interpolation }
-                        Some(vertex, field.Semantic, parameter)
-                    else
-                        None
-                | _ ->
-                    None
+            | PropertyGet(Some vertex, field, []) when vertex.Type = vertexType ->
+                let isRecordField = FSharpType.GetRecordFields(vertexType, true) |> Array.exists (fun pi -> pi = field)
+                if isRecordField then 
+                    let parameter = { paramType = field.PropertyType; paramInterpolation = field.Interpolation }
+                    ValueSome(vertex, field.Semantic, parameter)
+                else
+                    ValueNone
+            | _ ->
+                ValueNone
 
-
-
+        [<return: Struct>]
         let (|TessellateCall|_|) (e : Expr) =
             match e with
-                | Call(None, MethodQuote <@ tessellateTriangle @> _, [li; l01;l12;l20]) ->
-                    Some(3, [li], [l01;l12;l20])
-                | Call(None, MethodQuote <@ tessellateQuad @> _, [lu;lv; l01;l30;l23;l12]) ->
-                    Some(4, [lu; lv], [l01;l30;l23;l12])
+            | Call(None, MethodQuote <@ tessellateTriangle @> _, [li; l01;l12;l20]) ->
+                ValueSome(3, [li], [l01;l12;l20])
+            | Call(None, MethodQuote <@ tessellateQuad @> _, [lu;lv; l01;l30;l23;l12]) ->
+                ValueSome(4, [lu; lv], [l01;l30;l23;l12])
 
-                | _ ->
-                    None
+            | _ ->
+                ValueNone
 
+        [<return: Struct>]
         let rec (|TrivialInput|_|) (e : Expr) =
             match e with
-                | Value _
-                | TupleGet(TrivialInput, _)
-                | PropertyGet((None | Some TrivialInput), _, [])
-                | ReadInput(_,_,(None | Some TrivialInput))
-                | FieldGet((None | Some TrivialInput), _) ->
-                    Some ()
-                | _ ->
-                    None
+            | Value _
+            | TupleGet(TrivialInput, _)
+            | PropertyGet((None | Some TrivialInput), _, [])
+            | ReadInput(_,_,(None | Some TrivialInput))
+            | FieldGet((None | Some TrivialInput), _) ->
+                ValueSome ()
+            | _ ->
+                ValueNone
 
         let private (|Cons|Nil|Other|) (u : UnionCaseInfo) =
             if u.DeclaringType.IsGenericType && u.DeclaringType.GetGenericTypeDefinition() = typedefof<list<_>> then
@@ -284,57 +303,63 @@ module Preprocessor =
             else
                 Other
 
+        [<return: Struct>]
         let rec (|NewList|_|) (e : Expr) =
             match e with
-                | NewUnionCase(Cons, [h; NewList r]) ->
-                    Some (h :: r)
-                | NewUnionCase(Nil, []) ->
-                    Some []
-                | _-> 
-                    None
-                    
-        let rec (|NewSeq|_|) (e : Expr) : Option<list<Expr>> =
-            match e with
-                | Coerce(NewSeq args, _) -> Some args
-                | NewArray(_,args) -> Some args
-                | NewList(args) -> Some args
-                | RangeSequence(Int32 min, Int32 step, Int32 max) -> Some (List.map Expr.Value [min .. step .. max ])
-                | _ -> None
+            | NewUnionCase(Cons, [h; NewList r]) ->
+                ValueSome (h :: r)
+            | NewUnionCase(Nil, []) ->
+                ValueSome []
+            | _-> 
+                ValueNone
 
+        [<return: Struct>]
+        let rec (|NewSeq|_|) (e : Expr) : ValueOption<list<Expr>> =
+            match e with
+            | Coerce(NewSeq args, _) -> ValueSome args
+            | NewArray(_,args) -> ValueSome args
+            | NewList(args) -> ValueSome args
+            | RangeSequence(Int32 min, Int32 step, Int32 max) -> ValueSome (List.map Expr.Value [min .. step .. max ])
+            | _ -> ValueNone
+
+        [<return: Struct>]
         let private (|ArrCtor|_|) (c : ConstructorInfo) =
             match c.DeclaringType with
-                | ArrOf(l,t) -> Some (l,t)
-                | _ -> None
+            | ArrOf(l,t) -> ValueSome (l,t)
+            | _ -> ValueNone
 
+        [<return: Struct>]
         let (|NewArr|_|) (e : Expr) =
             match e with
-                | NewObject(ArrCtor(l,t), args) ->
-                    match args with
-                        | [] -> Some(t,l,[])
-                        | [NewSeq args] -> Some(t,l,args)
-                        | _ -> None
+            | NewObject(ArrCtor(l,t), args) ->
+                match args with
+                | [] -> ValueSome(t,l,[])
+                | [NewSeq args] -> ValueSome(t,l,args)
+                | _ -> ValueNone
 
-                | _ ->
-                    None
+            | _ ->
+                ValueNone
 
+        [<return: Struct>]
         let (|RemoveBuilder|_|) (e : Expr) =
             match e with
-            | BuilderCombine(_, l, r) -> Expr.Seq [l;r] |> Some
-            | BuilderReturn(_, _, e) -> e |> Some
-            | BuilderReturnFrom(_, _, e) -> e |> Some
-            | BuilderRun(_, e) -> e |> Some
-            | BuilderDelay(_, e) -> e |> Some
-            | BuilderZero _ -> Expr.Unit |> Some
-            | BuilderFor(_, var, RangeSequence(first, step, last), body) -> Expr.ForInteger(var, first, step, last, body) |> Some
-            | BuilderFor(_, var, sequence, body) -> Expr.ForEach(var, sequence, body) |> Some
-            | BuilderWhile(_, Lambda(_, guard), body) -> Expr.WhileLoop(guard, body) |> Some
-            | _ -> None
+            | BuilderCombine(_, l, r) -> Expr.Seq [l;r] |> ValueSome
+            | BuilderReturn(_, _, e) -> e |> ValueSome
+            | BuilderReturnFrom(_, _, e) -> e |> ValueSome
+            | BuilderRun(_, e) -> e |> ValueSome
+            | BuilderDelay(_, e) -> e |> ValueSome
+            | BuilderZero _ -> Expr.Unit |> ValueSome
+            | BuilderFor(_, var, RangeSequence(first, step, last), body) -> Expr.ForInteger(var, first, step, last, body) |> ValueSome
+            | BuilderFor(_, var, sequence, body) -> Expr.ForEach(var, sequence, body) |> ValueSome
+            | BuilderWhile(_, Lambda(_, guard), body) -> Expr.WhileLoop(guard, body) |> ValueSome
+            | _ -> ValueNone
 
+        [<return: Struct>]
         let (|Scene|_|) (e : Expr) =
             if e.Type = typeof<Scene> then
                 match Expr.TryEval e with
                 | Some (:? Scene as s) ->
-                    Some {
+                    ValueSome {
                         uniformName = s.AccelerationStructure.Semantic
                         uniformType = typeof<Scene>
                         uniformValue = AccelerationStructure s.AccelerationStructure.Semantic
@@ -343,85 +368,93 @@ module Preprocessor =
                 | _ ->
                     failwith "[FShade] Failed to evaluate scene expression"
             else
-                None
+                ValueNone
 
+        [<return: Struct>]
         let (|TraceRay|_|) (e : Expr) =
             match e with
             | Call(Some (Scene accel), Method("TraceRay", _), args) ->
                 match args with
                 | [origin; direction; ray; miss; minT; maxT; flags; cullMask] ->
-                    Some {| accelerationStructure = accel; origin = origin; direction = direction;
-                            payload = None; ray = ray; miss = miss; minT = minT; maxT = maxT;
-                            flags = flags; cullMask = cullMask |}
+                    ValueSome {| accelerationStructure = accel; origin = origin; direction = direction;
+                                 payload = ValueNone; ray = ray; miss = miss; minT = minT; maxT = maxT;
+                                 flags = flags; cullMask = cullMask |}
 
                 | [origin; direction; payload; ray; miss; minT; maxT; flags; cullMask] ->
-                    Some {| accelerationStructure = accel; origin = origin; direction = direction;
-                            payload = Some payload; ray = ray; miss = miss; minT = minT; maxT = maxT;
-                            flags = flags; cullMask = cullMask |}
+                    ValueSome {| accelerationStructure = accel; origin = origin; direction = direction;
+                                 payload = ValueSome payload; ray = ray; miss = miss; minT = minT; maxT = maxT;
+                                 flags = flags; cullMask = cullMask |}
 
                 | _ ->
                     failwithf "[FShade] Illformed call to TraceRay with %d arguments" args.Length
 
             | _ ->
-                None
+                ValueNone
 
+        [<return: Struct>]
         let private (|StaticMethod|_|) (e : Expr) =
             match e with
-            | Call(None, mi, args) when mi.IsStatic -> Some (mi.DeclaringType, mi.Name, args)
-            | _ -> None
+            | Call(None, mi, args) when mi.IsStatic -> ValueSome (mi.DeclaringType, mi.Name, args)
+            | _ -> ValueNone
 
+        [<return: Struct>]
         let (|ExecuteCallable|_|) (e : Expr) =
             match e with
             | StaticMethod(t, "Execute", args) when t = typeof<Callable> ->
                 match args with
-                | [id] -> Some (id, None)
-                | [data; id] -> Some (id, Some data)
+                | [id] -> ValueSome (id, ValueNone)
+                | [data; id] -> ValueSome (id, ValueSome data)
                 | _ ->
                     failwithf "[FShade] Illformed call to Callable.Execute with %d arguments" args.Length
             | _ ->
-                None
+                ValueNone
 
+        [<return: Struct>]
         let (|ReportIntersection|_|) (e : Expr) =
             match e with
             | StaticMethod(t, "Report", args) when t = typeof<Intersection> ->
                 match args with
-                | [t; kind] -> Some (t, kind, None)
-                | [t; attribute; kind] -> Some (t, kind, Some attribute)
+                | [t; kind] -> ValueSome (t, kind, ValueNone)
+                | [t; attribute; kind] -> ValueSome (t, kind, ValueSome attribute)
                 | _ ->
                     failwithf "[FShade] Illformed call to Intersection.Report with %d arguments" args.Length
             | _ ->
-                None
+                ValueNone
 
         let private (|SemanticProperty|_|) (pi : PropertyInfo) =
             let attributes = pi.GetCustomAttributes<SemanticAttribute>(true) |> Seq.toList
             attributes |> List.tryHead |> Option.map (fun att -> att.Semantic)
 
+        [<return: Struct>]
         let (|SemanticInput|_|) (e : Expr) =
             match e with
             | PropertyGet(Some t, pi, []) when FSharpType.IsRecord t.Type ->
                 match pi with
                 | SemanticProperty semantic ->
                     let parameter = { paramType = pi.PropertyType; paramInterpolation = InterpolationMode.Default }
-                    Some (semantic, parameter)
+                    ValueSome (semantic, parameter)
                 | _ ->
-                    None
+                    ValueNone
             | _ ->
-                None
+                ValueNone
 
+        [<return: Struct>]
         let (|RayPayloadIn|_|) (e : Expr) =
             match e with
-            | SemanticInput(semantic, _) when semantic = Intrinsics.RayPayloadIn -> Some e.Type
-            | _ -> None
+            | SemanticInput(semantic, _) when semantic = Intrinsics.RayPayloadIn -> ValueSome e.Type
+            | _ -> ValueNone
 
+        [<return: Struct>]
         let (|CallableDataIn|_|) (e : Expr) =
             match e with
-            | SemanticInput(semantic, _) when semantic = Intrinsics.CallableDataIn -> Some e.Type
-            | _ -> None
+            | SemanticInput(semantic, _) when semantic = Intrinsics.CallableDataIn -> ValueSome e.Type
+            | _ -> ValueNone
 
+        [<return: Struct>]
         let (|HitAttribute|_|) (e : Expr) =
             match e with
-            | SemanticInput(semantic, _) when semantic = Intrinsics.HitAttribute -> Some e.Type
-            | _ -> None
+            | SemanticInput(semantic, _) when semantic = Intrinsics.HitAttribute -> ValueSome e.Type
+            | _ -> ValueNone
 
     [<AutoOpen>]
     module private ComplexIntrinsicPatterns =
@@ -441,140 +474,156 @@ module Preprocessor =
         let private emulatedSpecialFloatingPointCheck =
             System.Text.RegularExpressions.Regex @"^([iI]s|Any|All)(PositiveInfinity|NegativeInfinity|Finite)$"
 
+        [<return: Struct>]
         let private (|FloatingPointExpr|_|) (e : Expr) =
             match e.Type with
-            | Float32 | Float64 -> Some e
-            | _ -> None
+            | Float32 | Float64 -> ValueSome e
+            | _ -> ValueNone
 
+        [<return: Struct>]
         let private (|VectorExpr|_|) (e : Expr) =
             match e.Type with
-            | VectorOf(d, t) -> Some (e, d, t)
-            | _ -> None
+            | VectorOf(d, t) -> ValueSome (e, d, t)
+            | _ -> ValueNone
 
+        [<return: Struct>]
         let private (|MatrixExpr|_|) (e : Expr) =
             match e.Type with
-            | MatrixOf(d, t) -> Some (e, d, t)
-            | _ -> None
+            | MatrixOf(d, t) -> ValueSome (e, d, t)
+            | _ -> ValueNone
 
+        [<return: Struct>]
         let private (|Property|_|) (pi : PropertyInfo) =
-            Some pi.Name
+            ValueSome pi.Name
 
+        [<return: Struct>]
         let (|ConstantSwizzle|_|) (e : Expr) =
             match e with
             | PropertyGet(Some (VectorExpr(v, _, baseType)), prop, []) when zeroOneVecProperty.IsMatch prop.Name ->
-                Some (v, prop, baseType)
+                ValueSome (v, prop, baseType)
             | _ ->
-                None
+                ValueNone
 
+        [<return: Struct>]
         let (|DotInt|_|) (e : Expr) =
             match e with
             | Call(_, MethodQuote <@ Vec.dot : V4d -> V4d -> float @> _, [VectorExpr (a, d, Integral); VectorExpr (b, _, _)])
             | Call(_, Method("Dot", _), [VectorExpr (a, d, Integral); VectorExpr (b, _, _)]) ->
-                Some (a, b, vectorFields |> List.take d)
+                ValueSome (a, b, vectorFields |> List.take d)
             | _ ->
-                None
+                ValueNone
 
+        [<return: Struct>]
         let (|LengthSquared|_|) (e : Expr) =
             match e with
             | Call(_, MethodQuote <@ Vec.lengthSquared : V4d -> float @> _, [VectorExpr (v, d, ft)])
             | Call(_, Method("LengthSquared", _), [VectorExpr (v, d, ft)])
             | PropertyGet(Some (VectorExpr (v, d, ft)), Property "LengthSquared", _) ->
-                Some v
+                ValueSome v
             | _ ->
-                None
+                ValueNone
 
+        [<return: Struct>]
         let (|DistanceSquared|_|) (e : Expr) =
             match e with
             | Call(_, MethodQuote <@ Vec.distanceSquared : V4d -> V4d -> float @> _, [VectorExpr (a, _, aft); VectorExpr (b, _, bft)])
             | Call(_, Method("DistanceSquared", _), [VectorExpr (a, _, aft); VectorExpr (b, _, bft)]) when aft = bft ->
-                Some (a, b)
+                ValueSome (a, b)
             | _ ->
-                None
+                ValueNone
 
+        [<return: Struct>]
         let (|Distance1|_|) (e : Expr) =
             match e with
             | Call(_, Method("Distance1", _), [VectorExpr (a, d, aft); VectorExpr (b, _, bft)]) when aft = bft ->
-                Some (a, b, vectorFields |> List.take d)
+                ValueSome (a, b, vectorFields |> List.take d)
             | _ ->
-                None
+                ValueNone
 
+        [<return: Struct>]
         let (|DistanceMinMax|_|) (e : Expr) =
             match e with
             | Call(_, Method("DistanceMin", _), [VectorExpr (a, d, aft); VectorExpr (b, _, bft)]) when aft = bft ->
-                Some (a, b, "Min")
+                ValueSome (a, b, "Min")
             | Call(_, Method("DistanceMax", _), [VectorExpr (a, d, aft); VectorExpr (b, _, bft)]) when aft = bft ->
-                Some (a, b, "Max")
+                ValueSome (a, b, "Max")
             | _ ->
-                None
+                ValueNone
 
+        [<return: Struct>]
         let (|Norm|_|) (e : Expr) =
             match e with
             | Call(_, Method("Norm1", _), [VectorExpr (v, _, _)])
             | PropertyGet(Some (VectorExpr (v, _, _)), Property "Norm1", _) ->
-                Some (v, "1")
+                ValueSome (v, "1")
 
             | Call(_, Method("NormMin", _), [VectorExpr (v, _, _)])
             | PropertyGet(Some (VectorExpr (v, _, _)), Property "NormMin", _) ->
-                Some (v, "Min")
+                ValueSome (v, "Min")
 
             | Call(_, Method("NormMax", _), [VectorExpr (v, _, _)])
             | PropertyGet(Some (VectorExpr (v, _, _)), Property "NormMax", _) ->
-                Some (v, "Max")
+                ValueSome (v, "Max")
 
             | _ ->
-                None
+                ValueNone
 
+        [<return: Struct>]
         let (|MinMaxElement|_|) (e : Expr) =
             match e with
             | Call(_, Method("MinElement", _), [VectorExpr (v, d, ft)])
             | PropertyGet(Some (VectorExpr (v, d, ft)), Property "MinElement", _) ->
-                Some (v, "Min", ft, vectorFields |> List.take d)
+                ValueSome (v, "Min", ft, vectorFields |> List.take d)
 
             | Call(_, Method("MaxElement", _), [VectorExpr (v, d, ft)])
             | PropertyGet(Some (VectorExpr (v, d, ft)), Property "MaxElement", _) ->
-                Some (v, "Max", ft, vectorFields |> List.take d)
+                ValueSome (v, "Max", ft, vectorFields |> List.take d)
 
             | _ ->
-                None
+                ValueNone
 
+        [<return: Struct>]
         let (|InvLerp|_|) (e : Expr) =
             match e with
             | Call(_, MethodQuote <@ invLerp : float -> float -> float -> float @> _, [a; b; y]) ->
-                Some [a; b; y]
+                ValueSome [a; b; y]
 
             | Call(_, (Method("InvLerp", _) as mi), [y; a; b]) when mi.DeclaringType = typeof<Fun> ->
-                Some [a; b; y]
+                ValueSome [a; b; y]
 
             | _ ->
-                None
+                ValueNone
 
+        [<return: Struct>]
         let (|LinearStep|_|) (e : Expr) =
             match e with
             | Call(_, MethodQuote <@ linearstep : float -> float -> float -> float @> _, [edge0; edge1; x]) ->
-                Some [edge0; edge1; x]
+                ValueSome [edge0; edge1; x]
 
             | Call(_, (Method("Linearstep", _) as mi), [x; edge0; edge1]) when mi.DeclaringType = typeof<Fun> ->
-                Some [edge0; edge1; x]
+                ValueSome [edge0; edge1; x]
 
             | _ ->
-                None
+                ValueNone
 
+        [<return: Struct>]
         let (|TransformPosProj|_|) (e : Expr) =
             match e with
             | Call(_, MethodQuote <@ Mat.transformPosProj : M44d -> V3d -> V3d @> _, [m; VectorExpr(v, d, _)]) ->
-                Some (d, false, [m; v])
+                ValueSome (d, false, [m; v])
 
             | Call(_, (Method("TransformPosProj", _) as mi), [m; VectorExpr(v, d, _)]) when mi.DeclaringType = typeof<Mat> ->
-                Some (d, false, [m; v])
+                ValueSome (d, false, [m; v])
 
             | Call(_, (Method("TransposedTransformProj", _) as mi), [m; VectorExpr(v, d, _)])
             | Call(_, (Method("TransposedTransformPosProj", _) as mi), [m; VectorExpr(v, d, _)]) when mi.DeclaringType = typeof<Mat> ->
-                Some (d, true, [m; v])
+                ValueSome (d, true, [m; v])
 
             | _ ->
-                None
+                ValueNone
 
         // returns (arguments, typ, dimension, isAllQuantifier, name)
+        [<return: Struct>]
         let (|MatrixQuantifiedBooleanOperation|_|) (e : Expr) =
             match e with
             | Call(_, Method(name, _), ([MatrixExpr(mat, dim, _)] as args))
@@ -587,19 +636,20 @@ module Preprocessor =
                     let name = m.Groups.[2].Value
 
                     match name, all with
-                    | "Equal", true | "Different", false -> None  // trivial equality
+                    | "Equal", true | "Different", false -> ValueNone  // trivial equality
                     | _ ->
                         let args =
                             if args.Length = 0 then [mat]
                             else args
 
-                        Some (args, mat.Type, dim, all, name)
+                        ValueSome (args, mat.Type, dim, all, name)
                 else
-                    None
+                    ValueNone
             | _ ->
-                None
+                ValueNone
 
         // returns (expr, isAllQuantifier, propertyFunctionName)
+        [<return: Struct>]
         let private (|EmulatedSpecialFloatingPointCheck|_|) (e : Expr) =
             match e with
             | Call(_, Method(name, _), [value])
@@ -608,41 +658,45 @@ module Preprocessor =
                 if m.Success then
                     let isAllQuantifier = (m.Groups.[1].Value = "All")
                     let propertyName = m.Groups.[2].Value
-                    Some (value, isAllQuantifier, propertyName)
+                    ValueSome (value, isAllQuantifier, propertyName)
                 else
-                    None
+                    ValueNone
             | _ ->
-                None
+                ValueNone
 
         // returns (vectoExpr, dimension, isAllQuantifier, propertyFunctionName)
+        [<return: Struct>]
         let (|VectorEmulatedSpecialFloatingPointCheck|_|) (e : Expr) =
             match e with
-            | EmulatedSpecialFloatingPointCheck (VectorExpr(v, d, _), all, name) -> Some (v, d, all, name)
-            | _ -> None
+            | EmulatedSpecialFloatingPointCheck (VectorExpr(v, d, _), all, name) -> ValueSome (v, d, all, name)
+            | _ -> ValueNone
 
         // returns (expr, isVector, name)
+        [<return: Struct>]
         let private (|ScalarOrVectorAllEmulatedSpecialFloatingPointCheck|_|) (e : Expr) =
             match e with
-            | EmulatedSpecialFloatingPointCheck (VectorExpr(e, _, _), true, name) -> Some (e, true, name)
-            | EmulatedSpecialFloatingPointCheck (FloatingPointExpr e, _, name) -> Some (e, false, name)
-            | _ -> None
+            | EmulatedSpecialFloatingPointCheck (VectorExpr(e, _, _), true, name) -> ValueSome (e, true, name)
+            | EmulatedSpecialFloatingPointCheck (FloatingPointExpr e, _, name) -> ValueSome (e, false, name)
+            | _ -> ValueNone
 
         // returns (expr, isVector, isPositive)
+        [<return: Struct>]
         let (|ScalarOrVectorAllSignedInfinity|_|) (e : Expr) =
             match e with
             | ScalarOrVectorAllEmulatedSpecialFloatingPointCheck (e, isVector, name) ->
                 match name with
-                | "PositiveInfinity" -> Some (e, isVector, true)
-                | "NegativeInfinity" -> Some (e, isVector, false)
-                | _ -> None
+                | "PositiveInfinity" -> ValueSome (e, isVector, true)
+                | "NegativeInfinity" -> ValueSome (e, isVector, false)
+                | _ -> ValueNone
             | _ ->
-                None
+                ValueNone
 
         // returns (expr, isVector)
+        [<return: Struct>]
         let (|ScalarOrVectorAllFinite|_|) (e : Expr) =
             match e with
-            | ScalarOrVectorAllEmulatedSpecialFloatingPointCheck (e, isVector, "Finite") -> Some (e, isVector)
-            | _ -> None
+            | ScalarOrVectorAllEmulatedSpecialFloatingPointCheck (e, isVector, "Finite") -> ValueSome (e, isVector)
+            | _ -> ValueNone
 
     // Used to determine which preprocess function to call
     [<RequireQualifiedAccess>]
@@ -888,11 +942,12 @@ module Preprocessor =
                     { s with hitAttribute = Some (name, hitAttribute) }, name
             )
 
+        [<return: Struct>]
         let private (|Name|_|) (value : obj) =
             match value with
-            | :? string as name -> Some name
-            | :? Symbol as sym -> Some (string sym)
-            | _ -> None
+            | :? string as name -> ValueSome name
+            | :? Symbol as sym -> ValueSome (string sym)
+            | _ -> ValueNone
 
         let useRayType (e : Expr) =
             State.custom (fun (s : State) ->
@@ -967,11 +1022,12 @@ module Preprocessor =
                 typeof<V4d>
             |]
 
+        [<return: Struct>]
         let private (|TensorOp|_|) (a : Expr, b : Expr) =
             match a.Type, b.Type with
-            | (VectorOf(_, _) | MatrixOf(_, _)), _ -> Some a.Type
-            | _, (VectorOf(_, _) | MatrixOf(_, _)) -> Some b.Type
-            | _ -> None
+            | (VectorOf(_, _) | MatrixOf(_, _)), _ -> ValueSome a.Type
+            | _, (VectorOf(_, _) | MatrixOf(_, _)) -> ValueSome b.Type
+            | _ -> ValueNone
 
         type Expr with
             static member Add(a : Expr, b : Expr) =
@@ -1070,9 +1126,9 @@ module Preprocessor =
 
                 let! payloadIn =
                     match args.payload with
-                    | Some p ->
+                    | ValueSome p ->
                         preprocessRaytracingS stage p |> State.map Some
-                    | None ->
+                    | ValueNone ->
                         State.value None
 
                 let! payloadName, payloadIndex = State.usePayload e.Type
@@ -1113,9 +1169,9 @@ module Preprocessor =
 
                 let! callableDataIn =
                     match data with
-                    | Some d ->
+                    | ValueSome d ->
                         preprocessRaytracingS stage d |> State.map Some
-                    | None ->
+                    | ValueNone ->
                         State.value None
 
                 let! callableDataName, callableDataIndex = State.useCallableData e.Type
@@ -1147,12 +1203,12 @@ module Preprocessor =
 
                 let! attribute =
                     match attribute with
-                    | Some attr ->
+                    | ValueSome attr ->
                         preprocessRaytracingS stage attr
                         |> State.bind (fun value ->
                             State.useHitAttribute value.Type |> State.map (fun name -> Some (name, value))
                         )
-                    | None ->
+                    | ValueNone ->
                         State.value None
 
                 return Expr.Seq [

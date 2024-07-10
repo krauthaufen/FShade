@@ -269,69 +269,75 @@ module ExpressionExtensions =
 
             Expr.WriteOutputs map
 
+    [<return: Struct>]
     let (|UnsafeWrite|_|) (e : Expr) =
         match e with
         | Call(None, mi, [target; value]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = ShaderIO.UnsafeWriteMeth ->
-            Some (target, value)
+            ValueSome (target, value)
         | _ ->
-            None
+            ValueNone
 
+    [<return: Struct>]
     let (|ReadInputOrRaytracingData|_|) (e : Expr) =
         match e with
         | Call(None, mi, [ Value((:? ParameterKind as kind),_); Value((:? string as name),_); Constant(:? Option<ShaderSlot> as slot)]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = ShaderIO.ReadInputMeth ->
-            Some(kind, name, None, slot)
+            ValueSome(kind, name, None, slot)
 
         | Call(None, mi, [ Value((:? ParameterKind as kind),_); Value((:? string as name),_); index;  Constant(:? Option<ShaderSlot> as slot)]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = ShaderIO.ReadInputIndexedMeth ->
-            Some(kind, name, Some index, slot)
+            ValueSome(kind, name, Some index, slot)
 
         | _ ->
-            None
+            ValueNone
 
+    [<return: Struct>]
     let (|ReadInput|_|) (e : Expr) =
         match e with
         | ReadInputOrRaytracingData (kind, name, index, _) when kind <> ParameterKind.RaytracingData ->
-            Some (kind, name, index)
+            ValueSome (kind, name, index)
 
         | _ ->
-            None
+            ValueNone
 
+    [<return: Struct>]
     let (|ReadRaytracingData|_|) (e : Expr) =
         match e with
         | ReadInputOrRaytracingData (ParameterKind.RaytracingData, name, None, slot) ->
-            Some (name, slot)
+            ValueSome (name, slot)
 
         | _ ->
-            None
+            ValueNone
 
+    [<return: Struct>]
     let (|WriteOutputsRaw|_|) (e : Expr) =
         match e with
-            | Call(none, mi, [NewArray(_,args)]) when mi = ShaderIO.WriteOutputsMeth ->
-                let args =
-                    args |> List.map (fun a ->
-                        match a with
-                            | NewTuple [String name; index; value ] ->
-                                let value =
-                                    match value with
-                                    | Coerce(value, t) when t = typeof<obj> -> value
-                                    | e -> e
-                                match index with
-                                    | Int32 -1 -> name, None, value
-                                    | _ -> name, (Some index), value
-                            | _ ->  
-                                failwithf "[FShade] ill-formed WriteOutputs argument: %A" a    
-                    )
+        | Call(None, mi, [NewArray(_,args)]) when mi = ShaderIO.WriteOutputsMeth ->
+            let args =
+                args |> List.map (fun a ->
+                    match a with
+                    | NewTuple [String name; index; value ] ->
+                        let value =
+                            match value with
+                            | Coerce(value, t) when t = typeof<obj> -> value
+                            | e -> e
+                        match index with
+                        | Int32 -1 -> name, None, value
+                        | _ -> name, (Some index), value
+                    | _ ->  
+                        failwithf "[FShade] ill-formed WriteOutputs argument: %A" a    
+                )
 
-                Some args
-            | _ -> 
-                None
+            ValueSome args
+        | _ -> 
+            ValueNone
 
+    [<return: Struct>]
     let (|WriteOutputs|_|) (e : Expr) =
         match e with
-            | WriteOutputsRaw(args) ->
-                let args = args |> List.map (fun (a,b,c) -> a, (b,c)) |> Map.ofList
-                Some args
-            | _ -> 
-                None
+        | WriteOutputsRaw(args) ->
+            let args = args |> List.map (fun (a,b,c) -> a, (b,c)) |> Map.ofList
+            ValueSome args
+        | _ -> 
+            ValueNone
 
     let private unrollMeth = getMethodInfo <@ Preprocessor.unroll : unit -> unit @>
 
@@ -340,42 +346,47 @@ module ExpressionExtensions =
     let private deref = getMethodInfo <@ (!) @>
     let private setref = getMethodInfo <@ (:=) @>
 
+    [<return: Struct>]
     let (|RefExpr|_|) (e : Expr) =
         match e.Type with
-        | Ref inner -> Some inner
-        | _ -> None
+        | Ref inner -> ValueSome inner
+        | _ -> ValueNone
 
+    [<return: Struct>]
     let (|RefOf|_|) (e : Expr) =
         match e with
         | Call(None, mi, [v]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = refof ->
-            Some v
+            ValueSome v
         | _ ->
-            None
+            ValueNone
 
+    [<return: Struct>]
     let (|NewRef|_|) (e : Expr) =
         match e with
         | Call(None, mi, [v]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = newref ->
-            Some v
+            ValueSome v
         | _ ->
-            None
+            ValueNone
 
+    [<return: Struct>]
     let (|DeRef|_|) (e : Expr) =
         match e with
         | Call(None, mi, [v]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = deref ->
-            Some v
+            ValueSome v
         | PropertyGet(Some (RefExpr _ as v), pi, []) when pi.Name = "Value" ->
-            Some v
+            ValueSome v
         | _ ->
-            None
+            ValueNone
 
+    [<return: Struct>]
     let (|SetRef|_|) (e : Expr) =
         match e with
         | Call(None, mi, [r;v]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = setref ->
-            Some(r, v)
+            ValueSome(r, v)
         | PropertySet(Some (RefExpr _ as r), pi, [], v) when pi.Name = "Value" ->
-            Some(r, v)
+            ValueSome(r, v)
         | _ ->
-            None
+            ValueNone
 
     type MethodInfo with
         static member WriteOutputs = ShaderIO.WriteOutputsMeth
@@ -416,52 +427,51 @@ module private Affected =
     let rec usedInputsS (e : Expr) : State<State, Set<string>> =
         state {
             match e with
-                | ReadInputOrRaytracingData(ParameterKind.Input, name, idx, _) ->
-                    match idx with
-                        | Some idx -> 
-                            let! used = usedInputsS idx
-                            return Set.add name used
-                        | None ->
-                            return Set.singleton name
+            | ReadInputOrRaytracingData(ParameterKind.Input, name, idx, _) ->
+                match idx with
+                | Some idx -> 
+                    let! used = usedInputsS idx
+                    return Set.add name used
+                | None ->
+                    return Set.singleton name
 
-                | WriteOutputs values ->
-                    let! values = 
-                        values |> Map.toList |> List.mapS (fun (name, (index, value)) ->
-                            state {
-                                let! vUsed = usedInputsS value
-                                do! State.affects name vUsed
-                                match index with
-                                    | Some index -> 
-                                        let! iUsed = usedInputsS index
-                                        do! State.affects name iUsed
-                                        return Set.union iUsed vUsed
-                                    | _ ->
-                                        return vUsed
-                            }
-                        )   
-                    return Set.unionMany values
+            | WriteOutputs values ->
+                let! values = 
+                    values |> Map.toList |> List.mapS (fun (name, (index, value)) ->
+                        state {
+                            let! vUsed = usedInputsS value
+                            do! State.affects name vUsed
+                            match index with
+                            | Some index -> 
+                                let! iUsed = usedInputsS index
+                                do! State.affects name iUsed
+                                return Set.union iUsed vUsed
+                            | _ ->
+                                return vUsed
+                        }
+                    )   
+                return Set.unionMany values
 
-                | VarSet(v, e) ->
-                    let! eUsed = usedInputsS e
-                    do! State.add v eUsed
-                    return eUsed
+            | VarSet(v, e) ->
+                let! eUsed = usedInputsS e
+                do! State.add v eUsed
+                return eUsed
                     
-                | Let(v, e, b) ->
-                    let! eUsed = usedInputsS e
-                    do! State.add v eUsed
-                    let! bUsed = usedInputsS b
-                    return Set.union eUsed bUsed
+            | Let(v, e, b) ->
+                let! eUsed = usedInputsS e
+                do! State.add v eUsed
+                let! bUsed = usedInputsS b
+                return Set.union eUsed bUsed
 
-                | ShapeVar v -> 
-                    return! State.dependencies v
+            | ShapeVar v -> 
+                return! State.dependencies v
 
-                | ShapeLambda(v, b) ->
-                    return! usedInputsS b
+            | ShapeLambda(v, b) ->
+                return! usedInputsS b
 
-                | ShapeCombination(o, args) ->
-                    let! args = args |> List.mapS usedInputsS
-                    return Set.unionMany args
-
+            | ShapeCombination(o, args) ->
+                let! args = args |> List.mapS usedInputsS
+                return Set.unionMany args
         }
 
     let getAffectedOutputsMap (e : Expr) =

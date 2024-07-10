@@ -233,20 +233,21 @@ module Optimizer =
                     return! s e
             }
 
+        [<return: Struct>]
         let rec (|TrivialOrInput|_|) (e : Expr) =
             match e with
-                | Var _ 
-                | Value _
-                | FieldGet(None, _)
-                | PropertyGet(None, _, [])
-                | TupleGet(Trivial, _)
-                | PropertyGet(Some TrivialOrInput, (FSharpTypeProperty | ArrayLengthProperty), [])
-                | FieldGet(Some TrivialOrInput, _) 
-                | ReadInput(_, _, None) 
-                | ReadInput(_, _, Some TrivialOrInput) -> 
-                    Some()
-                | _ ->
-                    None
+            | Var _ 
+            | Value _
+            | FieldGet(None, _)
+            | PropertyGet(None, _, [])
+            | TupleGet(Trivial, _)
+            | PropertyGet(Some TrivialOrInput, (FSharpTypeProperty | ArrayLengthProperty), [])
+            | FieldGet(Some TrivialOrInput, _) 
+            | ReadInput(_, _, None) 
+            | ReadInput(_, _, Some TrivialOrInput) -> 
+                ValueSome ()
+            | _ ->
+                ValueNone
 
         let inlineCode (f : UtilityFunction) (args : list<Expr>) =
             let rec wrap (v : list<Var>) (e : list<Expr>) (b : Expr) =
@@ -285,38 +286,41 @@ module Optimizer =
                     | Some a -> a |> f |> State.map Some
                     | None -> State.value None
 
+        [<return: Struct>]
         let rec (|LExpr|_|) (e : Expr) =
             // TODO: complete?
             match e with
-                | Var v -> Some v
-                | FieldGet(Some (LExpr v), fi) -> Some v
-                | PropertyGet(Some (LExpr v), _, _) -> Some v
-                | GetArray(LExpr a, i) -> Some a
-                | _ -> None
+            | Var v -> ValueSome v
+            | FieldGet(Some (LExpr v), fi) -> ValueSome v
+            | PropertyGet(Some (LExpr v), _, _) -> ValueSome v
+            | GetArray(LExpr a, i) -> ValueSome a
+            | _ -> ValueNone
 
+        [<return: Struct>]
         let rec (|MutableArgument|_|) (e : Expr) =
             match e with
-                | Var v -> 
-                    if v.IsMutable then
-                        Some v
-                    else
-                        match v.Type with
-                            | ArrOf _ -> Some v
-                            | ArrayOf _ -> Some v
-                            | Ref _ -> Some v
-                            | _ -> None
-                | GetArray(Var v, _) -> Some v
+            | Var v -> 
+                if v.IsMutable then
+                    ValueSome v
+                else
+                    match v.Type with
+                    | ArrOf _ -> ValueSome v
+                    | ArrayOf _ -> ValueSome v
+                    | Ref _ -> ValueSome v
+                    | _ -> ValueNone
+            | GetArray(Var v, _) -> ValueSome v
 
-                | RefOf (MutableArgument v) -> Some v
-                | AddressOf (MutableArgument v) -> Some v
-                | _ -> None
+            | RefOf (MutableArgument v) -> ValueSome v
+            | AddressOf (MutableArgument v) -> ValueSome v
+            | _ -> ValueNone
 
+        [<return: Struct>]
         let rec (|StorageArgument|_|) (e : Expr) =
             match e with
-                | RefOf (GetArray(ReadInputOrRaytracingData(ParameterKind.Uniform, _, _, _), _)) ->
-                    Some ()
-                | _ ->
-                    None
+            | RefOf (GetArray(ReadInputOrRaytracingData(ParameterKind.Uniform, _, _, _), _)) ->
+                ValueSome ()
+            | _ ->
+                ValueNone
 
     /// The dead code elimination removes unused bindings from the code
     /// e.g. `let a = someFunction(x,y) in 10` gets reduced to `10` assuming
@@ -1078,13 +1082,14 @@ module Optimizer =
                     Map.tryFind v s.variableValues
                 )
 
+        [<return: Struct>]
         let rec private (|AllConstant|_|) (e : list<Expr>) =
             match e with
-                | [] -> Some []
-                | h :: t ->
-                    match h, t with
-                        | Value(h,_), AllConstant t -> Some (h :: t)
-                        | _ -> None
+            | [] -> ValueSome []
+            | h :: t ->
+                match h, t with
+                | Value(h,_), AllConstant t -> ValueSome (h :: t)
+                | _ -> ValueNone
 
 
         let functionTable (l : list<string * obj>) =
@@ -1452,6 +1457,7 @@ module Optimizer =
                 "ToDouble", (float : decimal -> _) :> obj
             ]
 
+        [<return: Struct>]
         let private (|Operator|_|) (mi : MethodInfo) =
             let parameters =
                 mi.GetParameters()
@@ -1459,31 +1465,32 @@ module Optimizer =
                 |> List.map (fun p -> p.ParameterType)
 
             match operators.TryGetValue((mi.Name, parameters)) with
-            | (true, f) -> Some f
-            | _ -> None
+            | (true, f) -> ValueSome f
+            | _ -> ValueNone
 
+        [<return: Struct>]
         let rec (|SeqCons|_|) (e : Expr) =
             match e with
-                | Unit ->
-                    None
+            | Unit ->
+                ValueNone
 
-                | Sequential(SeqCons(head, tail), r) ->
-                    let tail = 
-                        match tail with
-                            | Some t -> Expr.Sequential(t, r) |> Some
-                            | None -> Some r
-                    Some (head, tail)
-                    
+            | Sequential(SeqCons(head, tail), r) ->
+                let tail = 
+                    match tail with
+                    | ValueSome t -> Expr.Sequential(t, r) |> ValueSome
+                    | ValueNone -> ValueSome r
+                ValueSome (head, tail)
 
-                | e -> 
-                    Some (e, None)
+            | e ->
+                ValueSome (e, ValueNone)
   
+        [<return: Struct>]
         let rec (|SeqCons2|_|) (e : Expr) =
             match e with
-                | SeqCons(a, Some (SeqCons(b, c))) ->
-                    Some (a,b,c)
-                | _ ->
-                    None
+            | SeqCons(a, ValueSome (SeqCons(b, c))) ->
+                ValueSome (a,b,c)
+            | _ ->
+                ValueNone
 
         let rec evaluateConstantsS (e : Expr) =
             state {
@@ -1536,22 +1543,22 @@ module Optimizer =
                                         evaluateConstantsS body
                                     )
                                 match rest with
-                                    | Some rest -> 
-                                        let! rest = evaluateConstantsS rest
-                                        return Expr.Seq [Expr.Seq unrolled; rest]
-                                    | None ->
-                                        return Expr.Seq unrolled
+                                | ValueSome rest -> 
+                                    let! rest = evaluateConstantsS rest
+                                    return Expr.Seq [Expr.Seq unrolled; rest]
+                                | ValueNone ->
+                                    return Expr.Seq unrolled
                             | _ ->
                                 let! body = evaluateConstantsS body
                                 match rest with
-                                    | Some rest -> 
-                                        let! rest = evaluateConstantsS rest
-                                        match body with
-                                            | Value _ -> return rest
-                                            | _ -> 
-                                                return Expr.Seq [u; Expr.ForInteger(v, first, step, last, body); rest]
-                                    | None ->
-                                        return Expr.Seq [u; Expr.ForInteger(v, first, step, last, body)]
+                                | ValueSome rest -> 
+                                    let! rest = evaluateConstantsS rest
+                                    match body with
+                                        | Value _ -> return rest
+                                        | _ -> 
+                                            return Expr.Seq [u; Expr.ForInteger(v, first, step, last, body); rest]
+                                | ValueNone ->
+                                    return Expr.Seq [u; Expr.ForInteger(v, first, step, last, body)]
 
 
                         
@@ -2346,113 +2353,119 @@ module Optimizer =
 
             let swizzle = System.Text.RegularExpressions.Regex @"[xyzw]+"
 
+            [<return: Struct>]
             let rec (|TrivialOrInput|_|) (nonMutable : Set<Var>) (e : Expr) =
                 match e with
-                    | Var v when v.IsMutable -> 
-                        if Set.contains v nonMutable then Some ()
-                        else None
+                | Var v when v.IsMutable -> 
+                    if Set.contains v nonMutable then ValueSome ()
+                    else ValueNone
 
-                    | Var _ 
-                    | Value _
-                    | FieldGet(None, _)
-                    | PropertyGet(None, _, [])
-                    | TupleGet(Trivial, _)
-                    | PropertyGet(Some (TrivialOrInput nonMutable), (FSharpTypeProperty | ArrayLengthProperty), [])
-                    | FieldGet(Some (TrivialOrInput nonMutable), _) 
-                    | ReadInput(_, _, None) 
-                    | ReadInput(_, _, Some (TrivialOrInput nonMutable)) -> 
-                        Some()
-                    
-                    | PropertyGet(Some (TrivialOrInput nonMutable as t), prop, []) ->
-                        match t.Type with
-                        | Aardvark.Base.TypeInfo.Patterns.VectorOf _ -> 
-                            if swizzle.IsMatch (prop.Name.ToLower()) then Some ()
-                            else None
-                        | _ ->
-                            None
+                | Var _
+                | Value _
+                | FieldGet(None, _)
+                | PropertyGet(None, _, [])
+                | TupleGet(Trivial, _)
+                | PropertyGet(Some (TrivialOrInput nonMutable), (FSharpTypeProperty | ArrayLengthProperty), [])
+                | FieldGet(Some (TrivialOrInput nonMutable), _) 
+                | ReadInput(_, _, None) 
+                | ReadInput(_, _, Some (TrivialOrInput nonMutable)) -> 
+                    ValueSome()
 
+                | PropertyGet(Some (TrivialOrInput nonMutable as t), prop, []) ->
+                    match t.Type with
+                    | Aardvark.Base.TypeInfo.Patterns.VectorOf _ -> 
+                        if swizzle.IsMatch (prop.Name.ToLower()) then ValueSome ()
+                        else ValueNone
                     | _ ->
-                        None
+                        ValueNone
 
+                | _ ->
+                    ValueNone
+
+            [<return: Struct>]
             let rec (|OnlyVar|_|) (nonMutable : Set<Var>)  (e : Expr) =
                 match e with
-                    | Var v when v.IsMutable -> 
-                        if Set.contains v nonMutable then Some ()
-                        else None
+                | Var v when v.IsMutable -> 
+                    if Set.contains v nonMutable then ValueSome ()
+                    else ValueNone
 
-                    | Var _ 
-                    | Value _ ->
-                        Some ()
-                    | _ -> 
-                        None
-                        
+                | Var _ 
+                | Value _ ->
+                    ValueSome ()
+                | _ -> 
+                    ValueNone
+            
+            [<return: Struct>]
             let rec (|OnlyInputs|_|) (e : Expr) =
                 match e with
-                    | ReadInput _ ->
-                        Some ()
-                    | _ -> 
-                        None
+                | ReadInput _ ->
+                    ValueSome ()
+                | _ -> 
+                    ValueNone
                         
+            [<return: Struct>]
             let rec (|InputOrVar|_|)  (nonMutable : Set<Var>)   (e : Expr) =
                 match e with
-                    | Var v when v.IsMutable -> 
-                        if Set.contains v nonMutable then Some ()
-                        else None
-                    | ReadInput _ 
-                    | Var _ ->
-                        Some ()
-                    | _ -> 
-                        None
+                | Var v when v.IsMutable -> 
+                    if Set.contains v nonMutable then ValueSome ()
+                    else ValueNone
+                | ReadInput _ 
+                | Var _ ->
+                    ValueSome ()
+                | _ -> 
+                    ValueNone
 
+            [<return: Struct>]
             let rec (|SamplerOrImageType|_|) (t : Type) =
                 match t with
-                    | SamplerType _ 
-                    | ImageType _
-                    | ArrOf(_,SamplerOrImageType)
-                    | ArrayOf(SamplerOrImageType) ->
-                        Some ()
-                    | _ ->
-                        None
+                | SamplerType _ 
+                | ImageType _
+                | ArrOf(_,SamplerOrImageType)
+                | ArrayOf(SamplerOrImageType) ->
+                    ValueSome ()
+                | _ ->
+                    ValueNone
 
             let letValuePattern =
                 State.get |> State.map (fun s ->
                     let pat = 
                         match s.variables, s.trivial, s.inputs with
-                            | (false | true), true, true ->
-                                (|TrivialOrInput|_|) s.nonMutable
+                        | (false | true), true, true ->
+                            (|TrivialOrInput|_|) s.nonMutable
 
-                            | (false | true), true, false ->
-                                (|Trivial|_|) 
+                        | (false | true), true, false ->
+                            (|Trivial|_|)
 
-                            | true, false, false ->
-                                (|OnlyVar|_|) s.nonMutable
+                        | true, false, false ->
+                            (|OnlyVar|_|) s.nonMutable
 
-                            | false, false, true ->
-                                (|OnlyInputs|_|)
+                        | false, false, true ->
+                            (|OnlyInputs|_|)
 
-                            | true, false, true ->
-                                (|InputOrVar|_|) s.nonMutable
-                                 
-                            | false, false, false ->
-                                fun _ -> None
+                        | true, false, true ->
+                            (|InputOrVar|_|) s.nonMutable
+
+                        | false, false, false ->
+                            fun _ -> ValueNone
 
                     let sam (e : Expr) =
                         match e.Type with
-                            | SamplerOrImageType -> Some ()
-                            | _ -> None
+                        | SamplerOrImageType -> ValueSome ()
+                        | _ -> ValueNone
 
-                    fun e -> 
+                    fun e ->
                         match sam e with
-                            | Some () -> Some ()
-                            | None -> pat e
+                        | ValueSome () -> ValueSome ()
+                        | ValueNone -> pat e
                 )
 
+        [<return: Struct>]
         let (|TupleBind|_|) (e : Expr) =
             match e with
             | Let(v, CallFunction(utility, args), body) when FSharpType.IsTuple v.Type ->
-                Some(v, utility, args, body)
+                ValueSome(v, utility, args, body)
             | _ ->
-                None
+                ValueNone
 
 
         let rec inlineS (e : Expr) =
@@ -2669,10 +2682,10 @@ module Optimizer =
                             let! state = State.get
                             let! pattern = State.letValuePattern
                             match pattern e with
-                                | Some () ->
+                                | ValueSome () ->
                                     let b = b.Substitute(fun vi -> if vi = v then Some e else None)
                                     return! inlineS b
-                                | None ->
+                                | ValueNone ->
                                     let nonMutable = state.nonMutable
                                     let rec canInline (e : Expr) =
                                         if e.Type.IsRef || e.Type.IsArr || e.Type.IsArray then

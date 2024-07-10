@@ -18,19 +18,20 @@ module internal Framework =
 
         let inline private tryParseInt (input : string) =
             match Int32.TryParse input with
-            | (true, value) -> Some value
-            | _ -> None
+            | (true, value) -> ValueSome value
+            | _ -> ValueNone
 
         let inline private tryMatch (regex : Regex[]) (input : string) =
-            regex |> Array.tryPick (fun r ->
+            regex |> Array.tryPickV (fun r ->
                 let m = r.Match input
                 if m.Success then
                     let v = m.Groups.["version"].Value
                     tryParseInt <| v.Replace(".", "").PadRight(3, '0')
                 else
-                    None
+                    ValueNone
             )
 
+        [<return: Struct>]
         let (|NetCore|_|) =
             tryMatch [|
                 Regex "net(?<version>[0-9]\.[0.9])"
@@ -39,12 +40,14 @@ module internal Framework =
                 Regex ".NET Core (?<version>[0-9]\.[0-9])"
             |]
 
+        [<return: Struct>]
         let (|NetFramework|_|) =
             tryMatch [|
                 Regex "net(?<version>[0-9][0-9][0-9]?)"
                 Regex ".NET Framework (?<version>[0-9]\.[0-9])"
             |]
 
+        [<return: Struct>]
         let (|NetStandard|_|) =
             tryMatch [|
                 Regex "netstandard(?<version>[0-9]\.[0-9])"

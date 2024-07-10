@@ -729,16 +729,18 @@ module Assembler =
     [<AutoOpen>] 
     module Patterns =
 
+        [<return: Struct>]
         let (|CTexture|_|) (t : CType) =
             match t with   
-            | CIntrinsic { tag = (:? GLSLTextureType as t)} -> Some (t, 1)
-            | CArray(CIntrinsic { tag = (:? GLSLTextureType as t)}, len) -> Some (t, len)
-            | _ -> None
+            | CIntrinsic { tag = (:? GLSLTextureType as t)} -> ValueSome (t, 1)
+            | CArray(CIntrinsic { tag = (:? GLSLTextureType as t)}, len) -> ValueSome (t, len)
+            | _ -> ValueNone
 
+        [<return: Struct>]
         let (|CAccelerationStructure|_|) (t : CType) =
             match t with
-            | CIntrinsic { tag = (:? Type as t) } when t = typeof<Scene> -> Some ()
-            | _ -> None
+            | CIntrinsic { tag = (:? Type as t) } when t = typeof<Scene> -> ValueSome ()
+            | _ -> ValueNone
 
 
     let reservedNames =

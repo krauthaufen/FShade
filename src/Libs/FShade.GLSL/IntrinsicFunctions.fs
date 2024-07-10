@@ -12,7 +12,9 @@ open FShade.Imperative
 
 [<AutoOpen>]
 module IntrinsicFunctions =
-    let (|IntrinsicFunction|_|) : MethodInfo -> Option<CIntrinsic> =
+
+    [<return: Struct>]
+    let (|IntrinsicFunction|_|) : MethodInfo -> ValueOption<CIntrinsic> =
         MethodTable.ofList [
             // ==========================================================================
             // ANGLES & TRIGONOMETRIC
@@ -1702,6 +1704,7 @@ module IntrinsicFunctions =
             CIntrinsic.tagged "terminateRayEXT", [ exactly <@ terminateRay @> ]
         ]
 
+    [<return: Struct>]
     let (|TextureLookup|_|) (mi : MethodInfo) =
         match mi with
         | Method(name, (((ImageType(_, dim, isArray, isMS, valueType)) as img ::_) as args)) when mi.DeclaringType = img ->
@@ -1755,7 +1758,7 @@ module IntrinsicFunctions =
                 | "get_Samples" -> ["GL_ARB_shader_texture_image_samples"]
                 | _ -> []
 
-            Some (functionName, Set.ofList extensions)
+            ValueSome (functionName, Set.ofList extensions)
 
         | Method(name, (((SamplerType(dim, isArray, isShadow, isMS, valueType)) as sam ::_) as args)) when mi.DeclaringType = sam ->
             let coordComponents =
@@ -1878,7 +1881,7 @@ module IntrinsicFunctions =
                 | "get_Samples" -> ["GL_ARB_shader_texture_image_samples"]
                 | _ -> []
 
-            Some (functionName, Set.ofList extensions)
+            ValueSome (functionName, Set.ofList extensions)
         | _ ->
-            None
+            ValueNone
 

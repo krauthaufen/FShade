@@ -41,13 +41,14 @@ module ReflectionPatterns =
         member x.PrimitiveIndex =
             let att = x.GetCustomAttributes<PrimitiveIndexAttribute>(true) |> Seq.toList
             match att with
-                | x::_ -> Some x.Index
-                | _ -> None
+                | x::_ -> ValueSome x.Index
+                | _ -> ValueNone
 
     /// <summary>
     /// determines whether a given type is a Sampler and returns its properties if successful.
     /// The properties are given by SamplerType(dim, isArray, isShadow, isMS, valueType)
     /// </summary>
+    [<return: Struct>]
     let (|SamplerType|_|) (t : Type) =
         if typeof<ISampler>.IsAssignableFrom(t) then
             let dim : SamplerDimension = getProp "Dimension" t
@@ -56,15 +57,16 @@ module ReflectionPatterns =
             let isMS : bool = getProp "IsMultisampled" t
             let valueType : Type = getProp "ValueType" t
 
-            SamplerType(dim, isArray, isShadow, isMS, valueType) |> Some
+            SamplerType(dim, isArray, isShadow, isMS, valueType) |> ValueSome
 
         else
-            None
+            ValueNone
 
     /// <summary>
     /// determines whether a given type is an Image and returns its properties if successful.
     /// The properties are given by ImageType(dim, isArray, isMS, valueType)
     /// </summary>
+    [<return: Struct>]
     let (|ImageType|_|) (t : Type) =
         if typeof<IImage>.IsAssignableFrom(t) then
             let dim : SamplerDimension = getProp "Dimension" t
@@ -72,15 +74,16 @@ module ReflectionPatterns =
             let isMS : bool = getProp "IsMultisampled" t
             let valueType : Type = getProp "ValueType" t
             let format : Type = getProp "FormatType" t
-            ImageType(format, dim, isArray, isMS, valueType) |> Some
+            ImageType(format, dim, isArray, isMS, valueType) |> ValueSome
         else
-            None
+            ValueNone
 
+    [<return: Struct>]
     let (|AccelerationStructure|_|) (t : Type) =
         if typeof<IAccelerationStructure>.IsAssignableFrom(t) then
-            Some ()
+            ValueSome ()
         else
-            None
+            ValueNone
 
     type UniformParameter with
         member x.decorations =
@@ -104,172 +107,173 @@ module BasicQuotationPatterns =
     open Microsoft.FSharp.Quotations.Patterns
     open Microsoft.FSharp.Quotations.DerivedPatterns
 
+    [<return: Struct>]
     let (|BuilderCall|_|) (e : Expr) =
         match e with
-            | Call(Some t, mi, args) when typeof<IShaderBuilder>.IsAssignableFrom t.Type ->
-                BuilderCall(t, mi, args) |> Some
-            | _ -> None
+        | Call(Some t, mi, args) when typeof<IShaderBuilder>.IsAssignableFrom t.Type ->
+            BuilderCall(t, mi, args) |> ValueSome
+        | _ -> ValueNone
 
+    [<return: Struct>]
     let (|UniformScopeType|_|) (t : Type) =
-        if t = typeof<UniformScope> then UniformScopeType |> Some
-        else None
+        if t = typeof<UniformScope> then UniformScopeType |> ValueSome
+        else ValueNone
 
+    [<return: Struct>]
     let (|Uniform|_|) (e : Expr) =
         match e with
+        | ValueWithName(sam,t,name) ->
+            match sam with
+            | :? ISampler as sam ->
+                let tex = sam.Texture
+                ValueSome { 
+                    uniformName = name
+                    uniformType = sam.GetType()
+                    uniformValue = Sampler(tex.Semantic, sam.State) 
+                } 
+            | _ ->
+                match t with
+                | ArrayOf(SamplerType _) ->
+                    let arr = sam |> unbox<Array>
+                    let samplers = 
+                        List.init arr.Length (fun i -> 
+                            let sam1 = arr.GetValue i |> unbox<ISampler>
+                            let tex = sam1.Texture
+                            tex.Semantic, sam1.State
+                        )
 
-            | ValueWithName(sam,t,name) ->
-                match sam with
-                | :? ISampler as sam ->
-                    let tex = sam.Texture
-                    Some { 
+                    let t = Peano.getArrayType arr.Length t
+                    ValueSome {
                         uniformName = name
+                        uniformType = t
+                        uniformValue = SamplerArray(List.toArray samplers)
+                    } 
+                | _ ->
+                    ValueNone
+
+        | PropertyGet(None, pi, []) ->
+            match pi.Type with
+            | SamplerType(_) ->
+                match Expr.TryEval e with
+                | Some sam ->
+                    let sam = sam |> unbox<ISampler>
+                    let tex = sam.Texture
+                    ValueSome { 
+                        uniformName = pi.Name
                         uniformType = sam.GetType()
                         uniformValue = Sampler(tex.Semantic, sam.State) 
                     } 
-                | _ ->
-                    match t with
-                    | ArrayOf(SamplerType _) ->
-                        let arr = sam |> unbox<Array>
-                        let samplers = 
-                            List.init arr.Length (fun i -> 
-                                let sam1 = arr.GetValue i |> unbox<ISampler>
-                                let tex = sam1.Texture
-                                tex.Semantic, sam1.State
-                            )
 
-                        let t = Peano.getArrayType arr.Length t
-                        Some {
-                            uniformName = name
-                            uniformType = t
-                            uniformValue = SamplerArray(List.toArray samplers)
-                        } 
-                    | _ ->
-                        None
+                | None ->
+                    ValueNone
 
-            | PropertyGet(None, pi, []) ->
-                match pi.Type with
-                | SamplerType(_) ->
-                    match Expr.TryEval e with
-                        | Some sam ->
-                            let sam = sam |> unbox<ISampler>
-                            let tex = sam.Texture
-                            Some { 
-                                uniformName = pi.Name
-                                uniformType = sam.GetType()
-                                uniformValue = Sampler(tex.Semantic, sam.State) 
-                            } 
+            | ArrayOf((SamplerType _ as t)) ->
+                match Expr.TryEval e with
+                | Some sam ->
+                    let arr = sam |> unbox<Array>
+                    let samplers = 
+                        List.init arr.Length (fun i -> 
+                            let sam1 = arr.GetValue i |> unbox<ISampler>
+                            let tex = sam1.Texture
+                            tex.Semantic, sam1.State
+                        )
 
-                        | None ->
-                            None
+                    let t = Peano.getArrayType arr.Length t
+                    ValueSome {
+                        uniformName = pi.Name
+                        uniformType = t
+                        uniformValue = SamplerArray(List.toArray samplers)
+                    } 
 
-                | ArrayOf((SamplerType _ as t)) ->
-                    match Expr.TryEval e with
-                        | Some sam ->
-                            let arr = sam |> unbox<Array>
-                            let samplers = 
-                                List.init arr.Length (fun i -> 
-                                    let sam1 = arr.GetValue i |> unbox<ISampler>
-                                    let tex = sam1.Texture
-                                    tex.Semantic, sam1.State
-                                )
+                | None -> 
+                    ValueNone
 
-                            let t = Peano.getArrayType arr.Length t
-                            Some {
-                                uniformName = pi.Name
-                                uniformType = t
-                                uniformValue = SamplerArray(List.toArray samplers)
-                            } 
+            | _ -> ValueNone
 
-                        | None -> 
-                            None
+        | Call(None, Method("op_Dynamic", [UniformScopeType; _]), [scope; Value(s,_)]) ->
+            match Expr.TryEval scope with
+            | Some scope ->
+                let scope = scope |> unbox
+                ValueSome {
+                    uniformName = unbox s
+                    uniformType = e.Type
+                    uniformValue = Attribute(scope, unbox s)
+                }
 
-                | _ -> None
+            | None ->
+                ValueNone
 
-            | Call(None, Method("op_Dynamic", [UniformScopeType; _]), [scope; Value(s,_)]) ->
-                match Expr.TryEval scope with
-                    | Some scope ->
-                        let scope = scope |> unbox
-                        Some {
-                            uniformName = unbox s
-                            uniformType = e.Type
-                            uniformValue = Attribute(scope, unbox s)
+        | PropertyGet(Some scope, p, []) when scope.Type = typeof<UniformScope> ->
+            match Expr.TryEval scope with
+            | Some scope ->
+                let old = UniformStuff.Push()
+                let result = p.GetValue(scope, [||])
+                match result with
+                    | :? ISemanticValue as v ->
+                        ValueSome {
+                            uniformName = v.Semantic
+                            uniformType = v.GetType()
+                            uniformValue = Attribute(v.Scope, v.Semantic)
                         }
-
-                    | None ->
-                        None
-
-            | PropertyGet(Some scope, p, []) when scope.Type = typeof<UniformScope> ->
-                match Expr.TryEval scope with
-                    | Some scope ->
-                        let old = UniformStuff.Push()
-                        let result = p.GetValue(scope, [||])
-                        match result with
-                            | :? ISemanticValue as v ->
-                                Some {
-                                    uniformName = v.Semantic
-                                    uniformType = v.GetType()
-                                    uniformValue = Attribute(v.Scope, v.Semantic)
-                                }
-                            | _ ->
-                                match UniformStuff.Pop old with
-                                    | Some (scope, name) -> 
-                                        Some {
-                                            uniformName = name
-                                            uniformType = p.PropertyType
-                                            uniformValue = Attribute(scope, name)
-                                        }
-                                    | None -> 
-                                        None
-                    | None ->
-                        None
+                    | _ ->
+                        match UniformStuff.Pop old with
+                        | Some (scope, name) -> 
+                            ValueSome {
+                                uniformName = name
+                                uniformType = p.PropertyType
+                                uniformValue = Attribute(scope, name)
+                            }
+                        | None -> 
+                            ValueNone
+            | None ->
+                ValueNone
 //                with :? TargetInvocationException as ex ->
 //                    match ex.InnerException with
 //                        | :? SemanticException as s -> 
-//                            Some {
+//                            ValueSome {
 //                                uniformName = s.Semantic
 //                                uniformType = p.PropertyType
 //                                uniformValue = Attribute(s.Scope, s.Semantic)
 //                            }
 //
 //                        | _ -> 
-//                            None
+//                            ValueNone
 
-            | Call(None, m, [scope]) when scope.Type = typeof<UniformScope> ->
-                match Expr.TryEval scope with
-                    | Some scope ->
-                        let old = UniformStuff.Push()
-                        let result = m.Invoke(null, [| scope |])
-                        match result with
-                            | :? ISemanticValue as v ->
-                                Some {
-                                    uniformName = v.Semantic
-                                    uniformType = v.GetType()
-                                    uniformValue = Attribute(v.Scope, v.Semantic)
+        | Call(None, m, [scope]) when scope.Type = typeof<UniformScope> ->
+            match Expr.TryEval scope with
+            | Some scope ->
+                let old = UniformStuff.Push()
+                let result = m.Invoke(null, [| scope |])
+                match result with
+                    | :? ISemanticValue as v ->
+                        ValueSome {
+                            uniformName = v.Semantic
+                            uniformType = v.GetType()
+                            uniformValue = Attribute(v.Scope, v.Semantic)
+                        }
+                    | _ ->
+                        match UniformStuff.Pop old with
+                            | Some (scope, name) -> 
+                                ValueSome {
+                                    uniformName = name
+                                    uniformType = m.ReturnType
+                                    uniformValue = Attribute(scope, name)
                                 }
-                            | _ ->
-                                match UniformStuff.Pop old with
-                                    | Some (scope, name) -> 
-                                        Some {
-                                            uniformName = name
-                                            uniformType = m.ReturnType
-                                            uniformValue = Attribute(scope, name)
-                                        }
-                                    | None -> 
-                                        None
+                            | None -> 
+                                ValueNone
 
-                    | None ->
-                        None
+            | None ->
+                ValueNone
+
+        | _ -> ValueNone
 
 
-            | _ -> None
-
-
-
+    [<return: Struct>]
     let (|DebugRange|_|) (e : Expr) =
         match e with
             | NewTuple([String "DebugRange"; NewTuple [String file; Int32 startLine; Int32 startCol; Int32 endLine; Int32 endCol]]) -> 
-                Some { file = file; startLine = startLine; startCol = startCol; endLine = endLine; endCol = endCol }
-            | _ -> None
+                ValueSome { file = file; startLine = startLine; startCol = startCol; endLine = endLine; endCol = endCol }
+            | _ -> ValueNone
 
 
     module Map =

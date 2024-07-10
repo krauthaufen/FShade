@@ -29,21 +29,23 @@ module SourceDefinition =
                typedefof<OptimizedClosures.FSharpFunc<_, _, _, _, _>>
                typedefof<OptimizedClosures.FSharpFunc<_, _, _, _, _, _>> |]
 
+        [<return: Struct>]
         let (|Closure|_|) ((field, value) : FieldInfo * obj) =
             let ft = field.Type
 
             if ft.IsGenericType then
                 let def = ft.GetGenericTypeDefinition()
                 if closureTypes |> Array.contains def then
-                    Some value
+                    ValueSome value
                 else
-                    None
+                    ValueNone
             else
-                None
+                ValueNone
 
+        [<return: Struct>]
         let (|Self|_|) (field : FieldInfo) =
-            if field.Name = "self@" then Some ()
-            else None
+            if field.Name = "self@" then ValueSome ()
+            else ValueNone
 
     // Gets the applied arguments from a shader function with parameters
     let private getArguments (shaderFunction : 'a -> 'b) =

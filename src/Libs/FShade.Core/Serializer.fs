@@ -24,12 +24,13 @@ module Serializer =
             BindingFlags.NonPublic |||
             BindingFlags.FlattenHierarchy
 
+        [<return: Struct>]
         let private (|GenericMethodDef|_|) (mi : MethodInfo) =
             if mi.IsGenericMethodDefinition then
                 let args = mi.GetGenericArguments()
-                Some args.Length
+                ValueSome args.Length
             else
-                None
+                ValueNone
 
         type Type with
 
@@ -874,6 +875,7 @@ module Serializer =
                 with _ ->
                     None
 
+            [<return: Struct>]
             let (|ReflectedCall|_|) (e : Expr) =
                 match e with
                     | Call(t,mi,args) ->
@@ -886,29 +888,30 @@ module Serializer =
                                     match t with
                                         | Some t -> t :: args
                                         | None -> args
-                                Some (isInline, mi, def, args)
+                                ValueSome (isInline, mi, def, args)
                             | None ->
-                                None
+                                ValueNone
                     | _ ->
-                        None
+                        ValueNone
 
+            [<return: Struct>]
             let (|IntrinsicCall|_|) (e : Expr) =
                 match e with
                     | Call(t,mi,args) ->
                         let att = mi.GetCustomAttributes(typeof<IntrinsicAttribute>, true) |> Seq.map unbox<IntrinsicAttribute> |> Seq.toList
                         match att with
                             | [] ->
-                                None
+                                ValueNone
                             | i -> 
                                 let args = 
                                     match t with
-                                        | Some t -> t :: args
-                                        | None -> args
+                                    | Some t -> t :: args
+                                    | None -> args
                                 let intr = i |> List.map (fun i -> i.Intrinsic)
 
-                                Some (intr, args)
+                                ValueSome (intr, args)
                     | _ ->
-                        None
+                        ValueNone
 
 
         let rec internal serializeInternal (state : SerializerState) (dst : BinaryWriter) (e : Expr) =
