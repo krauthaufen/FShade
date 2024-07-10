@@ -3,7 +3,7 @@ on:
   push:
     branches:
       - master
-      - v54
+      - v56
     paths:
       - RELEASE_NOTES.md
       - .github/workflows/publish.yml
@@ -18,6 +18,11 @@ jobs:
         uses: actions/setup-dotnet@v3
         with:
           global-json-file: global.json
+      - name: Build
+        shell: cmd
+        run: dotnet build -c Release src\FShade.sln
+      - name: Test
+        run: dotnet test src\FShade.sln -c Release --no-build --nologo --logger:"console;verbosity=normal"          
       - name: Pack
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
