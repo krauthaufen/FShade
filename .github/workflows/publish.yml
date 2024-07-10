@@ -18,15 +18,12 @@ jobs:
         uses: actions/setup-dotnet@v3
         with:
           global-json-file: global.json
-      - name: Build
-        shell: cmd
-        run: dotnet build -c Release src\FShade.sln
-      - name: Test
-        run: dotnet test src\FShade.sln -c Release --no-build --nologo --logger:"console;verbosity=normal"          
       - name: Pack
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: .\pack.cmd
+      - name: Test
+        run: dotnet test src\FShade.sln -c Release --no-build --nologo --logger:"console;verbosity=normal"
       - name: Upload Packages
         uses: actions/upload-artifact@v3
         with:

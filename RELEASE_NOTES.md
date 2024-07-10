@@ -1,3 +1,6 @@
+### 5.6.0-prerelease0001
+- Initial prerelease
+
 ### 5.5.4
 * [GLSL] Fixed issue with variable names containing @
 * [Raytracing] Fixed issue with callable data name indexing
