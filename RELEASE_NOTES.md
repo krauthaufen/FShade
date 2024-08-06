@@ -1,3 +1,8 @@
+### 5.6.0
+- Updated to NET 8 and Aardvark.Base 5.3
+- Use struct representation for partial active patterns
+- Removed Effect.toLayered
+
 ### 5.6.0-prerelease0001
 - Initial prerelease
 
