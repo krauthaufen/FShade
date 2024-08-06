@@ -3,9 +3,9 @@ source https://api.nuget.org/v3/index.json
 
 nuget FSharp.Core                           >= 8.0.0 lowest_matching: true
 nuget Aardvark.Build                        ~> 1.0.24
-nuget Aardvark.Base                         ~> 5.3.0-prerelease0001
-nuget Aardvark.Base.FSharp                  ~> 5.3.0-prerelease0001
-nuget Aardvark.Base.Incremental             ~> 5.3.0-prerelease0001
+nuget Aardvark.Base                         ~> 5.3.0
+nuget Aardvark.Base.FSharp                  ~> 5.3.0
+nuget Aardvark.Base.Incremental             ~> 5.3.0
 
 nuget FsPickler                             ~> 5.3.2
 nuget Mono.Cecil                            ~> 0.11.4
