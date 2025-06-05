@@ -1,7 +1,5 @@
-
-![Windows](https://github.com/krauthaufen/FShade/workflows/Windows/badge.svg)
-![MacOS](https://github.com/krauthaufen/FShade/workflows/MacOS/badge.svg)
-![Linux](https://github.com/krauthaufen/FShade/workflows/Linux/badge.svg)
+![Build](https://github.com/krauthaufen/FShade/workflows/Build/badge.svg)
+![Publish](https://github.com/krauthaufen/FShade/workflows/Publish/badge.svg)
 [![NuGet](https://badgen.net/nuget/v/FShade)](https://www.nuget.org/packages/FShade/)
 [![Discord](https://badgen.net/discord/online-members/UyecnhM)](https://discord.gg/UyecnhM)
 
