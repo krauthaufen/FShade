@@ -53,7 +53,7 @@ module GLSLType =
     module private Helpers =
     
         let imageTypes =
-            LookupTable.lookupTable [
+            LookupTable.lookup [
                 (false, false, false, SamplerDimension.Sampler1d), typedefof<Image1d<_>>
                 (false, false, false, SamplerDimension.Sampler2d), typedefof<Image2d<_>>
                 (false, false, false, SamplerDimension.Sampler3d), typedefof<Image3d<_>>
@@ -81,7 +81,7 @@ module GLSLType =
 
         // integral, isArray, isMS, isShadow
         let samplerTypes =
-            LookupTable.lookupTable [
+            LookupTable.lookup [
                 (false, false, false, false, SamplerDimension.Sampler1d), typeof<Sampler1d>
                 (false, false, false, false, SamplerDimension.Sampler2d), typeof<Sampler2d>
                 (false, false, false, false, SamplerDimension.Sampler3d), typeof<Sampler3d>

@@ -217,19 +217,19 @@ module Preprocessor =
         [<return: Struct>]
         let rec (|Integral|_|) (t : Type) =
             match t with
-            | TypeInfo.Patterns.Enum
-            | TypeInfo.Patterns.Integral
-            | TypeInfo.Patterns.VectorOf(_, Integral) -> ValueSome ()
-            | TypeInfo.Patterns.MatrixOf(_, Integral) -> ValueSome ()
+            | TypeMeta.Patterns.Enum
+            | TypeMeta.Patterns.Integral
+            | TypeMeta.Patterns.VectorOf(_, Integral) -> ValueSome ()
+            | TypeMeta.Patterns.MatrixOf(_, Integral) -> ValueSome ()
             | _ -> ValueNone
 
         [<return: Struct>]
         let rec (|FloatingPoint|_|) (t : Type) =
             match t with
-            | TypeInfo.Patterns.Float32
-            | TypeInfo.Patterns.Float64
-            | TypeInfo.Patterns.VectorOf(_, (TypeInfo.Patterns.Float32 | TypeInfo.Patterns.Float64)) -> ValueSome ()
-            | TypeInfo.Patterns.MatrixOf(_, (TypeInfo.Patterns.Float32 | TypeInfo.Patterns.Float64)) -> ValueSome ()
+            | TypeMeta.Patterns.Float32
+            | TypeMeta.Patterns.Float64
+            | TypeMeta.Patterns.VectorOf(_, (TypeMeta.Patterns.Float32 | TypeMeta.Patterns.Float64)) -> ValueSome ()
+            | TypeMeta.Patterns.MatrixOf(_, (TypeMeta.Patterns.Float32 | TypeMeta.Patterns.Float64)) -> ValueSome ()
             | _ -> ValueNone
 
         [<return: Struct>]
@@ -1098,12 +1098,12 @@ module Preprocessor =
 
             static member Zero(t : Type) =
                 match t with
-                | TypeInfo.Patterns.Int32 -> Expr.Value 0
-                | TypeInfo.Patterns.UInt32 -> Expr.Value 0u
-                | TypeInfo.Patterns.Float32 -> Expr.Value 0.0f
-                | TypeInfo.Patterns.Float64 -> Expr.Value 0.0
-                | TypeInfo.Patterns.Vector
-                | TypeInfo.Patterns.Matrix ->
+                | TypeMeta.Patterns.Int32 -> Expr.Value 0
+                | TypeMeta.Patterns.UInt32 -> Expr.Value 0u
+                | TypeMeta.Patterns.Float32 -> Expr.Value 0.0f
+                | TypeMeta.Patterns.Float64 -> Expr.Value 0.0
+                | TypeMeta.Patterns.Vector
+                | TypeMeta.Patterns.Matrix ->
                     let pi = t.GetProperty("Zero", [||])
                     Expr.PropertyGet pi
 
@@ -2109,8 +2109,8 @@ module Preprocessor =
     and getOutputValues (sem : string) (value : Expr) : Preprocess<list<string * Option<Expr> * Expr>> =
         state {
             match value.Type with
-            | TypeInfo.Patterns.VectorOf (_, (TypeInfo.Patterns.Float32 | TypeInfo.Patterns.Float64 | TypeInfo.Patterns.Int32 | TypeInfo.Patterns.UInt32))
-            | TypeInfo.Patterns.Float32 | TypeInfo.Patterns.Float64 | TypeInfo.Patterns.Int32 | TypeInfo.Patterns.UInt32 ->
+            | TypeMeta.Patterns.VectorOf (_, (TypeMeta.Patterns.Float32 | TypeMeta.Patterns.Float64 | TypeMeta.Patterns.Int32 | TypeMeta.Patterns.UInt32))
+            | TypeMeta.Patterns.Float32 | TypeMeta.Patterns.Float64 | TypeMeta.Patterns.Int32 | TypeMeta.Patterns.UInt32 ->
                 let! value = preprocessS value
                 do! State.writeOutput sem { paramType = value.Type; paramInterpolation = InterpolationMode.Default }
                 return [sem, None, value]
@@ -2984,7 +2984,7 @@ module Shader =
         ]
 
     let private typeConversions =
-        LookupTable.lookupTable' [
+        LookupTable.tryLookup [
             // Float32
             (typeof<V2f>, typeof<float32>), fun value -> <@@ (%%value : V2f).X @@>
 

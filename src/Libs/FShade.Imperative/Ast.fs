@@ -10,8 +10,7 @@ open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Quotations.Patterns
 
 open Aardvark.Base
-open Aardvark.Base.TypeInfo
-open Aardvark.Base.TypeInfo.Patterns
+open Aardvark.Base.TypeMeta
 open Aardvark.Base.Sorting
 open FSharp.Data.Adaptive
 

@@ -104,7 +104,7 @@ module ImageFormatExtensions =
         open Formats
 
         let ofFormatType =
-            LookupTable.lookupTable' [
+            LookupTable.tryLookup [
                 typeof<rgba32f>, ImageFormat.Rgba32f
                 typeof<rgba16f>, ImageFormat.Rgba16f
                 typeof<rg32f>, ImageFormat.Rg32f
@@ -152,7 +152,7 @@ module ImageFormatExtensions =
 
 
         let toFormatType =
-            LookupTable.lookupTable [
+            LookupTable.lookup [
                 ImageFormat.Rgba32f, typeof<rgba32f>
                 ImageFormat.Rgba16f, typeof<rgba16f>
                 ImageFormat.Rg32f, typeof<rg32f>

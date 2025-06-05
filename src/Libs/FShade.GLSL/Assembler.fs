@@ -1429,7 +1429,7 @@ module Assembler =
 
     let private imageFormat =
         let lookup =
-            LookupTable.lookupTable' [
+            LookupTable.tryLookup [
                 typeof<Formats.r11g11b10f>, "r11f_g11f_b10f"
                 typeof<Formats.rgb10a2>,    "rgb10_a2"
                 typeof<Formats.rgb10a2ui>,  "rgb10_a2ui"

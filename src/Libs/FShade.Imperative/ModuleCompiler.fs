@@ -11,8 +11,6 @@ open Microsoft.FSharp.Quotations.Patterns
 open Microsoft.FSharp.Quotations.DerivedPatterns
 
 open Aardvark.Base
-open Aardvark.Base.TypeInfo
-open Aardvark.Base.TypeInfo.Patterns
 
 open FShade
 open FShade.Imperative

@@ -12,8 +12,7 @@ open Microsoft.FSharp.Quotations.ExprShape
 open Microsoft.FSharp.Quotations.DerivedPatterns
 
 open Aardvark.Base
-open Aardvark.Base.TypeInfo
-open Aardvark.Base.TypeInfo.Patterns
+open Aardvark.Base.TypeMeta
 open FSharp.Data.Adaptive
 
 open FShade
@@ -275,8 +274,8 @@ module Compiler =
         let rec tryDeconstructValue (t : Type) (v : obj) =
             if t.IsEnum then
                 match t.GetEnumUnderlyingType() with
-                | SByte  -> Expr.Value(unbox<int8> v, t) |> Some
-                | Byte   -> Expr.Value(unbox<uint8> v, t) |> Some
+                | Int8   -> Expr.Value(unbox<int8> v, t) |> Some
+                | UInt8  -> Expr.Value(unbox<uint8> v, t) |> Some
                 | Int16  -> Expr.Value(unbox<int16> v, t) |> Some
                 | UInt16 -> Expr.Value(unbox<uint16> v, t) |> Some
                 | Int32  -> Expr.Value(unbox<int32> v, t) |> Some

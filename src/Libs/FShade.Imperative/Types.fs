@@ -88,7 +88,7 @@ module ShaderStage =
         | _ -> false
 
     let prefix =
-        LookupTable.lookupTable [
+        LookupTable.lookup [
             ShaderStage.Vertex,         "vs"
             ShaderStage.TessControl,    "tc"
             ShaderStage.TessEval,       "te"

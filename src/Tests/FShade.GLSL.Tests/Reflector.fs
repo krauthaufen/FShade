@@ -174,7 +174,7 @@ module ShaderType =
 
 
     let toPrimtiveType =
-        LookupTable.lookupTable [
+        LookupTable.lookup [
             Bool,               typeof<bool>
             
             Int32,              typeof<int32>
@@ -313,7 +313,7 @@ module PrimitiveType =
     let m44d = PrimitiveType.Matrix(v4d, 4)
 
     let toType =
-        LookupTable.lookupTable [
+        LookupTable.lookup [
             bool,       typeof<bool>
             int8,       typeof<int8>
             int16,      typeof<int16>
@@ -695,7 +695,7 @@ module ShaderUniformParameter =
 
     module Dim =
         let toTextureDimension =
-            LookupTable.lookupTable [
+            LookupTable.lookup [
                 Dim.Dim1D, SamplerDimension.Sampler1d
                 Dim.Dim2D, SamplerDimension.Sampler2d
                 Dim.Dim3D, SamplerDimension.Sampler3d

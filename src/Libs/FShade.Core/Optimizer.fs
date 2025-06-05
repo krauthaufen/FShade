@@ -2373,7 +2373,7 @@ module Optimizer =
 
                 | PropertyGet(Some (TrivialOrInput nonMutable as t), prop, []) ->
                     match t.Type with
-                    | Aardvark.Base.TypeInfo.Patterns.VectorOf _ -> 
+                    | TypeMeta.Patterns.VectorOf _ ->
                         if swizzle.IsMatch (prop.Name.ToLower()) then ValueSome ()
                         else ValueNone
                     | _ ->

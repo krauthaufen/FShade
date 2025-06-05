@@ -328,7 +328,7 @@ module ReflectionPatterns =
         let make op = (fun (x : obj) (y : obj) -> box (op (unbox x) (unbox y)))
 
         let bitwiseOr =
-            LookupTable.lookupTable [
+            LookupTable.lookup [
                 typeof<int8>,   make ((|||) : int8 -> _ -> _)
                 typeof<uint8>,  make ((|||) : uint8 -> _ -> _)
                 typeof<int16>,  make ((|||) : int16 -> _ -> _)
@@ -340,7 +340,7 @@ module ReflectionPatterns =
             ]
 
         let bitwiseAnd =
-            LookupTable.lookupTable [
+            LookupTable.lookup [
                 typeof<int8>,   make ((&&&) : int8 -> _ -> _)
                 typeof<uint8>,  make ((&&&) : uint8 -> _ -> _)
                 typeof<int16>,  make ((&&&) : int16 -> _ -> _)
@@ -352,7 +352,7 @@ module ReflectionPatterns =
             ]
 
         let bitwiseXor =
-            LookupTable.lookupTable [
+            LookupTable.lookup [
                 typeof<int8>,   make ((^^^) : int8 -> _ -> _)
                 typeof<uint8>,  make ((^^^) : uint8 -> _ -> _)
                 typeof<int16>,  make ((^^^) : int16 -> _ -> _)
@@ -363,7 +363,7 @@ module ReflectionPatterns =
                 typeof<uint64>, make ((^^^) : uint64 -> _ -> _)
             ]
 
-        LookupTable.lookupTable' [
+        LookupTable.tryLookup [
             getMethodInfo <@ (|||) : int -> int -> int @>, bitwiseOr
             getMethodInfo <@ (&&&) : int -> int -> int @>, bitwiseAnd
             getMethodInfo <@ (^^^) : int -> int -> int @>, bitwiseXor
@@ -373,7 +373,7 @@ module ReflectionPatterns =
         let make op = (fun (x : obj) (y : obj) -> box (op (unbox x) (unbox y)))
 
         let bitwiseLsh =
-            LookupTable.lookupTable [
+            LookupTable.lookup [
                 typeof<int8>,   make ((<<<) : int8 -> _ -> _)
                 typeof<uint8>,  make ((<<<) : uint8 -> _ -> _)
                 typeof<int16>,  make ((<<<) : int16 -> _ -> _)
@@ -385,7 +385,7 @@ module ReflectionPatterns =
             ]
 
         let bitwiseRsh =
-            LookupTable.lookupTable [
+            LookupTable.lookup [
                 typeof<int8>,   make ((>>>) : int8 -> _ -> _)
                 typeof<uint8>,  make ((>>>) : uint8 -> _ -> _)
                 typeof<int16>,  make ((>>>) : int16 -> _ -> _)
@@ -396,7 +396,7 @@ module ReflectionPatterns =
                 typeof<uint64>, make ((>>>) : uint64 -> _ -> _)
             ]
 
-        LookupTable.lookupTable' [
+        LookupTable.tryLookup [
             getMethodInfo <@ (<<<) : int -> int -> int @>, bitwiseLsh
             getMethodInfo <@ (>>>) : int -> int -> int @>, bitwiseRsh
         ]
@@ -439,7 +439,7 @@ module ReflectionPatterns =
     let private converters : Type -> Option<obj -> obj> =
         let make f = fun (i : obj) -> box (f i)
 
-        LookupTable.lookupTable' [
+        LookupTable.tryLookup [
             typeof<int8>,       make Convert.ToSByte
             typeof<uint8>,      make Convert.ToByte
             typeof<int16>,      make Convert.ToInt16
@@ -1202,8 +1202,6 @@ module StateExtensions =
 [<AutoOpen>]
 module private Helpers = 
     open System.Text.RegularExpressions
-    open Aardvark.Base.TypeInfo
-    open Aardvark.Base.TypeInfo.Patterns
     open Aardvark.Base.Monads.State
 
     let rx = Regex @"(?<name>.*)`[0-9]+"

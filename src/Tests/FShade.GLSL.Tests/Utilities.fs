@@ -27,7 +27,7 @@ type CompilerResult =
 module GLSL =
 
     let private toGLSLangStage =
-        LookupTable.lookupTable [
+        LookupTable.lookup [
             ShaderStage.Vertex, GLSLang.ShaderStage.Vertex
             ShaderStage.TessControl, GLSLang.ShaderStage.TessControl
             ShaderStage.TessEval, GLSLang.ShaderStage.TessEvaluation
