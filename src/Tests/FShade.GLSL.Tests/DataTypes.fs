@@ -16,6 +16,8 @@ type UniformScope with
     member x.Data64ui  : uint64[] = x?StorageBuffer?Data6
     member x.Data64i  : int64[]   = x?StorageBuffer?Data7
     member x.DataV3l  : V3l[]     = x?StorageBuffer?Data8
+    member x.Array    : int[]     = x?StorageBuffer?Array
+    member x.Arr : Arr<N<8>, int> = x?Arr
 
 type Vertex =
     {
@@ -28,6 +30,18 @@ type Vertex =
         Data64i  : int64
         DataV3l  : V3l
     }
+
+[<Test>]
+let ``Array index unsigned``() =
+    Setup.Run()
+    let shader (v: Vertex) = fragment { return uniform.Array.Get(5) + uniform.Array.Get(uint v.Data16ui) }
+    GLSL.shouldCompile [ Effect.ofFunction shader ]
+
+[<Test>]
+let ``Arr index unsigned``() =
+    Setup.Run()
+    let shader (v: Vertex) = fragment { return uniform.Arr.Get(5) + uniform.Arr.Get(7u) }
+    GLSL.shouldCompile [ Effect.ofFunction shader ]
 
 [<Test>]
 let ``Attributes 8ui``() =

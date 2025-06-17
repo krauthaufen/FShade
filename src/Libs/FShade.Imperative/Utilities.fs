@@ -3,6 +3,7 @@
 open System
 open System.Threading
 open System.Reflection
+open System.Runtime.CompilerServices
 
 open Microsoft.FSharp.Reflection
 open Microsoft.FSharp.Quotations
@@ -108,6 +109,32 @@ module ExprWorkardound =
             try Expr.TryGetReflectedDefinition mb
             with e -> None
         )
+
+[<Sealed; AbstractClass; Extension>]
+type ArrayIndexingExtensions() =
+    [<Extension>]
+    static member Get(this: 'T[], index: int) : 'T = this.[index]
+
+    [<Extension>]
+    static member Get(this: 'T[], index: uint) : 'T = this.[int index]
+
+    [<Extension>]
+    static member Set(this: 'T[], index: int, value: 'T) : unit = this.[index] <- value
+
+    [<Extension>]
+    static member Set(this: 'T[], index: uint, value: 'T) : unit = this.[int index] <- value
+
+    [<Extension>]
+    static member Get(this: Arr<_, 'T>, index: int) : 'T = this.[index]
+
+    [<Extension>]
+    static member Get(this: Arr<_, 'T>, index: uint) : 'T = this.[int index]
+
+    [<Extension>]
+    static member Set(this: Arr<_, 'T>, index: int, value: 'T) : unit = this.[index] <- value
+
+    [<Extension>]
+    static member Set(this: Arr<_, 'T>, index: uint, value: 'T) : unit = this.[int index] <- value
 
 module Peano = 
     let getPeanoType (i : int) =
@@ -830,8 +857,13 @@ module ExprExtensions =
         match e with
         | Call(None, mi, [arr;idx]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = Methods.getArray ->
             ValueSome(arr, idx)
+
+        | Call(None, Method("Get", (ArrayOf(_) | ArrOf(_, _)) :: _), [arr;idx])  ->
+            ValueSome(arr, idx)
+
         | PropertyGet(Some arr, prop, [idx]) when prop.Name = "Item" && arr.Type.IsGenericType && arr.Type.GetGenericTypeDefinition() = typedefof<Arr<_,_>> ->
             ValueSome(arr, idx)
+
         | _ ->
             ValueNone
 
@@ -839,6 +871,9 @@ module ExprExtensions =
     let (|SetArray|_|) (e : Expr) =
         match e with
         | Call(None, mi, [arr;idx;value]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = Methods.setArray ->
+            ValueSome(arr, idx, value)
+
+        | Call(None, Method("Set", (ArrayOf(_) | ArrOf(_, _)) :: _), [arr;idx;value])  ->
             ValueSome(arr, idx, value)
 
         | PropertySet(Some arr, prop, [idx], value) when prop.Name = "Item" && arr.Type.IsGenericType && arr.Type.GetGenericTypeDefinition() = typedefof<Arr<_,_>> ->
