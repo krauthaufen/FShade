@@ -2106,11 +2106,20 @@ module Preprocessor =
 
         preprocessByTypeS typ e
 
+    and [<return: Struct>] private (|PrimitiveOutputType|_|) = function
+        | TypeMeta.Patterns.Float16
+        | TypeMeta.Patterns.Float32
+        | TypeMeta.Patterns.Float64
+        | TypeMeta.Patterns.Int8 | TypeMeta.Patterns.UInt8
+        | TypeMeta.Patterns.Int16 | TypeMeta.Patterns.UInt16
+        | TypeMeta.Patterns.Int32 | TypeMeta.Patterns.UInt32 -> ValueSome ()
+        | _ -> ValueNone
+
     and getOutputValues (sem : string) (value : Expr) : Preprocess<list<string * Option<Expr> * Expr>> =
         state {
             match value.Type with
-            | TypeMeta.Patterns.VectorOf (_, (TypeMeta.Patterns.Float32 | TypeMeta.Patterns.Float64 | TypeMeta.Patterns.Int32 | TypeMeta.Patterns.UInt32))
-            | TypeMeta.Patterns.Float32 | TypeMeta.Patterns.Float64 | TypeMeta.Patterns.Int32 | TypeMeta.Patterns.UInt32 ->
+            | PrimitiveOutputType
+            | TypeMeta.Patterns.VectorOf (_, PrimitiveOutputType) ->
                 let! value = preprocessS value
                 do! State.writeOutput sem { paramType = value.Type; paramInterpolation = InterpolationMode.Default }
                 return [sem, None, value]

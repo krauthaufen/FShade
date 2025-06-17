@@ -80,32 +80,35 @@ module GLSL =
 
         glsl, results
 
-    let compile (e : list<Effect>) =
+    let compile' (backend : Backend) (e : list<Effect>) =
         let e = Effect.compose e
         Console.WriteLine("COMPILE {0}", e.Id)
-        let outputs, lastStage = 
-            e.LastShader 
-                |> Option.map (fun s -> (s.shaderOutputs |> Map.map (fun k v -> v.paramType) |> Map.toList), s.shaderStage) 
+        let outputs, lastStage =
+            e.LastShader
+                |> Option.map (fun s -> (s.shaderOutputs |> Map.map (fun k v -> v.paramType) |> Map.toList), s.shaderStage)
                 |> Option.defaultValue (["Colors", typeof<V4d>], ShaderStage.Fragment)
-            
-        let module_ = 
-            e |> Effect.toModule { 
+
+        let module_ =
+            e |> Effect.toModule {
                 depthRange = Range1d(-1.0, 1.0)
                 flipHandedness = false;
                 lastStage = lastStage;
                 outputs = outputs |> List.mapi (fun i (n,t) -> n, (t,i)) |> Map.ofList
             }
 
-        let glsl = ModuleCompiler.compileGLSL430 module_
-        
+        let glsl = ModuleCompiler.compileGLSL backend module_
+
         glsl,
         module_.Entries |> List.map (fun e ->
             let stage = e.decorations |> List.tryPick (function FShade.Imperative.EntryDecoration.Stages s -> Some s.Stage | _ -> None) |> Option.get
-            
+
             let res = glslang stage glsl.code
-            
+
             stage, res
         )
+
+    let compile (e : list<Effect>) =
+        compile' glsl430 e
 
     let private printResults (res : List<ShaderStage * CompilerResult>) (glsl : GLSLShader) =
         Console.WriteLine("====================== CODE ======================")
@@ -123,9 +126,12 @@ module GLSL =
                 | Warning w -> ()
                 | Error e -> failwithf "ERROR: %A" e
 
-    let shouldCompile (e : list<Effect>) =
-        let glsl, res = compile e
+    let shouldCompile' (backend : Backend) (e : list<Effect>) =
+        let glsl, res = compile' backend e
         printResults res glsl
+
+    let rec shouldCompile (e : list<Effect>) =
+        shouldCompile' glsl430 e
 
     let shouldCompileRaytracing (e : RaytracingEffect) =
         let glsl, res = compileRaytracing e
@@ -145,10 +151,24 @@ module GLSL =
                     failwithf "ERROR: Compiled shader did not contain '%s'" regex
         )
 
-    let shouldCompileAndContainRegex (e : list<Effect>) (s : list<string>) =
-        let glsl, res = compile e
+    let shouldCompileAndContainRegex' (backend : Backend) (e : list<Effect>) (s : list<string>) =
+        let glsl, res = compile' backend e
         let s = s |> List.map (fun s -> s, None)
-        
+
+        Console.WriteLine("{0}", glsl.code)
+        for (stage, r) in res do
+            Console.WriteLine("{0}: {1}", stage, sprintf "%A" r)
+            match r with
+                | Success -> shouldContainRegex glsl s
+                | Warning w -> shouldContainRegex glsl s
+                | Error e -> failwithf "ERROR: %A" e
+    let shouldCompileAndContainRegex (e : list<Effect>) (s : list<string>) =
+        shouldCompileAndContainRegex' glsl430 e s
+
+    let shouldCompileAndContainRegexWithCount' (backend : Backend) (e : list<Effect>) (s : list<string * int>) =
+        let glsl, res = compile' backend e
+        let s = s |> List.map (fun (s, n) -> s, Some n)
+
         Console.WriteLine("{0}", glsl.code)
         for (stage, r) in res do
             Console.WriteLine("{0}: {1}", stage, sprintf "%A" r)
@@ -158,16 +178,7 @@ module GLSL =
                 | Error e -> failwithf "ERROR: %A" e
 
     let shouldCompileAndContainRegexWithCount (e : list<Effect>) (s : list<string * int>) =
-        let glsl, res = compile e
-        let s = s |> List.map (fun (s, n) -> s, Some n)
-        
-        Console.WriteLine("{0}", glsl.code)
-        for (stage, r) in res do
-            Console.WriteLine("{0}: {1}", stage, sprintf "%A" r)
-            match r with
-                | Success -> shouldContainRegex glsl s
-                | Warning w -> shouldContainRegex glsl s
-                | Error e -> failwithf "ERROR: %A" e
+        shouldCompileAndContainRegexWithCount' glsl430 e s
 
     let shouldCompileRaytracingAndContainRegex (e : RaytracingEffect) (s : list<string>) =
         let glsl, res = compileRaytracing e
