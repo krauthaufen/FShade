@@ -54,7 +54,7 @@ type CType =
 
     | CArray of elementType : CType * length : int
     | CPointer of modifier : CPointerModifier * elementType : CType
-    | CStruct of name : string * fields : list<CType * string> * original : Option<Type> // TODO: Remove original, breaks equality when using the shader debugger
+    | CStruct of name : string * fields : list<CType * string>
     | CIntrinsic of CIntrinsicType
 
 [<AllowNullLiteral>]
@@ -124,11 +124,11 @@ module CType =
         let name = typeName t
         if FSharpType.IsRecord(t, true) then
             let fields = FSharpType.GetRecordFields(t, true) |> Array.toList |> List.map (fun pi -> ofTypeInternal seen b pi.PropertyType, pi.Name) 
-            CStruct(name, fields, None)
+            CStruct(name, fields)
             
         elif FSharpType.IsTuple t then
             let fields = FSharpType.GetTupleElements(t) |> Array.toList |> List.mapi (fun i t -> ofTypeInternal seen b t, sprintf "Item%d" i)
-            CStruct(name, fields, None)
+            CStruct(name, fields)
 
         elif FSharpType.IsUnion(t, true) then
             let caseFields = 
@@ -140,17 +140,17 @@ module CType =
                 )
 
             let tagField = (CType.CInt(true, 32), "tag")
-            CStruct(name, tagField :: caseFields, None)
+            CStruct(name, tagField :: caseFields)
             
         elif t.IsValueType then
             let fields = t.GetFields(BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
             let fields = fields |> Array.sortBy (fun f -> System.Runtime.InteropServices.Marshal.OffsetOf(f.DeclaringType, f.Name)) |> Array.toList |> List.map (fun fi -> ofTypeInternal seen b fi.FieldType, fi.Name) 
-            CStruct(name, fields, None)
+            CStruct(name, fields)
 
         else
             let fields = t.GetFields(BindingFlags.NonPublic ||| BindingFlags.Public ||| BindingFlags.Instance)
             let fields = fields |> Array.toList |> List.map (fun fi -> ofTypeInternal seen b fi.FieldType, fi.Name) 
-            CStruct(name, fields, None)
+            CStruct(name, fields)
  
     /// creates a c representation for a given system type
     let ofType (b : IBackend) (t : Type) : CType =
@@ -504,7 +504,7 @@ type internal Used() =
                     x.AddType e
 
 
-                | CStruct(_,fields,_) ->
+                | CStruct(_,fields) ->
                     for (t,_) in fields do
                         x.AddType t
                 | _ ->

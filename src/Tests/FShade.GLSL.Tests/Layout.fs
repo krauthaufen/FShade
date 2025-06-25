@@ -138,7 +138,7 @@ let layoutGLSLang (b : GLSLUniformBuffer) =
             | Array(len, b,_) -> CArray(toCType b, len)
             | Bool -> CType.CBool
             | Struct(name, fields, _) ->
-                CStruct(name, fields |> List.map (fun (name,t,_) -> toCType t, name), None)
+                CStruct(name, fields |> List.map (fun (name,t,_) -> toCType t, name))
 
             | DynamicArray _ | Image _ | Sampler _ | Void  | Intrinsic _ -> 
                 failwith ""
@@ -166,7 +166,7 @@ let layoutGLSLang (b : GLSLUniformBuffer) =
                 | CType.CFloat _ -> e
                 | CType.CVector(b,_) -> CExpr.CVecSwizzle(b, e, [CVecComponent.X]) |> getFloat
                 | CType.CMatrix(b,_,_) -> CExpr.CMatrixElement(b, e, CValue(CInt(true, 32), CIntegral 0L), CValue(CInt(true, 32), CIntegral 0L)) |> getFloat
-                | CType.CStruct(_,fields,_) ->
+                | CType.CStruct(_,fields) ->
                     let (t,n) = fields |> List.head 
                     CExpr.CField(t, e, n) |> getFloat
                 | CType.CArray(t,len) ->

@@ -369,7 +369,7 @@ module ModuleCompiler =
         module private Helpers =
             let allDirectChildTypes (ctype : CType) =
                 match ctype with
-                    | CStruct(_, fields, _) -> 
+                    | CStruct(_, fields) ->
                         fields |> List.map fst |> HashSet.ofList
 
                     | CVector(t,_) 
@@ -391,7 +391,7 @@ module ModuleCompiler =
                             let! used = t |> allDirectChildTypes |> HashSet.toList |> List.chooseS ofType |>> HashSet.ofList
 
                             match t with
-                                | CStruct(name, fields, _) ->
+                                | CStruct(name, fields) ->
                                     let def = CStructDef(name, fields)
                                     let node = TypeGraphNode(Some def, used)
                                     s.cache.[t] <- Some node

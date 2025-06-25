@@ -698,7 +698,7 @@ module Assembler =
                     yield OpTypeRuntimeArray(id, e)
                     return id
                     
-                | CType.CStruct(name, fields, _) ->
+                | CType.CStruct(name, fields) ->
                     let fields = List.toArray fields
                     let! fieldTypes = fields |> Array.mapS (fst >> assembleType)
 
@@ -1564,7 +1564,7 @@ module Assembler =
                             | Some name ->
                                 let! binding = SpirV.newBinding
 
-                                let t = CStruct(name, fields |> List.map (fun f -> f.cUniformType, f.cUniformName), None)
+                                let t = CStruct(name, fields |> List.map (fun f -> f.cUniformType, f.cUniformName))
                                 let! tid = assemblePtrType StorageClass.Uniform t
 
                                 yield OpDecorate(tid, Decoration.GLSLPacked, [||])

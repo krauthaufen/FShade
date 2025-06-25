@@ -1080,7 +1080,7 @@ module Compiler =
                     | CVector(i,_) | CMatrix(i,_,_) | CArray(i,_) | CPointer(_,i) ->
                         visit i
 
-                    | CStruct(_, fields, _) ->
+                    | CStruct(_, fields) ->
                         usedTypes <- HashMap.add (t :> obj) cType usedTypes
                         for (f,_) in fields do
                             visit f

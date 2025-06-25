@@ -141,7 +141,7 @@ module GLSLType =
                 else GLSLType.Mat(c, r, ofCType rev elem)
 
             | CType.CArray(elem, len) -> GLSLType.Array(len, ofCType rev elem, -1)
-            | CType.CStruct(name, fields,_) -> GLSLType.Struct(name, fields |> List.map (fun (t, n) -> n, ofCType rev t, -1), -1)
+            | CType.CStruct(name, fields) -> GLSLType.Struct(name, fields |> List.map (fun (t, n) -> n, ofCType rev t, -1), -1)
 
             | CType.CIntrinsic a ->
                 match a.tag with

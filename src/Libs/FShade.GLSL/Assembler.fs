@@ -882,7 +882,7 @@ module Assembler =
                 let! inner = assembleTypeS rev t
                 return inner.Name + "[" + string l + "]" |> Identifier
 
-            | CType.CStruct(n,_,_) ->
+            | CType.CStruct(n,_) ->
                 return glslName n
 
             | CType.CPointer(_, t) ->
