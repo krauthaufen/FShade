@@ -112,7 +112,7 @@ let ``Storage buffers 16i``() =
 [<Test>]
 let ``Storage buffers 16f``() =
     Setup.Run()
-    let shader (v: Vertex) = fragment { uniform.Data16f.[1] <- float16 42.0f; return float uniform.Data16f.[0] }
+    let shader (v: Vertex) = fragment { uniform.Data16f.[1] <- float16 42.0f; return float32 uniform.Data16f.[0] }
     GLSL.shouldCompileAndContainRegex' glsl430 [ Effect.ofFunction shader ] ["float16_t"]
 
 [<Test>]

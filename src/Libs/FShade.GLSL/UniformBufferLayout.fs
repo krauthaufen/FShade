@@ -132,7 +132,6 @@ module GLSLType =
             | CType.CVoid -> GLSLType.Void
             | CType.CInt(signed, width) -> GLSLType.Int(signed, width)
 
-            | CType.CFloat 64 -> GLSLType.Float 32
             | CType.CFloat(width) -> GLSLType.Float(width)
 
             | CType.CVector(elem, dim) -> GLSLType.Vec(dim, ofCType rev elem)
@@ -479,7 +478,8 @@ module private Tools =
                 | GLSLType.Int(false, b) -> sprintf "uint%d" b
                 
                 | GLSLType.Float 16 -> "half"
-                | GLSLType.Float (32 | 64) -> "float"
+                | GLSLType.Float 32 -> "float"
+                | GLSLType.Float 64 -> "double"
                 | GLSLType.Float b -> sprintf "float%d" b
 
                 | GLSLType.Vec(dim, elem) -> sprintf "%s%d" (toString elem) dim
@@ -1290,15 +1290,15 @@ module GLSLProgramInterface =
             let maxLod = 
                 match src.ReadByte() with
                 | 0uy -> None
-                | _ -> Some (src.ReadDouble())
+                | _ -> Some (src.ReadSingle())
             let minLod = 
                 match src.ReadByte() with
                 | 0uy -> None
-                | _ -> Some (src.ReadDouble())
+                | _ -> Some (src.ReadSingle())
             let mipLodBias = 
                 match src.ReadByte() with
                 | 0uy -> None
-                | _ -> Some (src.ReadDouble())
+                | _ -> Some (src.ReadSingle())
 
             {
                 AddressU = addressU
@@ -1710,9 +1710,6 @@ module LayoutStd140 =
             | GLSLType.Int(_,w) ->
                 let s = w / 8
                 t, s, s
-
-            | GLSLType.Float(64) ->
-                t, 4, 4
                 
             | GLSLType.Float(w) ->
                 let s = w / 8 

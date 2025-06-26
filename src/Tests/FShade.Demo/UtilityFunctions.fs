@@ -11,36 +11,36 @@ open System.Reflection
 module UtiliyFunctions =
     
     type UniformScope with
-        member x.A : float = x?Bla?A
-        member x.B : float = x?Bla?B
-        member x.AB : float = x?Bla?AB
+        member x.A : float32 = x?Bla?A
+        member x.B : float32 = x?Bla?B
+        member x.AB : float32 = x?Bla?AB
 
-        member x.X : M33d = x?Buffy?X
-        member x.Y : M44d = x?Buffy?Y
+        member x.X : M33f = x?Buffy?X
+        member x.Y : M44f = x?Buffy?Y
 
-        member x.Heinz : Arr<8 N, float> = x?Buffy?Heinz
+        member x.Heinz : Arr<8 N, float32> = x?Buffy?Heinz
 
     type Vertex = 
         { 
             [<SourceVertexIndex>] i : int
-            [<Position>] pos : V4d
-            [<Semantic("Hugo"); Interpolation(InterpolationMode.Centroid)>] hugo: V3d 
+            [<Position>] pos : V4f
+            [<Semantic("Hugo"); Interpolation(InterpolationMode.Centroid)>] hugo: V3f 
         }
  
     type Vertex1 = 
         { 
-            [<Position>] pos : V4d
-            [<Semantic("Hugo")>] hugo: V3d 
+            [<Position>] pos : V4f
+            [<Semantic("Hugo")>] hugo: V3f 
         }
  
     type DummyVertex =
         {
-            [<Semantic("Bla")>] c : V3d
+            [<Semantic("Bla")>] c : V3f
         }
 
     let tess (v : Triangle<DummyVertex>) =
         tessellation {
-            let! c = tessellateTriangle 1.0 (1.0, 1.0, 1.0)
+            let! c = tessellateTriangle 1.0f (1.0f, 1.0f, 1.0f)
             return { c = c }
         }
        
@@ -49,17 +49,17 @@ module UtiliyFunctions =
         open Aardvark.Base.Ag
 
         [<Inline>]
-        let monster (a : float) =
-            if a < 10.0 then
+        let monster (a : float32) =
+            if a < 10.0f then
                 discard()
 
         [<Inline>]
-        let f (a : float) (b : float) =
-            let x = 10.0 * FShade.Imperative.ExpressionExtensions.ShaderIO.ReadInput<float>(FShade.Imperative.ParameterKind.Input, "SomeInput", None)
+        let f (a : float32) (b : float32) =
+            let x = 10.0f * FShade.Imperative.ExpressionExtensions.ShaderIO.ReadInput<float32>(FShade.Imperative.ParameterKind.Input, "SomeInput", None)
             a + b * uniform.A + x
   
         //[<Inline>]
-        let g (a : float) (b : float) =
+        let g (a : float32) (b : float32) =
             let arr = Arr<8 N, int> [1..8]
 
             for i in 0 .. 7 do
@@ -68,19 +68,19 @@ module UtiliyFunctions =
             
             let mutable a = a
             for i in 0 .. 7 do
-                a <- a + float arr.[i]
+                a <- a + float32 arr.[i]
 
             f a a + uniform.A + uniform.B
 
     let vs (v : Vertex) =
         vertex {
-            //let m = M44d.Identity * v.pos
+            //let m = M44f.Identity * v.pos
 
             let m = uniform.X  * uniform.Y.TransformDir v.pos.XYZ * uniform.Heinz.[0]
 
-            let test = g 1.0 2.9
+            let test = g 1.0f 2.9f
 
-            return { v with pos = V4d(m, 1.0) }
+            return { v with pos = V4f(m, 1.0f) }
         }
 
     let sammy =
@@ -107,14 +107,14 @@ module UtiliyFunctions =
         //sammy.Sample v
 
     type UniformScope with
-        member x.Stacy : float[] = uniform?StorageBuffer?Stacy 
+        member x.Stacy : float32[] = uniform?StorageBuffer?Stacy 
         member x.Ingolf : Image2d<Formats.r32f> = uniform?Ingolf
     
 
     let shader (v : Vertex1) =
         fragment {
             // should be removed
-            monster 12.0
+            monster 12.0f
 
 
             let a = 10 // * int v.pos.X
@@ -128,15 +128,15 @@ module UtiliyFunctions =
 
             let asdv = uniform.Ingolf.[V2i.Zero].X
 
-            return funny (V3d(a,a,a)) + V4d.IIII * g v.hugo.X v.hugo.Y * float c + uniform.Stacy.[0] * asdv
+            return funny (V3f(a,a,a)) + V4f.IIII * g v.hugo.X v.hugo.Y * float32 c + uniform.Stacy.[0] * asdv
         }
 
     let gs0 (v : Triangle<Vertex>) =
         triangle {
 
-            let a = 3.0 * v.P0.pos * v.P0.hugo.X
-            let b = 3.0 * v.P1.pos * v.P1.hugo.X
-            let c = 3.0 * v.P2.pos * v.P2.hugo.X
+            let a = 3.0f * v.P0.pos * v.P0.hugo.X
+            let b = 3.0f * v.P1.pos * v.P1.hugo.X
+            let c = 3.0f * v.P2.pos * v.P2.hugo.X
 
             yield { v.P0 with pos = a + b; hugo = v.P0.pos.XYZ + v.P0.hugo }
             yield { v.P1 with pos = b + c; hugo = v.P1.pos.XYZ + v.P1.hugo }
@@ -146,13 +146,13 @@ module UtiliyFunctions =
 
     let gs1 (v : Triangle<Vertex>) =
         triangle {
-            yield { v.P0 with pos = 2.0 * v.P0.pos }
-            yield { v.P1 with pos = 2.0 * v.P1.pos }
-            yield { v.P2 with pos = 2.0 * v.P2.pos }
+            yield { v.P0 with pos = 2.0f * v.P0.pos }
+            yield { v.P1 with pos = 2.0f * v.P1.pos }
+            yield { v.P2 with pos = 2.0f * v.P2.pos }
             restartStrip()
-            yield { v.P0 with pos = 3.0 * v.P0.pos }
-            yield { v.P1 with pos = 3.0 * v.P1.pos }
-            yield { v.P2 with pos = 3.0 * v.P2.pos }
+            yield { v.P0 with pos = 3.0f * v.P0.pos }
+            yield { v.P1 with pos = 3.0f * v.P1.pos }
+            yield { v.P2 with pos = 3.0f * v.P2.pos }
 
         }
 
@@ -170,7 +170,7 @@ module UtiliyFunctions =
 
                 let config =
                     {
-                        depthRange      = Range1d(-1.0, 1.0)
+                        depthRange      = Range1f(-1.0f, 1.0f)
                         flipHandedness  = false
                         lastStage       = shader.shaderStage
                         outputs         = Map.union existing additional 
@@ -247,7 +247,7 @@ module UtiliyFunctions =
             ]
         let glsl =
             effect
-                |> Effect.toModule { EffectConfig.empty with outputs = Map.ofList ["Colors", (typeof<V4d>, 0)] }
+                |> Effect.toModule { EffectConfig.empty with outputs = Map.ofList ["Colors", (typeof<V4f>, 0)] }
                 |> ModuleCompiler.compileGLSL410
 
         logLines glsl.code 
@@ -264,7 +264,7 @@ module UtiliyFunctions =
 //                try
 //                    let glsl =
 //                        replacement
-//                            |> Effect.toModule { EffectConfig.empty with outputs = Map.ofList ["Colors", (typeof<V4d>, 0)] }
+//                            |> Effect.toModule { EffectConfig.empty with outputs = Map.ofList ["Colors", (typeof<V4f>, 0)] }
 //                            |> ModuleCompiler.compileGLSL410
 //
 //
@@ -304,8 +304,8 @@ module UtiliyFunctions =
 //            // decompose derived uniforms here
 //            |> Effect.substituteUniforms (fun name typ index ->
 //                if name = "AB" then
-//                    let a = Expr.ReadInput<float>(ParameterKind.Uniform, "A")
-//                    let b = Expr.ReadInput<float>(ParameterKind.Uniform, "B")
+//                    let a = Expr.ReadInput<float32>(ParameterKind.Uniform, "A")
+//                    let b = Expr.ReadInput<float32>(ParameterKind.Uniform, "B")
 //                    Some <@@ (%a) * (%b) @@>
 //                else
 //                    None

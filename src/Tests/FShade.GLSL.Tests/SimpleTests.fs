@@ -14,11 +14,11 @@ type MyEnum =
 
 type Vertex =
     {
-        [<Position>] pos : V4d
-        [<Color>] c : V4d
-        [<Interpolation(InterpolationMode.NoPerspective ||| InterpolationMode.Sample)>] hugo : V3d
-        [<Interpolation(InterpolationMode.Flat ||| InterpolationMode.PerPatch)>] hugo2 : V3d
-        foo : V4d
+        [<Position>] pos : V4f
+        [<Color>] c : V4f
+        [<Interpolation(InterpolationMode.NoPerspective ||| InterpolationMode.Sample)>] hugo : V3f
+        [<Interpolation(InterpolationMode.Flat ||| InterpolationMode.PerPatch)>] hugo2 : V3f
+        foo : V4f
         what : V4i
         [<Semantic("Id")>] id : int
         [<PrimitiveId>] primId : int
@@ -45,16 +45,16 @@ let ``Reserved Names``() =
     let shader (v : Vertex) =
         vertex {
             let mutable input = v.pos
-            input <- V4d.Zero
+            input <- V4f.Zero
 
             let mutable output = input
-            output <- V4d.Zero
+            output <- V4f.Zero
 
             let mutable this = output
-            this <- V4d.Zero
+            this <- V4f.Zero
 
             let mutable union = this
-            union <- V4d.Zero
+            union <- V4f.Zero
 
             return union
         }
@@ -100,14 +100,14 @@ let ``Helper with duplicate names``() =
 
     let vert (v : Vertex) =
         vertex {
-            if v.pos.X > 0.0 then
+            if v.pos.X > 0.0f then
                 let Positions = v.pos.W + v.pos.X
                 let (a,b) =
-                    let v = 2.0 * v.pos
-                    (v.X, v.Y + 1.0 + Positions)
-                return { v with pos = V4d(a,b,b,a) }
+                    let v = 2.0f * v.pos
+                    (v.X, v.Y + 1.0f + Positions)
+                return { v with pos = V4f(a,b,b,a) }
             else
-                return { v with pos = V4d.Zero }
+                return { v with pos = V4f.Zero }
         }
 
     GLSL.shouldCompile [ Effect.ofFunction vert ]
@@ -115,9 +115,9 @@ let ``Helper with duplicate names``() =
 
 type PointSizeVertex =
     {
-        [<Position>] pos : V4d
-        [<Color>] c : V4d
-        [<PointSize>] s : float
+        [<Position>] pos : V4f
+        [<Color>] c : V4f
+        [<PointSize>] s : float32
     }
 
 
@@ -127,14 +127,14 @@ let ``PointSize shader``() =
 
     let vert (v : PointSizeVertex) =
         vertex {
-            if v.pos.X > 0.0 then
+            if v.pos.X > 0.0f then
                 let Positions = v.pos.W + v.pos.X
                 let (a,b) =
-                    let v = 2.0 * v.pos
-                    (v.X, v.Y + 1.0 + Positions)
-                return { v with pos = V4d(a,b,b,a); s = 10.0 }
+                    let v = 2.0f * v.pos
+                    (v.X, v.Y + 1.0f + Positions)
+                return { v with pos = V4f(a,b,b,a); s = 10.0f }
             else
-                return { v with pos = V4d.Zero; s = 5.0 }
+                return { v with pos = V4f.Zero; s = 5.0f }
         }
 
     GLSL.shouldCompile [ Effect.ofFunction vert ]
@@ -143,9 +143,9 @@ let ``PointSize shader``() =
 
 
 [<ReflectedDefinition>]
-let fillArray (array : Arr<N<10>, V4d>) denom =
+let fillArray (array : Arr<N<10>, V4f>) denom =
     for i in 0 .. 9 do
-        array.[i] <- V4d(float i / denom)
+        array.[i] <- V4f(float32 i / denom)
 
 
 [<Test>]
@@ -154,9 +154,9 @@ let ``Fill Array with Function``() =
 
     let frag (v : Vertex) =
         fragment {
-            let array = Arr<N<10>, V4d>()
+            let array = Arr<N<10>, V4f>()
 
-            10.0 |> fillArray array
+            10.0f |> fillArray array
 
             return array.[uniform?color]
         }
@@ -182,9 +182,9 @@ void .*_fillArray_.*\(vec4 array\[10], float denom\)
 
 
 [<ReflectedDefinition>]
-let fillArrayReturn (array : Arr<N<10>, V4d>) denom =
+let fillArrayReturn (array : Arr<N<10>, V4f>) denom =
     for i in 0 .. 9 do
-        array.[i] <- V4d(float i / denom)
+        array.[i] <- V4f(float32 i / denom)
 
     array
 
@@ -195,10 +195,10 @@ let ``Fill Array with Return Function``() =
 
     let frag (v : Vertex) =
         fragment {
-            let array = Arr<N<10>, V4d>()
+            let array = Arr<N<10>, V4f>()
 
 
-            let array1 = fillArrayReturn array 10.0
+            let array1 = fillArrayReturn array 10.0f
 
             return array1.[uniform?color]
         }
@@ -224,9 +224,9 @@ vec4\[10\] .*_fillArrayReturn_.*\(vec4 array\[10], float denom\)
     GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [ expectedFillArrayGLSL; expectedMainGLSL ]
 
 [<ReflectedDefinition>][<Inline>]
-let fillArrayInline (array : Arr<N<10>, V4d>) denom =
+let fillArrayInline (array : Arr<N<10>, V4f>) denom =
     for i in 0 .. 9 do
-        array.[i] <- V4d(float i / denom)
+        array.[i] <- V4f(float32 i / denom)
 
 
 [<Test>]
@@ -235,9 +235,9 @@ let ``Fill Array with Inline Function``() =
 
     let frag (v : Vertex) =
         fragment {
-            let array = Arr<N<10>, V4d>()
+            let array = Arr<N<10>, V4f>()
 
-            10.0 |> fillArrayInline array
+            10.0f |> fillArrayInline array
 
             // using this instead works
             // fillArrayInline array 10.0
@@ -262,9 +262,9 @@ let ``Fill Array with Inline Function``() =
 let valueIdentity v = v
 
 [<ReflectedDefinition>][<Inline>]
-let condTimesTwo (v : float) =
-    if v > 0.5 then
-        valueIdentity (v * 2.0)
+let condTimesTwo (v : float32) =
+    if v > 0.5f then
+        valueIdentity (v * 2.0f)
     else
         valueIdentity v
 
@@ -277,37 +277,37 @@ let ``Nested Double Inline``() =
 
             let v = condTimesTwo (uniform?value)
 
-            return V4d(v)
+            return V4f(v)
         }
 
     GLSL.shouldCompile [ Effect.ofFunction frag ]
 
 [<ReflectedDefinition;AutoOpen>]
 module Helper =
-    let b (h : float) (s : float) (v : float) =
-        let s = clamp 0.0 1.0 s
-        let v = clamp 0.0 uniform?Blubb?MaxValue v
+    let b (h : float32) (s : float32) (v : float32) =
+        let s = clamp 0.0f 1.0f s
+        let v = clamp 0.0f uniform?Blubb?MaxValue v
 
-        let h = h % 1.0
-        let h = if h < 0.0 then h + 1.0 else h
-        let hi = floor ( h * 6.0 ) |> int
-        let f = h * 6.0 - float hi
-        let p = v * (1.0 - s)
-        let q = v * (1.0 - s * f)
-        let t = v * (1.0 - s * ( 1.0 - f ))
+        let h = h % 1.0f
+        let h = if h < 0.0f then h + 1.0f else h
+        let hi = floor ( h * 6.0f ) |> int
+        let f = h * 6.0f - float32 hi
+        let p = v * (1.0f - s)
+        let q = v * (1.0f - s * f)
+        let t = v * (1.0f - s * ( 1.0f - f ))
         match hi with
-            | 1 -> V3d(q,v,p)
-            | 2 -> V3d(p,v,t)
-            | 3 -> V3d(p,q,v)
-            | 4 -> V3d(t,p,v)
-            | 5 -> V3d(v,p,q)
-            | _ -> V3d(v,t,p)
+            | 1 -> V3f(q,v,p)
+            | 2 -> V3f(p,v,t)
+            | 3 -> V3f(p,q,v)
+            | 4 -> V3f(t,p,v)
+            | 5 -> V3f(v,p,q)
+            | _ -> V3f(v,t,p)
 
-    let a (h : float) (s : float) (v : float) =
-        if h < 0.0 then discard()
+    let a (h : float32) (s : float32) (v : float32) =
+        if h < 0.0f then discard()
         b h s v
 
-    let hsv2rgb (h : float) (s : float) (v : float)  =
+    let hsv2rgb (h : float32) (s : float32) (v : float32)  =
         a h s v
 
     type UniformScope with
@@ -315,22 +315,22 @@ module Helper =
 
     let sampleOffsets16 =
         [|
-            V3d(0.0,0.0,0.0)
-            V3d(0.0,0.0,0.0)
-            V3d(0.0,0.0,0.0)
-            V3d(0.0,0.0,0.0)
-            V3d(0.0,0.0,0.0)
-            V3d(0.0,0.0,0.0)
-            V3d(0.0,0.0,0.0)
-            V3d(0.0,0.0,0.0)
-            V3d(0.0,0.0,0.0)
-            V3d(0.0,0.0,0.0)
-            V3d(0.0,0.0,0.0)
-            V3d(0.0,0.0,0.0)
-            V3d(0.0,0.0,0.0)
-            V3d(0.0,0.0,0.0)
-            V3d(0.0,0.0,0.0)
-            V3d(0.0,0.0,0.0)
+            V3f(0.0,0.0,0.0)
+            V3f(0.0,0.0,0.0)
+            V3f(0.0,0.0,0.0)
+            V3f(0.0,0.0,0.0)
+            V3f(0.0,0.0,0.0)
+            V3f(0.0,0.0,0.0)
+            V3f(0.0,0.0,0.0)
+            V3f(0.0,0.0,0.0)
+            V3f(0.0,0.0,0.0)
+            V3f(0.0,0.0,0.0)
+            V3f(0.0,0.0,0.0)
+            V3f(0.0,0.0,0.0)
+            V3f(0.0,0.0,0.0)
+            V3f(0.0,0.0,0.0)
+            V3f(0.0,0.0,0.0)
+            V3f(0.0,0.0,0.0)
         |]
 
 [<Test>]
@@ -344,12 +344,12 @@ let ``Bad Helpers``() =
                 match id.X with
                     | 0 ->
                         let a = uniform.RegionBuffer.[id.X]
-                        hsv2rgb (float a) 1.0 1.0
+                        hsv2rgb (float32 a) 1.0f 1.0f
                     | _ ->
                         let b = uniform.RegionBuffer.[0]
-                        V3d.III
+                        V3f.III
             uniform.RegionBuffer.[id.X] <- int sampleOffsets16.[int urdar.X].X
-            return V4d(sampleOffsets16.[int urdar.X], 1.0)
+            return V4f(sampleOffsets16.[int urdar.X], 1.0f)
         }
 
     //let a = ComputeShader.ofFunction V3i.III c |> ComputeShader.toModule
@@ -358,12 +358,12 @@ let ``Bad Helpers``() =
     GLSL.shouldCompile [ Effect.ofFunction c ]
 
 [<ReflectedDefinition>]
-let util (a : ref<float>) =
-    a := !a + 1.0
+let util (a : ref<float32>) =
+    a := !a + 1.0f
 
 [<ReflectedDefinition>]
-let util2 (a : ref<float>) =
-    a.Value <- a.Value + 1.0
+let util2 (a : ref<float32>) =
+    a.Value <- a.Value + 1.0f
 
 [<Test>]
 let ``Ref translated to inout``() =
@@ -401,7 +401,7 @@ let ``Ref storage buffer modification``() =
     let frag (v : Vertex) =
         fragment {
             atomicAdd &&uniform.Test.[0] 19
-            return float uniform.Test.[0] * v.c
+            return float32 uniform.Test.[0] * v.c
         }
 
     GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [ "atomicAdd" ]
@@ -420,10 +420,10 @@ type Shader private () =
         }
 
     [<LocalSize(X = 8, Y = 8)>]
-    static member shader (v : V4d[]) =
+    static member shader (v : V4f[]) =
         compute {
             let id = getGlobalId().XY
-            let a =  Shader.Sampler.Sample(V2d id)
+            let a =  Shader.Sampler.Sample(V2f id)
             v.[id.X] <- a
         }
 
@@ -451,19 +451,19 @@ let ``[Compute] includes samplerInfo``() =
 
 type UniformScope with
     member x.Count : int = uniform?Count
-    member x.Trafo : M34d = uniform?Hugo
+    member x.Trafo : M34f = uniform?Hugo
 
 type MyVertex =
     {
-        [<Position>] pos : V4d
-        [<Color>] c : V4d
-        [<Semantic("AAATrafo")>] trafo : M34d
+        [<Position>] pos : V4f
+        [<Color>] c : V4f
+        [<Semantic("AAATrafo")>] trafo : M34f
     }
     
 type MyVertex2 =
     {
-        [<Position>] pos : V4d
-        [<Color>] c : V4d
+        [<Position>] pos : V4f
+        [<Color>] c : V4f
     }
 
 [<Test>]
@@ -473,20 +473,20 @@ let ``Compose variables correct``() =
             let a = v.trafo * v.pos
             let mutable value = a.X
             for i in 0 .. uniform.Count do
-                value <- sin(float i) * cos(float i) * value
-            return (1.0 + value) * v.c
+                value <- sin(float32 i) * cos(float32 i) * value
+            return (1.0f + value) * v.c
         }
 
     GLSL.shouldCompile [ Effect.ofFunction frag; Effect.ofFunction frag]
 
 
 [<ReflectedDefinition>]
-let clampPointToPolygon (vc : int) (p : V3d) =
+let clampPointToPolygon (vc : int) (p : V3f) =
 
     if vc > 0 then
         (p, vc, -1, -1)
     else
-        (p * 2.0, vc + 1, -1, -1)
+        (p * 2.0f, vc + 1, -1, -1)
 
 [<Test>]
 let ``Struct declaration`` () =
@@ -496,42 +496,42 @@ let ``Struct declaration`` () =
         fragment {
 
             let (x, y, z, w) = clampPointToPolygon ((int)v.pos.X) (v.pos.XYZ)
-            return V4d(x, float (y + z + w))
+            return V4f(x, float32 (y + z + w))
         }
 
-    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag1 ] [ "struct tup_Aardvark_Base_V3d_int32_int32_int32" ]
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag1 ] [ "struct tup_Aardvark_Base_V3f_int32_int32_int32" ]
 
     let frag2 (v : Vertex) =
         fragment {
 
             let (x, y, _, _) = clampPointToPolygon ((int)v.pos.X) (v.pos.XYZ)
-            return V4d(x, float y)
+            return V4f(x, float32 y)
         }
 
-    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag2 ] [ "struct tup_Aardvark_Base_V3d_int32_int32_int32" ]
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag2 ] [ "struct tup_Aardvark_Base_V3f_int32_int32_int32" ]
 
     let frag3 (v : Vertex) =
         fragment {
 
             let (x, _, _, _) = clampPointToPolygon ((int)v.pos.X) (v.pos.XYZ)
-            return V4d(x, 1.0)
+            return V4f(x, 1.0f)
         }
 
-    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag3 ] [ "struct tup_Aardvark_Base_V3d_int32_int32_int32" ]
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag3 ] [ "struct tup_Aardvark_Base_V3f_int32_int32_int32" ]
 
 
 type UniformScope with
-    member x.SomeUniform : V3d = uniform?SomeUniform
-    member x.SomeUniformArr : Arr<N<3>,V3d> = uniform?SomeUniformArr
+    member x.SomeUniform : V3f = uniform?SomeUniform
+    member x.SomeUniformArr : Arr<N<3>,V3f> = uniform?SomeUniformArr
 
 
 [<ReflectedDefinition>] [<Inline>]
-let inlineFun1 (forward : V3d) (up : V3d) =
+let inlineFun1 (forward : V3f) (up : V3f) =
     Vec.Cross(up, -forward) + up - forward
 
 
 [<ReflectedDefinition>] [<Inline>]
-let inlineFun2 (p : V3d) =
+let inlineFun2 (p : V3f) =
 
     let i = int p.X
 
@@ -549,7 +549,7 @@ let ``Inline Inline`` () =
     let frag (v : Vertex) =
         fragment {
             let x = inlineFun2 (v.pos.XYZ)
-            return V4d(x.X, x.Y, x.Z, 1.0)
+            return V4f(x.X, x.Y, x.Z, 1.0f)
         }
 
     GLSL.shouldCompile [ Effect.ofFunction frag ]
@@ -563,11 +563,11 @@ let private textureArraySampler =
     }
 
 [<ReflectedDefinition>] [<Inline>]
-let GetSample(switch : int, lc : V2d, sam : Sampler2d) : V3d =
+let GetSample(switch : int, lc : V2f, sam : Sampler2d) : V3f =
     match switch with
     | 1 -> sam.Sample(lc).XYZ
-    | 2 -> sam.Sample(lc * 2.0).XYZ
-    | _ -> V3d.OOO
+    | 2 -> sam.Sample(lc * 2.0f).XYZ
+    | _ -> V3f.OOO
 
 [<Test>]
 let ``Sampler Loop Inline`` () =
@@ -576,12 +576,12 @@ let ``Sampler Loop Inline`` () =
     let frag (switch : int) (v : Vertex) =
         fragment {
             let lc = v.pos.XY
-            let mutable sum = V3d.Zero
+            let mutable sum = V3f.Zero
             for i in 0..uniform?TextureCount-1 do
                 let layer = GetSample(switch, lc, textureArraySampler.[i])
                 sum <- sum + layer
 
-            return V4d(sum, 1.0)
+            return V4f(sum, 1.0f)
         }
 
     GLSL.shouldCompile [ Effect.ofFunction (frag 1) ]
@@ -592,7 +592,7 @@ let ``Unroll Match`` () =
 
     let frag (switch : int) (v : Vertex) =
         fragment {
-            let mutable res = V3d.OOO
+            let mutable res = V3f.OOO
             Preprocessor.unroll()
             for i in 0..5 do
                 let p = match i with
@@ -609,15 +609,15 @@ let ``Unroll Match`` () =
                 //        else if i = 4 then v.pos.ZYX
                 //        else v.pos.ZXY
                 res <- res + p
-            return V4d(res, 1.0)
+            return V4f(res, 1.0f)
         }
 
     GLSL.shouldCompile [ Effect.ofFunction (frag 1) ] // should not contain "0 == 0", "0 == 1", "0 == 2", ...
 
 type Fragment =
     {
-        [<Color>] c : V4d
-        [<Depth(DepthWriteMode.OnlyLess)>] d : float
+        [<Color>] c : V4f
+        [<Depth(DepthWriteMode.OnlyLess)>] d : float32
     }
 
 let ``Depth Only Less``() =
@@ -626,18 +626,18 @@ let ``Depth Only Less``() =
     let fraggy (v : Vertex) =
         fragment {
             return {
-                c = V4d.IIII
-                d = 0.5
+                c = V4f.IIII
+                d = 0.5f
             }
         }
 
     GLSL.shouldCompile [ Effect.ofFunction (fraggy) ]
 [<ReflectedDefinition>] [<Inline>]
-let createTuple(x : V3d) : (Arr<N<5>,V3d> * int) =
-    let arr = Arr<N<5>, V3d>()
+let createTuple(x : V3f) : (Arr<N<5>,V3f> * int) =
+    let arr = Arr<N<5>, V3f>()
     let mutable cnt = 0
     for i in 0..4 do
-        if x.Length < float i * 0.4 then
+        if x.Length < float32 i * 0.4f then
             arr.[cnt] <- x
             cnt <- cnt + 1
 
@@ -652,11 +652,11 @@ let ``Tuple Inline`` () =
 
             let (va, vc) = createTuple v.pos.XYZ
 
-            let mutable col = V3d.OOO
+            let mutable col = V3f.OOO
             for i in 0..vc-1 do
-                col <- col + (va.[i]) * (float i)
+                col <- col + (va.[i]) * (float32 i)
 
-            return V4d(col, 1.0)
+            return V4f(col, 1.0f)
         }
 
     GLSL.shouldCompile [ Effect.ofFunction (frag) ]
@@ -676,24 +676,24 @@ let ``Variable Declaration`` () =
 
         fragment {
 
-            let va = Unchecked.defaultof<Arr<N<5>,V3d>>
+            let va = Unchecked.defaultof<Arr<N<5>,V3f>>
 
-            let tmp = v.pos * 2.0
-            let mutable value = 0.0
+            let tmp = v.pos * 2.0f
+            let mutable value = 0.0f
             for i in 0..3 do
-                let v = if v.pos.W > 0.0 then 1.0 else computeSome tmp.XYZ va.[i] va.[i+1]
+                let v = if v.pos.W > 0.0f then 1.0f else computeSome tmp.XYZ va.[i] va.[i+1]
                 value <- value + v
 
-            return V4d(value)
+            return V4f(value)
         }
 
     GLSL.shouldCompile [ Effect.ofFunction (frag) ]
 
 type VertexClip =
     {
-        [<Position>] pos : V4d
-        [<Color>] c : V4d
-        [<ClipDistance>] cd : float[]
+        [<Position>] pos : V4f
+        [<Color>] c : V4f
+        [<ClipDistance>] cd : float32[]
     }
 
 [<Test>]
@@ -704,7 +704,7 @@ let ``ClipDistance Pass-Through`` () =
     let vs (v : Vertex) =
         vertex {
 
-            let plane : V4d = uniform?ClipPlane
+            let plane : V4f = uniform?ClipPlane
             let cd = Vec.dot v.pos plane
 
             return { pos = v.pos; c = v.c ; cd = [| cd |] }
@@ -721,7 +721,7 @@ let ``ClipDistance Pass-Through`` () =
     let frag (v : Vertex) =
 
         fragment {
-            return V4d(1, 1, 1, 1)
+            return V4f(1, 1, 1, 1)
         }
 
     GLSL.shouldCompile [ Effect.ofFunction vs; Effect.ofFunction gs; Effect.ofFunction frag ]
@@ -729,7 +729,7 @@ let ``ClipDistance Pass-Through`` () =
 
 type VertexWithPid =
     {
-        [<Position>] pos : V4d
+        [<Position>] pos : V4f
         [<PrimitiveId>] pid : uint32
     }
 
@@ -750,14 +750,14 @@ let ``GS PrimitiveId`` () =
     let frag (v : Vertex) =
 
         fragment {
-            return V4d(1, 1, 1, 1)
+            return V4f(1, 1, 1, 1)
         }
 
     GLSL.shouldCompile [ Effect.ofFunction gs; Effect.ofFunction frag ]
 
 type VertexLayer =
     {
-        [<Position>] pos : V4d
+        [<Position>] pos : V4f
         [<Layer>] l : int
     }
 
@@ -791,14 +791,14 @@ let ``GS Composition with Layer`` () =
     let frag (v : Vertex) =
 
         fragment {
-            return V4d(1, 1, 1, 1)
+            return V4f(1, 1, 1, 1)
         }
 
     GLSL.shouldCompile [ Effect.ofFunction gs1; Effect.ofFunction gs2; Effect.ofFunction frag ]
 
 type VertexLayerSid =
     {
-        [<Position>] pos : V4d
+        [<Position>] pos : V4f
         [<Layer>] l : int
         [<SourceVertexIndex>] sid : int
     }
@@ -819,7 +819,7 @@ let ``GS Composition with Layer2`` () =
     let gs2 (t : Triangle<Vertex>) =
 
         triangle {
-            if t.P0.pos.X > 1.0 then
+            if t.P0.pos.X > 1.0f then
                 yield t.P0
                 yield t.P1
                 yield t.P2
@@ -828,7 +828,7 @@ let ``GS Composition with Layer2`` () =
     let frag (v : Vertex) =
 
         fragment {
-            return V4d(1, 1, 1, 1)
+            return V4f(1, 1, 1, 1)
         }
 
     GLSL.shouldCompile [ Effect.ofFunction gs1; Effect.ofFunction gs2; Effect.ofFunction frag ]
@@ -881,7 +881,7 @@ let ``DuplicateId`` () =
     let psOther (v : Vertex) =
         fragment {
             let value = sampler3.Sample(v.pos.XY).X
-            return V4d(value, 1.0, 1.0, 1.0)
+            return V4f(value, 1.0f, 1.0f, 1.0f)
         }
 
     let fxOther = Effect.ofFunction psOther
@@ -889,7 +889,7 @@ let ``DuplicateId`` () =
     let ps1 (v : Vertex) =
         fragment {
             let value = sampler1.Sample(v.pos.XY).X
-            return V4d(value, 1.0, 1.0, 1.0)
+            return V4f(value, 1.0f, 1.0f, 1.0f)
         }
 
     let fx1 = Effect.ofFunction ps1
@@ -901,7 +901,7 @@ let ``DuplicateId`` () =
     let ps2 (v : Vertex) =
         fragment {
             let value = sampler2.Sample(v.pos.XY).X
-            return V4d(value, 1.0, 1.0, 1.0)
+            return V4f(value, 1.0f, 1.0f, 1.0f)
         }
 
     let fx2 = Effect.ofFunction ps2
@@ -912,10 +912,10 @@ let ``DuplicateId`` () =
 
 
 [<ReflectedDefinition>]
-let helper (v : V4d) =
+let helper (v : V4f) =
     // without this uniform query (e.g. replacing it by a constant) the helper will be generated in the global block
     match uniform?CRASH with
-    | 1 -> v * 2.0
+    | 1 -> v * 2.0f
     | _ -> v
 
 [<Test>]
@@ -932,7 +932,7 @@ let ``VS/TS shared helper`` () =
 
         tessellation {
 
-            let! coord = tessellateTriangle 2.0 (2.0, 2.0, 2.0)
+            let! coord = tessellateTriangle 2.0f (2.0f, 2.0f, 2.0f)
 
             let v = t.[0].pos * coord.X + t.[1].pos * coord.Y + t.[2].pos * coord.Z
 
@@ -943,7 +943,7 @@ let ``VS/TS shared helper`` () =
 
     let frag (v : Vertex) =
         fragment {
-            return V4d(1, 1, 1, 1)
+            return V4f(1, 1, 1, 1)
         }
 
     GLSL.shouldCompile [ Effect.ofFunction vs; Effect.ofFunction ts; Effect.ofFunction frag ]
@@ -951,14 +951,14 @@ let ``VS/TS shared helper`` () =
 module ReflectedFunctionTest = 
 
     let constantArray =
-        [| V4d.Zero |]
+        [| V4f.Zero |]
 
     [<ReflectedDefinition>]
     let foo () =
-        V3d.Zero
+        V3f.Zero
 
     [<ReflectedDefinition>]
-    let get (tc : float) =
+    let get (tc : float32) =
         constantArray.[int tc]
 
 [<Test>]
@@ -972,7 +972,7 @@ let ``Reflected function``() =
 
     let fs (v : Vertex) =
         fragment {
-            return V4d(ReflectedFunctionTest.foo(), 1.0)
+            return V4f(ReflectedFunctionTest.foo(), 1.0f)
         }
 
     GLSL.shouldCompile [Effect.ofFunction vs; Effect.ofFunction fs]
@@ -983,19 +983,19 @@ let ``Reflected function with constant array``() =
 
     let function0 (v : MyVertex2) =
          vertex {
-            let h = ReflectedFunctionTest.get (float ((v.pos.X**0.15)*0.8))
+            let h = ReflectedFunctionTest.get (float32 ((v.pos.X**0.15f)*0.8f))
             return { v with c = h }
          }
 
     let function1 (v : MyVertex2) =
         vertex { 
-            let h = ReflectedFunctionTest.get (float v.pos.Y / 6.0)
+            let h = ReflectedFunctionTest.get (float32 v.pos.Y / 6.0f)
             return { v with pos = h }
         }
 
     let function2 (v : MyVertex2) =
         fragment {
-            let h = ReflectedFunctionTest.get (v.pos.X / 8.0)
+            let h = ReflectedFunctionTest.get (v.pos.X / 8.0f)
             return { v with pos = h }
         }
 
@@ -1022,7 +1022,7 @@ let ``Integer with implicit flat interpolation``() =
 
     let fs (v : Vertex) =
         fragment {
-            return V3d v.what
+            return V3f v.what
         }
 
     GLSL.shouldCompile [Effect.ofFunction fs]
@@ -1062,7 +1062,7 @@ let ``Integer vertex field output``() =
 
     let fs (v : Vertex) =
         fragment {
-            return { v with c = v.c + 1.0 }
+            return { v with c = v.c + 1.0f }
         }
 
     let fs2 (v : Vertex) =
@@ -1078,17 +1078,17 @@ let ``Output type conversions``() =
 
     let fs1 (v : Vertex) =
         fragment {
-            return v.c + 1.0
+            return v.c + 1.0f
         }
 
     let fs2 (v : Vertex) =
         fragment {
-            return v.c.ZXY + 2.0
+            return v.c.ZXY + 2.0f
         }
 
     let fs3 (v : Vertex) =
         fragment {
-            return v.c.WX + 3.0
+            return v.c.WX + 3.0f
         }
 
     GLSL.shouldCompile [
@@ -1120,16 +1120,16 @@ let ``Debug output``() =
         fragment {
             Debug.Printf("Hello" + " my " +  "World!")
             Debug.Printf(formatStr)
-            Debug.Printf("Hello, look at my float: %f", 0.0)
-            Debug.Printf("Hello, look at my float: %f", 0.0)
-            Debug.Printf("Hello, look at my float: %f", v.c.X)
+            Debug.Printf("Hello, look at my float32: %f", 0.0)
+            Debug.Printf("Hello, look at my float32: %f", 0.0)
+            Debug.Printf("Hello, look at my float32: %f", v.c.X)
             Debug.Printf("Hello, look at my vector: %v4f", v.c)
 
             Debug.Printfn("Hello" + " my " +  "World!")
             Debug.Printfn(formatStr)
-            Debug.Printfn("Hello, look at my float: %f", 0.0)
-            Debug.Printfn("Hello, look at my float: %f", 0.0)
-            Debug.Printfn("Hello, look at my float: %f", v.c.X)
+            Debug.Printfn("Hello, look at my float32: %f", 0.0)
+            Debug.Printfn("Hello, look at my float32: %f", 0.0)
+            Debug.Printfn("Hello, look at my float32: %f", v.c.X)
             Debug.Printfn("Hello, look at my vector: %v4f", v.c)
 
             return V4i.Zero
@@ -1161,12 +1161,12 @@ let ``Float32 vertex types``() =
 
     let fs2 (v : Vertex) =
         fragment {
-            return v.c.YXZW + (V4d.YAxis * 2.0)
+            return v.c.YXZW + (V4f.YAxis * 2.0f)
         }
 
     let fs3 (v : F32Vertex) =
         fragment {
-            return {| whatever = float (v.c.XYZ + 2.0f).Y |}
+            return {| whatever = float32 (v.c.XYZ + 2.0f).Y |}
         }
 
     let fs4 (v : F32Vertex) =
@@ -1193,10 +1193,10 @@ let ``Enum with non-int32 underlying type``() =
     GLSL.shouldCompileAndContainRegex [ Effect.ofFunction fs ] [ Regex.Escape "uint(fs_myenum)"; "1234u" ]
 
 type UniformScope with
-    member x.SomeVector : V3d = x?Foo?Bar?MyVector
-    member x.SomeVector2 : V3d = x?Foo?Bar?MyVector
-    member x.BadVector : float = x?Foo?Bar?MyVector
-    member x.BadVector2 : V3d = x?MyBuff?Yea?MyVector
+    member x.SomeVector : V3f = x?Foo?Bar?MyVector
+    member x.SomeVector2 : V3f = x?Foo?Bar?MyVector
+    member x.BadVector : float32 = x?Foo?Bar?MyVector
+    member x.BadVector2 : V3f = x?MyBuff?Yea?MyVector
 
 [<Test>]
 let ``Uniform alias``() =
@@ -1215,7 +1215,7 @@ let ``Uniform alias with mismatching type``() =
 
     let fs (v : Vertex) =
         fragment {
-            return uniform.SomeVector + V3d(uniform.BadVector, 0.0, 0.0)
+            return uniform.SomeVector + V3f(uniform.BadVector, 0.0f, 0.0f)
         }
 
     let exn =

@@ -122,7 +122,7 @@ let ``[While] counting and changing used/unused values``() =
 
 [<Test>]
 let ``[This] mutable this preseved``() =
-    let v = V2d(1.0, 1.0)
+    let v = V2f(1.0f, 1.0f)
     let input =
         <@
             let mutable a = v
@@ -141,7 +141,7 @@ let ``[This] mutable this preseved``() =
 [<Test>]
 let ``[This] immutable this removed``() =
 
-    let v = V2d(1.0, 1.0)
+    let v = V2f(1.0f, 1.0f)
     let input =
         <@
             let a = v
@@ -240,7 +240,7 @@ let ``[Hoist] nested lets``() =
             let a =
                 let b = 
                     let c = 
-                        let d = produce<float>()
+                        let d = produce<float32>()
                         d * d
                     c * c
                 b * b
@@ -250,7 +250,7 @@ let ``[Hoist] nested lets``() =
 
     let expected =
         <@
-            let d = produce<float>()
+            let d = produce<float32>()
             let c = d * d
             let b = c * c
             let a = b * b
@@ -511,8 +511,8 @@ let ``[Constant] enum to uint64``() =
 
 [<Test>]
 let ``[Constant] enum to float``() =
-    let input    = <@ keep (float MyEnum.C) @>
-    let expected = <@ keep 4.0 @>
+    let input    = <@ keep (float32 MyEnum.C) @>
+    let expected = <@ keep 4.0f @>
     input |> Opt.run |> should exprEqual expected
 
 [<Test>]
@@ -521,35 +521,35 @@ let ``[Constant] enum to float32``() =
     let expected = <@ keep 4.0f @>
     input |> Opt.run |> should exprEqual expected
 
-let private myCoolIntrinsic (_value : float) =
-    onlyInShaderCode<float> "myCoolIntrinsic"
+let private myCoolIntrinsic (_value : float32) =
+    onlyInShaderCode<float32> "myCoolIntrinsic"
 
-let private myCoolIntrinsic2 (_value : float) =
+let private myCoolIntrinsic2 (_value : float32) =
     raise <| FShadeOnlyInShaderCodeException "myCoolIntrinsic"
 
-let private myCoolIntrinsic3 (value : float) =
-    value + 1.0
+let private myCoolIntrinsic3 (value : float32) =
+    value + 1.0f
 
-let private myNotSoCoolIntrinsic (_value : float) =
+let private myNotSoCoolIntrinsic (_value : float32) =
     raise <| System.ArgumentException()
 
 [<Test>]
 let ``[Constant] respect onlyInShaderCode``() =
-    let input    = <@ keep (myCoolIntrinsic 1.0) @>
+    let input    = <@ keep (myCoolIntrinsic 1.0f) @>
     input |> Opt.run |> should exprEqual input
 
 [<Test>]
 let ``[Constant] respect FShadeOnlyInShaderCodeException``() =
-    let input    = <@ keep (myCoolIntrinsic2 1.0) @>
+    let input    = <@ keep (myCoolIntrinsic2 1.0f) @>
     input |> Opt.run |> should exprEqual input
 
 [<Test>]
 let ``[Constant] evaluate method``() =
-    let input    = <@ keep (myCoolIntrinsic3 1.0) @>
-    let expected = <@ keep 2.0 @>
+    let input    = <@ keep (myCoolIntrinsic3 1.0f) @>
+    let expected = <@ keep 2.0f @>
     input |> Opt.run |> should exprEqual expected
 
 [<Test>]
 let ``[Constant] evaluate throwing method``() =
-    let input    = <@ keep (myNotSoCoolIntrinsic 1.0) @>
+    let input    = <@ keep (myNotSoCoolIntrinsic 1.0f) @>
     input |> Opt.run |> should exprEqual input

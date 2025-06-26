@@ -7,8 +7,8 @@ open FShade.GLSL
 module Shaders = 
     type Vertex =
         {
-            [<Position>] p : V4d
-            [<Semantic("TexCoord")>] tc : V2d
+            [<Position>] p : V4f
+            [<Semantic("TexCoord")>] tc : V2f
         }
 
     let thing =
@@ -20,18 +20,18 @@ module Shaders =
         }
 
     type UniformScope with
-        member x.A : float = uniform?BufferA?ValueA
-        member x.B : float = uniform?BufferA?ValueB
-        member x.C : float = uniform?BufferA?ValueC
+        member x.A : float32 = uniform?BufferA?ValueA
+        member x.B : float32 = uniform?BufferA?ValueB
+        member x.C : float32 = uniform?BufferA?ValueC
 
     let vert (v : Vertex) =
         vertex {
-            return { v with p = 3.0 * v.p }
+            return { v with p = 3.0f * v.p }
         }
     
     let frag1 (v : Vertex) =
         fragment {
-            return V4d.IIII * uniform.A * uniform.B
+            return V4f.IIII * uniform.A * uniform.B
         }
 
     let frag2 (v : Vertex) =
@@ -42,7 +42,7 @@ module Shaders =
 
 let config =
     EffectConfig.ofList [
-        "Colors", typeof<V4d>, 0
+        "Colors", typeof<V4f>, 0
     ]
 
 let run() =

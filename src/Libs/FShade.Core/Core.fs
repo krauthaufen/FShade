@@ -264,13 +264,13 @@ type SamplerBaseBuilder() =
     member x.BorderColor((t, h : SamplerState), c : C4f) = t,{ h with BorderColor = Some c }
              
     [<CustomOperation("maxLod")>]
-    member x.MaxLod((t, h : SamplerState), c : float) = t,{ h with MaxLod = Some c }
+    member x.MaxLod((t, h : SamplerState), c : float32) = t,{ h with MaxLod = Some c }
              
     [<CustomOperation("minLod")>]
-    member x.MinLod((t, h : SamplerState), c : float) = t,{ h with MinLod = Some c }
+    member x.MinLod((t, h : SamplerState), c : float32) = t,{ h with MinLod = Some c }
              
     [<CustomOperation("mipLodBias")>]
-    member x.MipLodBias((t, h : SamplerState), c : float) = t,{ h with MipLodBias = Some c }
+    member x.MipLodBias((t, h : SamplerState), c : float32) = t,{ h with MipLodBias = Some c }
              
     [<CustomOperation("filter")>]
     member x.Filter((t, h : SamplerState), f : Filter) = t,{ h with Filter = Some f }

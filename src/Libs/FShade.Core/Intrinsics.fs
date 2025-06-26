@@ -162,8 +162,8 @@ module InstrinsicAttributes =
 
 type TessLevels =
     {
-        [<TessLevelInner>] innerLevel : float[]
-        [<TessLevelOuter>] outerLevel : float[]
+        [<TessLevelInner>] innerLevel : float32[]
+        [<TessLevelOuter>] outerLevel : float32[]
     }
 
 module RaytracingInputTypes =
@@ -184,24 +184,24 @@ module RaytracingInputTypes =
 
     type RayParameters =
         {
-            [<WorldRayOrigin>]    origin    : V3d
-            [<WorldRayDirection>] direction : V3d
-            [<RayTmin>]           minT      : float
-            [<RayTmax>]           maxT      : float
+            [<WorldRayOrigin>]    origin    : V3f
+            [<WorldRayDirection>] direction : V3f
+            [<RayTmin>]           minT      : float32
+            [<RayTmax>]           maxT      : float32
             [<IncomingRayFlags>]  flags     : RayFlags
         }
 
     type ObjectSpace =
         {
-            [<ObjectRayOrigin>]    rayOrigin     : V3d
-            [<ObjectRayDirection>] rayDirection  : V3d
-            [<ObjectToWorld>]      objectToWorld : M44d
-            [<WorldToObject>]      worldToObject : M44d
+            [<ObjectRayOrigin>]    rayOrigin     : V3f
+            [<ObjectRayDirection>] rayDirection  : V3f
+            [<ObjectToWorld>]      objectToWorld : M44f
+            [<WorldToObject>]      worldToObject : M44f
         }
 
     type RayHit<'T> =
         {
-            [<HitT>]         t          : float
+            [<HitT>]         t          : float32
             [<HitKind>]      kind       : RayHitKind
             [<HitAttribute>] attribute  : 'T
         }
@@ -232,8 +232,8 @@ type RayHitInput<'Payload, 'HitAttribute> =
         [<RayPayloadIn>] payload : 'Payload
     }
 
-type RayHitInput           = RayHitInput<unit, V2d>
-type RayHitInput<'Payload> = RayHitInput<'Payload, V2d>
+type RayHitInput           = RayHitInput<unit, V2f>
+type RayHitInput<'Payload> = RayHitInput<'Payload, V2f>
 
 /// Type containing input available in ray miss shaders.
 type RayMissInput<'Payload> =

@@ -90,7 +90,7 @@ module GLSL =
 
         let module_ =
             e |> Effect.toModule {
-                depthRange = Range1d(-1.0, 1.0)
+                depthRange = Range1f(-1.0f, 1.0f)
                 flipHandedness = false;
                 lastStage = lastStage;
                 outputs = outputs |> List.mapi (fun i (n,t) -> n, (t,i)) |> Map.ofList

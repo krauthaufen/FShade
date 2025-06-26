@@ -16,7 +16,7 @@ type BindingMode =
     | Global = 1
     | PerKind = 2
 
-[<Struct; NoComparison; StructuralEquality>]
+[<Struct; NoComparison>]
 type GLSLVersion(major : int, minor : int, patch : int, suffix : string) =
     member x.Major = major
     member x.Minor = minor
@@ -856,7 +856,11 @@ module Assembler =
                 do! AssemblerState.useTypeExtensions false 16
                 return "float16_t" |> Identifier
 
-            | CType.CFloat(32 | 64) ->
+            | CType.CFloat(64) ->
+                do! AssemblerState.useTypeExtensions false 64
+                return "double" |> Identifier
+
+            | CType.CFloat(32) ->
                 return "float" |> Identifier
 
             | CType.CVector(CType.CInt(signed, (8 | 16 | 32 | 64 as size)), d) ->
@@ -869,10 +873,19 @@ module Assembler =
                 do! AssemblerState.useTypeExtensions false 16
                 return $"f16vec{d}" |> Identifier
 
-            | CType.CVector(CType.CFloat(32 | 64 as size), d) ->
+            | CType.CVector(CType.CFloat(64), d) ->
+                do! AssemblerState.useTypeExtensions false 64
+                return $"dvec{d}" |> Identifier
+
+            | CType.CVector(CType.CFloat(32), d) ->
                 return $"vec{d}" |> Identifier
 
-            | CType.CMatrix(CType.CFloat(32 | 64), r,c) ->
+            | CType.CMatrix(CType.CFloat(64), r,c) ->
+                do! AssemblerState.useTypeExtensions false 64
+                let! mat = assembleTypeS rev (CType.CMatrix(CType.CFloat(32), r,c))
+                return $"d{mat.Name}" |> Identifier
+
+            | CType.CMatrix(CType.CFloat(32), r,c) ->
                 let typ =
                     if rev then "mat" + string r + "x" + string c
                     else "mat" + string c + "x" + string r

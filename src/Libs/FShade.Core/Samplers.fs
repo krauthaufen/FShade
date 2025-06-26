@@ -9,8 +9,8 @@ type Sampler1dArrayShadow(tex : ISemanticValue, state : SamplerState) =
         member x.State = state
 
     static member Dimension = SamplerDimension.Sampler1d
-    static member ValueType = typeof<float>
-    static member CoordType = typeof<float>
+    static member ValueType = typeof<float32>
+    static member CoordType = typeof<float32>
     static member IsArray = true
     static member IsShadow = true
     static member IsMultisampled = false
@@ -25,28 +25,28 @@ type Sampler1dArrayShadow(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V2i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : float, slice : int, cmp : float) : float = onlyInShaderCode "Sample"
+    member x.Sample(coord : float32, slice : int, cmp : float32) : float32 = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : float, slice : int, cmp : float, lodBias : float) : float = onlyInShaderCode "Sample"
+    member x.Sample(coord : float32, slice : int, cmp : float32, lodBias : float32) : float32 = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with offset
-    member x.SampleOffset(coord : float, slice : int, cmp : float, offset : int) : float = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : float32, slice : int, cmp : float32, offset : int) : float32 = onlyInShaderCode "SampleOffset"
     
     /// regular sampled texture-lookup with offset with lod-bias
-    member x.SampleOffset(coord : float, slice : int, cmp : float, offset : int, lodBias : float) : float = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : float32, slice : int, cmp : float32, offset : int, lodBias : float32) : float32 = onlyInShaderCode "SampleOffset"
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : float, slice : int, cmp : float, level : float) : float = onlyInShaderCode "SampleLevel"
+    member x.SampleLevel(coord : float32, slice : int, cmp : float32, level : float32) : float32 = onlyInShaderCode "SampleLevel"
     
     /// sampled texture-lookup with given level and offset
-    member x.SampleLevelOffset(coord : float, slice : int, cmp : float, level : float, offset : int) : float = onlyInShaderCode "SampleLevelOffset"
+    member x.SampleLevelOffset(coord : float32, slice : int, cmp : float32, level : float32, offset : int) : float32 = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : float, slice : int, cmp : float, dTdx : float, dTdy : float) : float = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : float32, slice : int, cmp : float32, dTdx : float32, dTdy : float32) : float32 = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : float) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : float32) : V2f = onlyInShaderCode "QueryLod"
     
 
 type Sampler1dArray(tex : ISemanticValue, state : SamplerState) =
@@ -55,8 +55,8 @@ type Sampler1dArray(tex : ISemanticValue, state : SamplerState) =
         member x.State = state
 
     static member Dimension = SamplerDimension.Sampler1d
-    static member ValueType = typeof<V4d>
-    static member CoordType = typeof<float>
+    static member ValueType = typeof<V4f>
+    static member CoordType = typeof<float32>
     static member IsArray = true
     static member IsShadow = false
     static member IsMultisampled = false
@@ -71,35 +71,35 @@ type Sampler1dArray(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V2i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : float, slice : int) : V4d = onlyInShaderCode "Sample"
+    member x.Sample(coord : float32, slice : int) : V4f = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : float, slice : int, lodBias : float) : V4d = onlyInShaderCode "Sample"
+    member x.Sample(coord : float32, slice : int, lodBias : float32) : V4f = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with offset
-    member x.SampleOffset(coord : float, slice : int, offset : int) : V4d = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : float32, slice : int, offset : int) : V4f = onlyInShaderCode "SampleOffset"
     
     /// regular sampled texture-lookup with offset with lod-bias
-    member x.SampleOffset(coord : float, slice : int, offset : int, lodBias : float) : V4d = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : float32, slice : int, offset : int, lodBias : float32) : V4f = onlyInShaderCode "SampleOffset"
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : float, slice : int, level : float) : V4d = onlyInShaderCode "SampleLevel"
+    member x.SampleLevel(coord : float32, slice : int, level : float32) : V4f = onlyInShaderCode "SampleLevel"
     
     /// sampled texture-lookup with given level and offset
-    member x.SampleLevelOffset(coord : float, slice : int, level : float, offset : int) : V4d = onlyInShaderCode "SampleLevelOffset"
+    member x.SampleLevelOffset(coord : float32, slice : int, level : float32, offset : int) : V4f = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : float, slice : int, dTdx : float, dTdy : float) : V4d = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : float32, slice : int, dTdx : float32, dTdy : float32) : V4f = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : float) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : float32) : V2f = onlyInShaderCode "QueryLod"
     
     /// non-sampled texture read
-    member x.Read(coord : int, slice : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4d = onlyInShaderCode "Read"
+    member x.Read(coord : int, slice : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4f = onlyInShaderCode "Read"
     
     /// non-sampled texture read
     member x.Item
-        with get (coord : int, slice : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4d = onlyInShaderCode "Fetch"
+        with get (coord : int, slice : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4f = onlyInShaderCode "Fetch"
     
 
 type Sampler1dShadow(tex : ISemanticValue, state : SamplerState) =
@@ -108,8 +108,8 @@ type Sampler1dShadow(tex : ISemanticValue, state : SamplerState) =
         member x.State = state
 
     static member Dimension = SamplerDimension.Sampler1d
-    static member ValueType = typeof<float>
-    static member CoordType = typeof<float>
+    static member ValueType = typeof<float32>
+    static member CoordType = typeof<float32>
     static member IsArray = false
     static member IsShadow = true
     static member IsMultisampled = false
@@ -124,34 +124,34 @@ type Sampler1dShadow(tex : ISemanticValue, state : SamplerState) =
     member x.Size : int = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : float, cmp : float) : float = onlyInShaderCode "Sample"
+    member x.Sample(coord : float32, cmp : float32) : float32 = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : float, cmp : float, lodBias : float) : float = onlyInShaderCode "Sample"
+    member x.Sample(coord : float32, cmp : float32, lodBias : float32) : float32 = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with offset
-    member x.SampleOffset(coord : float, cmp : float, offset : int) : float = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : float32, cmp : float32, offset : int) : float32 = onlyInShaderCode "SampleOffset"
     
     /// regular sampled texture-lookup with offset with lod-bias
-    member x.SampleOffset(coord : float, cmp : float, offset : int, lodBias : float) : float = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : float32, cmp : float32, offset : int, lodBias : float32) : float32 = onlyInShaderCode "SampleOffset"
     
     /// projective sampled texture-lookup
-    member x.SampleProj(coord : V2d, cmp : float) : float = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V2f, cmp : float32) : float32 = onlyInShaderCode "SampleProj"
     
     /// projective sampled texture-lookup with lod-bias
-    member x.SampleProj(coord : V2d, cmp : float, lodBias : float) : float = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V2f, cmp : float32, lodBias : float32) : float32 = onlyInShaderCode "SampleProj"
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : float, cmp : float, level : float) : float = onlyInShaderCode "SampleLevel"
+    member x.SampleLevel(coord : float32, cmp : float32, level : float32) : float32 = onlyInShaderCode "SampleLevel"
     
     /// sampled texture-lookup with given level and offset
-    member x.SampleLevelOffset(coord : float, cmp : float, level : float, offset : int) : float = onlyInShaderCode "SampleLevelOffset"
+    member x.SampleLevelOffset(coord : float32, cmp : float32, level : float32, offset : int) : float32 = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : float, cmp : float, dTdx : float, dTdy : float) : float = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : float32, cmp : float32, dTdx : float32, dTdy : float32) : float32 = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : float) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : float32) : V2f = onlyInShaderCode "QueryLod"
     
 
 type Sampler1d(tex : ISemanticValue, state : SamplerState) =
@@ -160,8 +160,8 @@ type Sampler1d(tex : ISemanticValue, state : SamplerState) =
         member x.State = state
 
     static member Dimension = SamplerDimension.Sampler1d
-    static member ValueType = typeof<V4d>
-    static member CoordType = typeof<float>
+    static member ValueType = typeof<V4f>
+    static member CoordType = typeof<float32>
     static member IsArray = false
     static member IsShadow = false
     static member IsMultisampled = false
@@ -176,41 +176,41 @@ type Sampler1d(tex : ISemanticValue, state : SamplerState) =
     member x.Size : int = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : float) : V4d = onlyInShaderCode "Sample"
+    member x.Sample(coord : float32) : V4f = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : float, lodBias : float) : V4d = onlyInShaderCode "Sample"
+    member x.Sample(coord : float32, lodBias : float32) : V4f = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with offset
-    member x.SampleOffset(coord : float, offset : int) : V4d = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : float32, offset : int) : V4f = onlyInShaderCode "SampleOffset"
     
     /// regular sampled texture-lookup with offset with lod-bias
-    member x.SampleOffset(coord : float, offset : int, lodBias : float) : V4d = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : float32, offset : int, lodBias : float32) : V4f = onlyInShaderCode "SampleOffset"
     
     /// projective sampled texture-lookup
-    member x.SampleProj(coord : V2d) : V4d = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V2f) : V4f = onlyInShaderCode "SampleProj"
     
     /// projective sampled texture-lookup with lod-bias
-    member x.SampleProj(coord : V2d, lodBias : float) : V4d = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V2f, lodBias : float32) : V4f = onlyInShaderCode "SampleProj"
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : float, level : float) : V4d = onlyInShaderCode "SampleLevel"
+    member x.SampleLevel(coord : float32, level : float32) : V4f = onlyInShaderCode "SampleLevel"
     
     /// sampled texture-lookup with given level and offset
-    member x.SampleLevelOffset(coord : float, level : float, offset : int) : V4d = onlyInShaderCode "SampleLevelOffset"
+    member x.SampleLevelOffset(coord : float32, level : float32, offset : int) : V4f = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : float, dTdx : float, dTdy : float) : V4d = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : float32, dTdx : float32, dTdy : float32) : V4f = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : float) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : float32) : V2f = onlyInShaderCode "QueryLod"
     
     /// non-sampled texture read
-    member x.Read(coord : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4d = onlyInShaderCode "Read"
+    member x.Read(coord : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4f = onlyInShaderCode "Read"
     
     /// non-sampled texture read
     member x.Item
-        with get (coord : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4d = onlyInShaderCode "Fetch"
+        with get (coord : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4f = onlyInShaderCode "Fetch"
     
 
 type Sampler2dArrayMS(tex : ISemanticValue, state : SamplerState) =
@@ -219,8 +219,8 @@ type Sampler2dArrayMS(tex : ISemanticValue, state : SamplerState) =
         member x.State = state
 
     static member Dimension = SamplerDimension.Sampler2d
-    static member ValueType = typeof<V4d>
-    static member CoordType = typeof<V2d>
+    static member ValueType = typeof<V4f>
+    static member CoordType = typeof<V2f>
     static member IsArray = true
     static member IsShadow = false
     static member IsMultisampled = true
@@ -232,11 +232,11 @@ type Sampler2dArrayMS(tex : ISemanticValue, state : SamplerState) =
     member x.Samples : int = onlyInShaderCode "Samples"
     
     /// non-sampled texture read
-    member x.Read(coord : V2i, slice : int, [<Optional; DefaultParameterValue(0)>] sample : int) : V4d = onlyInShaderCode "Read"
+    member x.Read(coord : V2i, slice : int, [<Optional; DefaultParameterValue(0)>] sample : int) : V4f = onlyInShaderCode "Read"
     
     /// non-sampled texture read
     member x.Item
-        with get (coord : V2i, slice : int, [<Optional; DefaultParameterValue(0)>] sample : int) : V4d = onlyInShaderCode "Fetch"
+        with get (coord : V2i, slice : int, [<Optional; DefaultParameterValue(0)>] sample : int) : V4f = onlyInShaderCode "Fetch"
     
 
 type Sampler2dArrayShadow(tex : ISemanticValue, state : SamplerState) =
@@ -245,8 +245,8 @@ type Sampler2dArrayShadow(tex : ISemanticValue, state : SamplerState) =
         member x.State = state
 
     static member Dimension = SamplerDimension.Sampler2d
-    static member ValueType = typeof<float>
-    static member CoordType = typeof<V2d>
+    static member ValueType = typeof<float32>
+    static member CoordType = typeof<V2f>
     static member IsArray = true
     static member IsShadow = true
     static member IsMultisampled = false
@@ -261,28 +261,28 @@ type Sampler2dArrayShadow(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V3i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : V2d, slice : int, cmp : float) : float = onlyInShaderCode "Sample"
+    member x.Sample(coord : V2f, slice : int, cmp : float32) : float32 = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V2d, slice : int, cmp : float, lodBias : float) : float = onlyInShaderCode "Sample"
+    member x.Sample(coord : V2f, slice : int, cmp : float32, lodBias : float32) : float32 = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with offset
-    member x.SampleOffset(coord : V2d, slice : int, cmp : float, offset : V2i) : float = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : V2f, slice : int, cmp : float32, offset : V2i) : float32 = onlyInShaderCode "SampleOffset"
     
     /// regular sampled texture-lookup with offset with lod-bias
-    member x.SampleOffset(coord : V2d, slice : int, cmp : float, offset : V2i, lodBias : float) : float = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : V2f, slice : int, cmp : float32, offset : V2i, lodBias : float32) : float32 = onlyInShaderCode "SampleOffset"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : V2d, slice : int, cmp : float, dTdx : V2d, dTdy : V2d) : float = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : V2f, slice : int, cmp : float32, dTdx : V2f, dTdy : V2f) : float32 = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : V2d) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : V2f) : V2f = onlyInShaderCode "QueryLod"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.Gather(coord : V2d, slice : int, cmp : float) : V4d = onlyInShaderCode "Gather"
+    member x.Gather(coord : V2f, slice : int, cmp : float32) : V4f = onlyInShaderCode "Gather"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.GatherOffset(coord : V2d, slice : int, cmp : float, offset : V2i) : V4d = onlyInShaderCode "GatherOffset"
+    member x.GatherOffset(coord : V2f, slice : int, cmp : float32, offset : V2i) : V4f = onlyInShaderCode "GatherOffset"
     
 
 type Sampler2dArray(tex : ISemanticValue, state : SamplerState) =
@@ -291,8 +291,8 @@ type Sampler2dArray(tex : ISemanticValue, state : SamplerState) =
         member x.State = state
 
     static member Dimension = SamplerDimension.Sampler2d
-    static member ValueType = typeof<V4d>
-    static member CoordType = typeof<V2d>
+    static member ValueType = typeof<V4f>
+    static member CoordType = typeof<V2f>
     static member IsArray = true
     static member IsShadow = false
     static member IsMultisampled = false
@@ -307,41 +307,41 @@ type Sampler2dArray(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V3i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : V2d, slice : int) : V4d = onlyInShaderCode "Sample"
+    member x.Sample(coord : V2f, slice : int) : V4f = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V2d, slice : int, lodBias : float) : V4d = onlyInShaderCode "Sample"
+    member x.Sample(coord : V2f, slice : int, lodBias : float32) : V4f = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with offset
-    member x.SampleOffset(coord : V2d, slice : int, offset : V2i) : V4d = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : V2f, slice : int, offset : V2i) : V4f = onlyInShaderCode "SampleOffset"
     
     /// regular sampled texture-lookup with offset with lod-bias
-    member x.SampleOffset(coord : V2d, slice : int, offset : V2i, lodBias : float) : V4d = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : V2f, slice : int, offset : V2i, lodBias : float32) : V4f = onlyInShaderCode "SampleOffset"
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, slice : int, level : float) : V4d = onlyInShaderCode "SampleLevel"
+    member x.SampleLevel(coord : V2f, slice : int, level : float32) : V4f = onlyInShaderCode "SampleLevel"
     
     /// sampled texture-lookup with given level and offset
-    member x.SampleLevelOffset(coord : V2d, slice : int, level : float, offset : V2i) : V4d = onlyInShaderCode "SampleLevelOffset"
+    member x.SampleLevelOffset(coord : V2f, slice : int, level : float32, offset : V2i) : V4f = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : V2d, slice : int, dTdx : V2d, dTdy : V2d) : V4d = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : V2f, slice : int, dTdx : V2f, dTdy : V2f) : V4f = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : V2d) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : V2f) : V2f = onlyInShaderCode "QueryLod"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.Gather(coord : V2d, slice : int, [<Optional; DefaultParameterValue(0)>] comp : int) : V4d = onlyInShaderCode "Gather"
+    member x.Gather(coord : V2f, slice : int, [<Optional; DefaultParameterValue(0)>] comp : int) : V4f = onlyInShaderCode "Gather"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.GatherOffset(coord : V2d, slice : int, offset : V2i, [<Optional; DefaultParameterValue(0)>] comp : int) : V4d = onlyInShaderCode "GatherOffset"
+    member x.GatherOffset(coord : V2f, slice : int, offset : V2i, [<Optional; DefaultParameterValue(0)>] comp : int) : V4f = onlyInShaderCode "GatherOffset"
     
     /// non-sampled texture read
-    member x.Read(coord : V2i, slice : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4d = onlyInShaderCode "Read"
+    member x.Read(coord : V2i, slice : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4f = onlyInShaderCode "Read"
     
     /// non-sampled texture read
     member x.Item
-        with get (coord : V2i, slice : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4d = onlyInShaderCode "Fetch"
+        with get (coord : V2i, slice : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4f = onlyInShaderCode "Fetch"
     
 
 type Sampler2dMS(tex : ISemanticValue, state : SamplerState) =
@@ -350,8 +350,8 @@ type Sampler2dMS(tex : ISemanticValue, state : SamplerState) =
         member x.State = state
 
     static member Dimension = SamplerDimension.Sampler2d
-    static member ValueType = typeof<V4d>
-    static member CoordType = typeof<V2d>
+    static member ValueType = typeof<V4f>
+    static member CoordType = typeof<V2f>
     static member IsArray = false
     static member IsShadow = false
     static member IsMultisampled = true
@@ -363,11 +363,11 @@ type Sampler2dMS(tex : ISemanticValue, state : SamplerState) =
     member x.Samples : int = onlyInShaderCode "Samples"
     
     /// non-sampled texture read
-    member x.Read(coord : V2i, [<Optional; DefaultParameterValue(0)>] sample : int) : V4d = onlyInShaderCode "Read"
+    member x.Read(coord : V2i, [<Optional; DefaultParameterValue(0)>] sample : int) : V4f = onlyInShaderCode "Read"
     
     /// non-sampled texture read
     member x.Item
-        with get (coord : V2i, [<Optional; DefaultParameterValue(0)>] sample : int) : V4d = onlyInShaderCode "Fetch"
+        with get (coord : V2i, [<Optional; DefaultParameterValue(0)>] sample : int) : V4f = onlyInShaderCode "Fetch"
     
 
 type Sampler2dShadow(tex : ISemanticValue, state : SamplerState) =
@@ -376,8 +376,8 @@ type Sampler2dShadow(tex : ISemanticValue, state : SamplerState) =
         member x.State = state
 
     static member Dimension = SamplerDimension.Sampler2d
-    static member ValueType = typeof<float>
-    static member CoordType = typeof<V2d>
+    static member ValueType = typeof<float32>
+    static member CoordType = typeof<V2f>
     static member IsArray = false
     static member IsShadow = true
     static member IsMultisampled = false
@@ -392,40 +392,40 @@ type Sampler2dShadow(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V2i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : V2d, cmp : float) : float = onlyInShaderCode "Sample"
+    member x.Sample(coord : V2f, cmp : float32) : float32 = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V2d, cmp : float, lodBias : float) : float = onlyInShaderCode "Sample"
+    member x.Sample(coord : V2f, cmp : float32, lodBias : float32) : float32 = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with offset
-    member x.SampleOffset(coord : V2d, cmp : float, offset : V2i) : float = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : V2f, cmp : float32, offset : V2i) : float32 = onlyInShaderCode "SampleOffset"
     
     /// regular sampled texture-lookup with offset with lod-bias
-    member x.SampleOffset(coord : V2d, cmp : float, offset : V2i, lodBias : float) : float = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : V2f, cmp : float32, offset : V2i, lodBias : float32) : float32 = onlyInShaderCode "SampleOffset"
     
     /// projective sampled texture-lookup
-    member x.SampleProj(coord : V3d, cmp : float) : float = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V3f, cmp : float32) : float32 = onlyInShaderCode "SampleProj"
     
     /// projective sampled texture-lookup with lod-bias
-    member x.SampleProj(coord : V3d, cmp : float, lodBias : float) : float = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V3f, cmp : float32, lodBias : float32) : float32 = onlyInShaderCode "SampleProj"
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, cmp : float, level : float) : float = onlyInShaderCode "SampleLevel"
+    member x.SampleLevel(coord : V2f, cmp : float32, level : float32) : float32 = onlyInShaderCode "SampleLevel"
     
     /// sampled texture-lookup with given level and offset
-    member x.SampleLevelOffset(coord : V2d, cmp : float, level : float, offset : V2i) : float = onlyInShaderCode "SampleLevelOffset"
+    member x.SampleLevelOffset(coord : V2f, cmp : float32, level : float32, offset : V2i) : float32 = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : V2d, cmp : float, dTdx : V2d, dTdy : V2d) : float = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : V2f, cmp : float32, dTdx : V2f, dTdy : V2f) : float32 = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : V2d) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : V2f) : V2f = onlyInShaderCode "QueryLod"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.Gather(coord : V2d, cmp : float) : V4d = onlyInShaderCode "Gather"
+    member x.Gather(coord : V2f, cmp : float32) : V4f = onlyInShaderCode "Gather"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.GatherOffset(coord : V2d, cmp : float, offset : V2i) : V4d = onlyInShaderCode "GatherOffset"
+    member x.GatherOffset(coord : V2f, cmp : float32, offset : V2i) : V4f = onlyInShaderCode "GatherOffset"
     
 
 type Sampler2d(tex : ISemanticValue, state : SamplerState) =
@@ -434,8 +434,8 @@ type Sampler2d(tex : ISemanticValue, state : SamplerState) =
         member x.State = state
 
     static member Dimension = SamplerDimension.Sampler2d
-    static member ValueType = typeof<V4d>
-    static member CoordType = typeof<V2d>
+    static member ValueType = typeof<V4f>
+    static member CoordType = typeof<V2f>
     static member IsArray = false
     static member IsShadow = false
     static member IsMultisampled = false
@@ -450,47 +450,47 @@ type Sampler2d(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V2i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : V2d) : V4d = onlyInShaderCode "Sample"
+    member x.Sample(coord : V2f) : V4f = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V2d, lodBias : float) : V4d = onlyInShaderCode "Sample"
+    member x.Sample(coord : V2f, lodBias : float32) : V4f = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with offset
-    member x.SampleOffset(coord : V2d, offset : V2i) : V4d = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : V2f, offset : V2i) : V4f = onlyInShaderCode "SampleOffset"
     
     /// regular sampled texture-lookup with offset with lod-bias
-    member x.SampleOffset(coord : V2d, offset : V2i, lodBias : float) : V4d = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : V2f, offset : V2i, lodBias : float32) : V4f = onlyInShaderCode "SampleOffset"
     
     /// projective sampled texture-lookup
-    member x.SampleProj(coord : V3d) : V4d = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V3f) : V4f = onlyInShaderCode "SampleProj"
     
     /// projective sampled texture-lookup with lod-bias
-    member x.SampleProj(coord : V3d, lodBias : float) : V4d = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V3f, lodBias : float32) : V4f = onlyInShaderCode "SampleProj"
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, level : float) : V4d = onlyInShaderCode "SampleLevel"
+    member x.SampleLevel(coord : V2f, level : float32) : V4f = onlyInShaderCode "SampleLevel"
     
     /// sampled texture-lookup with given level and offset
-    member x.SampleLevelOffset(coord : V2d, level : float, offset : V2i) : V4d = onlyInShaderCode "SampleLevelOffset"
+    member x.SampleLevelOffset(coord : V2f, level : float32, offset : V2i) : V4f = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : V2d, dTdx : V2d, dTdy : V2d) : V4d = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : V2f, dTdx : V2f, dTdy : V2f) : V4f = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : V2d) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : V2f) : V2f = onlyInShaderCode "QueryLod"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.Gather(coord : V2d, [<Optional; DefaultParameterValue(0)>] comp : int) : V4d = onlyInShaderCode "Gather"
+    member x.Gather(coord : V2f, [<Optional; DefaultParameterValue(0)>] comp : int) : V4f = onlyInShaderCode "Gather"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.GatherOffset(coord : V2d, offset : V2i, [<Optional; DefaultParameterValue(0)>] comp : int) : V4d = onlyInShaderCode "GatherOffset"
+    member x.GatherOffset(coord : V2f, offset : V2i, [<Optional; DefaultParameterValue(0)>] comp : int) : V4f = onlyInShaderCode "GatherOffset"
     
     /// non-sampled texture read
-    member x.Read(coord : V2i, [<Optional; DefaultParameterValue(0)>] lod : int) : V4d = onlyInShaderCode "Read"
+    member x.Read(coord : V2i, [<Optional; DefaultParameterValue(0)>] lod : int) : V4f = onlyInShaderCode "Read"
     
     /// non-sampled texture read
     member x.Item
-        with get (coord : V2i, [<Optional; DefaultParameterValue(0)>] lod : int) : V4d = onlyInShaderCode "Fetch"
+        with get (coord : V2i, [<Optional; DefaultParameterValue(0)>] lod : int) : V4f = onlyInShaderCode "Fetch"
     
 
 type Sampler3d(tex : ISemanticValue, state : SamplerState) =
@@ -499,8 +499,8 @@ type Sampler3d(tex : ISemanticValue, state : SamplerState) =
         member x.State = state
 
     static member Dimension = SamplerDimension.Sampler3d
-    static member ValueType = typeof<V4d>
-    static member CoordType = typeof<V3d>
+    static member ValueType = typeof<V4f>
+    static member CoordType = typeof<V3f>
     static member IsArray = false
     static member IsShadow = false
     static member IsMultisampled = false
@@ -515,41 +515,41 @@ type Sampler3d(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V3i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : V3d) : V4d = onlyInShaderCode "Sample"
+    member x.Sample(coord : V3f) : V4f = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V3d, lodBias : float) : V4d = onlyInShaderCode "Sample"
+    member x.Sample(coord : V3f, lodBias : float32) : V4f = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with offset
-    member x.SampleOffset(coord : V3d, offset : V3i) : V4d = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : V3f, offset : V3i) : V4f = onlyInShaderCode "SampleOffset"
     
     /// regular sampled texture-lookup with offset with lod-bias
-    member x.SampleOffset(coord : V3d, offset : V3i, lodBias : float) : V4d = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : V3f, offset : V3i, lodBias : float32) : V4f = onlyInShaderCode "SampleOffset"
     
     /// projective sampled texture-lookup
-    member x.SampleProj(coord : V4d) : V4d = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V4f) : V4f = onlyInShaderCode "SampleProj"
     
     /// projective sampled texture-lookup with lod-bias
-    member x.SampleProj(coord : V4d, lodBias : float) : V4d = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V4f, lodBias : float32) : V4f = onlyInShaderCode "SampleProj"
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, level : float) : V4d = onlyInShaderCode "SampleLevel"
+    member x.SampleLevel(coord : V3f, level : float32) : V4f = onlyInShaderCode "SampleLevel"
     
     /// sampled texture-lookup with given level and offset
-    member x.SampleLevelOffset(coord : V3d, level : float, offset : V3i) : V4d = onlyInShaderCode "SampleLevelOffset"
+    member x.SampleLevelOffset(coord : V3f, level : float32, offset : V3i) : V4f = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : V3d, dTdx : V3d, dTdy : V3d) : V4d = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : V3f, dTdx : V3f, dTdy : V3f) : V4f = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : V3f) : V2f = onlyInShaderCode "QueryLod"
     
     /// non-sampled texture read
-    member x.Read(coord : V3i, [<Optional; DefaultParameterValue(0)>] lod : int) : V4d = onlyInShaderCode "Read"
+    member x.Read(coord : V3i, [<Optional; DefaultParameterValue(0)>] lod : int) : V4f = onlyInShaderCode "Read"
     
     /// non-sampled texture read
     member x.Item
-        with get (coord : V3i, [<Optional; DefaultParameterValue(0)>] lod : int) : V4d = onlyInShaderCode "Fetch"
+        with get (coord : V3i, [<Optional; DefaultParameterValue(0)>] lod : int) : V4f = onlyInShaderCode "Fetch"
     
 
 type SamplerCubeArrayShadow(tex : ISemanticValue, state : SamplerState) =
@@ -558,8 +558,8 @@ type SamplerCubeArrayShadow(tex : ISemanticValue, state : SamplerState) =
         member x.State = state
 
     static member Dimension = SamplerDimension.SamplerCube
-    static member ValueType = typeof<float>
-    static member CoordType = typeof<V3d>
+    static member ValueType = typeof<float32>
+    static member CoordType = typeof<V3f>
     static member IsArray = true
     static member IsShadow = true
     static member IsMultisampled = false
@@ -574,16 +574,16 @@ type SamplerCubeArrayShadow(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V3i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : V3d, slice : int, cmp : float) : float = onlyInShaderCode "Sample"
+    member x.Sample(coord : V3f, slice : int, cmp : float32) : float32 = onlyInShaderCode "Sample"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : V3d, slice : int, cmp : float, dTdx : V3d, dTdy : V3d) : float = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : V3f, slice : int, cmp : float32, dTdx : V3f, dTdy : V3f) : float32 = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : V3f) : V2f = onlyInShaderCode "QueryLod"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.Gather(coord : V3d, slice : int, cmp : float) : V4d = onlyInShaderCode "Gather"
+    member x.Gather(coord : V3f, slice : int, cmp : float32) : V4f = onlyInShaderCode "Gather"
     
 
 type SamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
@@ -592,8 +592,8 @@ type SamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
         member x.State = state
 
     static member Dimension = SamplerDimension.SamplerCube
-    static member ValueType = typeof<V4d>
-    static member CoordType = typeof<V3d>
+    static member ValueType = typeof<V4f>
+    static member CoordType = typeof<V3f>
     static member IsArray = true
     static member IsShadow = false
     static member IsMultisampled = false
@@ -608,22 +608,22 @@ type SamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V3i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : V3d, slice : int) : V4d = onlyInShaderCode "Sample"
+    member x.Sample(coord : V3f, slice : int) : V4f = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V3d, slice : int, lodBias : float) : V4d = onlyInShaderCode "Sample"
+    member x.Sample(coord : V3f, slice : int, lodBias : float32) : V4f = onlyInShaderCode "Sample"
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, slice : int, level : float) : V4d = onlyInShaderCode "SampleLevel"
+    member x.SampleLevel(coord : V3f, slice : int, level : float32) : V4f = onlyInShaderCode "SampleLevel"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : V3d, slice : int, dTdx : V3d, dTdy : V3d) : V4d = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : V3f, slice : int, dTdx : V3f, dTdy : V3f) : V4f = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : V3f) : V2f = onlyInShaderCode "QueryLod"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.Gather(coord : V3d, slice : int, [<Optional; DefaultParameterValue(0)>] comp : int) : V4d = onlyInShaderCode "Gather"
+    member x.Gather(coord : V3f, slice : int, [<Optional; DefaultParameterValue(0)>] comp : int) : V4f = onlyInShaderCode "Gather"
     
 
 type SamplerCubeShadow(tex : ISemanticValue, state : SamplerState) =
@@ -632,8 +632,8 @@ type SamplerCubeShadow(tex : ISemanticValue, state : SamplerState) =
         member x.State = state
 
     static member Dimension = SamplerDimension.SamplerCube
-    static member ValueType = typeof<float>
-    static member CoordType = typeof<V3d>
+    static member ValueType = typeof<float32>
+    static member CoordType = typeof<V3f>
     static member IsArray = false
     static member IsShadow = true
     static member IsMultisampled = false
@@ -648,19 +648,19 @@ type SamplerCubeShadow(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V2i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : V3d, cmp : float) : float = onlyInShaderCode "Sample"
+    member x.Sample(coord : V3f, cmp : float32) : float32 = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V3d, cmp : float, lodBias : float) : float = onlyInShaderCode "Sample"
+    member x.Sample(coord : V3f, cmp : float32, lodBias : float32) : float32 = onlyInShaderCode "Sample"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : V3d, cmp : float, dTdx : V3d, dTdy : V3d) : float = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : V3f, cmp : float32, dTdx : V3f, dTdy : V3f) : float32 = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : V3f) : V2f = onlyInShaderCode "QueryLod"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.Gather(coord : V3d, cmp : float) : V4d = onlyInShaderCode "Gather"
+    member x.Gather(coord : V3f, cmp : float32) : V4f = onlyInShaderCode "Gather"
     
 
 type SamplerCube(tex : ISemanticValue, state : SamplerState) =
@@ -669,8 +669,8 @@ type SamplerCube(tex : ISemanticValue, state : SamplerState) =
         member x.State = state
 
     static member Dimension = SamplerDimension.SamplerCube
-    static member ValueType = typeof<V4d>
-    static member CoordType = typeof<V3d>
+    static member ValueType = typeof<V4f>
+    static member CoordType = typeof<V3f>
     static member IsArray = false
     static member IsShadow = false
     static member IsMultisampled = false
@@ -685,22 +685,22 @@ type SamplerCube(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V2i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : V3d) : V4d = onlyInShaderCode "Sample"
+    member x.Sample(coord : V3f) : V4f = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V3d, lodBias : float) : V4d = onlyInShaderCode "Sample"
+    member x.Sample(coord : V3f, lodBias : float32) : V4f = onlyInShaderCode "Sample"
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, level : float) : V4d = onlyInShaderCode "SampleLevel"
+    member x.SampleLevel(coord : V3f, level : float32) : V4f = onlyInShaderCode "SampleLevel"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : V3d, dTdx : V3d, dTdy : V3d) : V4d = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : V3f, dTdx : V3f, dTdy : V3f) : V4f = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : V3f) : V2f = onlyInShaderCode "QueryLod"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.Gather(coord : V3d, [<Optional; DefaultParameterValue(0)>] comp : int) : V4d = onlyInShaderCode "Gather"
+    member x.Gather(coord : V3f, [<Optional; DefaultParameterValue(0)>] comp : int) : V4f = onlyInShaderCode "Gather"
     
 
 type IntSampler1dArray(tex : ISemanticValue, state : SamplerState) =
@@ -710,7 +710,7 @@ type IntSampler1dArray(tex : ISemanticValue, state : SamplerState) =
 
     static member Dimension = SamplerDimension.Sampler1d
     static member ValueType = typeof<V4i>
-    static member CoordType = typeof<float>
+    static member CoordType = typeof<float32>
     static member IsArray = true
     static member IsShadow = false
     static member IsMultisampled = false
@@ -725,28 +725,28 @@ type IntSampler1dArray(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V2i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : float, slice : int) : V4i = onlyInShaderCode "Sample"
+    member x.Sample(coord : float32, slice : int) : V4i = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : float, slice : int, lodBias : float) : V4i = onlyInShaderCode "Sample"
+    member x.Sample(coord : float32, slice : int, lodBias : float32) : V4i = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with offset
-    member x.SampleOffset(coord : float, slice : int, offset : int) : V4i = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : float32, slice : int, offset : int) : V4i = onlyInShaderCode "SampleOffset"
     
     /// regular sampled texture-lookup with offset with lod-bias
-    member x.SampleOffset(coord : float, slice : int, offset : int, lodBias : float) : V4i = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : float32, slice : int, offset : int, lodBias : float32) : V4i = onlyInShaderCode "SampleOffset"
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : float, slice : int, level : float) : V4i = onlyInShaderCode "SampleLevel"
+    member x.SampleLevel(coord : float32, slice : int, level : float32) : V4i = onlyInShaderCode "SampleLevel"
     
     /// sampled texture-lookup with given level and offset
-    member x.SampleLevelOffset(coord : float, slice : int, level : float, offset : int) : V4i = onlyInShaderCode "SampleLevelOffset"
+    member x.SampleLevelOffset(coord : float32, slice : int, level : float32, offset : int) : V4i = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : float, slice : int, dTdx : float, dTdy : float) : V4i = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : float32, slice : int, dTdx : float32, dTdy : float32) : V4i = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : float) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : float32) : V2f = onlyInShaderCode "QueryLod"
     
     /// non-sampled texture read
     member x.Read(coord : int, slice : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4i = onlyInShaderCode "Read"
@@ -763,7 +763,7 @@ type IntSampler1d(tex : ISemanticValue, state : SamplerState) =
 
     static member Dimension = SamplerDimension.Sampler1d
     static member ValueType = typeof<V4i>
-    static member CoordType = typeof<float>
+    static member CoordType = typeof<float32>
     static member IsArray = false
     static member IsShadow = false
     static member IsMultisampled = false
@@ -778,34 +778,34 @@ type IntSampler1d(tex : ISemanticValue, state : SamplerState) =
     member x.Size : int = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : float) : V4i = onlyInShaderCode "Sample"
+    member x.Sample(coord : float32) : V4i = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : float, lodBias : float) : V4i = onlyInShaderCode "Sample"
+    member x.Sample(coord : float32, lodBias : float32) : V4i = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with offset
-    member x.SampleOffset(coord : float, offset : int) : V4i = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : float32, offset : int) : V4i = onlyInShaderCode "SampleOffset"
     
     /// regular sampled texture-lookup with offset with lod-bias
-    member x.SampleOffset(coord : float, offset : int, lodBias : float) : V4i = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : float32, offset : int, lodBias : float32) : V4i = onlyInShaderCode "SampleOffset"
     
     /// projective sampled texture-lookup
-    member x.SampleProj(coord : V2d) : V4i = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V2f) : V4i = onlyInShaderCode "SampleProj"
     
     /// projective sampled texture-lookup with lod-bias
-    member x.SampleProj(coord : V2d, lodBias : float) : V4i = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V2f, lodBias : float32) : V4i = onlyInShaderCode "SampleProj"
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : float, level : float) : V4i = onlyInShaderCode "SampleLevel"
+    member x.SampleLevel(coord : float32, level : float32) : V4i = onlyInShaderCode "SampleLevel"
     
     /// sampled texture-lookup with given level and offset
-    member x.SampleLevelOffset(coord : float, level : float, offset : int) : V4i = onlyInShaderCode "SampleLevelOffset"
+    member x.SampleLevelOffset(coord : float32, level : float32, offset : int) : V4i = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : float, dTdx : float, dTdy : float) : V4i = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : float32, dTdx : float32, dTdy : float32) : V4i = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : float) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : float32) : V2f = onlyInShaderCode "QueryLod"
     
     /// non-sampled texture read
     member x.Read(coord : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4i = onlyInShaderCode "Read"
@@ -822,7 +822,7 @@ type IntSampler2dArrayMS(tex : ISemanticValue, state : SamplerState) =
 
     static member Dimension = SamplerDimension.Sampler2d
     static member ValueType = typeof<V4i>
-    static member CoordType = typeof<V2d>
+    static member CoordType = typeof<V2f>
     static member IsArray = true
     static member IsShadow = false
     static member IsMultisampled = true
@@ -848,7 +848,7 @@ type IntSampler2dArray(tex : ISemanticValue, state : SamplerState) =
 
     static member Dimension = SamplerDimension.Sampler2d
     static member ValueType = typeof<V4i>
-    static member CoordType = typeof<V2d>
+    static member CoordType = typeof<V2f>
     static member IsArray = true
     static member IsShadow = false
     static member IsMultisampled = false
@@ -863,34 +863,34 @@ type IntSampler2dArray(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V3i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : V2d, slice : int) : V4i = onlyInShaderCode "Sample"
+    member x.Sample(coord : V2f, slice : int) : V4i = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V2d, slice : int, lodBias : float) : V4i = onlyInShaderCode "Sample"
+    member x.Sample(coord : V2f, slice : int, lodBias : float32) : V4i = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with offset
-    member x.SampleOffset(coord : V2d, slice : int, offset : V2i) : V4i = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : V2f, slice : int, offset : V2i) : V4i = onlyInShaderCode "SampleOffset"
     
     /// regular sampled texture-lookup with offset with lod-bias
-    member x.SampleOffset(coord : V2d, slice : int, offset : V2i, lodBias : float) : V4i = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : V2f, slice : int, offset : V2i, lodBias : float32) : V4i = onlyInShaderCode "SampleOffset"
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, slice : int, level : float) : V4i = onlyInShaderCode "SampleLevel"
+    member x.SampleLevel(coord : V2f, slice : int, level : float32) : V4i = onlyInShaderCode "SampleLevel"
     
     /// sampled texture-lookup with given level and offset
-    member x.SampleLevelOffset(coord : V2d, slice : int, level : float, offset : V2i) : V4i = onlyInShaderCode "SampleLevelOffset"
+    member x.SampleLevelOffset(coord : V2f, slice : int, level : float32, offset : V2i) : V4i = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : V2d, slice : int, dTdx : V2d, dTdy : V2d) : V4i = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : V2f, slice : int, dTdx : V2f, dTdy : V2f) : V4i = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : V2d) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : V2f) : V2f = onlyInShaderCode "QueryLod"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.Gather(coord : V2d, slice : int, [<Optional; DefaultParameterValue(0)>] comp : int) : V4i = onlyInShaderCode "Gather"
+    member x.Gather(coord : V2f, slice : int, [<Optional; DefaultParameterValue(0)>] comp : int) : V4i = onlyInShaderCode "Gather"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.GatherOffset(coord : V2d, slice : int, offset : V2i, [<Optional; DefaultParameterValue(0)>] comp : int) : V4i = onlyInShaderCode "GatherOffset"
+    member x.GatherOffset(coord : V2f, slice : int, offset : V2i, [<Optional; DefaultParameterValue(0)>] comp : int) : V4i = onlyInShaderCode "GatherOffset"
     
     /// non-sampled texture read
     member x.Read(coord : V2i, slice : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4i = onlyInShaderCode "Read"
@@ -907,7 +907,7 @@ type IntSampler2dMS(tex : ISemanticValue, state : SamplerState) =
 
     static member Dimension = SamplerDimension.Sampler2d
     static member ValueType = typeof<V4i>
-    static member CoordType = typeof<V2d>
+    static member CoordType = typeof<V2f>
     static member IsArray = false
     static member IsShadow = false
     static member IsMultisampled = true
@@ -933,7 +933,7 @@ type IntSampler2d(tex : ISemanticValue, state : SamplerState) =
 
     static member Dimension = SamplerDimension.Sampler2d
     static member ValueType = typeof<V4i>
-    static member CoordType = typeof<V2d>
+    static member CoordType = typeof<V2f>
     static member IsArray = false
     static member IsShadow = false
     static member IsMultisampled = false
@@ -948,40 +948,40 @@ type IntSampler2d(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V2i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : V2d) : V4i = onlyInShaderCode "Sample"
+    member x.Sample(coord : V2f) : V4i = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V2d, lodBias : float) : V4i = onlyInShaderCode "Sample"
+    member x.Sample(coord : V2f, lodBias : float32) : V4i = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with offset
-    member x.SampleOffset(coord : V2d, offset : V2i) : V4i = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : V2f, offset : V2i) : V4i = onlyInShaderCode "SampleOffset"
     
     /// regular sampled texture-lookup with offset with lod-bias
-    member x.SampleOffset(coord : V2d, offset : V2i, lodBias : float) : V4i = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : V2f, offset : V2i, lodBias : float32) : V4i = onlyInShaderCode "SampleOffset"
     
     /// projective sampled texture-lookup
-    member x.SampleProj(coord : V3d) : V4i = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V3f) : V4i = onlyInShaderCode "SampleProj"
     
     /// projective sampled texture-lookup with lod-bias
-    member x.SampleProj(coord : V3d, lodBias : float) : V4i = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V3f, lodBias : float32) : V4i = onlyInShaderCode "SampleProj"
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, level : float) : V4i = onlyInShaderCode "SampleLevel"
+    member x.SampleLevel(coord : V2f, level : float32) : V4i = onlyInShaderCode "SampleLevel"
     
     /// sampled texture-lookup with given level and offset
-    member x.SampleLevelOffset(coord : V2d, level : float, offset : V2i) : V4i = onlyInShaderCode "SampleLevelOffset"
+    member x.SampleLevelOffset(coord : V2f, level : float32, offset : V2i) : V4i = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : V2d, dTdx : V2d, dTdy : V2d) : V4i = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : V2f, dTdx : V2f, dTdy : V2f) : V4i = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : V2d) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : V2f) : V2f = onlyInShaderCode "QueryLod"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.Gather(coord : V2d, [<Optional; DefaultParameterValue(0)>] comp : int) : V4i = onlyInShaderCode "Gather"
+    member x.Gather(coord : V2f, [<Optional; DefaultParameterValue(0)>] comp : int) : V4i = onlyInShaderCode "Gather"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.GatherOffset(coord : V2d, offset : V2i, [<Optional; DefaultParameterValue(0)>] comp : int) : V4i = onlyInShaderCode "GatherOffset"
+    member x.GatherOffset(coord : V2f, offset : V2i, [<Optional; DefaultParameterValue(0)>] comp : int) : V4i = onlyInShaderCode "GatherOffset"
     
     /// non-sampled texture read
     member x.Read(coord : V2i, [<Optional; DefaultParameterValue(0)>] lod : int) : V4i = onlyInShaderCode "Read"
@@ -998,7 +998,7 @@ type IntSampler3d(tex : ISemanticValue, state : SamplerState) =
 
     static member Dimension = SamplerDimension.Sampler3d
     static member ValueType = typeof<V4i>
-    static member CoordType = typeof<V3d>
+    static member CoordType = typeof<V3f>
     static member IsArray = false
     static member IsShadow = false
     static member IsMultisampled = false
@@ -1013,34 +1013,34 @@ type IntSampler3d(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V3i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : V3d) : V4i = onlyInShaderCode "Sample"
+    member x.Sample(coord : V3f) : V4i = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V3d, lodBias : float) : V4i = onlyInShaderCode "Sample"
+    member x.Sample(coord : V3f, lodBias : float32) : V4i = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with offset
-    member x.SampleOffset(coord : V3d, offset : V3i) : V4i = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : V3f, offset : V3i) : V4i = onlyInShaderCode "SampleOffset"
     
     /// regular sampled texture-lookup with offset with lod-bias
-    member x.SampleOffset(coord : V3d, offset : V3i, lodBias : float) : V4i = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : V3f, offset : V3i, lodBias : float32) : V4i = onlyInShaderCode "SampleOffset"
     
     /// projective sampled texture-lookup
-    member x.SampleProj(coord : V4d) : V4i = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V4f) : V4i = onlyInShaderCode "SampleProj"
     
     /// projective sampled texture-lookup with lod-bias
-    member x.SampleProj(coord : V4d, lodBias : float) : V4i = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V4f, lodBias : float32) : V4i = onlyInShaderCode "SampleProj"
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, level : float) : V4i = onlyInShaderCode "SampleLevel"
+    member x.SampleLevel(coord : V3f, level : float32) : V4i = onlyInShaderCode "SampleLevel"
     
     /// sampled texture-lookup with given level and offset
-    member x.SampleLevelOffset(coord : V3d, level : float, offset : V3i) : V4i = onlyInShaderCode "SampleLevelOffset"
+    member x.SampleLevelOffset(coord : V3f, level : float32, offset : V3i) : V4i = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : V3d, dTdx : V3d, dTdy : V3d) : V4i = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : V3f, dTdx : V3f, dTdy : V3f) : V4i = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : V3f) : V2f = onlyInShaderCode "QueryLod"
     
     /// non-sampled texture read
     member x.Read(coord : V3i, [<Optional; DefaultParameterValue(0)>] lod : int) : V4i = onlyInShaderCode "Read"
@@ -1057,7 +1057,7 @@ type IntSamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
 
     static member Dimension = SamplerDimension.SamplerCube
     static member ValueType = typeof<V4i>
-    static member CoordType = typeof<V3d>
+    static member CoordType = typeof<V3f>
     static member IsArray = true
     static member IsShadow = false
     static member IsMultisampled = false
@@ -1072,22 +1072,22 @@ type IntSamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V3i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : V3d, slice : int) : V4i = onlyInShaderCode "Sample"
+    member x.Sample(coord : V3f, slice : int) : V4i = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V3d, slice : int, lodBias : float) : V4i = onlyInShaderCode "Sample"
+    member x.Sample(coord : V3f, slice : int, lodBias : float32) : V4i = onlyInShaderCode "Sample"
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, slice : int, level : float) : V4i = onlyInShaderCode "SampleLevel"
+    member x.SampleLevel(coord : V3f, slice : int, level : float32) : V4i = onlyInShaderCode "SampleLevel"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : V3d, slice : int, dTdx : V3d, dTdy : V3d) : V4i = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : V3f, slice : int, dTdx : V3f, dTdy : V3f) : V4i = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : V3f) : V2f = onlyInShaderCode "QueryLod"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.Gather(coord : V3d, slice : int, [<Optional; DefaultParameterValue(0)>] comp : int) : V4i = onlyInShaderCode "Gather"
+    member x.Gather(coord : V3f, slice : int, [<Optional; DefaultParameterValue(0)>] comp : int) : V4i = onlyInShaderCode "Gather"
     
 
 type IntSamplerCube(tex : ISemanticValue, state : SamplerState) =
@@ -1097,7 +1097,7 @@ type IntSamplerCube(tex : ISemanticValue, state : SamplerState) =
 
     static member Dimension = SamplerDimension.SamplerCube
     static member ValueType = typeof<V4i>
-    static member CoordType = typeof<V3d>
+    static member CoordType = typeof<V3f>
     static member IsArray = false
     static member IsShadow = false
     static member IsMultisampled = false
@@ -1112,22 +1112,22 @@ type IntSamplerCube(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V2i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : V3d) : V4i = onlyInShaderCode "Sample"
+    member x.Sample(coord : V3f) : V4i = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V3d, lodBias : float) : V4i = onlyInShaderCode "Sample"
+    member x.Sample(coord : V3f, lodBias : float32) : V4i = onlyInShaderCode "Sample"
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, level : float) : V4i = onlyInShaderCode "SampleLevel"
+    member x.SampleLevel(coord : V3f, level : float32) : V4i = onlyInShaderCode "SampleLevel"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : V3d, dTdx : V3d, dTdy : V3d) : V4i = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : V3f, dTdx : V3f, dTdy : V3f) : V4i = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : V3f) : V2f = onlyInShaderCode "QueryLod"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.Gather(coord : V3d, [<Optional; DefaultParameterValue(0)>] comp : int) : V4i = onlyInShaderCode "Gather"
+    member x.Gather(coord : V3f, [<Optional; DefaultParameterValue(0)>] comp : int) : V4i = onlyInShaderCode "Gather"
     
 
 type UIntSampler1dArray(tex : ISemanticValue, state : SamplerState) =
@@ -1137,7 +1137,7 @@ type UIntSampler1dArray(tex : ISemanticValue, state : SamplerState) =
 
     static member Dimension = SamplerDimension.Sampler1d
     static member ValueType = typeof<V4ui>
-    static member CoordType = typeof<float>
+    static member CoordType = typeof<float32>
     static member IsArray = true
     static member IsShadow = false
     static member IsMultisampled = false
@@ -1152,28 +1152,28 @@ type UIntSampler1dArray(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V2i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : float, slice : int) : V4ui = onlyInShaderCode "Sample"
+    member x.Sample(coord : float32, slice : int) : V4ui = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : float, slice : int, lodBias : float) : V4ui = onlyInShaderCode "Sample"
+    member x.Sample(coord : float32, slice : int, lodBias : float32) : V4ui = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with offset
-    member x.SampleOffset(coord : float, slice : int, offset : int) : V4ui = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : float32, slice : int, offset : int) : V4ui = onlyInShaderCode "SampleOffset"
     
     /// regular sampled texture-lookup with offset with lod-bias
-    member x.SampleOffset(coord : float, slice : int, offset : int, lodBias : float) : V4ui = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : float32, slice : int, offset : int, lodBias : float32) : V4ui = onlyInShaderCode "SampleOffset"
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : float, slice : int, level : float) : V4ui = onlyInShaderCode "SampleLevel"
+    member x.SampleLevel(coord : float32, slice : int, level : float32) : V4ui = onlyInShaderCode "SampleLevel"
     
     /// sampled texture-lookup with given level and offset
-    member x.SampleLevelOffset(coord : float, slice : int, level : float, offset : int) : V4ui = onlyInShaderCode "SampleLevelOffset"
+    member x.SampleLevelOffset(coord : float32, slice : int, level : float32, offset : int) : V4ui = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : float, slice : int, dTdx : float, dTdy : float) : V4ui = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : float32, slice : int, dTdx : float32, dTdy : float32) : V4ui = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : float) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : float32) : V2f = onlyInShaderCode "QueryLod"
     
     /// non-sampled texture read
     member x.Read(coord : int, slice : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4ui = onlyInShaderCode "Read"
@@ -1190,7 +1190,7 @@ type UIntSampler1d(tex : ISemanticValue, state : SamplerState) =
 
     static member Dimension = SamplerDimension.Sampler1d
     static member ValueType = typeof<V4ui>
-    static member CoordType = typeof<float>
+    static member CoordType = typeof<float32>
     static member IsArray = false
     static member IsShadow = false
     static member IsMultisampled = false
@@ -1205,34 +1205,34 @@ type UIntSampler1d(tex : ISemanticValue, state : SamplerState) =
     member x.Size : int = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : float) : V4ui = onlyInShaderCode "Sample"
+    member x.Sample(coord : float32) : V4ui = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : float, lodBias : float) : V4ui = onlyInShaderCode "Sample"
+    member x.Sample(coord : float32, lodBias : float32) : V4ui = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with offset
-    member x.SampleOffset(coord : float, offset : int) : V4ui = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : float32, offset : int) : V4ui = onlyInShaderCode "SampleOffset"
     
     /// regular sampled texture-lookup with offset with lod-bias
-    member x.SampleOffset(coord : float, offset : int, lodBias : float) : V4ui = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : float32, offset : int, lodBias : float32) : V4ui = onlyInShaderCode "SampleOffset"
     
     /// projective sampled texture-lookup
-    member x.SampleProj(coord : V2d) : V4ui = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V2f) : V4ui = onlyInShaderCode "SampleProj"
     
     /// projective sampled texture-lookup with lod-bias
-    member x.SampleProj(coord : V2d, lodBias : float) : V4ui = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V2f, lodBias : float32) : V4ui = onlyInShaderCode "SampleProj"
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : float, level : float) : V4ui = onlyInShaderCode "SampleLevel"
+    member x.SampleLevel(coord : float32, level : float32) : V4ui = onlyInShaderCode "SampleLevel"
     
     /// sampled texture-lookup with given level and offset
-    member x.SampleLevelOffset(coord : float, level : float, offset : int) : V4ui = onlyInShaderCode "SampleLevelOffset"
+    member x.SampleLevelOffset(coord : float32, level : float32, offset : int) : V4ui = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : float, dTdx : float, dTdy : float) : V4ui = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : float32, dTdx : float32, dTdy : float32) : V4ui = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : float) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : float32) : V2f = onlyInShaderCode "QueryLod"
     
     /// non-sampled texture read
     member x.Read(coord : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4ui = onlyInShaderCode "Read"
@@ -1249,7 +1249,7 @@ type UIntSampler2dArrayMS(tex : ISemanticValue, state : SamplerState) =
 
     static member Dimension = SamplerDimension.Sampler2d
     static member ValueType = typeof<V4ui>
-    static member CoordType = typeof<V2d>
+    static member CoordType = typeof<V2f>
     static member IsArray = true
     static member IsShadow = false
     static member IsMultisampled = true
@@ -1275,7 +1275,7 @@ type UIntSampler2dArray(tex : ISemanticValue, state : SamplerState) =
 
     static member Dimension = SamplerDimension.Sampler2d
     static member ValueType = typeof<V4ui>
-    static member CoordType = typeof<V2d>
+    static member CoordType = typeof<V2f>
     static member IsArray = true
     static member IsShadow = false
     static member IsMultisampled = false
@@ -1290,34 +1290,34 @@ type UIntSampler2dArray(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V3i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : V2d, slice : int) : V4ui = onlyInShaderCode "Sample"
+    member x.Sample(coord : V2f, slice : int) : V4ui = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V2d, slice : int, lodBias : float) : V4ui = onlyInShaderCode "Sample"
+    member x.Sample(coord : V2f, slice : int, lodBias : float32) : V4ui = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with offset
-    member x.SampleOffset(coord : V2d, slice : int, offset : V2i) : V4ui = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : V2f, slice : int, offset : V2i) : V4ui = onlyInShaderCode "SampleOffset"
     
     /// regular sampled texture-lookup with offset with lod-bias
-    member x.SampleOffset(coord : V2d, slice : int, offset : V2i, lodBias : float) : V4ui = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : V2f, slice : int, offset : V2i, lodBias : float32) : V4ui = onlyInShaderCode "SampleOffset"
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, slice : int, level : float) : V4ui = onlyInShaderCode "SampleLevel"
+    member x.SampleLevel(coord : V2f, slice : int, level : float32) : V4ui = onlyInShaderCode "SampleLevel"
     
     /// sampled texture-lookup with given level and offset
-    member x.SampleLevelOffset(coord : V2d, slice : int, level : float, offset : V2i) : V4ui = onlyInShaderCode "SampleLevelOffset"
+    member x.SampleLevelOffset(coord : V2f, slice : int, level : float32, offset : V2i) : V4ui = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : V2d, slice : int, dTdx : V2d, dTdy : V2d) : V4ui = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : V2f, slice : int, dTdx : V2f, dTdy : V2f) : V4ui = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : V2d) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : V2f) : V2f = onlyInShaderCode "QueryLod"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.Gather(coord : V2d, slice : int, [<Optional; DefaultParameterValue(0)>] comp : int) : V4ui = onlyInShaderCode "Gather"
+    member x.Gather(coord : V2f, slice : int, [<Optional; DefaultParameterValue(0)>] comp : int) : V4ui = onlyInShaderCode "Gather"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.GatherOffset(coord : V2d, slice : int, offset : V2i, [<Optional; DefaultParameterValue(0)>] comp : int) : V4ui = onlyInShaderCode "GatherOffset"
+    member x.GatherOffset(coord : V2f, slice : int, offset : V2i, [<Optional; DefaultParameterValue(0)>] comp : int) : V4ui = onlyInShaderCode "GatherOffset"
     
     /// non-sampled texture read
     member x.Read(coord : V2i, slice : int, [<Optional; DefaultParameterValue(0)>] lod : int) : V4ui = onlyInShaderCode "Read"
@@ -1334,7 +1334,7 @@ type UIntSampler2dMS(tex : ISemanticValue, state : SamplerState) =
 
     static member Dimension = SamplerDimension.Sampler2d
     static member ValueType = typeof<V4ui>
-    static member CoordType = typeof<V2d>
+    static member CoordType = typeof<V2f>
     static member IsArray = false
     static member IsShadow = false
     static member IsMultisampled = true
@@ -1360,7 +1360,7 @@ type UIntSampler2d(tex : ISemanticValue, state : SamplerState) =
 
     static member Dimension = SamplerDimension.Sampler2d
     static member ValueType = typeof<V4ui>
-    static member CoordType = typeof<V2d>
+    static member CoordType = typeof<V2f>
     static member IsArray = false
     static member IsShadow = false
     static member IsMultisampled = false
@@ -1375,40 +1375,40 @@ type UIntSampler2d(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V2i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : V2d) : V4ui = onlyInShaderCode "Sample"
+    member x.Sample(coord : V2f) : V4ui = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V2d, lodBias : float) : V4ui = onlyInShaderCode "Sample"
+    member x.Sample(coord : V2f, lodBias : float32) : V4ui = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with offset
-    member x.SampleOffset(coord : V2d, offset : V2i) : V4ui = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : V2f, offset : V2i) : V4ui = onlyInShaderCode "SampleOffset"
     
     /// regular sampled texture-lookup with offset with lod-bias
-    member x.SampleOffset(coord : V2d, offset : V2i, lodBias : float) : V4ui = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : V2f, offset : V2i, lodBias : float32) : V4ui = onlyInShaderCode "SampleOffset"
     
     /// projective sampled texture-lookup
-    member x.SampleProj(coord : V3d) : V4ui = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V3f) : V4ui = onlyInShaderCode "SampleProj"
     
     /// projective sampled texture-lookup with lod-bias
-    member x.SampleProj(coord : V3d, lodBias : float) : V4ui = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V3f, lodBias : float32) : V4ui = onlyInShaderCode "SampleProj"
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V2d, level : float) : V4ui = onlyInShaderCode "SampleLevel"
+    member x.SampleLevel(coord : V2f, level : float32) : V4ui = onlyInShaderCode "SampleLevel"
     
     /// sampled texture-lookup with given level and offset
-    member x.SampleLevelOffset(coord : V2d, level : float, offset : V2i) : V4ui = onlyInShaderCode "SampleLevelOffset"
+    member x.SampleLevelOffset(coord : V2f, level : float32, offset : V2i) : V4ui = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : V2d, dTdx : V2d, dTdy : V2d) : V4ui = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : V2f, dTdx : V2f, dTdy : V2f) : V4ui = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : V2d) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : V2f) : V2f = onlyInShaderCode "QueryLod"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.Gather(coord : V2d, [<Optional; DefaultParameterValue(0)>] comp : int) : V4ui = onlyInShaderCode "Gather"
+    member x.Gather(coord : V2f, [<Optional; DefaultParameterValue(0)>] comp : int) : V4ui = onlyInShaderCode "Gather"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.GatherOffset(coord : V2d, offset : V2i, [<Optional; DefaultParameterValue(0)>] comp : int) : V4ui = onlyInShaderCode "GatherOffset"
+    member x.GatherOffset(coord : V2f, offset : V2i, [<Optional; DefaultParameterValue(0)>] comp : int) : V4ui = onlyInShaderCode "GatherOffset"
     
     /// non-sampled texture read
     member x.Read(coord : V2i, [<Optional; DefaultParameterValue(0)>] lod : int) : V4ui = onlyInShaderCode "Read"
@@ -1425,7 +1425,7 @@ type UIntSampler3d(tex : ISemanticValue, state : SamplerState) =
 
     static member Dimension = SamplerDimension.Sampler3d
     static member ValueType = typeof<V4ui>
-    static member CoordType = typeof<V3d>
+    static member CoordType = typeof<V3f>
     static member IsArray = false
     static member IsShadow = false
     static member IsMultisampled = false
@@ -1440,34 +1440,34 @@ type UIntSampler3d(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V3i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : V3d) : V4ui = onlyInShaderCode "Sample"
+    member x.Sample(coord : V3f) : V4ui = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V3d, lodBias : float) : V4ui = onlyInShaderCode "Sample"
+    member x.Sample(coord : V3f, lodBias : float32) : V4ui = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with offset
-    member x.SampleOffset(coord : V3d, offset : V3i) : V4ui = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : V3f, offset : V3i) : V4ui = onlyInShaderCode "SampleOffset"
     
     /// regular sampled texture-lookup with offset with lod-bias
-    member x.SampleOffset(coord : V3d, offset : V3i, lodBias : float) : V4ui = onlyInShaderCode "SampleOffset"
+    member x.SampleOffset(coord : V3f, offset : V3i, lodBias : float32) : V4ui = onlyInShaderCode "SampleOffset"
     
     /// projective sampled texture-lookup
-    member x.SampleProj(coord : V4d) : V4ui = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V4f) : V4ui = onlyInShaderCode "SampleProj"
     
     /// projective sampled texture-lookup with lod-bias
-    member x.SampleProj(coord : V4d, lodBias : float) : V4ui = onlyInShaderCode "SampleProj"
+    member x.SampleProj(coord : V4f, lodBias : float32) : V4ui = onlyInShaderCode "SampleProj"
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, level : float) : V4ui = onlyInShaderCode "SampleLevel"
+    member x.SampleLevel(coord : V3f, level : float32) : V4ui = onlyInShaderCode "SampleLevel"
     
     /// sampled texture-lookup with given level and offset
-    member x.SampleLevelOffset(coord : V3d, level : float, offset : V3i) : V4ui = onlyInShaderCode "SampleLevelOffset"
+    member x.SampleLevelOffset(coord : V3f, level : float32, offset : V3i) : V4ui = onlyInShaderCode "SampleLevelOffset"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : V3d, dTdx : V3d, dTdy : V3d) : V4ui = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : V3f, dTdx : V3f, dTdy : V3f) : V4ui = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : V3f) : V2f = onlyInShaderCode "QueryLod"
     
     /// non-sampled texture read
     member x.Read(coord : V3i, [<Optional; DefaultParameterValue(0)>] lod : int) : V4ui = onlyInShaderCode "Read"
@@ -1484,7 +1484,7 @@ type UIntSamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
 
     static member Dimension = SamplerDimension.SamplerCube
     static member ValueType = typeof<V4ui>
-    static member CoordType = typeof<V3d>
+    static member CoordType = typeof<V3f>
     static member IsArray = true
     static member IsShadow = false
     static member IsMultisampled = false
@@ -1499,22 +1499,22 @@ type UIntSamplerCubeArray(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V3i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : V3d, slice : int) : V4ui = onlyInShaderCode "Sample"
+    member x.Sample(coord : V3f, slice : int) : V4ui = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V3d, slice : int, lodBias : float) : V4ui = onlyInShaderCode "Sample"
+    member x.Sample(coord : V3f, slice : int, lodBias : float32) : V4ui = onlyInShaderCode "Sample"
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, slice : int, level : float) : V4ui = onlyInShaderCode "SampleLevel"
+    member x.SampleLevel(coord : V3f, slice : int, level : float32) : V4ui = onlyInShaderCode "SampleLevel"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : V3d, slice : int, dTdx : V3d, dTdy : V3d) : V4ui = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : V3f, slice : int, dTdx : V3f, dTdy : V3f) : V4ui = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : V3f) : V2f = onlyInShaderCode "QueryLod"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.Gather(coord : V3d, slice : int, [<Optional; DefaultParameterValue(0)>] comp : int) : V4ui = onlyInShaderCode "Gather"
+    member x.Gather(coord : V3f, slice : int, [<Optional; DefaultParameterValue(0)>] comp : int) : V4ui = onlyInShaderCode "Gather"
     
 
 type UIntSamplerCube(tex : ISemanticValue, state : SamplerState) =
@@ -1524,7 +1524,7 @@ type UIntSamplerCube(tex : ISemanticValue, state : SamplerState) =
 
     static member Dimension = SamplerDimension.SamplerCube
     static member ValueType = typeof<V4ui>
-    static member CoordType = typeof<V3d>
+    static member CoordType = typeof<V3f>
     static member IsArray = false
     static member IsShadow = false
     static member IsMultisampled = false
@@ -1539,22 +1539,22 @@ type UIntSamplerCube(tex : ISemanticValue, state : SamplerState) =
     member x.Size : V2i = onlyInShaderCode "Size"
     
     /// regular sampled texture-lookup
-    member x.Sample(coord : V3d) : V4ui = onlyInShaderCode "Sample"
+    member x.Sample(coord : V3f) : V4ui = onlyInShaderCode "Sample"
     
     /// regular sampled texture-lookup with lod-bias
-    member x.Sample(coord : V3d, lodBias : float) : V4ui = onlyInShaderCode "Sample"
+    member x.Sample(coord : V3f, lodBias : float32) : V4ui = onlyInShaderCode "Sample"
     
     /// sampled texture-lookup with given level
-    member x.SampleLevel(coord : V3d, level : float) : V4ui = onlyInShaderCode "SampleLevel"
+    member x.SampleLevel(coord : V3f, level : float32) : V4ui = onlyInShaderCode "SampleLevel"
     
     /// sampled texture-lookup with explicit gradients
-    member x.SampleGrad(coord : V3d, dTdx : V3d, dTdy : V3d) : V4ui = onlyInShaderCode "SampleGrad"
+    member x.SampleGrad(coord : V3f, dTdx : V3f, dTdy : V3f) : V4ui = onlyInShaderCode "SampleGrad"
     
     /// query lod levels
-    member x.QueryLod(coord : V3d) : V2d = onlyInShaderCode "QueryLod"
+    member x.QueryLod(coord : V3f) : V2f = onlyInShaderCode "QueryLod"
     
     /// gathers one component for the neighbouring 4 texels
-    member x.Gather(coord : V3d, [<Optional; DefaultParameterValue(0)>] comp : int) : V4ui = onlyInShaderCode "Gather"
+    member x.Gather(coord : V3f, [<Optional; DefaultParameterValue(0)>] comp : int) : V4ui = onlyInShaderCode "Gather"
     
 
 [<AutoOpen>]
@@ -1857,11 +1857,11 @@ module SamplerBuilders =
     let uintSamplerCube = UIntSamplerCubeBuilder()
     
 
-type Image1dArray<'f when 'f :> Formats.IFloatingFormat>() =
+type Image1dArray<'Format when 'Format :> Formats.IFloatingFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.Sampler1d
-    static member ValueType = typeof<V4d>
+    static member ValueType = typeof<V4f>
     static member CoordType = typeof<int>
     static member IsArray = true
     static member IsMultisampled = false
@@ -1869,23 +1869,23 @@ type Image1dArray<'f when 'f :> Formats.IFloatingFormat>() =
     member x.Size : V2i = onlyInShaderCode "Size"
     
     /// load single texel from image
-    member x.Load(coord : int, slice : int) : V4d = onlyInShaderCode "Load"
+    member x.Load(coord : int, slice : int) : V4f = onlyInShaderCode "Load"
     
     /// write single texel into image
     [<FShade.Imperative.KeepCall>]
-    member x.Store(coord : int, slice : int, data : V4d) : unit = onlyInShaderCode "Store"
+    member x.Store(coord : int, slice : int, data : V4f) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
-        with get (coord : int, slice : int) : V4d = onlyInShaderCode "Load"
-        and set (coord : int, slice : int) (data : V4d) : unit = onlyInShaderCode "Store"
+        with get (coord : int, slice : int) : V4f = onlyInShaderCode "Load"
+        and set (coord : int, slice : int) (data : V4f) : unit = onlyInShaderCode "Store"
     
 
-type Image1d<'f when 'f :> Formats.IFloatingFormat>() =
+type Image1d<'Format when 'Format :> Formats.IFloatingFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.Sampler1d
-    static member ValueType = typeof<V4d>
+    static member ValueType = typeof<V4f>
     static member CoordType = typeof<int>
     static member IsArray = false
     static member IsMultisampled = false
@@ -1893,23 +1893,23 @@ type Image1d<'f when 'f :> Formats.IFloatingFormat>() =
     member x.Size : int = onlyInShaderCode "Size"
     
     /// load single texel from image
-    member x.Load(coord : int) : V4d = onlyInShaderCode "Load"
+    member x.Load(coord : int) : V4f = onlyInShaderCode "Load"
     
     /// write single texel into image
     [<FShade.Imperative.KeepCall>]
-    member x.Store(coord : int, data : V4d) : unit = onlyInShaderCode "Store"
+    member x.Store(coord : int, data : V4f) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
-        with get (coord : int) : V4d = onlyInShaderCode "Load"
-        and set (coord : int) (data : V4d) : unit = onlyInShaderCode "Store"
+        with get (coord : int) : V4f = onlyInShaderCode "Load"
+        and set (coord : int) (data : V4f) : unit = onlyInShaderCode "Store"
     
 
-type Image2dArrayMS<'f when 'f :> Formats.IFloatingFormat>() =
+type Image2dArrayMS<'Format when 'Format :> Formats.IFloatingFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.Sampler2d
-    static member ValueType = typeof<V4d>
+    static member ValueType = typeof<V4f>
     static member CoordType = typeof<V2i>
     static member IsArray = true
     static member IsMultisampled = true
@@ -1920,23 +1920,23 @@ type Image2dArrayMS<'f when 'f :> Formats.IFloatingFormat>() =
     member x.Samples : int = onlyInShaderCode "Samples"
     
     /// load single texel from image
-    member x.Load(coord : V2i, slice : int, sample : int) : V4d = onlyInShaderCode "Load"
+    member x.Load(coord : V2i, slice : int, sample : int) : V4f = onlyInShaderCode "Load"
     
     /// write single texel into image
     [<FShade.Imperative.KeepCall>]
-    member x.Store(coord : V2i, slice : int, sample : int, data : V4d) : unit = onlyInShaderCode "Store"
+    member x.Store(coord : V2i, slice : int, sample : int, data : V4f) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
-        with get (coord : V2i, slice : int, sample : int) : V4d = onlyInShaderCode "Load"
-        and set (coord : V2i, slice : int, sample : int) (data : V4d) : unit = onlyInShaderCode "Store"
+        with get (coord : V2i, slice : int, sample : int) : V4f = onlyInShaderCode "Load"
+        and set (coord : V2i, slice : int, sample : int) (data : V4f) : unit = onlyInShaderCode "Store"
     
 
-type Image2dArray<'f when 'f :> Formats.IFloatingFormat>() =
+type Image2dArray<'Format when 'Format :> Formats.IFloatingFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.Sampler2d
-    static member ValueType = typeof<V4d>
+    static member ValueType = typeof<V4f>
     static member CoordType = typeof<V2i>
     static member IsArray = true
     static member IsMultisampled = false
@@ -1944,23 +1944,23 @@ type Image2dArray<'f when 'f :> Formats.IFloatingFormat>() =
     member x.Size : V3i = onlyInShaderCode "Size"
     
     /// load single texel from image
-    member x.Load(coord : V2i, slice : int) : V4d = onlyInShaderCode "Load"
+    member x.Load(coord : V2i, slice : int) : V4f = onlyInShaderCode "Load"
     
     /// write single texel into image
     [<FShade.Imperative.KeepCall>]
-    member x.Store(coord : V2i, slice : int, data : V4d) : unit = onlyInShaderCode "Store"
+    member x.Store(coord : V2i, slice : int, data : V4f) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
-        with get (coord : V2i, slice : int) : V4d = onlyInShaderCode "Load"
-        and set (coord : V2i, slice : int) (data : V4d) : unit = onlyInShaderCode "Store"
+        with get (coord : V2i, slice : int) : V4f = onlyInShaderCode "Load"
+        and set (coord : V2i, slice : int) (data : V4f) : unit = onlyInShaderCode "Store"
     
 
-type Image2dMS<'f when 'f :> Formats.IFloatingFormat>() =
+type Image2dMS<'Format when 'Format :> Formats.IFloatingFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.Sampler2d
-    static member ValueType = typeof<V4d>
+    static member ValueType = typeof<V4f>
     static member CoordType = typeof<V2i>
     static member IsArray = false
     static member IsMultisampled = true
@@ -1971,23 +1971,23 @@ type Image2dMS<'f when 'f :> Formats.IFloatingFormat>() =
     member x.Samples : int = onlyInShaderCode "Samples"
     
     /// load single texel from image
-    member x.Load(coord : V2i, sample : int) : V4d = onlyInShaderCode "Load"
+    member x.Load(coord : V2i, sample : int) : V4f = onlyInShaderCode "Load"
     
     /// write single texel into image
     [<FShade.Imperative.KeepCall>]
-    member x.Store(coord : V2i, sample : int, data : V4d) : unit = onlyInShaderCode "Store"
+    member x.Store(coord : V2i, sample : int, data : V4f) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
-        with get (coord : V2i, sample : int) : V4d = onlyInShaderCode "Load"
-        and set (coord : V2i, sample : int) (data : V4d) : unit = onlyInShaderCode "Store"
+        with get (coord : V2i, sample : int) : V4f = onlyInShaderCode "Load"
+        and set (coord : V2i, sample : int) (data : V4f) : unit = onlyInShaderCode "Store"
     
 
-type Image2d<'f when 'f :> Formats.IFloatingFormat>() =
+type Image2d<'Format when 'Format :> Formats.IFloatingFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.Sampler2d
-    static member ValueType = typeof<V4d>
+    static member ValueType = typeof<V4f>
     static member CoordType = typeof<V2i>
     static member IsArray = false
     static member IsMultisampled = false
@@ -1995,23 +1995,23 @@ type Image2d<'f when 'f :> Formats.IFloatingFormat>() =
     member x.Size : V2i = onlyInShaderCode "Size"
     
     /// load single texel from image
-    member x.Load(coord : V2i) : V4d = onlyInShaderCode "Load"
+    member x.Load(coord : V2i) : V4f = onlyInShaderCode "Load"
     
     /// write single texel into image
     [<FShade.Imperative.KeepCall>]
-    member x.Store(coord : V2i, data : V4d) : unit = onlyInShaderCode "Store"
+    member x.Store(coord : V2i, data : V4f) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
-        with get (coord : V2i) : V4d = onlyInShaderCode "Load"
-        and set (coord : V2i) (data : V4d) : unit = onlyInShaderCode "Store"
+        with get (coord : V2i) : V4f = onlyInShaderCode "Load"
+        and set (coord : V2i) (data : V4f) : unit = onlyInShaderCode "Store"
     
 
-type Image3d<'f when 'f :> Formats.IFloatingFormat>() =
+type Image3d<'Format when 'Format :> Formats.IFloatingFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.Sampler3d
-    static member ValueType = typeof<V4d>
+    static member ValueType = typeof<V4f>
     static member CoordType = typeof<V3i>
     static member IsArray = false
     static member IsMultisampled = false
@@ -2019,23 +2019,23 @@ type Image3d<'f when 'f :> Formats.IFloatingFormat>() =
     member x.Size : V3i = onlyInShaderCode "Size"
     
     /// load single texel from image
-    member x.Load(coord : V3i) : V4d = onlyInShaderCode "Load"
+    member x.Load(coord : V3i) : V4f = onlyInShaderCode "Load"
     
     /// write single texel into image
     [<FShade.Imperative.KeepCall>]
-    member x.Store(coord : V3i, data : V4d) : unit = onlyInShaderCode "Store"
+    member x.Store(coord : V3i, data : V4f) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
-        with get (coord : V3i) : V4d = onlyInShaderCode "Load"
-        and set (coord : V3i) (data : V4d) : unit = onlyInShaderCode "Store"
+        with get (coord : V3i) : V4f = onlyInShaderCode "Load"
+        and set (coord : V3i) (data : V4f) : unit = onlyInShaderCode "Store"
     
 
-type ImageCubeArray<'f when 'f :> Formats.IFloatingFormat>() =
+type ImageCubeArray<'Format when 'Format :> Formats.IFloatingFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.SamplerCube
-    static member ValueType = typeof<V4d>
+    static member ValueType = typeof<V4f>
     static member CoordType = typeof<V2i>
     static member IsArray = true
     static member IsMultisampled = false
@@ -2043,23 +2043,23 @@ type ImageCubeArray<'f when 'f :> Formats.IFloatingFormat>() =
     member x.Size : V3i = onlyInShaderCode "Size"
     
     /// load single texel from image
-    member x.Load(coord : V2i, layerFace : int) : V4d = onlyInShaderCode "Load"
+    member x.Load(coord : V2i, layerFace : int) : V4f = onlyInShaderCode "Load"
     
     /// write single texel into image
     [<FShade.Imperative.KeepCall>]
-    member x.Store(coord : V2i, layerFace : int, data : V4d) : unit = onlyInShaderCode "Store"
+    member x.Store(coord : V2i, layerFace : int, data : V4f) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
-        with get (coord : V2i, layerFace : int) : V4d = onlyInShaderCode "Load"
-        and set (coord : V2i, layerFace : int) (data : V4d) : unit = onlyInShaderCode "Store"
+        with get (coord : V2i, layerFace : int) : V4f = onlyInShaderCode "Load"
+        and set (coord : V2i, layerFace : int) (data : V4f) : unit = onlyInShaderCode "Store"
     
 
-type ImageCube<'f when 'f :> Formats.IFloatingFormat>() =
+type ImageCube<'Format when 'Format :> Formats.IFloatingFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.SamplerCube
-    static member ValueType = typeof<V4d>
+    static member ValueType = typeof<V4f>
     static member CoordType = typeof<V2i>
     static member IsArray = false
     static member IsMultisampled = false
@@ -2067,21 +2067,21 @@ type ImageCube<'f when 'f :> Formats.IFloatingFormat>() =
     member x.Size : V2i = onlyInShaderCode "Size"
     
     /// load single texel from image
-    member x.Load(coord : V2i, face : int) : V4d = onlyInShaderCode "Load"
+    member x.Load(coord : V2i, face : int) : V4f = onlyInShaderCode "Load"
     
     /// write single texel into image
     [<FShade.Imperative.KeepCall>]
-    member x.Store(coord : V2i, face : int, data : V4d) : unit = onlyInShaderCode "Store"
+    member x.Store(coord : V2i, face : int, data : V4f) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
-        with get (coord : V2i, face : int) : V4d = onlyInShaderCode "Load"
-        and set (coord : V2i, face : int) (data : V4d) : unit = onlyInShaderCode "Store"
+        with get (coord : V2i, face : int) : V4f = onlyInShaderCode "Load"
+        and set (coord : V2i, face : int) (data : V4f) : unit = onlyInShaderCode "Store"
     
 
-type IntImage1dArray<'f when 'f :> Formats.ISignedFormat>() =
+type IntImage1dArray<'Format when 'Format :> Formats.ISignedFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.Sampler1d
     static member ValueType = typeof<V4i>
     static member CoordType = typeof<int>
@@ -2127,9 +2127,9 @@ type IntImage1dArray<'f when 'f :> Formats.ISignedFormat>() =
     member x.AtomicCompareExchange(coord : int, slice : int, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
     
 
-type IntImage1d<'f when 'f :> Formats.ISignedFormat>() =
+type IntImage1d<'Format when 'Format :> Formats.ISignedFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.Sampler1d
     static member ValueType = typeof<V4i>
     static member CoordType = typeof<int>
@@ -2175,9 +2175,9 @@ type IntImage1d<'f when 'f :> Formats.ISignedFormat>() =
     member x.AtomicCompareExchange(coord : int, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
     
 
-type IntImage2dArrayMS<'f when 'f :> Formats.ISignedFormat>() =
+type IntImage2dArrayMS<'Format when 'Format :> Formats.ISignedFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.Sampler2d
     static member ValueType = typeof<V4i>
     static member CoordType = typeof<V2i>
@@ -2226,9 +2226,9 @@ type IntImage2dArrayMS<'f when 'f :> Formats.ISignedFormat>() =
     member x.AtomicCompareExchange(coord : V2i, slice : int, sample : int, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
     
 
-type IntImage2dArray<'f when 'f :> Formats.ISignedFormat>() =
+type IntImage2dArray<'Format when 'Format :> Formats.ISignedFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.Sampler2d
     static member ValueType = typeof<V4i>
     static member CoordType = typeof<V2i>
@@ -2274,9 +2274,9 @@ type IntImage2dArray<'f when 'f :> Formats.ISignedFormat>() =
     member x.AtomicCompareExchange(coord : V2i, slice : int, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
     
 
-type IntImage2dMS<'f when 'f :> Formats.ISignedFormat>() =
+type IntImage2dMS<'Format when 'Format :> Formats.ISignedFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.Sampler2d
     static member ValueType = typeof<V4i>
     static member CoordType = typeof<V2i>
@@ -2325,9 +2325,9 @@ type IntImage2dMS<'f when 'f :> Formats.ISignedFormat>() =
     member x.AtomicCompareExchange(coord : V2i, sample : int, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
     
 
-type IntImage2d<'f when 'f :> Formats.ISignedFormat>() =
+type IntImage2d<'Format when 'Format :> Formats.ISignedFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.Sampler2d
     static member ValueType = typeof<V4i>
     static member CoordType = typeof<V2i>
@@ -2373,9 +2373,9 @@ type IntImage2d<'f when 'f :> Formats.ISignedFormat>() =
     member x.AtomicCompareExchange(coord : V2i, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
     
 
-type IntImage3d<'f when 'f :> Formats.ISignedFormat>() =
+type IntImage3d<'Format when 'Format :> Formats.ISignedFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.Sampler3d
     static member ValueType = typeof<V4i>
     static member CoordType = typeof<V3i>
@@ -2421,9 +2421,9 @@ type IntImage3d<'f when 'f :> Formats.ISignedFormat>() =
     member x.AtomicCompareExchange(coord : V3i, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
     
 
-type IntImageCubeArray<'f when 'f :> Formats.ISignedFormat>() =
+type IntImageCubeArray<'Format when 'Format :> Formats.ISignedFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.SamplerCube
     static member ValueType = typeof<V4i>
     static member CoordType = typeof<V2i>
@@ -2469,9 +2469,9 @@ type IntImageCubeArray<'f when 'f :> Formats.ISignedFormat>() =
     member x.AtomicCompareExchange(coord : V2i, layerFace : int, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
     
 
-type IntImageCube<'f when 'f :> Formats.ISignedFormat>() =
+type IntImageCube<'Format when 'Format :> Formats.ISignedFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.SamplerCube
     static member ValueType = typeof<V4i>
     static member CoordType = typeof<V2i>
@@ -2517,9 +2517,9 @@ type IntImageCube<'f when 'f :> Formats.ISignedFormat>() =
     member x.AtomicCompareExchange(coord : V2i, face : int, cmp : int, data : int) : int = onlyInShaderCode "AtomicCompareExchange"
     
 
-type UIntImage1dArray<'f when 'f :> Formats.IUnsignedFormat>() =
+type UIntImage1dArray<'Format when 'Format :> Formats.IUnsignedFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.Sampler1d
     static member ValueType = typeof<V4ui>
     static member CoordType = typeof<int>
@@ -2565,9 +2565,9 @@ type UIntImage1dArray<'f when 'f :> Formats.IUnsignedFormat>() =
     member x.AtomicCompareExchange(coord : int, slice : int, cmp : uint, data : uint) : uint = onlyInShaderCode "AtomicCompareExchange"
     
 
-type UIntImage1d<'f when 'f :> Formats.IUnsignedFormat>() =
+type UIntImage1d<'Format when 'Format :> Formats.IUnsignedFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.Sampler1d
     static member ValueType = typeof<V4ui>
     static member CoordType = typeof<int>
@@ -2613,9 +2613,9 @@ type UIntImage1d<'f when 'f :> Formats.IUnsignedFormat>() =
     member x.AtomicCompareExchange(coord : int, cmp : uint, data : uint) : uint = onlyInShaderCode "AtomicCompareExchange"
     
 
-type UIntImage2dArrayMS<'f when 'f :> Formats.IUnsignedFormat>() =
+type UIntImage2dArrayMS<'Format when 'Format :> Formats.IUnsignedFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.Sampler2d
     static member ValueType = typeof<V4ui>
     static member CoordType = typeof<V2i>
@@ -2664,9 +2664,9 @@ type UIntImage2dArrayMS<'f when 'f :> Formats.IUnsignedFormat>() =
     member x.AtomicCompareExchange(coord : V2i, slice : int, sample : int, cmp : uint, data : uint) : uint = onlyInShaderCode "AtomicCompareExchange"
     
 
-type UIntImage2dArray<'f when 'f :> Formats.IUnsignedFormat>() =
+type UIntImage2dArray<'Format when 'Format :> Formats.IUnsignedFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.Sampler2d
     static member ValueType = typeof<V4ui>
     static member CoordType = typeof<V2i>
@@ -2712,9 +2712,9 @@ type UIntImage2dArray<'f when 'f :> Formats.IUnsignedFormat>() =
     member x.AtomicCompareExchange(coord : V2i, slice : int, cmp : uint, data : uint) : uint = onlyInShaderCode "AtomicCompareExchange"
     
 
-type UIntImage2dMS<'f when 'f :> Formats.IUnsignedFormat>() =
+type UIntImage2dMS<'Format when 'Format :> Formats.IUnsignedFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.Sampler2d
     static member ValueType = typeof<V4ui>
     static member CoordType = typeof<V2i>
@@ -2763,9 +2763,9 @@ type UIntImage2dMS<'f when 'f :> Formats.IUnsignedFormat>() =
     member x.AtomicCompareExchange(coord : V2i, sample : int, cmp : uint, data : uint) : uint = onlyInShaderCode "AtomicCompareExchange"
     
 
-type UIntImage2d<'f when 'f :> Formats.IUnsignedFormat>() =
+type UIntImage2d<'Format when 'Format :> Formats.IUnsignedFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.Sampler2d
     static member ValueType = typeof<V4ui>
     static member CoordType = typeof<V2i>
@@ -2811,9 +2811,9 @@ type UIntImage2d<'f when 'f :> Formats.IUnsignedFormat>() =
     member x.AtomicCompareExchange(coord : V2i, cmp : uint, data : uint) : uint = onlyInShaderCode "AtomicCompareExchange"
     
 
-type UIntImage3d<'f when 'f :> Formats.IUnsignedFormat>() =
+type UIntImage3d<'Format when 'Format :> Formats.IUnsignedFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.Sampler3d
     static member ValueType = typeof<V4ui>
     static member CoordType = typeof<V3i>
@@ -2859,9 +2859,9 @@ type UIntImage3d<'f when 'f :> Formats.IUnsignedFormat>() =
     member x.AtomicCompareExchange(coord : V3i, cmp : uint, data : uint) : uint = onlyInShaderCode "AtomicCompareExchange"
     
 
-type UIntImageCubeArray<'f when 'f :> Formats.IUnsignedFormat>() =
+type UIntImageCubeArray<'Format when 'Format :> Formats.IUnsignedFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.SamplerCube
     static member ValueType = typeof<V4ui>
     static member CoordType = typeof<V2i>
@@ -2907,9 +2907,9 @@ type UIntImageCubeArray<'f when 'f :> Formats.IUnsignedFormat>() =
     member x.AtomicCompareExchange(coord : V2i, layerFace : int, cmp : uint, data : uint) : uint = onlyInShaderCode "AtomicCompareExchange"
     
 
-type UIntImageCube<'f when 'f :> Formats.IUnsignedFormat>() =
+type UIntImageCube<'Format when 'Format :> Formats.IUnsignedFormat>() =
     interface IImage
-    static member FormatType = typeof<'f>
+    static member FormatType = typeof<'Format>
     static member Dimension = SamplerDimension.SamplerCube
     static member ValueType = typeof<V4ui>
     static member CoordType = typeof<V2i>

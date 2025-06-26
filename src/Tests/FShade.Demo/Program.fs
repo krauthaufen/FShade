@@ -59,10 +59,10 @@ module Shader =
             id : int
 
             [<Semantic("Average")>]
-            avg : float
+            avg : float32
 
             [<Semantic("StdDev")>]
-            stddev : float
+            stddev : float32
 
             [<Semantic("Surface")>]
             surface : int
@@ -79,8 +79,8 @@ module Shader =
             let id = getVertexId()
             return {
                 id = ~~~uniform.RegionBuffer.[id].Id
-                avg = float uniform.RegionBuffer.[id].Average
-                stddev = float uniform.RegionBuffer.[id].StdDev
+                avg = uniform.RegionBuffer.[id].Average
+                stddev = uniform.RegionBuffer.[id].StdDev
                 surface = uniform.RegionBuffer.[id].SurfaceCount
                 count = uniform.RegionBuffer.[id].Count
             }
@@ -101,7 +101,7 @@ let compileEffect (e : list<Effect>) =
                 let outputs = shader.shaderOutputs |> Map.map (fun name p -> p.paramType, newId())
                 shader.shaderStage, outputs
             | None ->
-                ShaderStage.Fragment, Map.ofList ["Colors", (typeof<V4d>, 0)]
+                ShaderStage.Fragment, Map.ofList ["Colors", (typeof<V4f>, 0)]
 
     let glsl =
         e |> Effect.toModule { EffectConfig.empty with lastStage = lastStage; outputs = outputs } |> ModuleCompiler.compileGLSL410
@@ -111,7 +111,7 @@ let compileEffect (e : list<Effect>) =
     glsl
 
 
-type Vertex = { [<Position>] pos : V4d }
+type Vertex = { [<Position>] pos : V4f }
 
 let shaderA (v : Vertex) =
     fragment {
@@ -122,28 +122,28 @@ let shaderA (v : Vertex) =
 
 let funny (v : Vertex) =
     vertex {
-        if v.pos.X > 0.0 then
+        if v.pos.X > 0.0f then
             let Positions = v.pos.W + v.pos.X
             let (a,b) = 
-                let v = 2.0 * v.pos
-                (v.X, v.Y + 1.0 + Positions)
-            return { v with pos = V4d(a,b,b,a) }
+                let v = 2.0f * v.pos
+                (v.X, v.Y + 1.0f + Positions)
+            return { v with pos = V4f(a,b,b,a) }
         else
-            return { pos = V4d.Zero }
+            return { pos = V4f.Zero }
     }
 
 
 type Fragment = 
     {
-        [<Color>] c : V4d
-        [<Depth(DepthWriteMode.OnlyLess)>] d : float
+        [<Color>] c : V4f
+        [<Depth(DepthWriteMode.OnlyLess)>] d : float32
     }
 
 let fraggy (v : Vertex) =
     fragment {
         return {
-            c = V4d.IIII
-            d = 0.5
+            c = V4f.IIII
+            d = 0.5f
         }
     }
 
@@ -154,11 +154,11 @@ let fraggy (v : Vertex) =
 
 //type Result =
 //    {
-//        value : V4d
+//        value : V4f
 //    }
 
 //type Ray =
-//    { origin : V3d; direction : V3d }
+//    { origin : V3f; direction : V3f }
 
 ////type Scene =
 ////    | Self
@@ -183,9 +183,9 @@ let fraggy (v : Vertex) =
 
 //    type UniformScope with
 //        member x.Index : int[][] = uniform?StorageBuffer?Index
-//        member x.Positions : V4d[][] = uniform?StorageBuffer?Positions
-//        member x.Colors : V4d[][] = uniform?StorageBuffer?Colors
-//        member x.TexCoords : V2d[][] = uniform?StorageBuffer?TexCoords
+//        member x.Positions : V4f[][] = uniform?StorageBuffer?Positions
+//        member x.Colors : V4f[][] = uniform?StorageBuffer?Colors
+//        member x.TexCoords : V2f[][] = uniform?StorageBuffer?TexCoords
 
 //let sammy =
 //    sampler2d {
@@ -206,7 +206,7 @@ let fraggy (v : Vertex) =
 //        let i1 = buffers.Index.[gi].[3 * state.primitiveId + 1]
 //        let i2 = buffers.Index.[gi].[3 * state.primitiveId + 2]
 
-//        let c = V3d(state.coord.X, state.coord.Y, 1.0 - state.coord.X - state.coord.Y)
+//        let c = V3f(state.coord.X, state.coord.Y, 1.0 - state.coord.X - state.coord.Y)
 //        let tc = c.X * buffers.TexCoords.[gi].[i0] + c.Y * buffers.TexCoords.[gi].[i1] + c.Z * buffers.TexCoords.[gi].[i2]
 
 //        let hitty = state.query.origin + state.rayT * state.query.direction
@@ -216,7 +216,7 @@ let fraggy (v : Vertex) =
 //                tmin = 666.0
 //                scene = state.query.scene
 //                origin = hitty
-//                direction = V3d.OOI
+//                direction = V3f.OOI
 //                payload = state.query.payload
 //                tmax = 1337.0
 //            }
@@ -226,7 +226,7 @@ let fraggy (v : Vertex) =
 //                tmin = 666.0
 //                scene = RayScene.RayScene "Hugo"
 //                origin = hitty
-//                direction = V3d.OOI
+//                direction = V3f.OOI
 //                payload = state.query.payload
 //                tmax = 1337.0
 //            }
@@ -234,7 +234,7 @@ let fraggy (v : Vertex) =
 //        return { 
 //            value = 
 //                if res2.ishit then sammy.Sample(tc) * res.value
-//                else V4d.IIII
+//                else V4f.IIII
 //        }
 //    }
 
@@ -377,14 +377,14 @@ module RaytracingTest =
 
     type Payload =
         {
-            foo : float
+            foo : float32
             flag : bool
         }
 
     type CallableData =
         {
             flag : bool
-            value : float
+            value : float32
         }
 
     let scene =
@@ -393,35 +393,35 @@ module RaytracingTest =
     let callableShader (input : RayCallableInput<CallableData>) =
         callable {
             if input.data.flag then
-                return { value = 0.5; flag = false }
+                return { value = 0.5f; flag = false }
             else
-                return { value = 1.0; flag = false }
+                return { value = 1.0f; flag = false }
         }
 
     let intersectionShader (input : RayIntersectionInput) =
         intersection {
-            Intersection.Report(0.5, true, RayHitKind.FrontFacingTriangle) |> ignore
+            Intersection.Report(0.5f, true, RayHitKind.FrontFacingTriangle) |> ignore
         }
 
     let missShader (input : RayMissInput<Payload>) =
         miss {
             if input.payload.flag then
-                return { foo = 1.0; flag = false }
+                return { foo = 1.0f; flag = false }
             else
-                return { foo = 0.0; flag = false }
+                return { foo = 0.0f; flag = false }
         }
 
     let anyHitShader (input : RayHitInput<Payload>) =
         anyHit {
-            if input.ray.direction = V3d.Zero then
+            if input.ray.direction = V3f.Zero then
                 ignoreIntersection()
-            elif input.hit.attribute.X = 0.0 then
+            elif input.hit.attribute.X = 0.0f then
                 terminateRay()
         }
 
     let closestHitShader (input : RayHitInput<Payload>) =
         closestHit {
-            let whatever = scene.TraceRay(V3d.Zero, V3d.XAxis)
+            let whatever = scene.TraceRay(V3f.Zero, V3f.XAxis)
             return { foo = input.hit.attribute.X; flag = whatever }
         }
 
@@ -431,9 +431,9 @@ module RaytracingTest =
         let missType = Sym.ofString "missMain"
 
         raygen {
-            let whatever = Callable.Execute({ flag = true; value = 0.0 })
-            let result = scene.TraceRay<Payload>(scene.TraceRay<V3d>(V3d.Zero, V3d.ZAxis, V3d.One), V3d.YAxis, miss = missType, ray = rayType, flags = secondaryRayFlags)
-            uniform.OutputBuffer.[input.work.id.XY] <- V4d(result.foo + whatever.value)
+            let whatever = Callable.Execute({ flag = true; value = 0.0f })
+            let result = scene.TraceRay<Payload>(scene.TraceRay<V3f>(V3f.Zero, V3f.ZAxis, V3f.One), V3f.YAxis, miss = missType, ray = rayType, flags = secondaryRayFlags)
+            uniform.OutputBuffer.[input.work.id.XY] <- V4f(result.foo + whatever.value)
         }
 [<AutoOpen>]
 module IOExtensions =
@@ -485,19 +485,19 @@ module IOExtensions =
 let main args =
     Aardvark.Init()
 
-    let f = System.IO.Path.GetTempFileName()
-    do
-        use f = System.IO.File.OpenWrite f
-        f.Write (Span [|V3d.III; V3d.OIO; V3d.IIO|])
-
-
-    do 
-        use f = System.IO.File.OpenRead f
-        let arr = Array.zeroCreate<V3d> (int (f.Length / int64 sizeof<V3d>))
-        f.ReadSafe(Span arr)
-        printfn "%A" arr
-
-    exit 0
+    // let f = System.IO.Path.GetTempFileName()
+    // do
+    //     use f = System.IO.File.OpenWrite f
+    //     f.Write (Span [|V3f.III; V3f.OIO; V3f.IIO|])
+    //
+    //
+    // do
+    //     use f = System.IO.File.OpenRead f
+    //     let arr = Array.zeroCreate<V3f> (int (f.Length / int64 sizeof<V3f>))
+    //     f.ReadSafe(Span arr)
+    //     printfn "%A" arr
+    //
+    // exit 0
 
 
     let effect =
@@ -523,7 +523,7 @@ let main args =
     Log.start "GLSL"
     let lines = glsl.code.Split("\r\n") |> Array.indexed
 
-    let digits = log10 (float lines.Length) |> ceil |> int
+    let digits = log10 (float32 lines.Length) |> ceil |> int
     for (i, l) in lines do
         let i = 
             let v = string (i + 1)

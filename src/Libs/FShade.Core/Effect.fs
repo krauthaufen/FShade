@@ -119,7 +119,7 @@ type EffectConfig =
         /// Target depth range for optional depth range mapping.
         /// The final depth will be mapped from [-1, 1] to the target range.
         /// If the target range is [-1, 1] no mapping will be performed.
-        depthRange          : Range1d
+        depthRange          : Range1f
 
         /// Indicates whether the y-component of vertex clip cooridnates is to be inverted.
         flipHandedness      : bool
@@ -135,7 +135,7 @@ type EffectConfig =
 module EffectConfig =
     let empty =
         {
-            depthRange      = Range1d(-1.0, 1.0)
+            depthRange      = Range1f(-1.0f, 1.0f)
             flipHandedness  = false
             lastStage       = ShaderStage.Fragment
             outputs         = Map.empty
@@ -682,14 +682,14 @@ module Effect =
             |> Map.map (fun _ -> f)
             |> ofMap
 
-    let private withDepthRange (flipHandedness : bool) (range : Range1d) (effect : Effect) =
+    let private withDepthRange (flipHandedness : bool) (range : Range1f) (effect : Effect) =
         Serializer.Init()
-        if flipHandedness || range.Min <> -1.0 || range.Max <> 1.0 then
+        if flipHandedness || range.Min <> -1.0f || range.Max <> 1.0f then
             let convertValue (v : ShaderOutputValue) =
                 let ie = v.Value
 
                 let newZ =
-                    if range.Min <> -1.0 || range.Max <> 1.0 then
+                    if range.Min <> -1.0f || range.Max <> 1.0f then
                         //   newZ = a * z + b * w
                         // due to projective division:
                         //   max = (a * w + b * w) / w
@@ -702,17 +702,17 @@ module Effect =
                         // so finally we get:
                         //   a = (max - min) / 2
                         //   b = (max + min) / 2
-                        let a = range.Size / 2.0
-                        let b = (range.Min + range.Max) / 2.0
-                        if a = b then <@@ a * ((%%ie : V4d).Z + (%%ie : V4d).W) @@>
-                        else <@@ a * (%%ie : V4d).Z + b * (%%ie : V4d).W @@>
+                        let a = range.Size / 2.0f
+                        let b = (range.Min + range.Max) / 2.0f
+                        if a = b then <@@ a * ((%%ie : V4f).Z + (%%ie : V4f).W) @@>
+                        else <@@ a * (%%ie : V4f).Z + b * (%%ie : V4f).W @@>
                     else  
-                        <@@ (%%ie : V4d).Z @@>
+                        <@@ (%%ie : V4f).Z @@>
 
                 if flipHandedness then
-                    v |> ShaderOutputValue.withValue <@@ V4d((%%ie : V4d).X, -(%%ie : V4d).Y, %%newZ, (%%ie : V4d).W)  @@>
+                    v |> ShaderOutputValue.withValue <@@ V4f((%%ie : V4f).X, -(%%ie : V4f).Y, %%newZ, (%%ie : V4f).W)  @@>
                 else
-                    v |> ShaderOutputValue.withValue <@@ V4d((%%ie : V4d).X, (%%ie : V4d).Y, %%newZ, (%%ie : V4d).W)  @@>
+                    v |> ShaderOutputValue.withValue <@@ V4f((%%ie : V4f).X, (%%ie : V4f).Y, %%newZ, (%%ie : V4f).W)  @@>
 
             match lastPrimShader effect with
                 | Some shader ->

@@ -7,8 +7,8 @@ open FShade.Tests
 
 type Vertex =
     {
-        [<Position>] pos : V4d
-        [<Color>] c : V4d
+        [<Position>] pos : V4f
+        [<Color>] c : V4f
     }
 
 [<AutoOpen>]
@@ -153,7 +153,7 @@ let ``Load``() =
 
     let fs (v : Vertex) =
         fragment {
-            let mutable c = V4d.Zero
+            let mutable c = V4f.Zero
             c <- c + uniform.Img1D.Load(1)                      + uniform.Img1D.[1]
             c <- c + uniform.Img1DArray.Load(0, 1)              + uniform.Img1DArray.[0, 1]
             c <- c + uniform.Img2D.Load V2i.Zero                + uniform.Img2D.[V2i.Zero]
@@ -197,25 +197,25 @@ let ``Store``() =
 
     let fs (v : Vertex) =
         fragment {
-            uniform.Img1D.Store(1, V4d.Zero)
-            uniform.Img1DArray.Store(0, 1, V4d.Zero)
-            uniform.Img2D.Store(V2i.Zero, V4d.Zero)
-            uniform.Img2DArray.Store(V2i.Zero, 1, V4d.Zero)
-            uniform.Img3D.Store(V3i.Zero, V4d.Zero)
-            uniform.ImgCube.Store(V2i.Zero, 3, V4d.Zero)
-            uniform.ImgCubeArray.Store(V2i.Zero, 4, V4d.Zero)
-            uniform.Img2DMS.Store(V2i.Zero, 0, V4d.Zero)
-            uniform.Img2DArrayMS.Store(V2i.Zero, 1, 0, V4d.Zero)
+            uniform.Img1D.Store(1, V4f.Zero)
+            uniform.Img1DArray.Store(0, 1, V4f.Zero)
+            uniform.Img2D.Store(V2i.Zero, V4f.Zero)
+            uniform.Img2DArray.Store(V2i.Zero, 1, V4f.Zero)
+            uniform.Img3D.Store(V3i.Zero, V4f.Zero)
+            uniform.ImgCube.Store(V2i.Zero, 3, V4f.Zero)
+            uniform.ImgCubeArray.Store(V2i.Zero, 4, V4f.Zero)
+            uniform.Img2DMS.Store(V2i.Zero, 0, V4f.Zero)
+            uniform.Img2DArrayMS.Store(V2i.Zero, 1, 0, V4f.Zero)
 
-            uniform.Img1D.[1] <- V4d.Zero
-            uniform.Img1DArray.[0, 1] <- V4d.Zero
-            uniform.Img2D.[V2i.Zero] <- V4d.Zero
-            uniform.Img2DArray.[V2i.Zero, 1] <- V4d.Zero
-            uniform.Img3D.[V3i.Zero] <- V4d.Zero
-            uniform.ImgCube.[V2i.Zero, 3] <- V4d.Zero
-            uniform.ImgCubeArray.[V2i.Zero, 4] <- V4d.Zero
-            uniform.Img2DMS.[V2i.Zero, 0] <- V4d.Zero
-            uniform.Img2DArrayMS.[V2i.Zero, 1, 0] <- V4d.Zero
+            uniform.Img1D.[1] <- V4f.Zero
+            uniform.Img1DArray.[0, 1] <- V4f.Zero
+            uniform.Img2D.[V2i.Zero] <- V4f.Zero
+            uniform.Img2DArray.[V2i.Zero, 1] <- V4f.Zero
+            uniform.Img3D.[V3i.Zero] <- V4f.Zero
+            uniform.ImgCube.[V2i.Zero, 3] <- V4f.Zero
+            uniform.ImgCubeArray.[V2i.Zero, 4] <- V4f.Zero
+            uniform.Img2DMS.[V2i.Zero, 0] <- V4f.Zero
+            uniform.Img2DArrayMS.[V2i.Zero, 1, 0] <- V4f.Zero
 
             uniform.IntImg1D.Store(1, V4i.Zero)
             uniform.IntImg1DArray.Store(0, 1, V4i.Zero)
@@ -257,7 +257,7 @@ let ``Store``() =
             uniform.UIntImg2DMS.[V2i.Zero, 0] <- V4ui.Zero
             uniform.UIntImg2DArrayMS.[V2i.Zero, 1, 0] <- V4ui.Zero
 
-            return V3d.Zero
+            return V3f.Zero
         }
 
     GLSL.shouldCompile [Effect.ofFunction fs]
@@ -288,7 +288,7 @@ let ``AtomicAdd``() =
             let _ = uniform.UIntImg2DMS.AtomicAdd(V2i.Zero, 0, 0u)
             let _ = uniform.UIntImg2DArrayMS.AtomicAdd(V2i.Zero, 1, 0, 0u)
 
-            return V3d.Zero
+            return V3f.Zero
         }
 
     GLSL.shouldCompile [Effect.ofFunction fs]
@@ -319,7 +319,7 @@ let ``AtomicMin``() =
             let _ = uniform.UIntImg2DMS.AtomicMin(V2i.Zero, 0, 0u)
             let _ = uniform.UIntImg2DArrayMS.AtomicMin(V2i.Zero, 1, 0, 0u)
 
-            return V3d.Zero
+            return V3f.Zero
         }
 
     GLSL.shouldCompile [Effect.ofFunction fs]
@@ -350,7 +350,7 @@ let ``AtomicMax``() =
             let _ = uniform.UIntImg2DMS.AtomicMax(V2i.Zero, 0, 0u)
             let _ = uniform.UIntImg2DArrayMS.AtomicMax(V2i.Zero, 1, 0, 0u)
 
-            return V3d.Zero
+            return V3f.Zero
         }
 
     GLSL.shouldCompile [Effect.ofFunction fs]
@@ -381,7 +381,7 @@ let ``AtomicAnd``() =
             let _ = uniform.UIntImg2DMS.AtomicAnd(V2i.Zero, 0, 0u)
             let _ = uniform.UIntImg2DArrayMS.AtomicAnd(V2i.Zero, 1, 0, 0u)
 
-            return V3d.Zero
+            return V3f.Zero
         }
 
     GLSL.shouldCompile [Effect.ofFunction fs]
@@ -412,7 +412,7 @@ let ``AtomicOr``() =
             let _ = uniform.UIntImg2DMS.AtomicOr(V2i.Zero, 0, 0u)
             let _ = uniform.UIntImg2DArrayMS.AtomicOr(V2i.Zero, 1, 0, 0u)
 
-            return V3d.Zero
+            return V3f.Zero
         }
 
     GLSL.shouldCompile [Effect.ofFunction fs]
@@ -443,7 +443,7 @@ let ``AtomicXor``() =
             let _ = uniform.UIntImg2DMS.AtomicXor(V2i.Zero, 0, 0u)
             let _ = uniform.UIntImg2DArrayMS.AtomicXor(V2i.Zero, 1, 0, 0u)
 
-            return V3d.Zero
+            return V3f.Zero
         }
 
     GLSL.shouldCompile [Effect.ofFunction fs]
@@ -474,7 +474,7 @@ let ``AtomicExchange``() =
             let _ = uniform.UIntImg2DMS.AtomicExchange(V2i.Zero, 0, 0u)
             let _ = uniform.UIntImg2DArrayMS.AtomicExchange(V2i.Zero, 1, 0, 0u)
 
-            return V3d.Zero
+            return V3f.Zero
         }
 
     GLSL.shouldCompile [Effect.ofFunction fs]
@@ -505,7 +505,7 @@ let ``AtomicCompareExchange``() =
             let _ = uniform.UIntImg2DMS.AtomicCompareExchange(V2i.Zero, 0, 42u, 0u)
             let _ = uniform.UIntImg2DArrayMS.AtomicCompareExchange(V2i.Zero, 1, 0, 42u, 0u)
 
-            return V3d.Zero
+            return V3f.Zero
         }
 
     GLSL.shouldCompile [Effect.ofFunction fs]
@@ -556,7 +556,7 @@ let ``Formats``() =
             let _ = uniform.Img_r16i.Load 0
             let _ = uniform.Img_r8i.Load 0
 
-            return V3d.Zero
+            return V3f.Zero
         }
 
     GLSL.shouldCompile [Effect.ofFunction fs]

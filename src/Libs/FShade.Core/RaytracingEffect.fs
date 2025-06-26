@@ -20,8 +20,8 @@ module RaytracingIntrinsics =
     let traceRay (accelerationStructure : IAccelerationStructure)
                  (rayFlags : RayFlags) (cullMask : int)
                  (sbtRecordOffset : int) (sbtRecordStride : int) (missIndex : int)
-                 (origin : V3d) (minT : float)
-                 (direction : V3d) (maxT : float)
+                 (origin : V3f) (minT : float32)
+                 (direction : V3f) (maxT : float32)
                  (payload : int) : unit =
         onlyInShaderCode "traceRay"
 

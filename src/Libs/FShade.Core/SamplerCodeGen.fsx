@@ -98,7 +98,7 @@ type Write private() =
 
         if (variants &&& SampleVariants.Bias) <> SampleVariants.None then
             line "/// %s with lod-bias" comment
-            line "member x.%s(%s, lodBias : float) : %s = onlyInShaderCode \"%s\"" name args returnType name
+            line "member x.%s(%s, lodBias : float32) : %s = onlyInShaderCode \"%s\"" name args returnType name
             line ""
 
     static member MemberFunction(name : string, arguments : list<string * string>, returnType : string,
@@ -148,8 +148,8 @@ type Write private() =
 
 let floatVec (c : int) =
     match c with
-        | 1 -> "float"
-        | n -> sprintf "V%dd" n
+        | 1 -> "float32"
+        | n -> sprintf "V%df" n
 
 let intVec (c : int) =
     match c with
@@ -191,15 +191,15 @@ let run() =
         let returnType =
             match t with
             | SamplerType.Float -> 
-                if s then "float"
-                else "V4d"
+                if s then "float32"
+                else "V4f"
             | SamplerType.Int -> "V4i"
             | SamplerType.UInt -> "V4ui"
             | _ -> failwith "unknown sampler baseType"
 
         let gatherReturnType =
             match t with
-            | SamplerType.Float -> "V4d"
+            | SamplerType.Float -> "V4f"
             | SamplerType.Int -> "V4i"
             | SamplerType.UInt -> "V4ui"
             | _ -> failwith "unknown sampler baseType"
@@ -310,7 +310,7 @@ let run() =
         if not m && not (s && d = SamplerDimension.SamplerCube) && not (s && a && d = SamplerDimension.Sampler2d) then
             Write.MemberFunction(
                 "SampleLevel",
-                (["coord", coordType] @ additionalArgs @ ["level", "float"]),
+                (["coord", coordType] @ additionalArgs @ ["level", "float32"]),
                 returnType,
                 comment = "sampled texture-lookup with given level"
             )
@@ -319,7 +319,7 @@ let run() =
         if not m && d <> SamplerDimension.SamplerCube && not (s && a && d = SamplerDimension.Sampler2d) then
             Write.MemberFunction(
                 "SampleLevelOffset",
-                (["coord", coordType] @ additionalArgs @ ["level", "float"; "offset", texelCoordType]),
+                (["coord", coordType] @ additionalArgs @ ["level", "float32"; "offset", texelCoordType]),
                 returnType,
                 comment = "sampled texture-lookup with given level and offset"
             )
@@ -338,7 +338,7 @@ let run() =
             Write.MemberFunction(
                 "QueryLod",
                 ["coord", coordType],
-                "V2d",
+                "V2f",
                 comment = "query lod levels"
             )
 
@@ -470,7 +470,7 @@ let run() =
 
         let returnType =
             match t with
-                | SamplerType.Float -> "V4d"
+                | SamplerType.Float -> "V4f"
                 | SamplerType.Int -> "V4i"
                 | SamplerType.UInt -> "V4ui"
                 | _ -> failwith "unknown image baseType"
@@ -503,11 +503,11 @@ let run() =
                 | SamplerType.UInt -> "Formats.IUnsignedFormat"
                 | _ -> ""
 
-        start "type %s<'f when 'f :> %s>() =" name iface
+        start "type %s<'Format when 'Format :> %s>() =" name iface
         
         line "interface IImage"
         
-        line  "static member FormatType = typeof<'f>"
+        line  "static member FormatType = typeof<'Format>"
         line  "static member Dimension = SamplerDimension.Sampler%s" dim
         line  "static member ValueType = typeof<%s>" returnType
         line  "static member CoordType = typeof<%s>" coordType

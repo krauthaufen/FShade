@@ -40,7 +40,7 @@ module Primitives =
 
         static member VertexCount = 2
         static member InputTopology = InputTopology.Line
-        member x.Interpolate(coord : float) : 'v = onlyInShaderCode "read"
+        member x.Interpolate(coord : float32) : 'v = onlyInShaderCode "read"
 
     type Triangle<'a> = Triangle of 'a * 'a * 'a with
         interface Primitive<'a>
@@ -59,7 +59,7 @@ module Primitives =
 
         static member VertexCount = 3
         static member InputTopology = InputTopology.Triangle
-        member x.Interpolate(coord : V3d) : 'v = onlyInShaderCode "read"
+        member x.Interpolate(coord : V3f) : 'v = onlyInShaderCode "read"
 
     type LineAdjacency<'a> = Triangle of 'a * 'a * 'a * 'a with
         interface Primitive<'a>
@@ -120,11 +120,11 @@ module Primitives =
         member x.P2 : 'a = onlyInShaderCode "read"
 
 
-        member x.TessCoord : V3d = onlyInShaderCode "read"
+        member x.TessCoord : V3f = onlyInShaderCode "read"
 
         static member VertexCount = 3
         static member InputTopology = InputTopology.Patch 3
-        member x.Interpolate(coord : V3d) : 'v = onlyInShaderCode "read"
+        member x.Interpolate(coord : V3f) : 'v = onlyInShaderCode "read"
 
     type Patch4<'a> = Patch4 of 'a * 'a * 'a * 'a with
         interface Primitive<'a>
@@ -142,11 +142,11 @@ module Primitives =
         [<PrimitiveIndex(3)>]
         member x.P3 : 'a = onlyInShaderCode "read"
 
-        member x.TessCoord : V3d = onlyInShaderCode "read"
+        member x.TessCoord : V3f = onlyInShaderCode "read"
 
         static member VertexCount = 4
         static member InputTopology = InputTopology.Patch 4
-        member x.Interpolate(coord : V2d) : 'v = onlyInShaderCode "read"
+        member x.Interpolate(coord : V2f) : 'v = onlyInShaderCode "read"
 
     type Patch<'d, 'a when 'd :> INatural>() =
         static let dim = Peano.getSize typeof<'d>
@@ -198,60 +198,60 @@ module Primitives =
     let discard () : unit = onlyInShaderCode "discard"
 
     [<ReflectedDefinition>]
-    let packUnorm2x16 (v : V2d) : uint32 =
-        let h = (clamp 0.0 1.0 v.X) * 65535.0 |> round |> uint32
-        let l = (clamp 0.0 1.0 v.Y) * 65535.0 |> round |> uint32
+    let packUnorm2x16 (v : V2f) : uint32 =
+        let h = (clamp 0.0f 1.0f v.X) * 65535.0f |> round |> uint32
+        let l = (clamp 0.0f 1.0f v.Y) * 65535.0f |> round |> uint32
         (h <<< 16) ||| l
 
     [<ReflectedDefinition>]
-    let packSnorm2x16 (v : V2d) : uint32 = 
-        let h = (clamp 0.0 1.0 (0.5 * v.X + 0.5)) * 65535.0 |> round |> uint32
-        let l = (clamp 0.0 1.0 (0.5 * v.Y + 0.5)) * 65535.0 |> round |> uint32
+    let packSnorm2x16 (v : V2f) : uint32 =
+        let h = (clamp 0.0f 1.0f (0.5f * v.X + 0.5f)) * 65535.0f |> round |> uint32
+        let l = (clamp 0.0f 1.0f (0.5f * v.Y + 0.5f)) * 65535.0f |> round |> uint32
         (h <<< 16) ||| l
 
     [<ReflectedDefinition>]
-    let packUnorm4x8 (v : V4d) : uint32 =
-        let r = (clamp 0.0 1.0 v.X) * 255.0 |> round |> uint32
-        let g = (clamp 0.0 1.0 v.Y) * 255.0 |> round |> uint32
-        let b = (clamp 0.0 1.0 v.Z) * 255.0 |> round |> uint32
-        let a = (clamp 0.0 1.0 v.W) * 255.0 |> round |> uint32
+    let packUnorm4x8 (v : V4f) : uint32 =
+        let r = (clamp 0.0f 1.0f v.X) * 255.0f |> round |> uint32
+        let g = (clamp 0.0f 1.0f v.Y) * 255.0f |> round |> uint32
+        let b = (clamp 0.0f 1.0f v.Z) * 255.0f |> round |> uint32
+        let a = (clamp 0.0f 1.0f v.W) * 255.0f |> round |> uint32
         (r <<< 24) ||| (g <<< 16) ||| (b <<< 8) ||| a
         
     [<ReflectedDefinition>]
-    let packSnorm4x8 (v : V4d) : uint32 = 
-        let r = (clamp 0.0 1.0 (0.5 * v.X + 0.5)) * 255.0 |> round |> uint32
-        let g = (clamp 0.0 1.0 (0.5 * v.Y + 0.5)) * 255.0 |> round |> uint32
-        let b = (clamp 0.0 1.0 (0.5 * v.Z + 0.5)) * 255.0 |> round |> uint32
-        let a = (clamp 0.0 1.0 (0.5 * v.W + 0.5)) * 255.0 |> round |> uint32
+    let packSnorm4x8 (v : V4f) : uint32 =
+        let r = (clamp 0.0f 1.0f (0.5f * v.X + 0.5f)) * 255.0f |> round |> uint32
+        let g = (clamp 0.0f 1.0f (0.5f * v.Y + 0.5f)) * 255.0f |> round |> uint32
+        let b = (clamp 0.0f 1.0f (0.5f * v.Z + 0.5f)) * 255.0f |> round |> uint32
+        let a = (clamp 0.0f 1.0f (0.5f * v.W + 0.5f)) * 255.0f |> round |> uint32
         (r <<< 24) ||| (g <<< 16) ||| (b <<< 8) ||| a
         
     [<ReflectedDefinition>]
-    let unpackUnorm2x16 (v : uint32) : V2d =
-        let x = float (v >>> 16) / 65535.0
-        let y = float (v &&& 0xFFFFu) / 65535.0
-        V2d(x,y)
+    let unpackUnorm2x16 (v : uint32) : V2f =
+        let x = float32 (v >>> 16) / 65535.0f
+        let y = float32 (v &&& 0xFFFFu) / 65535.0f
+        V2f(x,y)
         
     [<ReflectedDefinition>]
-    let unpackSnorm2x16 (v : uint32) : V2d = 
-        let x = float (v >>> 16) / 65535.0
-        let y = float (v &&& 0xFFFFu) / 65535.0
-        V2d(2.0 * x - 1.0, 2.0 * y - 1.0)
+    let unpackSnorm2x16 (v : uint32) : V2f =
+        let x = float32 (v >>> 16) / 65535.0f
+        let y = float32 (v &&& 0xFFFFu) / 65535.0f
+        V2f(2.0f * x - 1.0f, 2.0f * y - 1.0f)
         
     [<ReflectedDefinition>]
-    let unpackUnorm4x8 (v : uint32) : V4d = 
-        let x = float (v >>> 24) / 255.0
-        let y = float ((v >>> 16) &&& 0xFFu) / 255.0
-        let z = float ((v >>> 8) &&& 0xFFu) / 255.0
-        let w = float (v &&& 0xFFu) / 255.0
-        V4d(x,y,z,w)
+    let unpackUnorm4x8 (v : uint32) : V4f =
+        let x = float32 (v >>> 24) / 255.0f
+        let y = float32 ((v >>> 16) &&& 0xFFu) / 255.0f
+        let z = float32 ((v >>> 8) &&& 0xFFu) / 255.0f
+        let w = float32 (v &&& 0xFFu) / 255.0f
+        V4f(x,y,z,w)
         
     [<ReflectedDefinition>]
-    let unpackSnorm4x8 (v : uint32) : V4d = 
-        let x = float (v >>> 24) / 255.0
-        let y = float ((v >>> 16) &&& 0xFFu) / 255.0
-        let z = float ((v >>> 8) &&& 0xFFu) / 255.0
-        let w = float (v &&& 0xFFu) / 255.0
-        V4d(2.0 * x - 1.0, 2.0 * y - 1.0, 2.0 * z - 1.0, 2.0 * w - 1.0)
+    let unpackSnorm4x8 (v : uint32) : V4f =
+        let x = float32 (v >>> 24) / 255.0f
+        let y = float32 ((v >>> 16) &&& 0xFFu) / 255.0f
+        let z = float32 ((v >>> 8) &&& 0xFFu) / 255.0f
+        let w = float32 (v &&& 0xFFu) / 255.0f
+        V4f(2.0f * x - 1.0f, 2.0f * y - 1.0f, 2.0f * z - 1.0f, 2.0f * w - 1.0f)
 
     [<AbstractClass; Sealed>]
     type Bitwise private() = 
@@ -286,10 +286,10 @@ module Primitives =
         static member LSB(v : int64) : int = onlyInShaderCode "LSB"
 
 
-        static member FloatBitsToInt(v : float) : int = onlyInShaderCode "FloatBitsToInt"
-        static member FloatBitsToUInt(v : float) : uint32 = onlyInShaderCode "FloatBitsToUInt"
-        static member IntBitsToFloat(v : int) : float = onlyInShaderCode "IntBitsToFloat"
-        static member UIntBitsToFloat(v : uint32) : float = onlyInShaderCode "UIntBitsToFloat"
+        static member FloatBitsToInt(v : float32) : int = onlyInShaderCode "FloatBitsToInt"
+        static member FloatBitsToUInt(v : float32) : uint32 = onlyInShaderCode "FloatBitsToUInt"
+        static member IntBitsToFloat(v : int) : float32 = onlyInShaderCode "IntBitsToFloat"
+        static member UIntBitsToFloat(v : uint32) : float32 = onlyInShaderCode "UIntBitsToFloat"
 
 
 
@@ -302,7 +302,7 @@ module Primitives =
     let barrier() : unit = onlyInShaderCode "barrier"
     let allocateShared<'a when 'a : unmanaged> (size : int) : 'a[] =  onlyInShaderCode "allocateShared"
 
-    let reportIntersection(t : float, hitKind : RayHitKind) : bool = onlyInShaderCode "reportIntersection"
+    let reportIntersection(t : float32, hitKind : RayHitKind) : bool = onlyInShaderCode "reportIntersection"
     let ignoreIntersection() : unit = onlyInShaderCode "ignoreIntersection"
     let terminateRay() : unit = onlyInShaderCode "terminateRay"
 
@@ -349,7 +349,7 @@ module Primitives =
 
     type TessCoord<'a> = class end
 
-    let tessellateTriangle (li : float) (l01 : float, l12 : float, l20 : float) : TessCoord<V3d> =
+    let tessellateTriangle (li : float32) (l01 : float32, l12 : float32, l20 : float32) : TessCoord<V3f> =
         onlyInShaderCode "tessellateTriangle"
         
     /// lu:  Inner tessellation level in horizontal (u) direction
@@ -358,7 +358,7 @@ module Primitives =
     /// l03: Outer tessellation level for edge defined by v=0 (i.e. edge 3-0)
     /// l23: Outer tessellation level for edge defined by u=1 (i.e. edge 2-3)
     /// l30: Outer tessellation level for edge defined by v=1 (i.e. edge 1-2)
-    let tessellateQuad (lu : float, lv : float) (l01 : float, l30 : float, l23 : float, l12 : float) : TessCoord<V2d> =
+    let tessellateQuad (lu : float32, lv : float32) (l01 : float32, l30 : float32, l23 : float32, l12 : float32) : TessCoord<V2f> =
         onlyInShaderCode "tessellateQuad"
 
 

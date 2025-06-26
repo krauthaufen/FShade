@@ -7,14 +7,14 @@ open NUnit.Framework
 open FShade.Tests
 
 type UniformScope with
-    member x.SomeUniform : V3d = uniform?SomeUniform
+    member x.SomeUniform : V3f = uniform?SomeUniform
     member x.OutputBuffer : Image2d<Formats.rgba32f> = uniform?OutputBuffer
     member x.Flags : RayFlags = uniform?Flags
-    member x.SomeAttribute : V3d[] = uniform?StorageBuffer?SomeAttribute
+    member x.SomeAttribute : V3f[] = uniform?StorageBuffer?SomeAttribute
 
 type Payload =
     {
-        color : V3d
+        color : V3f
         depth : int
     }
 
@@ -24,15 +24,15 @@ let scene =
 [<ReflectedDefinition>]
 let trace (input : RayHitInput<Payload>) =
     if input.payload.depth < 16 then
-        let payload = { color = V3d.Zero; depth = input.payload.depth + 1}
+        let payload = { color = V3f.Zero; depth = input.payload.depth + 1}
         let result = scene.TraceRay(input.ray.origin, input.ray.direction, payload, flags = uniform.Flags)
         result.color
     else
-        V3d.Zero
+        V3f.Zero
 
 [<ReflectedDefinition>]
 let whatever() =
-    V4d(uniform.SomeUniform, 1.0)
+    V4f(uniform.SomeUniform, 1.0f)
 
 
 [<Test>]
@@ -51,9 +51,9 @@ let ``Reflected functions``() =
 
     let chitShaderShadow (input : RayHitInput<Payload>) =
         closestHit {
-            let shadowed = scene.TraceRay<bool>(V3d.Zero, V3d.XAxis)
+            let shadowed = scene.TraceRay<bool>(V3f.Zero, V3f.XAxis)
             if shadowed then
-                return { color = V3d.Zero; depth = 0 }
+                return { color = V3f.Zero; depth = 0 }
             else
                 return { color = trace input; depth = 0 }
         }
@@ -185,7 +185,7 @@ let ``Intersection shader with custom hit kind``() =
 
     let intersectionShader (input : RayIntersectionInput)=
         intersection {
-            Intersection.Report(0.5, RayHitKind.SomeWeirdStuff) |> ignore
+            Intersection.Report(0.5f, RayHitKind.SomeWeirdStuff) |> ignore
         }
 
     let hitgroupMain =
@@ -212,8 +212,8 @@ let ``Ray type based on enum``() =
 
     let raygenShader (input : MyEnum) =
         raygen {
-            scene.TraceRay<int>(V3d.Zero, V3d.ZAxis, ray = if float ((input &&& MyEnum.A) <<< 2) <> 123.0 then "Yay" else "Nay") |> ignore
-            scene.TraceRay<int>(V3d.Zero, V3d.ZAxis, ray = if uint8 ((input ^^^ MyEnum.A) >>> 2) <> 123uy then "Nay" else "Yay") |> ignore
+            scene.TraceRay<int>(V3f.Zero, V3f.ZAxis, ray = if float ((input &&& MyEnum.A) <<< 2) <> 123.0 then "Yay" else "Nay") |> ignore
+            scene.TraceRay<int>(V3f.Zero, V3f.ZAxis, ray = if uint8 ((input ^^^ MyEnum.A) >>> 2) <> 123uy then "Nay" else "Yay") |> ignore
         }
 
     let effect =
@@ -229,7 +229,7 @@ let ``Ray type based on SRTP``() =
 
     let raygenShader =
         raygen {
-            scene.TraceRay<int>(V3d.Zero, V3d.ZAxis, ray = if atanh 0.0 = 0.0 then "Yay" else "Nay") |> ignore
+            scene.TraceRay<int>(V3f.Zero, V3f.ZAxis, ray = if atanh 0.0 = 0.0 then "Yay" else "Nay") |> ignore
         }
 
     let effect =

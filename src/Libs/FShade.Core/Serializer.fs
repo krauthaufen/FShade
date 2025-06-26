@@ -1859,15 +1859,15 @@ module Serializer =
                 let maxLod = 
                     match src.ReadByte() with
                     | 0uy -> None
-                    | _ -> Some (src.ReadDouble())
+                    | _ -> Some (src.ReadSingle())
                 let minLod = 
                     match src.ReadByte() with
                     | 0uy -> None
-                    | _ -> Some (src.ReadDouble())
+                    | _ -> Some (src.ReadSingle())
                 let mipLodBias = 
                     match src.ReadByte() with
                     | 0uy -> None
-                    | _ -> Some (src.ReadDouble())
+                    | _ -> Some (src.ReadSingle())
 
                 {
                     AddressU = addressU

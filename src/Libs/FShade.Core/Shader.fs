@@ -981,8 +981,8 @@ module Preprocessor =
         let private traceRay (scene : IAccelerationStructure)
                              (cullMask : int) (flags : RayFlags)
                              (rayId : string) (missId : string)
-                             (origin : V3d) (minT : float)
-                             (direction : V3d) (maxT : float)
+                             (origin : V3f) (minT : float32)
+                             (direction : V3f) (maxT : float32)
                              (payload : int) : unit =
             onlyInShaderCode "traceRayStub"
 
@@ -1014,9 +1014,9 @@ module Preprocessor =
     module private ExprExtensions =
         open TypeInfo.Patterns
 
-        let private toFloat = getMethodInfo <@ float : int -> float @>
+        let private toDouble = getMethodInfo <@ float : int -> float @>
 
-        let private floatVecType = [|
+        let private doubleVecType = [|
                 typeof<V2d>
                 typeof<V3d>
                 typeof<V4d>
@@ -1066,17 +1066,17 @@ module Preprocessor =
                     let mi = MethodInfo.op_division.MakeGenericMethod(a.Type, b.Type, b.Type)
                     Expr.Call(mi, [a; b])
 
-            static member ToFloat(expr : Expr) =
+            static member ToDouble(expr : Expr) =
                 match expr.Type with
                 | FloatingPoint -> expr
 
                 | VectorOf(dim, _) ->
-                    let vdt = floatVecType.[dim - 2]
+                    let vdt = doubleVecType.[dim - 2]
                     let ctor = vdt.GetConstructor [| expr.Type |]
                     Expr.NewObject(ctor, [expr])
 
                 | _ ->
-                    let tf = toFloat.MakeGenericMethod expr.Type
+                    let tf = toDouble.MakeGenericMethod expr.Type
                     Expr.Call(tf, [expr])
 
             static member And(a : Expr, b : Expr) =
@@ -1492,9 +1492,9 @@ module Preprocessor =
             | InvLerp [a; b; y] ->
                 // Convert to floating point if input is integral
                 // E.g invLerp : int32 -> int32 -> int32 -> float
-                let! a = preprocessNormalS (Expr.ToFloat a)
-                let! b = preprocessNormalS (Expr.ToFloat b)
-                let! y = preprocessNormalS (Expr.ToFloat y)
+                let! a = preprocessNormalS (Expr.ToDouble a)
+                let! b = preprocessNormalS (Expr.ToDouble b)
+                let! y = preprocessNormalS (Expr.ToDouble y)
 
                 let ta = Var("tmp", y.Type)
 
@@ -1749,9 +1749,9 @@ module Preprocessor =
                 do! State.setBuilder b
 
                 let coord = 
-                    let c = Expr.ReadInput(ParameterKind.Input, typeof<V3d>, Intrinsics.TessCoord)
+                    let c = Expr.ReadInput(ParameterKind.Input, typeof<V3f>, Intrinsics.TessCoord)
                     if var.Type = c.Type then c
-                    else <@@ (%%c : V3d).XY @@>
+                    else <@@ (%%c : V3f).XY @@>
 
                 let tev = Expr.Let(var, coord, tev)
 
@@ -1783,13 +1783,13 @@ module Preprocessor =
                     | _ ->
                         failwithf "[FShade] invalid shader(s) after tessellate-call: %A" tev
 
-                do! State.writeOutput Intrinsics.TessLevelInner { paramType = typeof<float[]>; paramInterpolation = InterpolationMode.Default }
-                do! State.writeOutput Intrinsics.TessLevelOuter { paramType = typeof<float[]>; paramInterpolation = InterpolationMode.Default }
+                do! State.writeOutput Intrinsics.TessLevelInner { paramType = typeof<float32[]>; paramInterpolation = InterpolationMode.Default }
+                do! State.writeOutput Intrinsics.TessLevelOuter { paramType = typeof<float32[]>; paramInterpolation = InterpolationMode.Default }
 
                 return 
                     Expr.WriteOutputs [
-                        yield Intrinsics.TessLevelInner, None, Expr.NewArray(typeof<float>, inner)
-                        yield Intrinsics.TessLevelOuter, None, Expr.NewArray(typeof<float>, outer)
+                        yield Intrinsics.TessLevelInner, None, Expr.NewArray(typeof<float32>, inner)
+                        yield Intrinsics.TessLevelOuter, None, Expr.NewArray(typeof<float32>, outer)
                         yield! free |> List.map (fun (v,_) -> v.Name, None, Expr.Var v)
                     ]
 
@@ -2715,8 +2715,8 @@ module Shader =
 
             ShaderStage.TessControl,
                 Map.ofList [
-                    Intrinsics.PointSize, typeof<float>
-                    Intrinsics.ClipDistance, typeof<float[]>
+                    Intrinsics.PointSize, typeof<float32>
+                    Intrinsics.ClipDistance, typeof<float32[]>
                     Intrinsics.PatchVertices, typeof<int>
                     Intrinsics.PrimitiveId, typeof<int>
                     Intrinsics.InvocationId, typeof<int>
@@ -2724,33 +2724,33 @@ module Shader =
 
             ShaderStage.TessEval,
                 Map.ofList [
-                    Intrinsics.PointSize, typeof<float>
-                    Intrinsics.ClipDistance, typeof<float[]>
-                    Intrinsics.TessCoord, typeof<V3d>
+                    Intrinsics.PointSize, typeof<float32>
+                    Intrinsics.ClipDistance, typeof<float32[]>
+                    Intrinsics.TessCoord, typeof<V3f>
                     Intrinsics.PatchVertices, typeof<int>
                     Intrinsics.PrimitiveId, typeof<int>
-                    Intrinsics.TessLevelInner, typeof<Arr<2 N, float>>
-                    Intrinsics.TessLevelOuter, typeof<Arr<4 N, float>>
+                    Intrinsics.TessLevelInner, typeof<Arr<2 N, float32>>
+                    Intrinsics.TessLevelOuter, typeof<Arr<4 N, float32>>
                 ]
                 
             ShaderStage.Geometry,
                 Map.ofList [
                     Intrinsics.SourceVertexIndex, typeof<int[]>
-                    Intrinsics.PointSize, typeof<float>
-                    Intrinsics.ClipDistance, typeof<float[]>
+                    Intrinsics.PointSize, typeof<float32>
+                    Intrinsics.ClipDistance, typeof<float32[]>
                     Intrinsics.PrimitiveId, typeof<int>
                     Intrinsics.InvocationId, typeof<int>
                 ]
 
             ShaderStage.Fragment,
                 Map.ofList [
-                    Intrinsics.FragCoord, typeof<V4d>
-                    Intrinsics.PointCoord, typeof<V2d>
+                    Intrinsics.FragCoord, typeof<V4f>
+                    Intrinsics.PointCoord, typeof<V2f>
                     Intrinsics.FrontFacing, typeof<bool>
                     Intrinsics.SampleId, typeof<int>
-                    Intrinsics.SamplePosition, typeof<V2d>
+                    Intrinsics.SamplePosition, typeof<V2f>
                     Intrinsics.SampleMask, typeof<int[]>
-                    Intrinsics.ClipDistance, typeof<float[]>
+                    Intrinsics.ClipDistance, typeof<float32[]>
                     Intrinsics.PrimitiveId, typeof<int>
                     Intrinsics.Layer, typeof<int>
                     Intrinsics.ViewportIndex, typeof<int>
@@ -2772,17 +2772,17 @@ module Shader =
                     Intrinsics.InstanceCustomIndex, typeof<int>
                     Intrinsics.GeometryIndex, typeof<int>
 
-                    Intrinsics.WorldRayOrigin, typeof<V3d>
-                    Intrinsics.WorldRayDirection, typeof<V3d>
-                    Intrinsics.ObjectRayOrigin, typeof<V3d>
-                    Intrinsics.ObjectRayDirection, typeof<V3d>
+                    Intrinsics.WorldRayOrigin, typeof<V3f>
+                    Intrinsics.WorldRayDirection, typeof<V3f>
+                    Intrinsics.ObjectRayOrigin, typeof<V3f>
+                    Intrinsics.ObjectRayDirection, typeof<V3f>
 
-                    Intrinsics.RayTmin, typeof<float>
-                    Intrinsics.RayTmax, typeof<float>
+                    Intrinsics.RayTmin, typeof<float32>
+                    Intrinsics.RayTmax, typeof<float32>
                     Intrinsics.IncomingRayFlags, typeof<uint32>
 
-                    Intrinsics.ObjectToWorld, typeof<M44d>
-                    Intrinsics.WorldToObject, typeof<M44d>
+                    Intrinsics.ObjectToWorld, typeof<M44f>
+                    Intrinsics.WorldToObject, typeof<M44f>
                 ]
 
             ShaderStage.AnyHit,
@@ -2795,20 +2795,20 @@ module Shader =
                     Intrinsics.InstanceCustomIndex, typeof<int>
                     Intrinsics.GeometryIndex, typeof<int>
 
-                    Intrinsics.WorldRayOrigin, typeof<V3d>
-                    Intrinsics.WorldRayDirection, typeof<V3d>
-                    Intrinsics.ObjectRayOrigin, typeof<V3d>
-                    Intrinsics.ObjectRayDirection, typeof<V3d>
+                    Intrinsics.WorldRayOrigin, typeof<V3f>
+                    Intrinsics.WorldRayDirection, typeof<V3f>
+                    Intrinsics.ObjectRayOrigin, typeof<V3f>
+                    Intrinsics.ObjectRayDirection, typeof<V3f>
 
-                    Intrinsics.RayTmin, typeof<float>
-                    Intrinsics.RayTmax, typeof<float>
+                    Intrinsics.RayTmin, typeof<float32>
+                    Intrinsics.RayTmax, typeof<float32>
                     Intrinsics.IncomingRayFlags, typeof<uint32>
 
-                    Intrinsics.HitT, typeof<float>
+                    Intrinsics.HitT, typeof<float32>
                     Intrinsics.HitKind, typeof<uint32>
 
-                    Intrinsics.ObjectToWorld, typeof<M44d>
-                    Intrinsics.WorldToObject, typeof<M44d>
+                    Intrinsics.ObjectToWorld, typeof<M44f>
+                    Intrinsics.WorldToObject, typeof<M44f>
                 ]
 
             ShaderStage.ClosestHit,
@@ -2821,20 +2821,20 @@ module Shader =
                     Intrinsics.InstanceCustomIndex, typeof<int>
                     Intrinsics.GeometryIndex, typeof<int>
 
-                    Intrinsics.WorldRayOrigin, typeof<V3d>
-                    Intrinsics.WorldRayDirection, typeof<V3d>
-                    Intrinsics.ObjectRayOrigin, typeof<V3d>
-                    Intrinsics.ObjectRayDirection, typeof<V3d>
+                    Intrinsics.WorldRayOrigin, typeof<V3f>
+                    Intrinsics.WorldRayDirection, typeof<V3f>
+                    Intrinsics.ObjectRayOrigin, typeof<V3f>
+                    Intrinsics.ObjectRayDirection, typeof<V3f>
 
-                    Intrinsics.RayTmin, typeof<float>
-                    Intrinsics.RayTmax, typeof<float>
+                    Intrinsics.RayTmin, typeof<float32>
+                    Intrinsics.RayTmax, typeof<float32>
                     Intrinsics.IncomingRayFlags, typeof<uint32>
 
-                    Intrinsics.HitT, typeof<float>
+                    Intrinsics.HitT, typeof<float32>
                     Intrinsics.HitKind, typeof<uint32>
 
-                    Intrinsics.ObjectToWorld, typeof<M44d>
-                    Intrinsics.WorldToObject, typeof<M44d>
+                    Intrinsics.ObjectToWorld, typeof<M44f>
+                    Intrinsics.WorldToObject, typeof<M44f>
                 ]
 
             ShaderStage.Miss,
@@ -2842,11 +2842,11 @@ module Shader =
                     Intrinsics.LaunchId, typeof<V3i>
                     Intrinsics.LaunchSize, typeof<V3i>
 
-                    Intrinsics.WorldRayOrigin, typeof<V3d>
-                    Intrinsics.WorldRayDirection, typeof<V3d>
+                    Intrinsics.WorldRayOrigin, typeof<V3f>
+                    Intrinsics.WorldRayDirection, typeof<V3f>
 
-                    Intrinsics.RayTmin, typeof<float>
-                    Intrinsics.RayTmax, typeof<float>
+                    Intrinsics.RayTmin, typeof<float32>
+                    Intrinsics.RayTmax, typeof<float32>
                     Intrinsics.IncomingRayFlags, typeof<uint32>
                 ]
 
@@ -2861,33 +2861,33 @@ module Shader =
         Dictionary.ofList [
             ShaderStage.Vertex,
                 Map.ofList [
-                    Intrinsics.PointSize, typeof<float>
-                    Intrinsics.ClipDistance, typeof<float[]>
+                    Intrinsics.PointSize, typeof<float32>
+                    Intrinsics.ClipDistance, typeof<float32[]>
                 ]
 
             ShaderStage.TessControl,
                 Map.ofList [
-                    Intrinsics.TessLevelInner, typeof<Arr<2 N, float>>
-                    Intrinsics.TessLevelOuter, typeof<Arr<4 N, float>>
+                    Intrinsics.TessLevelInner, typeof<Arr<2 N, float32>>
+                    Intrinsics.TessLevelOuter, typeof<Arr<4 N, float32>>
                 ]
 
             ShaderStage.TessEval,
                 Map.ofList [
-                    Intrinsics.PointSize, typeof<float>
-                    Intrinsics.ClipDistance, typeof<float[]>
+                    Intrinsics.PointSize, typeof<float32>
+                    Intrinsics.ClipDistance, typeof<float32[]>
                 ]
 
             ShaderStage.Geometry,
                 Map.ofList [
-                    Intrinsics.PointSize, typeof<float>
-                    Intrinsics.ClipDistance, typeof<float[]>
+                    Intrinsics.PointSize, typeof<float32>
+                    Intrinsics.ClipDistance, typeof<float32[]>
                     Intrinsics.Layer, typeof<int>
                     Intrinsics.ViewportIndex, typeof<int>
                 ]
 
             ShaderStage.Fragment,
                 Map.ofList [
-                    Intrinsics.Depth, typeof<float>
+                    Intrinsics.Depth, typeof<float32>
                     Intrinsics.SampleMask, typeof<int[]>
                 ]
 
@@ -3005,22 +3005,6 @@ module Shader =
             (typeof<V4f>, typeof<V2f>),     fun value -> <@@ (%%value : V4f).XY @@>
             (typeof<V4f>, typeof<V3f>),     fun value -> <@@ (%%value : V4f).XYZ @@>
 
-            // Float32 -> Float64
-            (typeof<float32>, typeof<float>), fun value -> <@@ float (%%value : float32) @@>
-
-            (typeof<V2f>, typeof<float>),     fun value -> <@@ float (%%value : V2f).X @@>
-            (typeof<V2f>, typeof<V2d>),       fun value -> <@@ V2d (%%value : V2f) @@>
-
-            (typeof<V3f>, typeof<float>),     fun value -> <@@ float (%%value : V3f).X @@>
-            (typeof<V3f>, typeof<V2d>),       fun value -> <@@ V2d(%%value : V3f).XY @@>
-            (typeof<V3f>, typeof<V3d>),       fun value -> <@@ V3d(%%value : V3f) @@>
-            (typeof<V3f>, typeof<V4d>),       fun value -> <@@ V4d((%%value : V3f), 1.0f) @@>
-
-            (typeof<V4f>, typeof<float>),     fun value -> <@@ float (%%value : V4f).X @@>
-            (typeof<V4f>, typeof<V2d>),       fun value -> <@@ V2d(%%value : V4f).XY @@>
-            (typeof<V4f>, typeof<V3d>),       fun value -> <@@ V3d(%%value : V4f).XYZ @@>
-            (typeof<V4f>, typeof<V4d>),       fun value -> <@@ V4d(%%value : V4f) @@>
-
             // Float64
             (typeof<V2d>, typeof<float>), fun value -> <@@ (%%value : V2d).X @@>
 
@@ -3031,22 +3015,6 @@ module Shader =
             (typeof<V4d>, typeof<float>), fun value -> <@@ (%%value : V4d).X @@>
             (typeof<V4d>, typeof<V2d>),   fun value -> <@@ (%%value : V4d).XY @@>
             (typeof<V4d>, typeof<V3d>),   fun value -> <@@ (%%value : V4d).XYZ @@>
-
-            // Float64 -> Float32
-            (typeof<float>, typeof<float32>), fun value -> <@@ float32 (%%value : float) @@>
-
-            (typeof<V2d>, typeof<float32>),   fun value -> <@@ float32 (%%value : V2d).X @@>
-            (typeof<V2d>, typeof<V2f>),       fun value -> <@@ V2f (%%value : V2d) @@>
-
-            (typeof<V3d>, typeof<float32>),   fun value -> <@@ float32 (%%value : V3d).X @@>
-            (typeof<V3d>, typeof<V2f>),       fun value -> <@@ V2f(%%value : V3d).XY @@>
-            (typeof<V3d>, typeof<V3f>),       fun value -> <@@ V3f(%%value : V3d) @@>
-            (typeof<V3d>, typeof<V4f>),       fun value -> <@@ V4f((%%value : V3d), 1.0) @@>
-
-            (typeof<V4d>, typeof<float32>),   fun value -> <@@ float32 (%%value : V4d).X @@>
-            (typeof<V4d>, typeof<V2f>),       fun value -> <@@ V2f(%%value : V4d).XY @@>
-            (typeof<V4d>, typeof<V3f>),       fun value -> <@@ V3f(%%value : V4d).XYZ @@>
-            (typeof<V4d>, typeof<V4f>),       fun value -> <@@ V4f(%%value : V4d) @@>
 
             // Int32
             (typeof<V2i>, typeof<int32>), fun value -> <@@ (%%value : V2i).X @@>
@@ -3090,40 +3058,40 @@ module Shader =
     let private emitVertexMeth = getMethodInfo <@ emitVertex @>
 
     let private interpolate3 (coord : Expr) (p0 : Expr) (p1 : Expr) (p2 : Expr) =
-        let coord : Expr<V3d> = Expr.Cast coord
-        if p0.Type = typeof<float> then
-            <@@ (%coord).X * (%%p0 : float) + (%coord).Y * (%%p1 : float) + (%coord).Z * (%%p2 : float)  @@>
-        elif p0.Type = typeof<V2d> then
-            <@@ (%coord).X * (%%p0 : V2d) + (%coord).Y * (%%p1 : V2d) + (%coord).Z * (%%p2 : V2d)  @@>
-        elif p0.Type = typeof<V3d> then
-            <@@ (%coord).X * (%%p0 : V3d) + (%coord).Y * (%%p1 : V3d) + (%coord).Z * (%%p2 : V3d)  @@>
-        elif p0.Type = typeof<V4d> then
-            <@@ (%coord).X * (%%p0 : V4d) + (%coord).Y * (%%p1 : V4d) + (%coord).Z * (%%p2 : V4d)  @@>
+        let coord : Expr<V3f> = Expr.Cast coord
+        if p0.Type = typeof<float32> then
+            <@@ (%coord).X * (%%p0 : float32) + (%coord).Y * (%%p1 : float32) + (%coord).Z * (%%p2 : float32)  @@>
+        elif p0.Type = typeof<V2f> then
+            <@@ (%coord).X * (%%p0 : V2f) + (%coord).Y * (%%p1 : V2f) + (%coord).Z * (%%p2 : V2f)  @@>
+        elif p0.Type = typeof<V3f> then
+            <@@ (%coord).X * (%%p0 : V3f) + (%coord).Y * (%%p1 : V3f) + (%coord).Z * (%%p2 : V3f)  @@>
+        elif p0.Type = typeof<V4f> then
+            <@@ (%coord).X * (%%p0 : V4f) + (%coord).Y * (%%p1 : V4f) + (%coord).Z * (%%p2 : V4f)  @@>
         else
             failwithf "[FShade] cannot interpolate %A" p0.Type
 
     let private interpolate4 (coord : Expr) (p0 : Expr) (p1 : Expr) (p2 : Expr) (p3 : Expr) =
-        let coord : Expr<V3d> = Expr.Cast coord
+        let coord : Expr<V3f> = Expr.Cast coord
         
-        if p0.Type = typeof<float> then
+        if p0.Type = typeof<float32> then
             <@@ 
-                (1.0 - (%coord).Y) * ((1.0 - (%coord).X) * (%%p0 : float) + (%coord).X * (%%p1 : float)) +
-                (%coord).Y * ((1.0 - (%coord).X) * (%%p2 : float) + (%coord).X * (%%p3 : float)) 
+                (1.0f - (%coord).Y) * ((1.0f - (%coord).X) * (%%p0 : float32) + (%coord).X * (%%p1 : float32)) +
+                (%coord).Y * ((1.0f - (%coord).X) * (%%p2 : float32) + (%coord).X * (%%p3 : float32))
             @@>
-        elif p0.Type = typeof<V2d> then
+        elif p0.Type = typeof<V2f> then
             <@@ 
-                (1.0 - (%coord).Y) * ((1.0 - (%coord).X) * (%%p0 : V2d) + (%coord).X * (%%p1 : V2d)) +
-                (%coord).Y * ((1.0 - (%coord).X) * (%%p2 : V2d) + (%coord).X * (%%p3 : V2d)) 
+                (1.0f - (%coord).Y) * ((1.0f - (%coord).X) * (%%p0 : V2f) + (%coord).X * (%%p1 : V2f)) +
+                (%coord).Y * ((1.0f - (%coord).X) * (%%p2 : V2f) + (%coord).X * (%%p3 : V2f))
             @@>
-        elif p0.Type = typeof<V3d> then
+        elif p0.Type = typeof<V3f> then
             <@@ 
-                (1.0 - (%coord).Y) * ((1.0 - (%coord).X) * (%%p0 : V3d) + (%coord).X * (%%p1 : V3d)) +
-                (%coord).Y * ((1.0 - (%coord).X) * (%%p2 : V3d) + (%coord).X * (%%p3 : V3d)) 
+                (1.0f - (%coord).Y) * ((1.0f - (%coord).X) * (%%p0 : V3f) + (%coord).X * (%%p1 : V3f)) +
+                (%coord).Y * ((1.0f - (%coord).X) * (%%p2 : V3f) + (%coord).X * (%%p3 : V3f))
             @@>
-        elif p0.Type = typeof<V4d> then
+        elif p0.Type = typeof<V4f> then
             <@@ 
-                (1.0 - (%coord).Y) * ((1.0 - (%coord).X) * (%%p0 : V4d) + (%coord).X * (%%p1 : V4d)) +
-                (%coord).Y * ((1.0 - (%coord).X) * (%%p2 : V4d) + (%coord).X * (%%p3 : V4d)) 
+                (1.0f - (%coord).Y) * ((1.0f - (%coord).X) * (%%p0 : V4f) + (%coord).X * (%%p1 : V4f)) +
+                (%coord).Y * ((1.0f - (%coord).X) * (%%p2 : V4f) + (%coord).X * (%%p3 : V4f))
             @@>
         else
             failwithf "[FShade] cannot interpolate %A" p0.Type
@@ -3521,14 +3489,14 @@ module Shader =
                                     | ShaderStage.TessEval ->
                                         match shader.shaderInputTopology.Value with
                                         | InputTopology.Patch 3 | InputTopology.Triangle ->
-                                            let coord = Expr.ReadInput<V3d>(ParameterKind.Input, Intrinsics.TessCoord)
+                                            let coord = Expr.ReadInput<V3f>(ParameterKind.Input, Intrinsics.TessCoord)
                                             let p0 = Expr.ReadInput(ParameterKind.Input, t, n, Expr.Value 0)
                                             let p1 = Expr.ReadInput(ParameterKind.Input, t, n, Expr.Value 1)
                                             let p2 = Expr.ReadInput(ParameterKind.Input, t, n, Expr.Value 2)
                                             interpolate3 coord p0 p1 p2 |> ShaderOutputValue.ofValue
 
                                         | InputTopology.Patch 4 ->
-                                            let coord = Expr.ReadInput<V3d>(ParameterKind.Input, Intrinsics.TessCoord)
+                                            let coord = Expr.ReadInput<V3f>(ParameterKind.Input, Intrinsics.TessCoord)
                                             let p0 = Expr.ReadInput(ParameterKind.Input, t, n, Expr.Value 0)
                                             let p1 = Expr.ReadInput(ParameterKind.Input, t, n, Expr.Value 1)
                                             let p2 = Expr.ReadInput(ParameterKind.Input, t, n, Expr.Value 2)
@@ -3713,9 +3681,9 @@ module Shader =
 
                     match Map.tryFind Intrinsics.Position inputs with
                         | Some p ->
-                            inputs |> Map.add Intrinsics.FragmentPosition typeof<V4d>
+                            inputs |> Map.add Intrinsics.FragmentPosition typeof<V4f>
                         | None ->
-                            inputs |> Map.add Intrinsics.Position typeof<V4d>
+                            inputs |> Map.add Intrinsics.Position typeof<V4f>
 
                 | ShaderStage.Geometry | ShaderStage.TessControl ->
                     shader.shaderInputs
@@ -3737,7 +3705,7 @@ module Shader =
             | ShaderStage.Fragment ->
                 shader.shaderOutputs
                     |> Map.map (fun _ p -> p.paramType)
-                    |> Map.add Intrinsics.Depth typeof<float>
+                    |> Map.add Intrinsics.Depth typeof<float32>
             | _ ->
                 shader.shaderOutputs
                     |> Map.map (fun _ p -> p.paramType)

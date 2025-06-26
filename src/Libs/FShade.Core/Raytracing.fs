@@ -11,10 +11,10 @@ module private Identifier =
 
 module private TraceDefaults =
     [<Literal>]
-    let MinT = 0.001
+    let MinT = 0.001f
 
     [<Literal>]
-    let MaxT = 10000.0
+    let MaxT = 10000.0f
 
     [<Literal>]
     let Flags = RayFlags.None
@@ -33,10 +33,10 @@ type Callable private() =
 
 [<AbstractClass; Sealed>]
 type Intersection private() =
-    static member Report(t : float, [<Optional; DefaultParameterValue(RayHitKind.Default)>] hitKind : RayHitKind) : bool =
+    static member Report(t : float32, [<Optional; DefaultParameterValue(RayHitKind.Default)>] hitKind : RayHitKind) : bool =
         onlyInShaderCode "Intersection.Report"
 
-    static member Report(t : float, attribute : 'T, [<Optional; DefaultParameterValue(RayHitKind.Default)>] hitKind : RayHitKind) : bool =
+    static member Report(t : float32, attribute : 'T, [<Optional; DefaultParameterValue(RayHitKind.Default)>] hitKind : RayHitKind) : bool =
         onlyInShaderCode "Intersection.Report"
 
 type IAccelerationStructure = interface end
@@ -46,26 +46,26 @@ type Scene(accelerationStructure : ISemanticValue) =
 
     member x.AccelerationStructure = accelerationStructure
 
-    member x.TraceRay<'T>(origin : V3d, direction : V3d,
+    member x.TraceRay<'T>(origin : V3f, direction : V3f,
                           [<Optional; DefaultParameterValue(Identifier.Default)>]     ray : string,
                           [<Optional; DefaultParameterValue(Identifier.Default)>]     miss : string,
-                          [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT : float,
-                          [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT : float,
+                          [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT : float32,
+                          [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT : float32,
                           [<Optional; DefaultParameterValue(TraceDefaults.Flags)>]    flags : RayFlags,
                           [<Optional; DefaultParameterValue(TraceDefaults.CullMask)>] cullMask : int) : 'T = onlyInShaderCode "TraceRay"
 
-    member x.TraceRay<'T>(origin : V3d, direction : V3d, payload : 'T,
+    member x.TraceRay<'T>(origin : V3f, direction : V3f, payload : 'T,
                           [<Optional; DefaultParameterValue(Identifier.Default)>]     ray : string,
                           [<Optional; DefaultParameterValue(Identifier.Default)>]     miss : string,
-                          [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT : float,
-                          [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT : float,
+                          [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT : float32,
+                          [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT : float32,
                           [<Optional; DefaultParameterValue(TraceDefaults.Flags)>]    flags : RayFlags,
                           [<Optional; DefaultParameterValue(TraceDefaults.CullMask)>] cullMask : int) : 'T = onlyInShaderCode "TraceRay"
 
     [<Inline>]
-    member x.TraceRay<'T>(origin : V3d, direction : V3d, ray : Symbol, miss : Symbol,
-                          [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT : float,
-                          [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT : float,
+    member x.TraceRay<'T>(origin : V3f, direction : V3f, ray : Symbol, miss : Symbol,
+                          [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT : float32,
+                          [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT : float32,
                           [<Optional; DefaultParameterValue(TraceDefaults.Flags)>]    flags : RayFlags,
                           [<Optional; DefaultParameterValue(TraceDefaults.CullMask)>] cullMask : int) : 'T =
         x.TraceRay<'T>(origin, direction,
@@ -74,9 +74,9 @@ type Scene(accelerationStructure : ISemanticValue) =
                        cullMask = cullMask)
 
     [<Inline>]
-    member x.TraceRay<'T>(origin : V3d, direction : V3d, payload : 'T, ray : Symbol, miss : Symbol,
-                          [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT : float,
-                          [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT : float,
+    member x.TraceRay<'T>(origin : V3f, direction : V3f, payload : 'T, ray : Symbol, miss : Symbol,
+                          [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT : float32,
+                          [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT : float32,
                           [<Optional; DefaultParameterValue(TraceDefaults.Flags)>]    flags : RayFlags,
                           [<Optional; DefaultParameterValue(TraceDefaults.CullMask)>] cullMask : int) : 'T =
         x.TraceRay<'T>(origin, direction, payload,

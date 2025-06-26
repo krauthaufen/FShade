@@ -10,8 +10,8 @@ open FShade.Tests
 
 type Vertex =
     {
-        [<Position>] pos : V4d
-        [<Color>] c : V4d
+        [<Position>] pos : V4f
+        [<Color>] c : V4f
     }
         
 type Computation = WantA=1 | WantB=2 | WantC=3
@@ -23,10 +23,10 @@ let ``Simple``() =
     let frag (comp : Computation) (v : Vertex) =
         fragment {
             let result = match comp with
-                         | Computation.WantA -> V4d(Constant.Pi)
-                         | Computation.WantB -> v.pos * Constant.E
-                         | Computation.WantC -> v.c * 2.0
-                         | _ -> V4d.OOOO
+                         | Computation.WantA -> V4f(Constant.Pi)
+                         | Computation.WantB -> v.pos * ConstantF.E
+                         | Computation.WantC -> v.c * 2.0f
+                         | _ -> V4f.OOOO
 
             return result
         }
@@ -39,16 +39,16 @@ let ``Simple``() =
     let codeB, _ = GLSL.compile [ shaderB ]
     let codeC, _ = GLSL.compile [ shaderC ]
 
-    if (codeA.code.IndexOf "3.14159265") < 0 then failwith "does not contain computation A"
+    if (codeA.code.IndexOf "3.141592") < 0 then failwith "does not contain computation A"
     if (codeA.code.IndexOf "2.7182") >= 0 then failwith "does also contain computation B"
     if (codeA.code.IndexOf "fs_Colors") >= 0 then failwith "does also contain computation C"
 
     if (codeB.code.IndexOf "2.7182") < 0 then failwith "does not contain computation B"
-    if (codeB.code.IndexOf "3.14159265") >= 0 then failwith "does also contain computation A"
+    if (codeB.code.IndexOf "3.141592") >= 0 then failwith "does also contain computation A"
     if (codeB.code.IndexOf "fs_Colors") >= 0 then failwith "does also contain computation C"
 
     if (codeC.code.IndexOf "fs_Colors") < 0 then failwith "does not contain computation C"
-    if (codeC.code.IndexOf "3.14159265") >= 0 then failwith "does also contain computation A"
+    if (codeC.code.IndexOf "3.141592") >= 0 then failwith "does also contain computation A"
     if (codeC.code.IndexOf "2.7182") >= 0 then failwith "does also contain computation B"
 
 
@@ -58,22 +58,22 @@ let ``Complex``() =
         
     let frag (comp : Computation) (v : Vertex) =
         fragment {
-            let result = if v.pos.W <> 0.0 then
+            let result = if v.pos.W <> 0.0f then
                             match comp with
                              | Computation.WantA -> 
                                 let temp = v.pos.X * v.pos.Y * v.pos.Z + v.pos.W
-                                2.0 * (sin temp) * (cos temp)
+                                2.0f * (sin temp) * (cos temp)
                              | Computation.WantB -> 
                                 let temp = (v.pos.X + v.pos.Y) * (v.pos.Z + v.pos.W)
-                                log ((abs temp) + 1.0)
+                                log ((abs temp) + 1.0f)
                              | Computation.WantC -> 
                                 let temp = Vec.cross (v.c.XYZ) (v.pos.XYZ)
                                 temp |> Vec.length
-                             | _ -> 0.0
+                             | _ -> 0.0f
                          else 
-                            0.0
+                            0.0f
 
-            return V4d(result)
+            return V4f(result)
         }
 
     let shaderA = frag (Computation.WantA) |> Effect.ofFunction
@@ -98,18 +98,18 @@ let ``Complex``() =
 
 
 [<ReflectedDefinition>] [<Inline>]
-let computer (comp : Computation, pos : V4d, c : V4d) =
+let computer (comp : Computation, pos : V4f, c : V4f) =
     match comp with
     | Computation.WantA -> 
         let temp = pos.X * pos.Y * pos.Z + pos.W
-        2.0 * (sin temp) * (cos temp)
+        2.0f * (sin temp) * (cos temp)
     | Computation.WantB -> 
         let temp = (pos.X + pos.Y) * (pos.Z + pos.W)
-        log ((abs temp) + 1.0)
+        log ((abs temp) + 1.0f)
     | Computation.WantC -> 
         let temp = Vec.cross (c.XYZ) (pos.XYZ)
         temp |> Vec.length
-    | _ -> 0.0
+    | _ -> 0.0f
 
 [<Test>]
 let ``Subroutine``() =
@@ -119,7 +119,7 @@ let ``Subroutine``() =
         fragment {
             let result = computer(comp, v.pos, v.c)
 
-            return V4d(result)
+            return V4f(result)
         }
 
     let shaderA = frag (Computation.WantA) |> Effect.ofFunction
@@ -144,31 +144,31 @@ let ``Subroutine``() =
 
 
 [<ReflectedDefinition>]
-let computeA (pos : V3d) =
+let computeA (pos : V3f) =
     let temp = pos.X * pos.Y + pos.Z
-    2.0 * (sin temp) * (cos temp)
+    2.0f * (sin temp) * (cos temp)
 
 [<ReflectedDefinition>]
-let computeB (pos : V3d) =
+let computeB (pos : V3f) =
     let someUni = uniform?SOME
     let temp = (pos.X + pos.Y) * (pos.Z + someUni)
-    log ((abs temp) + 1.0)
+    log ((abs temp) + 1.0f)
 
 [<ReflectedDefinition>]
-let computeC (pos : V3d) =
+let computeC (pos : V3f) =
     let temp = Vec.cross (pos) (pos)
     temp |> Vec.length
    
 
-let Foo : V3d = V3d(0.299, 0.587, 0.114); 
+let Foo : V3f = V3f(0.299, 0.587, 0.114); 
 
 [<ReflectedDefinition>] [<Inline>]
-let computerXXX (color : V4d, comp : Computation, mb : bool) =
+let computerXXX (color : V4f, comp : Computation, mb : bool) =
     
-        let exposureValue = 1.0
+        let exposureValue = 1.0f
 
-        let exposureValue = if uniform?ExposureOffset <> 0.0 then
-                                exp ((log (max exposureValue 0.0001)) - uniform?ExposureOffset)
+        let exposureValue = if uniform?ExposureOffset <> 0.0f then
+                                exp ((log (max exposureValue 0.0001f)) - uniform?ExposureOffset)
                             else
                                 exposureValue
 
@@ -180,21 +180,21 @@ let computerXXX (color : V4d, comp : Computation, mb : bool) =
             if mb then
                 let lum = Vec.Dot(exposedColor, Foo) 
                     
-                if lum > 1e-7 then
+                if lum > 1e-7f then
                     let lumTm = match comp with
-                                    | Computation.WantA -> computeA(V3d(lum))
-                                    | Computation.WantB -> computeB(V3d(lum))
-                                    | Computation.WantC -> computeC(V3d(lum))
+                                    | Computation.WantA -> computeA(V3f(lum))
+                                    | Computation.WantB -> computeB(V3f(lum))
+                                    | Computation.WantC -> computeC(V3f(lum))
                                     | _ -> lum
                  
                     lumTm * (exposedColor / lum)
                 else
-                    V3d.OOO
+                    V3f.OOO
             else
                 match comp with
-                | Computation.WantA -> V3d(computeA(exposedColor))
-                | Computation.WantB -> V3d(computeB(exposedColor))
-                | Computation.WantC -> V3d(computeC(exposedColor))
+                | Computation.WantA -> V3f(computeA(exposedColor))
+                | Computation.WantB -> V3f(computeB(exposedColor))
+                | Computation.WantC -> V3f(computeC(exposedColor))
                 | _ -> exposedColor
                 
         tmColor
@@ -206,24 +206,24 @@ let ``Hilite``() =
     let frag2 (comp : Computation) (myBool : bool) (v : Vertex) =
         fragment {
 
-            let mutable result = V3d.OOO
+            let mutable result = V3f.OOO
             let result = computerXXX(v.pos, comp, myBool) 
-            return V4d(result, 1.0)
+            return V4f(result, 1.0f)
         }
 
     let frag (comp : Computation) (myBool : bool) (v : Vertex) =
         fragment {
 
-            let mutable result = V3d.OOO
+            let mutable result = V3f.OOO
             for i in 0..3 do
                 
-                if v.pos.W <> 0.0 then 
-                    result <- result + computerXXX((V4d.IIII * v.pos), comp, (if myBool then true else false)) 
+                if v.pos.W <> 0.0f then
+                    result <- result + computerXXX((V4f.IIII * v.pos), comp, (if myBool then true else false)) 
                 else 
                     result <- result + v.pos.XYZ
                 
-            result <- result * 2.0
-            return V4d(result, 1.0)
+            result <- result * 2.0f
+            return V4f(result, 1.0f)
         }
 
     let theBool = false
@@ -233,7 +233,7 @@ let ``Hilite``() =
 
     let config =
         EffectConfig.ofList [
-            "Colors", typeof<V4d>, 0
+            "Colors", typeof<V4f>, 0
         ]
 
     let md1 = shaderA |> Effect.toModule config
@@ -269,7 +269,7 @@ let ``Hilite``() =
     if (codeC.code.IndexOf "abs") >= 0 then failwith "codeC does also contain computation B"
 
 [<ReflectedDefinition; Inline>]
-let util (a : float) (b : float) (c : float) =
+let util (a : float32) (b : float32) (c : float32) =
     a + b * c
 
 [<Test>]
@@ -277,8 +277,8 @@ let ``Broken``() =
     Setup.Run()
     let frag2 (v : Vertex) =
         fragment {
-            let z : V3d = Fun.Sqrt (V3i v.c.XYZ)
-            return V4d(z, util (sin v.pos.X) (cos v.pos.Y) (tan v.pos.Z))
+            let z : V3f = Fun.Sqrt (v.c.XYZ)
+            return V4f(z, util (sin v.pos.X) (cos v.pos.Y) (tan v.pos.Z))
         }
 
     GLSL.shouldCompile [Effect.ofFunction frag2]

@@ -95,9 +95,9 @@ type SamplerState =
         Comparison : Option<ComparisonFunction>
         BorderColor : Option<C4f>
         MaxAnisotropy : Option<int>
-        MaxLod : Option<float>
-        MinLod : Option<float>
-        MipLodBias : Option<float>
+        MaxLod : Option<float32>
+        MinLod : Option<float32>
+        MipLodBias : Option<float32>
     }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -151,13 +151,13 @@ module SamplerExtensions =
         member x.BorderColor(h : SamplerState, c : C4f) = { h with BorderColor = Some c }
 
         [<CustomOperation("maxLod")>]
-        member x.MaxLod(h : SamplerState, c : float) = { h with MaxLod = Some c }
+        member x.MaxLod(h : SamplerState, c : float32) = { h with MaxLod = Some c }
 
         [<CustomOperation("minLod")>]
-        member x.MinLod(h : SamplerState, c : float) = { h with MinLod = Some c }
+        member x.MinLod(h : SamplerState, c : float32) = { h with MinLod = Some c }
 
         [<CustomOperation("mipLodBias")>]
-        member x.MipLodBias(h : SamplerState, c : float) = { h with MipLodBias = Some c }
+        member x.MipLodBias(h : SamplerState, c : float32) = { h with MipLodBias = Some c }
 
         [<CustomOperation("filter")>]
         member x.Filter(h : SamplerState, f : Filter) = { h with Filter = Some f }

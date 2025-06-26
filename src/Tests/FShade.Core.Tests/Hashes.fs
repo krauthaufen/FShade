@@ -8,14 +8,14 @@ open System.IO
 
 type Vertex = 
     {
-        [<Position>] pos : V4d
-        [<Semantic("TexCoord")>] tc : V2d
+        [<Position>] pos : V4f
+        [<Semantic("TexCoord")>] tc : V2f
     }
 
 type Effect0 private () =
 
     [<GLSLIntrinsic("someFun({0})")>]
-    static let sepp (a : V2d) : V4d =
+    static let sepp (a : V2f) : V4f =
         onlyInShaderCode "sepp"
 
     static member vertexShader (v : Vertex) =
@@ -25,7 +25,7 @@ type Effect0 private () =
 
     static member fragmentShader (v : Vertex) =
         fragment {
-            return V4d.Zero
+            return V4f.Zero
         }
 
 type Shader1 private () =
@@ -76,7 +76,7 @@ type Shader3 private () =
 type Shader4 private() =
 
     [<GLSLIntrinsic("someFun({0})")>]
-    static let sepp (a : V2d) : V4d =
+    static let sepp (a : V2f) : V4f =
         onlyInShaderCode "sepp"
 
     static member shader (v : Vertex) =
@@ -87,7 +87,7 @@ type Shader4 private() =
 type Shader5 private() =
 
     [<GLSLIntrinsic("someFun({0})")>]
-    static let heinz (a : V2d) : V4d =
+    static let heinz (a : V2f) : V4f =
         onlyInShaderCode "sepp"
 
     static member shader (v : Vertex) =
@@ -99,7 +99,7 @@ type Shader6 private () =
 
     static member shader (v : Vertex) =
         fragment {
-            let a : V4d = uniform?Blubber?Value
+            let a : V4f = uniform?Blubber?Value
             return a
         }
 
@@ -145,7 +145,7 @@ let ``[Serializer] instance field get``() =
 
     let bla (v : Vertex) =
         fragment {
-            return V4d(v.pos.X)
+            return V4f(v.pos.X)
         }
 
     bla |> roundtrip
@@ -165,7 +165,7 @@ let ``[Serializer] instance field set and get``() =
 type SomeFuncs() =
 
     [<ReflectedDefinition>]
-    static member Hehe (input : V4d) =
+    static member Hehe (input : V4f) =
         input.XYZ
 
     [<ReflectedDefinition>]
@@ -180,7 +180,7 @@ type SomeFuncs() =
     static member Hehe<'T1, 'T2> (i1 : 'T1, i2 : 'T2, foo : int) =
         i1
 
-    static member Haha (input : V4d) =
+    static member Haha (input : V4f) =
         input.XYZ
 
     static member Haha<'T> (input : 'T) =
@@ -192,7 +192,7 @@ type SomeFuncs() =
     static member Haha<'T1, 'T2> (i1 : 'T1, i2 : 'T2, foo : int) =
         i1
 
-    member x.Hihi (input : V4d) =
+    member x.Hihi (input : V4f) =
         input.XYZ
 
     member x.Hihi<'T> (input : 'T) =
@@ -210,7 +210,7 @@ let ``[Serializer] reflected function``() =
 
     let bla (v : Vertex) =
         fragment {
-            return V4d(SomeFuncs.Hehe v.pos, 0.0)
+            return V4f(SomeFuncs.Hehe v.pos, 0.0f)
         }
 
     bla |> roundtrip
@@ -220,7 +220,7 @@ let ``[Serializer] reflected generic function``() =
 
     let bla (v : Vertex) =
         fragment {
-            return V4d(SomeFuncs.Hehe(v.pos.XYZ, 3) + SomeFuncs.Hehe(v.pos.XYZ, v.tc, 3), 0.0)
+            return V4f(SomeFuncs.Hehe(v.pos.XYZ, 3) + SomeFuncs.Hehe(v.pos.XYZ, v.tc, 3), 0.0f)
         }
 
     bla |> roundtrip
@@ -230,7 +230,7 @@ let ``[Serializer] static call``() =
 
     let bla (v : Vertex) =
         fragment {
-            return V4d(SomeFuncs.Haha v.pos, 0.0)
+            return V4f(SomeFuncs.Haha v.pos, 0.0f)
         }
 
     bla |> roundtrip
@@ -240,7 +240,7 @@ let ``[Serializer] static generic call``() =
 
     let bla (v : Vertex) =
         fragment {
-            return V4d(SomeFuncs.Haha(v.pos.XYZ, 3) + SomeFuncs.Haha(v.pos.XYZ, v.tc, 3), 0.0)
+            return V4f(SomeFuncs.Haha(v.pos.XYZ, 3) + SomeFuncs.Haha(v.pos.XYZ, v.tc, 3), 0.0f)
         }
 
     bla |> roundtrip
@@ -251,7 +251,7 @@ let ``[Serializer] instance call``() =
     let bla (v : Vertex) =
         fragment {
             let funcs = SomeFuncs()
-            return V4d(funcs.Hihi v.pos, 0.0)
+            return V4f(funcs.Hihi v.pos, 0.0f)
         }
 
     bla |> roundtrip
@@ -262,7 +262,7 @@ let ``[Serializer] instance generic call``() =
     let bla (v : Vertex) =
         fragment {
             let funcs = Unchecked.defaultof<SomeFuncs>
-            return V4d(funcs.Hihi(v.pos.XYZ, 3) + funcs.Hihi(v.pos.XYZ, v.tc, 3), 0.0)
+            return V4f(funcs.Hihi(v.pos.XYZ, 3) + funcs.Hihi(v.pos.XYZ, v.tc, 3), 0.0f)
         }
 
     bla |> roundtrip
@@ -274,7 +274,7 @@ let ``[Serializer] utility function call``() =
 
     let bla (v : Vertex) =
         fragment {
-            return V4d(SomeFuncs.Hehe v.pos, 1.0)
+            return V4f(SomeFuncs.Hehe v.pos, 1.0f)
         }
 
     let shader = Shader.ofFunction bla |> List.head
@@ -286,7 +286,7 @@ let ``[Serializer] utility function generic call``() =
 
     let bla (v : Vertex) =
         fragment {
-            return V4d(SomeFuncs.Hehe v.pos.XYZ, 1.0)
+            return V4f(SomeFuncs.Hehe v.pos.XYZ, 1.0f)
         }
 
     let shader = Shader.ofFunction bla |> List.head
@@ -302,7 +302,7 @@ let ``[Serializer] sampler arrays``() =
 
     let shader (v : Vertex) =
         fragment {
-            let mutable color = V4d.Zero
+            let mutable color = V4f.Zero
             let cnt : int = uniform?TextureCount
             for i in 0..cnt-1 do
                 color <- color + samplerArray.[i].Sample(v.tc)
@@ -317,8 +317,8 @@ let ``[Serializer] storage buffers``() =
 
     let shader (v : Vertex) =
         fragment {
-            let mutable color = V4d.Zero
-            let buf : V4d[] = uniform?StorageBuffer?buffy
+            let mutable color = V4f.Zero
+            let buf : V4f[] = uniform?StorageBuffer?buffy
             let cnt : int = uniform?BufferLength
             for i in 0..cnt-1 do
                 color <- color + buf.[i]
@@ -468,10 +468,10 @@ type UniformScope with
     member x.Img  : Image1d<Formats.rgba8>   = x?Img
     member x.Img2 : Image1d<Formats.rgba8>   = x?Img
     member x.Img3 : Image1d<Formats.rgba32f> = x?Img
-    member x.Foo  : V3d                      = x?Foo
-    member x.Foo2 : V3d                      = x?Foo
-    member x.Foo3 : V3d                      = x?Foo3
-    member x.Foo4 : V2d                      = x?Foo
+    member x.Foo  : V3f                      = x?Foo
+    member x.Foo2 : V3f                      = x?Foo
+    member x.Foo3 : V3f                      = x?Foo3
+    member x.Foo4 : V2f                      = x?Foo
 
 [<Test>]
 let ``[Hashing] includes image format``() =
@@ -502,19 +502,19 @@ let ``[Hashing] includes uniform semantic``() =
     let s1 (v : Vertex) =
         fragment {
             let _ = uniform.Foo
-            return V3d.Zero
+            return V3f.Zero
         }
 
     let s2 (v : Vertex) =
         fragment {
             let _ = uniform.Foo2
-            return V3d.Zero
+            return V3f.Zero
         }
 
     let s3 (v : Vertex) =
         fragment {
             let _ = uniform.Foo3
-            return V3d.Zero
+            return V3f.Zero
         }
 
     let e1 = Effect.ofFunction s1
@@ -529,19 +529,19 @@ let ``[Hashing] includes uniform type``() =
     let s1 (v : Vertex) =
         fragment {
             let _ = uniform.Foo
-            return V3d.Zero
+            return V3f.Zero
         }
 
     let s2 (v : Vertex) =
         fragment {
             let _ = uniform.Foo2
-            return V3d.Zero
+            return V3f.Zero
         }
 
     let s3 (v : Vertex) =
         fragment {
             let _ = uniform.Foo4
-            return V3d.Zero
+            return V3f.Zero
         }
 
     let e1 = Effect.ofFunction s1
