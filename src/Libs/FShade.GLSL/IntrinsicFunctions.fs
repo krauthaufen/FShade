@@ -1189,48 +1189,71 @@ module IntrinsicFunctions =
                 generic <@ smoothstep : float -> float -> V2d -> V2d @>
             ]
 
-
-            CIntrinsic.tagged "int(round(mix({1}, {2}, {0})))", [
+            CIntrinsic.tagged "int8_t(round(mix({1}, {2}, {0})))", [
                 exactly <@ Fun.Lerp : float32 * int8    * int8 -> _ @>
-                exactly <@ Fun.Lerp : float32 * int16   * int16 -> _ @>
-                exactly <@ Fun.Lerp : float32 * int32   * int32 -> _ @>
-                exactly <@ Fun.Lerp : float32 * int64   * int64 -> _ @>
                 exactly <@ Fun.Lerp : float   * int8    * int8 -> _ @>
+            ]
+            CIntrinsic.tagged "int16_t(round(mix({1}, {2}, {0})))", [
+                exactly <@ Fun.Lerp : float32 * int16   * int16 -> _ @>
                 exactly <@ Fun.Lerp : float   * int16   * int16 -> _ @>
+            ]
+            CIntrinsic.tagged "int(round(mix({1}, {2}, {0})))", [
+                exactly <@ Fun.Lerp : float32 * int32   * int32 -> _ @>
                 exactly <@ Fun.Lerp : float   * int32   * int32 -> _ @>
+            ]
+            CIntrinsic.tagged "int64_t(round(mix({1}, {2}, {0})))", [
+                exactly <@ Fun.Lerp : float32 * int64   * int64 -> _ @>
                 exactly <@ Fun.Lerp : float   * int64   * int64 -> _ @>
             ]
 
-            CIntrinsic.tagged "int(round(mix({0}, {1}, {2})))", [
+            CIntrinsic.tagged "int8_t(round(mix({0}, {1}, {2})))", [
                 exactly <@ lerp : int8  -> int8  -> float32 -> _ @>
-                exactly <@ lerp : int16 -> int16 -> float32 -> _ @>
-                exactly <@ lerp : int32 -> int32 -> float32 -> _ @>
-                exactly <@ lerp : int64 -> int64 -> float32 -> _ @>
                 exactly <@ lerp : int8  -> int8  -> float   -> _ @>
+            ]
+            CIntrinsic.tagged "int16_t(round(mix({0}, {1}, {2})))", [
+                exactly <@ lerp : int16 -> int16 -> float32 -> _ @>
                 exactly <@ lerp : int16 -> int16 -> float   -> _ @>
+            ]
+            CIntrinsic.tagged "int(round(mix({0}, {1}, {2})))", [
+                exactly <@ lerp : int32 -> int32 -> float32 -> _ @>
                 exactly <@ lerp : int32 -> int32 -> float   -> _ @>
+            ]
+            CIntrinsic.tagged "int64_t(round(mix({0}, {1}, {2})))", [
+                exactly <@ lerp : int64 -> int64 -> float32 -> _ @>
                 exactly <@ lerp : int64 -> int64 -> float   -> _ @>
             ]
 
-            CIntrinsic.tagged "uint(mix({1}, {2}, {0}) + 0.5)", [
+            CIntrinsic.tagged "uint8_t(mix({1}, {2}, {0}) + 0.5)", [
                 exactly <@ Fun.Lerp : float32 * uint8    * uint8 -> _ @>
-                exactly <@ Fun.Lerp : float32 * uint16   * uint16 -> _ @>
-                exactly <@ Fun.Lerp : float32 * uint32   * uint32 -> _ @>
-                exactly <@ Fun.Lerp : float32 * uint64   * uint64 -> _ @>
                 exactly <@ Fun.Lerp : float   * uint8    * uint8 -> _ @>
+            ]
+            CIntrinsic.tagged "uint16_t(mix({1}, {2}, {0}) + 0.5)", [
+                exactly <@ Fun.Lerp : float32 * uint16   * uint16 -> _ @>
                 exactly <@ Fun.Lerp : float   * uint16   * uint16 -> _ @>
+            ]
+            CIntrinsic.tagged "uint(mix({1}, {2}, {0}) + 0.5)", [
+                exactly <@ Fun.Lerp : float32 * uint32   * uint32 -> _ @>
                 exactly <@ Fun.Lerp : float   * uint32   * uint32 -> _ @>
+            ]
+            CIntrinsic.tagged "uint64_t(mix({1}, {2}, {0}) + 0.5)", [
+                exactly <@ Fun.Lerp : float32 * uint64   * uint64 -> _ @>
                 exactly <@ Fun.Lerp : float   * uint64   * uint64 -> _ @>
             ]
 
-            CIntrinsic.tagged "uint(mix({0}, {1}, {2}) + 0.5)", [
+            CIntrinsic.tagged "uint8_t(mix({0}, {1}, {2}) + 0.5)", [
                 exactly <@ lerp : uint8  -> uint8  -> float32 -> _ @>
-                exactly <@ lerp : uint16 -> uint16 -> float32 -> _ @>
-                exactly <@ lerp : uint32 -> uint32 -> float32 -> _ @>
-                exactly <@ lerp : uint64 -> uint64 -> float32 -> _ @>
                 exactly <@ lerp : uint8  -> uint8  -> float   -> _ @>
+            ]
+            CIntrinsic.tagged "uint16_t(mix({0}, {1}, {2}) + 0.5)", [
+                exactly <@ lerp : uint16 -> uint16 -> float32 -> _ @>
                 exactly <@ lerp : uint16 -> uint16 -> float   -> _ @>
+            ]
+            CIntrinsic.tagged "uint(mix({0}, {1}, {2}) + 0.5)", [
+                exactly <@ lerp : uint32 -> uint32 -> float32 -> _ @>
                 exactly <@ lerp : uint32 -> uint32 -> float   -> _ @>
+            ]
+            CIntrinsic.tagged "uint64_t(mix({0}, {1}, {2}) + 0.5)", [
+                exactly <@ lerp : uint64 -> uint64 -> float32 -> _ @>
                 exactly <@ lerp : uint64 -> uint64 -> float   -> _ @>
             ]
 

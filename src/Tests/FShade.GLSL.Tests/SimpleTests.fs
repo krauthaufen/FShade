@@ -1,6 +1,7 @@
 ﻿module SingleEffects
 
 open System
+open System.Text.RegularExpressions
 open Aardvark.Base
 open FShade
 open NUnit.Framework
@@ -1189,7 +1190,7 @@ let ``Enum with non-int32 underlying type``() =
             return V2ui(uint32 v.myenum, uint32 MyEnum.A)
         }
 
-    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction fs ] [ "uint fs_myenum"; "1234u" ]
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction fs ] [ Regex.Escape "uint(fs_myenum)"; "1234u" ]
 
 type UniformScope with
     member x.SomeVector : V3d = x?Foo?Bar?MyVector
