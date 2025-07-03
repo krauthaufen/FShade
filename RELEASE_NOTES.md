@@ -1,3 +1,10 @@
+### 5.7.0-prerelease0001
+- Removed double as float feature
+- Added basic support for 8-bit, 16-bit, and 64-bit data types
+- Added support for indexing arrays with uint
+- Removed unused original field from CType.CStruct
+- [fshadeaot] Added double checking feature
+
 ### 5.6.0
 - Updated to NET 8 and Aardvark.Base 5.3
 - Use struct representation for partial active patterns
