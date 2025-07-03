@@ -56,7 +56,10 @@ let ``Reserved Names``() =
             let mutable union = this
             union <- V4f.Zero
 
-            return union
+            let mutable foo' = union
+            foo' <- V4f.Zero
+
+            return foo'
         }
 
     GLSL.shouldCompile [Effect.ofFunction shader]

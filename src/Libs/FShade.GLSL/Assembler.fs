@@ -791,18 +791,26 @@ module Assembler =
             ]
         Regex("^(" + str + ")$")
 
+    let private invalidCharsRx = Regex(@"[^_a-zA-Z0-9]|__+")
 
     let checkName (name : string) =
-        if name.Contains "__" then
-            failwithf "[GLSL] %A is not a GLSL compatible name" name
+        let invalid = invalidCharsRx.Matches name
+        if invalid.Count > 0 then
+            let str = seq { for m in invalid do m.Value } |> String.concat " "
+            failwithf "[GLSL] %A contains characters not allowed in names: %s" name str
 
         if reservedNames.IsMatch name then
-            failwithf "[GLSL] %A is not a GLSL compatible name" name
-            
+            failwithf "[GLSL] %A is a reserved keyword and cannot be used as name" name
+
         Identifier(name)
 
     let glslName (name : string) =
-        let name = name.Replace("__", "_").Replace("@", "_AT_")
+        let name =
+            invalidCharsRx.Replace(name, fun m ->
+                if m.Value |> String.contains "_" then "_"
+                else m.Value |> Seq.map (int >> string) |> String.concat ""
+            )
+
         if reservedNames.IsMatch name then
             Identifier("_" + name)
         else
