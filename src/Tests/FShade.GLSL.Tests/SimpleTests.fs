@@ -1200,6 +1200,8 @@ type UniformScope with
     member x.SomeVector2 : V3f = x?Foo?Bar?MyVector
     member x.BadVector : float32 = x?Foo?Bar?MyVector
     member x.BadVector2 : V3f = x?MyBuff?Yea?MyVector
+    member x.MyPushedVec : V3f = x?PushConstant?Vec
+    member x.MyPushedVal : float32 = x?PushConstant?Val
 
 [<Test>]
 let ``Uniform alias``() =
@@ -1276,3 +1278,14 @@ let ``Uniform and storage buffers use std140 and std430 layout``() =
         |> ModuleCompiler.compileGLSL430
 
     GLSL.shouldContainRegex glsl [ "std430", None ]
+
+[<Test>]
+let ``Push constants``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            return V4f(uniform.MyPushedVec, uniform.MyPushedVal)
+        }
+
+    GLSL.shouldCompileAndContainRegex' glslVulkan [ Effect.ofFunction fs ] [ "push_constant" ]

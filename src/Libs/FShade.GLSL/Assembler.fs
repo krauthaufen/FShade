@@ -57,6 +57,7 @@ type Config =
         version                     : GLSLVersion
         enabledExtensions           : Set<string>
         createUniformBuffers        : bool
+        pushConstants               : bool
 
         bindingMode                 : BindingMode
         createDescriptorSets        : bool
@@ -1564,6 +1565,7 @@ module Assembler =
             decorations |> List.choose (fun d ->
                 match d with
                 | UniformDecoration.Format t -> Some <| imageFormat t
+                | UniformDecoration.PushConstant -> Some "push_constant"
                 | UniformDecoration.BufferBinding _
                 | UniformDecoration.BufferDescriptorSet _
                 | UniformDecoration.FieldIndex _ -> None
@@ -1685,8 +1687,17 @@ module Assembler =
                                 
                             | Some bufferName when config.createUniformBuffers ->
                                 let bufferName = checkName bufferName
-                                let! binding = getBinding InputKind.UniformBuffer 1 fields
-                                let prefix = uniformLayout Layout.Std140 [] set binding
+
+                                let! set, binding, prefix =
+                                    state {
+                                        if config.pushConstants && bufferName.Name = "PushConstant" then
+                                            let prefix = uniformLayout Layout.Std140 [UniformDecoration.PushConstant] -1 -1
+                                            return -1, -1, prefix
+                                        else
+                                            let! binding = getBinding InputKind.UniformBuffer 1 fields
+                                            let prefix = uniformLayout Layout.Std140 [] set binding
+                                            return set, binding, prefix
+                                    }
                             
                                 let! fieldStr =
                                     fields |> List.mapS (fun u ->

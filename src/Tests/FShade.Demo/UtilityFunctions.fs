@@ -181,6 +181,7 @@ module UtiliyFunctions =
                         version                     = GLSL.GLSLVersion(4,1,0)
                         enabledExtensions           = Set.ofList [ ]
                         createUniformBuffers        = true
+                        pushConstants               = false
                         bindingMode                 = GLSL.BindingMode.PerKind
                         createDescriptorSets        = true
                         stepDescriptorSets          = false

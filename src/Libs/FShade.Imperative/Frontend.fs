@@ -27,6 +27,7 @@ type UniformDecoration =
     | FieldIndex of int
     | BufferDescriptorSet of int
     | BufferBinding of int
+    | PushConstant
 
 type Uniform =
     {
