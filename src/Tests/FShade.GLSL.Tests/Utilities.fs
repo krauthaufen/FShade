@@ -44,7 +44,7 @@ module GLSL =
 
     let glslangWithTarget (target : GLSLang.Target) (stage : ShaderStage) (defines : List<string>) (code : string) =
         let res = 
-            match GLSLang.tryCompileWithTarget target (toGLSLangStage stage) "main" defines code with
+            match GLSLang.tryCompileWithTarget target (toGLSLangStage stage) "main" false defines code with
             | Some _, warn -> 
                 if String.IsNullOrWhiteSpace warn then Success
                 else Warning warn
@@ -54,7 +54,7 @@ module GLSL =
 
     let glslangWithDefines (stage : ShaderStage) (defines : List<string>) (code : string) =
         let res = 
-            match GLSLang.tryCompile (toGLSLangStage stage) "main" defines code with
+            match GLSLang.tryCompile (toGLSLangStage stage) "main" false defines code with
             | Some _, warn -> 
                 if String.IsNullOrWhiteSpace warn then Success
                 else Warning warn

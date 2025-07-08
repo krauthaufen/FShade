@@ -237,7 +237,7 @@ let layoutGLSLang (b : GLSLUniformBuffer) =
     let glsl = m |> Assembler.assemble glslVulkan
     
     let spirv = 
-        match GLSLang.GLSLang.tryCompile GLSLang.ShaderStage.Vertex "main" [] glsl.code with
+        match GLSLang.GLSLang.tryCompile GLSLang.ShaderStage.Vertex "main" false [] glsl.code with
             | Some spirv,_ -> spirv
             | None, err -> failwithf "%s" err
     let map = FShade.Reflector.ShaderInfo.ofBinary spirv
