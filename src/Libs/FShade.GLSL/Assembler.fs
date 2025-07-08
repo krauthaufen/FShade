@@ -297,21 +297,6 @@ module AssemblerState =
 
     let stages = State.get |> State.map (fun s -> s.stages)
 
-    let tryGetParameterName (kind : ParameterKind) (name : string) =
-        state {
-            let! stages = stages
-            match kind with
-                | ParameterKind.Input ->
-                    return Map.tryFind name IntrinsicParameters.builtInInputs.[stages.Stage]
-                | ParameterKind.Output ->
-                    if name = Intrinsics.Position && stages.Next = Some ShaderStage.Fragment then
-                        return Some "gl_Position"
-                    else
-                        return Map.tryFind name IntrinsicParameters.builtInOutputs.[stages.Stage]
-                | _ ->
-                    return None
-        }
-
     let reverseMatrixLogic = State.get |> State.map (fun s -> s.config.reverseMatrixLogic)
     let config = State.get |> State.map (fun s -> s.config)
 
@@ -420,6 +405,31 @@ module AssemblerState =
 
                 for e in extensions do
                     do! useExtension e
+        }
+
+    let tryGetParameterName (kind : ParameterKind) (name : string) =
+        state {
+            let! stages = stages
+
+            let paramName =
+                match kind with
+                | ParameterKind.Input ->
+                    Map.tryFind name builtInInputs.[stages.Stage]
+
+                | ParameterKind.Output ->
+                    if name = Intrinsics.Position && stages.Next = Some ShaderStage.Fragment then
+                        Some "gl_Position"
+                    else
+                        Map.tryFind name builtInOutputs.[stages.Stage]
+                | _ ->
+                    None
+
+            if paramName.IsSome then
+                match Map.tryFind name builtInExtensions with
+                | Some ext -> do! useExtension ext
+                | _ -> ()
+
+            return paramName
         }
   
 module Interface =
@@ -821,7 +831,7 @@ module Assembler =
         state {
             let! builtIn = AssemblerState.tryGetParameterName kind name
             match builtIn with
-                | Some name -> 
+                | Some name ->
                     return Identifier(name)
 
                 | None ->

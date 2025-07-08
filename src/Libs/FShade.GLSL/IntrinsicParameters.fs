@@ -12,6 +12,11 @@ module IntrinsicParameters =
             "gl_PrimitiveID"
         ]
 
+    let builtInExtensions =
+        Map.ofList [
+            Intrinsics.HitPositions, "GL_EXT_ray_tracing_position_fetch"
+        ]
+
     let builtInInputs =
         Dictionary.ofList [
             ShaderStage.Vertex,
@@ -114,6 +119,7 @@ module IntrinsicParameters =
 
                     Intrinsics.HitT, "gl_HitTEXT"
                     Intrinsics.HitKind, "gl_HitKindEXT"
+                    Intrinsics.HitPositions, "gl_HitTriangleVertexPositionsEXT"
 
                     Intrinsics.ObjectToWorld, "mat4(gl_ObjectToWorld3x4EXT)"
                     Intrinsics.WorldToObject, "mat4(gl_WorldToObject3x4EXT)"
@@ -140,6 +146,7 @@ module IntrinsicParameters =
 
                     Intrinsics.HitT, "gl_HitTEXT"
                     Intrinsics.HitKind, "gl_HitKindEXT"
+                    Intrinsics.HitPositions, "gl_HitTriangleVertexPositionsEXT"
 
                     Intrinsics.ObjectToWorld, "mat4(gl_ObjectToWorld3x4EXT)"
                     Intrinsics.WorldToObject, "mat4(gl_WorldToObject3x4EXT)"

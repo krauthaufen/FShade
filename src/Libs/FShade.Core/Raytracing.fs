@@ -62,7 +62,6 @@ type Scene(accelerationStructure : ISemanticValue) =
                           [<Optional; DefaultParameterValue(TraceDefaults.Flags)>]    flags : RayFlags,
                           [<Optional; DefaultParameterValue(TraceDefaults.CullMask)>] cullMask : int) : 'T = onlyInShaderCode "TraceRay"
 
-    [<Inline>]
     member x.TraceRay<'T>(origin : V3f, direction : V3f, ray : Symbol, miss : Symbol,
                           [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT : float32,
                           [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT : float32,
@@ -73,7 +72,6 @@ type Scene(accelerationStructure : ISemanticValue) =
                        minT = minT, maxT = maxT, flags = flags,
                        cullMask = cullMask)
 
-    [<Inline>]
     member x.TraceRay<'T>(origin : V3f, direction : V3f, payload : 'T, ray : Symbol, miss : Symbol,
                           [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT : float32,
                           [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT : float32,

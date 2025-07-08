@@ -2806,6 +2806,7 @@ module Shader =
 
                     Intrinsics.HitT, typeof<float32>
                     Intrinsics.HitKind, typeof<uint32>
+                    Intrinsics.HitPositions, typeof<Arr<3 N, V3f>>
 
                     Intrinsics.ObjectToWorld, typeof<M44f>
                     Intrinsics.WorldToObject, typeof<M44f>
@@ -2832,6 +2833,7 @@ module Shader =
 
                     Intrinsics.HitT, typeof<float32>
                     Intrinsics.HitKind, typeof<uint32>
+                    Intrinsics.HitPositions, typeof<Arr<3 N, V3f>>
 
                     Intrinsics.ObjectToWorld, typeof<M44f>
                     Intrinsics.WorldToObject, typeof<M44f>

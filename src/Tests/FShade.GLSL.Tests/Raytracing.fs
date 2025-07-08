@@ -238,3 +238,34 @@ let ``Ray type based on SRTP``() =
         }
 
     GLSL.shouldCompileRaytracing effect
+
+[<Test>]
+let ``Hit triangle vertex positions``() =
+    Setup.Run()
+
+    let raygenShader =
+        raygen {
+            ()
+        }
+
+    let chitShader (input: RayHitInput<V3f>) =
+        closestHit {
+            return input.hit.positions.[0]
+        }
+
+    let anyhitShader (input: RayHitInput<V3f>) =
+        anyHit {
+            ignoreIntersection()
+            return input.hit.positions.[2]
+        }
+
+    let effect =
+         let hitgroup1 =
+             hitgroup { closestHit chitShader; anyHit anyhitShader }
+
+         raytracingEffect {
+             raygen raygenShader
+             hitgroup "1" hitgroup1
+         }
+
+    GLSL.shouldCompileRaytracing effect

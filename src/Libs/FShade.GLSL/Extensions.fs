@@ -86,7 +86,7 @@ module Backends =
     let glslRaytracing =
         Backend.Create {
             version                     = GLSLVersion(4,6,0)
-            enabledExtensions           = Set.ofList [ "GL_EXT_ray_tracing"; "GL_EXT_nonuniform_qualifier"]
+            enabledExtensions           = Set.ofList [ "GL_EXT_ray_tracing"; "GL_EXT_nonuniform_qualifier" ]
             createUniformBuffers        = true
             pushConstants               = true
             bindingMode                 = BindingMode.Global

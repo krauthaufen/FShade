@@ -103,6 +103,8 @@ module Intrinsics =
     let HitKind = "HitKind"
     [<Literal>]
     let HitAttribute = "HitAttribute"
+    [<Literal>]
+    let HitPositions = "HitPositions"
 
     // Transform matrices
     [<Literal>]
@@ -154,6 +156,7 @@ module InstrinsicAttributes =
     type HitTAttribute() =                inherit SemanticAttribute(Intrinsics.HitT)
     type HitKindAttribute() =             inherit SemanticAttribute(Intrinsics.HitKind)
     type HitAttributeAttribute() =        inherit SemanticAttribute(Intrinsics.HitAttribute)
+    type HitPositionsAttribute() =        inherit SemanticAttribute(Intrinsics.HitPositions)
     type RayPayloadInAttribute() =        inherit SemanticAttribute(Intrinsics.RayPayloadIn)
     type ObjectToWorldAttribute() =       inherit SemanticAttribute(Intrinsics.ObjectToWorld)
     type WorldToObjectAttribute() =       inherit SemanticAttribute(Intrinsics.WorldToObject)
@@ -204,6 +207,7 @@ module RaytracingInputTypes =
             [<HitT>]         t          : float32
             [<HitKind>]      kind       : RayHitKind
             [<HitAttribute>] attribute  : 'T
+            [<HitPositions>] positions  : Arr<3 N, V3f>
         }
 
 /// Type containing input available in ray generation shaders.
