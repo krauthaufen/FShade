@@ -269,3 +269,41 @@ let ``Hit triangle vertex positions``() =
          }
 
     GLSL.shouldCompileRaytracing effect
+
+[<Test>]
+let ``Object / World transforms``() =
+    Setup.Run()
+
+    let raygenShader =
+        raygen {
+            ()
+        }
+
+    let chitShader (input: RayHitInput<V4f>) =
+        closestHit {
+            return input.objectSpace.objectToWorld.R0 + input.objectSpace.worldToObject.R0 + input.payload
+        }
+
+    let anyhitShader (input: RayHitInput<V3f>) =
+        anyHit {
+            ignoreIntersection()
+            return input.objectSpace.objectToWorld.C0 + input.objectSpace.worldToObject.C0 + input.payload
+        }
+
+    let intersectionShader (input : RayIntersectionInput) =
+        intersection {
+            let _ = input.objectSpace.objectToWorld
+            let _ = input.objectSpace.worldToObject
+            Intersection.Report(0.5f, RayHitKind.SomeWeirdStuff) |> ignore
+        }
+
+    let effect =
+         let hitgroup1 =
+             hitgroup { closestHit chitShader; anyHit anyhitShader; intersection intersectionShader }
+
+         raytracingEffect {
+             raygen raygenShader
+             hitgroup "1" hitgroup1
+         }
+
+    GLSL.shouldCompileRaytracing effect

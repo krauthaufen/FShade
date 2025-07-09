@@ -2781,8 +2781,8 @@ module Shader =
                     Intrinsics.RayTmax, typeof<float32>
                     Intrinsics.IncomingRayFlags, typeof<uint32>
 
-                    Intrinsics.ObjectToWorld, typeof<M44f>
-                    Intrinsics.WorldToObject, typeof<M44f>
+                    Intrinsics.ObjectToWorld, typeof<M34f>
+                    Intrinsics.WorldToObject, typeof<M34f>
                 ]
 
             ShaderStage.AnyHit,
@@ -2808,8 +2808,8 @@ module Shader =
                     Intrinsics.HitKind, typeof<uint32>
                     Intrinsics.HitPositions, typeof<Arr<3 N, V3f>>
 
-                    Intrinsics.ObjectToWorld, typeof<M44f>
-                    Intrinsics.WorldToObject, typeof<M44f>
+                    Intrinsics.ObjectToWorld, typeof<M34f>
+                    Intrinsics.WorldToObject, typeof<M34f>
                 ]
 
             ShaderStage.ClosestHit,
@@ -2835,8 +2835,8 @@ module Shader =
                     Intrinsics.HitKind, typeof<uint32>
                     Intrinsics.HitPositions, typeof<Arr<3 N, V3f>>
 
-                    Intrinsics.ObjectToWorld, typeof<M44f>
-                    Intrinsics.WorldToObject, typeof<M44f>
+                    Intrinsics.ObjectToWorld, typeof<M34f>
+                    Intrinsics.WorldToObject, typeof<M34f>
                 ]
 
             ShaderStage.Miss,

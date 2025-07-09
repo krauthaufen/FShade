@@ -198,8 +198,8 @@ module RaytracingInputTypes =
         {
             [<ObjectRayOrigin>]    rayOrigin     : V3f
             [<ObjectRayDirection>] rayDirection  : V3f
-            [<ObjectToWorld>]      objectToWorld : M44f
-            [<WorldToObject>]      worldToObject : M44f
+            [<ObjectToWorld>]      objectToWorld : M34f
+            [<WorldToObject>]      worldToObject : M34f
         }
 
     type RayHit<'T> =
