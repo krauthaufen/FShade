@@ -307,3 +307,34 @@ let ``Object / World transforms``() =
          }
 
     GLSL.shouldCompileRaytracing effect
+
+[<ReflectedDefinition>]
+let invokeCallable (id: CallableId) : int =
+    Callable.Execute(id)
+
+[<Test>]
+let ``CallableId``() =
+    Setup.Run()
+
+    let id2 = CallableId "Foo2"
+
+    let raygenShader =
+        raygen {
+            let mutable id = CallableId()
+            id <- if uniform?BlaBlub then CallableId "Foo" else CallableId "Haah"
+            invokeCallable id |> ignore
+            ()
+        }
+
+    let callableShader (input : RayCallableInput<CallableId>)=
+        callable {
+            return id2
+        }
+
+    let effect =
+         raytracingEffect {
+             raygen raygenShader
+             callable "Foo" callableShader
+         }
+
+    GLSL.shouldCompileRaytracing effect

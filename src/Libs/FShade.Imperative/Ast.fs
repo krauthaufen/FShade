@@ -268,13 +268,12 @@ module CLiteral =
             | :? uint32 as v        -> CLiteral.CIntegral(int64 v) |> Some
             | :? uint64 as v        -> CLiteral.CIntegral(int64 v) |> Some
             | :? unativeint as v    -> CLiteral.CIntegral(int64 v) |> Some
-
-
             | :? float16 as v       -> CLiteral.CFractional(float v) |> Some
             | :? float32 as v       -> CLiteral.CFractional(float v) |> Some
             | :? float as v         -> CLiteral.CFractional(v) |> Some
             | :? decimal as v       -> CLiteral.CFractional(float v) |> Some
             | :? string as v        -> CLiteral.CString(v) |> Some
+            | :? IRaytracingId as v -> CLiteral.CIntegral(int64 v.Index) |> Some
             | _                     -> None
 
 type CVecComponent =

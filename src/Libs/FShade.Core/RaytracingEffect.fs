@@ -19,7 +19,7 @@ module RaytracingIntrinsics =
     [<KeepCall>]
     let traceRay (accelerationStructure : IAccelerationStructure)
                  (rayFlags : RayFlags) (cullMask : int)
-                 (sbtRecordOffset : int) (sbtRecordStride : int) (missIndex : int)
+                 (sbtRecordOffset : RayId) (sbtRecordStride : int) (missIndex : MissId)
                  (origin : V3f) (minT : float32)
                  (direction : V3f) (maxT : float32)
                  (payload : int) : unit =
@@ -29,7 +29,7 @@ module RaytracingIntrinsics =
 
 
     [<KeepCall>]
-    let executeCallable (index : int) (callable : int) : unit =
+    let executeCallable (id : CallableId) (callable : int) : unit =
         onlyInShaderCode "executeCallable"
 
     let executeCallableMeth = getMethodInfo <@ executeCallable @>
@@ -58,30 +58,41 @@ module private RaytracingUtilities =
 
     let rec private substituteStubs (sbt : ShaderBindingTableLayout) (e : Expr) =
         match e with
+        | Value (:? RayId as id, _) when not id.IsEmpty ->
+            let index = sbt.GetRayOffset(id.Name)
+            Expr.Value <| RayId(id.Name, index)
+
+        | Value (:? MissId as id, _) when not id.IsEmpty ->
+            let index = sbt.GetMissIndex(id.Name)
+            Expr.Value <| MissId(id.Name, index)
+
         | Call(None, mi, args) when mi = Preprocessor.Stubs.traceRayMeth ->
             match args with
-            | [accel; cullMask; flags;
-               String rayId; String missId;
+            | [accel; cullMask; flags; rayId; missId;
                origin; minT; direction; maxT; payload] ->
-                let sbtRecordOffset = Expr.Value <| sbt.GetRayOffset(Sym.ofString rayId)
+                let rayId = substituteStubs sbt rayId
                 let sbtRecordStride = Expr.Value sbt.RayStride
-                let missIndex = Expr.Value <| sbt.GetMissIndex(Sym.ofString missId)
+                let missId = substituteStubs sbt missId
 
                 Expr.Call(
                     RaytracingIntrinsics.traceRayMeth,
                     [accel; flags; cullMask;
-                    sbtRecordOffset; sbtRecordStride; missIndex;
+                    rayId; sbtRecordStride; missId;
                     origin; minT; direction; maxT; payload]
                 )
 
             | _ ->
                 failwithf "[FShade] Unexpected arguments when substituting traceRay stub: %A" args
 
+        | Value (:? CallableId as id, _) when not id.IsEmpty ->
+            let index = sbt.GetCallableIndex(id.Name)
+            Expr.Value <| CallableId(id.Name, index)
+
         | Call(None, mi, args) when mi = Preprocessor.Stubs.executeCallableMeth ->
             match args with
-            | [String id; callable] ->
-                let callableIndex = Expr.Value <| sbt.GetCallableIndex(Sym.ofString id)
-                Expr.Call(RaytracingIntrinsics.executeCallableMeth, [callableIndex; callable])
+            | [id; callable] ->
+                let id = substituteStubs sbt id
+                Expr.Call(RaytracingIntrinsics.executeCallableMeth, [id; callable])
 
             | _ ->
                 failwithf "[FShade] Unexpected arguments when substituting executeCallable stub: %A" args

@@ -85,6 +85,13 @@ module ReflectionPatterns =
         else
             ValueNone
 
+    [<return: Struct>]
+    let (|RaytracingId|_|) (t : Type) =
+        if typeof<IRaytracingId>.IsAssignableFrom(t) then
+            ValueSome ()
+        else
+            ValueNone
+
     type UniformParameter with
         member x.decorations =
             match x.uniformType with

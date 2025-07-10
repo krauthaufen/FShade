@@ -41,6 +41,9 @@ type RayHitKind =
     | FrontFacingTriangle = 0xFE
     | BackFacingTriangle  = 0xFF
 
+type IRaytracingId =
+    abstract member Index : int
+
 type ShaderStage =
     | Vertex        = 0
     | TessControl   = 1

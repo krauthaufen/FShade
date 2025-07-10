@@ -223,6 +223,12 @@ type Backend private(config : Config) =
                     tag = t
                 }
 
+            | RaytracingId ->
+                Some {
+                    intrinsicTypeName = "int"
+                    tag = t
+                }
+
             | _ ->
                 None
 

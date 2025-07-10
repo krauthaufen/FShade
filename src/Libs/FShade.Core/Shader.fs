@@ -371,6 +371,20 @@ module Preprocessor =
                 ValueNone
 
         [<return: Struct>]
+        let (|RayId|_|) (e : Expr) =
+            match e with
+            | NewObject(ci, [name]) when ci.DeclaringType = typeof<RayId> -> ValueSome name
+            | ValueWithName (:? RayId as id, _, _) -> ValueSome <| Expr.Value id
+            | _ -> ValueNone
+
+        [<return: Struct>]
+        let (|MissId|_|) (e : Expr) =
+            match e with
+            | NewObject(ci, [name]) when ci.DeclaringType = typeof<MissId> -> ValueSome name
+            | ValueWithName (:? MissId as id, _, _) -> ValueSome <| Expr.Value id
+            | _ -> ValueNone
+
+        [<return: Struct>]
         let (|TraceRay|_|) (e : Expr) =
             match e with
             | Call(Some (Scene accel), Method("TraceRay", _), args) ->
@@ -395,6 +409,13 @@ module Preprocessor =
         let private (|StaticMethod|_|) (e : Expr) =
             match e with
             | Call(None, mi, args) when mi.IsStatic -> ValueSome (mi.DeclaringType, mi.Name, args)
+            | _ -> ValueNone
+
+        [<return: Struct>]
+        let (|CallableId|_|) (e : Expr) =
+            match e with
+            | NewObject(ci, [name]) when ci.DeclaringType = typeof<CallableId> -> ValueSome name
+            | ValueWithName (:? CallableId as id, _, _) -> ValueSome <| Expr.Value id
             | _ -> ValueNone
 
         [<return: Struct>]
@@ -723,9 +744,9 @@ module Preprocessor =
             callableData    : HashMap<Type, string * int>
             callableDataIn  : Option<string * Type>
             hitAttribute    : Option<string * Type>
-            rayTypes        : Set<string>
-            missShaders     : Set<string>
-            callableShaders : Set<string>
+            rayTypes        : Set<RayId>
+            missShaders     : Set<MissId>
+            callableShaders : Set<CallableId>
             localSize       : V3i
             expressionType  : ShaderExpressionType
         }
@@ -942,45 +963,51 @@ module Preprocessor =
                     { s with hitAttribute = Some (name, hitAttribute) }, name
             )
 
-        [<return: Struct>]
-        let private (|Name|_|) (value : obj) =
-            match value with
-            | :? string as name -> ValueSome name
-            | :? Symbol as sym -> ValueSome (string sym)
+        let private tryGetId<'T> (create : Symbol -> 'T) (e : Expr) =
+            match Expr.TryEval e with
+            | Some (:? 'T as id) -> ValueSome id
+            | Some (:? Symbol as sym) -> ValueSome <| create sym
+            | Some (:? string as name) -> ValueSome <| create (Sym.ofString name)
             | _ -> ValueNone
 
         let useRayType (e : Expr) =
             State.custom (fun (s : State) ->
-                match Expr.TryEval e with
-                | Some (Name name) ->
-                    { s with rayTypes = s.rayTypes |> Set.add name }, name
+                match tryGetId RayId e with
+                | ValueSome id ->
+                    let s = if id.IsEmpty then s else { s with rayTypes = s.rayTypes |> Set.add id }
+                    s, Expr.Value id
                 | _ ->
-                    failwithf "[FShade] Ray type name must be constant"
+                    if e.Type = typeof<RayId> then s, e
+                    else failwithf "[FShade] Ray type name must be constant: %A" e
             )
 
         let useMissShader (e : Expr) =
             State.custom (fun (s : State) ->
-                match Expr.TryEval e with
-                | Some (Name name) ->
-                    { s with missShaders = s.missShaders |> Set.add name }, name
+                match tryGetId MissId e with
+                | ValueSome id ->
+                    let s = if id.IsEmpty then s else { s with missShaders = s.missShaders |> Set.add id }
+                    s, Expr.Value id
                 | _ ->
-                    failwithf "[FShade] Miss shader name must be constant"
+                    if e.Type = typeof<MissId> then s, e
+                    else failwithf "[FShade] Miss shader name must be constant: %A" e
             )
 
         let useCallableShader (e : Expr) =
             State.custom (fun (s : State) ->
-                match Expr.TryEval e with
-                | (Some (Name name)) ->
-                    { s with callableShaders = s.callableShaders |> Set.add name }, name
+                match tryGetId CallableId e with
+                | ValueSome id ->
+                    let s = if id.IsEmpty then s else { s with callableShaders = s.callableShaders |> Set.add id }
+                    s, Expr.Value id
                 | _ ->
-                    failwithf "[FShade] Callable shader name must be constant"
+                    if e.Type = typeof<CallableId> then s, e
+                    else failwithf "[FShade] Callable shader name must be constant: %A" e
             )
 
     module Stubs =
         [<KeepCall>]
         let private traceRay (scene : IAccelerationStructure)
                              (cullMask : int) (flags : RayFlags)
-                             (rayId : string) (missId : string)
+                             (rayId : RayId) (missId : MissId)
                              (origin : V3f) (minT : float32)
                              (direction : V3f) (maxT : float32)
                              (payload : int) : unit =
@@ -990,7 +1017,7 @@ module Preprocessor =
 
 
         [<KeepCall>]
-        let private executeCallable (id : string) (callable : int) : unit =
+        let private executeCallable (id : CallableId) (callable : int) : unit =
             onlyInShaderCode "executeCallableStub"
 
         let executeCallableMeth = getMethodInfo <@ executeCallable @>
@@ -1116,6 +1143,12 @@ module Preprocessor =
             | TraceRay _ when not (ShaderStage.supportsTraceRay stage) ->
                 return failwithf "[FShade] Cannot invoke TraceRay in %A shaders" stage
 
+            | RayId id ->
+                return! State.useRayType id
+
+            | MissId id ->
+                return! State.useMissShader id
+
             | TraceRay args ->
                 let! origin = preprocessRaytracingS stage args.origin
                 let! direction = preprocessRaytracingS stage args.direction
@@ -1132,12 +1165,10 @@ module Preprocessor =
                         State.value None
 
                 let! payloadName, payloadIndex = State.usePayload e.Type
-                let! ray = State.useRayType args.ray
-                let! miss = State.useMissShader args.miss
+                let! rayId = State.useRayType args.ray
+                let! missId = State.useMissShader args.miss
                 let! accel = State.readAccelerationStructure args.accelerationStructure
 
-                let rayId = Expr.Value(ray)
-                let missId = Expr.Value(miss)
                 let payloadIndex = Expr.Value(payloadIndex)
 
                 return Expr.Seq [
@@ -1164,6 +1195,9 @@ module Preprocessor =
                 let! name = State.usePayloadIn payload
                 return Expr.ReadRaytracingData(payload, name)
 
+            | CallableId id ->
+                return! State.useCallableShader id
+
             | ExecuteCallable(id, data) ->
                 let! id = State.useCallableShader id
 
@@ -1182,7 +1216,7 @@ module Preprocessor =
                     | Some d -> Expr.WriteRaytracingData(callableDataName, d)
                     | _ -> ()
 
-                    Expr.Call(Stubs.executeCallableMeth, [Expr.Value id; callableDataIndex])
+                    Expr.Call(Stubs.executeCallableMeth, [id; callableDataIndex])
 
                     Expr.ReadRaytracingData(e.Type, callableDataName)
                 ]
@@ -2240,9 +2274,9 @@ module Preprocessor =
                 shaderCallableData      = inverseMap state.callableData
                 shaderCallableDataIn    = state.callableDataIn
                 shaderHitAttribute      = state.hitAttribute
-                shaderRayTypes          = state.rayTypes |> Set.map Sym.ofString
-                shaderMissShaders       = state.missShaders |> Set.map Sym.ofString
-                shaderCallableShaders   = state.callableShaders |> Set.map Sym.ofString
+                shaderRayTypes          = state.rayTypes |> Set.map _.Name
+                shaderMissShaders       = state.missShaders |> Set.map _.Name
+                shaderCallableShaders   = state.callableShaders |> Set.map _.Name
             }
 
         shader :: state.shaders
