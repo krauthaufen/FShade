@@ -257,30 +257,6 @@ module RaytracingBuilders =
         member inline x.AnyHit(group : HitGroup, rayType : string, f : 'a -> Expr<'b>) =
             x.AnyHit(group, Sym.ofString rayType, f)
 
-        [<CustomOperation("anyHit"); Obsolete("Use overload with untupled arguments.")>]
-        member x.AnyHit(group : HitGroup, (rayType, shader) : Symbol * Shader) =
-            x.AnyHit(group, rayType, shader)
-
-        [<CustomOperation("anyHit"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.AnyHit(group : HitGroup, (rayType, e) : Symbol * Expr<'a>) =
-            x.AnyHit(group, rayType, e)
-
-        [<CustomOperation("anyHit"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.AnyHit(group : HitGroup, (rayType, f) : Symbol * ('a -> Expr<'b>)) =
-            x.AnyHit(group, rayType, f)
-
-        [<CustomOperation("anyHit"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.AnyHit(group : HitGroup, (rayType, shader) : string * Shader) =
-            x.AnyHit(group, rayType, shader)
-
-        [<CustomOperation("anyHit"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.AnyHit(group : HitGroup, (rayType, e) : string * Expr<'a>) =
-            x.AnyHit(group, rayType, e)
-
-        [<CustomOperation("anyHit"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.AnyHit(group : HitGroup, (rayType, f) : string * ('a -> Expr<'b>)) =
-            x.AnyHit(group, rayType, f)
-
         [<CustomOperation("anyHit")>]
         member inline x.AnyHit(group : HitGroup, shader : Shader) =
             x.AnyHit(group, Identifier.Default, shader)
@@ -318,30 +294,6 @@ module RaytracingBuilders =
         member x.ClosestHit(group : HitGroup, rayType : string, f : 'a -> Expr<'b>) =
             x.ClosestHit(group, Sym.ofString rayType, f)
 
-        [<CustomOperation("closestHit"); Obsolete("Use overload with untupled arguments.")>]
-        member x.ClosestHit(group : HitGroup, (rayType, shader) : Symbol * Shader) =
-            x.ClosestHit(group, rayType, shader)
-
-        [<CustomOperation("closestHit"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.ClosestHit(group : HitGroup, (rayType, e) : Symbol * Expr<'a>) =
-            x.ClosestHit(group, rayType, e)
-
-        [<CustomOperation("closestHit"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.ClosestHit(group : HitGroup, (rayType, f) : Symbol * ('a -> Expr<'b>)) =
-            x.ClosestHit(group, rayType, f)
-
-        [<CustomOperation("closestHit"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.ClosestHit(group : HitGroup, (rayType, shader) : string * Shader) =
-            x.ClosestHit(group, rayType, shader)
-
-        [<CustomOperation("closestHit"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.ClosestHit(group : HitGroup, (rayType, e) : string * Expr<'a>) =
-            x.ClosestHit(group, rayType, e)
-
-        [<CustomOperation("closestHit"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.ClosestHit(group : HitGroup, (rayType, f) : string * ('a -> Expr<'b>)) =
-            x.ClosestHit(group, rayType, f)
-
         [<CustomOperation("closestHit")>]
         member inline x.ClosestHit(group : HitGroup, shader : Shader) =
             x.ClosestHit(group, Identifier.Default, shader)
@@ -378,30 +330,6 @@ module RaytracingBuilders =
         [<CustomOperation("intersection")>]
         member x.Intersection(group : HitGroup, rayType : string, f : 'a -> Expr<'b>) =
             x.Intersection(group, Sym.ofString rayType, f)
-
-        [<CustomOperation("intersection"); Obsolete("Use overload with untupled arguments.")>]
-        member x.Intersection(group : HitGroup, (rayType, shader) : Symbol * Shader) =
-            x.Intersection(group, rayType, shader)
-
-        [<CustomOperation("intersection"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.Intersection(group : HitGroup, (rayType, e) : Symbol * Expr<'a>) =
-            x.Intersection(group, rayType, e)
-
-        [<CustomOperation("intersection"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.Intersection(group : HitGroup, (rayType, f) : Symbol * ('a -> Expr<'b>)) =
-            x.Intersection(group, rayType, f)
-
-        [<CustomOperation("intersection"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.Intersection(group : HitGroup, (rayType, shader) : string * Shader) =
-            x.Intersection(group, rayType, shader)
-
-        [<CustomOperation("intersection"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.Intersection(group : HitGroup, (rayType, e) : string * Expr<'a>) =
-            x.Intersection(group, rayType, e)
-
-        [<CustomOperation("intersection"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.Intersection(group : HitGroup, (rayType, f) : string * ('a -> Expr<'b>)) =
-            x.Intersection(group, rayType, f)
 
         [<CustomOperation("intersection")>]
         member inline x.Intersection(group : HitGroup, shader : Shader) =
@@ -483,30 +411,6 @@ module RaytracingBuilders =
         member inline x.Miss(shaders : Map<ShaderSlot, RaytracingShader>, name : string, f : 'a -> Expr<'b>) =
             x.Miss(shaders, Sym.ofString name, f)
 
-        [<CustomOperation("miss"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.Miss(shaders : Map<ShaderSlot, RaytracingShader>, (name, shader) : Symbol * Shader) =
-            x.Miss(shaders, name, shader)
-
-        [<CustomOperation("miss"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.Miss(shaders : Map<ShaderSlot, RaytracingShader>, (name, e) : Symbol * Expr<'a>) =
-            x.Miss(shaders, name, e)
-
-        [<CustomOperation("miss"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.Miss(shaders : Map<ShaderSlot, RaytracingShader>, (name, f) : Symbol * ('a -> Expr<'b>)) =
-            x.Miss(shaders, name, f)
-
-        [<CustomOperation("miss"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.Miss(shaders : Map<ShaderSlot, RaytracingShader>, (name, shader) : string * Shader) =
-           x.Miss(shaders, name, shader)
-
-        [<CustomOperation("miss"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.Miss(shaders : Map<ShaderSlot, RaytracingShader>, (name, e) : string * Expr<'a>) =
-            x.Miss(shaders, name, e)
-
-        [<CustomOperation("miss"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.Miss(shaders : Map<ShaderSlot, RaytracingShader>, (name, f) : string * ('a -> Expr<'b>)) =
-            x.Miss(shaders, name, f)
-
         [<CustomOperation("miss")>]
         member inline x.Miss(shaders : Map<ShaderSlot, RaytracingShader>, shader : Shader) =
             x.Miss(shaders, Identifier.Default, shader)
@@ -543,30 +447,6 @@ module RaytracingBuilders =
         [<CustomOperation("callable")>]
         member inline x.Callable(shaders : Map<ShaderSlot, RaytracingShader>, name : string , f : 'a -> Expr<'b>) =
             x.Callable(shaders, Sym.ofString name, f)
-
-        [<CustomOperation("callable"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.Callable(shaders : Map<ShaderSlot, RaytracingShader>, (name, shader) : Symbol * Shader) =
-            x.Callable(shaders, name, shader)
-
-        [<CustomOperation("callable"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.Callable(shaders : Map<ShaderSlot, RaytracingShader>, (name, e) : Symbol * Expr<'a>) =
-            x.Callable(shaders, name, e)
-
-        [<CustomOperation("callable"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.Callable(shaders : Map<ShaderSlot, RaytracingShader>, (name, f) : Symbol * ('a -> Expr<'b>)) =
-            x.Callable(shaders, name, f)
-
-        [<CustomOperation("callable"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.Callable(shaders : Map<ShaderSlot, RaytracingShader>, (name, shader) : string * Shader) =
-            x.Callable(shaders, name, shader)
-
-        [<CustomOperation("callable"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.Callable(shaders : Map<ShaderSlot, RaytracingShader>, (name, e) : string * Expr<'a>) =
-            x.Callable(shaders, name, e)
-
-        [<CustomOperation("callable"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.Callable(shaders : Map<ShaderSlot, RaytracingShader>, (name, f) : string * ('a -> Expr<'b>)) =
-            x.Callable(shaders, name, f)
 
         [<CustomOperation("callable")>]
         member inline x.Callable(shaders : Map<ShaderSlot, RaytracingShader>, shader : Shader) =
@@ -606,14 +486,6 @@ module RaytracingBuilders =
         [<CustomOperation("hitgroup")>]
         member inline x.HitGroup(shaders : Map<ShaderSlot, RaytracingShader>, name : string, group : HitGroup) =
             x.HitGroup(shaders, Sym.ofString name, group)
-
-        [<CustomOperation("hitgroup"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.HitGroup(shaders : Map<ShaderSlot, RaytracingShader>, (name, group) : Symbol * HitGroup) =
-            x.HitGroup(shaders, name, group)
-
-        [<CustomOperation("hitgroup"); Obsolete("Use overload with untupled arguments.")>]
-        member inline x.HitGroup(shaders : Map<ShaderSlot, RaytracingShader>, (name, group) : string * HitGroup) =
-            x.HitGroup(shaders, name, group)
 
 
     let hitgroup = HitGroupBuilder()
