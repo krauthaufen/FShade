@@ -1143,6 +1143,7 @@ module Effect =
                 shaderMissShaders = Set.empty
                 shaderCallableShaders = Set.empty
                 shaderDepthWriteMode = DepthWriteMode.None
+                shaderStorageBufferAccess = Map.empty
             }
             
     let tryReplaceGeometry (e : Effect) =

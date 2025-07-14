@@ -1447,6 +1447,13 @@ module Assembler =
         | Std430 = 2
 
     let private uniformLayout (layout : Layout) (decorations : list<UniformDecoration>) (set : int) (binding : int) =
+        
+        let bufferAccess =
+            decorations |> List.tryPick (function 
+                | UniformDecoration.BufferAccess a -> Some a
+                | _ -> None
+            )
+            
         let decorations =
             decorations |> List.choose (fun d ->
                 match d with
@@ -1454,6 +1461,7 @@ module Assembler =
                 | UniformDecoration.BufferBinding _
                 | UniformDecoration.BufferDescriptorSet _
                 | UniformDecoration.FieldIndex _ -> None
+                | UniformDecoration.BufferAccess _ -> None
             )
 
         let decorations =
@@ -1473,10 +1481,16 @@ module Assembler =
 
             layout @ decorations
 
-        match decorations with
+        let layout = 
+            match decorations with
             | [] -> ""
-            | d -> d |> String.concat ", " |> sprintf "layout(%s)\r\n" 
+            | d -> d |> String.concat ", " |> sprintf "layout(%s)" 
 
+        match bufferAccess with
+        | Some StorageAccess.Read -> sprintf "%s\r\nreadonly " layout
+        | Some StorageAccess.Write -> sprintf "%s\r\nwriteonly " layout
+        | _ -> sprintf "%s\r\n" layout
+    
 
 
     let assembleUniformsS (uniforms : list<CUniform>) =
@@ -1541,9 +1555,16 @@ module Assembler =
                                     fields |> List.mapS (fun field ->
                                         state {
                                             let! binding = getBinding InputKind.StorageBuffer 1 [field]
-                                            let prefix = uniformLayout Layout.Std430 [] set binding
+                                            let prefix = uniformLayout Layout.Std430 field.cUniformDecorations set binding
                                             let name = checkName field.cUniformName
 
+                                            
+                                            let access =
+                                                field.cUniformDecorations |> List.tryPick (function
+                                                    | UniformDecoration.BufferAccess a -> Some a
+                                                    | _ -> None
+                                                ) |> Option.defaultValue StorageAccess.None
+                                            
                                             match field.cUniformType with
                                             | CType.CPointer(_,ct) ->
                                                 do! Interface.addStorageBuffer {
@@ -1551,7 +1572,8 @@ module Assembler =
                                                     ssbBinding = binding
                                                     ssbName = name.Name
                                                     ssbType = GLSLType.ofCType config.reverseMatrixLogic ct
-                                                }
+                                                    ssbAccess = access
+                                                }                      
                                                 match ct with
                                                 | CType.CPointer(_,ct) ->
                                                     let typ = assembleType config.reverseMatrixLogic ct
@@ -1754,7 +1776,7 @@ module Assembler =
                                         | true, _, mode when mode.HasFlag InterpolationMode.PerPatch -> return ["patch"]
                                         | _ -> return []
 
-                                | ParameterDecoration.StorageBuffer(read, write) ->
+                                | ParameterDecoration.StorageBuffer(access) ->
                                     let! binding = AssemblerState.newBinding InputKind.StorageBuffer 1
 
                                     let args = []
@@ -1772,13 +1794,14 @@ module Assembler =
 
                                     let args = "std430" :: args |> String.concat ","
 
-                                    let rw = ""
-//                                            match read, write with
-//                                                | false, true -> " writeonly"
-//                                                | true, false -> " readonly"
-//                                                | _ -> ""
+                                    let rw =
+                                        match access with
+                                        | StorageAccess.Read -> "readonly "
+                                        | StorageAccess.Write -> "writeonly "
+                                        | StorageAccess.ReadWrite -> ""
+                                        | _ -> ""
 
-                                    return [sprintf "layout(%s) buffer%s " args rw + (p.cParamSemantic + "_ssb")]
+                                    return [sprintf "layout(%s) %sbuffer " args rw + (p.cParamSemantic + "_ssb")]
 
                                 | ParameterDecoration.Shared -> 
                                     return ["shared"]
@@ -1844,12 +1867,19 @@ module Assembler =
 
                     if isBuffer then
                         match p.cParamType with
-                            | CType.CPointer(_,ct) -> 
+                            | CType.CPointer(_,ct) ->
+                                let access =
+                                    p.cParamDecorations |> Seq.tryPick (function
+                                        | ParameterDecoration.StorageBuffer access -> Some access
+                                        | _ -> None
+                                    ) |> Option.defaultValue StorageAccess.None
+                                
                                 do! Interface.addStorageBuffer {
                                     ssbSet = bSet
                                     ssbBinding = bBinding
                                     ssbName = p.cParamName
                                     ssbType = GLSLType.ofCType config.reverseMatrixLogic ct
+                                    ssbAccess = access
                                 }
                             | _ ->
                                 failwithf "[GLSL] not a storage buffer type: %A" p.cParamType

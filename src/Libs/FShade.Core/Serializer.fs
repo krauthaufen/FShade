@@ -2073,6 +2073,11 @@ module Serializer =
             for s in shader.shaderCallableShaders do dst.Write (string s)
 
             dst.Write (int shader.shaderDepthWriteMode)
+            
+            dst.Write (Map.count shader.shaderStorageBufferAccess)
+            for KeyValue(name, access) in shader.shaderStorageBufferAccess do
+                dst.Write name
+                dst.Write (int access)
  
         let internal deserializeInternal (state : DeserializerState) (src : BinaryReader) =
             let stage = src.ReadInt32() |> unbox<ShaderStage>
@@ -2182,6 +2187,14 @@ module Serializer =
             let shaderDepthWriteMode =
                 src.ReadInt32() |> unbox<DepthWriteMode>
 
+            let shaderStorageBufferAccess =
+                let cnt = src.ReadInt32()
+                List.init cnt (fun _ ->
+                    let name = src.ReadString()
+                    let access = src.ReadInt32() |> unbox<StorageAccess>
+                    name, access
+                ) |> Map.ofList
+            
             {
                 shaderStage = stage
                 shaderInputs = shaderInputs
@@ -2203,6 +2216,7 @@ module Serializer =
                 shaderMissShaders = shaderMissShaders
                 shaderCallableShaders = shaderCallableShaders
                 shaderDepthWriteMode = shaderDepthWriteMode
+                shaderStorageBufferAccess = shaderStorageBufferAccess
             }
 
 [<AutoOpen>]

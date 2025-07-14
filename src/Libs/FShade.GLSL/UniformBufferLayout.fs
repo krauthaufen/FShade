@@ -357,6 +357,7 @@ type GLSLStorageBuffer =
         ssbBinding      : int
         ssbName         : string
         ssbType         : GLSLType
+        ssbAccess       : StorageAccess
     }
 
 type GLSLUniformBufferField =
@@ -1350,6 +1351,7 @@ module GLSLProgramInterface =
             dst.Write ssb.ssbName
             dst.Write ssb.ssbSet
             GLSLType.serializeInternal dst ssb.ssbType
+            dst.Write (int ssb.ssbAccess)
             
         dst.Write program.uniformBuffers.Count
         for KeyValue(name, ub) in program.uniformBuffers do
@@ -1503,11 +1505,13 @@ module GLSLProgramInterface =
                 let ssbName = src.ReadString()
                 let ssbSet = src.ReadInt32()
                 let ssbType = GLSLType.deserializeInternal src
+                let ssbAccess = src.ReadInt32() |> unbox<StorageAccess>
                 name, {
                     ssbBinding = ssbBinding
                     ssbName = ssbName
                     ssbSet = ssbSet
                     ssbType = ssbType
+                    ssbAccess = ssbAccess
                 }
             )   
             |> MapExt.ofList

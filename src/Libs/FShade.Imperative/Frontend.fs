@@ -17,7 +17,7 @@ type ParameterDecoration =
     | Memory of MemoryType
     | Const
     | Slot of int
-    | StorageBuffer of read : bool * write : bool
+    | StorageBuffer of access : StorageAccess
     | Shared
     | DepthWrite of DepthWriteMode
 
@@ -27,6 +27,7 @@ type UniformDecoration =
     | FieldIndex of int
     | BufferDescriptorSet of int
     | BufferBinding of int
+    | BufferAccess of StorageAccess
 
 type Uniform =
     {

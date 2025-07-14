@@ -62,7 +62,10 @@ type Shader =
         shaderMissShaders : Set<Symbol>
         /// the shader's referenced callable shaders (only useful in some raytracing shaders)
         shaderCallableShaders : Set<Symbol>
+        /// the shader's depth write mode (only greater, only less, etc.)
         shaderDepthWriteMode : DepthWriteMode
+        /// access flags for storage buffers
+        shaderStorageBufferAccess : Map<string, StorageAccess>
     }
 
 [<CompilerMessage("Preprocessor should not be used directly", 4321, IsHidden = true)>]
@@ -707,27 +710,28 @@ module Preprocessor =
 
     type State =
         {
-            depthWriteMode  : DepthWriteMode
-            inputTypes      : List<Type>
-            inputTopology   : Option<InputTopology>
-            vertexType      : Type
-            builder         : Option<Expr>
-            inputs          : Map<string, ParameterDescription>
-            outputs         : Map<string, ParameterDescription>
-            uniforms        : Map<string, UniformParameter>
-            vertexIndex     : Map<Var, Expr>
-            variableValues  : Map<Var, Expr>
-            shaders         : list<Shader>
-            payloads        : HashMap<Type, string * int>
-            payloadIn       : Option<string * Type>
-            callableData    : HashMap<Type, string * int>
-            callableDataIn  : Option<string * Type>
-            hitAttribute    : Option<string * Type>
-            rayTypes        : Set<string>
-            missShaders     : Set<string>
-            callableShaders : Set<string>
-            localSize       : V3i
-            expressionType  : ShaderExpressionType
+            depthWriteMode      : DepthWriteMode
+            inputTypes          : List<Type>
+            inputTopology       : Option<InputTopology>
+            vertexType          : Type
+            builder             : Option<Expr>
+            inputs              : Map<string, ParameterDescription>
+            outputs             : Map<string, ParameterDescription>
+            uniforms            : Map<string, UniformParameter>
+            vertexIndex         : Map<Var, Expr>
+            variableValues      : Map<Var, Expr>
+            shaders             : list<Shader>
+            payloads            : HashMap<Type, string * int>
+            payloadIn           : Option<string * Type>
+            callableData        : HashMap<Type, string * int>
+            callableDataIn      : Option<string * Type>
+            hitAttribute        : Option<string * Type>
+            rayTypes            : Set<string>
+            missShaders         : Set<string>
+            callableShaders     : Set<string>
+            localSize           : V3i
+            expressionType      : ShaderExpressionType
+            storageBufferAccess : Map<string, StorageAccess>
         }
         
     let shaderUtilityFunctions = System.Collections.Concurrent.ConcurrentDictionary<V3i * MethodBase, Option<Expr * State>>()
@@ -740,27 +744,28 @@ module Preprocessor =
 
         let empty =
             {
-                depthWriteMode  = DepthWriteMode.None
-                inputTypes      = []
-                inputTopology   = None
-                vertexType      = typeof<NoInput>
-                builder         = None
-                inputs          = Map.empty
-                outputs         = Map.empty
-                uniforms        = Map.empty
-                vertexIndex     = Map.empty
-                variableValues  = Map.empty
-                shaders         = []
-                payloads        = HashMap.empty
-                payloadIn       = None
-                callableData    = HashMap.empty
-                callableDataIn  = None
-                hitAttribute    = None
-                rayTypes        = Set.empty
-                missShaders     = Set.empty
-                callableShaders = Set.empty
-                localSize       = V3i.Zero
-                expressionType  = ShaderExpressionType.Normal
+                depthWriteMode      = DepthWriteMode.None
+                inputTypes          = []
+                inputTopology       = None
+                vertexType          = typeof<NoInput>
+                builder             = None
+                inputs              = Map.empty
+                outputs             = Map.empty
+                uniforms            = Map.empty
+                vertexIndex         = Map.empty
+                variableValues      = Map.empty
+                shaders             = []
+                payloads            = HashMap.empty
+                payloadIn           = None
+                callableData        = HashMap.empty
+                callableDataIn      = None
+                hitAttribute        = None
+                rayTypes            = Set.empty
+                missShaders         = Set.empty
+                callableShaders     = Set.empty
+                localSize           = V3i.Zero
+                expressionType      = ShaderExpressionType.Normal
+                storageBufferAccess = Map.empty
             }
 
         let createInner (parent : State) =
@@ -854,6 +859,13 @@ module Preprocessor =
                     { s with State.uniforms = Map.add p.uniformName p s.uniforms }
             )
 
+        let addStorageAccess (name : string) (access : StorageAccess) =
+            State.modify (fun s ->
+                match Map.tryFind name s.storageBufferAccess with
+                | Some a -> { s with storageBufferAccess = Map.add name (access ||| a) s.storageBufferAccess }
+                | None -> { s with storageBufferAccess = Map.add name access s.storageBufferAccess }
+            )
+        
         let writeOutput (name : string) (desc : ParameterDescription) = 
             State.modify (fun s ->
                 { s with State.outputs = Map.add name desc s.outputs }
@@ -1262,6 +1274,7 @@ module Preprocessor =
             match e with
                 | GetArray(ValueWithName(v, t, name), i) ->
                     let! i = preprocessComputeS i
+                    do! State.addStorageAccess name StorageAccess.Read
                     match t with
                         | ArrOf(_,t) | ArrayOf t ->
                             return Expr.ReadInput(ParameterKind.Input, t, name, i)
@@ -1271,6 +1284,7 @@ module Preprocessor =
                 | SetArray(ValueWithName(v, t, name), i, e) ->
                     let! i = preprocessComputeS i
                     let! e = preprocessComputeS e
+                    do! State.addStorageAccess name StorageAccess.Write
                     return Expr.WriteOutputsRaw([name, Some i, e])
 
                 | PropertyGet(Some (ValueWithName(v, t, name)), prop, []) when t.IsArray && (prop.Name = "Length" || prop.Name = "LongLength") ->
@@ -1358,6 +1372,24 @@ module Preprocessor =
             let! vertexType = State.vertexType
 
             match e with
+            
+            | SetArray(StorageBuffer u, index, value) ->
+                let! value = preprocessNormalS value
+                let! index = preprocessNormalS index
+                do! u |> State.readUniform true
+                
+                do! State.addStorageAccess u.uniformName StorageAccess.Write
+                
+                return Expr.ArraySet(Expr.ReadInput(ParameterKind.Uniform, u.uniformType, u.uniformName), index, value)
+            
+            | GetArray(StorageBuffer u, index) ->
+                let! index = preprocessNormalS index
+                do! u |> State.readUniform true
+                
+                do! State.addStorageAccess u.uniformName StorageAccess.Read
+                
+                return Expr.ArrayAccess(Expr.ReadInput(ParameterKind.Uniform, u.uniformType, u.uniformName), index)
+            
             | ConstantSwizzle(v, prop, baseType) ->
                 let tmp = Var("tmp", v.Type)
                 let components =
@@ -2214,26 +2246,27 @@ module Preprocessor =
 
         let shader = 
             { 
-                shaderStage             = builder.ShaderStage
-                shaderInputs            = state.inputs
-                shaderOutputs           = outputs
-                shaderUniforms          = state.uniforms
-                shaderInputTopology     = state.inputTopology
-                shaderOutputTopology    = builder.OutputTopology
-                shaderOutputVertices    = outputVertices
-                shaderOutputPrimitives  = None
-                shaderInvocations       = 1
-                shaderBody              = body
-                shaderDebugRange        = None
-                shaderDepthWriteMode    = state.depthWriteMode
-                shaderPayloads          = inverseMap state.payloads
-                shaderPayloadIn         = state.payloadIn
-                shaderCallableData      = inverseMap state.callableData
-                shaderCallableDataIn    = state.callableDataIn
-                shaderHitAttribute      = state.hitAttribute
-                shaderRayTypes          = state.rayTypes |> Set.map Sym.ofString
-                shaderMissShaders       = state.missShaders |> Set.map Sym.ofString
-                shaderCallableShaders   = state.callableShaders |> Set.map Sym.ofString
+                shaderStage                 = builder.ShaderStage
+                shaderInputs                = state.inputs
+                shaderOutputs               = outputs
+                shaderUniforms              = state.uniforms
+                shaderInputTopology         = state.inputTopology
+                shaderOutputTopology        = builder.OutputTopology
+                shaderOutputVertices        = outputVertices
+                shaderOutputPrimitives      = None
+                shaderInvocations           = 1
+                shaderBody                  = body
+                shaderDebugRange            = None
+                shaderDepthWriteMode        = state.depthWriteMode
+                shaderPayloads              = inverseMap state.payloads
+                shaderPayloadIn             = state.payloadIn
+                shaderCallableData          = inverseMap state.callableData
+                shaderCallableDataIn        = state.callableDataIn
+                shaderHitAttribute          = state.hitAttribute
+                shaderRayTypes              = state.rayTypes |> Set.map Sym.ofString
+                shaderMissShaders           = state.missShaders |> Set.map Sym.ofString
+                shaderCallableShaders       = state.callableShaders |> Set.map Sym.ofString
+                shaderStorageBufferAccess   = state.storageBufferAccess
             }
 
         shader :: state.shaders
@@ -3596,11 +3629,23 @@ module Shader =
                         | UniformValue.SamplerArray arr -> Array.toList arr |> List.map (fun (n,s) -> n, s :> obj)
                         | _ -> []
 
+                
+                let decorations = 
+                    match u.uniformValue with
+                    | UniformValue.Attribute(scope, name) when scope.FullName = "StorageBuffer" ->
+                        match Map.tryFind name s.shaderStorageBufferAccess with
+                        | Some access ->
+                            UniformDecoration.BufferAccess access :: u.decorations
+                        | None ->
+                            u.decorations
+                    | _ ->
+                        u.decorations
+                
                 {
                     uniformName = u.uniformName
                     uniformType = u.uniformType
                     uniformBuffer = uniformBuffer
-                    uniformDecorations = u.decorations
+                    uniformDecorations = decorations
                     uniformTextureInfo = textureInfos
                 }
             )
@@ -3661,29 +3706,30 @@ module Shader =
             | ShaderStage.Vertex | ShaderStage.Fragment ->
                 let parameters = attributes |> Map.map (fun _ -> ParameterDescription.ofType)
                 {
-                    shaderStage             = stage
-                    shaderInputs            = parameters
-                    shaderOutputs           = parameters
-                    shaderUniforms          = Map.empty
-                    shaderInputTopology     = None
-                    shaderOutputTopology    = None
-                    shaderOutputVertices    = ShaderOutputVertices.Unknown
-                    shaderOutputPrimitives  = None
-                    shaderInvocations       = 1
+                    shaderStage                 = stage
+                    shaderInputs                = parameters
+                    shaderOutputs               = parameters
+                    shaderUniforms              = Map.empty
+                    shaderInputTopology         = None
+                    shaderOutputTopology        = None
+                    shaderOutputVertices        = ShaderOutputVertices.Unknown
+                    shaderOutputPrimitives      = None
+                    shaderInvocations           = 1
                     shaderBody =
                         attributes
                             |> Map.map (fun n t -> None, Expr.ReadInput(ParameterKind.Input, t, n))
                             |> Expr.WriteOutputs
-                    shaderDebugRange        = None
-                    shaderDepthWriteMode    = DepthWriteMode.None
-                    shaderPayloads          = Map.empty
-                    shaderPayloadIn         = None
-                    shaderCallableData      = Map.empty
-                    shaderCallableDataIn    = None
-                    shaderHitAttribute      = None
-                    shaderRayTypes          = Set.empty
-                    shaderMissShaders       = Set.empty
-                    shaderCallableShaders   = Set.empty
+                    shaderDebugRange            = None
+                    shaderDepthWriteMode        = DepthWriteMode.None
+                    shaderPayloads              = Map.empty
+                    shaderPayloadIn             = None
+                    shaderCallableData          = Map.empty
+                    shaderCallableDataIn        = None
+                    shaderHitAttribute          = None
+                    shaderRayTypes              = Set.empty
+                    shaderMissShaders           = Set.empty
+                    shaderCallableShaders       = Set.empty
+                    shaderStorageBufferAccess   = Map.empty
                 }
             | _ ->
                 failwith "[FShade] not implemented"
