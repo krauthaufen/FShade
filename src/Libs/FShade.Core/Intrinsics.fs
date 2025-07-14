@@ -173,40 +173,86 @@ module RaytracingInputTypes =
 
     type WorkDimensions =
         {
+            /// The index of the work item being processed.
             [<LaunchId>]   id   : V3i
+
+            /// The number of work items in each dimension.
             [<LaunchSize>] size : V3i
         }
 
     type GeometryInstance =
         {
+            /// The index of the triangle or bounding box being processed.
             [<PrimitiveId>]         primitiveId         : int
+
+            /// The index of the instance that intersects the current ray.
             [<InstanceId>]          instanceId          : int
+
+            /// The application defined value of the instance that intersects
+            /// the current ray. The value provided in this built-in is obtained
+            /// from the lower 24 bits of the variable, the upper 8 bits are zero.
             [<InstanceCustomIndex>] instanceCustomIndex : int
+
+            /// The geometry index for the acceleration structure geometry currently being shaded.
             [<GeometryIndex>]       geometryIndex       : int
         }
 
     type RayParameters =
         {
+            /// The origin of the ray being processed in world space.
             [<WorldRayOrigin>]    origin    : V3f
+
+            /// The direction of the ray being processed in world space.
             [<WorldRayDirection>] direction : V3f
+
+            /// The parametric minT value of the ray being processed.
+            /// The value is independent of the space in which the ray origin and direction exist.
             [<RayTmin>]           minT      : float32
+
+            /// The parametric maxT value of the ray being processed.
+            /// The value is independent of the space in which the ray origin and direction exist.
             [<RayTmax>]           maxT      : float32
+
+            /// The flags of the current ray.
             [<IncomingRayFlags>]  flags     : RayFlags
         }
 
     type ObjectSpace =
         {
+            /// The origin of the ray being processed in object space.
             [<ObjectRayOrigin>]    rayOrigin     : V3f
+
+            /// The direction of the ray being processed in object space.
             [<ObjectRayDirection>] rayDirection  : V3f
+
+            /// The object-to-world transformation matrix determined
+            /// by the instance of the current intersection.
             [<ObjectToWorld>]      objectToWorld : M34f
+
+            /// The world-to-object transformation matrix determined
+            /// by the instance of the current intersection.
             [<WorldToObject>]      worldToObject : M34f
         }
 
     type RayHit<'T> =
         {
+            /// The parametric value of the ray being processed.
+            /// The value is independent of the space in which the ray origin and direction exist.
             [<HitT>]         t          : float32
+
+            /// Describes the intersection that triggered the execution of the current
+            /// shader. Values are sent from the intersection shader. For triangle
+            /// geometry, kind is set to FrontFacingTriangle or BackFacingTriangle.
             [<HitKind>]      kind       : RayHitKind
+
+            /// Attribute written by the intersection shader.
+            /// For triangle geometry without custom intersection shader, the attribute
+            /// is a V2f containing the barycentric coordinates of the hit.
             [<HitAttribute>] attribute  : 'T
+
+            /// The object space vertices of the triangle at the current intersection.
+            /// The positions returned are transformed by the geometry transform.
+            /// Note: Requires GL_EXT_ray_tracing_position_fetch.
             [<HitPositions>] positions  : Arr<3 N, V3f>
         }
 
@@ -233,6 +279,8 @@ type RayHitInput<'Payload, 'HitAttribute> =
         ray         : RaytracingInputTypes.RayParameters
         hit         : RaytracingInputTypes.RayHit<'HitAttribute>
         objectSpace : RaytracingInputTypes.ObjectSpace
+
+        /// The payload passed to TraceRay().
         [<RayPayloadIn>] payload : 'Payload
     }
 
