@@ -56,6 +56,7 @@ type Config =
     {
         version                     : GLSLVersion
         enabledExtensions           : Set<string>
+        availableExtensions         : Map<string, bool>
         createUniformBuffers        : bool
         pushConstants               : bool
 
@@ -2218,7 +2219,13 @@ module Assembler =
                 let! values = m.values |> List.mapS assembleValueDefS
 
                 let! s = State.get
-                let extensions = Set.union c.enabledExtensions s.requiredExtensions
+                let extensions =
+                    Set.union c.enabledExtensions s.requiredExtensions
+                    |> Set.filter (fun ext ->
+                        let supported = c.availableExtensions |> Map.tryFindV ext |> ValueOption.defaultValue true
+                        if not supported then Log.warn "[FShade] Extension %A is not supported" ext
+                        supported
+                    )
 
                 let version =
                     if c.version.Suffix <> "" then sprintf "#version %d%d%d %s" c.version.Major c.version.Minor c.version.Patch c.version.Suffix

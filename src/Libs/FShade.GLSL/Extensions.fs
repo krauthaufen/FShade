@@ -11,6 +11,7 @@ module Backends =
         Backend.Create {
             version                     = GLSLVersion(4,1,0)
             enabledExtensions           = Set.ofList [ ]
+            availableExtensions         = Map.empty
             createUniformBuffers        = true
             pushConstants               = false
             bindingMode                 = BindingMode.PerKind
@@ -30,6 +31,7 @@ module Backends =
         Backend.Create {
             version                     = GLSLVersion(4,3,0)
             enabledExtensions           = Set.ofList [ ]
+            availableExtensions         = Map.empty
             createUniformBuffers        = true
             pushConstants               = false
             bindingMode                 = BindingMode.PerKind
@@ -49,6 +51,7 @@ module Backends =
         Backend.Create {
             version                     = GLSLVersion(1,2,0)
             enabledExtensions           = Set.empty
+            availableExtensions         = Map.empty
             createUniformBuffers        = false
             pushConstants               = false
             bindingMode                 = BindingMode.None
@@ -68,6 +71,7 @@ module Backends =
         Backend.Create {
             version                     = GLSLVersion(4,5,0)
             enabledExtensions           = Set.ofList [ "GL_ARB_tessellation_shader"; "GL_ARB_separate_shader_objects"; "GL_ARB_shading_language_420pack" ]
+            availableExtensions         = Map.empty
             createUniformBuffers        = true
             pushConstants               = true
             bindingMode                 = BindingMode.Global
@@ -87,6 +91,7 @@ module Backends =
         Backend.Create {
             version                     = GLSLVersion(4,6,0)
             enabledExtensions           = Set.ofList [ "GL_EXT_ray_tracing"; "GL_EXT_nonuniform_qualifier" ]
+            availableExtensions         = Map.empty
             createUniformBuffers        = true
             pushConstants               = true
             bindingMode                 = BindingMode.Global

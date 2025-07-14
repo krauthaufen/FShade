@@ -180,6 +180,7 @@ module UtiliyFunctions =
                     GLSL.Backend.Create {
                         version                     = GLSL.GLSLVersion(4,1,0)
                         enabledExtensions           = Set.ofList [ ]
+                        availableExtensions         = Map.empty
                         createUniformBuffers        = true
                         pushConstants               = false
                         bindingMode                 = GLSL.BindingMode.PerKind
