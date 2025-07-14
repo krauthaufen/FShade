@@ -69,28 +69,8 @@ module Backends =
 
     let glslVulkan =
         Backend.Create {
-            version                     = GLSLVersion(4,5,0)
-            enabledExtensions           = Set.ofList [ "GL_ARB_tessellation_shader"; "GL_ARB_separate_shader_objects"; "GL_ARB_shading_language_420pack" ]
-            availableExtensions         = Map.empty
-            createUniformBuffers        = true
-            pushConstants               = true
-            bindingMode                 = BindingMode.Global
-            createDescriptorSets        = true
-            stepDescriptorSets          = false
-            createInputLocations        = true
-            createOutputLocations       = true
-            createPassingLocations      = true
-            createPerStageUniforms      = true
-            reverseMatrixLogic          = true
-            reverseTessellationWinding  = true
-            depthWriteMode              = true
-            useInOut                    = true
-        }
-
-    let glslRaytracing =
-        Backend.Create {
             version                     = GLSLVersion(4,6,0)
-            enabledExtensions           = Set.ofList [ "GL_EXT_ray_tracing"; "GL_EXT_nonuniform_qualifier" ]
+            enabledExtensions           = Set.ofList [ "GL_ARB_tessellation_shader"; "GL_ARB_separate_shader_objects"; "GL_ARB_shading_language_420pack" ]
             availableExtensions         = Map.empty
             createUniformBuffers        = true
             pushConstants               = true
@@ -135,6 +115,3 @@ module Backends =
 
         let compileGLSLVulkan (module_ : Module) =
             compileGLSL glslVulkan module_
-
-        let compileGLSLRaytracing (module_ : Module) =
-            compileGLSL glslRaytracing module_

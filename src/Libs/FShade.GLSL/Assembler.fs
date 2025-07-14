@@ -2038,6 +2038,9 @@ module Assembler =
                         }
                     )
 
+            match stages with
+            | ShaderStageDescription.Raytracing _ -> do! AssemblerState.useExtension "GL_EXT_ray_tracing"
+            | _ -> ()
 
             let entryName = checkName e.cEntryName
 

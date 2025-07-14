@@ -518,7 +518,7 @@ let main args =
     let glsl =
         effect
         |> RaytracingEffect.toModule
-        |> ModuleCompiler.compileGLSLRaytracing
+        |> ModuleCompiler.compileGLSLVulkan
 
     Log.start "GLSL"
     let lines = glsl.code.Split("\r\n") |> Array.indexed

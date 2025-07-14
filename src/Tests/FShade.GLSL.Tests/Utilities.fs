@@ -67,7 +67,7 @@ module GLSL =
 
     let compileRaytracing (effect : RaytracingEffect) =
         let module_ = effect |> RaytracingEffect.toModule
-        let glsl = module_ |> ModuleCompiler.compileGLSLRaytracing
+        let glsl = module_ |> ModuleCompiler.compileGLSLVulkan
 
         let compile (slot : ShaderSlot) (shader : RaytracingShader) =
             let result = glslangWithTarget GLSLang.Target.SPIRV_1_4 shader.Stage [slot.Conditional] glsl.code
