@@ -1,3 +1,12 @@
+### 5.7.0-prerelease0002
+- Added support for push constants
+- Added support for GL_EXT_ray_tracing_position_fetch
+- [Raytracing] Changed type of object-world transforms to M34f
+- [Raytracing] Added RayId, MissId, and CallableId
+- [GLSL] Improved name mangling for invalid characters
+- [GLSL] Added Config.availableExtensions
+- [GLSL] Merged Vulkan and Raytracing backends
+
 ### 5.7.0-prerelease0001
 - Removed double as float feature
 - Added basic support for 8-bit, 16-bit, and 64-bit data types
