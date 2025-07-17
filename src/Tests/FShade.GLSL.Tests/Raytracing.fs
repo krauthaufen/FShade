@@ -240,6 +240,33 @@ let ``Ray type based on SRTP``() =
     GLSL.shouldCompileRaytracing effect
 
 [<Test>]
+let ``ignoreIntersection / terminateRay``() =
+    Setup.Run()
+
+    let raygenShader =
+        raygen {
+            ()
+        }
+
+    let anyhitShader (input: RayHitInput<int>) =
+        anyHit {
+            ignoreIntersection()
+            terminateRay()
+            return int input.hit.attribute.X
+        }
+
+    let effect =
+         let hitgroup1 =
+             hitgroup { anyHit anyhitShader }
+
+         raytracingEffect {
+             raygen raygenShader
+             hitgroup "1" hitgroup1
+         }
+
+    GLSL.shouldCompileRaytracingAndContainRegex effect [ "ignoreIntersectionEXT"; "terminateRayEXT" ]
+
+[<Test>]
 let ``Hit triangle vertex positions``() =
     Setup.Run()
 
@@ -255,7 +282,6 @@ let ``Hit triangle vertex positions``() =
 
     let anyhitShader (input: RayHitInput<V3f>) =
         anyHit {
-            ignoreIntersection()
             return input.hit.positions.[2]
         }
 
@@ -286,7 +312,6 @@ let ``Object / World transforms``() =
 
     let anyhitShader (input: RayHitInput<V3f>) =
         anyHit {
-            ignoreIntersection()
             return input.objectSpace.objectToWorld.C0 + input.objectSpace.worldToObject.C0 + input.payload
         }
 

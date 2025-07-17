@@ -2,6 +2,7 @@
 
 open Aardvark.Base
 open System.Runtime.InteropServices
+open FShade.Imperative
 
 module private Identifier =
     [<Literal>]
@@ -138,6 +139,32 @@ type Scene(accelerationStructure : ISemanticValue) =
                           [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT : float32,
                           [<Optional; DefaultParameterValue(TraceDefaults.Flags)>]    flags : RayFlags,
                           [<Optional; DefaultParameterValue(TraceDefaults.CullMask)>] cullMask : int) : 'T = onlyInShaderCode "TraceRay"
+
+[<AutoOpen>]
+module RaytracingIntrinsics =
+
+    [<KeepCall>]
+    let ignoreIntersection() : unit = onlyInShaderCode "ignoreIntersection"
+
+    [<KeepCall>]
+    let terminateRay() : unit = onlyInShaderCode "terminateRay"
+
+    [<KeepCall>]
+    let private reportIntersection (t : float32) (hitKind : RayHitKind) : bool = onlyInShaderCode "reportIntersection"
+
+    [<KeepCall>]
+    let private executeCallable (id : CallableId) (callableDataLocation : int) : unit = onlyInShaderCode "executeCallable"
+
+    [<KeepCall>]
+    let private traceRay (accelerationStructure : IAccelerationStructure) (rayFlags : RayFlags) (cullMask : int)
+                         (sbtRecordOffset : RayId) (sbtRecordStride : int) (missIndex : MissId) (origin : V3f) (minT : float32)
+                         (direction : V3f) (maxT : float32) (payloadLocation : int) : unit =
+        onlyInShaderCode "traceRay"
+
+    module MethodInfo =
+        let reportIntersection = getMethodInfo <@ reportIntersection @>
+        let executeCallable = getMethodInfo <@ executeCallable @>
+        let traceRay = getMethodInfo <@ traceRay @>
 
 [<AutoOpen>]
 module SceneExtensions =

@@ -1003,25 +1003,6 @@ module Preprocessor =
                     else failwithf "[FShade] Callable shader name must be constant: %A" e
             )
 
-    module Stubs =
-        [<KeepCall>]
-        let private traceRay (scene : IAccelerationStructure)
-                             (cullMask : int) (flags : RayFlags)
-                             (rayId : RayId) (missId : MissId)
-                             (origin : V3f) (minT : float32)
-                             (direction : V3f) (maxT : float32)
-                             (payload : int) : unit =
-            onlyInShaderCode "traceRayStub"
-
-        let traceRayMeth = getMethodInfo <@ traceRay @>
-
-
-        [<KeepCall>]
-        let private executeCallable (id : CallableId) (callable : int) : unit =
-            onlyInShaderCode "executeCallableStub"
-
-        let executeCallableMeth = getMethodInfo <@ executeCallable @>
-
     module private MethodInfo =
 
         let op_addition    = getMethodInfo <@ (+) : float -> float -> float @>
@@ -1035,7 +1016,6 @@ module Preprocessor =
 
         let not = getMethodInfo <@ not : bool -> bool @>
         let defaultOf = getMethodInfo <@ Unchecked.defaultof<int> @>
-        let reportIntersection = getMethodInfo <@ reportIntersection @>
 
     [<AutoOpen>]
     module private ExprExtensions =
@@ -1159,10 +1139,8 @@ module Preprocessor =
 
                 let! payloadIn =
                     match args.payload with
-                    | ValueSome p ->
-                        preprocessRaytracingS stage p |> State.map Some
-                    | ValueNone ->
-                        State.value None
+                    | ValueSome p -> preprocessRaytracingS stage p |> State.map ValueSome
+                    | ValueNone -> State.value ValueNone
 
                 let! payloadName, payloadIndex = State.usePayload e.Type
                 let! rayId = State.useRayType args.ray
@@ -1173,16 +1151,13 @@ module Preprocessor =
 
                 return Expr.Seq [
                     match payloadIn with
-                    | Some p -> Expr.WriteRaytracingData(payloadName, p)
+                    | ValueSome p -> Expr.WriteRaytracingData(payloadName, p)
                     | _ -> ()
 
+                    // sbtRecordStride is set to -1 initially, replaced when creating RaytracingEffect
                     Expr.Call(
-                        Stubs.traceRayMeth,
-                        [accel; cullMask;
-                        flags; rayId; missId;
-                        origin; minT;
-                        direction; maxT;
-                        payloadIndex]
+                        MethodInfo.traceRay,
+                        [ accel; flags; cullMask; rayId; Expr.Value(-1); missId; origin; minT; direction; maxT; payloadIndex ]
                     )
 
                     Expr.ReadRaytracingData(e.Type, payloadName)
@@ -1203,20 +1178,18 @@ module Preprocessor =
 
                 let! callableDataIn =
                     match data with
-                    | ValueSome d ->
-                        preprocessRaytracingS stage d |> State.map Some
-                    | ValueNone ->
-                        State.value None
+                    | ValueSome d -> preprocessRaytracingS stage d |> State.map ValueSome
+                    | ValueNone ->  State.value ValueNone
 
                 let! callableDataName, callableDataIndex = State.useCallableData e.Type
                 let callableDataIndex = Expr.Value(callableDataIndex)
 
                 return Expr.Seq [
                     match callableDataIn with
-                    | Some d -> Expr.WriteRaytracingData(callableDataName, d)
+                    | ValueSome d -> Expr.WriteRaytracingData(callableDataName, d)
                     | _ -> ()
 
-                    Expr.Call(Stubs.executeCallableMeth, [id; callableDataIndex])
+                    Expr.Call(MethodInfo.executeCallable, [id; callableDataIndex])
 
                     Expr.ReadRaytracingData(e.Type, callableDataName)
                 ]
@@ -1238,18 +1211,17 @@ module Preprocessor =
                 let! attribute =
                     match attribute with
                     | ValueSome attr ->
-                        preprocessRaytracingS stage attr
-                        |> State.bind (fun value ->
-                            State.useHitAttribute value.Type |> State.map (fun name -> Some (name, value))
-                        )
-                    | ValueNone ->
-                        State.value None
+                        state {
+                            let! value = preprocessRaytracingS stage attr
+                            let! name = State.useHitAttribute value.Type
+                            return ValueSome (name, value)
+                        }
+                    | _ ->
+                        State.value ValueNone
 
                 return Expr.Seq [
                     match attribute with
-                    | Some (name, value) ->
-                        Expr.WriteRaytracingData(name, value)
-
+                    | ValueSome (name, value) -> Expr.WriteRaytracingData(name, value)
                     | _ -> ()
 
                     Expr.Call(MethodInfo.reportIntersection, [t; kind])
@@ -2957,19 +2929,16 @@ module Shader =
             ShaderStage.Vertex, 
                 HashSet.ofList [
                     getMethodInfo <@ barrier @>
-                    getMethodInfo <@ Debug.Printf @>
                 ]
 
             ShaderStage.TessControl, 
                 HashSet.ofList [
                     getMethodInfo <@ barrier @>
-                    getMethodInfo <@ Debug.Printf @>
                 ]
 
             ShaderStage.TessEval, 
                 HashSet.ofList [
                     getMethodInfo <@ barrier @>
-                    getMethodInfo <@ Debug.Printf @>
                 ]
 
             ShaderStage.Geometry, 
@@ -2978,53 +2947,17 @@ module Shader =
                     getMethodInfo <@ restartStrip @>
                     getMethodInfo <@ endPrimitive @>
                     getMethodInfo <@ barrier @>
-                    getMethodInfo <@ Debug.Printf @>
                 ]
 
             ShaderStage.Fragment, 
                 HashSet.ofList [
                     getMethodInfo <@ discard @>
                     getMethodInfo <@ barrier @>
-                    getMethodInfo <@ Debug.Printf @>
                 ]
 
             ShaderStage.Compute,
                 HashSet.ofList [
                     getMethodInfo <@ barrier @>
-                    getMethodInfo <@ Debug.Printf @>
-                ]
-
-            ShaderStage.RayGeneration,
-                HashSet.ofList [
-                    getMethodInfo <@ Debug.Printf @>
-                ]
-
-            ShaderStage.Intersection,
-                HashSet.ofList [
-                    getMethodInfo <@ reportIntersection @>
-                    getMethodInfo <@ Debug.Printf @>
-                ]
-
-            ShaderStage.AnyHit,
-                HashSet.ofList [
-                    getMethodInfo <@ ignoreIntersection @>
-                    getMethodInfo <@ terminateRay @>
-                    getMethodInfo <@ Debug.Printf @>
-                ]
-
-            ShaderStage.ClosestHit,
-                HashSet.ofList [
-                    getMethodInfo <@ Debug.Printf @>
-                ]
-
-            ShaderStage.Miss,
-                HashSet.ofList [
-                    getMethodInfo <@ Debug.Printf @>
-                ]
-
-            ShaderStage.Callable,
-                HashSet.ofList [
-                    getMethodInfo <@ Debug.Printf @>
                 ]
         ]
 
@@ -3184,7 +3117,7 @@ module Shader =
     ///    3) inline copy variables
     ///    4) inline functions where possible
     let optimize (shader : Shader) =
-        let sideEffects = sideEffects.[shader.shaderStage]
+        let sideEffects = sideEffects.GetOrDefault(shader.shaderStage, HashSet.empty)
 
         let isSideEffect (m : MethodInfo) =
             if sideEffects.Contains m then

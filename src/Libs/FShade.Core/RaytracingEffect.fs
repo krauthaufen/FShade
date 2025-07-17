@@ -8,32 +8,10 @@ open System.Security.Cryptography
 
 open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Quotations.Patterns
-open Microsoft.FSharp.Quotations.DerivedPatterns
 open Microsoft.FSharp.Quotations.ExprShape
 
 open Aardvark.Base
 open FShade.Imperative
-
-module RaytracingIntrinsics =
-
-    [<KeepCall>]
-    let traceRay (accelerationStructure : IAccelerationStructure)
-                 (rayFlags : RayFlags) (cullMask : int)
-                 (sbtRecordOffset : RayId) (sbtRecordStride : int) (missIndex : MissId)
-                 (origin : V3f) (minT : float32)
-                 (direction : V3f) (maxT : float32)
-                 (payload : int) : unit =
-        onlyInShaderCode "traceRay"
-
-    let traceRayMeth = getMethodInfo <@ traceRay @>
-
-
-    [<KeepCall>]
-    let executeCallable (id : CallableId) (callable : int) : unit =
-        onlyInShaderCode "executeCallable"
-
-    let executeCallableMeth = getMethodInfo <@ executeCallable @>
-
 
 [<AutoOpen>]
 module private RaytracingUtilities =
@@ -66,16 +44,16 @@ module private RaytracingUtilities =
             let index = sbt.GetMissIndex(id.Name)
             Expr.Value <| MissId(id.Name, index)
 
-        | Call(None, mi, args) when mi = Preprocessor.Stubs.traceRayMeth ->
+        | Call(None, mi, args) when mi = MethodInfo.traceRay ->
             match args with
-            | [accel; cullMask; flags; rayId; missId;
+            | [accel; flags; cullMask; rayId; _; missId;
                origin; minT; direction; maxT; payload] ->
                 let rayId = substituteStubs sbt rayId
                 let sbtRecordStride = Expr.Value sbt.RayStride
                 let missId = substituteStubs sbt missId
 
                 Expr.Call(
-                    RaytracingIntrinsics.traceRayMeth,
+                    MethodInfo.traceRay,
                     [accel; flags; cullMask;
                     rayId; sbtRecordStride; missId;
                     origin; minT; direction; maxT; payload]
@@ -87,15 +65,6 @@ module private RaytracingUtilities =
         | Value (:? CallableId as id, _) when not id.IsEmpty ->
             let index = sbt.GetCallableIndex(id.Name)
             Expr.Value <| CallableId(id.Name, index)
-
-        | Call(None, mi, args) when mi = Preprocessor.Stubs.executeCallableMeth ->
-            match args with
-            | [id; callable] ->
-                let id = substituteStubs sbt id
-                Expr.Call(RaytracingIntrinsics.executeCallableMeth, [id; callable])
-
-            | _ ->
-                failwithf "[FShade] Unexpected arguments when substituting executeCallable stub: %A" args
 
         | CallFunction(f, args) ->
             let f = f |> UtilityFunction.map (substituteStubs sbt)
