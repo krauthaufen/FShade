@@ -86,7 +86,7 @@ module GLSL =
         let outputs, lastStage =
             e.LastShader
                 |> Option.map (fun s -> (s.shaderOutputs |> Map.map (fun k v -> v.paramType) |> Map.toList), s.shaderStage)
-                |> Option.defaultValue (["Colors", typeof<V4d>], ShaderStage.Fragment)
+                |> Option.defaultValue (["Colors", typeof<V4f>], ShaderStage.Fragment)
 
         let module_ =
             e |> Effect.toModule {

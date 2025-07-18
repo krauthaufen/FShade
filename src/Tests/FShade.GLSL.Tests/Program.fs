@@ -6,6 +6,7 @@ open System.IO
 open Aardvark.Base
 open FShade
 open FShade.Imperative
+open FShade.Tests.GLSL
 open Microsoft.FSharp.Quotations
 open FShade.GLSL
 
@@ -25,7 +26,7 @@ module Trafo =
         member x.ViewProjTrafo : M44f = x?PerView?ViewProjTrafo
         member x.ModelViewTrafo : M44f = x?PerModel?ModelViewTrafo
         member x.ModelViewProjTrafo : M44f = x?PerModel?ModelViewProjTrafo
-        member x.NormalMatrix : M33d = x?PerModel?NormalMatrix
+        member x.NormalMatrix : M33f = x?PerModel?NormalMatrix
 
         member x.ModelTrafoInv : M44f = x?PerModel?ModelTrafoInv
         member x.ViewTrafoInv : M44f = x?PerView?ViewTrafoInv
@@ -197,26 +198,74 @@ module ThickLine =
         }
 
 
+    let sammy =
+        [|
+            sampler2d {
+                texture uniform?DiffuseColorTexture
+                filter Filter.MinMagMipLinear
+                addressU WrapMode.Clamp
+                addressV WrapMode.Clamp
+                addressW WrapMode.Clamp
+            }
+            sampler2d {
+                texture uniform?Tex1
+                filter Filter.MinMagMipLinear
+                addressU WrapMode.Clamp
+                addressV WrapMode.Clamp
+                addressW WrapMode.Clamp
+            }
+        |]
+        
+    [<ReflectedDefinition>]
+    let mySammy (s : Sampler2d) (tc : V2f) =
+        s.Sample(tc)
+        
+    let frag (v : ThickLineVertex) =
+        fragment {
+            return mySammy sammy.[0] v.lc
+        }
+
+
 [<EntryPoint>]
 let main args = 
     Aardvark.Base.Aardvark.Init()
 
     let e = 
         Effect.compose [
-            Effect.ofFunction Trafo.trafo
-            Effect.ofFunction ThickLine.thickLine
+            Effect.ofFunction ThickLine.frag
         ]
 
-    let outputs = Map.ofList ["Colors", (typeof<V4f>, 0); "Normals", (typeof<V3f>, 1)]
-
+    let outputs = Map.ofList ["Colors", (typeof<V4f>, 0)]
+    
+    let glslSeparateSamplersAndTextures =
+        Backend.Create {
+            version                     = GLSLVersion(4,5,0)
+            enabledExtensions           = Set.ofList [ "GL_ARB_tessellation_shader"; "GL_ARB_separate_shader_objects"; "GL_ARB_shading_language_420pack" ]
+            createUniformBuffers        = true
+            bindingMode                 = BindingMode.Global
+            createDescriptorSets        = true
+            stepDescriptorSets          = false
+            createInputLocations        = true
+            createOutputLocations       = true
+            createPassingLocations      = true
+            createPerStageUniforms      = true
+            reverseMatrixLogic          = true
+            reverseTessellationWinding  = true
+            depthWriteMode              = true
+            useInOut                    = true
+            separateTexturesAndSamplers = true
+            pushConstants = false
+            availableExtensions = Map.empty
+        }
     let glsl = 
         e
         |> Effect.tryReplaceGeometry
         |> Option.get
         |> Effect.toModule { depthRange = Range1f(-1.0f, 1.0f); flipHandedness = false; lastStage = ShaderStage.Fragment; outputs = outputs }
-        |> ModuleCompiler.compileGLSL430
+        |> ModuleCompiler.compileGLSL glslSeparateSamplersAndTextures
 
     printfn "%s" glsl.code
 
+    shouldCompile' glslSeparateSamplersAndTextures [e]
   
     0
