@@ -1,3 +1,6 @@
+### 5.7.0-prerelease0003
+- [GLSL] added `Config.separateTexturesAndSamplers` for automatically splitting samplers into separate texture/sampler uniforms for better interop with Vulkan/WGSL
+
 ### 5.7.0-prerelease0002
 - Added support for push constants
 - Added support for GL_EXT_ray_tracing_position_fetch

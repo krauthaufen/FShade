@@ -3,6 +3,19 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.1.31911.260
 MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{660F6600-B00C-43EE-ABD2-2F97DB09932E}"
+	ProjectSection(SolutionItems) = preProject
+		global.json = ..\global.json
+		paket.dependencies = ..\paket.dependencies
+		paket.lock = ..\paket.lock
+		README.md = ..\README.md
+		RELEASE_NOTES.md = ..\RELEASE_NOTES.md
+		dotnet-tools.json = ..\.config\dotnet-tools.json
+		publish.yml = ..\.github\workflows\publish.yml
+		build.yml = ..\.github\workflows\build.yml
+		
+	EndProjectSection
+EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FShade.Imperative", "Libs\FShade.Imperative\FShade.Imperative.fsproj", "{1223C55B-5634-4764-B5BD-BF9AD95C073B}"
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FShade.Core", "Libs\FShade.Core\FShade.Core.fsproj", "{0F39C812-B7FB-4210-9E83-19D85A1CD10D}"
@@ -27,6 +40,7 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FShade.GLSL.Tests", "Tests\
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "fshadeaot", "FShade.Preprocessor\fshadeaot.fsproj", "{8EA0F9FC-F88E-4635-B285-AD5BB286B3D1}"
 EndProject
+
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
