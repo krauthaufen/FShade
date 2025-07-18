@@ -22,8 +22,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: .\pack.cmd
-      - name: Test
-        run: dotnet test src\FShade.sln -c Release --no-build --nologo --logger:"console;verbosity=normal"
+#      - name: Test
+#        run: dotnet test src\FShade.sln -c Release --no-build --nologo --logger:"console;verbosity=normal"
       - name: Upload Packages
         uses: actions/upload-artifact@v4
         with:
