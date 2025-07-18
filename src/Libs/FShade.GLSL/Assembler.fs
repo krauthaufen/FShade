@@ -67,6 +67,7 @@ type Config =
         createPerStageUniforms      : bool
         reverseMatrixLogic          : bool
         reverseTessellationWinding  : bool
+        separateTexturesAndSamplers : bool
 
         depthWriteMode              : bool
         useInOut                    : bool
@@ -123,6 +124,555 @@ module GLSLShader =
         use ms = new MemoryStream(data)
         tryDeserialize ms
 
+
+module SamplerSplitter =
+    
+    let textureTypeName (samplerName : string) =
+        samplerName.Replace("sampler", "texture")
+        
+    let textureType (s : GLSLSamplerType) =
+        {
+            GLSLTextureType.dimension   = s.dimension
+            GLSLTextureType.isShadow    = s.isShadow
+            GLSLTextureType.isArray     = s.isArray
+            GLSLTextureType.isMS        = s.isMS
+            GLSLTextureType.valueType   = s.valueType
+        }
+    
+    let samplerName (name : string) =
+        name + "SAM"
+        
+    let textureName (name : string) =
+        name + "TEX"
+    
+    [<AutoOpen>]
+    module Patterns =
+        let (|CSamplerType|_|) (t : CType) =
+            match t with
+            | CType.CIntrinsic { intrinsicTypeName = name; tag = :? GLSLTextureLike as (GLSLTextureLike.GLSLSampler sam) } ->
+                Some(name, sam)
+            | _ ->
+                None
+                
+        let (|CSampleExpr|_|) (e : CExpr) =
+            match e with
+            | CExpr.CCallIntrinsic(ret, func, args) when func.isSamplerFunction ->
+                Some (ret, func, args)
+            | _ ->
+                None
+           
+    module CUniform =
+        let splitTexturesAndSamplers (u : CUniform) =
+            match u.cUniformType with
+            | CSamplerType(name, sam) ->
+                let texType = 
+                    CType.CIntrinsic {
+                        intrinsicTypeName = textureTypeName name
+                        tag = GLSLTextureLike.GLSLTexture (textureType sam)
+                    }
+                
+                let samType =
+                    CType.CIntrinsic {
+                        intrinsicTypeName = "sampler"
+                        tag = GLSLTextureLike.GLSLSamplerState
+                    }
+                    
+                [
+                    {
+                        cUniformType         = texType
+                        cUniformName         = textureName u.cUniformName
+                        cUniformDecorations  = u.cUniformDecorations
+                        cUniformBuffer       = u.cUniformBuffer
+                    }
+                    
+                    {
+                        cUniformType         = samType
+                        cUniformName         = samplerName u.cUniformName
+                        cUniformDecorations  = u.cUniformDecorations
+                        cUniformBuffer       = u.cUniformBuffer
+                    }
+                ]
+            | CArray(CSamplerType(name, sam), len) ->
+                let texType = 
+                    CType.CIntrinsic {
+                        intrinsicTypeName = textureTypeName name
+                        tag = GLSLTextureLike.GLSLTexture (textureType sam)
+                    }
+                
+                let samType =
+                    CType.CIntrinsic {
+                        intrinsicTypeName = "sampler"
+                        tag = GLSLTextureLike.GLSLSamplerState
+                    }
+                    
+                [
+                    {
+                        cUniformType         = CType.CArray(texType, len)
+                        cUniformName         = textureName u.cUniformName
+                        cUniformDecorations  = u.cUniformDecorations
+                        cUniformBuffer       = u.cUniformBuffer
+                    }
+                    
+                    {
+                        cUniformType         = CType.CArray(samType, len)
+                        cUniformName         = samplerName u.cUniformName
+                        cUniformDecorations  = u.cUniformDecorations
+                        cUniformBuffer       = u.cUniformBuffer
+                    }
+                ]
+            | _ ->
+                [u]
+        
+    module CParameter =
+        let splitTexturesAndSamplers (p : CParameter) : list<CParameter> =
+            match p.ctype with
+            | CSamplerType(name, sam) ->
+                let texType = 
+                    CType.CIntrinsic {
+                        intrinsicTypeName = textureTypeName name
+                        tag = GLSLTextureLike.GLSLTexture (textureType sam)
+                    }
+                
+                let samType =
+                    CType.CIntrinsic {
+                        intrinsicTypeName = "sampler"
+                        tag = GLSLTextureLike.GLSLSamplerState
+                    }
+                    
+                [
+                    { p with ctype = texType; name = textureName p.name }
+                    { p with ctype = samType; name = samplerName p.name }
+                ]
+            | CArray(CSamplerType(name, sam), len) ->
+                let texType = 
+                    CType.CIntrinsic {
+                        intrinsicTypeName = textureTypeName name
+                        tag = GLSLTextureLike.GLSLTexture (textureType sam)
+                    }
+                
+                let samType =
+                    CType.CIntrinsic {
+                        intrinsicTypeName = "sampler"
+                        tag = GLSLTextureLike.GLSLSamplerState
+                    }
+                    
+                [
+                    { p with ctype = CType.CArray(texType, len); name = textureName p.name }
+                    { p with ctype = CType.CArray(samType, len); name = samplerName p.name }
+                ]
+            | _ ->
+                [p]
+            
+            
+            
+        
+    module CFunctionSignature =
+        let splitTexturesAndSamplers (u : CFunctionSignature) =
+            { u with parameters = u.parameters |> Array.collect (CParameter.splitTexturesAndSamplers >> Array.ofList) }
+        
+        
+    module CExpr =
+        
+        let rec splitExpr (e : CExpr) : list<CExpr> =
+            match e with
+            | CExpr.CVar v ->
+                match v.ctype with
+                | CSamplerType(name, sam) ->
+                    [
+                        CExpr.CVar {
+                            name = textureName v.name
+                            ctype = CType.CIntrinsic {
+                                intrinsicTypeName = textureTypeName name
+                                tag = GLSLTextureLike.GLSLTexture (textureType sam)
+                            }
+                        }
+                        
+                        CExpr.CVar {
+                            name = samplerName v.name
+                            ctype = CType.CIntrinsic {
+                                intrinsicTypeName = "sampler"
+                                tag = GLSLTextureLike.GLSLSamplerState
+                            }
+                        }
+                        
+                    ]
+                    
+                //     
+                // | CArray(CSamplerType(name, sam), len) ->
+                //     [
+                //         CExpr.CVar {
+                //             name = textureName v.name
+                //             ctype =
+                //                 CArray(
+                //                     CType.CIntrinsic {
+                //                         intrinsicTypeName = textureTypeName name
+                //                         tag = GLSLTextureLike.GLSLTexture (textureType sam)
+                //                     },
+                //                     len
+                //                 )
+                //         }
+                //         
+                //         CExpr.CVar {
+                //             name = samplerName v.name
+                //             ctype =
+                //                 CArray(
+                //                     CType.CIntrinsic {
+                //                         intrinsicTypeName = "sampler"
+                //                         tag = GLSLTextureLike.GLSLSamplerState
+                //                     },
+                //                     len
+                //                 )
+                //         }
+                //         
+                //     ]
+                //     
+                | _ ->
+                    [CExpr.CVar v]
+           
+            | CExpr.CReadInput(ParameterKind.Uniform, typ, name, idx) ->
+                match typ with
+                | CSamplerType(typeName, sam) ->
+                    let texType = 
+                        CType.CIntrinsic {
+                            intrinsicTypeName = textureTypeName typeName
+                            tag = GLSLTextureLike.GLSLTexture (textureType sam)
+                        }
+                    
+                    let samType =
+                        CType.CIntrinsic {
+                            intrinsicTypeName = "sampler"
+                            tag = GLSLTextureLike.GLSLSamplerState
+                        }
+                    [
+                        CExpr.CReadInput(ParameterKind.Uniform, texType, textureName name, idx)
+                        CExpr.CReadInput(ParameterKind.Uniform, samType, samplerName name, idx)
+                    ]
+                | _ ->
+                    [e]
+                
+            // | CExpr.CReadInput(ParameterKind.Uniform, CArray(CSamplerType(typeName, sam), len), name, None) ->
+            //     let texType = 
+            //         CType.CIntrinsic {
+            //             intrinsicTypeName = textureTypeName typeName
+            //             tag = GLSLTextureLike.GLSLTexture (textureType sam)
+            //         }
+            //     
+            //     let samType =
+            //         CType.CIntrinsic {
+            //             intrinsicTypeName = "sampler"
+            //             tag = GLSLTextureLike.GLSLSamplerState
+            //         }
+            //         
+            //     let texArr = CExpr.CReadInput(ParameterKind.Uniform, CArray(texType, len), textureName name, None)
+            //     let samArr = CExpr.CReadInput(ParameterKind.Uniform, CArray(samType, len), samplerName name, None)
+            //     
+            //     [
+            //         texArr
+            //         samArr
+            //     ]
+            //     
+            | CExpr.CItem(_, CExpr.CReadInput(ParameterKind.Uniform, CArray(CSamplerType(typeName, sam), len), name, None), index) ->
+                let texType = 
+                    CType.CIntrinsic {
+                        intrinsicTypeName = textureTypeName typeName
+                        tag = GLSLTextureLike.GLSLTexture (textureType sam)
+                    }
+                
+                let samType =
+                    CType.CIntrinsic {
+                        intrinsicTypeName = "sampler"
+                        tag = GLSLTextureLike.GLSLSamplerState
+                    }
+                    
+                let texArr = CExpr.CReadInput(ParameterKind.Uniform, CArray(texType, len), textureName name, None)
+                let samArr = CExpr.CReadInput(ParameterKind.Uniform, CArray(samType, len), samplerName name, None)
+                    
+                [
+                    CExpr.CItem(texType, texArr, index)
+                    CExpr.CItem(samType, samArr, index)
+                ]
+            
+            | CExpr.CItem(_, CExpr.CReadInput(ParameterKind.Uniform, CPointer(m, CSamplerType(typeName, sam)), name, None), index) ->
+                let texType = 
+                    CType.CIntrinsic {
+                        intrinsicTypeName = textureTypeName typeName
+                        tag = GLSLTextureLike.GLSLTexture (textureType sam)
+                    }
+                
+                let samType =
+                    CType.CIntrinsic {
+                        intrinsicTypeName = "sampler"
+                        tag = GLSLTextureLike.GLSLSamplerState
+                    }
+                    
+                let texArr = CExpr.CReadInput(ParameterKind.Uniform, CPointer(m, texType), textureName name, None)
+                let samArr = CExpr.CReadInput(ParameterKind.Uniform, CPointer(m, samType), samplerName name, None)
+                    
+                [
+                    CExpr.CItem(texType, texArr, index)
+                    CExpr.CItem(samType, samArr, index)
+                ]
+            
+            
+            | _ ->
+                [e]
+              
+        let rec splitTexturesAndSamplers (e : CExpr) : CExpr =
+            match e with
+            | CExpr.CCall(signature, args) ->
+                let newSignature = CFunctionSignature.splitTexturesAndSamplers signature
+                let newArgs = args |> Array.collect (splitExpr >> List.toArray) |> Array.map splitTexturesAndSamplers
+                CExpr.CCall(newSignature, newArgs)
+                
+            | CExpr.CCallIntrinsic(ret, func, args) ->
+                let newArgs = args |> Array.map (splitExpr >> List.map splitTexturesAndSamplers)
+                let realArgs =
+                    (args, newArgs) ||> Array.map2 (fun original newArg ->
+                        match newArg with
+                        | [a] -> a
+                        | [a;b] ->
+                            match original.ctype with
+                            | CSamplerType(typeName, _) ->
+                                CExpr.CCallIntrinsic(original.ctype, CIntrinsic.simple typeName, [|a; b|])
+                            | _ ->
+                                failwithf "bad sampler split: %A" original.ctype
+                        | _ ->
+                            failwith "impossible"
+                    )
+                
+                CExpr.CCallIntrinsic(ret, func, realArgs)
+                
+            | CExpr.CVar v -> CExpr.CVar v
+            | CExpr.CValue(typ, lit) -> CExpr.CValue(typ, lit)
+            | CExpr.CConditional(ctype, cond, ifTrue, ifFalse) ->
+                CExpr.CConditional(ctype, splitTexturesAndSamplers cond, splitTexturesAndSamplers ifTrue, splitTexturesAndSamplers ifFalse)
+            | CExpr.CNeg(typ, e) ->
+                CExpr.CNeg(typ, splitTexturesAndSamplers e)
+            | CExpr.CNot(typ, e) ->
+                CExpr.CNot(typ, splitTexturesAndSamplers e)
+            | CExpr.CAdd(typ, e1, e2) ->
+                CExpr.CAdd(typ, splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CSub(typ, e1, e2) ->
+                CExpr.CSub(typ, splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CMul(typ, e1, e2) ->
+                CExpr.CMul(typ, splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CDiv(typ, e1, e2) ->
+                CExpr.CDiv(typ, splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CMod(typ, e1, e2) ->
+                CExpr.CMod(typ, splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CTranspose(typ, e) ->
+                CExpr.CTranspose(typ, splitTexturesAndSamplers e)
+            | CExpr.CMulMatMat(typ, e1, e2) ->
+                CExpr.CMulMatMat(typ, splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CMulMatVec(typ, e1, e2) ->
+                CExpr.CMulMatVec(typ, splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CMulVecMat(typ, e1, e2) ->
+                CExpr.CMulVecMat(typ, splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CDot(typ, e1, e2) ->
+                CExpr.CDot(typ, splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CCross(typ, e1, e2) ->
+                CExpr.CCross(typ, splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CVecSwizzle(typ, e, comp) ->
+                CExpr.CVecSwizzle(typ, splitTexturesAndSamplers e, comp)
+            | CExpr.CVecItem(typ, e, index) ->
+                CExpr.CVecItem(typ, splitTexturesAndSamplers e, splitTexturesAndSamplers index)
+            | CExpr.CMatrixElement(typ, e, r, c) ->
+                CExpr.CMatrixElement(typ, splitTexturesAndSamplers e, splitTexturesAndSamplers r, splitTexturesAndSamplers c)
+            | CExpr.CConvertMatrix(typ, e) ->
+                CExpr.CConvertMatrix(typ, splitTexturesAndSamplers e)
+            | CExpr.CNewVector(typ, components) ->
+                CExpr.CNewVector(typ, components |> List.map splitTexturesAndSamplers)
+            | CExpr.CNewMatrix(typ, elements) ->
+                CExpr.CNewMatrix(typ, elements |> List.map splitTexturesAndSamplers)
+            | CExpr.CMatrixFromRows(typ, rows) ->
+                CExpr.CMatrixFromRows(typ, rows |> List.map splitTexturesAndSamplers)
+            | CExpr.CMatrixFromCols(typ, cols) ->
+                CExpr.CMatrixFromCols(typ, cols |> List.map splitTexturesAndSamplers)
+            | CExpr.CMatrixRow(typ, mat, row) ->
+                CExpr.CMatrixRow(typ, splitTexturesAndSamplers mat, splitTexturesAndSamplers row)
+            | CExpr.CMatrixCol(typ, mat, col) ->
+                CExpr.CMatrixCol(typ, splitTexturesAndSamplers mat, splitTexturesAndSamplers col)
+            | CExpr.CVecLength(typ, v) ->
+                CExpr.CVecLength(typ, splitTexturesAndSamplers v)
+            | CExpr.CConvert(typ, e) ->
+                CExpr.CConvert(typ, splitTexturesAndSamplers e)
+            | CExpr.CAnd(e1, e2) ->
+                CExpr.CAnd(splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.COr(e1, e2) ->
+                CExpr.COr(splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CBitAnd(typ, e1, e2) ->
+                CExpr.CBitAnd(typ, splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CBitOr(typ, e1, e2) ->
+                CExpr.CBitOr(typ, splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CBitXor(typ, e1, e2) ->
+                CExpr.CBitXor(typ, splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CBitNot(typ, e) ->
+                CExpr.CBitNot(typ, splitTexturesAndSamplers e)
+            | CExpr.CLeftShift(typ, e1, e2) ->
+                CExpr.CLeftShift(typ, splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CRightShift(typ, e1, e2) ->
+                CExpr.CRightShift(typ, splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CVecAnyEqual(e1, e2) ->
+                CExpr.CVecAnyEqual(splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CVecAllNotEqual(e1, e2) ->
+                CExpr.CVecAllNotEqual(splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CVecAnyLess(e1, e2) ->
+                CExpr.CVecAnyLess(splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CVecAllLess(e1, e2) ->
+                CExpr.CVecAllLess(splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CVecAnyLequal(e1, e2) ->
+                CExpr.CVecAnyLequal(splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CVecAllLequal(e1, e2) ->
+                CExpr.CVecAllLequal(splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CVecAnyGreater(e1, e2) ->
+                CExpr.CVecAnyGreater(splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CVecAllGreater(e1, e2) ->
+                CExpr.CVecAllGreater(splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CVecAnyGequal(e1, e2) ->
+                CExpr.CVecAnyGequal(splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CVecAllGequal(e1, e2) ->
+                CExpr.CVecAllGequal(splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CLess(e1, e2) ->
+                CExpr.CLess(splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CLequal(e1, e2) ->
+                CExpr.CLequal(splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CGreater(e1, e2) ->
+                CExpr.CGreater(splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CGequal(e1, e2) ->
+                CExpr.CGequal(splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CEqual(e1, e2) ->
+                CExpr.CEqual(splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CNotEqual(e1, e2) ->
+                CExpr.CNotEqual(splitTexturesAndSamplers e1, splitTexturesAndSamplers e2)
+            | CExpr.CAddressOf(typ, target) ->
+                CExpr.CAddressOf(typ, splitTexturesAndSamplers target)
+            | CExpr.CField(typ, target, fieldName) ->
+                CExpr.CField(typ, splitTexturesAndSamplers target, fieldName)
+            | CExpr.CItem(typ, target, index) ->
+                CExpr.CItem(typ, splitTexturesAndSamplers target, splitTexturesAndSamplers index)
+            | CExpr.CDebugPrintf(format, values) ->
+                let newValues = values |> Array.map splitTexturesAndSamplers
+                CExpr.CDebugPrintf(splitTexturesAndSamplers format, newValues)
+
+            | CExpr.CReadInput(kind, ctype, name, index) ->
+                CExpr.CReadInput(
+                    kind,
+                    ctype,
+                    name,
+                    index |> Option.map splitTexturesAndSamplers
+                )
+              
+    module CRExpr =
+        let rec splitTexturesAndSamplers (e : CRExpr) =
+            match e with
+            | CRExpr.CRExpr e ->
+                CExpr.splitTexturesAndSamplers e |> CRExpr.CRExpr
+            | CRExpr.CRArray(arrayType, values) ->
+                CRExpr.CRArray(arrayType, values |> List.map CExpr.splitTexturesAndSamplers)
+          
+    module CLExpr =
+        let rec splitTexturesAndSamplers (e : CLExpr) =
+            match e with
+            | CLVar v -> 
+                CLVar v
+            | CLField(typ, b, name) ->
+                CLField(typ, splitTexturesAndSamplers b, name)
+            | CLItem(typ, arr, index) ->
+                CLItem(typ, CExpr.splitTexturesAndSamplers arr, CExpr.splitTexturesAndSamplers index)
+            | CLPtr(typ, e) ->
+                CLPtr(typ, CExpr.splitTexturesAndSamplers e)
+            | CLVecSwizzle(typ, e, comp) ->
+                CLVecSwizzle(typ, splitTexturesAndSamplers e, comp)
+            | CLMatrixElement(typ, e, r, c) ->
+                CLMatrixElement(typ, splitTexturesAndSamplers e, CExpr.splitTexturesAndSamplers r, CExpr.splitTexturesAndSamplers c)
+            | CLInput(kind,ctype,name,index) ->
+                CLInput(kind, ctype, name, index |> Option.map CExpr.splitTexturesAndSamplers)
+
+    module CStatement =
+        let rec splitTexturesAndSamplers (e : CStatement) =
+            match e with
+            | CStatement.CNop ->
+                CStatement.CNop
+            | CStatement.CDo e ->
+                CStatement.CDo (CExpr.splitTexturesAndSamplers e)
+            | CStatement.CDeclare(v, e) ->
+                CStatement.CDeclare(v, Option.map CRExpr.splitTexturesAndSamplers e)
+            | CStatement.CWrite(lhs, e) ->
+                CStatement.CWrite(CLExpr.splitTexturesAndSamplers lhs, CExpr.splitTexturesAndSamplers e)
+            | CStatement.CIncrement(pre, l) ->
+                CStatement.CIncrement(pre, CLExpr.splitTexturesAndSamplers l)
+            | CStatement.CDecrement(pre, l) ->
+                CStatement.CDecrement(pre, CLExpr.splitTexturesAndSamplers l)
+            | CStatement.CSequential ls ->
+                ls |> List.map splitTexturesAndSamplers |> CStatement.CSequential
+            | CStatement.CIsolated ls ->
+                ls |> List.map splitTexturesAndSamplers |> CStatement.CIsolated
+            | CStatement.CReturn ->
+                CStatement.CReturn
+            | CStatement.CWriteOutput(name, value, r) ->
+                CStatement.CWriteOutput(name, value |> Option.map CExpr.splitTexturesAndSamplers, CRExpr.splitTexturesAndSamplers r)
+            | CStatement.CReturnValue e ->
+                CStatement.CReturnValue (CExpr.splitTexturesAndSamplers e)
+            | CStatement.CBreak ->
+                CStatement.CBreak
+            | CStatement.CContinue ->
+                CStatement.CContinue
+            | CStatement.CFor(init, cond, step, body) ->
+                CStatement.CFor(
+                    splitTexturesAndSamplers init,
+                    CExpr.splitTexturesAndSamplers cond,
+                    splitTexturesAndSamplers step,
+                    splitTexturesAndSamplers body
+                )
+            | CStatement.CWhile(guard, body) ->
+                CStatement.CWhile(
+                    CExpr.splitTexturesAndSamplers guard,
+                    splitTexturesAndSamplers body
+                )
+            | CStatement.CDoWhile(guard, body) ->
+                CStatement.CDoWhile(
+                    CExpr.splitTexturesAndSamplers guard,
+                    splitTexturesAndSamplers body
+                )
+            | CStatement.CIfThenElse(cond, ifTrue, ifFalse) ->
+                CStatement.CIfThenElse(
+                    CExpr.splitTexturesAndSamplers cond,
+                    splitTexturesAndSamplers ifTrue,
+                    splitTexturesAndSamplers ifFalse
+                )
+            | CStatement.CSwitch(value, cases) ->
+                let newCases = 
+                    cases |> Array.map (fun (lit, stmt) -> lit, splitTexturesAndSamplers stmt)
+                CStatement.CSwitch(CExpr.splitTexturesAndSamplers value, newCases)
+                
+    module CValueDef =
+        let rec splitTexturesAndSamplers (v : CValueDef) : CValueDef =
+            match v with
+            | CValueDef.CConstant _ -> v
+            
+            | CValueDef.CConditionalDef(cond, defs) ->
+                CValueDef.CConditionalDef(cond, defs |> List.map splitTexturesAndSamplers)
+                
+            | CValueDef.CEntryDef entry ->
+                CValueDef.CEntryDef { entry with cBody = CStatement.splitTexturesAndSamplers entry.cBody }
+                
+            | CValueDef.CFunctionDef(signature, body) ->
+                let newSignature = CFunctionSignature.splitTexturesAndSamplers signature
+                let newBody = CStatement.splitTexturesAndSamplers body
+                CValueDef.CFunctionDef(newSignature, newBody)
+                
+            | CValueDef.CUniformDef uniforms ->
+                let newUniforms = uniforms |> List.collect CUniform.splitTexturesAndSamplers
+                CValueDef.CUniformDef newUniforms
+                
+            | CValueDef.CRaytracingDataDef d ->
+                CValueDef.CRaytracingDataDef d
+                
+    let splitTexturesAndSamplers (m : CModule) : CModule =
+        let newValues = m.values |> List.map CValueDef.splitTexturesAndSamplers
+        { m with values = newValues }
+    
+
        
 
 type Backend private(config : Config) =
@@ -139,7 +689,7 @@ type Backend private(config : Config) =
     override x.TryGetIntrinsicMethod (c : MethodInfo) =
         match c with
             | IntrinsicFunction f -> Some f
-            | TextureLookup (fmt, exts) -> Some ({ CIntrinsic.tagged fmt with additional = exts })
+            | TextureLookup (fmt, exts, isSampler) -> Some ({ CIntrinsic.tagged fmt with additional = exts; isSamplerFunction = isSampler })
             | _ -> c.Intrinsic<GLSLIntrinsicAttribute>()
 
     override x.TryGetIntrinsicCtor (c : ConstructorInfo) =
@@ -171,7 +721,7 @@ type Backend private(config : Config) =
                 Some {
                     intrinsicTypeName = name
                     tag = 
-                        GLSLTextureType.GLSLSampler {
+                        GLSLTextureLike.GLSLSampler {
                             original = t
                             dimension = dim
                             isShadow = shadow
@@ -206,7 +756,7 @@ type Backend private(config : Config) =
                 Some {
                     intrinsicTypeName = name
                     tag = 
-                        GLSLTextureType.GLSLImage {
+                        GLSLTextureLike.GLSLImage {
                             original = t
                             dimension = dim
                             format = ImageFormat.ofFormatType tFmt
@@ -252,6 +802,9 @@ type AssemblerState =
         uniformBuffers          : MapExt<string, GLSLUniformBuffer>
         samplers                : MapExt<string, GLSLSampler>
         images                  : MapExt<string, GLSLImage>
+        textures                : MapExt<string, GLSLTexture>
+        samplerStates           : MapExt<string, GLSLSamplerState>
+        
         storageBuffers          : MapExt<string, GLSLStorageBuffer>
         accelerationStructures  : MapExt<string, GLSLAccelerationStructure>
 
@@ -278,6 +831,8 @@ module AssemblerState =
                     storageBuffers          = MapExt.empty
                     uniformBuffers          = MapExt.empty
                     accelerationStructures  = MapExt.empty
+                    samplerStates           = MapExt.empty
+                    textures                = MapExt.empty
                     shaders                 = GLSLProgramShaders.Graphics { stages = MapExt.empty }
                 }
                 
@@ -289,6 +844,8 @@ module AssemblerState =
             images                  = MapExt.empty
             storageBuffers          = MapExt.empty
             accelerationStructures  = MapExt.empty
+            samplerStates           = MapExt.empty
+            textures                = MapExt.empty
 
             textureInfos = Map.empty
         }
@@ -614,6 +1171,34 @@ module Interface =
             { s with ifaceNew = iface; samplers = MapExt.add sampler.samplerName sampler s.samplers }
         )
  
+    let addSamplerState (sampler : GLSLSamplerState) =
+        State.modify (fun (s : AssemblerState) ->
+            let realSamplerName = sampler.samplerName.Substring(0, sampler.samplerName.Length - 3) // remove the "SAM" suffix
+            let infos = Map.tryFind realSamplerName s.textureInfos |> Option.defaultValue []
+            let sampler = { sampler with samplerStates = infos |> List.map snd }
+            
+            
+            let iface = 
+                { s.ifaceNew with
+                    samplerStates = MapExt.add sampler.samplerName sampler s.ifaceNew.samplerStates
+                }
+                
+            { s with ifaceNew = iface; samplerStates = MapExt.add sampler.samplerName sampler s.samplerStates }
+        )
+ 
+    let addTexture (texture : GLSLTexture) =
+        State.modify (fun (s : AssemblerState) ->
+            
+            let realSamplerName = texture.textureName.Substring(0, texture.textureName.Length - 3) // remove the "TEX" suffix
+            let infos = Map.tryFind realSamplerName s.textureInfos |> Option.defaultValue []
+            let texture = { texture with textureSemantics = infos |> List.map fst }
+            let iface = 
+                { s.ifaceNew with
+                    textures = MapExt.add texture.textureName texture s.ifaceNew.textures
+                }
+                
+            { s with ifaceNew = iface; textures = MapExt.add texture.textureName texture s.textures }
+        )
     let addImage (image : GLSLImage) =
         State.modify (fun (s : AssemblerState) ->
             let iface = 
@@ -732,8 +1317,8 @@ module Assembler =
         [<return: Struct>]
         let (|CTexture|_|) (t : CType) =
             match t with   
-            | CIntrinsic { tag = (:? GLSLTextureType as t)} -> ValueSome (t, 1)
-            | CArray(CIntrinsic { tag = (:? GLSLTextureType as t)}, len) -> ValueSome (t, len)
+            | CIntrinsic { tag = (:? GLSLTextureLike as t)} -> ValueSome (t, 1)
+            | CArray(CIntrinsic { tag = (:? GLSLTextureLike as t)}, len) -> ValueSome (t, len)
             | _ -> ValueNone
 
         [<return: Struct>]
@@ -1499,7 +2084,7 @@ module Assembler =
             let! config = AssemblerState.config
             let buffers =
                 uniforms 
-                    |> List.map (fun u -> match u.cUniformType with | CIntrinsic { tag = (:? GLSLTextureType) } -> { u with cUniformBuffer = None } | _ -> u)
+                    |> List.map (fun u -> match u.cUniformType with | CIntrinsic { tag = (:? GLSLTextureLike) } -> { u with cUniformBuffer = None } | _ -> u)
                     |> List.groupBy (fun u -> u.cUniformBuffer)
                     |> List.collect (function (Some a, f) -> [Some a, f] | (None, f) -> f |> List.map (fun f -> None, [f]))
 
@@ -1620,7 +2205,32 @@ module Assembler =
                                             match u.cUniformType with   
                                             | CTexture (t, cnt) ->
                                                 match t with
-                                                    | GLSLTextureType.GLSLSampler samplerType -> 
+                                              
+                                                    | GLSLTextureLike.GLSLSamplerState ->
+                                                        let! binding = getBinding InputKind.Sampler cnt [u]
+                                                        prefix <- uniformLayout Layout.None u.cUniformDecorations set binding
+
+                                                        do! Interface.addSamplerState {
+                                                            samplerSet = set
+                                                            samplerBinding = binding
+                                                            samplerName = checkName(u.cUniformName).Name
+                                                            samplerStates = [] // filled in addSamplerState
+                                                        }
+                                                    
+                                                    
+                                                    | GLSLTextureLike.GLSLTexture tex ->
+                                                        let! binding = getBinding InputKind.Sampler cnt [u]
+                                                        prefix <- uniformLayout Layout.None u.cUniformDecorations set binding
+
+                                                        do! Interface.addTexture {
+                                                            textureSet = set
+                                                            textureBinding = binding
+                                                            textureType = tex
+                                                            textureName = checkName(u.cUniformName).Name
+                                                            textureSemantics = [] // filled in addTexture
+                                                        }
+                                                    
+                                                    | GLSLTextureLike.GLSLSampler samplerType -> 
                                                         let! binding = getBinding InputKind.Sampler cnt [u]
                                                         prefix <- uniformLayout Layout.None u.cUniformDecorations set binding
 
@@ -1633,7 +2243,7 @@ module Assembler =
                                                             samplerType = samplerType
                                                         }
                                                            
-                                                    | GLSLTextureType.GLSLImage imageType ->
+                                                    | GLSLTextureLike.GLSLImage imageType ->
                                                         let! binding = getBinding InputKind.Image cnt [u]
                                                         prefix <- uniformLayout Layout.None u.cUniformDecorations set binding
 

@@ -23,6 +23,7 @@ module Backends =
             reverseTessellationWinding  = false
             depthWriteMode              = false
             useInOut                    = true
+            separateTexturesAndSamplers = false
         }
 
     let glsl430 =
@@ -41,6 +42,7 @@ module Backends =
             reverseTessellationWinding  = false
             depthWriteMode              = true
             useInOut                    = true
+            separateTexturesAndSamplers = false
         }
 
     let glsl120 =
@@ -59,6 +61,7 @@ module Backends =
             reverseTessellationWinding  = false
             depthWriteMode              = false
             useInOut                    = false
+            separateTexturesAndSamplers = false
         }
 
     let glslVulkan =
@@ -77,6 +80,7 @@ module Backends =
             reverseTessellationWinding  = true
             depthWriteMode              = true
             useInOut                    = true
+            separateTexturesAndSamplers = false
         }
 
     let glslRaytracing =
@@ -95,6 +99,7 @@ module Backends =
             reverseTessellationWinding  = true
             depthWriteMode              = true
             useInOut                    = true
+            separateTexturesAndSamplers = false
         }
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -110,8 +115,15 @@ module Backends =
                 else
                     cfg
 
-            module_ 
-                |> ModuleCompiler.compile cfg 
+            let cModule =     
+                module_ 
+                |> ModuleCompiler.compile cfg
+                
+            let cModule = 
+                if cfg.Config.separateTexturesAndSamplers then SamplerSplitter.splitTexturesAndSamplers cModule
+                else cModule
+                
+            cModule
                 |> Assembler.assemble cfg
                 
         let compileGLSL120 (module_ : Module) =

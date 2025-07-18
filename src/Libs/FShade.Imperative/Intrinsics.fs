@@ -19,6 +19,7 @@ type GLSLIntrinsicAttribute private(format : string, requiredExtensions : Set<st
             tag = format
             arguments = None
             additional = requiredExtensions
+            isSamplerFunction = false
         }
 
     new(format : string) = GLSLIntrinsicAttribute(format, Set.empty)
