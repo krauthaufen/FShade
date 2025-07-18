@@ -19,6 +19,8 @@ type GLSLType =
     | Sampler of GLSLSamplerType
     | DynamicArray of elem : GLSLType * stride : int
     | Intrinsic of string
+    | Texture of GLSLTextureType
+    | SamplerState
 
 and GLSLImageType =
     {
@@ -41,8 +43,19 @@ and GLSLSamplerType =
     }
 
 and GLSLTextureType =
+    {
+        dimension   : SamplerDimension
+        isShadow    : bool
+        isArray     : bool
+        isMS        : bool
+        valueType   : GLSLType
+    }
+    
+and GLSLTextureLike =
     | GLSLImage of GLSLImageType
     | GLSLSampler of GLSLSamplerType
+    | GLSLTexture of GLSLTextureType
+    | GLSLSamplerState
     
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -144,10 +157,12 @@ module GLSLType =
 
             | CType.CIntrinsic a ->
                 match a.tag with
-                    | :? GLSLTextureType as t -> 
+                    | :? GLSLTextureLike as t -> 
                         match t with
                             | GLSLImage t -> GLSLType.Image t
                             | GLSLSampler t -> GLSLType.Sampler t
+                            | GLSLTexture t -> GLSLType.Texture t
+                            | GLSLSamplerState -> GLSLType.SamplerState
                     | _ ->
                         GLSLType.Intrinsic a.intrinsicTypeName
 
@@ -216,6 +231,16 @@ module GLSLType =
         | GLSLType.Intrinsic name ->
             dst.Write 11uy
             dst.Write name
+        | GLSLType.Texture t ->
+            dst.Write 12uy
+            dst.Write (int t.dimension)
+            serializeInternal dst t.valueType
+            dst.Write t.isArray
+            dst.Write t.isMS
+            dst.Write t.isShadow
+        | GLSLType.SamplerState ->
+            dst.Write 13uy
+            
 
     let rec internal deserializeInternal (src : BinaryReader) =
         match src.ReadByte() with
@@ -313,6 +338,22 @@ module GLSLType =
         | 11uy ->
             let name = src.ReadString()
             GLSLType.Intrinsic name
+        | 12uy ->
+            let dim = src.ReadInt32() |> unbox<SamplerDimension>
+            let valueType = deserializeInternal src
+            let isArray = src.ReadBoolean()
+            let isMS = src.ReadBoolean()
+            let isShadow = src.ReadBoolean()
+
+            GLSLType.Texture {
+                GLSLTextureType.dimension = dim
+                GLSLTextureType.isArray = isArray
+                GLSLTextureType.isMS = isMS
+                GLSLTextureType.isShadow = isShadow
+                GLSLTextureType.valueType = valueType
+            }
+        | 13uy ->
+            GLSLType.SamplerState
         | id ->
             failwithf "unexpected GLSLType: %A" id
 
@@ -349,13 +390,32 @@ type GLSLImage =
         imageName       : string
         imageType       : GLSLImageType
     }
+    
+    
+type GLSLTexture =
+    {
+        textureSet        : int
+        textureBinding    : int
+        textureName       : string
+        textureSemantics  : list<string>
+        textureType       : GLSLTextureType
+    }
 
+type GLSLSamplerState =
+    {
+        samplerSet      : int
+        samplerBinding  : int
+        samplerName     : string
+        samplerStates   : list<SamplerState>
+    }
+    
 type GLSLStorageBuffer =
     {
         ssbSet          : int
         ssbBinding      : int
         ssbName         : string
         ssbType         : GLSLType
+        ssbAccess       : StorageAccess
     }
 
 type GLSLUniformBufferField =
@@ -459,6 +519,25 @@ module private Tools =
             if t.isArray then sprintf "%simage%s%sArray%s" typePrefix dimStr msSuffix fmt
             else sprintf "%simage%s%s%s" typePrefix dimStr msSuffix fmt
 
+        let private textureName (t : GLSLTextureType) =
+            let dimStr =
+                match t.dimension with
+                    | SamplerDimension.Sampler1d -> "1D"
+                    | SamplerDimension.Sampler2d -> "2D"
+                    | SamplerDimension.Sampler3d -> "3D"
+                    | SamplerDimension.SamplerCube -> "Cube"
+                    | _ -> failwith "unsupported sampler dimension"
+
+            let shadowSuffix = if t.isShadow then "Shadow" else ""
+            let msSuffix = if t.isMS then "MS" else ""
+            let typePrefix = 
+                match t.valueType with
+                    | Vec(_,Int _) -> "i"
+                    | _ -> ""
+                    
+            if t.isArray then sprintf "%stexture%s%sArray%s" typePrefix dimStr msSuffix shadowSuffix
+            else sprintf "%stexture%s%s%s" typePrefix dimStr msSuffix shadowSuffix 
+              
         let rec toString (t : GLSLType) =
             match t with
                 | GLSLType.Intrinsic n -> n
@@ -491,6 +570,8 @@ module private Tools =
                 | GLSLType.Sampler sam -> samplerName sam
                 | GLSLType.DynamicArray(elem,_) -> sprintf "%s[]" (toString elem)
 
+                | GLSLType.SamplerState -> "sampler"
+                | GLSLType.Texture t -> textureName t
 [<CustomEquality; NoComparison>]
 type GLSLShaderInterface =
     {
@@ -739,6 +820,8 @@ and [<StructuredFormatDisplay("{AsString}")>] GLSLProgramInterface =
         storageBuffers          : MapExt<string, GLSLStorageBuffer>
         uniformBuffers          : MapExt<string, GLSLUniformBuffer>
         accelerationStructures  : MapExt<string, GLSLAccelerationStructure>
+        samplerStates           : MapExt<string, GLSLSamplerState>
+        textures                : MapExt<string, GLSLTexture>
         shaders                 : GLSLProgramShaders
     }
 
@@ -1350,6 +1433,7 @@ module GLSLProgramInterface =
             dst.Write ssb.ssbName
             dst.Write ssb.ssbSet
             GLSLType.serializeInternal dst ssb.ssbType
+            dst.Write (int ssb.ssbAccess)
             
         dst.Write program.uniformBuffers.Count
         for KeyValue(name, ub) in program.uniformBuffers do
@@ -1429,6 +1513,28 @@ module GLSLProgramInterface =
                         dst.Write 1uy
                         GLSLShaderInterface.serializeInternal dst s
 
+    
+        dst.Write (program.samplerStates.Count)
+        for KeyValue(name, state) in program.samplerStates do
+            dst.Write name
+            dst.Write state.samplerSet
+            dst.Write state.samplerBinding
+            dst.Write state.samplerName
+            dst.Write (List.length state.samplerStates)
+            for state in state.samplerStates do
+                SamplerState.serialize dst state
+            
+        dst.Write (program.textures.Count)
+        for KeyValue(name, tex) in program.textures do
+            dst.Write name
+            dst.Write tex.textureSet
+            dst.Write tex.textureBinding
+            dst.Write tex.textureName
+            dst.Write (List.length tex.textureSemantics)
+            for sem in tex.textureSemantics do
+                dst.Write sem
+            GLSLType.serializeInternal dst (GLSLType.Texture tex.textureType)
+    
     let internal deserializeInternal (src : BinaryReader) =
 
         let allShaders = System.Collections.Generic.List<GLSLShaderInterface>()
@@ -1503,11 +1609,13 @@ module GLSLProgramInterface =
                 let ssbName = src.ReadString()
                 let ssbSet = src.ReadInt32()
                 let ssbType = GLSLType.deserializeInternal src
+                let ssbAccess = src.ReadInt32() |> unbox<StorageAccess>
                 name, {
                     ssbBinding = ssbBinding
                     ssbName = ssbName
                     ssbSet = ssbSet
                     ssbType = ssbType
+                    ssbAccess = ssbAccess
                 }
             )   
             |> MapExt.ofList
@@ -1632,6 +1740,48 @@ module GLSLProgramInterface =
                     hitgroups = hitgroups
                 }
 
+       
+        let samplerStates =
+            let cnt = src.ReadInt32()
+            List.init cnt (fun _ ->
+                let name = src.ReadString()
+                let samplerSet = src.ReadInt32()
+                let samplerBinding = src.ReadInt32()
+                let samplerName = src.ReadString()
+                let samplerStates =
+                    let cnt = src.ReadInt32()
+                    List.init cnt (fun _ -> SamplerState.deserialize src)
+                name, { samplerSet = samplerSet; samplerBinding = samplerBinding; samplerName = samplerName; samplerStates = samplerStates }
+            )
+            |> MapExt.ofList
+         
+        let textures =
+            let cnt = src.ReadInt32()
+            List.init cnt (fun _ ->
+                let name = src.ReadString()
+                let textureSet = src.ReadInt32()
+                let textureBinding = src.ReadInt32()
+                let textureName = src.ReadString()
+                let textureSemantics =
+                    let cnt = src.ReadInt32()
+                    List.init cnt (fun _ -> src.ReadString())
+                let textureType =
+                    match GLSLType.deserializeInternal src with
+                    | GLSLType.Texture t -> t
+                    | t -> failwithf "bad TextureType: %A" t
+                name, { textureSet = textureSet; textureBinding = textureBinding; textureName = textureName; textureSemantics = textureSemantics; textureType = textureType }
+            )
+            |> MapExt.ofList
+        
+        // dst.Write (program.textures.Count)
+        // for KeyValue(name, tex) in program.textures do
+        //     dst.Write name
+        //     dst.Write tex.textureSet
+        //     dst.Write tex.textureBinding
+        //     GLSLType.serializeInternal dst (GLSLType.Texture tex.textureType)
+        //
+        
+        
         let result = 
             {
                 inputs = inputs
@@ -1642,6 +1792,8 @@ module GLSLProgramInterface =
                 uniformBuffers = uniformBuffers
                 shaders = shaders
                 accelerationStructures = accelerationStructures
+                samplerStates = samplerStates
+                textures = textures
             }
 
         result
@@ -1778,6 +1930,11 @@ module LayoutStd140 =
             | GLSLType.Intrinsic s ->
                 GLSLType.Intrinsic s, 1, 0
 
+            | GLSLType.Texture i ->
+                GLSLType.Texture i, 1, 0
+            | GLSLType.SamplerState ->
+                GLSLType.SamplerState, 1, 0
+                
     let applyLayout (ub : GLSLUniformBuffer) : GLSLUniformBuffer =
         let mutable offset = 0
 

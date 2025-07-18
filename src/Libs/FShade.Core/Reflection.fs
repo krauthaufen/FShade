@@ -276,6 +276,19 @@ module BasicQuotationPatterns =
 
 
     [<return: Struct>]
+    let (|StorageBuffer|_|) (e : Expr) =
+        match e with
+        | Uniform u ->
+            match u.uniformValue with
+            | UniformValue.Attribute(scope, name) when scope.Name = "StorageBuffer" ->
+                ValueSome u
+            | _ ->
+                ValueNone
+        | _ ->
+            ValueNone
+    
+    
+    [<return: Struct>]
     let (|DebugRange|_|) (e : Expr) =
         match e with
             | NewTuple([String "DebugRange"; NewTuple [String file; Int32 startLine; Int32 startCol; Int32 endLine; Int32 endCol]]) -> 

@@ -194,6 +194,7 @@ module UtiliyFunctions =
                         reverseTessellationWinding  = false
                         depthWriteMode              = false
                         useInOut                    = true
+                        separateTexturesAndSamplers = false
                     }
 
                 let glsl = 

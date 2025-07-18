@@ -22,8 +22,7 @@ open Aardvark.Base.ReflectionHelpers
 type ComputeBuffer =
     {
         contentType : Type
-        read : bool
-        write : bool
+        access : StorageAccess
     }
 
 type ComputeImage =
@@ -93,12 +92,12 @@ module ComputeShader =
                                 }
                             images <- Map.add name img images
 
-                let addBuffer (name : string) (arrayType : Type) (read : bool) (write : bool) =
+                let addBuffer (name : string) (arrayType : Type) (access : StorageAccess) =
                     match Map.tryFind name buffers with
                         | Some b ->
-                            buffers <- Map.add name { b with ComputeBuffer.read = b.read || read } buffers
+                            buffers <- Map.add name { b with ComputeBuffer.access = b.access ||| access } buffers
                         | None ->
-                            buffers <- Map.add name { ComputeBuffer.contentType = arrayType.GetElementType(); ComputeBuffer.read = read; ComputeBuffer.write = write } buffers
+                            buffers <- Map.add name { ComputeBuffer.contentType = arrayType.GetElementType(); ComputeBuffer.access = access } buffers
             
                 let setSamplerState (name : string) (index : int) (state : SamplerState) =
                     match Map.tryFind (name, index) samplerStates with
@@ -117,11 +116,23 @@ module ComputeShader =
                     match p.paramType with
                         | ImageType(fmt, dim, isArr, isMS, valueType) ->
                             addImage fmt name p.paramType dim isArr isMS valueType
-                        | t -> 
-                            addBuffer name t true false
+                        | t ->
+                            match Map.tryFind name state.storageBufferAccess with
+                            | Some access ->
+                                addBuffer name t access
+                            | None ->
+                                uniforms <- Map.add name { uniformType = t; uniformName = name; uniformValue = UniformValue.Attribute(uniform?Arguments, name) } uniforms
+
 
                 for (name, p) in Map.toSeq state.outputs do
-                    addBuffer name p.paramType false true
+                    
+                    match Map.tryFind name state.storageBufferAccess with
+                    | Some access ->
+                        addBuffer name p.paramType access
+                    | None ->
+                        Log.warn "unknown output: %A" name
+                        addBuffer name p.paramType StorageAccess.Write
+
 
 
 
@@ -151,6 +162,15 @@ module ComputeShader =
 
                             uniforms <- Map.add name p uniforms
 
+                        | ArrayOf _ ->
+                            match Map.tryFind name state.storageBufferAccess with
+                            | Some access ->
+                                addBuffer name p.uniformType access
+                            | None ->
+                                Log.warn "unknown array uniform: %A" name
+                                uniforms <- Map.add name p uniforms
+                                
+                        
                         | _ ->
                             if isArgument then
                                 uniforms <- Map.add name { p with uniformValue = UniformValue.Attribute(uniform?Arguments, name) } uniforms
@@ -230,7 +250,7 @@ module ComputeShader =
                     paramName = n
                     paramSemantic = n
                     paramType = i.contentType.MakeArrayType()
-                    paramDecorations = Set.ofList [ParameterDecoration.StorageBuffer(i.read, i.write)]
+                    paramDecorations = Set.ofList [ParameterDecoration.StorageBuffer(i.access)]
                 }
             )
 

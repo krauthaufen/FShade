@@ -299,10 +299,11 @@ module CVecComponent =
 
 type CIntrinsic =
     {
-        intrinsicName   : string
-        tag             : obj
-        arguments       : Option<list<int>>
-        additional      : obj
+        intrinsicName       : string
+        tag                 : obj
+        arguments           : Option<list<int>>
+        additional          : obj
+        isSamplerFunction   : bool
     }
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -313,6 +314,7 @@ module CIntrinsic =
             tag = null
             arguments = None
             additional = null
+            isSamplerFunction = false
         }
 
     let custom (name : string) (args : list<int>)=
@@ -321,6 +323,7 @@ module CIntrinsic =
             tag = null
             arguments = Some args
             additional = null
+            isSamplerFunction = false
         }
 
     let tagged (tag : obj)=
@@ -329,6 +332,7 @@ module CIntrinsic =
             tag = tag
             arguments = None
             additional = null
+            isSamplerFunction = false
         }
 
 /// represents a c-style expression

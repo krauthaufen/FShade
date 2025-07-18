@@ -1781,7 +1781,7 @@ module IntrinsicFunctions =
                 | "get_Samples" -> ["GL_ARB_shader_texture_image_samples"]
                 | _ -> []
 
-            ValueSome (functionName, Set.ofList extensions)
+            ValueSome (functionName, Set.ofList extensions, false)
 
         | Method(name, (((SamplerType(dim, isArray, isShadow, isMS, valueType)) as sam ::_) as args)) when mi.DeclaringType = sam ->
             let coordComponents =
@@ -1904,7 +1904,7 @@ module IntrinsicFunctions =
                 | "get_Samples" -> ["GL_ARB_shader_texture_image_samples"]
                 | _ -> []
 
-            ValueSome (functionName, Set.ofList extensions)
+            ValueSome (functionName, Set.ofList extensions, true)
         | _ ->
             ValueNone
 

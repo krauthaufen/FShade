@@ -62,7 +62,10 @@ type Shader =
         shaderMissShaders : Set<Symbol>
         /// the shader's referenced callable shaders (only useful in some raytracing shaders)
         shaderCallableShaders : Set<Symbol>
+        /// the shader's depth write mode (only greater, only less, etc.)
         shaderDepthWriteMode : DepthWriteMode
+        /// access flags for storage buffers
+        shaderStorageBufferAccess : Map<string, StorageAccess>
     }
 
 [<CompilerMessage("Preprocessor should not be used directly", 4321, IsHidden = true)>]
@@ -749,6 +752,7 @@ module Preprocessor =
             callableShaders : Set<CallableId>
             localSize       : V3i
             expressionType  : ShaderExpressionType
+            storageBufferAccess : Map<string, StorageAccess>
         }
         
     let shaderUtilityFunctions = System.Collections.Concurrent.ConcurrentDictionary<V3i * MethodBase, Option<Expr * State>>()
@@ -782,6 +786,7 @@ module Preprocessor =
                 callableShaders = Set.empty
                 localSize       = V3i.Zero
                 expressionType  = ShaderExpressionType.Normal
+                storageBufferAccess = Map.empty
             }
 
         let createInner (parent : State) =
@@ -875,6 +880,13 @@ module Preprocessor =
                     { s with State.uniforms = Map.add p.uniformName p s.uniforms }
             )
 
+        let addStorageAccess (name : string) (access : StorageAccess) =
+            State.modify (fun s ->
+                match Map.tryFind name s.storageBufferAccess with
+                | Some a -> { s with storageBufferAccess = Map.add name (access ||| a) s.storageBufferAccess }
+                | None -> { s with storageBufferAccess = Map.add name access s.storageBufferAccess }
+            )
+        
         let writeOutput (name : string) (desc : ParameterDescription) = 
             State.modify (fun s ->
                 { s with State.outputs = Map.add name desc s.outputs }
@@ -1268,6 +1280,7 @@ module Preprocessor =
             match e with
                 | GetArray(ValueWithName(v, t, name), i) ->
                     let! i = preprocessComputeS i
+                    do! State.addStorageAccess name StorageAccess.Read
                     match t with
                         | ArrOf(_,t) | ArrayOf t ->
                             return Expr.ReadInput(ParameterKind.Input, t, name, i)
@@ -1277,6 +1290,7 @@ module Preprocessor =
                 | SetArray(ValueWithName(v, t, name), i, e) ->
                     let! i = preprocessComputeS i
                     let! e = preprocessComputeS e
+                    do! State.addStorageAccess name StorageAccess.Write
                     return Expr.WriteOutputsRaw([name, Some i, e])
 
                 | PropertyGet(Some (ValueWithName(v, t, name)), prop, []) when t.IsArray && (prop.Name = "Length" || prop.Name = "LongLength") ->
@@ -1364,6 +1378,24 @@ module Preprocessor =
             let! vertexType = State.vertexType
 
             match e with
+            
+            | SetArray(StorageBuffer u, index, value) ->
+                let! value = preprocessNormalS value
+                let! index = preprocessNormalS index
+                do! u |> State.readUniform true
+                
+                do! State.addStorageAccess u.uniformName StorageAccess.Write
+                
+                return Expr.ArraySet(Expr.ReadInput(ParameterKind.Uniform, u.uniformType, u.uniformName), index, value)
+            
+            | GetArray(StorageBuffer u, index) ->
+                let! index = preprocessNormalS index
+                do! u |> State.readUniform true
+                
+                do! State.addStorageAccess u.uniformName StorageAccess.Read
+                
+                return Expr.ArrayAccess(Expr.ReadInput(ParameterKind.Uniform, u.uniformType, u.uniformName), index)
+            
             | ConstantSwizzle(v, prop, baseType) ->
                 let tmp = Var("tmp", v.Type)
                 let components =
@@ -2246,9 +2278,10 @@ module Preprocessor =
                 shaderCallableData      = inverseMap state.callableData
                 shaderCallableDataIn    = state.callableDataIn
                 shaderHitAttribute      = state.hitAttribute
-                shaderRayTypes          = state.rayTypes |> Set.map _.Name
-                shaderMissShaders       = state.missShaders |> Set.map _.Name
-                shaderCallableShaders   = state.callableShaders |> Set.map _.Name
+                shaderRayTypes          = state.rayTypes |> Set.map (fun i -> i.Name)
+                shaderMissShaders       = state.missShaders |> Set.map (fun i -> i.Name)
+                shaderCallableShaders   = state.callableShaders |> Set.map (fun i -> i.Name)
+                shaderStorageBufferAccess   = state.storageBufferAccess
             }
 
         shader :: state.shaders
@@ -3630,6 +3663,7 @@ module Shader =
                     shaderRayTypes          = Set.empty
                     shaderMissShaders       = Set.empty
                     shaderCallableShaders   = Set.empty
+                    shaderStorageBufferAccess = Map.empty
                 }
             | _ ->
                 failwith "[FShade] not implemented"

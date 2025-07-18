@@ -157,6 +157,13 @@ type InputTopology =
     | TriangleAdjacency 
     | Patch of int
 
+type StorageAccess =
+    | None          = 0x00
+    | Read          = 0x01
+    | Write         = 0x02
+    | ReadWrite     = 0x03
+    | Atomic        = 0x04
+
     
 type Preprocessor private() =
     static member unroll() = ()
