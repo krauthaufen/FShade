@@ -1378,6 +1378,22 @@ module Preprocessor =
             let! vertexType = State.vertexType
 
             match e with
+            
+            
+            | RefOf (GetArray(StorageBuffer u, index)) ->
+                let! index = preprocessNormalS index
+                do! u |> State.readUniform true
+                do! State.addStorageAccess u.uniformName StorageAccess.ReadWrite
+                let arr = Expr.ReadInput(ParameterKind.Uniform, u.uniformType, u.uniformName)
+                let access =
+                    match e with
+                    | Call(None, mi, _) -> Expr.Call(mi, [arr; index])
+                    | PropertyGet(Some _, pi, _) -> Expr.PropertyGet(arr, pi, [index])
+                    | _ -> failwithf "[FShade] Unexpected array get: %A" e
+                
+                return Expr.RefOf(access)
+                
+            
             | SetArray(StorageBuffer u, index, value) ->
                 let! value = preprocessNormalS value
                 let! index = preprocessNormalS index

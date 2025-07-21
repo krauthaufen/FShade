@@ -162,12 +162,13 @@ module ExpressionExtensions =
         static let readInputIndex   = find "ReadInput" [| typeof<ParameterKind>; typeof<string>; typeof<int>; typeof<ShaderSlot option> |]
         static let writeOutputs     = find "WriteOutputs" [| typeof<array<string * int * obj>> |]
         static let unsafeWrite      = allMethods |> Array.find (fun m -> m.Name = "UnsafeWrite")
-
+        static let refof = getMethodInfo <@ (~&&) @>
         static member internal ReadInputMeth = readInput
         static member internal ReadInputIndexedMeth = readInputIndex
         static member internal WriteOutputsMeth = writeOutputs
         static member internal UnsafeWriteMeth = unsafeWrite
-
+        static member internal RefOf = refof
+        
         static member ReadInput<'a>(kind : ParameterKind, name : string, slot : Option<ShaderSlot>) : 'a =
             onlyInShaderCode "ReadInput"
 
@@ -182,6 +183,9 @@ module ExpressionExtensions =
 
     type Expr with
 
+        static member RefOf(target : Expr) =
+            Expr.Call(ShaderIO.RefOf.MakeGenericMethod [| target.Type |], [target])
+        
         static member UnsafePropertySet(target : Expr, prop : PropertyInfo, indices : Expr list, value : Expr) =
             let mi = ShaderIO.UnsafeWriteMeth.MakeGenericMethod [| value.Type |]
             Expr.Call(mi, [Expr.PropertyGet(target, prop, indices); value])
