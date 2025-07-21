@@ -3574,12 +3574,17 @@ module Shader =
                         | UniformValue.Sampler (n,s) -> [n,s :> obj]
                         | UniformValue.SamplerArray arr -> Array.toList arr |> List.map (fun (n,s) -> n, s :> obj)
                         | _ -> []
-
+                        
+                let decorations =
+                    match Map.tryFind n s.shaderStorageBufferAccess with
+                    | Some acc -> UniformDecoration.BufferAccess acc :: u.decorations
+                    | None -> u.decorations
+                        
                 {
                     uniformName = u.uniformName
                     uniformType = u.uniformType
                     uniformBuffer = uniformBuffer
-                    uniformDecorations = u.decorations
+                    uniformDecorations = decorations
                     uniformTextureInfo = textureInfos
                 }
             )

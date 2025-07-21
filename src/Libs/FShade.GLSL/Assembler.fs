@@ -1017,6 +1017,8 @@ module Interface =
             shaderBuiltInFunctions          = HashSet.empty
             shaderDecorations               = []
             shaderBuiltIns                  = MapExt.empty
+            shaderSamplerStates             = HashSet.empty
+            shaderTextures                  = HashSet.empty
         }
 
     let private updateShaderInterface (action : AssemblerState -> GLSLShaderInterface -> GLSLShaderInterface) =
@@ -1174,13 +1176,13 @@ module Interface =
             let iface = 
                 { s.ifaceNew with
                     storageBuffers = MapExt.add ssb.ssbName ssb s.ifaceNew.storageBuffers
-                    shaders = 
-                        (s.stages, s.ifaceNew.shaders)
-                        ||> GLSLProgramShaders.alter (
-                            function 
-                            | Some s -> Some { s with shaderStorageBuffers = HashSet.add ssb.ssbName s.shaderStorageBuffers } 
-                            | None -> None
-                        )
+                    // shaders = 
+                    //     (s.stages, s.ifaceNew.shaders)
+                    //     ||> GLSLProgramShaders.alter (
+                    //         function 
+                    //         | Some s -> Some { s with shaderStorageBufferAccess = HashMap.add ssb.ssbName ssb.ssbAccess s.shaderStorageBufferAccess } 
+                    //         | None -> None
+                    //     )
                 }
                 
             { s with ifaceNew = iface; storageBuffers = MapExt.add ssb.ssbName ssb s.storageBuffers }
@@ -1191,13 +1193,13 @@ module Interface =
             let iface = 
                 { s.ifaceNew with
                     uniformBuffers = MapExt.add ub.ubName ub s.ifaceNew.uniformBuffers
-                    shaders = 
-                        (s.stages, s.ifaceNew.shaders)
-                        ||> GLSLProgramShaders.alter (
-                            function 
-                            | Some s -> Some { s with shaderUniformBuffers = HashSet.add ub.ubName s.shaderUniformBuffers } 
-                            | None -> None
-                        )
+                    // shaders = 
+                    //     (s.stages, s.ifaceNew.shaders)
+                    //     ||> GLSLProgramShaders.alter (
+                    //         function 
+                    //         | Some s -> Some { s with shaderUniformBuffers = HashSet.add ub.ubName s.shaderUniformBuffers } 
+                    //         | None -> None
+                    //     )
                 }
 
             let buffers = ub.ubFields |> List.map (fun f -> f.ufName, ub) |> MapExt.ofList
@@ -1210,13 +1212,13 @@ module Interface =
             let iface = 
                 { s.ifaceNew with
                     samplers = MapExt.add sampler.samplerName sampler s.ifaceNew.samplers
-                    shaders = 
-                        (s.stages, s.ifaceNew.shaders)
-                        ||> GLSLProgramShaders.alter (
-                            function 
-                            | Some s -> Some { s with shaderSamplers = HashSet.add sampler.samplerName s.shaderSamplers } 
-                            | None -> None
-                        )
+                    // shaders = 
+                    //     (s.stages, s.ifaceNew.shaders)
+                    //     ||> GLSLProgramShaders.alter (
+                    //         function 
+                    //         | Some s -> Some { s with shaderSamplers = HashSet.add sampler.samplerName s.shaderSamplers } 
+                    //         | None -> None
+                    //     )
                 }
                 
             { s with ifaceNew = iface; samplers = MapExt.add sampler.samplerName sampler s.samplers }
@@ -1255,13 +1257,13 @@ module Interface =
             let iface = 
                 { s.ifaceNew with
                     images = MapExt.add image.imageName image s.ifaceNew.images
-                    shaders = 
-                        (s.stages, s.ifaceNew.shaders)
-                        ||> GLSLProgramShaders.alter (
-                            function 
-                            | Some s -> Some { s with shaderImages = HashSet.add image.imageName s.shaderImages } 
-                            | None -> None
-                        )
+                    // shaders = 
+                    //     (s.stages, s.ifaceNew.shaders)
+                    //     ||> GLSLProgramShaders.alter (
+                    //         function 
+                    //         | Some s -> Some { s with shaderImages = HashSet.add image.imageName s.shaderImages } 
+                    //         | None -> None
+                    //     )
                 }
                 
             { s with ifaceNew = iface; images = MapExt.add image.imageName image s.images }
@@ -1272,13 +1274,13 @@ module Interface =
             let iface = 
                 { s.ifaceNew with
                     accelerationStructures = MapExt.add accel.accelName accel s.ifaceNew.accelerationStructures
-                    shaders = 
-                        (s.stages, s.ifaceNew.shaders)
-                        ||> GLSLProgramShaders.alter (
-                            function 
-                            | Some s -> Some { s with shaderAccelerationStructures = HashSet.add accel.accelName s.shaderAccelerationStructures } 
-                            | None -> None
-                        )
+                    // shaders = 
+                    //     (s.stages, s.ifaceNew.shaders)
+                    //     ||> GLSLProgramShaders.alter (
+                    //         function 
+                    //         | Some s -> Some { s with shaderAccelerationStructures = HashSet.add accel.accelName s.shaderAccelerationStructures } 
+                    //         | None -> None
+                    //     )
                 }
                 
             { s with ifaceNew = iface; accelerationStructures = MapExt.add accel.accelName accel s.accelerationStructures }
@@ -1340,6 +1342,14 @@ module Interface =
                 MapExt.tryFind name s.accelerationStructures 
                 |> Option.map (fun v s -> { s with shaderAccelerationStructures = HashSet.add v.accelName s.shaderAccelerationStructures })
                 
+            let samplerState =
+                MapExt.tryFind name s.samplerStates
+                |> Option.map (fun v s -> { s with  shaderSamplerStates = HashSet.add v.samplerName s.shaderSamplerStates })
+                
+            let texture =
+                MapExt.tryFind name s.textures
+                |> Option.map (fun v s -> { s with  shaderTextures = HashSet.add v.textureName s.shaderTextures })
+                
             let all =
                 [
                     match uniform with | Some u -> yield u | None -> ()
@@ -1347,6 +1357,8 @@ module Interface =
                     match sampler with | Some u -> yield u | None -> ()
                     match image with | Some u -> yield u | None -> ()
                     match accel with | Some u -> yield u | None -> ()
+                    match samplerState with | Some u -> yield u | None -> ()
+                    match texture with | Some u -> yield u | None -> ()
                 ]
             all |> List.fold (fun s v -> v s) shader
         )

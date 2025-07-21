@@ -584,6 +584,8 @@ type GLSLShaderInterface =
         shaderStorageBuffers         : HashSet<string>
         shaderUniformBuffers         : HashSet<string>
         shaderAccelerationStructures : HashSet<string>
+        shaderSamplerStates          : HashSet<string>
+        shaderTextures               : HashSet<string>
         shaderBuiltInFunctions       : HashSet<GLSLIntrinsic>
         shaderDecorations            : list<GLSLShaderDecoration>
         shaderBuiltIns               : MapExt<ParameterKind, MapExt<string, GLSLType>>
@@ -602,7 +604,9 @@ type GLSLShaderInterface =
             x.shaderAccelerationStructures.GetHashCode(),
             x.shaderBuiltInFunctions.GetHashCode(),
             x.shaderDecorations.GetHashCode(),
-            x.shaderBuiltIns.GetHashCode()
+            x.shaderBuiltIns.GetHashCode(),
+            x.shaderSamplerStates.GetHashCode(),
+            x.shaderTextures.GetHashCode()
         )
     override x.Equals(o) =
         match o with
@@ -618,7 +622,9 @@ type GLSLShaderInterface =
                 x.shaderAccelerationStructures = o.shaderAccelerationStructures &&
                 x.shaderBuiltInFunctions = o.shaderBuiltInFunctions &&
                 x.shaderDecorations = o.shaderDecorations &&
-                x.shaderBuiltIns = o.shaderBuiltIns
+                x.shaderBuiltIns = o.shaderBuiltIns &&
+                x.shaderSamplerStates = o.shaderSamplerStates &&
+                x.shaderTextures = o.shaderTextures
             | _ ->
                 false
 
@@ -651,9 +657,11 @@ type GLSLShaderInterface =
                     Seq.concat [
                         x.shaderAccelerationStructures |> Seq.map (sprintf "acc::%s")
                         x.shaderUniformBuffers |> Seq.map (sprintf "ub::%s")
-                        x.shaderStorageBuffers |> Seq.map (sprintf "ssb::%s")
+                        x.shaderStorageBuffers |> Seq.map (sprintf "ssb::%A")
                         x.shaderSamplers |> Seq.map (sprintf "sam::%s")
                         x.shaderImages |> Seq.map (sprintf "img::%s")
+                        x.shaderSamplerStates |> Seq.map (sprintf "samState::%s")
+                        x.shaderTextures |> Seq.map (sprintf "tex::%s")
                     ]
 
                 yield sprintf "uniform {%s}" (String.concat ", " usedUniforms) |> Some
@@ -824,6 +832,43 @@ and [<StructuredFormatDisplay("{AsString}")>] GLSLProgramInterface =
         textures                : MapExt<string, GLSLTexture>
         shaders                 : GLSLProgramShaders
     }
+
+    
+    member x.GetUniformStages(name : string) =
+        let getSet =
+            if MapExt.containsKey name x.samplers then fun (s : GLSLShaderInterface) -> s.shaderSamplers
+            elif MapExt.containsKey name x.images then fun (s : GLSLShaderInterface) -> s.shaderImages
+            elif MapExt.containsKey name x.storageBuffers then fun (s : GLSLShaderInterface) -> s.shaderStorageBuffers
+            elif MapExt.containsKey name x.uniformBuffers then fun (s : GLSLShaderInterface) -> s.shaderUniformBuffers
+            elif MapExt.containsKey name x.accelerationStructures then fun (s : GLSLShaderInterface) -> s.shaderAccelerationStructures
+            elif MapExt.containsKey name x.samplerStates then fun (s : GLSLShaderInterface) -> s.shaderSamplerStates
+            elif MapExt.containsKey name x.textures then fun (s : GLSLShaderInterface) -> s.shaderTextures
+            else fun _ -> HashSet.empty
+            
+        match x.shaders with
+        | GLSLProgramShaders.Compute c ->
+            if HashSet.contains name (getSet c) then Set.singleton ShaderStage.Compute
+            else Set.empty
+        | GLSLProgramShaders.Graphics g ->
+                let mutable set = Set.empty
+                for KeyValue(stage, sh) in g.stages do
+                    if HashSet.contains name (getSet sh) then
+                        set <- Set.add stage set
+                set
+        | GLSLProgramShaders.Raytracing r ->
+            r.Slots |> MapExt.toList |> List.choose (fun (slot, iface) ->
+                if HashSet.contains name (getSet iface) then
+                    match slot with
+                    | ShaderSlot.Callable _ -> ShaderStage.Callable |> Some
+                    | ShaderSlot.AnyHit _ -> ShaderStage.AnyHit |> Some
+                    | ShaderSlot.ClosestHit _ -> ShaderStage.ClosestHit |> Some
+                    | ShaderSlot.Intersection _ -> ShaderStage.Intersection |> Some
+                    | ShaderSlot.RayGeneration -> ShaderStage.RayGeneration |> Some
+                    | ShaderSlot.Miss _ -> ShaderStage.Miss |> Some
+                    | _ -> None // TODO: should not contain other stages
+                else
+                    None
+            ) |> Set.ofList
 
     override x.ToString() =
         many [
@@ -1016,6 +1061,14 @@ module GLSLShaderInterface =
                 dst.Write name
                 GLSLType.serializeInternal dst t
 
+        dst.Write (s.shaderSamplerStates.Count)
+        for name in s.shaderSamplerStates do
+            dst.Write name
+            
+        dst.Write (s.shaderTextures.Count)
+        for name in s.shaderTextures do
+            dst.Write name
+    
     let internal deserializeInternal (src : BinaryReader) =
         let stage = src.ReadInt32() |> unbox<ShaderStage>
         let entry = src.ReadString() 
@@ -1106,6 +1159,14 @@ module GLSLShaderInterface =
             )
             |> MapExt.ofList
 
+        let shaderSamplerStates =
+            let cnt = src.ReadInt32()
+            List.init cnt (fun _ -> src.ReadString()) |> HashSet.ofList
+            
+        let shaderTextures =
+            let cnt = src.ReadInt32()
+            List.init cnt (fun _ -> src.ReadString()) |> HashSet.ofList
+        
         {
             shaderStage                  = stage
             shaderEntry                  = entry
@@ -1119,6 +1180,8 @@ module GLSLShaderInterface =
             shaderBuiltInFunctions       = shaderBuiltInFunctions
             shaderDecorations            = shaderDecorations
             shaderBuiltIns               = shaderBuiltIns
+            shaderSamplerStates          = shaderSamplerStates
+            shaderTextures               = shaderTextures
         }
 
      
