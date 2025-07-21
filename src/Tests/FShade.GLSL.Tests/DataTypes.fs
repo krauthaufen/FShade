@@ -40,7 +40,7 @@ let ``Array index unsigned``() =
 [<Test>]
 let ``Arr index unsigned``() =
     Setup.Run()
-    let shader (v: Vertex) = fragment { return uniform.Arr.Get(5) + uniform.Arr.Get(7u) }
+    let shader (v: Vertex) = fragment { return uniform.Arr.Get(5) + uniform.Arr.Get(7u) + uniform.Arr.[1] }
     GLSL.shouldCompile [ Effect.ofFunction shader ]
 
 [<Test>]

@@ -1378,24 +1378,31 @@ module Preprocessor =
             let! vertexType = State.vertexType
 
             match e with
-            
             | SetArray(StorageBuffer u, index, value) ->
                 let! value = preprocessNormalS value
                 let! index = preprocessNormalS index
+                let arr = Expr.ReadInput(ParameterKind.Uniform, u.uniformType, u.uniformName)
+
                 do! u |> State.readUniform true
-                
                 do! State.addStorageAccess u.uniformName StorageAccess.Write
-                
-                return Expr.ArraySet(Expr.ReadInput(ParameterKind.Uniform, u.uniformType, u.uniformName), index, value)
-            
+
+                match e with
+                | Call(None, mi, _) -> return Expr.Call(mi, [arr; index; value])
+                | PropertySet(Some _, pi, _, _) -> return Expr.PropertySet(arr, pi, value, [index])
+                | _ -> return failwithf "[FShade] Unexpected array set: %A" e
+
             | GetArray(StorageBuffer u, index) ->
                 let! index = preprocessNormalS index
+                let arr = Expr.ReadInput(ParameterKind.Uniform, u.uniformType, u.uniformName)
+
                 do! u |> State.readUniform true
-                
                 do! State.addStorageAccess u.uniformName StorageAccess.Read
-                
-                return Expr.ArrayAccess(Expr.ReadInput(ParameterKind.Uniform, u.uniformType, u.uniformName), index)
-            
+
+                match e with
+                | Call(None, mi, _) -> return Expr.Call(mi, [arr; index])
+                | PropertyGet(Some _, pi, _) -> return Expr.PropertyGet(arr, pi, [index])
+                | _ -> return failwithf "[FShade] Unexpected array get: %A" e
+
             | ConstantSwizzle(v, prop, baseType) ->
                 let tmp = Var("tmp", v.Type)
                 let components =
