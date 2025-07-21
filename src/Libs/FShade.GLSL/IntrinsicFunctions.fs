@@ -8,10 +8,22 @@ open Aardvark.Base
 
 open FShade
 open FShade.Imperative
+open FShade.GLSL
 
 
 [<AutoOpen>]
 module IntrinsicFunctions =
+
+    let private requireExtension (extension: string) (intrinsics: (CIntrinsic * MethodInfo list) list) =
+        intrinsics |> List.map (fun (i, m) ->
+            let set =
+                match i.additional with
+                | :? Set<string> as set -> set
+                | null -> Set.empty
+                | arg -> failwith $"[FShade] Cannot add required extension to intrinsic {i.intrinsicName}: {arg}"
+
+            { i with additional = set |> Set.add extension }, m
+        )
 
     [<return: Struct>]
     let (|IntrinsicFunction|_|) : MethodInfo -> ValueOption<CIntrinsic> =
@@ -1720,11 +1732,48 @@ module IntrinsicFunctions =
             CIntrinsic.tagged "ivec3(gl_WorkGroupSize)", [ exactly <@ getWorkGroupSize @> ]
             CIntrinsic.tagged "barrier()", [ exactly <@ barrier @> ]
 
+            // ==========================================================================
+            // Raytracing
+            // ==========================================================================
+
             CIntrinsic.simple "traceRayEXT",            [ MethodInfo.traceRay ]
             CIntrinsic.simple "executeCallableEXT",     [ MethodInfo.executeCallable ]
             CIntrinsic.simple "reportIntersectionEXT",  [ MethodInfo.reportIntersection ]
             CIntrinsic.tagged "ignoreIntersectionEXT",  [ exactly <@ ignoreIntersection @> ]
             CIntrinsic.tagged "terminateRayEXT",        [ exactly <@ terminateRay @> ]
+
+            // ==========================================================================
+            // Raytracing (SER)
+            // ==========================================================================
+            yield! requireExtension GLSLExtension.NVShaderInvocationReorder [
+                CIntrinsic.simple "hitObjectTraceRayNV",                         [ MethodInfo.hitObjectTraceRay ]
+                CIntrinsic.simple "hitObjectRecordHitNV",                        [ MethodInfo.hitObjectRecordHit ]
+                CIntrinsic.simple "hitObjectRecordMissNV",                       [ MethodInfo.hitObjectRecordMiss ]
+                CIntrinsic.simple "hitObjectRecordEmptyNV",                      [ getMethodInfo <@ fun (ho: HitObject) -> ho.RecordEmpty @> ]
+                CIntrinsic.simple "hitObjectExecuteShaderNV",                    [ MethodInfo.hitObjectExecuteShader ]
+                CIntrinsic.simple "hitObjectGetAttributesNV",                    [ MethodInfo.hitObjectExtractAttributes ]
+
+                CIntrinsic.simple "hitObjectIsEmptyNV",                          [ exactly <@ fun (ho: HitObject) -> ho.IsEmpty @> ]
+                CIntrinsic.simple "hitObjectIsMissNV",                           [ exactly <@ fun (ho: HitObject) -> ho.IsMiss @> ]
+                CIntrinsic.simple "hitObjectIsHitNV",                            [ exactly <@ fun (ho: HitObject) -> ho.IsHit @> ]
+                CIntrinsic.simple "hitObjectGetRayTMinNV",                       [ exactly <@ fun (ho: HitObject) -> ho.RayMinT @> ]
+                CIntrinsic.simple "hitObjectGetRayTMaxNV",                       [ exactly <@ fun (ho: HitObject) -> ho.RayMaxT @> ]
+                CIntrinsic.simple "hitObjectGetWorldRayOriginNV",                [ exactly <@ fun (ho: HitObject) -> ho.RayOrigin @> ]
+                CIntrinsic.simple "hitObjectGetWorldRayDirectionNV",             [ exactly <@ fun (ho: HitObject) -> ho.RayDirection @> ]
+                CIntrinsic.simple "hitObjectGetObjectRayOriginNV",               [ exactly <@ fun (ho: HitObject) -> ho.RayObjectOrigin @> ]
+                CIntrinsic.simple "hitObjectGetObjectRayDirectionNV",            [ exactly <@ fun (ho: HitObject) -> ho.RayObjectDirection @> ]
+                CIntrinsic.tagged "transpose(hitObjectGetObjectToWorldNV({0}))", [ exactly <@ fun (ho: HitObject) -> ho.ObjectToWorld @> ]
+                CIntrinsic.tagged "transpose(hitObjectGetWorldToObjectNV({0}))", [ exactly <@ fun (ho: HitObject) -> ho.WorldToObject @> ]
+                CIntrinsic.simple "hitObjectGetInstanceCustomIndexNV",           [ exactly <@ fun (ho: HitObject) -> ho.InstanceCustomIndex @> ]
+                CIntrinsic.simple "hitObjectGetInstanceIdNV",                    [ exactly <@ fun (ho: HitObject) -> ho.InstanceId @> ]
+                CIntrinsic.simple "hitObjectGetGeometryIndexNV",                 [ exactly <@ fun (ho: HitObject) -> ho.GeometryIndex @> ]
+                CIntrinsic.simple "hitObjectGetPrimitiveIndexNV",                [ exactly <@ fun (ho: HitObject) -> ho.PrimitiveIndex @> ]
+                CIntrinsic.simple "hitObjectGetHitKindNV",                       [ exactly <@ fun (ho: HitObject) -> ho.HitKind @> ]
+
+                CIntrinsic.simple "reorderThreadNV",                             [ getMethodInfo <@ Thread.Reorder : uint * uint -> unit @> ]
+                CIntrinsic.simple "reorderThreadNV",                             [ getMethodInfo <@ Thread.Reorder : HitObject -> unit @> ]
+                CIntrinsic.simple "reorderThreadNV",                             [ getMethodInfo <@ Thread.Reorder : HitObject * uint * uint -> unit @> ]
+            ]
         ]
 
     [<return: Struct>]

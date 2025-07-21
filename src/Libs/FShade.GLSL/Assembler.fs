@@ -780,6 +780,12 @@ type Backend private(config : Config) =
                     tag = t
                 }
 
+            | HitObject ->
+                Some {
+                    intrinsicTypeName = "hitObjectNV"
+                    tag = Set.singleton GLSLExtension.NVShaderInvocationReorder
+                }
+
             | _ ->
                 None
 
@@ -936,6 +942,12 @@ module AssemblerState =
     let useExtension (extensionName : string) =
         State.modify (fun s ->
             { s with requiredExtensions = s.requiredExtensions |> Set.add extensionName }
+        )
+
+    let useExtensions (extensionNames : string seq) =
+        State.modify (fun s ->
+            let requiredExtensions = (s.requiredExtensions, extensionNames) ||> Seq.fold (flip Set.add)
+            { s with requiredExtensions = requiredExtensions }
         )
 
     let useTypeExtensions (integer: bool) (size: int) =
@@ -1526,6 +1538,10 @@ module Assembler =
                 return inner.Name |> sprintf "%s[]" |> Identifier
 
             | CType.CIntrinsic it ->
+                match it.tag with
+                | :? Set<string> as requiredExtensions -> do! AssemblerState.useExtensions requiredExtensions
+                | _ -> ()
+
                 return it.intrinsicTypeName |> Identifier
 
             | _ ->
@@ -2466,6 +2482,9 @@ module Assembler =
 
                             | RaytracingDataKind.CallableDataIn ->
                                 "callableDataInEXT"
+
+                            | RaytracingDataKind.HitObjectAttribute slot ->
+                                $"layout(location = {slot}) hitObjectAttributeNV"
 
                         let! decl = assembleDeclarationS config.reverseMatrixLogic r.cRaytracingDataType (checkName r.cRaytracingDataName)
                         return sprintf "%s %s;" prefix decl

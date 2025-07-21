@@ -92,6 +92,13 @@ module ReflectionPatterns =
         else
             ValueNone
 
+    [<return: Struct>]
+    let (|HitObject|_|) (t : Type) =
+        if typeof<HitObject> = t then
+            ValueSome ()
+        else
+            ValueNone
+
     type UniformParameter with
         member x.decorations =
             match x.uniformType with

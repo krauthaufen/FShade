@@ -56,6 +56,8 @@ type Shader =
         shaderCallableDataIn : Option<string * Type>
         /// the shader's hit attribute (only useful in some raytracing shaders)
         shaderHitAttribute : Option<string * Type>
+        /// the shader's hit object attributes (only useful in some raytracing shaders)
+        shaderHitObjectAttributes : Map<string, Type * int>
         /// the shader's referenced ray types (only useful in some raytracing shaders)
         shaderRayTypes : Set<Symbol>
         /// the shader's referenced miss shaders (only useful in some raytracing shaders)
@@ -395,15 +397,30 @@ module Preprocessor =
                 | [origin; direction; ray; miss; minT; maxT; flags; cullMask] ->
                     ValueSome {| accelerationStructure = accel; origin = origin; direction = direction;
                                  payload = ValueNone; ray = ray; miss = miss; minT = minT; maxT = maxT;
-                                 flags = flags; cullMask = cullMask |}
+                                 flags = flags; cullMask = cullMask; hitObject = ValueNone |}
 
                 | [origin; direction; payload; ray; miss; minT; maxT; flags; cullMask] ->
                     ValueSome {| accelerationStructure = accel; origin = origin; direction = direction;
                                  payload = ValueSome payload; ray = ray; miss = miss; minT = minT; maxT = maxT;
-                                 flags = flags; cullMask = cullMask |}
+                                 flags = flags; cullMask = cullMask; hitObject = ValueNone |}
 
                 | _ ->
-                    failwithf "[FShade] Illformed call to TraceRay with %d arguments" args.Length
+                    failwithf "[FShade] Ill-formed call to TraceRay with %d arguments" args.Length
+
+            | Call(Some this, Method("TraceRay", _), args) when this.Type = typeof<HitObject> ->
+                match args with
+                | [Scene accel; origin; direction; ray; miss; minT; maxT; flags; cullMask] ->
+                    ValueSome {| accelerationStructure = accel; origin = origin; direction = direction;
+                                 payload = ValueNone; ray = ray; miss = miss; minT = minT; maxT = maxT;
+                                 flags = flags; cullMask = cullMask; hitObject = ValueSome this |}
+
+                | [Scene accel; origin; direction; payload; ray; miss; minT; maxT; flags; cullMask] ->
+                    ValueSome {| accelerationStructure = accel; origin = origin; direction = direction;
+                                 payload = ValueSome payload; ray = ray; miss = miss; minT = minT; maxT = maxT;
+                                 flags = flags; cullMask = cullMask; hitObject = ValueSome this |}
+
+                | _ ->
+                    failwithf "[FShade] Ill-formed call to TraceRay with %d arguments" args.Length
 
             | _ ->
                 ValueNone
@@ -429,7 +446,7 @@ module Preprocessor =
                 | [id] -> ValueSome (id, ValueNone)
                 | [data; id] -> ValueSome (id, ValueSome data)
                 | _ ->
-                    failwithf "[FShade] Illformed call to Callable.Execute with %d arguments" args.Length
+                    failwithf "[FShade] Ill-formed call to Callable.Execute with %d arguments" args.Length
             | _ ->
                 ValueNone
 
@@ -441,7 +458,7 @@ module Preprocessor =
                 | [t; kind] -> ValueSome (t, kind, ValueNone)
                 | [t; attribute; kind] -> ValueSome (t, kind, ValueSome attribute)
                 | _ ->
-                    failwithf "[FShade] Illformed call to Intersection.Report with %d arguments" args.Length
+                    failwithf "[FShade] Ill-formed call to Intersection.Report with %d arguments" args.Length
             | _ ->
                 ValueNone
 
@@ -478,6 +495,76 @@ module Preprocessor =
         let (|HitAttribute|_|) (e : Expr) =
             match e with
             | SemanticInput(semantic, _) when semantic = Intrinsics.HitAttribute -> ValueSome e.Type
+            | _ -> ValueNone
+
+        [<return: Struct>]
+        let (|NewHitObject|_|) (e : Expr) =
+            match e with
+            | NewObject (ci, _) when ci.DeclaringType = typeof<HitObject> -> ValueSome ()
+            | _ -> ValueNone
+
+        [<return: Struct>]
+        let (|HitObjectRecordHit|_|) (e : Expr) =
+            match e with
+            | Call(Some this, (Method("RecordHit", _) as mi), args) when this.Type = typeof<HitObject> ->
+                match args with
+                | [Scene accel; instanceId; primitiveId; geometryIndex; origin; direction; ray; minT; maxT; hitKind] ->
+                    ValueSome {| accelerationStructure = accel; instanceId = instanceId; primitiveId = primitiveId; geometryIndex = geometryIndex
+                                 origin = origin; direction = direction; attribute = ValueNone; ray = ray; minT = minT; maxT = maxT; hitKind = hitKind
+                                 hitObject = this; attributeType = mi.GetGenericArguments().[0] |}
+
+                | [Scene accel; instanceId; primitiveId; geometryIndex; origin; direction; attribute; ray; minT; maxT; hitKind] ->
+                    ValueSome {| accelerationStructure = accel; instanceId = instanceId; primitiveId = primitiveId; geometryIndex = geometryIndex
+                                 origin = origin; direction = direction; attribute = ValueSome attribute; ray = ray; minT = minT; maxT = maxT; hitKind = hitKind
+                                 hitObject = this; attributeType = mi.GetGenericArguments().[0] |}
+
+                | _ ->
+                    failwithf "[FShade] Ill-formed call to HitObject.RecordHit with %d arguments" args.Length
+            | _ ->
+                ValueNone
+
+        [<return: Struct>]
+        let (|HitObjectRecordMiss|_|) (e : Expr) =
+            match e with
+            | Call(Some this, Method("RecordMiss", _), args) when this.Type = typeof<HitObject> ->
+                match args with
+                | [origin; direction; miss; minT; maxT] ->
+                    ValueSome {| origin = origin; direction = direction; miss = miss; minT = minT; maxT = maxT; hitObject = this; |}
+
+                | _ ->
+                    failwithf "[FShade] Ill-formed call to HitObject.RecordMiss with %d arguments" args.Length
+            | _ ->
+                ValueNone
+
+        [<return: Struct>]
+        let (|HitObjectRecordEmpty|_|) (e : Expr) =
+            match e with
+            | Call(Some this, Method("RecordEmpty", _), []) when this.Type = typeof<HitObject> ->
+                ValueSome ()
+            | _ ->
+                ValueNone
+
+        [<return: Struct>]
+        let (|HitObjectExecuteShader|_|) (e : Expr) =
+            match e with
+            | Call(Some this, Method("ExecuteShader", _), args) when this.Type = typeof<HitObject> ->
+                match args with
+                | [] -> ValueSome {| hitObject = this; payload = ValueNone |}
+                | [payload] -> ValueSome {| hitObject = this; payload = ValueSome payload |}
+                | _ -> failwithf "[FShade] Ill-formed call to HitObject.ExecuteShader with %d arguments" args.Length
+            | _ ->
+                ValueNone
+
+        [<return: Struct>]
+        let (|HitObjectGetAttributes|_|) (e : Expr) =
+            match e with
+            | Call(Some t, Method("GetAttributes", _), []) when t.Type = typeof<HitObject> -> ValueSome {| hitObject = t; attributeType = e.Type |}
+            | _ -> ValueNone
+
+        [<return: Struct>]
+        let (|ReorderThread|_|) (e : Expr) =
+            match e with
+            | StaticMethod(t, "Reorder", _) when t = typeof<Thread> -> ValueSome ()
             | _ -> ValueNone
 
     [<AutoOpen>]
@@ -731,27 +818,28 @@ module Preprocessor =
 
     type State =
         {
-            depthWriteMode  : DepthWriteMode
-            inputTypes      : List<Type>
-            inputTopology   : Option<InputTopology>
-            vertexType      : Type
-            builder         : Option<Expr>
-            inputs          : Map<string, ParameterDescription>
-            outputs         : Map<string, ParameterDescription>
-            uniforms        : Map<string, UniformParameter>
-            vertexIndex     : Map<Var, Expr>
-            variableValues  : Map<Var, Expr>
-            shaders         : list<Shader>
-            payloads        : HashMap<Type, string * int>
-            payloadIn       : Option<string * Type>
-            callableData    : HashMap<Type, string * int>
-            callableDataIn  : Option<string * Type>
-            hitAttribute    : Option<string * Type>
-            rayTypes        : Set<RayId>
-            missShaders     : Set<MissId>
-            callableShaders : Set<CallableId>
-            localSize       : V3i
-            expressionType  : ShaderExpressionType
+            depthWriteMode      : DepthWriteMode
+            inputTypes          : List<Type>
+            inputTopology       : Option<InputTopology>
+            vertexType          : Type
+            builder             : Option<Expr>
+            inputs              : Map<string, ParameterDescription>
+            outputs             : Map<string, ParameterDescription>
+            uniforms            : Map<string, UniformParameter>
+            vertexIndex         : Map<Var, Expr>
+            variableValues      : Map<Var, Expr>
+            shaders             : list<Shader>
+            payloads            : HashMap<Type, string * int>
+            payloadIn           : Option<string * Type>
+            callableData        : HashMap<Type, string * int>
+            callableDataIn      : Option<string * Type>
+            hitAttribute        : Option<string * Type>
+            hitObjectAttributes : HashMap<Type, string * int>
+            rayTypes            : Set<RayId>
+            missShaders         : Set<MissId>
+            callableShaders     : Set<CallableId>
+            localSize           : V3i
+            expressionType      : ShaderExpressionType
             storageBufferAccess : Map<string, StorageAccess>
         }
         
@@ -765,27 +853,28 @@ module Preprocessor =
 
         let empty =
             {
-                depthWriteMode  = DepthWriteMode.None
-                inputTypes      = []
-                inputTopology   = None
-                vertexType      = typeof<NoInput>
-                builder         = None
-                inputs          = Map.empty
-                outputs         = Map.empty
-                uniforms        = Map.empty
-                vertexIndex     = Map.empty
-                variableValues  = Map.empty
-                shaders         = []
-                payloads        = HashMap.empty
-                payloadIn       = None
-                callableData    = HashMap.empty
-                callableDataIn  = None
-                hitAttribute    = None
-                rayTypes        = Set.empty
-                missShaders     = Set.empty
-                callableShaders = Set.empty
-                localSize       = V3i.Zero
-                expressionType  = ShaderExpressionType.Normal
+                depthWriteMode      = DepthWriteMode.None
+                inputTypes          = []
+                inputTopology       = None
+                vertexType          = typeof<NoInput>
+                builder             = None
+                inputs              = Map.empty
+                outputs             = Map.empty
+                uniforms            = Map.empty
+                vertexIndex         = Map.empty
+                variableValues      = Map.empty
+                shaders             = []
+                payloads            = HashMap.empty
+                payloadIn           = None
+                callableData        = HashMap.empty
+                callableDataIn      = None
+                hitAttribute        = None
+                hitObjectAttributes = HashMap.empty
+                rayTypes            = Set.empty
+                missShaders         = Set.empty
+                callableShaders     = Set.empty
+                localSize           = V3i.Zero
+                expressionType      = ShaderExpressionType.Normal
                 storageBufferAccess = Map.empty
             }
 
@@ -796,6 +885,7 @@ module Preprocessor =
                 callableData        = parent.callableData
                 callableDataIn      = parent.callableDataIn
                 hitAttribute        = parent.hitAttribute
+                hitObjectAttributes = parent.hitObjectAttributes
                 expressionType      = parent.expressionType
                 uniforms            = parent.uniforms
                 rayTypes            = parent.rayTypes
@@ -811,6 +901,7 @@ module Preprocessor =
                     callableData        = inner.callableData
                     callableDataIn      = inner.callableDataIn
                     hitAttribute        = inner.hitAttribute
+                    hitObjectAttributes = inner.hitObjectAttributes
                     uniforms            = inner.uniforms
                     rayTypes            = inner.rayTypes
                     missShaders         = inner.missShaders
@@ -932,6 +1023,9 @@ module Preprocessor =
             }
 
         let usePayload (payload : Type) =
+            if payload = typeof<obj> then
+                failwith "[FShade] Payload cannot be of type System.Object."
+
             State.custom (fun (s : State) ->
                 match s.payloads |> HashMap.tryFind payload with
                 | Some (var, index) -> s, (var, index)
@@ -943,6 +1037,9 @@ module Preprocessor =
             )
 
         let usePayloadIn (payload : Type) =
+            if payload = typeof<obj> then
+                failwith "[FShade] Incoming payload cannot be of type System.Object."
+
             State.custom (fun (s : State) ->
                 match s.payloadIn with
                 | Some (_, p) when payload <> p -> failwithf "[FShade] Can only use one type of incoming payload (got %A and %A)" p payload
@@ -952,6 +1049,9 @@ module Preprocessor =
             )
 
         let useCallableData (data : Type) =
+            if data = typeof<obj> then
+                failwith "[FShade] Callable data cannot be of type System.Object."
+
             State.custom (fun (s : State) ->
                 match s.callableData |> HashMap.tryFind data with
                 | Some (var, index) -> s, (var, index)
@@ -963,6 +1063,9 @@ module Preprocessor =
             )
 
         let useCallableDataIn (data : Type) =
+            if data = typeof<obj> then
+                failwith "[FShade] Incoming callable data cannot be of type System.Object."
+
             State.custom (fun (s : State) ->
                 match s.callableDataIn with
                 | Some (_, d) when data <> d -> failwithf "[FShade] Can only use one type of incoming callable data (got %A and %A)" d data
@@ -972,12 +1075,29 @@ module Preprocessor =
             )
 
         let useHitAttribute (hitAttribute : Type) =
+            if hitAttribute = typeof<obj> then
+                failwith "[FShade] Hit attribute cannot be of type System.Object."
+
             State.custom (fun (s : State) ->
                 match s.hitAttribute with
                 | Some (_, h) when hitAttribute <> h -> failwithf "[FShade] Can only use one type of hit attribute (got %A and %A)" h hitAttribute
                 | _ ->
                     let name = "rayHitAttribute"
                     { s with hitAttribute = Some (name, hitAttribute) }, name
+            )
+
+        let useHitObjectAttribute (hitAttribute : Type) =
+            if hitAttribute = typeof<obj> then
+                failwith "[FShade] Hit object attribute cannot be of type System.Object."
+
+            State.custom (fun (s : State) ->
+                match s.hitObjectAttributes |> HashMap.tryFind hitAttribute with
+                | Some (var, index) -> s, (var, index)
+                | None ->
+                    let index = s.hitObjectAttributes.Count
+                    let name = sprintf "hitObjectAttribute%d" index
+                    let s = { s with hitObjectAttributes = s.hitObjectAttributes |> HashMap.add hitAttribute (name, index) }
+                    s, (name, index)
             )
 
         let private tryGetId<'T> (create : Symbol -> 'T) (e : Expr) =
@@ -1164,6 +1284,11 @@ module Preprocessor =
                 let! missId = State.useMissShader args.miss
                 let! accel = State.readAccelerationStructure args.accelerationStructure
 
+                let! hitObject =
+                    match args.hitObject with
+                    | ValueSome ho -> preprocessRaytracingS stage ho |> State.map ValueSome
+                    | _ -> State.value ValueNone
+
                 let payloadIndex = Expr.Value(payloadIndex)
 
                 return Expr.Seq [
@@ -1172,10 +1297,18 @@ module Preprocessor =
                     | _ -> ()
 
                     // sbtRecordStride is set to -1 initially, replaced when creating RaytracingEffect
-                    Expr.Call(
-                        MethodInfo.traceRay,
-                        [ accel; flags; cullMask; rayId; Expr.Value(-1); missId; origin; minT; direction; maxT; payloadIndex ]
-                    )
+                    match hitObject with
+                    | ValueSome ho ->
+                        Expr.Call(
+                            MethodInfo.hitObjectTraceRay,
+                            [ ho; accel; flags; cullMask; rayId; Expr.Value(-1); missId; origin; minT; direction; maxT; payloadIndex ]
+                        )
+
+                    | _ ->
+                        Expr.Call(
+                            MethodInfo.traceRay,
+                            [ accel; flags; cullMask; rayId; Expr.Value(-1); missId; origin; minT; direction; maxT; payloadIndex ]
+                        )
 
                     Expr.ReadRaytracingData(e.Type, payloadName)
                 ]
@@ -1212,7 +1345,7 @@ module Preprocessor =
                 ]
 
             | CallableDataIn _ when stage <> ShaderStage.Callable ->
-                return failwith "[FShade] Incmoing callable data can only be used in callable shaders"
+                return failwith "[FShade] Incoming callable data can only be used in callable shaders"
 
             | CallableDataIn data ->
                 let! name = State.useCallableDataIn data
@@ -1250,6 +1383,117 @@ module Preprocessor =
             | HitAttribute attr ->
                 let! name = State.useHitAttribute attr
                 return Expr.ReadRaytracingData(attr, name)
+
+            | NewHitObject ->
+                return Expr.Call(MethodInfo.newHitObject, [])
+
+            | Let(var, _, _) when var.Type = typeof<HitObject> && var.IsMutable ->
+                return failwithf "[FShade] HitObject values cannot be mutable: %A" var
+
+            | Let(var, NewHitObject, expr) ->
+                let! expr = preprocessRaytracingS stage expr
+                return Expr.Let(var, Expr.DefaultValue typeof<HitObject>, expr)
+
+            | Let(var, _, _) when var.Type = typeof<HitObject>->
+                return failwithf "[FShade] HitObject values can only be initialized via the default constructor: %A" var
+
+            | HitObjectRecordHit _ when not (ShaderStage.supportsTraceRay stage) ->
+                return failwithf "[FShade] Cannot invoke HitObject.RecordHit in %A shaders" stage
+
+            | HitObjectRecordHit args ->
+                let! hitObject = preprocessRaytracingS stage args.hitObject
+                let! instanceId = preprocessRaytracingS stage args.instanceId
+                let! primitiveId = preprocessRaytracingS stage args.primitiveId
+                let! geometryIndex = preprocessRaytracingS stage args.geometryIndex
+                let! origin = preprocessRaytracingS stage args.origin
+                let! direction = preprocessRaytracingS stage args.direction
+                let! minT = preprocessRaytracingS stage args.minT
+                let! maxT = preprocessRaytracingS stage args.maxT
+                let! hitKind = preprocessRaytracingS stage args.hitKind
+
+                let! attribute =
+                    match args.attribute with
+                    | ValueSome p -> preprocessRaytracingS stage p |> State.map ValueSome
+                    | _ -> State.value ValueNone
+
+                let! attributeName, attributeIndex = State.useHitObjectAttribute args.attributeType
+                let! rayId = State.useRayType args.ray
+                let! accel = State.readAccelerationStructure args.accelerationStructure
+
+                let attributeIndex = Expr.Value(attributeIndex)
+
+                return Expr.Seq [
+                    match attribute with
+                    | ValueSome p -> Expr.WriteRaytracingData(attributeName, p)
+                    | _ -> ()
+
+                    // sbtRecordStride is set to -1 initially, replaced when creating RaytracingEffect
+                    Expr.Call(
+                        MethodInfo.hitObjectRecordHit,
+                        [ hitObject; accel; instanceId; primitiveId; geometryIndex
+                          hitKind; rayId; Expr.Value(-1); origin; minT; direction; maxT;  attributeIndex ]
+                    )
+                ]
+
+            | HitObjectRecordMiss _ when not (ShaderStage.supportsTraceRay stage) ->
+                return failwithf "[FShade] Cannot invoke HitObject.RecordMiss in %A shaders" stage
+
+            | HitObjectRecordMiss args ->
+                let! hitObject = preprocessRaytracingS stage args.hitObject
+                let! origin = preprocessRaytracingS stage args.origin
+                let! direction = preprocessRaytracingS stage args.direction
+                let! minT = preprocessRaytracingS stage args.minT
+                let! maxT = preprocessRaytracingS stage args.maxT
+
+                let! missId = State.useMissShader args.miss
+
+                return Expr.Call(
+                    MethodInfo.hitObjectRecordMiss,
+                    [ hitObject; missId; origin; minT; direction; maxT ]
+                )
+
+            | HitObjectRecordEmpty when not (ShaderStage.supportsTraceRay stage) ->
+                return failwithf "[FShade] Cannot invoke HitObject.RecordEmpty in %A shaders" stage
+
+            | HitObjectExecuteShader _ when not (ShaderStage.supportsTraceRay stage) ->
+                return failwithf "[FShade] Cannot invoke HitObject.ExecuteShader in %A shaders" stage
+
+            | HitObjectExecuteShader args ->
+                let! hitObject = preprocessRaytracingS stage args.hitObject
+
+                let! payloadIn =
+                    match args.payload with
+                    | ValueSome p -> preprocessRaytracingS stage p |> State.map ValueSome
+                    | _ -> State.value ValueNone
+
+                let! payloadName, payloadIndex = State.usePayload e.Type
+                let payloadIndex = Expr.Value(payloadIndex)
+
+                return Expr.Seq [
+                    match payloadIn with
+                    | ValueSome p -> Expr.WriteRaytracingData(payloadName, p)
+                    | _ -> ()
+
+                    Expr.Call(MethodInfo.hitObjectExecuteShader, [hitObject; payloadIndex])
+                    Expr.ReadRaytracingData(e.Type, payloadName)
+                ]
+
+            | HitObjectGetAttributes _ when not (ShaderStage.supportsTraceRay stage) ->
+                return failwithf "[FShade] Cannot invoke HitObject.GetAttributes in %A shaders" stage
+
+            | HitObjectGetAttributes args ->
+                let! hitObject = preprocessRaytracingS stage args.hitObject
+
+                let! attributeName, attributeIndex = State.useHitObjectAttribute args.attributeType
+                let attributeIndex = Expr.Value(attributeIndex)
+
+                return Expr.Seq [
+                    Expr.Call(MethodInfo.hitObjectExtractAttributes, [hitObject; attributeIndex])
+                    Expr.ReadRaytracingData(e.Type, attributeName)
+                ]
+
+            | ReorderThread when stage <> ShaderStage.RayGeneration ->
+                return failwithf "[FShade] Cannot invoke Thread.Reorder in %A shaders" stage
 
             | BuilderReturn(_, _, value) when ShaderStage.supportsPayloadIn stage ->
                 let! name = State.usePayloadIn value.Type
@@ -2289,27 +2533,28 @@ module Preprocessor =
 
         let shader = 
             { 
-                shaderStage             = builder.ShaderStage
-                shaderInputs            = state.inputs
-                shaderOutputs           = outputs
-                shaderUniforms          = state.uniforms
-                shaderInputTopology     = state.inputTopology
-                shaderOutputTopology    = builder.OutputTopology
-                shaderOutputVertices    = outputVertices
-                shaderOutputPrimitives  = None
-                shaderInvocations       = 1
-                shaderBody              = body
-                shaderDebugRange        = None
-                shaderDepthWriteMode    = state.depthWriteMode
-                shaderPayloads          = inverseMap state.payloads
-                shaderPayloadIn         = state.payloadIn
-                shaderCallableData      = inverseMap state.callableData
-                shaderCallableDataIn    = state.callableDataIn
-                shaderHitAttribute      = state.hitAttribute
-                shaderRayTypes          = state.rayTypes |> Set.map (fun i -> i.Name)
-                shaderMissShaders       = state.missShaders |> Set.map (fun i -> i.Name)
-                shaderCallableShaders   = state.callableShaders |> Set.map (fun i -> i.Name)
-                shaderStorageBufferAccess   = state.storageBufferAccess
+                shaderStage               = builder.ShaderStage
+                shaderInputs              = state.inputs
+                shaderOutputs             = outputs
+                shaderUniforms            = state.uniforms
+                shaderInputTopology       = state.inputTopology
+                shaderOutputTopology      = builder.OutputTopology
+                shaderOutputVertices      = outputVertices
+                shaderOutputPrimitives    = None
+                shaderInvocations         = 1
+                shaderBody                = body
+                shaderDebugRange          = None
+                shaderDepthWriteMode      = state.depthWriteMode
+                shaderPayloads            = inverseMap state.payloads
+                shaderPayloadIn           = state.payloadIn
+                shaderCallableData        = inverseMap state.callableData
+                shaderCallableDataIn      = state.callableDataIn
+                shaderHitAttribute        = state.hitAttribute
+                shaderHitObjectAttributes = inverseMap state.hitObjectAttributes
+                shaderRayTypes            = state.rayTypes |> Set.map _.Name
+                shaderMissShaders         = state.missShaders |> Set.map _.Name
+                shaderCallableShaders     = state.callableShaders |> Set.map _.Name
+                shaderStorageBufferAccess = state.storageBufferAccess
             }
 
         shader :: state.shaders
@@ -3670,36 +3915,41 @@ module Shader =
     /// creates a shader "passing-thru" all supplied attributes
     let passing (attributes : Map<string, Type>) (stage : ShaderStage) =
         match stage with
-            | ShaderStage.Vertex | ShaderStage.Fragment ->
-                let parameters = attributes |> Map.map (fun _ -> ParameterDescription.ofType)
-                {
-                    shaderStage             = stage
-                    shaderInputs            = parameters
-                    shaderOutputs           = parameters
-                    shaderUniforms          = Map.empty
-                    shaderInputTopology     = None
-                    shaderOutputTopology    = None
-                    shaderOutputVertices    = ShaderOutputVertices.Unknown
-                    shaderOutputPrimitives  = None
-                    shaderInvocations       = 1
-                    shaderBody =
-                        attributes
-                            |> Map.map (fun n t -> None, Expr.ReadInput(ParameterKind.Input, t, n))
-                            |> Expr.WriteOutputs
-                    shaderDebugRange        = None
-                    shaderDepthWriteMode    = DepthWriteMode.None
-                    shaderPayloads          = Map.empty
-                    shaderPayloadIn         = None
-                    shaderCallableData      = Map.empty
-                    shaderCallableDataIn    = None
-                    shaderHitAttribute      = None
-                    shaderRayTypes          = Set.empty
-                    shaderMissShaders       = Set.empty
-                    shaderCallableShaders   = Set.empty
-                    shaderStorageBufferAccess = Map.empty
-                }
-            | _ ->
-                failwith "[FShade] not implemented"
+        | ShaderStage.Vertex | ShaderStage.Fragment ->
+            let parameters =
+                attributes |> Map.map (fun _ -> ParameterDescription.ofType)
+
+            let body =
+                attributes
+                |> Map.map (fun n t -> None, Expr.ReadInput(ParameterKind.Input, t, n))
+                |> Expr.WriteOutputs
+
+            {
+                shaderStage               = stage
+                shaderInputs              = parameters
+                shaderOutputs             = parameters
+                shaderUniforms            = Map.empty
+                shaderInputTopology       = None
+                shaderOutputTopology      = None
+                shaderOutputVertices      = ShaderOutputVertices.Unknown
+                shaderOutputPrimitives    = None
+                shaderInvocations         = 1
+                shaderBody                = body
+                shaderDebugRange          = None
+                shaderDepthWriteMode      = DepthWriteMode.None
+                shaderPayloads            = Map.empty
+                shaderPayloadIn           = None
+                shaderCallableData        = Map.empty
+                shaderCallableDataIn      = None
+                shaderHitAttribute        = None
+                shaderHitObjectAttributes = Map.empty
+                shaderRayTypes            = Set.empty
+                shaderMissShaders         = Set.empty
+                shaderCallableShaders     = Set.empty
+                shaderStorageBufferAccess = Map.empty
+            }
+        | _ ->
+            failwith "[FShade] not implemented"
     
     /// creates a shader (for the given stage) with no in-/outputs
     let empty (stage : ShaderStage) = 

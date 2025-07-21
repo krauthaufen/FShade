@@ -12,9 +12,28 @@ open Microsoft.FSharp.Quotations.ExprShape
 
 open Aardvark.Base
 open FShade.Imperative
+open FSharp.Data.Adaptive
 
 [<AutoOpen>]
 module private RaytracingUtilities =
+
+    let private methodsWithRayStride =
+        [|
+            MethodInfo.traceRay
+            MethodInfo.hitObjectTraceRay
+            MethodInfo.hitObjectRecordHit
+        |]
+        |> Array.map (fun mi -> mi, mi.GetParameters() |> Array.findIndex (fun p -> p.Name = "sbtRecordStride"))
+        |> HashMap.ofArray
+
+    [<return: Struct>]
+    let private (|CallWithRayStride|_|) = function
+        | Call(None, mi, args) ->
+            match methodsWithRayStride |> HashMap.tryFindV mi with
+            | ValueSome sbtRecordStrideArgIndex -> ValueSome (mi, args, sbtRecordStrideArgIndex)
+            | _ -> ValueNone
+
+        | _ -> ValueNone
 
     // Raytracing data is not global but scoped by the shader slot. Encoding
     // the slot explicitly leads to the creation of per-slot copies of reflected functions
@@ -44,23 +63,14 @@ module private RaytracingUtilities =
             let index = sbt.GetMissIndex(id.Name)
             Expr.Value <| MissId(id.Name, index)
 
-        | Call(None, mi, args) when mi = MethodInfo.traceRay ->
-            match args with
-            | [accel; flags; cullMask; rayId; _; missId;
-               origin; minT; direction; maxT; payload] ->
-                let rayId = substituteStubs sbt rayId
-                let sbtRecordStride = Expr.Value sbt.RayStride
-                let missId = substituteStubs sbt missId
-
-                Expr.Call(
-                    MethodInfo.traceRay,
-                    [accel; flags; cullMask;
-                    rayId; sbtRecordStride; missId;
-                    origin; minT; direction; maxT; payload]
+        | CallWithRayStride(mi, args, sbtRecordStrideArgIndex) ->
+            let args =
+                args |> List.mapi (fun i a ->
+                    if i = sbtRecordStrideArgIndex then Expr.Value sbt.RayStride
+                    else substituteStubs sbt a
                 )
 
-            | _ ->
-                failwithf "[FShade] Unexpected arguments when substituting traceRay stub: %A" args
+            Expr.Call(mi, args)
 
         | Value (:? CallableId as id, _) when not id.IsEmpty ->
             let index = sbt.GetCallableIndex(id.Name)

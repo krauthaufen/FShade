@@ -51,7 +51,7 @@ let ``Reflected functions``() =
 
     let chitShaderShadow (input : RayHitInput<Payload>) =
         closestHit {
-            let shadowed = scene.TraceRay<bool>(V3f.Zero, V3f.XAxis)
+            let shadowed = scene.TraceRay<bool>(V3f.Zero, V3f.XAxis, miss = "ShadowMiss", flags = RayFlags.SkipClosestHitShader)
             if shadowed then
                 return { color = V3f.Zero; depth = 0 }
             else
@@ -338,7 +338,7 @@ let invokeCallable (id: CallableId) : int =
     Callable.Execute(id)
 
 [<Test>]
-let ``CallableId``() =
+let ``CallableId based on uniform``() =
     Setup.Run()
 
     let id2 = CallableId "Foo2"
@@ -363,3 +363,93 @@ let ``CallableId``() =
          }
 
     GLSL.shouldCompileRaytracing effect
+
+[<ReflectedDefinition>]
+let traceHitObject<'T> (origin: V3f) (direction: V3f) (payload: 'T) (ho: HitObject) =
+    ho.TraceRay<'T>(scene, origin, direction) |> ignore
+    Thread.Reorder ho
+    Thread.Reorder(32u, 1u)
+    Thread.Reorder(ho, 32u, 1u)
+    ho.ExecuteShader<'T>(payload)
+
+[<ReflectedDefinition>]
+let myHitObject() =
+    HitObject()
+
+[<Test>]
+let ``Shader execution reordering``() =
+    Setup.Run()
+
+    let raygenShader =
+        raygen {
+            HitObject() |> traceHitObject V3f.Zero V3f.ZAxis 42 |> ignore
+            myHitObject() |> traceHitObject V3f.Zero V3f.ZAxis 42 |> ignore
+        }
+
+    let effect =
+         raytracingEffect {
+             raygen raygenShader
+         }
+
+    GLSL.shouldCompileRaytracing effect
+
+[<Test>]
+let ``Shader execution reordering intrinsics``() =
+    Setup.Run()
+
+    let raygenShader =
+        raygen {
+            let ho = HitObject()
+            let _ = ho.IsEmpty
+            let _ = ho.IsMiss
+            let _ = ho.IsHit
+            let _ = ho.RayMinT
+            let _ = ho.RayMaxT
+            let _ = ho.RayOrigin
+            let _ = ho.RayDirection
+            let _ = ho.RayObjectOrigin
+            let _ = ho.RayObjectDirection
+            let _ = ho.ObjectToWorld.C3
+            let _ = ho.WorldToObject.R2
+            let _ = ho.InstanceCustomIndex
+            let _ = ho.InstanceId
+            let _ = ho.GeometryIndex
+            let _ = ho.PrimitiveIndex
+            let _ = ho.HitKind
+            let _ = ho.GetAttributes<V4f>()
+            ho.RecordEmpty()
+            ho.RecordHit<float32>(scene, 1, 2, 3, V3f.Zero, V3f.ZAxis, "OtherRay")
+            ho.RecordMiss(V3f.Zero, V3f.ZAxis)
+            ho |> traceHitObject V3f.Zero V3f.ZAxis 42 |> ignore
+        }
+
+    let effect =
+         raytracingEffect {
+             raygen raygenShader
+         }
+
+    GLSL.shouldCompileRaytracingAndContainRegex effect [
+        "hitObjectTraceRayNV"
+        "hitObjectRecordHitNV"
+        "hitObjectRecordMissNV"
+        "hitObjectRecordEmptyNV"
+        "hitObjectExecuteShaderNV"
+        "hitObjectGetAttributesNV"
+        "hitObjectIsEmptyNV"
+        "hitObjectIsMissNV"
+        "hitObjectIsHitNV"
+        "hitObjectGetRayTMinNV"
+        "hitObjectGetRayTMaxNV"
+        "hitObjectGetWorldRayOriginNV"
+        "hitObjectGetWorldRayDirectionNV"
+        "hitObjectGetObjectRayOriginNV"
+        "hitObjectGetObjectRayDirectionNV"
+        "hitObjectGetObjectToWorldNV"
+        "hitObjectGetWorldToObjectNV"
+        "hitObjectGetInstanceCustomIndexNV"
+        "hitObjectGetInstanceIdNV"
+        "hitObjectGetGeometryIndexNV"
+        "hitObjectGetPrimitiveIndexNV"
+        "hitObjectGetHitKindNV"
+        "reorderThreadNV"
+    ]

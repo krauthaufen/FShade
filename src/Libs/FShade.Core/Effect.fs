@@ -1139,6 +1139,7 @@ module Effect =
                 shaderCallableData = Map.empty
                 shaderCallableDataIn = None
                 shaderHitAttribute = None
+                shaderHitObjectAttributes = Map.empty
                 shaderRayTypes = Set.empty
                 shaderMissShaders = Set.empty
                 shaderCallableShaders = Set.empty

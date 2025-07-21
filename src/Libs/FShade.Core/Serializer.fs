@@ -2063,6 +2063,13 @@ module Serializer =
             | None ->
                 dst.Write 0uy
 
+            dst.Write (Map.count shader.shaderHitObjectAttributes)
+            for KeyValue(n, (t,i)) in shader.shaderHitObjectAttributes do
+                dst.Write n
+                Type.serializeInternal state.TypeState dst t
+                dst.Write i
+                ()
+
             dst.Write (Set.count shader.shaderRayTypes)
             for s in shader.shaderRayTypes do dst.Write (string s)
         
@@ -2172,6 +2179,11 @@ module Serializer =
                 | 0uy -> None
                 | _ -> Some (src.ReadString(), Type.deserializeInternal state.TypeState src)
 
+            let shaderHitObjectAttributes =
+                let cnt = src.ReadInt32()
+                List.init cnt (fun _ -> src.ReadString(), (Type.deserializeInternal state.TypeState src, src.ReadInt32()))
+                |> Map.ofList
+
             let shaderRayTypes =
                 let cnt = src.ReadInt32()
                 List.init cnt (fun _ -> src.ReadString() |> Aardvark.Base.Symbol.Create) |> Set.ofList
@@ -2212,6 +2224,7 @@ module Serializer =
                 shaderCallableData = shaderCallableData
                 shaderCallableDataIn = shaderCallableDataIn
                 shaderHitAttribute = shaderHitAttribute
+                shaderHitObjectAttributes = shaderHitObjectAttributes
                 shaderRayTypes = shaderRayTypes
                 shaderMissShaders = shaderMissShaders
                 shaderCallableShaders = shaderCallableShaders

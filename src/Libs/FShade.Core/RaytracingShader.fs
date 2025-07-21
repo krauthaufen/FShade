@@ -87,12 +87,13 @@ module RaytracingShader =
             )
 
         let raytracingData =
-            let payloads       = s.Shader.shaderPayloads       |> ofMap    RaytracingDataKind.RayPayload
-            let payloadIn      = s.Shader.shaderPayloadIn      |> ofOption RaytracingDataKind.RayPayloadIn
-            let callableData   = s.Shader.shaderCallableData   |> ofMap    RaytracingDataKind.CallableData
-            let callableDataIn = s.Shader.shaderCallableDataIn |> ofOption RaytracingDataKind.CallableDataIn
-            let hitAttribute   = s.Shader.shaderHitAttribute   |> ofOption RaytracingDataKind.HitAttribute
-            payloads @ payloadIn @ callableData @ callableDataIn @ hitAttribute
+            let payloads            = s.Shader.shaderPayloads            |> ofMap    RaytracingDataKind.RayPayload
+            let payloadIn           = s.Shader.shaderPayloadIn           |> ofOption RaytracingDataKind.RayPayloadIn
+            let callableData        = s.Shader.shaderCallableData        |> ofMap    RaytracingDataKind.CallableData
+            let callableDataIn      = s.Shader.shaderCallableDataIn      |> ofOption RaytracingDataKind.CallableDataIn
+            let hitAttribute        = s.Shader.shaderHitAttribute        |> ofOption RaytracingDataKind.HitAttribute
+            let hitObjectAttributes = s.Shader.shaderHitObjectAttributes |> ofMap    RaytracingDataKind.HitObjectAttribute
+            payloads @ payloadIn @ callableData @ callableDataIn @ hitAttribute @ hitObjectAttributes
 
         let uniforms =
             s.Shader.shaderUniforms |> Map.toList |> List.map (fun (n, u) ->

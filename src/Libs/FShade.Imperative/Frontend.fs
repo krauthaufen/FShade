@@ -46,6 +46,7 @@ type RaytracingDataKind =
     | CallableData of location : int
     | CallableDataIn
     | HitAttribute
+    | HitObjectAttribute of location : int
 
 type RaytracingData =
     {
