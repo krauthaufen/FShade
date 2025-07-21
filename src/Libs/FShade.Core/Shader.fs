@@ -1380,7 +1380,7 @@ module Preprocessor =
             match e with
             
             
-            | RefOf (GetArray(StorageBuffer u, index)) ->
+            | RefOf (GetArray(StorageBuffer u, index) as e) ->
                 let! index = preprocessNormalS index
                 do! u |> State.readUniform true
                 do! State.addStorageAccess u.uniformName StorageAccess.ReadWrite
