@@ -868,7 +868,7 @@ module Serializer =
                         mi.TryInvoke(null, [||]) |> Option.map (fun res -> mi.Name, res)
 
                     | NewObject(ctor, []) ->
-                        Some (ctor.DeclaringType.Name, ctor.Invoke([||]))
+                        ctor.TryInvoke(null, [||]) |> Option.map (fun res -> ctor.DeclaringType.Name, res)
 
                     | _ ->
                         None

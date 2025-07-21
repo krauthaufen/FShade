@@ -79,7 +79,7 @@ module DynamicHostInvocation =
             invalid.Pop() |> ignore
             reraise()
 
-    type MethodInfo with
+    type MethodBase with
         member x.TryInvoke(obj : obj, parameters : obj[]) =
             tryInvoke (fun _ -> x.Invoke(obj, parameters))
 
