@@ -791,26 +791,31 @@ module Preprocessor =
 
         let createInner (parent : State) =
             { empty with
-                payloads        = parent.payloads
-                payloadIn       = parent.payloadIn
-                callableData    = parent.callableData
-                callableDataIn  = parent.callableDataIn
-                hitAttribute    = parent.hitAttribute
-                expressionType  = parent.expressionType
-                uniforms        = parent.uniforms }
+                payloads            = parent.payloads
+                payloadIn           = parent.payloadIn
+                callableData        = parent.callableData
+                callableDataIn      = parent.callableDataIn
+                hitAttribute        = parent.hitAttribute
+                expressionType      = parent.expressionType
+                uniforms            = parent.uniforms
+                rayTypes            = parent.rayTypes
+                missShaders         = parent.missShaders
+                callableShaders     = parent.callableShaders
+                storageBufferAccess = parent.storageBufferAccess }
 
         let mergeInner (inner : State) =
             State.modify (fun s ->
                 { s with
-                    payloads        = inner.payloads
-                    payloadIn       = inner.payloadIn
-                    callableData    = inner.callableData
-                    callableDataIn  = inner.callableDataIn
-                    hitAttribute    = inner.hitAttribute
-                    uniforms        = inner.uniforms
-                    rayTypes        = Set.union s.rayTypes inner.rayTypes
-                    missShaders     = Set.union s.missShaders inner.missShaders
-                    callableShaders = Set.union s.callableShaders inner.callableShaders }
+                    payloads            = inner.payloads
+                    payloadIn           = inner.payloadIn
+                    callableData        = inner.callableData
+                    callableDataIn      = inner.callableDataIn
+                    hitAttribute        = inner.hitAttribute
+                    uniforms            = inner.uniforms
+                    rayTypes            = inner.rayTypes
+                    missShaders         = inner.missShaders
+                    callableShaders     = inner.callableShaders
+                    storageBufferAccess = inner.storageBufferAccess }
             )
 
         let ofInputTypes (types : List<Type>) =
