@@ -1,3 +1,7 @@
+### 5.7.0-prerelease0004
+- [Shader] added UniformDecoration.BufferAccess properly
+- [GLSL] handled uniform usages properly per stage (correct GLSLShaderInterface)
+
 ### 5.7.0-prerelease0003
 - [GLSL] added `Config.separateTexturesAndSamplers` for automatically splitting samplers into separate texture/sampler uniforms for better interop with Vulkan/WGSL
 
