@@ -19,7 +19,7 @@
     <Compile Include="IntrinsicParameters.fs" />
     <Compile Include="UniformBufferLayout.fs" />
     <Compile Include="Assembler.fs" />
-    <Compile Include="Extensions.fs" />
+    <Compile Include="Backends.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\FShade.Core\FShade.Core.fsproj" />
