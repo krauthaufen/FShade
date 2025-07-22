@@ -1,3 +1,6 @@
+### 5.7.0-prerelease0006
+- [Compute] fixed shader-usages for storage outputs
+
 ### 5.7.0-prerelease0005
 - [Compute] shader-usages for uniforms/storage/images/samplers are now properly handled
 

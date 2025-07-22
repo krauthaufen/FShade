@@ -2076,6 +2076,10 @@ module Assembler =
                     let! name = parameterNameS ParameterKind.Output name
                     let! index = index |> Option.mapS assembleExprS
 
+                    let! s = State.get
+                    if s.stages.Stage = ShaderStage.Compute then
+                        do! Interface.useUniform name.Name
+                    
                     let name =
                         match index with
                             | Some index -> sprintf "%s[%s]" name.Name index
