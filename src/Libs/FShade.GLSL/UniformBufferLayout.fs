@@ -157,7 +157,7 @@ module GLSLType =
             | GLSLType.Vec(_, v) -> isSigned v
             | GLSLType.Mat(_,_,v) -> isSigned v
             | Float _ -> false
-            | Int(signed, _) -> 
+            | Int(signed, _) -> signed
             | _ -> false
 
     let rec ofCType (rev : bool) (t : CType) =
