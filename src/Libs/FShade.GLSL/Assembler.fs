@@ -1648,9 +1648,9 @@ module Assembler =
 
                 | CReadInput(kind, _, name, index) ->
                     let! name = parameterNameS kind name
-                    match kind with
-                        | ParameterKind.Uniform -> do! Interface.useUniform name.Name
-                        | _ -> ()
+                    let! s = State.get
+                    if kind = ParameterKind.Uniform || s.stages.Slot = ShaderSlot.Compute then
+                        do! Interface.useUniform name.Name
 
                     match index with
                         | Some index ->

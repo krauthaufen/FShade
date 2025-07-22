@@ -1,3 +1,6 @@
+### 5.7.0-prerelease0005
+- [Compute] shader-usages for uniforms/storage/images/samplers are now properly handled
+
 ### 5.7.0-prerelease0004
 - [Shader] added UniformDecoration.BufferAccess properly
 - [GLSL] handled uniform usages properly per stage (correct GLSLShaderInterface)
