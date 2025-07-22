@@ -952,31 +952,33 @@ module AssemblerState =
 
     let useTypeExtensions (integer: bool) (size: int) =
         state {
-            let! cfg = config
-
             if size = 8 || size = 16 || size = 64 then
                 let extensions =
                     [
-                        "NV_gpu_shader5"
+                        GLSLExtension.NVGpuShader5
 
-                        if size = 8 || size = 16 then
-                            $"GL_EXT_shader_{size}bit_storage"
+                        if size = 8 then
+                            GLSLExtension.EXTShader8bitStorage
+                        elif size = 16 then
+                            GLSLExtension.EXTShader16bitStorage
 
                         if integer then
-                            $"GL_EXT_shader_explicit_arithmetic_types_int{size}"
-
-                            if size = 16 then
-                                "GL_AMD_gpu_shader_int16"
+                            if size = 8 then
+                                GLSLExtension.EXTShaderExplicitArithmeticTypesInt8
+                            elif size = 16 then
+                                GLSLExtension.AMDGpuShaderInt16
+                                GLSLExtension.EXTShaderExplicitArithmeticTypesInt16
                             elif size = 64 then
-                                "GL_ARB_gpu_shader_int64"
-                                "GL_AMD_gpu_shader_int64"
+                                GLSLExtension.ARBGpuShaderInt64
+                                GLSLExtension.AMDGpuShaderInt64
+                                GLSLExtension.EXTShaderExplicitArithmeticTypesInt64
                         else
-                            $"GL_EXT_shader_explicit_arithmetic_types_float{size}"
-
                             if size = 16 then
-                                "GL_AMD_gpu_shader_half_float"
+                                GLSLExtension.AMDGpuShaderHalfFloat
+                                GLSLExtension.EXTShaderExplicitArithmeticTypesFloat16
                             elif size = 64 then
-                                "GL_ARB_gpu_shader_fp64"
+                                GLSLExtension.ARBGpuShaderFp64
+                                GLSLExtension.EXTShaderExplicitArithmeticTypesFloat64
                     ]
 
                 for e in extensions do
@@ -2010,7 +2012,7 @@ module Assembler =
                             return failwith "sadsadsad"
 
                 | CDebugPrintf(fmt, values) ->
-                    do! AssemblerState.useExtension "GL_EXT_debug_printf"
+                    do! AssemblerState.useExtension GLSLExtension.EXTDebugPrintf
 
                     let! fmt = assembleExprS fmt
                     let! values = values |> Array.mapS assembleExprS
@@ -2710,7 +2712,7 @@ module Assembler =
                     )
 
             match stages with
-            | ShaderStageDescription.Raytracing _ -> do! AssemblerState.useExtension "GL_EXT_ray_tracing"
+            | ShaderStageDescription.Raytracing _ -> do! AssemblerState.useExtension GLSLExtension.EXTRayTracing
             | _ -> ()
 
             let entryName = checkName e.cEntryName
@@ -2897,7 +2899,7 @@ module Assembler =
                     Set.union c.enabledExtensions s.requiredExtensions
                     |> Set.filter (fun ext ->
                         let supported = c.availableExtensions |> Map.tryFindV ext |> ValueOption.defaultValue true
-                        if not supported then Log.warn "[FShade] Extension %A is not supported" ext
+                        if not supported then Report.Line(3, $"[FShade] Extension \"{ext}\" is not supported")
                         supported
                     )
 

@@ -2,6 +2,7 @@
 
 open Aardvark.Base
 open FShade
+open FShade.GLSL
 
 [<AutoOpen>]
 module IntrinsicParameters =
@@ -14,7 +15,7 @@ module IntrinsicParameters =
 
     let builtInExtensions =
         Map.ofList [
-            Intrinsics.HitPositions, "GL_EXT_ray_tracing_position_fetch"
+            Intrinsics.HitPositions, GLSLExtension.EXTRayTracingPositionFetch
         ]
 
     let builtInInputs =

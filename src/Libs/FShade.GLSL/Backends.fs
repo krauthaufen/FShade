@@ -71,9 +71,16 @@ module Backends =
         }
 
     let glslVulkan =
+        let enabledExtension =
+            Set.ofList [
+                GLSLExtension.ARBTessellationShader
+                GLSLExtension.ARBSeparateShaderObjects
+                GLSLExtension.ARBShadingLanguage420pack
+            ]
+
         Backend.Create {
             version                     = GLSLVersion(4,6,0)
-            enabledExtensions           = Set.ofList [ "GL_ARB_tessellation_shader"; "GL_ARB_separate_shader_objects"; "GL_ARB_shading_language_420pack" ]
+            enabledExtensions           = enabledExtension
             availableExtensions         = Map.empty
             createUniformBuffers        = true
             pushConstants               = true

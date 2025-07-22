@@ -1827,7 +1827,7 @@ module IntrinsicFunctions =
 
             let extensions =
                 match name with
-                | "get_Samples" -> ["GL_ARB_shader_texture_image_samples"]
+                | "get_Samples" -> [GLSLExtension.ARBShaderTextureImageSamples]
                 | _ -> []
 
             ValueSome (functionName, Set.ofList extensions, false)
@@ -1950,7 +1950,7 @@ module IntrinsicFunctions =
 
             let extensions =
                 match name with
-                | "get_Samples" -> ["GL_ARB_shader_texture_image_samples"]
+                | "get_Samples" -> [GLSLExtension.ARBShaderTextureImageSamples]
                 | _ -> []
 
             ValueSome (functionName, Set.ofList extensions, true)
