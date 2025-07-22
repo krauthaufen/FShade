@@ -107,6 +107,22 @@ module GLSL =
             stage, res
         )
 
+    let compileCompute (c : ComputeShader) =
+        Console.WriteLine("COMPILE {0}", c.csId)
+        let module_ =
+            c |> ComputeShader.toModule
+
+        let glsl = ModuleCompiler.compileGLSLVulkan module_
+
+        glsl,
+        module_.Entries |> List.map (fun e ->
+            let stage = e.decorations |> List.tryPick (function FShade.Imperative.EntryDecoration.Stages s -> Some s.Stage | _ -> None) |> Option.get
+
+            let res = glslang stage glsl.code
+
+            stage, res
+        )
+        
     let compile (e : list<Effect>) =
         compile' glsl430 e
 
@@ -132,6 +148,10 @@ module GLSL =
 
     let rec shouldCompile (e : list<Effect>) =
         shouldCompile' glsl430 e
+
+    let shouldCompileCompute (c : ComputeShader) =
+        let glsl, res = compileCompute c
+        printResults res glsl
 
     let shouldCompileRaytracing (e : RaytracingEffect) =
         let glsl, res = compileRaytracing e
@@ -192,6 +212,12 @@ module GLSL =
                 | Warning w -> shouldContainRegex glsl s
                 | Error e -> failwithf "ERROR: %A" e
 
+    let shouldCompileComputeAndContainRegex (c : ComputeShader) (s : list<string>) =
+        let s = s |> List.map (fun s -> s, None)
+        let glsl, res = compileCompute c
+        shouldContainRegex glsl s
+        printResults res glsl
+        
 type Setup() =
     static let initialized = ref false
 

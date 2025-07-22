@@ -1,3 +1,6 @@
+### 5.7.0-prerelease0010
+- [ComputeShader] fixed read/write detection for argument-storage-buffers
+
 ### 5.7.0-prerelease0009
 - [GLSL] fixed bug in float-image deserialize
 

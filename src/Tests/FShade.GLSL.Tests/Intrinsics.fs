@@ -17,7 +17,7 @@ type Vertex =
 
 type UniformScope with
     member x.SomeUniform : V3f = uniform?SomeUniform
-
+    member x.Storage : int[] = uniform?StorageBuffer?Storage
 [<ReflectedDefinition>]
 let getVec() =
     V4f(uniform.SomeUniform, 1.0f)
@@ -538,6 +538,69 @@ let ``Rounding``() =
         }
 
     GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["floor"; "trunc"; "ceil"; "round"]
+
+[<GLSLIntrinsic("atomicAdd({0}, {1})")>]
+let atomicAdd (a : ref<int>) (b : int) : int = onlyInShaderCode "atomicAdd"
+
+[<Test>]
+let ``Atomics on Argument-Storage``() =
+    Setup.Run()
+    
+    let shader (a : int[]) =
+        compute {
+            atomicAdd &&a.[0] 1 |> ignore
+        }
+    GLSL.shouldCompileComputeAndContainRegex (ComputeShader.ofFunction (V3i(1024, 1024, 1024)) shader) [@"\)[ \t\r\n]*buffer a_ssb"]
+
+[<Test>]
+let ``Atomics on Uniform-Storage``() =
+    Setup.Run()
+    
+    let shader (a : int[]) =
+        compute {
+            atomicAdd &&uniform.Storage.[0] 1 |> ignore
+        }
+    GLSL.shouldCompileComputeAndContainRegex (ComputeShader.ofFunction (V3i(1024, 1024, 1024)) shader) [@"\)[ \t\r\n]*buffer Storage_ssb"]
+
+[<Test>]
+let ``Write on Argument-Storage``() =
+    Setup.Run()
+    
+    let shader (a : int[]) =
+        compute {
+            a.[0] <- 1
+        }
+    GLSL.shouldCompileComputeAndContainRegex (ComputeShader.ofFunction (V3i(1024, 1024, 1024)) shader) [@"\)[ \t\r\n]*writeonly buffer a_ssb"]
+
+[<Test>]
+let ``Write on Uniform-Storage``() =
+    Setup.Run()
+    
+    let shader (a : int[]) =
+        compute {
+            uniform.Storage.[0] <- 1
+        }
+    GLSL.shouldCompileComputeAndContainRegex (ComputeShader.ofFunction (V3i(1024, 1024, 1024)) shader) [@"\)[ \t\r\n]*writeonly buffer Storage_ssb"]
+
+[<Test>]
+let ``Read on Argument-Storage``() =
+    Setup.Run()
+    
+    let shader (a : int[]) (x : int[]) =
+        compute {
+            x.[0] <- a.[0]
+        }
+    GLSL.shouldCompileComputeAndContainRegex (ComputeShader.ofFunction (V3i(1024, 1024, 1024)) shader) [@"\)[ \t\r\n]*readonly buffer a_ssb"]
+
+[<Test>]
+let ``Read on Uniform-Storage``() =
+    Setup.Run()
+    
+    let shader (x : int[]) =
+        compute {
+            x.[0] <- uniform.Storage.[0]
+        }
+    GLSL.shouldCompileComputeAndContainRegex (ComputeShader.ofFunction (V3i(1024, 1024, 1024)) shader) [@"\)[ \t\r\n]*readonly buffer Storage_ssb"]
 
 [<Test>]
 let ``Abs``() =

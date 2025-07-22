@@ -1224,6 +1224,9 @@ module Interface =
 
     let useUniform (name : string) =
         updateShaderInterface (fun s shader ->
+            let name =
+                if name.StartsWith "cs_" then name.Substring 3
+                else name
             let uniform = 
                 MapExt.tryFind name s.uniformBuffers 
                 |> Option.map (fun v s -> { s with shaderUniformBuffers = HashSet.add v.ubName s.shaderUniformBuffers })

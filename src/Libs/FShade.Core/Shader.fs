@@ -977,6 +977,9 @@ module Preprocessor =
             )
 
         let addStorageAccess (name : string) (access : StorageAccess) =
+            let name =
+                if name.StartsWith "cs_" then name.Substring 3
+                else name
             State.modify (fun s ->
                 match Map.tryFind name s.storageBufferAccess with
                 | Some a -> { s with storageBufferAccess = Map.add name (access ||| a) s.storageBufferAccess }
@@ -1542,6 +1545,15 @@ module Preprocessor =
                     do! State.addStorageAccess name StorageAccess.Write
                     return Expr.WriteOutputsRaw([name, Some i, e])
 
+                | RefOf(GetArray(ValueWithName(v, t, name), i)) ->
+                    let! i = preprocessComputeS i
+                    do! State.addStorageAccess name StorageAccess.ReadWrite
+                    match t with
+                    | ArrOf(_,t) | ArrayOf t ->
+                        return Expr.RefOf(Expr.ReadInput(ParameterKind.Input, t, name, i))
+                    | _ ->
+                        return e
+                
                 | PropertyGet(Some (ValueWithName(v, t, name)), prop, []) when t.IsArray && (prop.Name = "Length" || prop.Name = "LongLength") ->
                     return Expr.ReadInput(ParameterKind.Uniform, typeof<int>, "cs_" + name + "_length")
 
