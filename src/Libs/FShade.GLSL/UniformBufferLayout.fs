@@ -67,29 +67,42 @@ module GLSLType =
     
         let imageTypes =
             LookupTable.lookup [
-                (false, false, false, SamplerDimension.Sampler1d), typedefof<Image1d<_>>
-                (false, false, false, SamplerDimension.Sampler2d), typedefof<Image2d<_>>
-                (false, false, false, SamplerDimension.Sampler3d), typedefof<Image3d<_>>
-                (false, false, false, SamplerDimension.SamplerCube), typedefof<ImageCube<_>>
+                (true, false, false, false, SamplerDimension.Sampler1d), typedefof<Image1d<_>>
+                (true, false, false, false, SamplerDimension.Sampler2d), typedefof<Image2d<_>>
+                (true, false, false, false, SamplerDimension.Sampler3d), typedefof<Image3d<_>>
+                (true, false, false, false, SamplerDimension.SamplerCube), typedefof<ImageCube<_>>
 
-                (false, true, false, SamplerDimension.Sampler1d), typedefof<Image1dArray<_>>
-                (false, true, false, SamplerDimension.Sampler2d), typedefof<Image2dArray<_>>
-                (false, true, false, SamplerDimension.SamplerCube), typedefof<ImageCubeArray<_>>
+                (true, false, true, false, SamplerDimension.Sampler1d), typedefof<Image1dArray<_>>
+                (true, false, true, false, SamplerDimension.Sampler2d), typedefof<Image2dArray<_>>
+                (true, false, true, false, SamplerDimension.SamplerCube), typedefof<ImageCubeArray<_>>
 
-                (false, false, true, SamplerDimension.Sampler2d), typedefof<Image2dMS<_>>
-                (false, true, true, SamplerDimension.Sampler2d), typedefof<Image2dArrayMS<_>>
+                (true, false, false, true, SamplerDimension.Sampler2d), typedefof<Image2dMS<_>>
+                (true, false, true, true, SamplerDimension.Sampler2d), typedefof<Image2dArrayMS<_>>
 
-                (true, false, false, SamplerDimension.Sampler1d), typedefof<IntImage1d<_>>
-                (true, false, false, SamplerDimension.Sampler2d), typedefof<IntImage2d<_>>
-                (true, false, false, SamplerDimension.Sampler3d), typedefof<IntImage3d<_>>
-                (true, false, false, SamplerDimension.SamplerCube), typedefof<IntImageCube<_>>
+                (true, true, false, false, SamplerDimension.Sampler1d), typedefof<IntImage1d<_>>
+                (true, true, false, false, SamplerDimension.Sampler2d), typedefof<IntImage2d<_>>
+                (true, true, false, false, SamplerDimension.Sampler3d), typedefof<IntImage3d<_>>
+                (true, true, false, false, SamplerDimension.SamplerCube), typedefof<IntImageCube<_>>
 
-                (true, true, false, SamplerDimension.Sampler1d), typedefof<IntImage1dArray<_>>
-                (true, true, false, SamplerDimension.Sampler2d), typedefof<IntImage2dArray<_>>
-                (true, true, false, SamplerDimension.SamplerCube), typedefof<IntImageCubeArray<_>>
+                (true, true, true, false, SamplerDimension.Sampler1d), typedefof<IntImage1dArray<_>>
+                (true, true, true, false, SamplerDimension.Sampler2d), typedefof<IntImage2dArray<_>>
+                (true, true, true, false, SamplerDimension.SamplerCube), typedefof<IntImageCubeArray<_>>
 
-                (true, false, true, SamplerDimension.Sampler2d), typedefof<IntImage2dMS<_>>
-                (true, true, true, SamplerDimension.Sampler2d), typedefof<IntImage2dArrayMS<_>>
+                (true, true, false, true, SamplerDimension.Sampler2d), typedefof<IntImage2dMS<_>>
+                (true, true, true, true, SamplerDimension.Sampler2d), typedefof<IntImage2dArrayMS<_>>
+                
+                
+                (false, true, false, false, SamplerDimension.Sampler1d), typedefof<UIntImage1d<_>>
+                (false, true, false, false, SamplerDimension.Sampler2d), typedefof<UIntImage2d<_>>
+                (false, true, false, false, SamplerDimension.Sampler3d), typedefof<UIntImage3d<_>>
+                (false, true, false, false, SamplerDimension.SamplerCube), typedefof<UIntImageCube<_>>
+
+                (false, true, true, false, SamplerDimension.Sampler1d), typedefof<UIntImage1dArray<_>>
+                (false, true, true, false, SamplerDimension.Sampler2d), typedefof<UIntImage2dArray<_>>
+                (false, true, true, false, SamplerDimension.SamplerCube), typedefof<UIntImageCubeArray<_>>
+
+                (false, true, false, true, SamplerDimension.Sampler2d), typedefof<UIntImage2dMS<_>>
+                (false, true, true, true, SamplerDimension.Sampler2d), typedefof<UIntImage2dArrayMS<_>>
             ]
 
         // integral, isArray, isMS, isShadow
@@ -137,6 +150,14 @@ module GLSLType =
             | GLSLType.Mat(_,_,v) -> isIntegral v
             | Float _ -> false
             | Int _ -> true
+            | _ -> false
+
+        let rec isSigned (t : GLSLType) =
+            match t with
+            | GLSLType.Vec(_, v) -> isSigned v
+            | GLSLType.Mat(_,_,v) -> isSigned v
+            | Float _ -> false
+            | Int(signed, _) -> 
             | _ -> false
 
     let rec ofCType (rev : bool) (t : CType) =
@@ -302,7 +323,7 @@ module GLSLType =
             let isMS = src.ReadBoolean()
 
             let original = 
-                let gen = imageTypes (isIntegral valueType, isArray, isMS, dim)
+                let gen = imageTypes (isSigned valueType, isIntegral valueType, isArray, isMS, dim)
                 match format with
                 | Some fmt -> gen.MakeGenericType [| ImageFormat.toFormatType fmt |]
                 | None -> gen
