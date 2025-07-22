@@ -1,3 +1,6 @@
+### 5.7.0-prerelease0009
+- [GLSL] fixed bug in float-image deserialize
+
 ### 5.7.0-prerelease0008 
 - [GLSL] Fixed issue with UIntImage serialization (was deserialized to IntImage)
 

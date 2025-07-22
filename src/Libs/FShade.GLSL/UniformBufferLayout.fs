@@ -156,9 +156,9 @@ module GLSLType =
             match t with
             | GLSLType.Vec(_, v) -> isSigned v
             | GLSLType.Mat(_,_,v) -> isSigned v
-            | Float _ -> false
+            | Float _ -> true
             | Int(signed, _) -> signed
-            | _ -> false
+            | _ -> true
 
     let rec ofCType (rev : bool) (t : CType) =
         match t with    
