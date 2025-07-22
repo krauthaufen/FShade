@@ -1,3 +1,6 @@
+### 5.7.0-prerelease0011
+- [ComputeShader] fixed usage for `cs_` prefixed uniforms
+
 ### 5.7.0-prerelease0010
 - [ComputeShader] fixed read/write detection for argument-storage-buffers
 

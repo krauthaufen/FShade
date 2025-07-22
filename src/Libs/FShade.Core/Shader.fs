@@ -977,9 +977,6 @@ module Preprocessor =
             )
 
         let addStorageAccess (name : string) (access : StorageAccess) =
-            let name =
-                if name.StartsWith "cs_" then name.Substring 3
-                else name
             State.modify (fun s ->
                 match Map.tryFind name s.storageBufferAccess with
                 | Some a -> { s with storageBufferAccess = Map.add name (access ||| a) s.storageBufferAccess }
