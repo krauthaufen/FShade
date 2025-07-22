@@ -163,22 +163,25 @@ module SamplerSplitter =
             | _ ->
                 None
            
+    let private textureAndSamplerType (name : string) (sam : GLSLSamplerType) =
+        let texType = 
+            CType.CIntrinsic {
+                intrinsicTypeName = textureTypeName name
+                tag = GLSLTextureLike.GLSLTexture (textureType sam)
+            }
+            
+        let samType =
+            CType.CIntrinsic {
+                intrinsicTypeName = if sam.isShadow then "samplerShadow" else "sampler"
+                tag = GLSLTextureLike.GLSLSamplerState sam.isShadow
+            }
+            
+        texType, samType 
     module CUniform =
         let splitTexturesAndSamplers (u : CUniform) =
             match u.cUniformType with
             | CSamplerType(name, sam) ->
-                let texType = 
-                    CType.CIntrinsic {
-                        intrinsicTypeName = textureTypeName name
-                        tag = GLSLTextureLike.GLSLTexture (textureType sam)
-                    }
-                
-                let samType =
-                    CType.CIntrinsic {
-                        intrinsicTypeName = "sampler"
-                        tag = GLSLTextureLike.GLSLSamplerState
-                    }
-                    
+                let texType, samType = textureAndSamplerType name sam
                 [
                     {
                         cUniformType         = texType
@@ -195,17 +198,7 @@ module SamplerSplitter =
                     }
                 ]
             | CArray(CSamplerType(name, sam), len) ->
-                let texType = 
-                    CType.CIntrinsic {
-                        intrinsicTypeName = textureTypeName name
-                        tag = GLSLTextureLike.GLSLTexture (textureType sam)
-                    }
-                
-                let samType =
-                    CType.CIntrinsic {
-                        intrinsicTypeName = "sampler"
-                        tag = GLSLTextureLike.GLSLSamplerState
-                    }
+                let texType, samType = textureAndSamplerType name sam
                     
                 [
                     {
@@ -229,34 +222,14 @@ module SamplerSplitter =
         let splitTexturesAndSamplers (p : CParameter) : list<CParameter> =
             match p.ctype with
             | CSamplerType(name, sam) ->
-                let texType = 
-                    CType.CIntrinsic {
-                        intrinsicTypeName = textureTypeName name
-                        tag = GLSLTextureLike.GLSLTexture (textureType sam)
-                    }
-                
-                let samType =
-                    CType.CIntrinsic {
-                        intrinsicTypeName = "sampler"
-                        tag = GLSLTextureLike.GLSLSamplerState
-                    }
+                let texType, samType = textureAndSamplerType name sam
                     
                 [
                     { p with ctype = texType; name = textureName p.name }
                     { p with ctype = samType; name = samplerName p.name }
                 ]
             | CArray(CSamplerType(name, sam), len) ->
-                let texType = 
-                    CType.CIntrinsic {
-                        intrinsicTypeName = textureTypeName name
-                        tag = GLSLTextureLike.GLSLTexture (textureType sam)
-                    }
-                
-                let samType =
-                    CType.CIntrinsic {
-                        intrinsicTypeName = "sampler"
-                        tag = GLSLTextureLike.GLSLSamplerState
-                    }
+                let texType, samType = textureAndSamplerType name sam
                     
                 [
                     { p with ctype = CType.CArray(texType, len); name = textureName p.name }
@@ -280,71 +253,27 @@ module SamplerSplitter =
             | CExpr.CVar v ->
                 match v.ctype with
                 | CSamplerType(name, sam) ->
+                    let texType, samType = textureAndSamplerType name sam
                     [
                         CExpr.CVar {
                             name = textureName v.name
-                            ctype = CType.CIntrinsic {
-                                intrinsicTypeName = textureTypeName name
-                                tag = GLSLTextureLike.GLSLTexture (textureType sam)
-                            }
+                            ctype = texType
                         }
                         
                         CExpr.CVar {
                             name = samplerName v.name
-                            ctype = CType.CIntrinsic {
-                                intrinsicTypeName = "sampler"
-                                tag = GLSLTextureLike.GLSLSamplerState
-                            }
+                            ctype = samType
                         }
                         
                     ]
-                    
-                //     
-                // | CArray(CSamplerType(name, sam), len) ->
-                //     [
-                //         CExpr.CVar {
-                //             name = textureName v.name
-                //             ctype =
-                //                 CArray(
-                //                     CType.CIntrinsic {
-                //                         intrinsicTypeName = textureTypeName name
-                //                         tag = GLSLTextureLike.GLSLTexture (textureType sam)
-                //                     },
-                //                     len
-                //                 )
-                //         }
-                //         
-                //         CExpr.CVar {
-                //             name = samplerName v.name
-                //             ctype =
-                //                 CArray(
-                //                     CType.CIntrinsic {
-                //                         intrinsicTypeName = "sampler"
-                //                         tag = GLSLTextureLike.GLSLSamplerState
-                //                     },
-                //                     len
-                //                 )
-                //         }
-                //         
-                //     ]
-                //     
+              
                 | _ ->
                     [CExpr.CVar v]
            
             | CExpr.CReadInput(ParameterKind.Uniform, typ, name, idx) ->
                 match typ with
                 | CSamplerType(typeName, sam) ->
-                    let texType = 
-                        CType.CIntrinsic {
-                            intrinsicTypeName = textureTypeName typeName
-                            tag = GLSLTextureLike.GLSLTexture (textureType sam)
-                        }
-                    
-                    let samType =
-                        CType.CIntrinsic {
-                            intrinsicTypeName = "sampler"
-                            tag = GLSLTextureLike.GLSLSamplerState
-                        }
+                    let texType, samType = textureAndSamplerType typeName sam
                     [
                         CExpr.CReadInput(ParameterKind.Uniform, texType, textureName name, idx)
                         CExpr.CReadInput(ParameterKind.Uniform, samType, samplerName name, idx)
@@ -352,39 +281,8 @@ module SamplerSplitter =
                 | _ ->
                     [e]
                 
-            // | CExpr.CReadInput(ParameterKind.Uniform, CArray(CSamplerType(typeName, sam), len), name, None) ->
-            //     let texType = 
-            //         CType.CIntrinsic {
-            //             intrinsicTypeName = textureTypeName typeName
-            //             tag = GLSLTextureLike.GLSLTexture (textureType sam)
-            //         }
-            //     
-            //     let samType =
-            //         CType.CIntrinsic {
-            //             intrinsicTypeName = "sampler"
-            //             tag = GLSLTextureLike.GLSLSamplerState
-            //         }
-            //         
-            //     let texArr = CExpr.CReadInput(ParameterKind.Uniform, CArray(texType, len), textureName name, None)
-            //     let samArr = CExpr.CReadInput(ParameterKind.Uniform, CArray(samType, len), samplerName name, None)
-            //     
-            //     [
-            //         texArr
-            //         samArr
-            //     ]
-            //     
             | CExpr.CItem(_, CExpr.CReadInput(ParameterKind.Uniform, CArray(CSamplerType(typeName, sam), len), name, None), index) ->
-                let texType = 
-                    CType.CIntrinsic {
-                        intrinsicTypeName = textureTypeName typeName
-                        tag = GLSLTextureLike.GLSLTexture (textureType sam)
-                    }
-                
-                let samType =
-                    CType.CIntrinsic {
-                        intrinsicTypeName = "sampler"
-                        tag = GLSLTextureLike.GLSLSamplerState
-                    }
+                let texType, samType = textureAndSamplerType typeName sam
                     
                 let texArr = CExpr.CReadInput(ParameterKind.Uniform, CArray(texType, len), textureName name, None)
                 let samArr = CExpr.CReadInput(ParameterKind.Uniform, CArray(samType, len), samplerName name, None)
@@ -395,17 +293,7 @@ module SamplerSplitter =
                 ]
             
             | CExpr.CItem(_, CExpr.CReadInput(ParameterKind.Uniform, CPointer(m, CSamplerType(typeName, sam)), name, None), index) ->
-                let texType = 
-                    CType.CIntrinsic {
-                        intrinsicTypeName = textureTypeName typeName
-                        tag = GLSLTextureLike.GLSLTexture (textureType sam)
-                    }
-                
-                let samType =
-                    CType.CIntrinsic {
-                        intrinsicTypeName = "sampler"
-                        tag = GLSLTextureLike.GLSLSamplerState
-                    }
+                let texType, samType = textureAndSamplerType typeName sam
                     
                 let texArr = CExpr.CReadInput(ParameterKind.Uniform, CPointer(m, texType), textureName name, None)
                 let samArr = CExpr.CReadInput(ParameterKind.Uniform, CPointer(m, samType), samplerName name, None)
@@ -2387,7 +2275,7 @@ module Assembler =
                                             | CTexture (t, cnt) ->
                                                 match t with
                                               
-                                                    | GLSLTextureLike.GLSLSamplerState ->
+                                                    | GLSLTextureLike.GLSLSamplerState isShadow ->
                                                         let! binding = getBinding InputKind.Sampler cnt [u]
                                                         prefix <- uniformLayout Layout.None u.cUniformDecorations set binding
 
@@ -2396,6 +2284,7 @@ module Assembler =
                                                             samplerBinding = binding
                                                             samplerName = checkName(u.cUniformName).Name
                                                             samplerStates = [] // filled in addSamplerState
+                                                            samplerIsShadow = isShadow
                                                         }
                                                     
                                                     

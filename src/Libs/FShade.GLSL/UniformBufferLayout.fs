@@ -20,7 +20,7 @@ type GLSLType =
     | DynamicArray of elem : GLSLType * stride : int
     | Intrinsic of string
     | Texture of GLSLTextureType
-    | SamplerState
+    | SamplerState of shadow : bool
 
 and GLSLImageType =
     {
@@ -55,7 +55,7 @@ and GLSLTextureLike =
     | GLSLImage of GLSLImageType
     | GLSLSampler of GLSLSamplerType
     | GLSLTexture of GLSLTextureType
-    | GLSLSamplerState
+    | GLSLSamplerState of isShadow : bool
     
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -162,7 +162,7 @@ module GLSLType =
                             | GLSLImage t -> GLSLType.Image t
                             | GLSLSampler t -> GLSLType.Sampler t
                             | GLSLTexture t -> GLSLType.Texture t
-                            | GLSLSamplerState -> GLSLType.SamplerState
+                            | GLSLSamplerState isShadow -> GLSLType.SamplerState isShadow
                     | _ ->
                         GLSLType.Intrinsic a.intrinsicTypeName
 
@@ -238,8 +238,9 @@ module GLSLType =
             dst.Write t.isArray
             dst.Write t.isMS
             dst.Write t.isShadow
-        | GLSLType.SamplerState ->
+        | GLSLType.SamplerState isShadow ->
             dst.Write 13uy
+            dst.Write (if isShadow then 1 else 0)
             
 
     let rec internal deserializeInternal (src : BinaryReader) =
@@ -353,7 +354,8 @@ module GLSLType =
                 GLSLTextureType.valueType = valueType
             }
         | 13uy ->
-            GLSLType.SamplerState
+            let isShadow = src.ReadInt32() <> 0
+            GLSLType.SamplerState isShadow
         | id ->
             failwithf "unexpected GLSLType: %A" id
 
@@ -407,6 +409,7 @@ type GLSLSamplerState =
         samplerBinding  : int
         samplerName     : string
         samplerStates   : list<SamplerState>
+        samplerIsShadow : bool
     }
     
 type GLSLStorageBuffer =
@@ -570,7 +573,8 @@ module private Tools =
                 | GLSLType.Sampler sam -> samplerName sam
                 | GLSLType.DynamicArray(elem,_) -> sprintf "%s[]" (toString elem)
 
-                | GLSLType.SamplerState -> "sampler"
+                | GLSLType.SamplerState false -> "sampler"
+                | GLSLType.SamplerState true -> "samplerShadow"
                 | GLSLType.Texture t -> textureName t
 [<CustomEquality; NoComparison>]
 type GLSLShaderInterface =
@@ -1460,7 +1464,7 @@ module GLSLProgramInterface =
                 MipLodBias = mipLodBias
             }
 
-    let internal serializeInternal (dst : BinaryWriter) (program : GLSLProgramInterface) =
+    let serializeInternal (dst : BinaryWriter) (program : GLSLProgramInterface) =
         dst.Write (List.length program.inputs)
         for p in program.inputs do GLSLParameter.serializeInternal dst p
         
@@ -1586,6 +1590,7 @@ module GLSLProgramInterface =
             dst.Write (List.length state.samplerStates)
             for state in state.samplerStates do
                 SamplerState.serialize dst state
+            dst.Write (if state.samplerIsShadow then 1 else 0)
             
         dst.Write (program.textures.Count)
         for KeyValue(name, tex) in program.textures do
@@ -1598,7 +1603,7 @@ module GLSLProgramInterface =
                 dst.Write sem
             GLSLType.serializeInternal dst (GLSLType.Texture tex.textureType)
     
-    let internal deserializeInternal (src : BinaryReader) =
+    let deserializeInternal (src : BinaryReader) =
 
         let allShaders = System.Collections.Generic.List<GLSLShaderInterface>()
         let inline add s = allShaders.Add s; s
@@ -1814,7 +1819,8 @@ module GLSLProgramInterface =
                 let samplerStates =
                     let cnt = src.ReadInt32()
                     List.init cnt (fun _ -> SamplerState.deserialize src)
-                name, { samplerSet = samplerSet; samplerBinding = samplerBinding; samplerName = samplerName; samplerStates = samplerStates }
+                let samplerIsShadow = src.ReadInt32() <> 0
+                name, { samplerSet = samplerSet; samplerBinding = samplerBinding; samplerName = samplerName; samplerStates = samplerStates; samplerIsShadow = samplerIsShadow }
             )
             |> MapExt.ofList
          
@@ -1995,8 +2001,8 @@ module LayoutStd140 =
 
             | GLSLType.Texture i ->
                 GLSLType.Texture i, 1, 0
-            | GLSLType.SamplerState ->
-                GLSLType.SamplerState, 1, 0
+            | GLSLType.SamplerState isShadow ->
+                GLSLType.SamplerState isShadow, 1, 0
                 
     let applyLayout (ub : GLSLUniformBuffer) : GLSLUniformBuffer =
         let mutable offset = 0

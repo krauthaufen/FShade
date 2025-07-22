@@ -1,3 +1,6 @@
+### 5.7.0-prerelease0007
+- [GLSL] samplerShadow correctly emitted when splitting shadow sampler2D/etc.
+
 ### 5.7.0-prerelease0006
 - [Compute] fixed shader-usages for storage outputs
 
