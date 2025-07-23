@@ -368,8 +368,11 @@ let ``CallableId based on uniform``() =
 let traceHitObject<'T> (origin: V3f) (direction: V3f) (payload: 'T) (ho: HitObject) =
     ho.TraceRay<'T>(scene, origin, direction) |> ignore
     Thread.Reorder ho
+    let hint: int = uniform?Blub
     Thread.Reorder(32u, 1u)
+    Thread.Reorder(hint, 1)
     Thread.Reorder(ho, 32u, 1u)
+    Thread.Reorder(ho, 32, 1)
     ho.ExecuteShader<'T>(payload)
 
 [<ReflectedDefinition>]

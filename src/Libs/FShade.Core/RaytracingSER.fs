@@ -243,6 +243,16 @@ type Thread =
     static member Reorder(hint: uint, bits: uint) : unit = onlyInShaderCode "Thread.Reorder"
 
     /// <summary>
+    /// Reorder threads based on user provided hint. Similar hint values
+    /// indicate similarity of subsequent work done after this call. Behavior
+    /// is implementation defined.
+    /// </summary>
+    /// <param name="hint">Determines desired ordering of threads relative to others.</param>
+    /// <param name="bits">Number of least significant bits an implementation should take into account from <paramref name="hint"/> in determining ordering.</param>
+    [<KeepCall>]
+    static member Reorder(hint: int, bits: int) : unit = onlyInShaderCode "Thread.Reorder"
+
+    /// <summary>
     /// Reorder threads based on provided hit object, The exact properties
     /// from hit object which are used to reorder the threads is implementation
     /// defined.
@@ -262,6 +272,18 @@ type Thread =
     /// <param name="bits">Number of least significant bits an implementation should take into account from <paramref name="hint"/> in determining ordering.</param>
     [<KeepCall>]
     static member Reorder(hitObject: HitObject, hint: uint, bits: uint) : unit = onlyInShaderCode "Thread.Reorder"
+
+    /// <summary>
+    /// Reorder threads based on provided hit object supplemented by additional
+    /// information based on user provided hint. The exact properties from
+    /// hit object and user specified hint which are used to reorder theads is
+    /// implementation defined.
+    /// </summary>
+    /// <param name="hitObject">The hit object to base the ordering on.</param>
+    /// <param name="hint">Determines desired ordering of threads relative to others.</param>
+    /// <param name="bits">Number of least significant bits an implementation should take into account from <paramref name="hint"/> in determining ordering.</param>
+    [<KeepCall>]
+    static member Reorder(hitObject: HitObject, hint: int, bits: int) : unit = onlyInShaderCode "Thread.Reorder"
 
 
 [<AutoOpen>]

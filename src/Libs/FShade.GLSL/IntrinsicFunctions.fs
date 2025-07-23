@@ -1771,8 +1771,10 @@ module IntrinsicFunctions =
                 CIntrinsic.simple "hitObjectGetHitKindNV",                       [ exactly <@ fun (ho: HitObject) -> ho.HitKind @> ]
 
                 CIntrinsic.simple "reorderThreadNV",                             [ getMethodInfo <@ Thread.Reorder : uint * uint -> unit @> ]
+                CIntrinsic.simple "reorderThreadNV",                             [ getMethodInfo <@ Thread.Reorder : int * int -> unit @> ]
                 CIntrinsic.simple "reorderThreadNV",                             [ getMethodInfo <@ Thread.Reorder : HitObject -> unit @> ]
                 CIntrinsic.simple "reorderThreadNV",                             [ getMethodInfo <@ Thread.Reorder : HitObject * uint * uint -> unit @> ]
+                CIntrinsic.simple "reorderThreadNV",                             [ getMethodInfo <@ Thread.Reorder : HitObject * int * int -> unit @> ]
             ]
         ]
 
