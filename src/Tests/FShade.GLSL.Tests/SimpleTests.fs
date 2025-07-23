@@ -1270,14 +1270,7 @@ let ``Uniform and storage buffers use std140 and std430 layout``() =
 
     GLSL.shouldCompileAndContainRegex [ Effect.ofFunction fs ] [ "std430" ]
     GLSL.shouldCompileAndContainRegex [ Effect.ofFunction fsu ] [ "std140" ]
-
-    let glsl =
-        cs
-        |> ComputeShader.ofFunction (V3i(128,128,128))
-        |> ComputeShader.toModule
-        |> ModuleCompiler.compileGLSL430
-
-    GLSL.shouldContainRegex glsl [ "std430", None ]
+    GLSL.shouldCompileComputeAndContainRegex (ComputeShader.ofFunction (V3i(128)) cs) [ "std430" ]
 
 [<Test>]
 let ``Push constants``() =

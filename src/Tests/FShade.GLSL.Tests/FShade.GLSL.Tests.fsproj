@@ -23,6 +23,7 @@
     <Compile Include="Images.fs" />
     <Compile Include="Raytracing.fs" />
     <Compile Include="DataTypes.fs" />
+    <Compile Include="Serializer.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
