@@ -129,7 +129,7 @@ type Write private() =
         line "    with get (%s) : %s = onlyInShaderCode \"%s\"" args returnType name
 
         if not <| setter.IsNullOrEmpty() then
-            line "    and set (%s) (data : %s) : unit = onlyInShaderCode \"%s\"" args returnType setter
+            line "    and [<KeepCall>] set (%s) (data : %s) : unit = onlyInShaderCode \"%s\"" args returnType setter
 
         line ""
 
@@ -160,9 +160,10 @@ let run() =
     builder.Clear() |> ignore
 
     line "namespace FShade"
+    line ""
     line "open Aardvark.Base"
     line "open System.Runtime.InteropServices"
-    line ""
+    line "open FShade.Imperative"
     line ""
 
     for (t,d,a,m,s) in allCombinations do
@@ -548,7 +549,7 @@ let run() =
             (args @ ["data", returnType]),
             "unit",
             comment = "write single texel into image",
-            attributes = "[<FShade.Imperative.KeepCall>]"
+            attributes = "[<KeepCall>]"
         )
 
         Write.Property(

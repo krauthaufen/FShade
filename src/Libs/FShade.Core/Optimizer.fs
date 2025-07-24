@@ -423,6 +423,7 @@ module Optimizer =
                             return true
                         else
                             return! hasSideEffectsS utility.functionBody
+
                     | Call(t, mi, args) ->
                         let! ts = t |> Option.mapS hasSideEffectsS
                         match ts with
@@ -439,6 +440,14 @@ module Optimizer =
                                         return true
                                     else
                                         return false
+
+                    | PropertySet(t, p, idx, value) ->
+                        let call =
+                            match t with
+                            | Some t -> Expr.Call(t, p.SetMethod, idx @ [value])
+                            | _ -> Expr.Call(p.SetMethod, idx @ [value])
+
+                        return! hasSideEffectsS call
 
                     | ShapeLambda(_,b) ->
                         return! hasSideEffectsS b

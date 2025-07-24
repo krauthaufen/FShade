@@ -262,6 +262,35 @@ let ``Store``() =
 
     GLSL.shouldCompile [Effect.ofFunction fs]
 
+[<ReflectedDefinition>]
+let store (value: V4f) =
+   uniform.Img2D.Store(V2i.Zero, value)
+   value
+
+[<ReflectedDefinition>]
+let storeIndexer (value: V4f) =
+   uniform.Img2D.[V2i.Zero] <- value
+   value
+
+[<Test>]
+let ``Store in utility function``() =
+    Setup.Run()
+
+    let vs1 (v : Vertex) =
+        vertex {
+            store v.pos |> ignore
+            return V3f.Zero
+        }
+
+    let vs2 (v : Vertex) =
+        vertex {
+            storeIndexer v.pos |> ignore
+            return V3f.Zero
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction vs1] ["imageStore"]
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction vs2] ["imageStore"]
+
 [<Test>]
 let ``AtomicAdd``() =
     Setup.Run()

@@ -1,7 +1,8 @@
 namespace FShade
+
 open Aardvark.Base
 open System.Runtime.InteropServices
-
+open FShade.Imperative
 
 type Sampler1dArrayShadow(tex : ISemanticValue, state : SamplerState) =
     interface ISampler with
@@ -1872,13 +1873,13 @@ type Image1dArray<'Format when 'Format :> Formats.IFloatingFormat>() =
     member x.Load(coord : int, slice : int) : V4f = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : int, slice : int, data : V4f) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : int, slice : int) : V4f = onlyInShaderCode "Load"
-        and set (coord : int, slice : int) (data : V4f) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : int, slice : int) (data : V4f) : unit = onlyInShaderCode "Store"
     
 
 type Image1d<'Format when 'Format :> Formats.IFloatingFormat>() =
@@ -1896,13 +1897,13 @@ type Image1d<'Format when 'Format :> Formats.IFloatingFormat>() =
     member x.Load(coord : int) : V4f = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : int, data : V4f) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : int) : V4f = onlyInShaderCode "Load"
-        and set (coord : int) (data : V4f) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : int) (data : V4f) : unit = onlyInShaderCode "Store"
     
 
 type Image2dArrayMS<'Format when 'Format :> Formats.IFloatingFormat>() =
@@ -1923,13 +1924,13 @@ type Image2dArrayMS<'Format when 'Format :> Formats.IFloatingFormat>() =
     member x.Load(coord : V2i, slice : int, sample : int) : V4f = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : V2i, slice : int, sample : int, data : V4f) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : V2i, slice : int, sample : int) : V4f = onlyInShaderCode "Load"
-        and set (coord : V2i, slice : int, sample : int) (data : V4f) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : V2i, slice : int, sample : int) (data : V4f) : unit = onlyInShaderCode "Store"
     
 
 type Image2dArray<'Format when 'Format :> Formats.IFloatingFormat>() =
@@ -1947,13 +1948,13 @@ type Image2dArray<'Format when 'Format :> Formats.IFloatingFormat>() =
     member x.Load(coord : V2i, slice : int) : V4f = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : V2i, slice : int, data : V4f) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : V2i, slice : int) : V4f = onlyInShaderCode "Load"
-        and set (coord : V2i, slice : int) (data : V4f) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : V2i, slice : int) (data : V4f) : unit = onlyInShaderCode "Store"
     
 
 type Image2dMS<'Format when 'Format :> Formats.IFloatingFormat>() =
@@ -1974,13 +1975,13 @@ type Image2dMS<'Format when 'Format :> Formats.IFloatingFormat>() =
     member x.Load(coord : V2i, sample : int) : V4f = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : V2i, sample : int, data : V4f) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : V2i, sample : int) : V4f = onlyInShaderCode "Load"
-        and set (coord : V2i, sample : int) (data : V4f) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : V2i, sample : int) (data : V4f) : unit = onlyInShaderCode "Store"
     
 
 type Image2d<'Format when 'Format :> Formats.IFloatingFormat>() =
@@ -1998,13 +1999,13 @@ type Image2d<'Format when 'Format :> Formats.IFloatingFormat>() =
     member x.Load(coord : V2i) : V4f = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : V2i, data : V4f) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : V2i) : V4f = onlyInShaderCode "Load"
-        and set (coord : V2i) (data : V4f) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : V2i) (data : V4f) : unit = onlyInShaderCode "Store"
     
 
 type Image3d<'Format when 'Format :> Formats.IFloatingFormat>() =
@@ -2022,13 +2023,13 @@ type Image3d<'Format when 'Format :> Formats.IFloatingFormat>() =
     member x.Load(coord : V3i) : V4f = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : V3i, data : V4f) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : V3i) : V4f = onlyInShaderCode "Load"
-        and set (coord : V3i) (data : V4f) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : V3i) (data : V4f) : unit = onlyInShaderCode "Store"
     
 
 type ImageCubeArray<'Format when 'Format :> Formats.IFloatingFormat>() =
@@ -2046,13 +2047,13 @@ type ImageCubeArray<'Format when 'Format :> Formats.IFloatingFormat>() =
     member x.Load(coord : V2i, layerFace : int) : V4f = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : V2i, layerFace : int, data : V4f) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : V2i, layerFace : int) : V4f = onlyInShaderCode "Load"
-        and set (coord : V2i, layerFace : int) (data : V4f) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : V2i, layerFace : int) (data : V4f) : unit = onlyInShaderCode "Store"
     
 
 type ImageCube<'Format when 'Format :> Formats.IFloatingFormat>() =
@@ -2070,13 +2071,13 @@ type ImageCube<'Format when 'Format :> Formats.IFloatingFormat>() =
     member x.Load(coord : V2i, face : int) : V4f = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : V2i, face : int, data : V4f) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : V2i, face : int) : V4f = onlyInShaderCode "Load"
-        and set (coord : V2i, face : int) (data : V4f) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : V2i, face : int) (data : V4f) : unit = onlyInShaderCode "Store"
     
 
 type IntImage1dArray<'Format when 'Format :> Formats.ISignedFormat>() =
@@ -2094,13 +2095,13 @@ type IntImage1dArray<'Format when 'Format :> Formats.ISignedFormat>() =
     member x.Load(coord : int, slice : int) : V4i = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : int, slice : int, data : V4i) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : int, slice : int) : V4i = onlyInShaderCode "Load"
-        and set (coord : int, slice : int) (data : V4i) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : int, slice : int) (data : V4i) : unit = onlyInShaderCode "Store"
     
     /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : int, slice : int, data : int) : int = onlyInShaderCode "AtomicAdd"
@@ -2142,13 +2143,13 @@ type IntImage1d<'Format when 'Format :> Formats.ISignedFormat>() =
     member x.Load(coord : int) : V4i = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : int, data : V4i) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : int) : V4i = onlyInShaderCode "Load"
-        and set (coord : int) (data : V4i) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : int) (data : V4i) : unit = onlyInShaderCode "Store"
     
     /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : int, data : int) : int = onlyInShaderCode "AtomicAdd"
@@ -2193,13 +2194,13 @@ type IntImage2dArrayMS<'Format when 'Format :> Formats.ISignedFormat>() =
     member x.Load(coord : V2i, slice : int, sample : int) : V4i = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : V2i, slice : int, sample : int, data : V4i) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : V2i, slice : int, sample : int) : V4i = onlyInShaderCode "Load"
-        and set (coord : V2i, slice : int, sample : int) (data : V4i) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : V2i, slice : int, sample : int) (data : V4i) : unit = onlyInShaderCode "Store"
     
     /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : V2i, slice : int, sample : int, data : int) : int = onlyInShaderCode "AtomicAdd"
@@ -2241,13 +2242,13 @@ type IntImage2dArray<'Format when 'Format :> Formats.ISignedFormat>() =
     member x.Load(coord : V2i, slice : int) : V4i = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : V2i, slice : int, data : V4i) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : V2i, slice : int) : V4i = onlyInShaderCode "Load"
-        and set (coord : V2i, slice : int) (data : V4i) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : V2i, slice : int) (data : V4i) : unit = onlyInShaderCode "Store"
     
     /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : V2i, slice : int, data : int) : int = onlyInShaderCode "AtomicAdd"
@@ -2292,13 +2293,13 @@ type IntImage2dMS<'Format when 'Format :> Formats.ISignedFormat>() =
     member x.Load(coord : V2i, sample : int) : V4i = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : V2i, sample : int, data : V4i) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : V2i, sample : int) : V4i = onlyInShaderCode "Load"
-        and set (coord : V2i, sample : int) (data : V4i) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : V2i, sample : int) (data : V4i) : unit = onlyInShaderCode "Store"
     
     /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : V2i, sample : int, data : int) : int = onlyInShaderCode "AtomicAdd"
@@ -2340,13 +2341,13 @@ type IntImage2d<'Format when 'Format :> Formats.ISignedFormat>() =
     member x.Load(coord : V2i) : V4i = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : V2i, data : V4i) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : V2i) : V4i = onlyInShaderCode "Load"
-        and set (coord : V2i) (data : V4i) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : V2i) (data : V4i) : unit = onlyInShaderCode "Store"
     
     /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : V2i, data : int) : int = onlyInShaderCode "AtomicAdd"
@@ -2388,13 +2389,13 @@ type IntImage3d<'Format when 'Format :> Formats.ISignedFormat>() =
     member x.Load(coord : V3i) : V4i = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : V3i, data : V4i) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : V3i) : V4i = onlyInShaderCode "Load"
-        and set (coord : V3i) (data : V4i) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : V3i) (data : V4i) : unit = onlyInShaderCode "Store"
     
     /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : V3i, data : int) : int = onlyInShaderCode "AtomicAdd"
@@ -2436,13 +2437,13 @@ type IntImageCubeArray<'Format when 'Format :> Formats.ISignedFormat>() =
     member x.Load(coord : V2i, layerFace : int) : V4i = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : V2i, layerFace : int, data : V4i) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : V2i, layerFace : int) : V4i = onlyInShaderCode "Load"
-        and set (coord : V2i, layerFace : int) (data : V4i) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : V2i, layerFace : int) (data : V4i) : unit = onlyInShaderCode "Store"
     
     /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : V2i, layerFace : int, data : int) : int = onlyInShaderCode "AtomicAdd"
@@ -2484,13 +2485,13 @@ type IntImageCube<'Format when 'Format :> Formats.ISignedFormat>() =
     member x.Load(coord : V2i, face : int) : V4i = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : V2i, face : int, data : V4i) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : V2i, face : int) : V4i = onlyInShaderCode "Load"
-        and set (coord : V2i, face : int) (data : V4i) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : V2i, face : int) (data : V4i) : unit = onlyInShaderCode "Store"
     
     /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : V2i, face : int, data : int) : int = onlyInShaderCode "AtomicAdd"
@@ -2532,13 +2533,13 @@ type UIntImage1dArray<'Format when 'Format :> Formats.IUnsignedFormat>() =
     member x.Load(coord : int, slice : int) : V4ui = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : int, slice : int, data : V4ui) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : int, slice : int) : V4ui = onlyInShaderCode "Load"
-        and set (coord : int, slice : int) (data : V4ui) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : int, slice : int) (data : V4ui) : unit = onlyInShaderCode "Store"
     
     /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : int, slice : int, data : uint) : uint = onlyInShaderCode "AtomicAdd"
@@ -2580,13 +2581,13 @@ type UIntImage1d<'Format when 'Format :> Formats.IUnsignedFormat>() =
     member x.Load(coord : int) : V4ui = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : int, data : V4ui) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : int) : V4ui = onlyInShaderCode "Load"
-        and set (coord : int) (data : V4ui) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : int) (data : V4ui) : unit = onlyInShaderCode "Store"
     
     /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : int, data : uint) : uint = onlyInShaderCode "AtomicAdd"
@@ -2631,13 +2632,13 @@ type UIntImage2dArrayMS<'Format when 'Format :> Formats.IUnsignedFormat>() =
     member x.Load(coord : V2i, slice : int, sample : int) : V4ui = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : V2i, slice : int, sample : int, data : V4ui) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : V2i, slice : int, sample : int) : V4ui = onlyInShaderCode "Load"
-        and set (coord : V2i, slice : int, sample : int) (data : V4ui) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : V2i, slice : int, sample : int) (data : V4ui) : unit = onlyInShaderCode "Store"
     
     /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : V2i, slice : int, sample : int, data : uint) : uint = onlyInShaderCode "AtomicAdd"
@@ -2679,13 +2680,13 @@ type UIntImage2dArray<'Format when 'Format :> Formats.IUnsignedFormat>() =
     member x.Load(coord : V2i, slice : int) : V4ui = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : V2i, slice : int, data : V4ui) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : V2i, slice : int) : V4ui = onlyInShaderCode "Load"
-        and set (coord : V2i, slice : int) (data : V4ui) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : V2i, slice : int) (data : V4ui) : unit = onlyInShaderCode "Store"
     
     /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : V2i, slice : int, data : uint) : uint = onlyInShaderCode "AtomicAdd"
@@ -2730,13 +2731,13 @@ type UIntImage2dMS<'Format when 'Format :> Formats.IUnsignedFormat>() =
     member x.Load(coord : V2i, sample : int) : V4ui = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : V2i, sample : int, data : V4ui) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : V2i, sample : int) : V4ui = onlyInShaderCode "Load"
-        and set (coord : V2i, sample : int) (data : V4ui) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : V2i, sample : int) (data : V4ui) : unit = onlyInShaderCode "Store"
     
     /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : V2i, sample : int, data : uint) : uint = onlyInShaderCode "AtomicAdd"
@@ -2778,13 +2779,13 @@ type UIntImage2d<'Format when 'Format :> Formats.IUnsignedFormat>() =
     member x.Load(coord : V2i) : V4ui = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : V2i, data : V4ui) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : V2i) : V4ui = onlyInShaderCode "Load"
-        and set (coord : V2i) (data : V4ui) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : V2i) (data : V4ui) : unit = onlyInShaderCode "Store"
     
     /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : V2i, data : uint) : uint = onlyInShaderCode "AtomicAdd"
@@ -2826,13 +2827,13 @@ type UIntImage3d<'Format when 'Format :> Formats.IUnsignedFormat>() =
     member x.Load(coord : V3i) : V4ui = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : V3i, data : V4ui) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : V3i) : V4ui = onlyInShaderCode "Load"
-        and set (coord : V3i) (data : V4ui) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : V3i) (data : V4ui) : unit = onlyInShaderCode "Store"
     
     /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : V3i, data : uint) : uint = onlyInShaderCode "AtomicAdd"
@@ -2874,13 +2875,13 @@ type UIntImageCubeArray<'Format when 'Format :> Formats.IUnsignedFormat>() =
     member x.Load(coord : V2i, layerFace : int) : V4ui = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : V2i, layerFace : int, data : V4ui) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : V2i, layerFace : int) : V4ui = onlyInShaderCode "Load"
-        and set (coord : V2i, layerFace : int) (data : V4ui) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : V2i, layerFace : int) (data : V4ui) : unit = onlyInShaderCode "Store"
     
     /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : V2i, layerFace : int, data : uint) : uint = onlyInShaderCode "AtomicAdd"
@@ -2922,13 +2923,13 @@ type UIntImageCube<'Format when 'Format :> Formats.IUnsignedFormat>() =
     member x.Load(coord : V2i, face : int) : V4ui = onlyInShaderCode "Load"
     
     /// write single texel into image
-    [<FShade.Imperative.KeepCall>]
+    [<KeepCall>]
     member x.Store(coord : V2i, face : int, data : V4ui) : unit = onlyInShaderCode "Store"
     
     /// access single texel of image
     member x.Item
         with get (coord : V2i, face : int) : V4ui = onlyInShaderCode "Load"
-        and set (coord : V2i, face : int) (data : V4ui) : unit = onlyInShaderCode "Store"
+        and [<KeepCall>] set (coord : V2i, face : int) (data : V4ui) : unit = onlyInShaderCode "Store"
     
     /// atomically add a value to an existing value in memory and return the original value
     member x.AtomicAdd(coord : V2i, face : int, data : uint) : uint = onlyInShaderCode "AtomicAdd"
