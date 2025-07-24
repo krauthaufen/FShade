@@ -456,3 +456,20 @@ let ``Shader execution reordering intrinsics``() =
         "hitObjectGetHitKindNV"
         "reorderThreadNV"
     ]
+
+[<Test>]
+let ``HitObject inlining``() =
+    Setup.Run()
+
+    let raygenShader =
+        raygen {
+            let ho = HitObject()
+            ho.TraceRay<V3f>(scene, V3f.Zero, V3f.ZAxis) |> ignore
+        }
+
+    let effect =
+         raytracingEffect {
+             raygen raygenShader
+         }
+
+    GLSL.shouldCompileRaytracingAndContainRegex effect ["hitObjectNV ho;"]

@@ -2682,7 +2682,7 @@ module Optimizer =
 
                     | Let(v, e, b) ->
                         //let! nonMutable = State.get |> State.map (fun s -> Set.contains v s.nonMutable)
-                        if v.IsMutable || v.Type.IsRef  then
+                        if v.IsMutable || v.Type.IsRef || v.Type = typeof<HitObject> then
                             let! e = inlineS e
                             let! b = inlineS b
                             return Expr.Let(v, e, b)
