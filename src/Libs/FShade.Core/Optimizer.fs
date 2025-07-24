@@ -496,9 +496,9 @@ module Optimizer =
                         if sideEffects then
                             let! self = eliminateDeadCodeS e
                             if self.Type = typeof<unit> then
-                                return e
+                                return self
                             else
-                                return Expr.Ignore e
+                                return Expr.Ignore self
                         else
                             return Expr.Unit
 

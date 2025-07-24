@@ -473,3 +473,24 @@ let ``HitObject inlining``() =
          }
 
     GLSL.shouldCompileRaytracingAndContainRegex effect ["hitObjectNV ho;"]
+
+[<ReflectedDefinition; KeepCall>]
+let traceAndIgnore() =
+    scene.TraceRay<V3f>(V3f.Zero, V3f.ZAxis) |> ignore
+    V3f.One
+
+[<Test>]
+let ``Eliminate unused payload read in utility function``() =
+    Setup.Run()
+
+    let raygenShader =
+        raygen {
+            traceAndIgnore() |> ignore
+        }
+
+    let effect =
+         raytracingEffect {
+             raygen raygenShader
+         }
+
+    GLSL.shouldCompileRaytracingAndContainRegex effect [ @"traceRayEXT.+;\s*return vec3" ]
