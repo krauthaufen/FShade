@@ -143,6 +143,11 @@ type Scene(accelerationStructure : ISemanticValue) =
 [<AutoOpen>]
 module RaytracingIntrinsics =
 
+    /// Utility to mark payloads and callable data as unmodified.
+    /// E.g. { unchanged<Payload> with color = V3f.III } will only write to the color field of the payload.
+    /// Fails if the optimizer cannot inline the expression.
+    let unchanged<'T> : 'T = onlyInShaderCode "unchanged"
+
     [<KeepCall>]
     let ignoreIntersection() : unit = onlyInShaderCode "ignoreIntersection"
 
@@ -162,6 +167,7 @@ module RaytracingIntrinsics =
         onlyInShaderCode "traceRay"
 
     module MethodInfo =
+        let unchanged = getMethodInfo <@ unchanged @>
         let reportIntersection = getMethodInfo <@ reportIntersection @>
         let executeCallable = getMethodInfo <@ executeCallable @>
         let traceRay = getMethodInfo <@ traceRay @>

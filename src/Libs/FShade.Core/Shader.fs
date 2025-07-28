@@ -3445,6 +3445,7 @@ module Shader =
         let newBody, state = 
             shader.shaderBody
                 |> Optimizer.inlining isSideEffect
+                |> Optimizer.simplifyRaytracingWrites
                 |> Optimizer.hoistImperativeConstructs
                 |> Optimizer.evaluateConstants' isSideEffect
                 |> Optimizer.eliminateDeadCode' isSideEffect

@@ -242,9 +242,11 @@ module ExpressionExtensions =
             let t = Expr.ReadRaytracingData(value.Type, name)
             Expr.UnsafeWrite(t, value)
 
-        static member WriteRaytracingData(name : string, value : Expr, slot : ShaderSlot) =
-            let t = Expr.ReadRaytracingData(value.Type, name, slot)
-            Expr.UnsafeWrite(t, value)
+        /// Write to a property of raytracing data (e.g. payload.color = value)
+        static member WriteRaytracingData(name : string, pi : PropertyInfo, value : Expr) =
+            let data = Expr.ReadRaytracingData(pi.DeclaringType, name)
+            let prop = Expr.PropertyGet(data, pi)
+            Expr.UnsafeWrite(prop, value)
 
         static member WriteOutputsRaw(values : list<string * Option<Expr> * Expr>) =
             let values =

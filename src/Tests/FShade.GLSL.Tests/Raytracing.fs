@@ -18,6 +18,15 @@ type Payload =
         depth : int
     }
 
+type BigPayload =
+    {
+        color : V3f
+        depth : int
+        origin : V3f
+        direction : V3f
+        flag : bool
+    }
+
 let scene =
     scene { accelerationStructure uniform?RaytracingScene }
 
@@ -151,6 +160,8 @@ let ``Callable shader``() =
 
     let raygenShader =
         raygen {
+            let data = { unchanged<BigPayload> with flag = true }
+            Callable.Execute(data, "big")     |> ignore
             Callable.Execute(0, "someName")   |> ignore
             Callable.Execute<int>("someName") |> ignore
             Callable.Execute(0, someName)     |> ignore
@@ -163,10 +174,21 @@ let ``Callable shader``() =
             return input.data
         }
 
+    let callableShaderBig (input : RayCallableInput<BigPayload>)=
+        callable {
+            let result =
+                if input.data.flag then
+                    V3f.One
+                else
+                    V3f.Zero
+            return { unchanged<BigPayload> with color = result }
+        }
+
     let effect =
          raytracingEffect {
              raygen raygenShader
              callable someName callableShader
+             callable "big" callableShaderBig
          }
 
     GLSL.shouldCompileRaytracing effect
@@ -494,3 +516,79 @@ let ``Eliminate unused payload read in utility function``() =
          }
 
     GLSL.shouldCompileRaytracingAndContainRegex effect [ @"traceRayEXT.+;\s*return vec3" ]
+
+
+[<Test>]
+let ``Write to payload fields``() =
+    Setup.Run()
+
+    let raygenShader =
+        raygen {
+            ()
+        }
+
+    let chitShader (input: RayHitInput<BigPayload>) =
+        closestHit {
+            return {
+                color = V3f.ZAxis
+                depth = 1
+                origin = uniform?Ori
+                direction = uniform?Dir
+                flag = false
+            }
+        }
+
+    let mainHitgroup =
+        hitgroup {
+            closestHit chitShader
+        }
+
+    let effect =
+         raytracingEffect {
+             raygen raygenShader
+             hitgroup "Main" mainHitgroup
+         }
+
+    GLSL.shouldCompileRaytracingAndContainRegex effect [ @"rayPayloadIn\.color =" ]
+
+[<ReflectedDefinition>]
+let traceBig (input : RayHitInput<BigPayload>) =
+    if input.payload.depth < 16 then
+        let payload = { unchanged<BigPayload> with depth = input.payload.depth + 1 }
+        let result = scene.TraceRay(input.ray.origin, input.ray.direction, payload, flags = uniform.Flags)
+        result.color
+    else
+        V3f.Zero
+
+[<Test>]
+let ``Write to payload fields partial``() =
+    Setup.Run()
+
+    let raygenShader =
+        raygen {
+            ()
+        }
+
+    let chitShader (input: RayHitInput<BigPayload>) =
+        closestHit {
+            let inner = traceBig input
+            let newPayload = { unchanged<BigPayload> with color = inner + input.payload.color * 0.5f }
+            let newPayload2 = newPayload
+            return newPayload2
+        }
+
+    let mainHitgroup =
+        hitgroup {
+            closestHit chitShader
+        }
+
+    let effect =
+         raytracingEffect {
+             raygen raygenShader
+             hitgroup "Main" mainHitgroup
+         }
+
+    GLSL.shouldCompileRaytracingAndContainRegex effect [
+        @"\{\s*rayPayload0.depth =.+;\s+traceRayEXT"
+        @"\{\s*rayPayloadIn.color = .+;\s*\}"
+    ]

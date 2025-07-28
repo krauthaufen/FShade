@@ -287,6 +287,12 @@ module Optimizer =
                     | None -> State.value None
 
         [<return: Struct>]
+        let (|Unchanged|_|) (e : Expr) =
+            match e with
+            | Call(None, mi, []) when mi.IsGenericMethod &&  mi.GetGenericMethodDefinition() = MethodInfo.unchanged -> ValueSome ()
+            | _ -> ValueNone
+
+        [<return: Struct>]
         let rec (|LExpr|_|) (e : Expr) =
             // TODO: complete?
             match e with
@@ -719,8 +725,8 @@ module Optimizer =
 
                     | PropertySet(Some t, pi, idx, value) ->
                         match t.Type with
-                         | ImageType _ -> ()
-                         | _ -> Log.warn "[FShade] found PropertySet on unknown expression: %A" t
+                        | ImageType _ -> ()
+                        | _ -> Log.warn "[FShade] found PropertySet on unknown expression: %A" t
 
                         let! idx = idx |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
                         let! value = eliminateDeadCodeS value
@@ -729,7 +735,8 @@ module Optimizer =
 
                     | UnsafeWrite(t, value) ->
                         match t with
-                        | ReadRaytracingData _ -> ()
+                        | ReadRaytracingData _
+                        | PropertyGet(Some (ReadRaytracingData _), _, _) -> ()
                         | _ -> Log.warn "[FShade] found UnsafeWrite on unknown expression: %A" t
 
                         let! value = eliminateDeadCodeS value
@@ -2375,9 +2382,10 @@ module Optimizer =
                 | PropertyGet(None, _, [])
                 | TupleGet(Trivial, _)
                 | PropertyGet(Some (TrivialOrInput nonMutable), (FSharpTypeProperty | ArrayLengthProperty), [])
-                | FieldGet(Some (TrivialOrInput nonMutable), _) 
-                | ReadInput(_, _, None) 
-                | ReadInput(_, _, Some (TrivialOrInput nonMutable)) -> 
+                | FieldGet(Some (TrivialOrInput nonMutable), _)
+                | Unchanged
+                | ReadInputOrRaytracingData(_, _, None, _)
+                | ReadInputOrRaytracingData(_, _, Some (TrivialOrInput nonMutable), _) ->
                     ValueSome()
 
                 | PropertyGet(Some (TrivialOrInput nonMutable as t), prop, []) ->
@@ -2407,7 +2415,7 @@ module Optimizer =
             [<return: Struct>]
             let rec (|OnlyInputs|_|) (e : Expr) =
                 match e with
-                | ReadInput _ ->
+                | ReadInputOrRaytracingData _ ->
                     ValueSome ()
                 | _ -> 
                     ValueNone
@@ -2418,7 +2426,7 @@ module Optimizer =
                 | Var v when v.IsMutable -> 
                     if Set.contains v nonMutable then ValueSome ()
                     else ValueNone
-                | ReadInput _ 
+                | ReadInputOrRaytracingData _
                 | Var _ ->
                     ValueSome ()
                 | _ -> 
@@ -2703,8 +2711,8 @@ module Optimizer =
                                             | _ -> false
                                         else
                                             match e with
-                                                | ReadInput(_, _, None) -> true
-                                                | ReadInput(_, _, Some idx) -> canInline idx
+                                                | ReadInputOrRaytracingData(_, _, None, _) -> true
+                                                | ReadInputOrRaytracingData(_, _, Some idx, _) -> canInline idx
                                         
                                                 | GetArray(e,i) ->
                                                     let res = canInline e && canInline i
@@ -3337,7 +3345,59 @@ module Optimizer =
 
             ()
 
+    module private Raytracing =
 
+        let simplifyWrites (e : Expr) =
+            let rec processExpr (e : Expr) =
+                match e with
+                | UnsafeWrite (ReadRaytracingData (name, _), NewRecord(typ, args)) ->
+                    let args = args |> List.map processExpr
+
+                    let fields = FSharpType.GetRecordFields(typ, true)
+                    let writes =
+                        args |> List.choosei (fun i -> function
+                            | Unchanged -> None
+                            | PropertyGet(Some Unchanged, pi, _) when pi = fields.[i] -> None
+                            | arg -> Some <| Expr.WriteRaytracingData(name, fields.[i], arg)
+                        )
+
+                    Expr.Seq writes
+
+                | CallFunction(utility, args) ->
+                    let args = args |> List.map processExpr
+                    let utility = utility |> UtilityFunction.map processExpr
+                    Expr.CallFunction(utility, args)
+
+                | ShapeVar v ->
+                    Expr.Var v
+
+                | ShapeLambda(v, b) ->
+                    let b = processExpr b
+                    Expr.Lambda(v, b)
+
+                | ShapeCombination(o, args) ->
+                    let args = args |> List.map processExpr
+                    RebuildShapeCombination(o, args)
+
+            // Make sure all "unchanged" expressions have been eliminated
+            let rec tryGetInvalid (context : Expr) (e : Expr) =
+                match e with
+                | Unchanged -> Some context
+                | CallFunction(utility, args) ->
+                    args
+                    |> List.tryPick (tryGetInvalid context)
+                    |> Option.orElse (utility.functionBody |> tryGetInvalid utility.functionBody)
+                | ShapeVar _ -> None
+                | ShapeLambda(_, b) -> tryGetInvalid context b
+                | ShapeCombination(_, args) -> args |> List.tryPick (tryGetInvalid context)
+
+            let result = processExpr e
+            match tryGetInvalid result result with
+            | None -> result
+            | Some invalid ->
+                let nl = Environment.NewLine
+                let output = invalid |> PrettyPrinter.print |> String.indent 1
+                failwithf $"[FShade] Failed inline 'unchanged' expressions:{nl}{nl}{output}{nl}"
 
     /// creates a new expression only containing e's visible side-effects.
     /// NOTE: all methods are assumed to be pure (except for the ones returning void/unit)
@@ -3386,3 +3446,7 @@ module Optimizer =
     /// this ensures that most imperative constructs occur on statement-level and can easily be compiled to C like languages.
     let hoistImperativeConstructs (e : Expr) =
         StatementHoisting.processStatement e
+
+    /// simplifies writes to payloads and callable data by replacing record expressions with individual field writes.
+    let simplifyRaytracingWrites (e : Expr) =
+        Raytracing.simplifyWrites e
