@@ -14,7 +14,51 @@ open FShade.Imperative
 open FSharp.Data.Adaptive
 
 module PrettyPrinter =
-    open Aardvark.Base.Monads.State
+
+    let private unaryOperators =
+        Map.ofList [
+            "op_UnaryNegation",      "-"
+            "op_LogicalNot",         "~~~"
+        ]
+
+    let private operators =
+        Map.ofList [
+            "op_Addition",           "+"
+            "op_Subtraction",        "-"
+            "op_Multiply",           "*"
+            "op_Division",           "/"
+            "op_Modulus",            "%"
+            "op_Exponentiation",     "**"
+            "op_BitwiseOr",          "|||"
+            "op_BitwiseAnd",         "&&&"
+            "op_ExclusiveOr",        "^^^"
+            "op_LeftShift",          "<<<"
+            "op_RightShift",         ">>>"
+            "op_LessThan",           "<"
+            "op_LessThanOrEqual",    "<="
+            "op_GreaterThan",        ">"
+            "op_GreaterThanOrEqual", ">="
+            "op_Equality",           "="
+            "op_Inequality",         "<>"
+        ]
+
+    [<return: Struct>]
+    let private (|UnaryOperator|_|) (e : Expr) =
+        match e with
+        | Call(None, Method(name, _), [x]) ->
+            match unaryOperators |> Map.tryFind name with
+            | Some op -> ValueSome (op, x)
+            | _ -> ValueNone
+        | _ -> ValueNone
+
+    [<return: Struct>]
+    let private (|Operator|_|) (e : Expr) =
+        match e with
+        | Call(None, Method(name, _), [x; y]) ->
+            match operators |> Map.tryFind name with
+            | Some op -> ValueSome (op, x, y)
+            | _ -> ValueNone
+        | _ -> ValueNone
 
     let rec print (e : Expr) =
         match e with
@@ -73,6 +117,39 @@ module PrettyPrinter =
                     sprintf "%s%s = %s" name indexer value
                 )
                 |> String.concat "\r\n"
+
+            | UnsafeWrite(t, v) ->
+                let t = print t
+                let v = print v
+                sprintf "%s <- %s" t v
+
+            | NewObject(ci, args) ->
+                let args = args |> List.map print |> String.concat ", "
+                $"{ci.DeclaringType.Name}({args})"
+
+            | NewRecord(typ, args) ->
+                let fields = FSharpType.GetRecordFields typ
+                let data =
+                    args
+                    |> List.mapi (fun i arg -> String.indent 2 $"{fields.[i].Name} = {print arg}")
+                    |> String.concat "\r\n"
+
+                let lb = String.indent 1 "{"
+                let rb = String.indent 1 "}"
+                $"\r\n{lb}\r\n{data}\r\n{rb}"
+
+            | Operator (op, x, y) ->
+                $"{print x} {op} {print y}"
+
+            | UnaryOperator (op, x) ->
+                $"{op}{print x}"
+
+            | CallFunction(func, args) ->
+                let args = args |> List.map print |> String.concat ", "
+                sprintf "%s(%s)" func.functionName args
+
+            | Call(None, mi, _) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = MethodInfo.unchanged ->
+                $"unchanged<{mi.GetGenericArguments().[0].Name}>"
 
             | Call(None, mi, args) ->
                 let args = args |> List.map print |> String.concat ", "
@@ -159,11 +236,6 @@ module PrettyPrinter =
                     sprintf "%s.%s <- %s" t indexers value
                 else
                     sprintf "%s.%s%s <- %s" t p.Name indexers value
-
-            | UnsafeWrite(t, v) ->
-                let t = print t
-                let v = print v
-                sprintf "%s <- %s" t v
 
             | Value(v,_) ->
                 sprintf "%A" v
@@ -3383,10 +3455,15 @@ module Optimizer =
             let rec tryGetInvalid (context : Expr) (e : Expr) =
                 match e with
                 | Unchanged -> Some context
+
+                | NewRecord(_, args) ->
+                    args |> List.tryPick (tryGetInvalid e)
+
                 | CallFunction(utility, args) ->
                     args
                     |> List.tryPick (tryGetInvalid context)
                     |> Option.orElse (utility.functionBody |> tryGetInvalid utility.functionBody)
+
                 | ShapeVar _ -> None
                 | ShapeLambda(_, b) -> tryGetInvalid context b
                 | ShapeCombination(_, args) -> args |> List.tryPick (tryGetInvalid context)

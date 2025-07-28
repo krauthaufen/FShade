@@ -32,6 +32,7 @@ type RayId =
     new (name: Symbol) = RayId(name, -1)
     new (name: string) = RayId(Sym.ofString name)
 
+    override this.ToString() = string this.Name
     member internal this.IsEmpty = this.Name.IsEmpty
 
     interface IRaytracingId with
@@ -50,6 +51,7 @@ type MissId =
     new (name: Symbol) = MissId(name, -1)
     new (name: string) = MissId(Sym.ofString name)
 
+    override this.ToString() = string this.Name
     member internal this.IsEmpty = this.Name.IsEmpty
 
     interface IRaytracingId with
@@ -68,6 +70,7 @@ type CallableId =
     new (name: Symbol) = CallableId(name, -1)
     new (name: string) = CallableId(Sym.ofString name)
 
+    override this.ToString() = string this.Name
     member internal this.IsEmpty = this.Name.IsEmpty
 
     interface IRaytracingId with
