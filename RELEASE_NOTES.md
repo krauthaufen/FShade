@@ -1,3 +1,10 @@
+### 5.7.0-prerelease0012
+- Added KeepCall attribute to image setters
+- [Optimizer] Added step for simplifying raytracing writes
+- [Optimizer] Fixed issue with dead-code elimination and utility functions
+- [Optimizer] Prevent HitObject declaration from being inlined
+- [Raytracing] Added Thread.Reorder overloads with int parameters
+
 ### 5.7.0-prerelease0011
 - [ComputeShader] fixed usage for `cs_` prefixed uniforms
 
