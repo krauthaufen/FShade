@@ -1,3 +1,6 @@
+### 5.7.0-prerelease0013
+- [ComputeShader] fixed ordering of UtilityFunctions and storage buffers in compute shaders
+
 ### 5.7.0-prerelease0012
 - Added KeepCall attribute to image setters
 - [Optimizer] Added step for simplifying raytracing writes

@@ -245,12 +245,14 @@ module ComputeShader =
 
     let toEntryPoint (s : ComputeShader) =
         let bufferArguments = 
-            s.csBuffers |> Map.toList |> List.map (fun (n,i) -> 
+            s.csBuffers |> Map.toList |> List.map (fun (n,i) ->
+                
                 { 
-                    paramName = n
-                    paramSemantic = n
-                    paramType = i.contentType.MakeArrayType()
-                    paramDecorations = Set.ofList [ParameterDecoration.StorageBuffer(i.access)]
+                    uniformName = n
+                    uniformType = i.contentType.MakeArrayType()
+                    uniformBuffer = Some "StorageBuffer"
+                    uniformDecorations = [UniformDecoration.BufferAccess i.access] 
+                    uniformTextureInfo = []
                 }
             )
 
@@ -308,8 +310,8 @@ module ComputeShader =
             entryName      = "main"
             inputs         = []
             outputs        = []
-            uniforms       = imageArguments @ uniforms
-            arguments      = bufferArguments @ sharedArguments
+            uniforms       = imageArguments @ uniforms @ bufferArguments
+            arguments      = sharedArguments
             raytracingData = []
             body           = s.csBody
             decorations = 
