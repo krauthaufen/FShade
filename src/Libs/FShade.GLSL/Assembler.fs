@@ -2605,7 +2605,9 @@ module Assembler =
                     )
 
             match stages with
-            | ShaderStageDescription.Raytracing _ -> do! AssemblerState.useExtension GLSLExtension.EXTRayTracing
+            | ShaderStageDescription.Raytracing _ ->
+                do! AssemblerState.useExtension GLSLExtension.EXTRayTracing
+                do! AssemblerState.useExtension GLSLExtension.EXTOpacityMicromap
             | _ -> ()
 
             let entryName = checkName e.cEntryName

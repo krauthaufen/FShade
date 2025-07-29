@@ -26,15 +26,16 @@ type MemoryType =
 
 [<Flags>]
 type RayFlags =
-    | None                     = 0
-    | Opaque                   = 1
-    | NoOpaque                 = 2
-    | TerminateOnFirstHit      = 4
-    | SkipClosestHitShader     = 8
-    | CullBackFacingTriangles  = 16
-    | CullFrontFacingTriangles = 32
-    | CullOpaque               = 64
-    | CullNoOpaque             = 128
+    | None                       = 0
+    | Opaque                     = 1
+    | NoOpaque                   = 2
+    | TerminateOnFirstHit        = 4
+    | SkipClosestHitShader       = 8
+    | CullBackFacingTriangles    = 16
+    | CullFrontFacingTriangles   = 32
+    | CullOpaque                 = 64
+    | CullNoOpaque               = 128
+    | ForceOpacityMicromap2State = 1024
 
 type RayHitKind =
     | Default             = 0
