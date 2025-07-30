@@ -1,3 +1,6 @@
+- Simplified for-loop unrolling
+- Added RayFlags.ForceOpacityMicromap2State
+
 ### 5.7.0-prerelease0013
 - [ComputeShader] fixed ordering of UtilityFunctions and storage buffers in compute shaders
 

@@ -590,14 +590,51 @@ let ``Sampler Loop Inline`` () =
     GLSL.shouldCompile [ Effect.ofFunction (frag 1) ]
 
 [<Test>]
+let ``Unroll Range`` () =
+    Setup.Run()
+
+    let frag (v : Vertex) =
+        fragment {
+            let mutable res = 0.0f
+
+            for i = unroll 0 to 2 do
+                res <- res + float32 i
+
+            return res
+        }
+
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [
+        @"res = \(res \+ 0\.0\);\s*res = \(res \+ 1\.0\);\s*res = \(res \+ 2\.0\);"
+    ]
+
+[<Test>]
+let ``Unroll Range Inverted`` () =
+    Setup.Run()
+
+    let frag (v : Vertex) =
+        fragment {
+            let mutable res = 0.0f
+
+            for i = unroll 2 downto 0 do
+                res <- res + float32 i
+
+            return res
+        }
+
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [
+        @"res = \(res \+ 2\.0\);\s*res = \(res \+ 1\.0\);\s*res = \(res \+ 0\.0\);"
+    ]
+
+
+[<Test>]
 let ``Unroll Match`` () =
     Setup.Run()
 
     let frag (switch : int) (v : Vertex) =
         fragment {
             let mutable res = V3f.OOO
-            Preprocessor.unroll()
-            for i in 0..5 do
+
+            for i in unroll 0 .. 5 do
                 let p = match i with
                         | 0 -> v.pos.XYZ
                         | 1 -> v.pos.XZY
@@ -615,7 +652,14 @@ let ``Unroll Match`` () =
             return V4f(res, 1.0f)
         }
 
-    GLSL.shouldCompile [ Effect.ofFunction (frag 1) ] // should not contain "0 == 0", "0 == 1", "0 == 2", ...
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction (frag 1) ] [
+        @"res = \(res \+ fs_Positions\.xyz\);\s*" +
+        @"res = \(res \+ fs_Positions\.xzy\);\s*" +
+        @"res = \(res \+ fs_Positions\.yzx\);\s*" +
+        @"res = \(res \+ fs_Positions\.yxz\);\s*" +
+        @"res = \(res \+ fs_Positions\.zyx\);\s*" +
+        @"res = \(res \+ fs_Positions\.zxy\);"
+    ]
 
 type Fragment =
     {

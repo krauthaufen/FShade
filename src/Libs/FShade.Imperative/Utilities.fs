@@ -508,8 +508,6 @@ module ExprExtensions =
         let opRangeStep = operators.GetMethod("op_RangeStep")
         let ignore = getMethodInfo <@ ignore @>
 
-        let unroll = getMethodInfo <@ Preprocessor.unroll : unit -> unit @>
-
     // Temporary work around for
     // https://github.com/dotnet/fsharp/issues/9903
     let rec private namedValues = function
@@ -1175,12 +1173,6 @@ module ExprExtensions =
 
             Alternatives(c, e) |> ValueSome
 
-        | _ -> ValueNone
-
-    [<return: Struct>]
-    let (|Unroll|_|) (e : Expr) =
-        match e with
-        | Call(None, mi, []) when mi = Methods.unroll -> ValueSome ()
         | _ -> ValueNone
 
     let (|Constant|_|) (e : Expr) =

@@ -1702,39 +1702,6 @@ module Compiler =
                 | Sequential(Sequential(a,b), c) ->
                     return! toCStatementS isLast (Expr.Sequential(a, Expr.Sequential(b, c)))
 
-                | Sequential(Unroll, Cons((ForInteger(v, first, step, last, b) as loop), rest)) ->
-                    let! rest = rest |> List.mapS (toCStatementS isLast)
-
-                    let loopBody (i : int) = b.Substitute(fun vi -> if vi = v then Some (Expr.Value(i)) else None)
-
-
-                    
-                    match first, step, last with
-                        | DerivedPatterns.Int32 first, DerivedPatterns.Int32 step, DerivedPatterns.Int32 last ->
-                            let range = [ first .. step .. last ]
-
-                            let! code = 
-                                range |> List.mapS (fun i ->
-                                    toCStatementS false (loopBody i) |> State.map (fun s -> CIsolated [s])
-                                )
-
-                            return CSequential [
-                                yield! code
-                                yield! rest
-                            ]
-                        | _ ->
-                            Log.warn "cannot unroll loop 'for i in %A .. %A .. %A'" first step last
-                            let! loop = toCStatementS false loop
-                            return CSequential [
-                                yield loop
-                                yield! rest
-                            ]
-
-
-                | Unroll ->
-                    Log.warn "[FShade] orphaned unroll detected"
-                    return CNop
-
                 | SetRef(ref, value) ->
                     let! r = toCLExprS ref
                     let! v = toCExprS value

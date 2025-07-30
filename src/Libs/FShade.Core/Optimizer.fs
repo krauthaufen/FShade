@@ -458,7 +458,6 @@ module Optimizer =
         let private staticallyNeededCalls =
             HashSet.ofList [
                 MethodInfo.WriteOutputs
-                MethodInfo.Unroll
             ]
 
         let private callNeededS (t : Option<Expr>) (mi : MethodInfo) (args : list<Expr>) =
@@ -1144,8 +1143,7 @@ module Optimizer =
                 State.get |> State.map (fun s -> 
                     (mi.IsGenericMethod && mi.GetGenericMethodDefinition() = MethodInfo.ReadInput) ||
                     (mi.IsGenericMethod && mi.GetGenericMethodDefinition() = MethodInfo.ReadInputIndexed) ||
-                    (mi = MethodInfo.WriteOutputs) || 
-                    (mi = MethodInfo.Unroll) ||
+                    (mi = MethodInfo.WriteOutputs) ||
                     (mi.IsGenericMethod && mi.GetGenericMethodDefinition() = MethodInfo.NewRef) ||
                     (s.isGlobalSideEffect (mi :> MemberInfo))
                 )
@@ -1169,6 +1167,22 @@ module Optimizer =
                 State.get |> State.map (fun s ->
                     Map.tryFind v s.variableValues
                 )
+
+        let private unrollMeth = getMethodInfo <@ unroll @>
+
+        [<return: Struct>]
+        let private (|Unroll|_|) (e : Expr) =
+            match e with
+            | Call(None, mi, [value]) when mi.IsGenericMethod && mi.GetGenericMethodDefinition() = unrollMeth -> ValueSome value
+            | _ -> ValueNone
+
+        [<return: Struct>]
+        let private (|UnrollForInteger|_|) (e : Expr) =
+            match e with
+            | ForInteger(var, Unroll first, step, last, body)
+            | ForInteger(var, first, Unroll step, last, body)
+            | ForInteger(var, first, step, Unroll last, body) -> ValueSome (var, first, step, last, body)
+            | _ -> ValueNone
 
         [<return: Struct>]
         let rec private (|AllConstant|_|) (e : list<Expr>) =
@@ -1571,14 +1585,6 @@ module Optimizer =
 
             | e ->
                 ValueSome (e, ValueNone)
-  
-        [<return: Struct>]
-        let rec (|SeqCons2|_|) (e : Expr) =
-            match e with
-            | SeqCons(a, ValueSome (SeqCons(b, c))) ->
-                ValueSome (a,b,c)
-            | _ ->
-                ValueNone
 
         let rec evaluateConstantsS (e : Expr) =
             state {
@@ -1617,39 +1623,24 @@ module Optimizer =
                             | _ ->
                                 return Expr.Application(lambda, arg)
 
-                    | SeqCons2((Unroll as u), ForInteger(v, first, step, last, body), rest) ->
+                    | UnrollForInteger(v, first, step, last, body) ->
                         let! first = evaluateConstantsS first
                         let! step = evaluateConstantsS step
                         let! last = evaluateConstantsS last
-                        
+
                         match first, step, last with
-                            | Int32 f, Int32 s, Int32 l ->
-                                let! unrolled = 
-                                    [f .. s .. l] |> List.mapS (fun i -> 
-                                        let value = Expr.Value(i)
-                                        let body = body.Substitute(fun vi -> if vi = v then Some value else None)
-                                        evaluateConstantsS body
-                                    )
-                                match rest with
-                                | ValueSome rest -> 
-                                    let! rest = evaluateConstantsS rest
-                                    return Expr.Seq [Expr.Seq unrolled; rest]
-                                | ValueNone ->
-                                    return Expr.Seq unrolled
-                            | _ ->
-                                let! body = evaluateConstantsS body
-                                match rest with
-                                | ValueSome rest -> 
-                                    let! rest = evaluateConstantsS rest
-                                    match body with
-                                        | Value _ -> return rest
-                                        | _ -> 
-                                            return Expr.Seq [u; Expr.ForInteger(v, first, step, last, body); rest]
-                                | ValueNone ->
-                                    return Expr.Seq [u; Expr.ForInteger(v, first, step, last, body)]
+                        | Int32 f, Int32 s, Int32 l ->
+                            let! unrolled =
+                                [f .. s .. l] |> List.mapS (fun i ->
+                                    let value = Expr.Value(i)
+                                    let body = body.Substitute(fun vi -> if vi = v then Some value else None)
+                                    evaluateConstantsS body
+                                )
+                            return Expr.Seq unrolled
 
-
-                        
+                        | _ ->
+                            let! body = evaluateConstantsS body
+                            return Expr.ForInteger(v, first, step, last, body)
 
                     | ForInteger(v, first, step, last, body) ->
                         let! first = evaluateConstantsS first

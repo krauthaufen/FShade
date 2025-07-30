@@ -167,6 +167,7 @@ type StorageAccess =
 
     
 type Preprocessor private() =
+    [<Obsolete("Use 'unroll' instead. E.g. for i in unroll 0 .. 5 do")>]
     static member unroll() = ()
 
 [<AutoOpen>]

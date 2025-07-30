@@ -348,8 +348,6 @@ module ExpressionExtensions =
         | _ -> 
             ValueNone
 
-    let private unrollMeth = getMethodInfo <@ Preprocessor.unroll : unit -> unit @>
-
     let private refof = getMethodInfo <@ (~&&) @>
     let private newref = getMethodInfo <@ ref @>
     let private deref = getMethodInfo <@ (!) @>
@@ -401,7 +399,6 @@ module ExpressionExtensions =
         static member WriteOutputs = ShaderIO.WriteOutputsMeth
         static member ReadInput = ShaderIO.ReadInputMeth
         static member ReadInputIndexed = ShaderIO.ReadInputIndexedMeth
-        static member Unroll = unrollMeth
         static member NewRef = newref
         static member DeRef = deref
 

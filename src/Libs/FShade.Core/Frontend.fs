@@ -197,6 +197,10 @@ module Primitives =
     let inline ddyCoarse< ^a when ^a : (static member (-) : ^a -> ^a -> ^a) > (v : ^a) : ^a = onlyInShaderCode "ffyCoarse"
     let discard () : unit = onlyInShaderCode "discard"
 
+    /// Signals to the optimizer that the given for-loop should be unrolled if possible.
+    /// E.g. "for i = unroll 0 to 5 do" or "for i in unroll 0 .. 5 do"
+    let unroll (loop: 'T) : 'T = onlyInShaderCode "unroll"
+
     [<ReflectedDefinition>]
     let packUnorm2x16 (v : V2f) : uint32 =
         let h = (clamp 0.0f 1.0f v.X) * 65535.0f |> round |> uint32
