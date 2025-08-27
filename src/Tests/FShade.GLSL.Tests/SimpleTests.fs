@@ -56,7 +56,10 @@ let ``Reserved Names``() =
             let mutable union = this
             union <- V4f.Zero
 
-            let mutable foo' = union
+            let mutable sample = union
+            sample <- V4f.Zero
+
+            let mutable foo' = sample
             foo' <- V4f.Zero
 
             return foo'

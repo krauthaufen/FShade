@@ -19,6 +19,7 @@
     <Compile Include="IntrinsicFunctions.fs" />
     <Compile Include="IntrinsicParameters.fs" />
     <Compile Include="UniformBufferLayout.fs" />
+    <Compile Include="Keywords.fs" />
     <Compile Include="Assembler.fs" />
     <Compile Include="Backends.fs" />
   </ItemGroup>
