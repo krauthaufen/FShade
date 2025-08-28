@@ -126,7 +126,7 @@ module GLSL =
     let compile (e : list<Effect>) =
         compile' glsl430 e
 
-    let private printResults (res : List<ShaderStage * CompilerResult>) (glsl : GLSLShader) =
+    let private printResults (rtx: RaytracingEffect option) (res : List<ShaderStage * CompilerResult>) (glsl : GLSLShader) =
         Console.WriteLine("====================== CODE ======================")
         Console.WriteLine(glsl.code)
         Console.WriteLine("====================== CODE ======================")
@@ -134,6 +134,27 @@ module GLSL =
         Console.WriteLine("======================= IO =======================")
         GLSLProgramInterface.print glsl.iface
         Console.WriteLine("======================= IO =======================")
+
+        rtx |> Option.iter (fun e ->
+            let sbt = e.ShaderBindingTableLayout
+            let sym (s: Symbol) = if s.IsEmpty then "<default>" else s.ToString()
+
+            Console.WriteLine("======================= SBT =======================")
+
+            Console.WriteLine("Ray offsets:")
+            for id, index in sbt.RayOffsets |> Map.toList |> List.sortBy snd do
+                Console.WriteLine($"    {index}: {sym id}")
+
+            Console.WriteLine("Miss indices:")
+            for id, index in sbt.MissIndices |> Map.toList |> List.sortBy snd do
+                Console.WriteLine($"    {index}: {sym id}")
+
+            Console.WriteLine("Callable indices:")
+            for id, index in sbt.CallableIndices |> Map.toList |> List.sortBy snd do
+                Console.WriteLine($"    {index}: {sym id}")
+
+            Console.WriteLine("======================= SBT =======================")
+        )
 
         for (stage, r) in res do
             Console.WriteLine("{0}: {1}", stage, sprintf "%A" r)
@@ -144,18 +165,18 @@ module GLSL =
 
     let shouldCompile' (backend : Backend) (e : list<Effect>) =
         let glsl, res = compile' backend e
-        printResults res glsl
+        printResults None res glsl
 
     let rec shouldCompile (e : list<Effect>) =
         shouldCompile' glsl430 e
 
     let shouldCompileCompute (c : ComputeShader) =
         let glsl, res = compileCompute c
-        printResults res glsl
+        printResults None res glsl
 
     let shouldCompileRaytracing (e : RaytracingEffect) =
         let glsl, res = compileRaytracing e
-        printResults res glsl
+        printResults (Some e) res glsl
 
     let shouldContainRegex (shader : GLSLShader) (regexList : list<string * Option<int>>) =
         regexList |> List.iter (fun (regex, count) ->
@@ -173,51 +194,31 @@ module GLSL =
 
     let shouldCompileAndContainRegex' (backend : Backend) (e : list<Effect>) (s : list<string>) =
         let glsl, res = compile' backend e
-        let s = s |> List.map (fun s -> s, None)
+        printResults None res glsl
+        s |> List.map (fun s -> s, None) |> shouldContainRegex glsl
 
-        Console.WriteLine("{0}", glsl.code)
-        for (stage, r) in res do
-            Console.WriteLine("{0}: {1}", stage, sprintf "%A" r)
-            match r with
-                | Success -> shouldContainRegex glsl s
-                | Warning w -> shouldContainRegex glsl s
-                | Error e -> failwithf "ERROR: %A" e
     let shouldCompileAndContainRegex (e : list<Effect>) (s : list<string>) =
         shouldCompileAndContainRegex' glsl430 e s
 
     let shouldCompileAndContainRegexWithCount' (backend : Backend) (e : list<Effect>) (s : list<string * int>) =
         let glsl, res = compile' backend e
-        let s = s |> List.map (fun (s, n) -> s, Some n)
-
-        Console.WriteLine("{0}", glsl.code)
-        for (stage, r) in res do
-            Console.WriteLine("{0}: {1}", stage, sprintf "%A" r)
-            match r with
-                | Success -> shouldContainRegex glsl s
-                | Warning w -> shouldContainRegex glsl s
-                | Error e -> failwithf "ERROR: %A" e
+        printResults None res glsl
+        s |> List.map (fun (s, n) -> s, Some n) |> shouldContainRegex glsl
 
     let shouldCompileAndContainRegexWithCount (e : list<Effect>) (s : list<string * int>) =
         shouldCompileAndContainRegexWithCount' glsl430 e s
 
     let shouldCompileRaytracingAndContainRegex (e : RaytracingEffect) (s : list<string>) =
         let glsl, res = compileRaytracing e
-        let s = s |> List.map (fun s -> s, None)
-        
-        Console.WriteLine("{0}", glsl.code)
-        for (stage, r) in res do
-            Console.WriteLine("{0}: {1}", stage, sprintf "%A" r)
-            match r with
-                | Success -> shouldContainRegex glsl s
-                | Warning w -> shouldContainRegex glsl s
-                | Error e -> failwithf "ERROR: %A" e
+        printResults (Some e) res glsl
+        s |> List.map (fun s -> s, None) |> shouldContainRegex glsl
 
     let shouldCompileComputeAndContainRegex (c : ComputeShader) (s : list<string>) =
         let s = s |> List.map (fun s -> s, None)
         let glsl, res = compileCompute c
         shouldContainRegex glsl s
-        printResults res glsl
-        
+        printResults None res glsl
+
 type Setup() =
     static let initialized = ref false
 

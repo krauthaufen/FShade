@@ -55,11 +55,11 @@ module private RaytracingUtilities =
 
     let rec private substituteStubs (sbt : ShaderBindingTableLayout) (e : Expr) =
         match e with
-        | Value (:? RayId as id, _) when not id.IsEmpty ->
+        | Value (:? RayId as id, _) when not id.IsNone ->
             let index = sbt.GetRayOffset(id.Name)
             Expr.Value <| RayId(id.Name, index)
 
-        | Value (:? MissId as id, _) when not id.IsEmpty ->
+        | Value (:? MissId as id, _) when not id.IsNone ->
             let index = sbt.GetMissIndex(id.Name)
             Expr.Value <| MissId(id.Name, index)
 
@@ -72,7 +72,7 @@ module private RaytracingUtilities =
 
             Expr.Call(mi, args)
 
-        | Value (:? CallableId as id, _) when not id.IsEmpty ->
+        | Value (:? CallableId as id, _) when not id.IsNone ->
             let index = sbt.GetCallableIndex(id.Name)
             Expr.Value <| CallableId(id.Name, index)
 
@@ -224,114 +224,78 @@ module RaytracingBuilders =
 
 
         [<CustomOperation("anyHit")>]
-        member x.AnyHit(group : HitGroup, rayType : Symbol, shader : Shader) =
-            x.SetShader(group, rayType, ShaderStage.AnyHit, RaytracingShader.ofShader shader)
+        member x.AnyHit(group : HitGroup, rayType : RayId, shader : Shader) =
+            x.SetShader(group, rayType.Name, ShaderStage.AnyHit, RaytracingShader.ofShader shader)
 
         [<CustomOperation("anyHit")>]
-        member x.AnyHit(group : HitGroup, rayType : Symbol, e : Expr<'a>) =
-            x.SetShader(group, rayType, ShaderStage.AnyHit, RaytracingShader.ofExpr [] e)
+        member x.AnyHit(group : HitGroup, rayType : RayId, e : Expr<'a>) =
+            x.SetShader(group, rayType.Name, ShaderStage.AnyHit, RaytracingShader.ofExpr [] e)
 
         [<CustomOperation("anyHit")>]
-        member x.AnyHit(group : HitGroup, rayType : Symbol, f : 'a -> Expr<'b>) =
-            x.SetShader(group, rayType, ShaderStage.AnyHit, RaytracingShader.ofFunction f)
-
-        [<CustomOperation("anyHit")>]
-        member inline x.AnyHit(group : HitGroup, rayType : string, shader : Shader) =
-            x.AnyHit(group, Sym.ofString rayType, shader)
-
-        [<CustomOperation("anyHit")>]
-        member inline x.AnyHit(group : HitGroup, rayType : string, e : Expr<'a>) =
-            x.AnyHit(group, Sym.ofString rayType, e)
-
-        [<CustomOperation("anyHit")>]
-        member inline x.AnyHit(group : HitGroup, rayType : string, f : 'a -> Expr<'b>) =
-            x.AnyHit(group, Sym.ofString rayType, f)
+        member x.AnyHit(group : HitGroup, rayType : RayId, f : 'a -> Expr<'b>) =
+            x.SetShader(group, rayType.Name, ShaderStage.AnyHit, RaytracingShader.ofFunction f)
 
         [<CustomOperation("anyHit")>]
         member inline x.AnyHit(group : HitGroup, shader : Shader) =
-            x.AnyHit(group, Identifier.Default, shader)
+            x.AnyHit(group, RayId.Default, shader)
 
         [<CustomOperation("anyHit")>]
         member inline x.AnyHit(group : HitGroup, e : Expr<'a>) =
-            x.AnyHit(group, Identifier.Default, e)
+            x.AnyHit(group, RayId.Default, e)
 
         [<CustomOperation("anyHit")>]
         member inline x.AnyHit(group : HitGroup, f : 'a -> Expr<'b>) =
-            x.AnyHit(group, Identifier.Default, f)
+            x.AnyHit(group, RayId.Default, f)
 
 
         [<CustomOperation("closestHit")>]
-        member x.ClosestHit(group : HitGroup, rayType : Symbol, shader : Shader) =
-            x.SetShader(group, rayType, ShaderStage.ClosestHit, RaytracingShader.ofShader shader)
+        member x.ClosestHit(group : HitGroup, rayType : RayId, shader : Shader) =
+            x.SetShader(group, rayType.Name, ShaderStage.ClosestHit, RaytracingShader.ofShader shader)
 
         [<CustomOperation("closestHit")>]
-        member x.ClosestHit(group : HitGroup, rayType : Symbol, e : Expr<'a>) =
-            x.SetShader(group, rayType, ShaderStage.ClosestHit, RaytracingShader.ofExpr [] e)
+        member x.ClosestHit(group : HitGroup, rayType : RayId, e : Expr<'a>) =
+            x.SetShader(group, rayType.Name, ShaderStage.ClosestHit, RaytracingShader.ofExpr [] e)
 
         [<CustomOperation("closestHit")>]
-        member x.ClosestHit(group : HitGroup, rayType : Symbol, f : 'a -> Expr<'b>) =
-            x.SetShader(group, rayType, ShaderStage.ClosestHit, RaytracingShader.ofFunction f)
-
-        [<CustomOperation("closestHit")>]
-        member x.ClosestHit(group : HitGroup, rayType : string, shader : Shader) =
-            x.ClosestHit(group, Sym.ofString rayType, shader)
-
-        [<CustomOperation("closestHit")>]
-        member x.ClosestHit(group : HitGroup, rayType : string, e : Expr<'a>) =
-           x.ClosestHit(group, Sym.ofString rayType, e)
-
-        [<CustomOperation("closestHit")>]
-        member x.ClosestHit(group : HitGroup, rayType : string, f : 'a -> Expr<'b>) =
-            x.ClosestHit(group, Sym.ofString rayType, f)
+        member x.ClosestHit(group : HitGroup, rayType : RayId, f : 'a -> Expr<'b>) =
+            x.SetShader(group, rayType.Name, ShaderStage.ClosestHit, RaytracingShader.ofFunction f)
 
         [<CustomOperation("closestHit")>]
         member inline x.ClosestHit(group : HitGroup, shader : Shader) =
-            x.ClosestHit(group, Identifier.Default, shader)
+            x.ClosestHit(group, RayId.Default, shader)
 
         [<CustomOperation("closestHit")>]
         member inline x.ClosestHit(group : HitGroup, e : Expr<'a>) =
-            x.ClosestHit(group, Identifier.Default, e)
+            x.ClosestHit(group, RayId.Default, e)
 
         [<CustomOperation("closestHit")>]
         member inline x.ClosestHit(group : HitGroup, f : 'a -> Expr<'b>) =
-            x.ClosestHit(group, Identifier.Default, f)
+            x.ClosestHit(group, RayId.Default, f)
 
 
         [<CustomOperation("intersection")>]
-        member x.Intersection(group : HitGroup, rayType : Symbol, shader : Shader) =
-            x.SetShader(group, rayType, ShaderStage.Intersection, RaytracingShader.ofShader shader)
+        member x.Intersection(group : HitGroup, rayType : RayId, shader : Shader) =
+            x.SetShader(group, rayType.Name, ShaderStage.Intersection, RaytracingShader.ofShader shader)
 
         [<CustomOperation("intersection")>]
-        member x.Intersection(group : HitGroup, rayType : Symbol, e : Expr<'a>) =
-            x.SetShader(group, rayType, ShaderStage.Intersection, RaytracingShader.ofExpr [] e)
+        member x.Intersection(group : HitGroup, rayType : RayId, e : Expr<'a>) =
+            x.SetShader(group, rayType.Name, ShaderStage.Intersection, RaytracingShader.ofExpr [] e)
 
         [<CustomOperation("intersection")>]
-        member x.Intersection(group : HitGroup, rayType : Symbol, f : 'a -> Expr<'b>) =
-            x.SetShader(group, rayType, ShaderStage.Intersection, RaytracingShader.ofFunction f)
-
-        [<CustomOperation("intersection")>]
-        member x.Intersection(group : HitGroup, rayType : string, shader : Shader) =
-            x.Intersection(group, Sym.ofString rayType, shader)
-
-        [<CustomOperation("intersection")>]
-        member x.Intersection(group : HitGroup, rayType : string, e : Expr<'a>) =
-           x.Intersection(group, Sym.ofString rayType, e)
-
-        [<CustomOperation("intersection")>]
-        member x.Intersection(group : HitGroup, rayType : string, f : 'a -> Expr<'b>) =
-            x.Intersection(group, Sym.ofString rayType, f)
+        member x.Intersection(group : HitGroup, rayType : RayId, f : 'a -> Expr<'b>) =
+            x.SetShader(group, rayType.Name, ShaderStage.Intersection, RaytracingShader.ofFunction f)
 
         [<CustomOperation("intersection")>]
         member inline x.Intersection(group : HitGroup, shader : Shader) =
-            x.Intersection(group, Identifier.Default, shader)
+            x.Intersection(group, RayId.Default, shader)
 
         [<CustomOperation("intersection")>]
         member inline x.Intersection(group : HitGroup, e : Expr<'a>) =
-            x.Intersection(group, Identifier.Default, e)
+            x.Intersection(group, RayId.Default, e)
 
         [<CustomOperation("intersection")>]
         member inline x.Intersection(group : HitGroup, f : 'a -> Expr<'b>) =
-            x.Intersection(group, Identifier.Default, f)
+            x.Intersection(group, RayId.Default, f)
 
 
     type RayGenerationShaderMustBeSpecified = RayGenerationShaderMustBeSpecified
@@ -378,77 +342,53 @@ module RaytracingBuilders =
 
 
         [<CustomOperation("miss")>]
-        member x.Miss(shaders : Map<ShaderSlot, RaytracingShader>, name : Symbol, shader : Shader) =
-            x.SetShader(shaders, ShaderSlot.Miss name, RaytracingShader.ofShader shader)
+        member x.Miss(shaders : Map<ShaderSlot, RaytracingShader>, id : MissId, shader : Shader) =
+            x.SetShader(shaders, ShaderSlot.Miss id.Name, RaytracingShader.ofShader shader)
 
         [<CustomOperation("miss")>]
-        member x.Miss(shaders : Map<ShaderSlot, RaytracingShader>, name : Symbol, e : Expr<'a>) =
-            x.SetShader(shaders, ShaderSlot.Miss name, RaytracingShader.ofExpr [] e)
+        member x.Miss(shaders : Map<ShaderSlot, RaytracingShader>, id : MissId, e : Expr<'a>) =
+            x.SetShader(shaders, ShaderSlot.Miss id.Name, RaytracingShader.ofExpr [] e)
 
         [<CustomOperation("miss")>]
-        member x.Miss(shaders : Map<ShaderSlot, RaytracingShader>, name : Symbol, f : 'a -> Expr<'b>) =
-            x.SetShader(shaders, ShaderSlot.Miss name, RaytracingShader.ofFunction f)
-
-        [<CustomOperation("miss")>]
-        member inline x.Miss(shaders : Map<ShaderSlot, RaytracingShader>, name : string, shader : Shader) =
-            x.Miss(shaders, Sym.ofString name, shader)
-
-        [<CustomOperation("miss")>]
-        member inline x.Miss(shaders : Map<ShaderSlot, RaytracingShader>, name : string, e : Expr<'a>) =
-            x.Miss(shaders, Sym.ofString name, e)
-
-        [<CustomOperation("miss")>]
-        member inline x.Miss(shaders : Map<ShaderSlot, RaytracingShader>, name : string, f : 'a -> Expr<'b>) =
-            x.Miss(shaders, Sym.ofString name, f)
+        member x.Miss(shaders : Map<ShaderSlot, RaytracingShader>, id : MissId, f : 'a -> Expr<'b>) =
+            x.SetShader(shaders, ShaderSlot.Miss id.Name, RaytracingShader.ofFunction f)
 
         [<CustomOperation("miss")>]
         member inline x.Miss(shaders : Map<ShaderSlot, RaytracingShader>, shader : Shader) =
-            x.Miss(shaders, Identifier.Default, shader)
+            x.Miss(shaders, MissId.Default, shader)
 
         [<CustomOperation("miss")>]
         member inline x.Miss(shaders : Map<ShaderSlot, RaytracingShader>, e : Expr<'a>) =
-            x.Miss(shaders, Identifier.Default, e)
+            x.Miss(shaders, MissId.Default, e)
 
         [<CustomOperation("miss")>]
         member inline x.Miss(shaders : Map<ShaderSlot, RaytracingShader>, f : 'a -> Expr<'b>) =
-            x.Miss(shaders, Identifier.Default, f)
+            x.Miss(shaders, MissId.Default, f)
 
 
         [<CustomOperation("callable")>]
-        member x.Callable(shaders : Map<ShaderSlot, RaytracingShader>, name : Symbol, shader : Shader) =
-            x.SetShader(shaders, ShaderSlot.Callable name, RaytracingShader.ofShader shader)
+        member x.Callable(shaders : Map<ShaderSlot, RaytracingShader>, id : CallableId, shader : Shader) =
+            x.SetShader(shaders, ShaderSlot.Callable id.Name, RaytracingShader.ofShader shader)
 
         [<CustomOperation("callable")>]
-        member x.Callable(shaders : Map<ShaderSlot, RaytracingShader>, name : Symbol, e : Expr<'a>) =
-            x.SetShader(shaders, ShaderSlot.Callable name, RaytracingShader.ofExpr [] e)
+        member x.Callable(shaders : Map<ShaderSlot, RaytracingShader>, id : CallableId, e : Expr<'a>) =
+            x.SetShader(shaders, ShaderSlot.Callable id.Name, RaytracingShader.ofExpr [] e)
 
         [<CustomOperation("callable")>]
-        member x.Callable(shaders : Map<ShaderSlot, RaytracingShader>, name : Symbol, f : 'a -> Expr<'b>) =
-            x.SetShader(shaders, ShaderSlot.Callable name, RaytracingShader.ofFunction f)
-
-        [<CustomOperation("callable")>]
-        member inline x.Callable(shaders : Map<ShaderSlot, RaytracingShader>, name : string, shader : Shader) =
-            x.Callable(shaders, Sym.ofString name, shader)
-
-        [<CustomOperation("callable")>]
-        member inline x.Callable(shaders : Map<ShaderSlot, RaytracingShader>, name : string, e : Expr<'a>) =
-            x.Callable(shaders, Sym.ofString name, e)
-
-        [<CustomOperation("callable")>]
-        member inline x.Callable(shaders : Map<ShaderSlot, RaytracingShader>, name : string , f : 'a -> Expr<'b>) =
-            x.Callable(shaders, Sym.ofString name, f)
+        member x.Callable(shaders : Map<ShaderSlot, RaytracingShader>, id : CallableId, f : 'a -> Expr<'b>) =
+            x.SetShader(shaders, ShaderSlot.Callable id.Name, RaytracingShader.ofFunction f)
 
         [<CustomOperation("callable")>]
         member inline x.Callable(shaders : Map<ShaderSlot, RaytracingShader>, shader : Shader) =
-            x.Callable(shaders, Identifier.Default, shader)
+            x.Callable(shaders, CallableId.Default, shader)
 
         [<CustomOperation("callable")>]
         member inline x.Callable(shaders : Map<ShaderSlot, RaytracingShader>, e : Expr<'a>) =
-            x.Callable(shaders, Identifier.Default, e)
+            x.Callable(shaders, CallableId.Default, e)
 
         [<CustomOperation("callable")>]
         member inline x.Callable(shaders : Map<ShaderSlot, RaytracingShader>, f : 'a -> Expr<'b>) =
-            x.Callable(shaders, Identifier.Default, f)
+            x.Callable(shaders, CallableId.Default, f)
 
 
         [<CustomOperation("hitgroup")>]

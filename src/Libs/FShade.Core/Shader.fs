@@ -379,6 +379,7 @@ module Preprocessor =
         let (|RayId|_|) (e : Expr) =
             match e with
             | NewObject(ci, [name]) when ci.DeclaringType = typeof<RayId> -> ValueSome name
+            | Call(None, Method("op_Implicit", _), [name]) when e.Type = typeof<RayId> -> ValueSome name
             | ValueWithName (:? RayId as id, _, _) -> ValueSome <| Expr.Value id
             | _ -> ValueNone
 
@@ -386,6 +387,7 @@ module Preprocessor =
         let (|MissId|_|) (e : Expr) =
             match e with
             | NewObject(ci, [name]) when ci.DeclaringType = typeof<MissId> -> ValueSome name
+            | Call(None, Method("op_Implicit", _), [name]) when e.Type = typeof<MissId> -> ValueSome name
             | ValueWithName (:? MissId as id, _, _) -> ValueSome <| Expr.Value id
             | _ -> ValueNone
 
@@ -435,6 +437,7 @@ module Preprocessor =
         let (|CallableId|_|) (e : Expr) =
             match e with
             | NewObject(ci, [name]) when ci.DeclaringType = typeof<CallableId> -> ValueSome name
+            | Call(None, Method("op_Implicit", _), [name]) when e.Type = typeof<CallableId> -> ValueSome name
             | ValueWithName (:? CallableId as id, _, _) -> ValueSome <| Expr.Value id
             | _ -> ValueNone
 
@@ -1105,13 +1108,14 @@ module Preprocessor =
             | Some (:? 'T as id) -> ValueSome id
             | Some (:? Symbol as sym) -> ValueSome <| create sym
             | Some (:? string as name) -> ValueSome <| create (Sym.ofString name)
+            | Some null when e.Type = typeof<string> -> ValueSome <| create Symbol.Empty
             | _ -> ValueNone
 
         let useRayType (e : Expr) =
             State.custom (fun (s : State) ->
                 match tryGetId RayId e with
                 | ValueSome id ->
-                    let s = if id.IsEmpty then s else { s with rayTypes = s.rayTypes |> Set.add id }
+                    let s = if id.IsNone then s else { s with rayTypes = s.rayTypes |> Set.add id }
                     s, Expr.Value id
                 | _ ->
                     if e.Type = typeof<RayId> then s, e
@@ -1122,7 +1126,7 @@ module Preprocessor =
             State.custom (fun (s : State) ->
                 match tryGetId MissId e with
                 | ValueSome id ->
-                    let s = if id.IsEmpty then s else { s with missShaders = s.missShaders |> Set.add id }
+                    let s = if id.IsNone then s else { s with missShaders = s.missShaders |> Set.add id }
                     s, Expr.Value id
                 | _ ->
                     if e.Type = typeof<MissId> then s, e
@@ -1133,7 +1137,7 @@ module Preprocessor =
             State.custom (fun (s : State) ->
                 match tryGetId CallableId e with
                 | ValueSome id ->
-                    let s = if id.IsEmpty then s else { s with callableShaders = s.callableShaders |> Set.add id }
+                    let s = if id.IsNone then s else { s with callableShaders = s.callableShaders |> Set.add id }
                     s, Expr.Value id
                 | _ ->
                     if e.Type = typeof<CallableId> then s, e

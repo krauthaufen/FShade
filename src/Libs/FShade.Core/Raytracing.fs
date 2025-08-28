@@ -4,10 +4,6 @@ open Aardvark.Base
 open System.Runtime.InteropServices
 open FShade.Imperative
 
-module private Identifier =
-    [<Literal>]
-    let Default = "__Default__"
-
 module private TraceDefaults =
     [<Literal>]
     let MinT = 0.001f
@@ -32,13 +28,23 @@ type RayId =
     new (name: Symbol) = RayId(name, -1)
     new (name: string) = RayId(Sym.ofString name)
 
+    /// Special RayId that will not be considered as a valid identifier.
+    /// Will not produce a new entry in the SBT and results in an invalid negative index.
+    static member None = RayId(Symbol.Empty, -2)
+
+    /// The default RayId when unspecified. Equivalent to RayId().
+    static member Default = RayId(Symbol.Empty)
+
+    static member op_Implicit (name: Symbol) = RayId(name)
+    static member op_Implicit (name: string) = RayId(name)
+
     override this.ToString() = string this.Name
-    member internal this.IsEmpty = this.Name.IsEmpty
+    member internal this.IsNone = (this.index - 1) = -2
 
     interface IRaytracingId with
         member this.Index =
-            if this.index > 0 || this.IsEmpty then this.index - 1
-            else failwith $"[FShade] RayId \"{this.Name}\" is invalid."
+            if this.index > 0 || this.IsNone then this.index - 1
+            else failwith $"[FShade] Index of RayId \"{this.Name}\" is invalid."
 
 /// Identifies a miss shader by its name.
 /// Gets replaced by the index corresponding to the name when the raytracing effect is compiled.
@@ -51,13 +57,23 @@ type MissId =
     new (name: Symbol) = MissId(name, -1)
     new (name: string) = MissId(Sym.ofString name)
 
+    /// Special MissId that will not be considered as a valid identifier.
+    /// Will not produce a new entry in the SBT and results in an invalid negative index.
+    static member None = MissId(Symbol.Empty, -2)
+
+    /// The default MissId when unspecified. Equivalent to MissId().
+    static member Default = MissId(Symbol.Empty)
+
+    static member op_Implicit (name: Symbol) = MissId(name)
+    static member op_Implicit (name: string) = MissId(name)
+
     override this.ToString() = string this.Name
-    member internal this.IsEmpty = this.Name.IsEmpty
+    member internal this.IsNone = (this.index - 1) = -2
 
     interface IRaytracingId with
         member this.Index =
-            if this.index > 0 || this.IsEmpty then this.index - 1
-            else failwith $"[FShade] MissId \"{this.Name}\" is invalid."
+            if this.index > 0 || this.IsNone then this.index - 1
+            else failwith $"[FShade] Index of MissId \"{this.Name}\" is invalid."
 
 /// Identifies a callable shader by its name.
 /// Gets replaced by the index corresponding to the name when the raytracing effect is compiled.
@@ -70,23 +86,28 @@ type CallableId =
     new (name: Symbol) = CallableId(name, -1)
     new (name: string) = CallableId(Sym.ofString name)
 
+    /// Special CallableId that will not be considered as a valid identifier.
+    /// Will not produce a new entry in the SBT and results in an invalid negative index.
+    static member None = CallableId(Symbol.Empty, -2)
+
+    /// The default CallableId when unspecified. Equivalent to CallableId().
+    static member Default = CallableId(Symbol.Empty)
+
+    static member op_Implicit (name: Symbol) = CallableId(name)
+    static member op_Implicit (name: string) = CallableId(name)
+
     override this.ToString() = string this.Name
-    member internal this.IsEmpty = this.Name.IsEmpty
+    member internal this.IsNone = (this.index - 1) = -2
 
     interface IRaytracingId with
         member this.Index =
-            if this.index > 0 || this.IsEmpty then this.index - 1
-            else failwith $"[FShade] CallableId \"{this.Name}\" is invalid."
+            if this.index > 0 || this.IsNone then this.index - 1
+            else failwith $"[FShade] Index of CallableId \"{this.Name}\" is invalid."
 
 [<AbstractClass; Sealed>]
 type Callable private() =
-    static member Execute<'T>(id : CallableId) : 'T = onlyInShaderCode "Callable.Execute"
-    static member Execute<'T>(data : 'T, id : CallableId) : 'T = onlyInShaderCode "Callable.Execute"
-    static member Execute<'T>([<Optional; DefaultParameterValue(Identifier.Default)>] id : string) : 'T = onlyInShaderCode "Callable.Execute"
-    static member Execute<'T>(data : 'T, [<Optional; DefaultParameterValue(Identifier.Default)>] id : string) : 'T = onlyInShaderCode "Callable.Execute"
-    static member Execute<'T>(id : Symbol) : 'T = onlyInShaderCode "Callable.Execute"
-    static member Execute<'T>(data : 'T, id : Symbol) : 'T = onlyInShaderCode "Callable.Execute"
-
+    static member Execute<'T>([<Optional; DefaultParameterValue(CallableId())>] id : CallableId) : 'T = onlyInShaderCode "Callable.Execute"
+    static member Execute<'T>(data : 'T, [<Optional; DefaultParameterValue(CallableId())>] id : CallableId) : 'T = onlyInShaderCode "Callable.Execute"
 
 [<AbstractClass; Sealed>]
 type Intersection private() =
@@ -103,41 +124,17 @@ type Scene(accelerationStructure : ISemanticValue) =
 
     member x.AccelerationStructure = accelerationStructure
 
-    member x.TraceRay<'T>(origin : V3f, direction : V3f, ray : RayId, miss : MissId,
-                          [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT : float32,
-                          [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT : float32,
-                          [<Optional; DefaultParameterValue(TraceDefaults.Flags)>]    flags : RayFlags,
-                          [<Optional; DefaultParameterValue(TraceDefaults.CullMask)>] cullMask : int) : 'T = onlyInShaderCode "TraceRay"
-
-    member x.TraceRay<'T>(origin : V3f, direction : V3f, payload : 'T, ray : RayId, miss : MissId,
-                          [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT : float32,
-                          [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT : float32,
-                          [<Optional; DefaultParameterValue(TraceDefaults.Flags)>]    flags : RayFlags,
-                          [<Optional; DefaultParameterValue(TraceDefaults.CullMask)>] cullMask : int) : 'T = onlyInShaderCode "TraceRay"
-
     member x.TraceRay<'T>(origin : V3f, direction : V3f,
-                          [<Optional; DefaultParameterValue(Identifier.Default)>]     ray : string,
-                          [<Optional; DefaultParameterValue(Identifier.Default)>]     miss : string,
+                          [<Optional; DefaultParameterValue(RayId())>]                ray : RayId,
+                          [<Optional; DefaultParameterValue(MissId())>]               miss : MissId,
                           [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT : float32,
                           [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT : float32,
                           [<Optional; DefaultParameterValue(TraceDefaults.Flags)>]    flags : RayFlags,
                           [<Optional; DefaultParameterValue(TraceDefaults.CullMask)>] cullMask : int) : 'T = onlyInShaderCode "TraceRay"
 
     member x.TraceRay<'T>(origin : V3f, direction : V3f, payload : 'T,
-                          [<Optional; DefaultParameterValue(Identifier.Default)>]     ray : string,
-                          [<Optional; DefaultParameterValue(Identifier.Default)>]     miss : string,
-                          [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT : float32,
-                          [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT : float32,
-                          [<Optional; DefaultParameterValue(TraceDefaults.Flags)>]    flags : RayFlags,
-                          [<Optional; DefaultParameterValue(TraceDefaults.CullMask)>] cullMask : int) : 'T = onlyInShaderCode "TraceRay"
-
-    member x.TraceRay<'T>(origin : V3f, direction : V3f, ray : Symbol, miss : Symbol,
-                          [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT : float32,
-                          [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT : float32,
-                          [<Optional; DefaultParameterValue(TraceDefaults.Flags)>]    flags : RayFlags,
-                          [<Optional; DefaultParameterValue(TraceDefaults.CullMask)>] cullMask : int) : 'T = onlyInShaderCode "TraceRay"
-
-    member x.TraceRay<'T>(origin : V3f, direction : V3f, payload : 'T, ray : Symbol, miss : Symbol,
+                          [<Optional; DefaultParameterValue(RayId())>]                ray : RayId,
+                          [<Optional; DefaultParameterValue(MissId())>]               miss : MissId,
                           [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT : float32,
                           [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT : float32,
                           [<Optional; DefaultParameterValue(TraceDefaults.Flags)>]    flags : RayFlags,

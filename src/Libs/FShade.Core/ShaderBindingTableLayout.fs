@@ -5,21 +5,27 @@ open Aardvark.Base
 /// Describes the basic layout of a shader binding table.
 type ShaderBindingTableLayout =
     {
-        RayOffsets : Map<Symbol, int>
-        MissIndices : Map<Symbol, int>
+        RayOffsets      : Map<Symbol, int>
+        MissIndices     : Map<Symbol, int>
         CallableIndices : Map<Symbol, int>
     }
 
     member x.RayStride = x.RayOffsets.Count
 
     member x.GetRayOffset(id : Symbol) =
-        x.RayOffsets |> Map.find id
+        match x.RayOffsets.TryGetValue id with
+        | true, value -> value
+        | _ -> failwithf "[FShade] Cannot find ray offset for %A" id
 
     member x.GetMissIndex(id : Symbol) =
-        x.MissIndices |> Map.find id
+        match x.MissIndices.TryGetValue id with
+        | true, value -> value
+        | _ -> failwithf "[FShade] Cannot find miss index for %A" id
 
     member x.GetCallableIndex(id : Symbol) =
-        x.CallableIndices |> Map.find id
+        match x.CallableIndices.TryGetValue id with
+        | true, value -> value
+        | _ -> failwithf "[FShade] Cannot find callable index for %A" id
 
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -35,7 +41,7 @@ module internal ShaderBindingTableLayout =
             |> Map.ofArray
 
         {
-            RayOffsets = makeMap (fun s -> s.RayTypes)
-            MissIndices = makeMap (fun s -> s.MissShaders)
-            CallableIndices = makeMap (fun s -> s.CallableShaders)
+            RayOffsets = makeMap _.RayTypes
+            MissIndices = makeMap _.MissShaders
+            CallableIndices = makeMap _.CallableShaders
         }

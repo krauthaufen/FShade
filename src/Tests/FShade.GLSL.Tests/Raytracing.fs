@@ -367,7 +367,7 @@ let ``CallableId based on uniform``() =
 
     let raygenShader =
         raygen {
-            let mutable id = CallableId()
+            let mutable id = CallableId.None
             id <- if uniform?BlaBlub then CallableId "Foo" else CallableId "Haah"
             invokeCallable id |> ignore
             ()
@@ -383,6 +383,11 @@ let ``CallableId based on uniform``() =
              raygen raygenShader
              callable "Foo" callableShader
          }
+
+    let hasCallable name = effect.ShaderBindingTableLayout.CallableIndices.ContainsKey name
+    Assert.IsFalse <| hasCallable Symbol.Empty
+    Assert.IsTrue <| hasCallable (Sym.ofString "Foo")
+    Assert.IsTrue <| hasCallable (Sym.ofString "Haah")
 
     GLSL.shouldCompileRaytracing effect
 
@@ -592,3 +597,34 @@ let ``Write to payload fields partial``() =
         @"\{\s*rayPayload0.depth =.+;\s+traceRayEXT"
         @"\{\s*rayPayloadIn.color = .+;\s*\}"
     ]
+
+[<Test>]
+let ``Overloads and optional arguments``() =
+    Setup.Run()
+
+    let raygenShader =
+        raygen {
+            scene.TraceRay<V3f>(V3f.Zero, V3f.ZAxis) |> ignore
+            scene.TraceRay<V3f>(V3f.Zero, V3f.ZAxis, miss = MissId "Miss") |> ignore
+            scene.TraceRay<V3f>(V3f.Zero, V3f.ZAxis, ray = RayId "Ray") |> ignore
+            scene.TraceRay<V3f>(V3f.Zero, V3f.ZAxis, miss = "Miss") |> ignore
+            scene.TraceRay<V3f>(V3f.Zero, V3f.ZAxis, ray = "Ray") |> ignore
+            scene.TraceRay<V3f>(V3f.Zero, V3f.ZAxis, miss = Sym.ofString "Miss") |> ignore
+            scene.TraceRay<V3f>(V3f.Zero, V3f.ZAxis, ray = Sym.ofString "Ray") |> ignore
+
+            let ho = HitObject()
+            ho.TraceRay<V3f>(scene, V3f.Zero, V3f.ZAxis) |> ignore
+            ho.TraceRay<V3f>(scene, V3f.Zero, V3f.ZAxis, miss = MissId "Miss") |> ignore
+            ho.TraceRay<V3f>(scene, V3f.Zero, V3f.ZAxis, ray = RayId "Ray") |> ignore
+            ho.TraceRay<V3f>(scene, V3f.Zero, V3f.ZAxis, miss = "Miss") |> ignore
+            ho.TraceRay<V3f>(scene, V3f.Zero, V3f.ZAxis, ray = "Ray") |> ignore
+            ho.TraceRay<V3f>(scene, V3f.Zero, V3f.ZAxis, miss = Sym.ofString "Miss") |> ignore
+            ho.TraceRay<V3f>(scene, V3f.Zero, V3f.ZAxis, ray = Sym.ofString "Ray") |> ignore
+        }
+
+    let effect =
+         raytracingEffect {
+             raygen raygenShader
+         }
+
+    GLSL.shouldCompileRaytracingAndContainRegex effect ["hitObjectNV ho;"]

@@ -67,33 +67,9 @@ type HitObject =
     /// resulting hit or miss information in the hit object. This does not
     /// execute any closest-hit or miss shaders. No thread reordering
     /// or user-observable driver side scheduling occurs.
-    member _.TraceRay<'Payload>(scene: Scene, origin: V3f, direction: V3f, ray: RayId, miss: MissId,
-                                [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT: float32,
-                                [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT: float32,
-                                [<Optional; DefaultParameterValue(TraceDefaults.Flags)>]    flags: RayFlags,
-                                [<Optional; DefaultParameterValue(TraceDefaults.CullMask)>] cullMask: int) : 'Payload = onlyInShaderCode "TraceRay"
-
-    /// Initiates a ray query against a top-level acceleration
-    /// structure, triggering the execution of various intersection and any-hit
-    /// shaders as ray-geometry intersections are being evaluated, and returns the
-    /// resulting hit or miss information in the hit object. This does not
-    /// execute any closest-hit or miss shaders. No thread reordering
-    /// or user-observable driver side scheduling occurs.
-    member _.TraceRay<'Payload>(scene: Scene, origin: V3f, direction: V3f, payload: 'Payload, ray: RayId, miss: MissId,
-                                [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT: float32,
-                                [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT:  float32,
-                                [<Optional; DefaultParameterValue(TraceDefaults.Flags)>]    flags: RayFlags,
-                                [<Optional; DefaultParameterValue(TraceDefaults.CullMask)>] cullMask: int) : 'Payload = onlyInShaderCode "TraceRay"
-
-    /// Initiates a ray query against a top-level acceleration
-    /// structure, triggering the execution of various intersection and any-hit
-    /// shaders as ray-geometry intersections are being evaluated, and returns the
-    /// resulting hit or miss information in the hit object. This does not
-    /// execute any closest-hit or miss shaders. No thread reordering
-    /// or user-observable driver side scheduling occurs.
     member _.TraceRay<'Payload>(scene: Scene, origin: V3f, direction: V3f,
-                                [<Optional; DefaultParameterValue(Identifier.Default)>]     ray: string,
-                                [<Optional; DefaultParameterValue(Identifier.Default)>]     miss: string,
+                                [<Optional; DefaultParameterValue(RayId())>]                ray : RayId,
+                                [<Optional; DefaultParameterValue(MissId())>]               miss : MissId,
                                 [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT: float32,
                                 [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT: float32,
                                 [<Optional; DefaultParameterValue(TraceDefaults.Flags)>]    flags: RayFlags,
@@ -106,67 +82,19 @@ type HitObject =
     /// execute any closest-hit or miss shaders. No thread reordering
     /// or user-observable driver side scheduling occurs.
     member _.TraceRay<'Payload>(scene: Scene, origin: V3f, direction: V3f, payload: 'Payload,
-                                [<Optional; DefaultParameterValue(Identifier.Default)>]     ray: string,
-                                [<Optional; DefaultParameterValue(Identifier.Default)>]     miss: string,
+                                [<Optional; DefaultParameterValue(RayId())>]                ray : RayId,
+                                [<Optional; DefaultParameterValue(MissId())>]               miss : MissId,
                                 [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT: float32,
-                                [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT: float32,
+                                [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT:  float32,
                                 [<Optional; DefaultParameterValue(TraceDefaults.Flags)>]    flags: RayFlags,
                                 [<Optional; DefaultParameterValue(TraceDefaults.CullMask)>] cullMask: int) : 'Payload = onlyInShaderCode "TraceRay"
 
-    /// Initiates a ray query against a top-level acceleration
-    /// structure, triggering the execution of various intersection and any-hit
-    /// shaders as ray-geometry intersections are being evaluated, and returns the
-    /// resulting hit or miss information in the hit object. This does not
-    /// execute any closest-hit or miss shaders. No thread reordering
-    /// or user-observable driver side scheduling occurs.
-    member _.TraceRay<'Payload>(scene: Scene, origin: V3f, direction: V3f, ray: Symbol, miss: Symbol,
-                                [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT: float32,
-                                [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT: float32,
-                                [<Optional; DefaultParameterValue(TraceDefaults.Flags)>]    flags: RayFlags,
-                                [<Optional; DefaultParameterValue(TraceDefaults.CullMask)>] cullMask: int) : 'Payload = onlyInShaderCode "TraceRay"
-
-    /// Initiates a ray query against a top-level acceleration
-    /// structure, triggering the execution of various intersection and any-hit
-    /// shaders as ray-geometry intersections are being evaluated, and returns the
-    /// resulting hit or miss information in the hit object. This does not
-    /// execute any closest-hit or miss shaders. No thread reordering
-    /// or user-observable driver side scheduling occurs.
-    member _.TraceRay<'Payload>(scene: Scene, origin: V3f, direction: V3f, payload: 'Payload, ray: Symbol, miss: Symbol,
-                                [<Optional; DefaultParameterValue(TraceDefaults.MinT)>]     minT: float32,
-                                [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>]     maxT: float32,
-                                [<Optional; DefaultParameterValue(TraceDefaults.Flags)>]    flags: RayFlags,
-                                [<Optional; DefaultParameterValue(TraceDefaults.CullMask)>] cullMask: int) : 'Payload = onlyInShaderCode "TraceRay"
-
-
-    /// Populates the hit object representing a hit without tracing a ray.
-    /// It is legal to construct a hit which is not the closest hit along the ray
-    /// or a hit which is not located along the ray.
-    member _.RecordHit<'Attribute>(scene: Scene, instanceId: int, primitiveId: int, geometryIndex: int, origin: V3f, direction: V3f, ray: RayId,
-                                   [<Optional; DefaultParameterValue(TraceDefaults.MinT)>] minT: float32,
-                                   [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>] maxT: float32,
-                                   [<Optional; DefaultParameterValue(RayHitKind.Default)>] kind: RayHitKind) : unit = onlyInShaderCode "RecordHit"
 
     /// Populates the hit object representing a hit without tracing a ray.
     /// It is legal to construct a hit which is not the closest hit along the ray
     /// or a hit which is not located along the ray.
     member _.RecordHit<'Attribute>(scene: Scene, instanceId: int, primitiveId: int, geometryIndex: int, origin: V3f, direction: V3f,
-                                   [<Optional; DefaultParameterValue(Identifier.Default)>] ray: string,
-                                   [<Optional; DefaultParameterValue(TraceDefaults.MinT)>] minT: float32,
-                                   [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>] maxT: float32,
-                                   [<Optional; DefaultParameterValue(RayHitKind.Default)>] kind: RayHitKind) : unit = onlyInShaderCode "RecordHit"
-
-    /// Populates the hit object representing a hit without tracing a ray.
-    /// It is legal to construct a hit which is not the closest hit along the ray
-    /// or a hit which is not located along the ray.
-    member _.RecordHit<'Attribute>(scene: Scene, instanceId: int, primitiveId: int, geometryIndex: int, origin: V3f, direction: V3f, ray: Symbol,
-                                   [<Optional; DefaultParameterValue(TraceDefaults.MinT)>] minT: float32,
-                                   [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>] maxT: float32,
-                                   [<Optional; DefaultParameterValue(RayHitKind.Default)>] kind: RayHitKind) : unit = onlyInShaderCode "RecordHit"
-
-    /// Populates the hit object representing a hit without tracing a ray.
-    /// It is legal to construct a hit which is not the closest hit along the ray
-    /// or a hit which is not located along the ray.
-    member _.RecordHit<'Attribute>(scene: Scene, instanceId: int, primitiveId: int, geometryIndex: int, origin: V3f, direction: V3f, attribute: 'Attribute, ray: RayId,
+                                   [<Optional; DefaultParameterValue(RayId())>]            ray : RayId,
                                    [<Optional; DefaultParameterValue(TraceDefaults.MinT)>] minT: float32,
                                    [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>] maxT: float32,
                                    [<Optional; DefaultParameterValue(RayHitKind.Default)>] kind: RayHitKind) : unit = onlyInShaderCode "RecordHit"
@@ -175,39 +103,17 @@ type HitObject =
     /// It is legal to construct a hit which is not the closest hit along the ray
     /// or a hit which is not located along the ray.
     member _.RecordHit<'Attribute>(scene: Scene, instanceId: int, primitiveId: int, geometryIndex: int, origin: V3f, direction: V3f, attribute: 'Attribute,
-                                   [<Optional; DefaultParameterValue(Identifier.Default)>] ray: string,
+                                   [<Optional; DefaultParameterValue(RayId())>]            ray : RayId,
                                    [<Optional; DefaultParameterValue(TraceDefaults.MinT)>] minT: float32,
                                    [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>] maxT: float32,
                                    [<Optional; DefaultParameterValue(RayHitKind.Default)>] kind: RayHitKind) : unit = onlyInShaderCode "RecordHit"
 
-    /// Populates the hit object representing a hit without tracing a ray.
-    /// It is legal to construct a hit which is not the closest hit along the ray
-    /// or a hit which is not located along the ray.
-    member _.RecordHit<'Attribute>(scene: Scene, instanceId: int, primitiveId: int, geometryIndex: int, origin: V3f, direction: V3f, attribute: 'Attribute, ray: Symbol,
-                                   [<Optional; DefaultParameterValue(TraceDefaults.MinT)>] minT: float32,
-                                   [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>] maxT: float32,
-                                   [<Optional; DefaultParameterValue(RayHitKind.Default)>] kind: RayHitKind) : unit = onlyInShaderCode "RecordHit"
-
-
-    // Populates the hit object representing a miss without tracing a ray.
-    // It is legal to construct a miss in a hit object for a ray that
-    // could have hit some geometry if traced.
-    member _.RecordMiss(origin: V3f, direction: V3f, miss: MissId,
-                        [<Optional; DefaultParameterValue(TraceDefaults.MinT)>] minT: float32,
-                        [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>] maxT: float32) : unit = onlyInShaderCode "RecordMiss"
 
     // Populates the hit object representing a miss without tracing a ray.
     // It is legal to construct a miss in a hit object for a ray that
     // could have hit some geometry if traced.
     member _.RecordMiss(origin: V3f, direction: V3f,
-                        [<Optional; DefaultParameterValue(Identifier.Default)>] miss: string,
-                        [<Optional; DefaultParameterValue(TraceDefaults.MinT)>] minT: float32,
-                        [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>] maxT: float32) : unit = onlyInShaderCode "RecordMiss"
-
-    // Populates the hit object representing a miss without tracing a ray.
-    // It is legal to construct a miss in a hit object for a ray that
-    // could have hit some geometry if traced.
-    member _.RecordMiss(origin: V3f, direction: V3f, miss: Symbol,
+                        [<Optional; DefaultParameterValue(MissId())>]           miss: MissId,
                         [<Optional; DefaultParameterValue(TraceDefaults.MinT)>] minT: float32,
                         [<Optional; DefaultParameterValue(TraceDefaults.MaxT)>] maxT: float32) : unit = onlyInShaderCode "RecordMiss"
 
