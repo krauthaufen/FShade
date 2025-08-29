@@ -234,7 +234,7 @@ module RaytracingInputTypes =
             [<WorldToObject>]      worldToObject : M34f
         }
 
-    type RayHit<'T> =
+    type RayHit<'Attribute> =
         {
             /// The parametric value of the ray being processed.
             /// The value is independent of the space in which the ray origin and direction exist.
@@ -248,11 +248,15 @@ module RaytracingInputTypes =
             /// Attribute written by the intersection shader.
             /// For triangle geometry without custom intersection shader, the attribute
             /// is a V2f containing the barycentric coordinates of the hit.
-            [<HitAttribute>] attribute  : 'T
+            [<HitAttribute>] attribute  : 'Attribute
 
+            /// <summary>
             /// The object space vertices of the triangle at the current intersection.
             /// The positions returned are transformed by the geometry transform.
-            /// Note: Requires GL_EXT_ray_tracing_position_fetch.
+            /// </summary>
+            /// <remarks>
+            /// Requires GL_EXT_ray_tracing_position_fetch.
+            /// </remarks>
             [<HitPositions>] positions  : Arr<3 N, V3f>
         }
 
@@ -271,13 +275,13 @@ type RayIntersectionInput =
         objectSpace : RaytracingInputTypes.ObjectSpace
     }
 
-/// Type containing input available in ray any hit and closest hit shaders.
-type RayHitInput<'Payload, 'HitAttribute> =
+/// Type containing input available in ray any-hit and closest-hit shaders.
+type RayHitInput<'Payload, 'Attribute> =
     {
         work        : RaytracingInputTypes.WorkDimensions
         geometry    : RaytracingInputTypes.GeometryInstance
         ray         : RaytracingInputTypes.RayParameters
-        hit         : RaytracingInputTypes.RayHit<'HitAttribute>
+        hit         : RaytracingInputTypes.RayHit<'Attribute>
         objectSpace : RaytracingInputTypes.ObjectSpace
 
         /// The payload passed to TraceRay().
@@ -298,8 +302,8 @@ type RayMissInput<'Payload> =
 type RayMissInput = RayMissInput<unit>
 
 /// Type containing input available in ray callable shaders.
-type RayCallableInput<'T> =
+type RayCallableInput<'Data> =
     {
         work : RaytracingInputTypes.WorkDimensions
-        [<CallableDataIn>] data : 'T
+        [<CallableDataIn>] data : 'Data
     }

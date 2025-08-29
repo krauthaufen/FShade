@@ -559,9 +559,9 @@ module Preprocessor =
                 ValueNone
 
         [<return: Struct>]
-        let (|HitObjectGetAttributes|_|) (e : Expr) =
+        let (|HitObjectGetAttribute|_|) (e : Expr) =
             match e with
-            | Call(Some t, Method("GetAttributes", _), []) when t.Type = typeof<HitObject> -> ValueSome {| hitObject = t; attributeType = e.Type |}
+            | Call(Some t, Method("GetAttribute", _), []) when t.Type = typeof<HitObject> -> ValueSome {| hitObject = t; attributeType = e.Type |}
             | _ -> ValueNone
 
         [<return: Struct>]
@@ -1482,10 +1482,10 @@ module Preprocessor =
                     Expr.ReadRaytracingData(e.Type, payloadName)
                 ]
 
-            | HitObjectGetAttributes _ when not (ShaderStage.supportsTraceRay stage) ->
-                return failwithf "[FShade] Cannot invoke HitObject.GetAttributes in %A shaders" stage
+            | HitObjectGetAttribute _ when not (ShaderStage.supportsTraceRay stage) ->
+                return failwithf "[FShade] Cannot invoke HitObject.GetAttribute in %A shaders" stage
 
-            | HitObjectGetAttributes args ->
+            | HitObjectGetAttribute args ->
                 let! hitObject = preprocessRaytracingS stage args.hitObject
 
                 let! attributeName, attributeIndex = State.useHitObjectAttribute args.attributeType

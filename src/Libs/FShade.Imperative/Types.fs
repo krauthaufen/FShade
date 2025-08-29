@@ -26,20 +26,54 @@ type MemoryType =
 
 [<Flags>]
 type RayFlags =
-    | None                       = 0
-    | Opaque                     = 1
-    | NoOpaque                   = 2
-    | TerminateOnFirstHit        = 4
-    | SkipClosestHitShader       = 8
-    | CullBackFacingTriangles    = 16
-    | CullFrontFacingTriangles   = 32
-    | CullOpaque                 = 64
-    | CullNoOpaque               = 128
-    | ForceOpacityMicromap2State = 1024
+    | None                          = 0
+
+    /// Force all geometries to behave as if they are opaque, regardless of their build parameters.
+    /// Mutually exclusive with NoOpaque, CullOpaque, and CullNoOpaque.
+    | Opaque                        = 1
+
+    /// Force all geometries to behave as if they are non-opaque, regardless of their build parameters.
+    /// Mutually exclusive with Opaque, CullOpaque, and CullNoOpaque.
+    | NoOpaque                      = 2
+
+    /// Do not sort hit candidates to determine the closest intersection.
+    /// Use the first reported intersection instead.
+    | TerminateOnFirstHit           = 4
+
+    /// Do not execute the closest hit shader after the closest intersection has been determined.
+    | SkipClosestHitShader          = 8
+
+    /// Ignore intersections with back-facing triangles.
+    /// Mutually exclusive with CullFrontFacingTriangles.
+    | CullBackFacingTriangles       = 16
+
+    /// Ignore intersections with front-facing triangles.
+    /// Mutually exclusive with CullBackFacingTriangles.
+    | CullFrontFacingTriangles      = 32
+
+    /// Ignore intersections with geometry that is considered opaque.
+    /// Mutually exclusive with Opaque, NoOpaque, and CullNoOpaque.
+    | CullOpaque                    = 64
+
+    /// Ignore intersections with geometry that is considered non-opaque.
+    /// Mutually exclusive with Opaque, NoOpaque, and CullOpaque.
+    | CullNoOpaque                  = 128
+
+    /// <summary>
+    /// Force opacity micromaps intersected by this ray to be evaluated in two-state mode.
+    /// </summary>
+    /// <remarks>
+    /// Requires GL_EXT_opacity_micromap.
+    /// </remarks>
+    | ForceOpacityMicromapsTwoState = 1024
 
 type RayHitKind =
     | Default             = 0
+
+    /// Intersection is with a front-facing triangle.
     | FrontFacingTriangle = 0xFE
+
+    /// Intersection is with a back-facing triangle.
     | BackFacingTriangle  = 0xFF
 
 type IRaytracingId =

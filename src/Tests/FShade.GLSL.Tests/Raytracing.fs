@@ -446,7 +446,7 @@ let ``Shader execution reordering intrinsics``() =
             let _ = ho.GeometryIndex
             let _ = ho.PrimitiveIndex
             let _ = ho.HitKind
-            let _ = ho.GetAttributes<V4f>()
+            let _ = ho.GetAttribute<V4f>()
             ho.RecordEmpty()
             ho.RecordHit<float32>(scene, 1, 2, 3, V3f.Zero, V3f.ZAxis, "OtherRay")
             ho.RecordMiss(V3f.Zero, V3f.ZAxis)
