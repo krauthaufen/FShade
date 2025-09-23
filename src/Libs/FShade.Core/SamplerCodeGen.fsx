@@ -435,7 +435,7 @@ let run() =
             | _ -> failwithf "Unknown sampler type %A" t
 
         start "type %s() = " builderName
-        line  "inherit SamplerBaseBuilder()"
+        line  "inherit SamplerBaseBuilder%A()" t
         line  "member x.Run((t : ShaderTextureHandle, s : SamplerState)) ="
         line  "    %s(t, s)" typeName
         line  "member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) ="

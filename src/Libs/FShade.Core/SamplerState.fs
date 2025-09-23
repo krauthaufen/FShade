@@ -150,6 +150,18 @@ module SamplerExtensions =
         [<CustomOperation("borderColor")>]
         member x.BorderColor(h : SamplerState, c : C4f) = { h with BorderColor = Some c }
 
+        [<CustomOperation("borderColor")>]
+        member x.BorderColor(h : SamplerState, c : V4f) = { h with BorderColor = Some <| C4f c }
+
+        [<CustomOperation("borderColor")>]
+        member x.BorderColor(h : SamplerState, c : C4ui) = { h with BorderColor = Some <| C4f (Fun.FloatFromUnsignedBits(V4ui c)) }
+
+        [<CustomOperation("borderColor")>]
+        member x.BorderColor(h : SamplerState, c : V4ui) = { h with BorderColor = Some <| C4f (Fun.FloatFromUnsignedBits c) }
+
+        [<CustomOperation("borderColor")>]
+        member x.BorderColor(h : SamplerState, c : V4i) = { h with BorderColor = Some <| C4f (Fun.FloatFromBits c) }
+
         [<CustomOperation("maxLod")>]
         member x.MaxLod(h : SamplerState, c : float32) = { h with MaxLod = Some c }
 

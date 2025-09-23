@@ -247,7 +247,6 @@ type SamplerBaseBuilder() =
     member x.TextureArray(b : TextureMustBeSpecified, t : ShaderTextureHandle, count : int) =
         ((t, count), SamplerState.empty)
 
-
     [<CustomOperation("addressU")>]
     member x.AddressU((t, h : SamplerState), w : WrapMode) = t,{ h with AddressU = Some w }
              
@@ -259,9 +258,6 @@ type SamplerBaseBuilder() =
              
     [<CustomOperation("maxAnisotropy")>]
     member x.MaxAnisotropy((t, h : SamplerState), a : int) = t,{ h with MaxAnisotropy = Some a }
-             
-    [<CustomOperation("borderColor")>]
-    member x.BorderColor((t, h : SamplerState), c : C4f) = t,{ h with BorderColor = Some c }
              
     [<CustomOperation("maxLod")>]
     member x.MaxLod((t, h : SamplerState), c : float32) = t,{ h with MaxLod = Some c }
@@ -280,6 +276,30 @@ type SamplerBaseBuilder() =
 
     [<CustomOperation("comparison")>]
     member x.Comparison((t, h : SamplerState), f : ComparisonFunction) = t,{ h with Comparison = Some f }
+
+type SamplerBaseBuilderFloat() =
+    inherit SamplerBaseBuilder()
+
+    [<CustomOperation("borderColor")>]
+    member x.BorderColor((t, h : SamplerState), c : C4f) = t,{ h with BorderColor = Some c }
+
+    [<CustomOperation("borderColor")>]
+    member x.BorderColor((t, h : SamplerState), c : V4f) = t,{ h with BorderColor = Some <| C4f c }
+
+type SamplerBaseBuilderUInt() =
+    inherit SamplerBaseBuilder()
+
+    [<CustomOperation("borderColor")>]
+    member x.BorderColor((t, h : SamplerState), c : C4ui) = t,{ h with BorderColor = Some <| C4f (Fun.FloatFromUnsignedBits(V4ui c)) }
+
+    [<CustomOperation("borderColor")>]
+    member x.BorderColor((t, h : SamplerState), c : V4ui) = t,{ h with BorderColor = Some <| C4f (Fun.FloatFromUnsignedBits c) }
+
+type SamplerBaseBuilderInt() =
+    inherit SamplerBaseBuilder()
+
+    [<CustomOperation("borderColor")>]
+    member x.BorderColor((t, h : SamplerState), c : V4i) = t,{ h with BorderColor = Some <| C4f (Fun.FloatFromBits c) }
 
 [<AutoOpen>]
 module UniformExtensions =

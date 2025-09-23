@@ -14,7 +14,7 @@ type Vertex =
 [<AutoOpen>]
 module private Samplers =
 
-    let sam1D        = sampler1d { texture uniform?DiffuseTexture }
+    let sam1D        = sampler1d { texture uniform?DiffuseTexture; borderColor C4f.Black; borderColor V4f.Zero }
     let sam1DArray   = sampler1dArray { texture uniform?DiffuseTexture }
     let sam2D        = sampler2d { texture uniform?DiffuseTexture }
     let sam2DArray   = sampler2dArray { texture uniform?DiffuseTexture }
@@ -24,7 +24,7 @@ module private Samplers =
     let samCube      = samplerCube { texture uniform?DiffuseTexture }
     let samCubeArray = samplerCubeArray { texture uniform?DiffuseTexture }
 
-    let intSam1D        = intSampler1d { texture uniform?DiffuseTexture }
+    let intSam1D        = intSampler1d { texture uniform?DiffuseTexture; borderColor V4i.Zero }
     let intSam1DArray   = intSampler1dArray { texture uniform?DiffuseTexture }
     let intSam2D        = intSampler2d { texture uniform?DiffuseTexture }
     let intSam2DArray   = intSampler2dArray { texture uniform?DiffuseTexture }
@@ -34,7 +34,7 @@ module private Samplers =
     let intSamCube      = intSamplerCube { texture uniform?DiffuseTexture }
     let intSamCubeArray = intSamplerCubeArray { texture uniform?DiffuseTexture }
 
-    let uintSam1D        = uintSampler1d { texture uniform?DiffuseTexture }
+    let uintSam1D        = uintSampler1d { texture uniform?DiffuseTexture; borderColor V4ui.Zero; borderColor C4ui.Black }
     let uintSam1DArray   = uintSampler1dArray { texture uniform?DiffuseTexture }
     let uintSam2D        = uintSampler2d { texture uniform?DiffuseTexture }
     let uintSam2DArray   = uintSampler2dArray { texture uniform?DiffuseTexture }
