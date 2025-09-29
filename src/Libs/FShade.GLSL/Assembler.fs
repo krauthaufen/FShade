@@ -804,7 +804,7 @@ module AssemblerState =
                 else
                     let l = CVector(et, rows) |> neededLocations rev
                     l * cols
-            | CVector(et,_) -> 
+            | CVector _ | CColor _->
                 1
             | CArray(et, len) ->
                 let inner = neededLocations rev et
@@ -1372,20 +1372,24 @@ module Assembler =
             | CType.CFloat(32) ->
                 return "float" |> Identifier
 
+            | CType.CColor(CType.CInt(signed, (8 | 16 | 32 | 64 as size)), d)
             | CType.CVector(CType.CInt(signed, (8 | 16 | 32 | 64 as size)), d) ->
                 do! AssemblerState.useTypeExtensions true size
                 let prefix = if signed then "i" else "u"
                 let size = if size = 32 then "" else string size
                 return $"{prefix}{size}vec{d}" |> Identifier
 
+            | CType.CColor(CType.CFloat(16), d)
             | CType.CVector(CType.CFloat(16), d) ->
                 do! AssemblerState.useTypeExtensions false 16
                 return $"f16vec{d}" |> Identifier
 
+            | CType.CColor(CType.CFloat(64), d)
             | CType.CVector(CType.CFloat(64), d) ->
                 do! AssemblerState.useTypeExtensions false 64
                 return $"dvec{d}" |> Identifier
 
+            | CType.CColor(CType.CFloat(32), d)
             | CType.CVector(CType.CFloat(32), d) ->
                 return $"vec{d}" |> Identifier
 
@@ -1481,16 +1485,17 @@ module Assembler =
                     return $"{v}{suffix}"
 
             | CLiteral.CFractional v ->
-                match t with
-                | CType.CFloat 16 ->
-                    let! t = assembleTypeS true t
-                    let! v = assembleLiteralS (CType.CFloat 32) l
-                    return $"{t.Name}({v})"
+                let! _ = assembleTypeS false t
 
-                | _ ->
-                    let str = v.ToString(System.Globalization.CultureInfo.InvariantCulture)
-                    if str.Contains "." || str.Contains "E" || str.Contains "e" then return str
-                    else return str + ".0"
+                let suffix =
+                    match t with
+                    | CType.CFloat(16) -> "hf"
+                    | CType.CFloat(64) -> "lf"
+                    | _ -> ""
+
+                let str = v.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                if str.Contains "." || str.Contains "E" || str.Contains "e" then return $"{str}{suffix}"
+                else return $"{str}.0{suffix}"
 
             | CLiteral.CString v -> return "\"" + v + "\""
         }
@@ -1601,7 +1606,7 @@ module Assembler =
 
                 | CMod(t, l, r) ->
                     match t with
-                        | CInt _ | CVector(CInt _, _) | CMatrix(CInt _, _, _) ->
+                        | CInt _ | CVector(CInt _, _) | CColor(CInt _, _) | CMatrix(CInt _, _, _) ->
                             let! l = assembleExprS l
                             let! r = assembleExprS r
                             return sprintf "(%s %% %s)" l r
@@ -1655,7 +1660,7 @@ module Assembler =
                     let! v = assembleExprS v
                     let! i = assembleExprS i
                     return sprintf "%s[%s]" v i
-                    
+
 
                 | CNewVector(r, args) ->
                     let! args = assembleExprsS ", " args

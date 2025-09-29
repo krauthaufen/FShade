@@ -244,7 +244,8 @@ let ``Inverse lerp constant``() =
         }
 
     GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader] [
-        Regex.Escape "vec2(0.5, 0.5);", 2
+        Regex.Escape "vec2(0.5, 0.5);", 1
+        Regex.Escape "dvec2(0.5lf, 0.5lf);", 1
         Regex.Escape "0.5;", 1
     ]
 

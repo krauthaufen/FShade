@@ -337,6 +337,12 @@ module ReflectionPatterns =
         | _ -> ValueNone
 
     [<return: Struct>]
+    let (|ColMethod|_|) (mi : MethodInfo) =
+        match mi with
+        | Method(name, args) when mi.DeclaringType = typeof<Col> -> ValueSome (name, args)
+        | _ -> ValueNone
+
+    [<return: Struct>]
     let (|VecMethod|_|) (mi : MethodInfo) =
         match mi with
         | Method(name, args) when mi.DeclaringType = typeof<Vec> -> ValueSome (name, args)

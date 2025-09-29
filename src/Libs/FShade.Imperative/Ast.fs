@@ -49,6 +49,7 @@ type CType =
     | CInt of signed : bool * width : int
     | CFloat of width : int
 
+    | CColor of elementType : CType * dim : int
     | CVector of elementType : CType * dim : int
     | CMatrix of elementType : CType * rows : int * cols : int
 
@@ -67,7 +68,7 @@ module CType =
     let private primitiveTypes =
         Dictionary.ofList [
             typeof<unit>, CType.CVoid
-            typeof<System.Void>, CType.CVoid
+            typeof<Void>, CType.CVoid
             typeof<bool>, CType.CBool
 
             typeof<int8>, CType.CInt(true, 8)
@@ -111,6 +112,7 @@ module CType =
                     let seen = HashSet.add t seen
                     match t with
                     | Enum              -> t.GetEnumUnderlyingType() |> ofTypeInternal seen b
+                    | ColorOf(d, t)     -> CColor(ofTypeInternal seen b t, d)
                     | VectorOf(d, t)    -> CVector(ofTypeInternal seen b t, d)
                     | MatrixOf(s, t)    -> CMatrix(ofTypeInternal seen b t, s.Y, s.X)
                     | ArrOf(len, t)     -> CArray(ofTypeInternal seen b t, len)
@@ -156,8 +158,20 @@ module CType =
     let ofType (b : IBackend) (t : Type) : CType =
         ofTypeInternal HashSet.empty b t
 
-   
-       
+    let elementType (typ: CType) =
+        match typ with
+        | CColor (et, _) | CVector (et, _) | CMatrix (et, _, _) | CArray (et, _) | CPointer (_, et) -> et
+        | _ -> typ
+
+    let withElementType (elementType: CType) (typ: CType) =
+        match typ with
+        | CColor(_, d)     -> CColor(elementType, d)
+        | CVector(_, d)    -> CVector(elementType, d)
+        | CMatrix(_, r, c) -> CMatrix(elementType, r, c)
+        | CArray(_, l)     -> CArray(elementType, l)
+        | CPointer(m, _)   -> CPointer(m, elementType)
+        | _ -> elementType
+
 /// represents a function-parameter modifier
 type CParameterModifier =
     | In

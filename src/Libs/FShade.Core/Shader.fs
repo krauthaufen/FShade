@@ -2,6 +2,7 @@
 
 open System
 open System.Reflection
+open System.Runtime.InteropServices
 
 open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Quotations.Patterns
@@ -224,6 +225,7 @@ module Preprocessor =
             match t with
             | TypeMeta.Patterns.Enum
             | TypeMeta.Patterns.Integral
+            | TypeMeta.Patterns.ColorOf(_, Integral) -> ValueSome ()
             | TypeMeta.Patterns.VectorOf(_, Integral) -> ValueSome ()
             | TypeMeta.Patterns.MatrixOf(_, Integral) -> ValueSome ()
             | _ -> ValueNone
@@ -233,6 +235,7 @@ module Preprocessor =
             match t with
             | TypeMeta.Patterns.Float32
             | TypeMeta.Patterns.Float64
+            | TypeMeta.Patterns.ColorOf(_, (TypeMeta.Patterns.Float32 | TypeMeta.Patterns.Float64)) -> ValueSome ()
             | TypeMeta.Patterns.VectorOf(_, (TypeMeta.Patterns.Float32 | TypeMeta.Patterns.Float64)) -> ValueSome ()
             | TypeMeta.Patterns.MatrixOf(_, (TypeMeta.Patterns.Float32 | TypeMeta.Patterns.Float64)) -> ValueSome ()
             | _ -> ValueNone
@@ -577,6 +580,9 @@ module Preprocessor =
         let private vectorFields =
             ["X"; "Y"; "Z"; "W"]
 
+        let private colorFields =
+            ["R"; "G"; "B"; "A"]
+
         let private zeroOneVecProperty =
             System.Text.RegularExpressions.Regex @"^([XYZW]*[OINP]+[XYZW]*)+$"
 
@@ -592,6 +598,12 @@ module Preprocessor =
         let private (|FloatingPointExpr|_|) (e : Expr) =
             match e.Type with
             | Float32 | Float64 -> ValueSome e
+            | _ -> ValueNone
+
+        [<return: Struct>]
+        let private (|ColorExpr|_|) (e : Expr) =
+            match e.Type with
+            | ColorOf(d, t) -> ValueSome (e, d, t)
             | _ -> ValueNone
 
         [<return: Struct>]
@@ -811,6 +823,25 @@ module Preprocessor =
             match e with
             | ScalarOrVectorAllEmulatedSpecialFloatingPointCheck (e, isVector, "Finite") -> ValueSome (e, isVector)
             | _ -> ValueNone
+
+        // returns (color, scalar, multiply, flip, fields)
+        [<return: Struct>]
+        let (|ColorIntScale|_|) (e : Expr) =
+            match e with
+            | Call(None, Method("op_Multiply", _), [ColorExpr (color, dim, Integral); FloatingPointExpr scalar]) ->
+                ValueSome (color, scalar, true, false, colorFields |> List.take dim)
+
+            | Call(None, Method("op_Multiply", _), [FloatingPointExpr scalar; ColorExpr (color, dim, Integral)]) ->
+                ValueSome (color, scalar, true, true, colorFields |> List.take dim)
+
+            | Call(None, Method("op_Division", _), [ColorExpr (color, dim, Integral); FloatingPointExpr scalar]) ->
+                ValueSome (color, scalar, false, false, colorFields |> List.take dim)
+
+            | Call(None, Method("op_Division", _), [FloatingPointExpr scalar; ColorExpr (color, dim, Integral)]) ->
+                ValueSome (color, scalar, false, true, colorFields |> List.take dim)
+
+            | _ ->
+                ValueNone
 
     // Used to determine which preprocess function to call
     [<RequireQualifiedAccess>]
@@ -1157,12 +1188,25 @@ module Preprocessor =
 
         let not = getMethodInfo <@ not : bool -> bool @>
         let defaultOf = getMethodInfo <@ Unchecked.defaultof<int> @>
+        let zero = getMethodInfo <@ LanguagePrimitives.GenericZero : int @>
+        let one = getMethodInfo <@ LanguagePrimitives.GenericOne : int @>
+
+        let round = getMethodInfo <@ round : float -> float @>
+
+        let toInt8    = getMethodInfo <@ int8    : int -> int8 @>
+        let toUInt8   = getMethodInfo <@ uint8   : int -> uint8 @>
+        let toInt16   = getMethodInfo <@ int16   : int -> int16 @>
+        let toUInt16  = getMethodInfo <@ uint16  : int -> uint16 @>
+        let toInt32   = getMethodInfo <@ int32   : int -> int32 @>
+        let toUInt32  = getMethodInfo <@ uint32  : int -> uint32 @>
+        let toInt64   = getMethodInfo <@ int64   : int -> int64 @>
+        let toUInt64  = getMethodInfo <@ uint64  : int -> uint64 @>
+        let toFloat32 = getMethodInfo <@ float32 : int -> float32 @>
+        let toFloat64 = getMethodInfo <@ float   : int -> float @>
 
     [<AutoOpen>]
     module private ExprExtensions =
         open TypeInfo.Patterns
-
-        let private toDouble = getMethodInfo <@ float : int -> float @>
 
         let private doubleVecType = [|
                 typeof<V2d>
@@ -1173,45 +1217,45 @@ module Preprocessor =
         [<return: Struct>]
         let private (|TensorOp|_|) (a : Expr, b : Expr) =
             match a.Type, b.Type with
-            | (VectorOf(_, _) | MatrixOf(_, _)), _ -> ValueSome a.Type
-            | _, (VectorOf(_, _) | MatrixOf(_, _)) -> ValueSome b.Type
+            | (ColorOf _ | VectorOf _| MatrixOf _), _ -> ValueSome a.Type
+            | _, (ColorOf _ | VectorOf _ | MatrixOf _) -> ValueSome b.Type
             | _ -> ValueNone
 
         type Expr with
-            static member Add(a : Expr, b : Expr) =
+            static member Add(a : Expr, b : Expr, [<Optional; DefaultParameterValue(null : Type)>] typ : Type) =
                 match a, b with
                 | TensorOp t ->
                     let mi = t.GetMethod("op_Addition", [| a.Type; b.Type |])
                     Expr.Call(mi, [a; b])
                 | _ ->
-                    let mi = MethodInfo.op_addition.MakeGenericMethod(a.Type, b.Type, b.Type)
+                    let mi = MethodInfo.op_addition.MakeGenericMethod(a.Type, b.Type, typ ||? b.Type)
                     Expr.Call(mi, [a; b])
 
-            static member Subtract(a : Expr, b : Expr) =
+            static member Subtract(a : Expr, b : Expr, [<Optional; DefaultParameterValue(null : Type)>] typ : Type) =
                 match a, b with
                 | TensorOp t ->
                     let mi = t.GetMethod("op_Subtraction", [| a.Type; b.Type |])
                     Expr.Call(mi, [a; b])
                 | _ ->
-                    let mi = MethodInfo.op_subtraction.MakeGenericMethod(a.Type, b.Type, b.Type)
+                    let mi = MethodInfo.op_subtraction.MakeGenericMethod(a.Type, b.Type, typ ||? b.Type)
                     Expr.Call(mi, [a; b])
 
-            static member Multiply(a : Expr, b : Expr) =
+            static member Multiply(a : Expr, b : Expr, [<Optional; DefaultParameterValue(null : Type)>] typ : Type) =
                 match a, b with
                 | TensorOp t ->
                     let mi = t.GetMethod("op_Multiply", [| a.Type; b.Type |])
                     Expr.Call(mi, [a; b])
                 | _ ->
-                    let mi = MethodInfo.op_multiply.MakeGenericMethod(a.Type, b.Type, b.Type)
+                    let mi = MethodInfo.op_multiply.MakeGenericMethod(a.Type, b.Type, typ ||? b.Type)
                     Expr.Call(mi, [a; b])
 
-            static member Division(a : Expr, b : Expr) =
+            static member Division(a : Expr, b : Expr, [<Optional; DefaultParameterValue(null : Type)>] typ : Type) =
                 match a, b with
                 | TensorOp t ->
                     let mi = t.GetMethod("op_Division", [| a.Type; b.Type |])
                     Expr.Call(mi, [a; b])
                 | _ ->
-                    let mi = MethodInfo.op_division.MakeGenericMethod(a.Type, b.Type, b.Type)
+                    let mi = MethodInfo.op_division.MakeGenericMethod(a.Type, b.Type, typ ||? b.Type)
                     Expr.Call(mi, [a; b])
 
             static member ToDouble(expr : Expr) =
@@ -1224,7 +1268,7 @@ module Preprocessor =
                     Expr.NewObject(ctor, [expr])
 
                 | _ ->
-                    let tf = toDouble.MakeGenericMethod expr.Type
+                    let tf = MethodInfo.toFloat64.MakeGenericMethod expr.Type
                     Expr.Call(tf, [expr])
 
             static member And(a : Expr, b : Expr) =
@@ -1245,18 +1289,39 @@ module Preprocessor =
                 Expr.Call(MethodInfo.not, [e])
 
             static member Zero(t : Type) =
-                match t with
-                | TypeMeta.Patterns.Int32 -> Expr.Value 0
-                | TypeMeta.Patterns.UInt32 -> Expr.Value 0u
-                | TypeMeta.Patterns.Float32 -> Expr.Value 0.0f
-                | TypeMeta.Patterns.Float64 -> Expr.Value 0.0
-                | TypeMeta.Patterns.Vector
-                | TypeMeta.Patterns.Matrix ->
-                    let pi = t.GetProperty("Zero", [||])
-                    Expr.PropertyGet pi
+                let mi = MethodInfo.zero.MakeGenericMethod t
+                Expr.Call(mi, [])
 
-                | _ ->
-                    failwithf "[FShade] Expr.Zero not implemented for type %s" t.FullName
+            static member One(t : Type) =
+                let mi = MethodInfo.one.MakeGenericMethod t
+                Expr.Call(mi, [])
+
+            static member Round(e : Expr) =
+                let mi = MethodInfo.round.MakeGenericMethod(e.Type)
+                Expr.Call(mi, [e])
+
+            static member Convert(e : Expr, typ : Type) =
+                let mi =
+                    match typ with
+                    | TypeMeta.Patterns.Int8    -> MethodInfo.toInt8.MakeGenericMethod e.Type
+                    | TypeMeta.Patterns.UInt8   -> MethodInfo.toUInt8.MakeGenericMethod e.Type
+                    | TypeMeta.Patterns.Int16   -> MethodInfo.toInt16.MakeGenericMethod e.Type
+                    | TypeMeta.Patterns.UInt16  -> MethodInfo.toUInt16.MakeGenericMethod e.Type
+                    | TypeMeta.Patterns.Int32   -> MethodInfo.toInt32.MakeGenericMethod e.Type
+                    | TypeMeta.Patterns.UInt32  -> MethodInfo.toUInt32.MakeGenericMethod e.Type
+                    | TypeMeta.Patterns.Int64   -> MethodInfo.toInt64.MakeGenericMethod e.Type
+                    | TypeMeta.Patterns.UInt64  -> MethodInfo.toUInt64.MakeGenericMethod e.Type
+                    | TypeMeta.Patterns.Float32 -> MethodInfo.toFloat32.MakeGenericMethod e.Type
+                    | TypeMeta.Patterns.Float64 -> MethodInfo.toFloat64.MakeGenericMethod e.Type
+                    | _ ->
+                        let op = typ.GetMethod("op_Explicit", [| e.Type |])
+                        if op = null then
+                            failwithf "[FShade] Cannot cast %A to %A" e.Type typ.Type
+                        else
+                            op
+
+                Expr.Call(mi, [e])
+
 
     let rec preprocessRaytracingS (stage : ShaderStage) (e : Expr) : Preprocess<Expr> =
         state {
@@ -1640,8 +1705,6 @@ module Preprocessor =
             let! vertexType = State.vertexType
 
             match e with
-            
-            
             | RefOf (GetArray(StorageBuffer u, index) as e) ->
                 let! index = preprocessNormalS index
                 do! u |> State.readUniform true
@@ -1654,8 +1717,7 @@ module Preprocessor =
                     | _ -> failwithf "[FShade] Unexpected array get: %A" e
                 
                 return Expr.RefOf(access)
-                
-            
+
             | SetArray(StorageBuffer u, index, value) ->
                 let! value = preprocessNormalS value
                 let! index = preprocessNormalS index
@@ -1680,6 +1742,36 @@ module Preprocessor =
                 | Call(None, mi, _) -> return Expr.Call(mi, [arr; index])
                 | PropertyGet(Some _, pi, _) -> return Expr.PropertyGet(arr, pi, [index])
                 | _ -> return failwithf "[FShade] Unexpected array get: %A" e
+
+            | ColorIntScale(col, scalar, multiply, flip, fields) ->
+                let! col = preprocessNormalS col
+                let! scalar = preprocessNormalS scalar
+
+                let tmp = Var("tmp", col.Type)
+
+                let args =
+                    fields |> List.map (fun f ->
+                        let f = Expr.FieldGet(Expr.Var tmp, col.Type.GetField f)
+                        let s =
+                            if multiply then
+                                Expr.Multiply(f, scalar)
+                            else
+                                if flip then
+                                    Expr.Division(scalar, f, scalar.Type)
+                                else
+                                    Expr.Division(f, scalar)
+
+                        Expr.Convert(Expr.Round s, f.Type)
+                    )
+
+                let ci =
+                    let types = args |> List.toArray |> Array.map _.Type
+                    col.Type.GetConstructor types
+
+                return Expr.Let(
+                    tmp, col,
+                    Expr.NewObject(ci, args)
+                )
 
             | ConstantSwizzle(v, prop, baseType) ->
                 let tmp = Var("tmp", v.Type)
@@ -2442,6 +2534,7 @@ module Preprocessor =
         state {
             match value.Type with
             | PrimitiveOutputType
+            | TypeMeta.Patterns.ColorOf (_, PrimitiveOutputType)
             | TypeMeta.Patterns.VectorOf (_, PrimitiveOutputType) ->
                 let! value = preprocessS value
                 do! State.writeOutput sem { paramType = value.Type; paramInterpolation = InterpolationMode.Default }
@@ -2483,7 +2576,7 @@ module Preprocessor =
                 return values
 
             | _ ->
-                return failwithf "[FShade] invalid vertex-type: %A" value.Type
+                return failwithf "[FShade] invalid vertex type: %A" value.Type
         }
 
     and toShaders (inputTypes : List<Type>) (vertexIndex : Map<Var, Expr>) (e : Expr) =
@@ -3287,22 +3380,68 @@ module Shader =
 
             (typeof<V3f>, typeof<float32>), fun value -> <@@ (%%value : V3f).X @@>
             (typeof<V3f>, typeof<V2f>),     fun value -> <@@ (%%value : V3f).XY @@>
+            (typeof<V3f>, typeof<C3f>),     fun value -> <@@ C3f(%%value : V3f) @@>
             (typeof<V3f>, typeof<V4f>),     fun value -> <@@ V4f((%%value : V3f), 1.0f) @@>
+            (typeof<V3f>, typeof<C4f>),     fun value -> <@@ C4f(%%value : V3f) @@>
 
             (typeof<V4f>, typeof<float32>), fun value -> <@@ (%%value : V4f).X @@>
             (typeof<V4f>, typeof<V2f>),     fun value -> <@@ (%%value : V4f).XY @@>
             (typeof<V4f>, typeof<V3f>),     fun value -> <@@ (%%value : V4f).XYZ @@>
+            (typeof<V4f>, typeof<C3f>),     fun value -> <@@ C3f(%%value : V4f) @@>
+            (typeof<V4f>, typeof<C4f>),     fun value -> <@@ C4f(%%value : V4f) @@>
+
+            (typeof<C3f>, typeof<float32>), fun value -> <@@ (%%value : C3f).R @@>
+            (typeof<C3f>, typeof<V2f>),     fun value -> <@@ V2f((%%value : C3f).R, (%%value : C3f).G) @@>
+            (typeof<C3f>, typeof<V3f>),     fun value -> <@@ V3f(%%value : C3f) @@>
+            (typeof<C3f>, typeof<V4f>),     fun value -> <@@ V4f(%%value : C3f) @@>
+            (typeof<C3f>, typeof<C4f>),     fun value -> <@@ C4f(%%value : C3f) @@>
+
+            (typeof<C4f>, typeof<float32>), fun value -> <@@ (%%value : C4f).R @@>
+            (typeof<C4f>, typeof<V2f>),     fun value -> <@@ V2f((%%value : C4f).R, (%%value : C4f).G) @@>
+            (typeof<C4f>, typeof<V3f>),     fun value -> <@@ V3f(%%value : C4f) @@>
+            (typeof<C4f>, typeof<C3f>),     fun value -> <@@ C3f(%%value : C4f) @@>
+            (typeof<C4f>, typeof<V4f>),     fun value -> <@@ V4f(%%value : C4f) @@>
 
             // Float64
             (typeof<V2d>, typeof<float>), fun value -> <@@ (%%value : V2d).X @@>
 
             (typeof<V3d>, typeof<float>), fun value -> <@@ (%%value : V3d).X @@>
             (typeof<V3d>, typeof<V2d>),   fun value -> <@@ (%%value : V3d).XY @@>
+            (typeof<V3d>, typeof<C3d>),   fun value -> <@@ C3d(%%value : V3d) @@>
             (typeof<V3d>, typeof<V4d>),   fun value -> <@@ V4d((%%value : V3d), 1.0) @@>
+            (typeof<V3d>, typeof<C4d>),   fun value -> <@@ C4d(%%value : V3d) @@>
 
             (typeof<V4d>, typeof<float>), fun value -> <@@ (%%value : V4d).X @@>
             (typeof<V4d>, typeof<V2d>),   fun value -> <@@ (%%value : V4d).XY @@>
             (typeof<V4d>, typeof<V3d>),   fun value -> <@@ (%%value : V4d).XYZ @@>
+            (typeof<V4d>, typeof<C3d>),   fun value -> <@@ C3d(%%value : V4d) @@>
+            (typeof<V4d>, typeof<C4d>),   fun value -> <@@ C4d(%%value : V4d) @@>
+
+            (typeof<C3d>, typeof<float>), fun value -> <@@ (%%value : C3d).R @@>
+            (typeof<C3d>, typeof<V2d>),   fun value -> <@@ V2d((%%value : C3d).R, (%%value : C3d).G) @@>
+            (typeof<C3d>, typeof<V3d>),   fun value -> <@@ V3d(%%value : C3d) @@>
+            (typeof<C3d>, typeof<V4d>),   fun value -> <@@ V4d(%%value : C3d) @@>
+            (typeof<C3d>, typeof<C4d>),   fun value -> <@@ C4d(%%value : C3d) @@>
+
+            (typeof<C4d>, typeof<float>), fun value -> <@@ (%%value : C4d).R @@>
+            (typeof<C4d>, typeof<V2d>),   fun value -> <@@ V2d((%%value : C4d).R, (%%value : C4d).G) @@>
+            (typeof<C4d>, typeof<V3d>),   fun value -> <@@ V3d(%%value : C4d) @@>
+            (typeof<C4d>, typeof<C3d>),   fun value -> <@@ C3d(%%value : C4d) @@>
+            (typeof<C4d>, typeof<V4d>),   fun value -> <@@ V4d(%%value : C4d) @@>
+
+            // UInt8
+            (typeof<C3b>, typeof<uint8>), fun value -> <@@ (%%value : C3b).R @@>
+            (typeof<C3b>, typeof<C4b>),   fun value -> <@@ C4b(%%value : C3b) @@>
+
+            (typeof<C4b>, typeof<uint8>), fun value -> <@@ (%%value : C4b).R @@>
+            (typeof<C4b>, typeof<C3b>),   fun value -> <@@ C3b(%%value : C4b) @@>
+
+            // UInt16
+            (typeof<C3us>, typeof<uint16>), fun value -> <@@ (%%value : C3us).R @@>
+            (typeof<C3us>, typeof<C4us>),   fun value -> <@@ C4us(%%value : C3us) @@>
+
+            (typeof<C4us>, typeof<uint16>), fun value -> <@@ (%%value : C4us).R @@>
+            (typeof<C4us>, typeof<C3us>),   fun value -> <@@ C3us(%%value : C4us) @@>
 
             // Int32
             (typeof<V2i>, typeof<int32>), fun value -> <@@ (%%value : V2i).X @@>
@@ -3319,10 +3458,26 @@ module Shader =
 
             (typeof<V3ui>, typeof<uint32>), fun value -> <@@ (%%value : V3ui).X @@>
             (typeof<V3ui>, typeof<V2ui>),   fun value -> <@@ (%%value : V3ui).XY @@>
+            (typeof<V3ui>, typeof<C3ui>),   fun value -> <@@ C3ui(%%value : V3ui) @@>
+            (typeof<V3ui>, typeof<C4ui>),   fun value -> <@@ C4ui(%%value : V3ui) @@>
 
             (typeof<V4ui>, typeof<uint32>), fun value -> <@@ (%%value : V4ui).X @@>
             (typeof<V4ui>, typeof<V2ui>),   fun value -> <@@ (%%value : V4ui).XY @@>
             (typeof<V4ui>, typeof<V3ui>),   fun value -> <@@ (%%value : V4ui).XYZ @@>
+            (typeof<V4ui>, typeof<C3ui>),   fun value -> <@@ C3ui(%%value : V4ui) @@>
+            (typeof<V4ui>, typeof<C4ui>),   fun value -> <@@ C4ui(%%value : V4ui) @@>
+
+            (typeof<C3ui>, typeof<uint32>), fun value -> <@@ (%%value : C3ui).R @@>
+            (typeof<C3ui>, typeof<V2ui>),   fun value -> <@@ V2ui((%%value : C3ui).R, (%%value : C3ui).G) @@>
+            (typeof<C3ui>, typeof<V3ui>),   fun value -> <@@ V3ui(%%value : C3ui) @@>
+            (typeof<C3ui>, typeof<V4ui>),   fun value -> <@@ V4ui(%%value : C3ui) @@>
+            (typeof<C3ui>, typeof<C4ui>),   fun value -> <@@ C4ui(%%value : C3ui) @@>
+
+            (typeof<C4ui>, typeof<uint32>), fun value -> <@@ (%%value : C4ui).R @@>
+            (typeof<C4ui>, typeof<V2ui>),   fun value -> <@@ V2ui((%%value : C4ui).R, (%%value : C4ui).G) @@>
+            (typeof<C4ui>, typeof<V3ui>),   fun value -> <@@ V3ui(%%value : C4ui) @@>
+            (typeof<C4ui>, typeof<C3ui>),   fun value -> <@@ C3ui(%%value : C4ui) @@>
+            (typeof<C4ui>, typeof<V4ui>),   fun value -> <@@ V4ui(%%value : C4ui) @@>
         ]
 
     let private converter (semantic : string) (inType : Type) (outType : Type) : Expr -> Expr =

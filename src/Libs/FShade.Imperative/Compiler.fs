@@ -2,13 +2,11 @@
 
 open System
 open System.Reflection
-open System.Collections.Generic
-open System.Runtime.CompilerServices
+open System.Text.RegularExpressions
 
 open Microsoft.FSharp.Reflection
 open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Quotations.Patterns
-open Microsoft.FSharp.Quotations.ExprShape
 open Microsoft.FSharp.Quotations.DerivedPatterns
 
 open Aardvark.Base
@@ -405,33 +403,170 @@ module Compiler =
                     | _ ->
                         e
 
+        module private Col =
+
+            // Taken from Aardvark.Base color conversion utilities
+            let private floatToIntConstants =
+                LookupTable.lookup [
+                    8,  CFractional 255.9999999999999
+                    16, CFractional 65535.99999999999
+                    32, CFractional 4294967295.999999
+                ]
+
+            let private intToFloatConstants =
+                LookupTable.lookup [
+                    8,  CFractional (1.0 / 255.0)
+                    16, CFractional (1.0 / 65535.0)
+                    32, CFractional (1.0 / 4294967295.0)
+                ]
+
+            let maxValue (elementType: CType) =
+                match elementType with
+                | CInt (false, w) -> CValue(elementType, CIntegral ((1L <<< w) - 1L))
+                | CFloat _        -> CValue(elementType, CFractional 1.0)
+                | t -> failwithf "[FShade] Invalid color channel type %A" t
+
+            /// Performs color channel conversions.
+            /// Input may be a vector, color, or scalar.
+            let convert (dstElementType: CType) (value: CExpr) =
+                let srcType = value.ctype
+                let srcElementType = CType.elementType srcType
+                let dstType = CType.withElementType dstElementType srcType
+
+                match srcElementType, dstElementType with
+                | CFloat 16, CInt (false, (8 | 16 | 32 as w)) ->
+                    let srcType32 = CType.withElementType (CFloat 32) srcType
+                    let constant = floatToIntConstants w
+                    let scaled = CMul(srcType32, CConvert(srcType32, value), CValue(CFloat 32, constant))
+                    CConvert (dstType, scaled)
+
+                | CFloat _, CInt (false, (8 | 16 | 32 as w)) ->
+                    let constant = floatToIntConstants w
+                    let scaled = CMul(srcType, value, CValue(srcElementType, constant))
+                    CConvert (dstType, scaled)
+
+                | CInt (false, (8 | 16 | 32 as w)), CFloat 16 ->
+                    let dstType32 = CType.withElementType (CFloat 32) dstType
+                    let constant = intToFloatConstants w
+                    let converted = CConvert (dstType32, value)
+                    CConvert (dstType, CMul(dstType32, converted, CValue(CFloat 32, constant)))
+
+                | CInt (false, (8 | 16 | 32 as w)), CFloat _ ->
+                    let constant = intToFloatConstants w
+                    let converted = CConvert (dstType, value)
+                    CMul(dstType, converted, CValue(dstElementType, constant))
+
+                | CInt(false, (8 | 16 | 32 as sw)), CInt(false, (8 | 16 | 32 as dw)) when sw > dw ->
+                    let shift = CValue(CInt(true, 32), CIntegral (int64 (sw - dw)))
+                    CConvert(dstType, CRightShift(srcType, value, shift))
+
+                | CInt(false, (8 | 16 | 32 as sw)), CInt(false, (8 | 16 | 32 as dw)) when dw > sw ->
+                    let smax = (1L <<< sw) - 1L
+                    let dmax = (1L <<< dw) - 1L
+                    let constant = CIntegral (dmax / smax)
+                    CMul(dstType, CConvert(dstType, value), CValue(dstElementType, constant))
+
+                | _ ->
+                    if srcType = dstType then value
+                    else CConvert (dstType, value)
+
         // Builds a new vector from the given arguments.
-        // If not enough arguments are provided, zeros are filled in.
+        // If not enough arguments are provided, default values are filled in.
         let private constructVector (elementType : CType) (dimension : int) (args : CExpr list) =
+            let mutable providedDim = 0
+            let mutable fromColor = ValueNone
 
-            // Check if the provided args are sufficient for the dimension
-            let providedDim =
-                args |> List.sumBy (fun expr ->
-                    match expr.ctype with
-                    | CVector(_, d) -> d
-                    | _ -> 1
-                )
+            for arg in args do
+                match arg.ctype with
+                | CColor (t, d) ->
+                    fromColor <- ValueSome t
+                    &providedDim += d
 
-            // Fill in zeros for the missing dimensions
+                | CVector (_, d) ->
+                    &providedDim += d
+
+                | _ ->
+                    &providedDim += 1
+
+            // Fill in default values for the missing dimensions
             let args =
                 if providedDim > 1 && providedDim < dimension then
-                    let newArgs =
-                        List.init (dimension - providedDim) (fun _ ->
-                            CValue(elementType, CIntegral 0L)
-                        )
-
+                    let defaultValue = match fromColor with ValueSome et -> Col.maxValue et | _ -> CValue(elementType, CIntegral 0L)
+                    let newArgs = defaultValue |> List.replicate (dimension - providedDim)
                     args @ newArgs
                 else
                     args
 
             CNewVector(CType.CVector(elementType, dimension), args)
 
-        let private vecSwizzleRx = System.Text.RegularExpressions.Regex @"get_([XYZW]+)"
+        let private constructColor (elementType : CType) (dimension : int) (args : CExpr list) =
+            let args =
+                match args |> List.map (fun arg -> arg.ctype, arg) with
+                // Construction from gray value. Color conversion is performed (e.g. C4b(float)).
+                | [ (CFloat _ | CInt _), gray ] ->
+                    let rgb = gray |> Col.convert elementType |> List.replicate 3
+                    let a = if dimension = 4 then [ Col.maxValue elementType ] else []
+                    rgb @ a
+
+                // Construction from red, green, blue values. Color conversion is performed (e.g. C4b(float, float, float)).
+                | [ (CFloat _ | CInt _), red; (CFloat _ | CInt _), green; (CFloat _ | CInt _), blue ] ->
+                    let rgb = [red; green; blue] |> List.map (Col.convert elementType)
+                    let a = if dimension = 4 then [ Col.maxValue elementType ] else []
+                    rgb @ a
+
+                // Construction from red, green, blue, alpha values. Color conversion is performed (e.g. C4b(float, float, float, float)).
+                | [ (CFloat _ | CInt _), red; (CFloat _ | CInt _), green; (CFloat _ | CInt _), blue; (CFloat _ | CInt _), alpha ] ->
+                    let rgb = [red; green; blue] |> List.map (Col.convert elementType)
+                    let a = alpha |> Col.convert elementType
+                    rgb @ [a]
+
+                // Construction from a color. Color conversion is performed (e.g. C4b(C3f)).
+                | [ CColor (_, d), color ] ->
+                    let rgb = color |> Col.convert elementType |> List.singleton
+                    let a = if dimension = 4 && d = 3 then [ Col.maxValue elementType ] else []
+                    rgb @ a
+
+                // Construction from a color and alpha value. Color conversion is performed (e.g. C4b(C3f, uint8)).
+                | [ CColor _, color; (CFloat _ | CInt _), alpha ] ->
+                    let rgb = color |> Col.convert elementType
+                    [rgb; alpha]
+
+                // Construction from a vector. Color conversion is NOT performed (e.g. C4b(V3f)).
+                | [ CVector (_, d), vector ] ->
+                    let a = if dimension = 4 && d = 3 then [ Col.maxValue elementType ] else []
+                    vector :: a
+
+                // Construction from a vector and alpha value. Color conversion is NOT performed (e.g. C4b(V3f, uint8)).
+                | [ CVector _, vector; (CFloat _ | CInt _), alpha ] ->
+                    [vector; alpha]
+
+                | _ ->
+                    failwithf "[FShade] Cannot construct color from %A" args
+
+            CNewVector(CType.CColor(elementType, dimension), args)
+
+        let private vecSwizzleRx = Regex @"get_([XYZW]+)"
+        let private fromColVecRx = Regex @"From[CV][34](?:f|d|b|us|ui|i|l)"
+        let private toColVecRx   = Regex @"To[CV][34](?:f|d|b|us|ui|i|l)"
+        let private colToCol =
+            let types = [ "Byte"; "UShort"; "UInt"; "Half"; "Float"; "Double" ] |> String.concat "|"
+            Regex $"^({types})To({types})$"
+
+        [<return: Struct>]
+        let private (|FromColorOrVectorMethod|_|) (mi: MethodInfo) =
+            if fromColVecRx.IsMatch mi.Name then ValueSome mi.ReturnType
+            else ValueNone
+
+        [<return: Struct>]
+        let private (|ToColorOrVectorMethod|_|) (mi: MethodInfo) =
+            if toColVecRx.IsMatch mi.Name then ValueSome mi.ReturnType
+            else ValueNone
+
+        [<return: Struct>]
+        let private (|ExplicitConversionOperator|_|) (mi: MethodInfo) =
+            if mi.Name = "op_Explicit" then ValueSome mi.ReturnType
+            else ValueNone
+
         let rec tryGetBuiltInMethod (b : IBackend) (mi : MethodInfo) (args : list<CExpr>) =
             let ct = CType.ofType b mi.ReturnType
             match mi, args with
@@ -599,12 +734,10 @@ module Compiler =
                 | MethodQuote <@ m34l : M34d -> _ @> _, [m] 
                 | MethodQuote <@ m44l : M44d -> _ @> _, [m] 
                 | Method("UpperLeftM33", [MatrixOf _]), [m]
-                | Method("op_Explicit", [MatrixOf _]), [m] ->
+                | ExplicitConversionOperator (MatrixOf _), [m] ->
                     match ct with
-                        | CMatrix(et, r, c) ->
-                            CConvertMatrix(ct, m) |> Some
-                        | _ ->
-                            None
+                    | CMatrix _ -> CConvertMatrix(ct, m) |> Some
+                    | _ -> None
 
                 | MethodQuote <@ v2d : V4d -> _ @> _, args
                 | MethodQuote <@ v3d : V4d -> _ @> _, args
@@ -621,12 +754,32 @@ module Compiler =
                 | MethodQuote <@ v2ui : V4d -> _ @> _, args
                 | MethodQuote <@ v3ui : V4d -> _ @> _, args
                 | MethodQuote <@ v4ui : V4d -> _ @> _, args
-                | Method("op_Explicit", [VectorOf _]), args ->
+                | FromColorOrVectorMethod (VectorOf _), args
+                | ToColorOrVectorMethod (VectorOf _), args
+                | ExplicitConversionOperator (VectorOf _), args ->
                     match ct with
-                    | CVector(et, dim) ->
-                        constructVector et dim args |> Some
-                    | _ ->
-                        None
+                    | CVector(et, dim) -> constructVector et dim args |> Some
+                    | _ -> None
+
+                | MethodQuote <@ c3b : V4d -> _ @> _, args
+                | MethodQuote <@ c4b : V4d -> _ @> _, args
+                | MethodQuote <@ c3us : V4d -> _ @> _, args
+                | MethodQuote <@ c4us : V4d -> _ @> _, args
+                | MethodQuote <@ c3ui : V4d -> _ @> _, args
+                | MethodQuote <@ c4ui : V4d -> _ @> _, args
+                | MethodQuote <@ c3f : V4d -> _ @> _, args
+                | MethodQuote <@ c4f : V4d -> _ @> _, args
+                | MethodQuote <@ c3d : V4d -> _ @> _, args
+                | MethodQuote <@ c4d : V4d -> _ @> _, args
+                | FromColorOrVectorMethod (ColorOf _), args
+                | ToColorOrVectorMethod (ColorOf _), args
+                | ExplicitConversionOperator (ColorOf _), args ->
+                    match ct with
+                    | CColor(et, dim) -> constructColor et dim args |> Some
+                    | _ -> None
+
+                | ColMethod(name, _), [ value ] when colToCol.IsMatch name ->
+                    Col.convert ct value |> Some
 
                 // vector swizzles
                 | (MethodQuote <@ Vec.x : V4d -> float @> _ ), [v] -> CVecSwizzle(ct, v, CVecComponent.x) |> Some
@@ -639,7 +792,7 @@ module Compiler =
                 | (MethodQuote <@ Vec.xyz : V4d -> V3d @> _), [v] -> CVecSwizzle(ct, v, CVecComponent.xyz) |> Some
                 | (MethodQuote <@ Vec.yzw : V4d -> V3d @> _), [v] -> CVecSwizzle(ct, v, CVecComponent.yzw) |> Some
 
-                | Method("get_Item", [VectorOf _; Int32]), [v;i] -> CVecItem(ct, v, i) |> Some
+                | Method("get_Item", [ColorOf _ | VectorOf _; Int32]), [v;i] -> CVecItem(ct, v, i) |> Some
 
                 | Method(name, [VectorOf _]), [v] when vecSwizzleRx.IsMatch name ->
                     let m = vecSwizzleRx.Match name
@@ -652,6 +805,9 @@ module Compiler =
                             | c -> failwithf "bad regex match: %A" m
                         )
                     CVecSwizzle(ct, v, components) |> Some
+
+                | Method("get_RGB", [ColorOf _]), [v] ->
+                    CVecSwizzle(ct, v, CVecComponent.xyz) |> Some
 
                 // vector relations
                 | (MethodQuote <@ Vec.anyEqual : V2d -> V2d -> bool @> _), [x; y]
@@ -831,6 +987,14 @@ module Compiler =
 
         let rec tryGetBuiltInCtor (b : IBackend) (ctor : ConstructorInfo) (args : list<CExpr>) =
             match ctor.DeclaringType with
+                | Float16 as t when args.Length = 1 ->
+                    let ct = CType.ofType b t
+                    CConvert(ct, List.head args) |> Some
+
+                | ColorOf(d, t) ->
+                    let et = CType.ofType b t
+                    constructColor et d args |> Some
+
                 | VectorOf(d, t) ->
                     let et = CType.ofType b t
                     constructVector et d args |> Some
@@ -848,6 +1012,11 @@ module Compiler =
         let tryGetBuiltInField (b : IBackend) (fi : FieldInfo) (arg : CExpr) =
             let ct = CType.ofType b fi.FieldType
             match fi.DeclaringType, fi.Name with
+                | ColorOf _,  "R" -> CVecSwizzle(ct, arg, [CVecComponent.X]) |> Some
+                | ColorOf _,  "G" -> CVecSwizzle(ct, arg, [CVecComponent.Y]) |> Some
+                | ColorOf _,  "B" -> CVecSwizzle(ct, arg, [CVecComponent.Z]) |> Some
+                | ColorOf _,  "A" -> CVecSwizzle(ct, arg, [CVecComponent.W]) |> Some
+
                 | VectorOf _, "X" -> CVecSwizzle(ct, arg, [CVecComponent.X]) |> Some
                 | VectorOf _, "Y" -> CVecSwizzle(ct, arg, [CVecComponent.Y]) |> Some
                 | VectorOf _, "Z" -> CVecSwizzle(ct, arg, [CVecComponent.Z]) |> Some

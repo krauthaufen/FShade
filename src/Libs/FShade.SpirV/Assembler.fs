@@ -674,6 +674,7 @@ module Assembler =
                     yield OpTypeFloat(id, w)
                     return id
 
+                | CType.CColor(e,d)
                 | CType.CVector(e,d) ->
                     let! e = assembleType e
                     let! id = SpirV.id
@@ -780,6 +781,7 @@ module Assembler =
                     else Unsigned
 
                 | CMatrix(t, _, _) -> (|Floating|Signed|Unsigned|Other|) t
+                | CColor(t, _) -> (|Floating|Signed|Unsigned|Other|) t
                 | CVector(t, _) -> (|Floating|Signed|Unsigned|Other|) t
 
                 | _ ->
@@ -790,6 +792,7 @@ module Assembler =
                 | CInt _ 
                 | CFloat _ ->
                     Scalar
+                | CColor(et,_)
                 | CVector(et,_) ->
                     Vector et
                 | CMatrix(et, _, _) ->
@@ -962,7 +965,7 @@ module Assembler =
                     let lType = l.ctype
                     let rType = r.ctype
                     match lType, rType with
-                        | CVector(et,d), Scalar ->
+                        | (CColor(et, d) | CVector(et,d)), Scalar ->
                             let! vid = newVector rType d rid
                             let! id = SpirV.id
                             match et with
@@ -973,7 +976,7 @@ module Assembler =
 
                             return id
 
-                        | Scalar, CVector(et, d) ->
+                        | Scalar, (CColor(et, d) | CVector(et,d)) ->
                             let! vid = newVector lType d lid
                             let! id = SpirV.id
                             match et with
@@ -1979,6 +1982,10 @@ type Backend private() =
 
     static let rec compileSimpleType (t : Type) =
         match t with
+            | ColorOf(d,et) ->
+                let et = compileSimpleType et
+                CColor(et, d)
+
             | VectorOf(d,et) -> 
                 let et = compileSimpleType et
                 CVector(et, d)

@@ -168,7 +168,9 @@ module GLSLType =
 
             | CType.CFloat(width) -> GLSLType.Float(width)
 
+            | CType.CColor(elem, dim)
             | CType.CVector(elem, dim) -> GLSLType.Vec(dim, ofCType rev elem)
+
             | CType.CMatrix(elem, r, c) -> 
                 if rev then GLSLType.Mat(r, c, ofCType rev elem)
                 else GLSLType.Mat(c, r, ofCType rev elem)
@@ -513,8 +515,9 @@ module private Tools =
             let msSuffix = if t.isMS then "MS" else ""
             let typePrefix = 
                 match t.valueType with
-                    | Vec(_,Int _) -> "i"
-                    | _ -> ""
+                | Vec(_, Int (true, _)) -> "i"
+                | Vec(_, Int (false, _)) -> "u"
+                | _ -> ""
                     
             if t.isArray then sprintf "%ssampler%s%sArray%s" typePrefix dimStr msSuffix shadowSuffix
             else sprintf "%ssampler%s%s%s" typePrefix dimStr msSuffix shadowSuffix 
@@ -531,8 +534,9 @@ module private Tools =
             let msSuffix = if t.isMS then "MS" else ""
             let typePrefix = 
                 match t.valueType with
-                    | Vec(_,Int _) -> "i"
-                    | _ -> ""
+                | Vec(_, Int (true, _)) -> "i"
+                | Vec(_, Int (false, _)) -> "u"
+                | _ -> ""
 
             let fmt = 
                 match t.format with
@@ -556,8 +560,9 @@ module private Tools =
             let msSuffix = if t.isMS then "MS" else ""
             let typePrefix = 
                 match t.valueType with
-                    | Vec(_,Int _) -> "i"
-                    | _ -> ""
+                | Vec(_, Int (true, _)) -> "i"
+                | Vec(_, Int (false, _)) -> "u"
+                | _ -> ""
                     
             if t.isArray then sprintf "%stexture%s%sArray%s" typePrefix dimStr msSuffix shadowSuffix
             else sprintf "%stexture%s%s%s" typePrefix dimStr msSuffix shadowSuffix 
