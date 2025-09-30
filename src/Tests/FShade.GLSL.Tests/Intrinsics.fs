@@ -156,12 +156,18 @@ let ``Inverse lerp``() =
         vertex {
             let mutable a = 0.0f
             a <- a + float32 (Fun.InvLerp(int8  v.c.X, int8  v.c.Y, int8  v.c.Z))
+            a <- a + float32 (Fun.InvLerp(uint8  v.c.X, uint8  v.c.Y, uint8  v.c.Z))
             a <- a + float32 (Fun.InvLerp(int16 v.c.X, int16 v.c.Y, int16 v.c.Z))
+            a <- a + float32 (Fun.InvLerp(uint16 v.c.X, uint16 v.c.Y, uint16 v.c.Z))
             a <- a + float32 (Fun.InvLerp(int32 v.c.X, int32 v.c.Y, int32 v.c.Z))
+            a <- a + float32 (Fun.InvLerp(uint32 v.c.X, uint32 v.c.Y, uint32 v.c.Z))
             a <- a + Fun.InvLerp(v.c.X - v.c.Y, v.c.Y, v.c.Z)
             a <- a + float32 (invLerp (int8  v.c.Y) (int8  v.c.Z) (int8  v.c.X))
+            a <- a + float32 (invLerp (uint8  v.c.Y) (uint8  v.c.Z) (uint8  v.c.X))
             a <- a + float32 (invLerp (int16 v.c.Y) (int16 v.c.Z) (int16 v.c.X))
+            a <- a + float32 (invLerp (uint16 v.c.Y) (uint16 v.c.Z) (uint16 v.c.X))
             a <- a + float32 (invLerp (int32 v.c.Y) (int32 v.c.Z) (int32 v.c.X))
+            a <- a + float32 (invLerp (uint32 v.c.Y) (uint32 v.c.Z) (uint32 v.c.X))
             a <- a + invLerp v.c.Y v.c.Z (v.c.X - v.c.Y)
             let _ = a
 
@@ -226,10 +232,20 @@ let ``Inverse lerp``() =
             let _ = Fun.InvLerp(V2i.One, V2i (getVec().XY), V2i.Zero)
             let x = float32 <| Fun.InvLerp(1, int <| getVec().X, 0)
 
+            let _ = invLerp (V4ui (getVec())) V4ui.Zero V4ui.One
+            let _ = invLerp (V3ui (getVec().XYZ)) V3ui.Zero V3ui.One
+            let _ = invLerp (V2ui (getVec().XY)) V2ui.Zero V2ui.One
+            let _ = invLerp (uint <| getVec().X) 0u 1u
+
+            let _ = Fun.InvLerp(V4ui.One, V4ui (getVec()), V4ui.Zero)
+            let _ = Fun.InvLerp(V3ui.One, V3ui (getVec().XYZ), V3ui.Zero)
+            let _ = Fun.InvLerp(V2ui.One, V2ui (getVec().XY), V2ui.Zero)
+            let x = float32 <| Fun.InvLerp(1u, uint <| getVec().X, 0u)
+
             return lerp v.c V4f.Zero x
         }
 
-    GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader] ["getVec", 17]
+    GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader] ["getVec", 24]
 
 [<Test>]
 let ``Inverse lerp constant``() =
@@ -328,6 +344,72 @@ let ``Lerp integer overloads``() =
             a <- a + lerp (V4i(v.c)) (V4i(v.c)) (float32 v.c.X)
             a <- a + lerp (V4i(v.c)) (V4i(v.c)) v.c
             a <- a + lerp (V4i(v.c)) (V4i(v.c)) (V4f(v.c))
+            let _ = a
+
+            let mutable a = V2ui.Zero
+            a <- a + Fun.Lerp(v.c.X, V2ui(v.c.XY), V2ui(v.c.XY))
+            a <- a + Fun.Lerp(float32 v.c.X, V2ui(v.c.XY), V2ui(v.c.XY))
+            a <- a + Fun.Lerp(v.c.XY, V2ui(v.c.XY), V2ui(v.c.XY))
+            a <- a + Fun.Lerp(V2f(v.c.XY), V2ui(v.c.XY), V2ui(v.c.XY))
+            a <- a + lerp (V2ui(v.c.XY)) (V2ui(v.c.XY)) v.c.X
+            a <- a + lerp (V2ui(v.c.XY)) (V2ui(v.c.XY)) (float32 v.c.X)
+            a <- a + lerp (V2ui(v.c.XY)) (V2ui(v.c.XY)) v.c.XY
+            a <- a + lerp (V2ui(v.c.XY)) (V2ui(v.c.XY)) (V2f(v.c.XY))
+            let _ = a
+
+            let mutable a = V3ui.Zero
+            a <- a + Fun.Lerp(v.c.X, V3ui(v.c.XYZ), V3ui(v.c.XYZ))
+            a <- a + Fun.Lerp(float32 v.c.X, V3ui(v.c.XYZ), V3ui(v.c.XYZ))
+            a <- a + Fun.Lerp(v.c.XYZ, V3ui(v.c.XYZ), V3ui(v.c.XYZ))
+            a <- a + Fun.Lerp(V3f(v.c.XYZ), V3ui(v.c.XYZ), V3ui(v.c.XYZ))
+            a <- a + lerp (V3ui(v.c.XYZ)) (V3ui(v.c.XYZ)) v.c.X
+            a <- a + lerp (V3ui(v.c.XYZ)) (V3ui(v.c.XYZ)) (float32 v.c.X)
+            a <- a + lerp (V3ui(v.c.XYZ)) (V3ui(v.c.XYZ)) v.c.XYZ
+            a <- a + lerp (V3ui(v.c.XYZ)) (V3ui(v.c.XYZ)) (V3f(v.c.XYZ))
+            let _ = a
+
+            let mutable a = V4ui.Zero
+            a <- a + Fun.Lerp(v.c.X, V4ui(v.c), V4ui(v.c))
+            a <- a + Fun.Lerp(float32 v.c.X, V4ui(v.c), V4ui(v.c))
+            a <- a + Fun.Lerp(v.c, V4ui(v.c), V4ui(v.c))
+            a <- a + Fun.Lerp(V4f(v.c), V4ui(v.c), V4ui(v.c))
+            a <- a + lerp (V4ui(v.c)) (V4ui(v.c)) v.c.X
+            a <- a + lerp (V4ui(v.c)) (V4ui(v.c)) (float32 v.c.X)
+            a <- a + lerp (V4ui(v.c)) (V4ui(v.c)) v.c
+            a <- a + lerp (V4ui(v.c)) (V4ui(v.c)) (V4f(v.c))
+            let _ = a
+            
+            let mutable a = V2l.Zero
+            a <- a + Fun.Lerp(v.c.X, V2l(v.c.XY), V2l(v.c.XY))
+            a <- a + Fun.Lerp(float32 v.c.X, V2l(v.c.XY), V2l(v.c.XY))
+            a <- a + Fun.Lerp(v.c.XY, V2l(v.c.XY), V2l(v.c.XY))
+            a <- a + Fun.Lerp(V2f(v.c.XY), V2l(v.c.XY), V2l(v.c.XY))
+            a <- a + lerp (V2l(v.c.XY)) (V2l(v.c.XY)) v.c.X
+            a <- a + lerp (V2l(v.c.XY)) (V2l(v.c.XY)) (float32 v.c.X)
+            a <- a + lerp (V2l(v.c.XY)) (V2l(v.c.XY)) v.c.XY
+            a <- a + lerp (V2l(v.c.XY)) (V2l(v.c.XY)) (V2f(v.c.XY))
+            let _ = a
+
+            let mutable a = V3l.Zero
+            a <- a + Fun.Lerp(v.c.X, V3l(v.c.XYZ), V3l(v.c.XYZ))
+            a <- a + Fun.Lerp(float32 v.c.X, V3l(v.c.XYZ), V3l(v.c.XYZ))
+            a <- a + Fun.Lerp(v.c.XYZ, V3l(v.c.XYZ), V3l(v.c.XYZ))
+            a <- a + Fun.Lerp(V3f(v.c.XYZ), V3l(v.c.XYZ), V3l(v.c.XYZ))
+            a <- a + lerp (V3l(v.c.XYZ)) (V3l(v.c.XYZ)) v.c.X
+            a <- a + lerp (V3l(v.c.XYZ)) (V3l(v.c.XYZ)) (float32 v.c.X)
+            a <- a + lerp (V3l(v.c.XYZ)) (V3l(v.c.XYZ)) v.c.XYZ
+            a <- a + lerp (V3l(v.c.XYZ)) (V3l(v.c.XYZ)) (V3f(v.c.XYZ))
+            let _ = a
+
+            let mutable a = V4l.Zero
+            a <- a + Fun.Lerp(v.c.X, V4l(v.c), V4l(v.c))
+            a <- a + Fun.Lerp(float32 v.c.X, V4l(v.c), V4l(v.c))
+            a <- a + Fun.Lerp(v.c, V4l(v.c), V4l(v.c))
+            a <- a + Fun.Lerp(V4f(v.c), V4l(v.c), V4l(v.c))
+            a <- a + lerp (V4l(v.c)) (V4l(v.c)) v.c.X
+            a <- a + lerp (V4l(v.c)) (V4l(v.c)) (float32 v.c.X)
+            a <- a + lerp (V4l(v.c)) (V4l(v.c)) v.c
+            a <- a + lerp (V4l(v.c)) (V4l(v.c)) (V4f(v.c))
             let _ = a
 
             return v.pos

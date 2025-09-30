@@ -202,3 +202,88 @@ let ``Color arithmetic``() =
         }
 
     GLSL.shouldCompile [Effect.ofFunction shader]
+
+[<Test>]
+let ``Color lerp``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = assertT <| Fun.Lerp(0.5f, v.color, v.color)
+            let _ = assertT <| Fun.Lerp(0.5, v.color, v.color)
+            let _ = assertT <| Fun.Lerp(0.5f, C4b v.color, C4b v.color)
+            let _ = assertT <| Fun.Lerp(0.5, C4b v.color, C4b v.color)
+            let _ = assertT <| Fun.Lerp(V3f 0.5f, v.color, v.color)
+            let _ = assertT <| Fun.Lerp(V3d 0.5, v.color, v.color)
+            let _ = assertT <| Fun.Lerp(V4f 0.5f, C4b v.color, C4b v.color)
+            let _ = assertT <| Fun.Lerp(V4d 0.5, C4b v.color, C4b v.color)
+
+            let _ = assertT <| lerp v.color v.color 0.5f
+            let _ = assertT <| lerp v.color v.color 0.5
+            let _ = assertT <| lerp (C4b v.color) (C4b v.color) 0.5f
+            let _ = assertT <| lerp (C4b v.color) (C4b v.color) 0.5
+            let _ = assertT <| lerp v.color v.color (V3f 0.5f)
+            let _ = assertT <| lerp v.color v.color (V3d 0.5)
+            let _ = assertT <| lerp (C4b v.color) (C4b v.color) (V4f 0.5f)
+            let _ = assertT <| lerp (C4b v.color) (C4b v.color) (V4d 0.5)
+
+            let _ = assertT <| Fun.Lerp(0.5f, C3us v.color, C3us v.color)
+            let _ = assertT <| Fun.Lerp(0.5, C3us v.color, C3us v.color)
+            let _ = assertT <| Fun.Lerp(0.5f, C4us v.color, C4us v.color)
+            let _ = assertT <| Fun.Lerp(0.5, C4us v.color, C4us v.color)
+            let _ = assertT <| Fun.Lerp(V3f 0.5f, C3us v.color, C3us v.color)
+            let _ = assertT <| Fun.Lerp(V3d 0.5, C3us v.color, C3us v.color)
+            let _ = assertT <| Fun.Lerp(V4f 0.5f, C4us v.color, C4us v.color)
+            let _ = assertT <| Fun.Lerp(V4d 0.5, C4us v.color, C4us v.color)
+
+            let _ = assertT <| lerp (C3us v.color) (C3us v.color) 0.5f
+            let _ = assertT <| lerp (C3us v.color) (C3us v.color) 0.5
+            let _ = assertT <| lerp (C4us v.color) (C4us v.color) 0.5f
+            let _ = assertT <| lerp (C4us v.color) (C4us v.color) 0.5
+            let _ = assertT <| lerp (C3us v.color) (C3us v.color) (V3f 0.5f)
+            let _ = assertT <| lerp (C3us v.color) (C3us v.color) (V3d 0.5)
+            let _ = assertT <| lerp (C4us v.color) (C4us v.color) (V4f 0.5f)
+            let _ = assertT <| lerp (C4us v.color) (C4us v.color) (V4d 0.5)
+            
+            let _ = assertT <| Fun.Lerp(0.5f, C3ui v.color, C3ui v.color)
+            let _ = assertT <| Fun.Lerp(0.5, C3ui v.color, C3ui v.color)
+            let _ = assertT <| Fun.Lerp(0.5f, C4ui v.color, C4ui v.color)
+            let _ = assertT <| Fun.Lerp(0.5, C4ui v.color, C4ui v.color)
+            let _ = assertT <| Fun.Lerp(V3f 0.5f, C3ui v.color, C3ui v.color)
+            let _ = assertT <| Fun.Lerp(V3d 0.5, C3ui v.color, C3ui v.color)
+            let _ = assertT <| Fun.Lerp(V4f 0.5f, C4ui v.color, C4ui v.color)
+            let _ = assertT <| Fun.Lerp(V4d 0.5, C4ui v.color, C4ui v.color)
+
+            let _ = assertT <| lerp (C3ui v.color) (C3ui v.color) 0.5f
+            let _ = assertT <| lerp (C3ui v.color) (C3ui v.color) 0.5
+            let _ = assertT <| lerp (C4ui v.color) (C4ui v.color) 0.5f
+            let _ = assertT <| lerp (C4ui v.color) (C4ui v.color) 0.5
+            let _ = assertT <| lerp (C3ui v.color) (C3ui v.color) (V3f 0.5f)
+            let _ = assertT <| lerp (C3ui v.color) (C3ui v.color) (V3d 0.5)
+            let _ = assertT <| lerp (C4ui v.color) (C4ui v.color) (V4f 0.5f)
+            let _ = assertT <| lerp (C4ui v.color) (C4ui v.color) (V4d 0.5)
+            
+            let _ = assertT <| Fun.Lerp(0.5f, C3f v.color, C3f v.color)
+            let _ = assertT <| Fun.Lerp(0.5f, C4f v.color, C4f v.color)
+            let _ = assertT <| Fun.Lerp(V3f 0.5f, C3f v.color, C3f v.color)
+            let _ = assertT <| Fun.Lerp(V4f 0.5f, C4f v.color, C4f v.color)
+
+            let _ = assertT <| lerp (C3f v.color) (C3f v.color) 0.5f
+            let _ = assertT <| lerp (C4f v.color) (C4f v.color) 0.5f
+            let _ = assertT <| lerp (C3f v.color) (C3f v.color) (V3f 0.5f)
+            let _ = assertT <| lerp (C4f v.color) (C4f v.color) (V4f 0.5f)
+
+            let _ = assertT <| Fun.Lerp(0.5, C3d v.color, C3d v.color)
+            let _ = assertT <| Fun.Lerp(0.5, C4d v.color, C4d v.color)
+            let _ = assertT <| Fun.Lerp(V3d 0.5, C3d v.color, C3d v.color)
+            let _ = assertT <| Fun.Lerp(V4d 0.5, C4d v.color, C4d v.color)
+
+            let _ = assertT <| lerp (C3d v.color) (C3d v.color) 0.5
+            let _ = assertT <| lerp (C4d v.color) (C4d v.color) 0.5
+            let _ = assertT <| lerp (C3d v.color) (C3d v.color) (V3d 0.5)
+            let _ = assertT <| lerp (C4d v.color) (C4d v.color) (V4d 0.5)
+
+            return v
+        }
+
+    GLSL.shouldCompile [Effect.ofFunction shader]

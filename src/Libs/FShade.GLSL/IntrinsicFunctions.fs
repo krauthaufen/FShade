@@ -1271,68 +1271,184 @@ module IntrinsicFunctions =
 
             CIntrinsic.tagged "ivec2(round(mix({1}, {2}, {0})))", [
                 exactly <@ Fun.Lerp : float32 * V2i * V2i -> _ @>
-                exactly <@ Fun.Lerp : float32 * V2l * V2l -> _ @>
                 exactly <@ Fun.Lerp : float * V2i * V2i -> _ @>
-                exactly <@ Fun.Lerp : float * V2l * V2l -> _ @>
                 exactly <@ Fun.Lerp : V2f * V2i * V2i -> _ @>
-                exactly <@ Fun.Lerp : V2f * V2l * V2l -> _ @>
                 exactly <@ Fun.Lerp : V2d * V2i * V2i -> _ @>
-                exactly <@ Fun.Lerp : V2d * V2l * V2l -> _ @>
+            ]
+            CIntrinsic.tagged "ivec3(round(mix({1}, {2}, {0})))", [
+                exactly <@ Fun.Lerp : float32 * V3i * V3i -> _ @>
+                exactly <@ Fun.Lerp : float * V3i * V3i -> _ @>
+                exactly <@ Fun.Lerp : V3f * V3i * V3i -> _ @>
+                exactly <@ Fun.Lerp : V3d * V3i * V3i -> _ @>
+            ]
+            CIntrinsic.tagged "ivec4(round(mix({1}, {2}, {0})))", [
+                exactly <@ Fun.Lerp : float32 * V4i * V4i -> _ @>
+                exactly <@ Fun.Lerp : float * V4i * V4i -> _ @>
+                exactly <@ Fun.Lerp : V4f * V4i * V4i -> _ @>
+                exactly <@ Fun.Lerp : V4d * V4i * V4i -> _ @>
             ]
 
             CIntrinsic.tagged "ivec2(round(mix({0}, {1}, {2})))", [
                 exactly <@ lerp : V2i -> V2i -> float32 -> _ @>
-                exactly <@ lerp : V2l -> V2l -> float32 -> _ @>
                 exactly <@ lerp : V2i -> V2i -> float -> _ @>
-                exactly <@ lerp : V2l -> V2l -> float -> _ @>
                 exactly <@ lerp : V2i -> V2i -> V2f -> _ @>
-                exactly <@ lerp : V2l -> V2l -> V2f -> _ @>
                 exactly <@ lerp : V2i -> V2i -> V2d -> _ @>
-                exactly <@ lerp : V2l -> V2l -> V2d -> _ @>
             ]
-
-            CIntrinsic.tagged "ivec3(round(mix({1}, {2}, {0})))", [
-                exactly <@ Fun.Lerp : float32 * V3i * V3i -> _ @>
-                exactly <@ Fun.Lerp : float32 * V3l * V3l -> _ @>
-                exactly <@ Fun.Lerp : float * V3i * V3i -> _ @>
-                exactly <@ Fun.Lerp : float * V3l * V3l -> _ @>
-                exactly <@ Fun.Lerp : V3f * V3i * V3i -> _ @>
-                exactly <@ Fun.Lerp : V3f * V3l * V3l -> _ @>
-                exactly <@ Fun.Lerp : V3d * V3i * V3i -> _ @>
-                exactly <@ Fun.Lerp : V3d * V3l * V3l -> _ @>
-            ]
-
             CIntrinsic.tagged "ivec3(round(mix({0}, {1}, {2})))", [
                 exactly <@ lerp : V3i -> V3i -> float32 -> _ @>
-                exactly <@ lerp : V3l -> V3l -> float32 -> _ @>
                 exactly <@ lerp : V3i -> V3i -> float -> _ @>
-                exactly <@ lerp : V3l -> V3l -> float -> _ @>
                 exactly <@ lerp : V3i -> V3i -> V3f -> _ @>
-                exactly <@ lerp : V3l -> V3l -> V3f -> _ @>
                 exactly <@ lerp : V3i -> V3i -> V3d -> _ @>
-                exactly <@ lerp : V3l -> V3l -> V3d -> _ @>
+            ]
+            CIntrinsic.tagged "ivec4(round(mix({0}, {1}, {2})))", [
+                exactly <@ lerp : V4i -> V4i -> float32 -> _ @>
+                exactly <@ lerp : V4i -> V4i -> float -> _ @>
+                exactly <@ lerp : V4i -> V4i -> V4f -> _ @>
+                exactly <@ lerp : V4i -> V4i -> V4d -> _ @>
             ]
 
-            CIntrinsic.tagged "ivec4(round(mix({1}, {2}, {0})))", [
-                exactly <@ Fun.Lerp : float32 * V4i * V4i -> _ @>
+            CIntrinsic.tagged "i64vec2(round(mix({1}, {2}, {0})))", [
+                exactly <@ Fun.Lerp : float32 * V2l * V2l -> _ @>
+                exactly <@ Fun.Lerp : float * V2l * V2l -> _ @>
+                exactly <@ Fun.Lerp : V2f * V2l * V2l -> _ @>
+                exactly <@ Fun.Lerp : V2d * V2l * V2l -> _ @>
+            ]
+            CIntrinsic.tagged "i64vec3(round(mix({1}, {2}, {0})))", [
+                exactly <@ Fun.Lerp : float32 * V3l * V3l -> _ @>
+                exactly <@ Fun.Lerp : float * V3l * V3l -> _ @>
+                exactly <@ Fun.Lerp : V3f * V3l * V3l -> _ @>
+                exactly <@ Fun.Lerp : V3d * V3l * V3l -> _ @>
+            ]
+            CIntrinsic.tagged "i64vec4(round(mix({1}, {2}, {0})))", [
                 exactly <@ Fun.Lerp : float32 * V4l * V4l -> _ @>
-                exactly <@ Fun.Lerp : float * V4i * V4i -> _ @>
                 exactly <@ Fun.Lerp : float * V4l * V4l -> _ @>
-                exactly <@ Fun.Lerp : V4f * V4i * V4i -> _ @>
                 exactly <@ Fun.Lerp : V4f * V4l * V4l -> _ @>
-                exactly <@ Fun.Lerp : V4d * V4i * V4i -> _ @>
                 exactly <@ Fun.Lerp : V4d * V4l * V4l -> _ @>
             ]
 
-            CIntrinsic.tagged "ivec4(round(mix({0}, {1}, {2})))", [
-                exactly <@ lerp : V4i -> V4i -> float32 -> _ @>
+            CIntrinsic.tagged "i64vec2(round(mix({0}, {1}, {2})))", [
+                exactly <@ lerp : V2l -> V2l -> float32 -> _ @>
+                exactly <@ lerp : V2l -> V2l -> float -> _ @>
+                exactly <@ lerp : V2l -> V2l -> V2f -> _ @>
+                exactly <@ lerp : V2l -> V2l -> V2d -> _ @>
+            ]
+            CIntrinsic.tagged "i64vec3(round(mix({0}, {1}, {2})))", [
+                exactly <@ lerp : V3l -> V3l -> float32 -> _ @>
+                exactly <@ lerp : V3l -> V3l -> float -> _ @>
+                exactly <@ lerp : V3l -> V3l -> V3f -> _ @>
+                exactly <@ lerp : V3l -> V3l -> V3d -> _ @>
+            ]
+            CIntrinsic.tagged "i64vec4(round(mix({0}, {1}, {2})))", [
                 exactly <@ lerp : V4l -> V4l -> float32 -> _ @>
-                exactly <@ lerp : V4i -> V4i -> float -> _ @>
                 exactly <@ lerp : V4l -> V4l -> float -> _ @>
-                exactly <@ lerp : V4i -> V4i -> V4f -> _ @>
                 exactly <@ lerp : V4l -> V4l -> V4f -> _ @>
-                exactly <@ lerp : V4i -> V4i -> V4d -> _ @>
                 exactly <@ lerp : V4l -> V4l -> V4d -> _ @>
+            ]
+
+            CIntrinsic.tagged "u8vec3(mix({1}, {2}, {0}) + 0.5)", [
+                exactly <@ Fun.Lerp : float32 * C3b * C3b -> _ @>
+                exactly <@ Fun.Lerp : float * C3b * C3b -> _ @>
+                exactly <@ Fun.Lerp : V3f * C3b * C3b -> _ @>
+                exactly <@ Fun.Lerp : V3d * C3b * C3b -> _ @>
+            ]
+            CIntrinsic.tagged "u8vec4(mix({1}, {2}, {0}) + 0.5)", [
+                exactly <@ Fun.Lerp : float32 * C4b * C4b -> _ @>
+                exactly <@ Fun.Lerp : float * C4b * C4b -> _ @>
+                exactly <@ Fun.Lerp : V4f * C4b * C4b -> _ @>
+                exactly <@ Fun.Lerp : V4d * C4b * C4b -> _ @>
+            ]
+
+            CIntrinsic.tagged "u8vec3(mix({0}, {1}, {2}) + 0.5)", [
+                exactly <@ lerp : C3b -> C3b -> float32 -> _ @>
+                exactly <@ lerp : C3b -> C3b -> float -> _ @>
+                exactly <@ lerp : C3b -> C3b -> V3f -> _ @>
+                exactly <@ lerp : C3b -> C3b -> V3d -> _ @>
+            ]
+            CIntrinsic.tagged "u8vec4(mix({0}, {1}, {2}) + 0.5)", [
+                exactly <@ lerp : C4b -> C4b -> float32 -> _ @>
+                exactly <@ lerp : C4b -> C4b -> float -> _ @>
+                exactly <@ lerp : C4b -> C4b -> V4f -> _ @>
+                exactly <@ lerp : C4b -> C4b -> V4d -> _ @>
+            ]
+
+            CIntrinsic.tagged "u16vec3(mix({1}, {2}, {0}) + 0.5)", [
+                exactly <@ Fun.Lerp : float32 * C3us * C3us -> _ @>
+                exactly <@ Fun.Lerp : float * C3us * C3us -> _ @>
+                exactly <@ Fun.Lerp : V3f * C3us * C3us -> _ @>
+                exactly <@ Fun.Lerp : V3d * C3us * C3us -> _ @>
+            ]
+            CIntrinsic.tagged "u16vec4(mix({1}, {2}, {0}) + 0.5)", [
+                exactly <@ Fun.Lerp : float32 * C4us * C4us -> _ @>
+                exactly <@ Fun.Lerp : float * C4us * C4us -> _ @>
+                exactly <@ Fun.Lerp : V4f * C4us * C4us -> _ @>
+                exactly <@ Fun.Lerp : V4d * C4us * C4us -> _ @>
+            ]
+
+            CIntrinsic.tagged "u16vec3(mix({0}, {1}, {2}) + 0.5)", [
+                exactly <@ lerp : C3us -> C3us -> float32 -> _ @>
+                exactly <@ lerp : C3us -> C3us -> float -> _ @>
+                exactly <@ lerp : C3us -> C3us -> V3f -> _ @>
+                exactly <@ lerp : C3us -> C3us -> V3d -> _ @>
+            ]
+            CIntrinsic.tagged "u16vec4(mix({0}, {1}, {2}) + 0.5)", [
+                exactly <@ lerp : C4us -> C4us -> float32 -> _ @>
+                exactly <@ lerp : C4us -> C4us -> float -> _ @>
+                exactly <@ lerp : C4us -> C4us -> V4f -> _ @>
+                exactly <@ lerp : C4us -> C4us -> V4d -> _ @>
+            ]
+
+            CIntrinsic.tagged "uvec2(mix({1}, {2}, {0}) + 0.5)", [
+                exactly <@ Fun.Lerp : float32 * V2ui * V2ui -> _ @>
+                exactly <@ Fun.Lerp : float * V2ui * V2ui -> _ @>
+                exactly <@ Fun.Lerp : V2f * V2ui * V2ui -> _ @>
+                exactly <@ Fun.Lerp : V2d * V2ui * V2ui -> _ @>
+            ]
+            CIntrinsic.tagged "uvec3(mix({1}, {2}, {0}) + 0.5)", [
+                exactly <@ Fun.Lerp : float32 * V3ui * V3ui -> _ @>
+                exactly <@ Fun.Lerp : float32 * C3ui * C3ui -> _ @>
+                exactly <@ Fun.Lerp : float * V3ui * V3ui -> _ @>
+                exactly <@ Fun.Lerp : float * C3ui * C3ui -> _ @>
+                exactly <@ Fun.Lerp : V3f * V3ui * V3ui -> _ @>
+                exactly <@ Fun.Lerp : V3f * C3ui * C3ui -> _ @>
+                exactly <@ Fun.Lerp : V3d * V3ui * V3ui -> _ @>
+                exactly <@ Fun.Lerp : V3d * C3ui * C3ui -> _ @>
+            ]
+            CIntrinsic.tagged "uvec4(mix({1}, {2}, {0}) + 0.5)", [
+                exactly <@ Fun.Lerp : float32 * V4ui * V4ui -> _ @>
+                exactly <@ Fun.Lerp : float32 * C4ui * C4ui -> _ @>
+                exactly <@ Fun.Lerp : float * V4ui * V4ui -> _ @>
+                exactly <@ Fun.Lerp : float * C4ui * C4ui -> _ @>
+                exactly <@ Fun.Lerp : V4f * V4ui * V4ui -> _ @>
+                exactly <@ Fun.Lerp : V4f * C4ui * C4ui -> _ @>
+                exactly <@ Fun.Lerp : V4d * V4ui * V4ui -> _ @>
+                exactly <@ Fun.Lerp : V4d * C4ui * C4ui -> _ @>
+            ]
+
+            CIntrinsic.tagged "uvec2(mix({0}, {1}, {2}) + 0.5)", [
+                exactly <@ lerp : V2ui -> V2ui -> float32 -> _ @>
+                exactly <@ lerp : V2ui -> V2ui -> float -> _ @>
+                exactly <@ lerp : V2ui -> V2ui -> V2f -> _ @>
+                exactly <@ lerp : V2ui -> V2ui -> V2d -> _ @>
+            ]
+            CIntrinsic.tagged "uvec3(mix({0}, {1}, {2}) + 0.5)", [
+                exactly <@ lerp : V3ui -> V3ui -> float32 -> _ @>
+                exactly <@ lerp : C3ui -> C3ui -> float32 -> _ @>
+                exactly <@ lerp : V3ui -> V3ui -> float -> _ @>
+                exactly <@ lerp : C3ui -> C3ui -> float -> _ @>
+                exactly <@ lerp : V3ui -> V3ui -> V3f -> _ @>
+                exactly <@ lerp : C3ui -> C3ui -> V3f -> _ @>
+                exactly <@ lerp : V3ui -> V3ui -> V3d -> _ @>
+                exactly <@ lerp : C3ui -> C3ui -> V3d -> _ @>
+            ]
+            CIntrinsic.tagged "uvec4(mix({0}, {1}, {2}) + 0.5)", [
+                exactly <@ lerp : V4ui -> V4ui -> float32 -> _ @>
+                exactly <@ lerp : C4ui -> C4ui -> float32 -> _ @>
+                exactly <@ lerp : V4ui -> V4ui -> float -> _ @>
+                exactly <@ lerp : C4ui -> C4ui -> float -> _ @>
+                exactly <@ lerp : V4ui -> V4ui -> V4f -> _ @>
+                exactly <@ lerp : C4ui -> C4ui -> V4f -> _ @>
+                exactly <@ lerp : V4ui -> V4ui -> V4d -> _ @>
+                exactly <@ lerp : C4ui -> C4ui -> V4d -> _ @>
             ]
 
             CIntrinsic.custom "mix" [1; 2; 0], [
@@ -1341,19 +1457,27 @@ module IntrinsicFunctions =
 
                 exactly <@ Fun.Lerp : float32 * V2f * V2f -> _ @>
                 exactly <@ Fun.Lerp : float32 * V3f * V3f -> _ @>
+                exactly <@ Fun.Lerp : float32 * C3f * C3f -> _ @>
                 exactly <@ Fun.Lerp : float32 * V4f * V4f -> _ @>
+                exactly <@ Fun.Lerp : float32 * C4f * C4f -> _ @>
 
                 exactly <@ Fun.Lerp : float * V2d * V2d -> _ @>
                 exactly <@ Fun.Lerp : float * V3d * V3d -> _ @>
+                exactly <@ Fun.Lerp : float * C3d * C3d -> _ @>
                 exactly <@ Fun.Lerp : float * V4d * V4d -> _ @>
+                exactly <@ Fun.Lerp : float * C4d * C4d -> _ @>
 
                 exactly <@ Fun.Lerp : V2f * V2f * V2f -> _ @>
                 exactly <@ Fun.Lerp : V3f * V3f * V3f -> _ @>
+                exactly <@ Fun.Lerp : V3f * C3f * C3f -> _ @>
                 exactly <@ Fun.Lerp : V4f * V4f * V4f -> _ @>
+                exactly <@ Fun.Lerp : V4f * C4f * C4f -> _ @>
 
                 exactly <@ Fun.Lerp : V2d * V2d * V2d -> _ @>
                 exactly <@ Fun.Lerp : V3d * V3d * V3d -> _ @>
+                exactly <@ Fun.Lerp : V3d * C3d * C3d -> _ @>
                 exactly <@ Fun.Lerp : V4d * V4d * V4d -> _ @>
+                exactly <@ Fun.Lerp : V4d * C4d * C4d -> _ @>
             ]
 
             CIntrinsic.simple "mix", [
