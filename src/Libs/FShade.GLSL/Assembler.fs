@@ -1469,14 +1469,18 @@ module Assembler =
             | CLiteral.Null -> return "null"
             | CLiteral.CIntegral v ->
                 match t with
-                | CType.CInt (signed, (8 | 16 as size)) ->
+                | CType.CInt (signed, 8) ->
                     let! t = assembleTypeS false t
                     let! v = assembleLiteralS (CType.CInt(signed, 32)) l
                     return $"{t.Name}({v})"
 
                 | _ ->
+                    let! _ = assembleTypeS false t
+
                     let suffix =
                         match t with
+                        | CType.CInt(true, 16) -> "s"
+                        | CType.CInt(false, 16) -> "us"
                         | CType.CInt(false, 32) -> "u"
                         | CType.CInt(true, 64)  -> "L"
                         | CType.CInt(false, 64) -> "UL"
