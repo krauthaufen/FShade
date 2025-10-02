@@ -70,7 +70,7 @@ type HitObject =
     /// shaders as ray-geometry intersections are being evaluated, and returns the
     /// resulting hit or miss information in the hit object. This does not
     /// execute any closest-hit or miss shaders. No thread reordering
-    /// or user-observable driver side scheduling occurs.
+    /// or user-observable driver-side scheduling occurs.
     /// </summary>
     /// <remarks>
     /// Only allowed in ray generation, closest-hit, and miss shaders.
@@ -114,7 +114,7 @@ type HitObject =
     /// shaders as ray-geometry intersections are being evaluated, and returns the
     /// resulting hit or miss information in the hit object. This does not
     /// execute any closest-hit or miss shaders. No thread reordering
-    /// or user-observable driver side scheduling occurs.
+    /// or user-observable driver-side scheduling occurs.
     /// </summary>
     /// <remarks>
     /// Only allowed in ray generation, closest-hit, and miss shaders.
@@ -318,7 +318,7 @@ type Thread =
     /// <summary>
     /// Reorder threads based on a user provided hint. Similar hint values
     /// indicate similarity of subsequent work done after this call. Behavior
-    /// is implementation defined.
+    /// is implementation-defined.
     /// </summary>
     /// <remarks>
     /// Only allowed in ray generation shaders.
@@ -331,7 +331,7 @@ type Thread =
     /// <summary>
     /// Reorder threads based on a user provided hint. Similar hint values
     /// indicate similarity of subsequent work done after this call. Behavior
-    /// is implementation defined.
+    /// is implementation-defined.
     /// </summary>
     /// <remarks>
     /// Only allowed in ray generation shaders.
@@ -343,8 +343,7 @@ type Thread =
 
     /// <summary>
     /// Reorder threads based on the provided hit object. The exact properties
-    /// from the hit object which are used to reorder the threads is implementation
-    /// defined.
+    /// from the hit object which are used to reorder the threads are implementation-defined.
     /// </summary>
     /// <remarks>
     /// Only allowed in ray generation shaders.
@@ -356,8 +355,8 @@ type Thread =
     /// <summary>
     /// Reorder threads based on the provided hit object supplemented by additional
     /// information based on a user provided hint. The exact properties from
-    /// the hit object and the user specified hint which are used to reorder theads is
-    /// implementation defined.
+    /// the hit object and the user specified hint which are used to reorder threads are
+    /// implementation-defined.
     /// </summary>
     /// <remarks>
     /// Only allowed in ray generation shaders.
@@ -371,8 +370,8 @@ type Thread =
     /// <summary>
     /// Reorder threads based on the provided hit object supplemented by additional
     /// information based on a user provided hint. The exact properties from
-    /// the hit object and the user specified hint which are used to reorder theads is
-    /// implementation defined.
+    /// the hit object and the user specified hint which are used to reorder threads are
+    /// implementation-defined.
     /// </summary>
     /// <remarks>
     /// Only allowed in ray generation shaders.

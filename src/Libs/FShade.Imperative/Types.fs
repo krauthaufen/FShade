@@ -24,39 +24,72 @@ type MemoryType =
     | Global = 1
     | Local = 2
 
+/// <summary>
+/// Bitmask flags that control ray traversal, hit reporting and shader invocation.
+/// These mirror the commonly used ray flags in Vulkan (KHR) and DirectX Raytracing (DXR)
+/// and are suppliedwhen invoking Scene.TraceRay or HitObject.TraceRay.
+/// </summary>
 [<Flags>]
 type RayFlags =
+    /// No special behavior; default traversal and shading.
     | None                          = 0
 
-    /// Force all geometries to behave as if they are opaque, regardless of their build parameters.
+    /// <summary>
+    /// Treat all geometry as opaque regardless of build-time opacity state.
+    /// Often used to bypass any-hit shaders and alpha-testing for faster traversal when transparency is not needed.
+    /// </summary>
+    /// <remarks>
     /// Mutually exclusive with NoOpaque, CullOpaque, and CullNoOpaque.
+    /// </remarks>
     | Opaque                        = 1
 
-    /// Force all geometries to behave as if they are non-opaque, regardless of their build parameters.
+    /// <summary>
+    /// Treat all geometry as non-opaque regardless of build-time opacity state.
+    /// </summary>
+    /// <remarks>
     /// Mutually exclusive with Opaque, CullOpaque, and CullNoOpaque.
+    /// </remarks>
     | NoOpaque                      = 2
 
-    /// Do not sort hit candidates to determine the closest intersection.
-    /// Use the first reported intersection instead.
+    /// <summary>
+    /// Do not sort hit candidates to determine the closest intersection; traversal may terminate
+    /// as soon as any hit is found and the first reported intersection is used as the final hit.
+    /// </summary>
     | TerminateOnFirstHit           = 4
 
-    /// Do not execute the closest hit shader after the closest intersection has been determined.
+    /// Do not execute the closest-hit shader even if a closest intersection is found.
     | SkipClosestHitShader          = 8
 
+    /// <summary>
     /// Ignore intersections with back-facing triangles.
+    /// </summary>
+    /// <remarks>
     /// Mutually exclusive with CullFrontFacingTriangles.
+    /// </remarks>
     | CullBackFacingTriangles       = 16
 
+    /// <summary>
     /// Ignore intersections with front-facing triangles.
+    /// </summary>
+    /// <remarks>
     /// Mutually exclusive with CullBackFacingTriangles.
+    /// </remarks>
     | CullFrontFacingTriangles      = 32
 
+    /// <summary>
     /// Ignore intersections with geometry that is considered opaque.
+    /// </summary>
+    /// <remarks>
     /// Mutually exclusive with Opaque, NoOpaque, and CullNoOpaque.
+    /// </remarks>
     | CullOpaque                    = 64
 
+    /// <summary>
     /// Ignore intersections with geometry that is considered non-opaque.
+    /// </summary>
+    /// <remarks>
     /// Mutually exclusive with Opaque, NoOpaque, and CullOpaque.
+    /// </remarks>
     | CullNoOpaque                  = 128
 
     /// <summary>

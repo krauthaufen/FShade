@@ -197,8 +197,13 @@ module Primitives =
     let inline ddyCoarse< ^a when ^a : (static member (-) : ^a -> ^a -> ^a) > (v : ^a) : ^a = onlyInShaderCode "ffyCoarse"
     let discard () : unit = onlyInShaderCode "discard"
 
+    /// <summary>
     /// Signals to the optimizer that the given for-loop should be unrolled if possible.
-    /// E.g. "for i = unroll 0 to 5 do" or "for i in unroll 0 .. 5 do"
+    /// </summary>
+    /// <example>
+    /// Usage:
+    /// <code>for i = unroll 0 to 5 do</code> or <code>for i in unroll 0 .. 5 do</code>
+    /// </example>
     let unroll (loop: 'T) : 'T = onlyInShaderCode "unroll"
 
     [<ReflectedDefinition>]

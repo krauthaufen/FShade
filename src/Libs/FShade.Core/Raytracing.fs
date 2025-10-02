@@ -17,8 +17,15 @@ module private TraceDefaults =
     [<Literal>]
     let CullMask = 0xFF
 
-/// Identifies a ray type by its name.
-/// Gets replaced by the index corresponding to the name when the raytracing effect is compiled.
+/// <summary>
+/// Identifies a ray type by its symbolic name.
+/// </summary>
+/// <remarks>
+/// During effect compilation the name is resolved to a zero-based Shader Binding Table (SBT) index.
+/// In user code you typically construct a RayId from a string or Symbol; at runtime the compiler replaces it
+/// with the corresponding index. Use RayId.Default for the default ray type or RayId.None to indicate that no
+/// valid ray identifier should be used (e.g., when constructing parameters that are unused).
+/// </remarks>
 [<Struct>]
 type RayId =
     val Name : Symbol
@@ -28,11 +35,19 @@ type RayId =
     new (name: Symbol) = RayId(name, -1)
     new (name: string) = RayId(Sym.ofString name)
 
-    /// Special RayId that will not be considered as a valid identifier.
-    /// Will not produce a new entry in the SBT and results in an invalid negative index.
+    /// <summary>
+    /// Special value that does not represent a valid ray identifier.
+    /// </summary>
+    /// <remarks>
+    /// Using RayId.None will not create a new SBT entry and results in a negative internal index.
+    /// This is typically used to indicate that a ray identifier parameter is intentionally unspecified.
+    /// </remarks>
     static member None = RayId(Symbol.Empty, -2)
 
-    /// The default RayId when unspecified. Equivalent to RayId().
+    /// <summary>
+    /// The default ray identifier used when no explicit name is provided.
+    /// </summary>
+    /// <remarks>Equivalent to RayId().</remarks>
     static member Default = RayId(Symbol.Empty)
 
     static member op_Implicit (name: Symbol) = RayId(name)
@@ -46,8 +61,14 @@ type RayId =
             if this.index > 0 || this.IsNone then this.index - 1
             else failwith $"[FShade] Index of RayId \"{this.Name}\" is invalid."
 
-/// Identifies a miss shader by its name.
-/// Gets replaced by the index corresponding to the name when the raytracing effect is compiled.
+/// <summary>
+/// Identifies a miss shader by its symbolic name.
+/// </summary>
+/// <remarks>
+/// During effect compilation the name is resolved to a zero-based index in the miss section of the SBT.
+/// You can construct a MissId from a string or Symbol in user code; at runtime the compiler replaces it with the corresponding index.
+/// Use MissId.Default to select the default miss shader or MissId.None to indicate that no valid identifier is provided.
+/// </remarks>
 [<Struct>]
 type MissId =
     val Name : Symbol
@@ -57,11 +78,19 @@ type MissId =
     new (name: Symbol) = MissId(name, -1)
     new (name: string) = MissId(Sym.ofString name)
 
-    /// Special MissId that will not be considered as a valid identifier.
-    /// Will not produce a new entry in the SBT and results in an invalid negative index.
+    /// <summary>
+    /// Special value that does not represent a valid miss shader identifier.
+    /// </summary>
+    /// <remarks>
+    /// Using MissId.None will not create a new SBT entry and results in a negative internal index.
+    /// This can be used to indicate that a miss shader id is intentionally unspecified.
+    /// </remarks>
     static member None = MissId(Symbol.Empty, -2)
 
-    /// The default MissId when unspecified. Equivalent to MissId().
+    /// <summary>
+    /// The default miss shader identifier used when no explicit name is provided.
+    /// </summary>
+    /// <remarks>Equivalent to MissId().</remarks>
     static member Default = MissId(Symbol.Empty)
 
     static member op_Implicit (name: Symbol) = MissId(name)
@@ -75,8 +104,15 @@ type MissId =
             if this.index > 0 || this.IsNone then this.index - 1
             else failwith $"[FShade] Index of MissId \"{this.Name}\" is invalid."
 
-/// Identifies a callable shader by its name.
-/// Gets replaced by the index corresponding to the name when the raytracing effect is compiled.
+/// <summary>
+/// Identifies a callable shader by its symbolic name.
+/// </summary>
+/// <remarks>
+/// During effect compilation the name is resolved to a zero-based index in the callable section of the SBT.
+/// In user code you can construct a CallableId from a string or Symbol; at runtime the compiler replaces it
+/// with the corresponding index. Use CallableId.Default to select the default callable shader or CallableId.None
+/// to indicate that no valid identifier is provided.
+/// </remarks>
 [<Struct>]
 type CallableId =
     val Name : Symbol
@@ -86,11 +122,19 @@ type CallableId =
     new (name: Symbol) = CallableId(name, -1)
     new (name: string) = CallableId(Sym.ofString name)
 
-    /// Special CallableId that will not be considered as a valid identifier.
-    /// Will not produce a new entry in the SBT and results in an invalid negative index.
+    /// <summary>
+    /// Special value that does not represent a valid callable shader identifier.
+    /// </summary>
+    /// <remarks>
+    /// Using CallableId.None will not create a new SBT entry and results in a negative internal index.
+    /// This can be used to indicate that a callable shader id is intentionally unspecified.
+    /// </remarks>
     static member None = CallableId(Symbol.Empty, -2)
 
-    /// The default CallableId when unspecified. Equivalent to CallableId().
+    /// <summary>
+    /// The default callable shader identifier used when no explicit name is provided.
+    /// </summary>
+    /// <remarks>Equivalent to CallableId().</remarks>
     static member Default = CallableId(Symbol.Empty)
 
     static member op_Implicit (name: Symbol) = CallableId(name)
@@ -172,6 +216,9 @@ type Intersection private() =
 
 type IAccelerationStructure = interface end
 
+/// <summary>
+/// Represents a top-level acceleration structure (TLAS) bound to a shader and provides methods to trace rays against it.
+/// </summary>
 type Scene(accelerationStructure : ISemanticValue) =
     interface IAccelerationStructure
 
@@ -265,9 +312,16 @@ type Scene(accelerationStructure : ISemanticValue) =
 [<AutoOpen>]
 module RaytracingIntrinsics =
 
+    /// <summary>
     /// Utility to mark payloads and callable data as unmodified.
-    /// E.g. { unchanged<Payload> with color = V3f.III } will only write to the color field of the payload.
-    /// Fails if the optimizer cannot inline the expression.
+    /// </summary>
+    /// <example>
+    /// Write only to the color field of a payload:
+    /// <code>{ unchanged&lt;Payload&gt; with color = V3f.III }</code>
+    /// </example>
+    /// <remarks>
+    /// This fails at compile time if the optimizer cannot inline the expression.
+    /// </remarks>
     let unchanged<'T> : 'T = onlyInShaderCode "unchanged"
 
     /// <summary>
@@ -319,9 +373,15 @@ module SceneExtensions =
 
     type AccelerationStructureMustBeSpecified = AccelerationStructureMustBeSpecified
 
+    /// <summary>
+    /// Computation expression builder for creating Scene values.
+    /// </summary>
     type SceneBuilder() =
         member x.Yield(_) = AccelerationStructureMustBeSpecified
 
+        /// <summary>
+        /// Specifies the acceleration structure handle to use for the scene.
+        /// </summary>
         [<CustomOperation("accelerationStructure")>]
         member x.AccelerationStructure(_ : AccelerationStructureMustBeSpecified, accelerationStructure : ShaderAccelerationStructureHandle) =
             accelerationStructure
@@ -329,4 +389,10 @@ module SceneExtensions =
         member x.Run(h : ShaderAccelerationStructureHandle) =
             Scene(h)
 
+    /// <summary>
+    /// Computation expression for constructing a Scene.
+    /// </summary>
+    /// <example>
+    /// <code>scene { accelerationStructure uniform?RaytracingScene }</code>
+    /// </example>
     let scene = SceneBuilder()
