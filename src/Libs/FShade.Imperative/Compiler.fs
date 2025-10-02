@@ -819,104 +819,116 @@ module Compiler =
                     CVecSwizzle(ct, v, CVecComponent.xyz) |> Some
 
                 // vector relations
-                | (MethodQuote <@ Vec.anyEqual : V2d -> V2d -> bool @> _), [x; y]
+                | MethodQuote <@ Vec.anyEqual : V2d -> V2d -> bool @> _, [x; y]
+                | ColMethod("AnyEqual", _), [x; y]
                 | VecMethod("AnyEqual", _), [x; y] ->
                     match x.ctype, y.ctype with
-                    | CVector _, CVector _ -> CVecAnyEqual(x, y) |> Some
-                    | CVector _ as vt, _   -> CVecAnyEqual(x, CNewVector(vt, [y])) |> Some
-                    | _, (CVector _ as vt) -> CVecAnyEqual(CNewVector(vt, [x]), y) |> Some
+                    | (CVector _ | CColor _), (CVector _ | CColor _) -> CVecAnyEqual(x, y) |> Some
+                    | (CVector _ | CColor _ as vt), _                -> CVecAnyEqual(x, CNewVector(vt, [y])) |> Some
+                    | _, (CVector _ | CColor _ as vt)                -> CVecAnyEqual(CNewVector(vt, [x]), y) |> Some
                     | _ -> None
 
-                | (MethodQuote <@ Vec.allEqual : V2d -> V2d -> bool @> _), [x; y]
+                | MethodQuote <@ Vec.allEqual : V2d -> V2d -> bool @> _, [x; y]
+                | ColMethod("AllEqual", _), [x; y]
                 | VecMethod("AllEqual", _), [x; y] ->
                     match x.ctype, y.ctype with
-                    | CVector _, CVector _ -> CEqual(x, y) |> Some
-                    | CVector _ as vt, _   -> CEqual(x, CNewVector(vt, [y])) |> Some
-                    | _, (CVector _ as vt) -> CEqual(CNewVector(vt, [x]), y) |> Some
+                    | (CVector _ | CColor _), (CVector _ | CColor _) -> CEqual(x, y) |> Some
+                    | (CVector _ | CColor _ as vt), _                -> CEqual(x, CNewVector(vt, [y])) |> Some
+                    | _, (CVector _ | CColor _ as vt)                -> CEqual(CNewVector(vt, [x]), y) |> Some
                     | _ -> None
 
-                | (MethodQuote <@ Vec.anyDifferent : V2d -> V2d -> bool @> _), [x; y]
+                | MethodQuote <@ Vec.anyDifferent : V2d -> V2d -> bool @> _, [x; y]
+                | ColMethod("AnyDifferent", _), [x; y]
                 | VecMethod("AnyDifferent", _), [x; y] ->
                     match x.ctype, y.ctype with
-                    | CVector _, CVector _ -> CNotEqual(x, y) |> Some
-                    | CVector _ as vt, _   -> CNotEqual(x, CNewVector(vt, [y])) |> Some
-                    | _, (CVector _ as vt) -> CNotEqual(CNewVector(vt, [x]), y) |> Some
+                    | (CVector _ | CColor _), (CVector _ | CColor _) -> CNotEqual(x, y) |> Some
+                    | (CVector _ | CColor _ as vt), _                -> CNotEqual(x, CNewVector(vt, [y])) |> Some
+                    | _, (CVector _ | CColor _ as vt)                -> CNotEqual(CNewVector(vt, [x]), y) |> Some
                     | _ -> None
 
-                | (MethodQuote <@ Vec.allDifferent : V2d -> V2d -> bool @> _), [x; y]
+                | MethodQuote <@ Vec.allDifferent : V2d -> V2d -> bool @> _, [x; y]
+                | ColMethod("AllDifferent", _), [x; y]
                 | VecMethod("AllDifferent", _), [x; y] ->
                     match x.ctype, y.ctype with
-                    | CVector _, CVector _ -> CVecAllNotEqual(x, y) |> Some
-                    | CVector _ as vt, _   -> CVecAllNotEqual(x, CNewVector(vt, [y])) |> Some
-                    | _, (CVector _ as vt) -> CVecAllNotEqual(CNewVector(vt, [x]), y) |> Some
+                    | (CVector _ | CColor _), (CVector _ | CColor _) -> CVecAllNotEqual(x, y) |> Some
+                    | (CVector _ | CColor _ as vt), _                -> CVecAllNotEqual(x, CNewVector(vt, [y])) |> Some
+                    | _, (CVector _ | CColor _ as vt)                -> CVecAllNotEqual(CNewVector(vt, [x]), y) |> Some
                     | _ -> None
 
-                | (MethodQuote <@ Vec.anySmaller : V2d -> V2d -> bool @> _), [x; y]
+                | MethodQuote <@ Vec.anySmaller : V2d -> V2d -> bool @> _, [x; y]
+                | ColMethod("AnySmaller", _), [x; y]
                 | VecMethod("AnySmaller", _), [x; y] ->
                     match x.ctype, y.ctype with
-                    | CVector _, CVector _ -> CVecAnyLess(x, y) |> Some
-                    | CVector _ as vt, _   -> CVecAnyLess(x, CNewVector(vt, [y])) |> Some
-                    | _, (CVector _ as vt) -> CVecAnyLess(CNewVector(vt, [x]), y) |> Some
+                    | (CVector _ | CColor _), (CVector _ | CColor _) -> CVecAnyLess(x, y) |> Some
+                    | (CVector _ | CColor _ as vt), _                -> CVecAnyLess(x, CNewVector(vt, [y])) |> Some
+                    | _, (CVector _ | CColor _ as vt)                -> CVecAnyLess(CNewVector(vt, [x]), y) |> Some
                     | _ -> None
 
-                | (MethodQuote <@ Vec.allSmaller : V2d -> V2d -> bool @> _), [x; y]
+                | MethodQuote <@ Vec.allSmaller : V2d -> V2d -> bool @> _, [x; y]
+                | ColMethod("AllSmaller", _), [x; y]
                 | VecMethod("AllSmaller", _), [x; y] ->
                     match x.ctype, y.ctype with
-                    | CVector _, CVector _ -> CVecAllLess(x, y) |> Some
-                    | CVector _ as vt, _   -> CVecAllLess(x, CNewVector(vt, [y])) |> Some
-                    | _, (CVector _ as vt) -> CVecAllLess(CNewVector(vt, [x]), y) |> Some
+                    | (CVector _ | CColor _), (CVector _ | CColor _) -> CVecAllLess(x, y) |> Some
+                    | (CVector _ | CColor _ as vt), _                -> CVecAllLess(x, CNewVector(vt, [y])) |> Some
+                    | _, (CVector _ | CColor _ as vt)                -> CVecAllLess(CNewVector(vt, [x]), y) |> Some
                     | _ -> None
 
-                | (MethodQuote <@ Vec.anySmallerOrEqual : V2d -> V2d -> bool @> _), [x; y]
+                | MethodQuote <@ Vec.anySmallerOrEqual : V2d -> V2d -> bool @> _, [x; y]
+                | ColMethod("AnySmallerOrEqual", _), [x; y]
                 | VecMethod("AnySmallerOrEqual", _), [x; y] ->
                     match x.ctype, y.ctype with
-                    | CVector _, CVector _ -> CVecAnyLequal(x, y) |> Some
-                    | CVector _ as vt, _   -> CVecAnyLequal(x, CNewVector(vt, [y])) |> Some
-                    | _, (CVector _ as vt) -> CVecAnyLequal(CNewVector(vt, [x]), y) |> Some
+                    | (CVector _ | CColor _), (CVector _ | CColor _) -> CVecAnyLequal(x, y) |> Some
+                    | (CVector _ | CColor _ as vt), _                -> CVecAnyLequal(x, CNewVector(vt, [y])) |> Some
+                    | _, (CVector _ | CColor _ as vt)                -> CVecAnyLequal(CNewVector(vt, [x]), y) |> Some
                     | _ -> None
 
-                | (MethodQuote <@ Vec.allSmallerOrEqual : V2d -> V2d -> bool @> _), [x; y]
+                | MethodQuote <@ Vec.allSmallerOrEqual : V2d -> V2d -> bool @> _, [x; y]
+                | ColMethod("AllSmallerOrEqual", _), [x; y]
                 | VecMethod("AllSmallerOrEqual", _), [x; y] ->
                     match x.ctype, y.ctype with
-                    | CVector _, CVector _ -> CVecAllLequal(x, y) |> Some
-                    | CVector _ as vt, _   -> CVecAllLequal(x, CNewVector(vt, [y])) |> Some
-                    | _, (CVector _ as vt) -> CVecAllLequal(CNewVector(vt, [x]), y) |> Some
+                    | (CVector _ | CColor _), (CVector _ | CColor _) -> CVecAllLequal(x, y) |> Some
+                    | (CVector _ | CColor _ as vt), _                -> CVecAllLequal(x, CNewVector(vt, [y])) |> Some
+                    | _, (CVector _ | CColor _ as vt)                -> CVecAllLequal(CNewVector(vt, [x]), y) |> Some
                     | _ -> None
 
-                | (MethodQuote <@ Vec.anyGreater : V2d -> V2d -> bool @> _), [x; y]
+                | MethodQuote <@ Vec.anyGreater : V2d -> V2d -> bool @> _, [x; y]
+                | ColMethod("AnyGreater", _), [x; y]
                 | VecMethod("AnyGreater", _), [x; y] ->
                     match x.ctype, y.ctype with
-                    | CVector _, CVector _ -> CVecAnyGreater(x, y) |> Some
-                    | CVector _ as vt, _   -> CVecAnyGreater(x, CNewVector(vt, [y])) |> Some
-                    | _, (CVector _ as vt) -> CVecAnyGreater(CNewVector(vt, [x]), y) |> Some
+                    | (CVector _ | CColor _), (CVector _ | CColor _) -> CVecAnyGreater(x, y) |> Some
+                    | (CVector _ | CColor _ as vt), _                -> CVecAnyGreater(x, CNewVector(vt, [y])) |> Some
+                    | _, (CVector _ | CColor _ as vt)                -> CVecAnyGreater(CNewVector(vt, [x]), y) |> Some
                     | _ -> None
 
-                | (MethodQuote <@ Vec.allGreater : V2d -> V2d -> bool @> _), [x; y]
+                | MethodQuote <@ Vec.allGreater : V2d -> V2d -> bool @> _, [x; y]
+                | ColMethod("AllGreater", _), [x; y]
                 | VecMethod("AllGreater", _), [x; y] ->
                     match x.ctype, y.ctype with
-                    | CVector _, CVector _ -> CVecAllGreater(x, y) |> Some
-                    | CVector _ as vt, _   -> CVecAllGreater(x, CNewVector(vt, [y])) |> Some
-                    | _, (CVector _ as vt) -> CVecAllGreater(CNewVector(vt, [x]), y) |> Some
+                    | (CVector _ | CColor _), (CVector _ | CColor _) -> CVecAllGreater(x, y) |> Some
+                    | (CVector _ | CColor _ as vt), _                -> CVecAllGreater(x, CNewVector(vt, [y])) |> Some
+                    | _, (CVector _ | CColor _ as vt)                -> CVecAllGreater(CNewVector(vt, [x]), y) |> Some
                     | _ -> None
 
-                | (MethodQuote <@ Vec.anyGreaterOrEqual : V2d -> V2d -> bool @> _), [x; y]
+                | MethodQuote <@ Vec.anyGreaterOrEqual : V2d -> V2d -> bool @> _, [x; y]
+                | ColMethod("AnyGreaterOrEqual", _), [x; y]
                 | VecMethod("AnyGreaterOrEqual", _), [x; y] ->
                     match x.ctype, y.ctype with
-                    | CVector _, CVector _ -> CVecAnyGequal(x, y) |> Some
-                    | CVector _ as vt, _   -> CVecAnyGequal(x, CNewVector(vt, [y])) |> Some
-                    | _, (CVector _ as vt) -> CVecAnyGequal(CNewVector(vt, [x]), y) |> Some
+                    | (CVector _ | CColor _), (CVector _ | CColor _) -> CVecAnyGequal(x, y) |> Some
+                    | (CVector _ | CColor _ as vt), _                -> CVecAnyGequal(x, CNewVector(vt, [y])) |> Some
+                    | _, (CVector _ | CColor _ as vt)                -> CVecAnyGequal(CNewVector(vt, [x]), y) |> Some
                     | _ -> None
 
-                | (MethodQuote <@ Vec.allGreaterOrEqual : V2d -> V2d -> bool @> _), [x; y]
+                | MethodQuote <@ Vec.allGreaterOrEqual : V2d -> V2d -> bool @> _, [x; y]
+                | ColMethod("AllGreaterOrEqual", _), [x; y]
                 | VecMethod("AllGreaterOrEqual", _), [x; y] ->
                     match x.ctype, y.ctype with
-                    | CVector _, CVector _ -> CVecAllGequal(x, y) |> Some
-                    | CVector _ as vt, _   -> CVecAllGequal(x, CNewVector(vt, [y])) |> Some
-                    | _, (CVector _ as vt) -> CVecAllGequal(CNewVector(vt, [x]), y) |> Some
+                    | (CVector _ | CColor _), (CVector _ | CColor _) -> CVecAllGequal(x, y) |> Some
+                    | (CVector _ | CColor _ as vt), _                -> CVecAllGequal(x, CNewVector(vt, [y])) |> Some
+                    | _, (CVector _ | CColor _ as vt)                -> CVecAllGequal(CNewVector(vt, [x]), y) |> Some
                     | _ -> None
 
                 // matrix relations
-                | (MethodQuote <@ Mat.allEqual : M22d -> M22d -> bool @> _), [x; y]
+                | MethodQuote <@ Mat.allEqual : M22d -> M22d -> bool @> _, [x; y]
                 | MatMethod("AllEqual", _), [x; y] ->
                     match x.ctype, y.ctype with
                     | CMatrix _, CMatrix _ -> CEqual(x, y) |> Some
@@ -924,7 +936,7 @@ module Compiler =
                     | _, (CMatrix _ as mt) -> CEqual(CNewMatrix(mt, [x]), y) |> Some
                     | _ -> None
 
-                | (MethodQuote <@ Mat.anyDifferent : M22d -> M22d -> bool @> _), [x; y]
+                | MethodQuote <@ Mat.anyDifferent : M22d -> M22d -> bool @> _, [x; y]
                 | MatMethod("AnyDifferent", _), [x; y] ->
                     match x.ctype, y.ctype with
                     | CMatrix _, CMatrix _ -> CNotEqual(x, y) |> Some

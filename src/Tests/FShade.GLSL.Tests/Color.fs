@@ -1,6 +1,7 @@
 ﻿module Color
 
 open Aardvark.Base
+open System.Text.RegularExpressions
 open FShade
 open NUnit.Framework
 open FShade.Tests
@@ -287,3 +288,75 @@ let ``Color lerp``() =
         }
 
     GLSL.shouldCompile [Effect.ofFunction shader]
+
+[<Test>]
+let ``Color relations``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = assertT <| Col.AllSmaller(v.color, 128uy)
+            let _ = assertT <| Col.AllSmaller(128uy, v.color)
+            let _ = assertT <| Col.AllSmaller(v.color, v.color)
+
+            let _ = assertT <| Col.AllSmallerOrEqual(v.color, 128uy)
+            let _ = assertT <| Col.AllSmallerOrEqual(128uy, v.color)
+            let _ = assertT <| Col.AllSmallerOrEqual(v.color, v.color)
+
+            let _ = assertT <| Col.AllGreater(v.color, 128uy)
+            let _ = assertT <| Col.AllGreater(128uy, v.color)
+            let _ = assertT <| Col.AllGreater(v.color, v.color)
+
+            let _ = assertT <| Col.AllGreaterOrEqual(v.color, 128uy)
+            let _ = assertT <| Col.AllGreaterOrEqual(128uy, v.color)
+            let _ = assertT <| Col.AllGreaterOrEqual(v.color, v.color)
+
+            let _ = assertT <| Col.AllEqual(v.color, 128uy)
+            let _ = assertT <| Col.AllEqual(128uy, v.color)
+            let _ = assertT <| Col.AllEqual(v.color, v.color)
+
+            let _ = assertT <| Col.AllDifferent(v.color, 128uy)
+            let _ = assertT <| Col.AllDifferent(128uy, v.color)
+            let _ = assertT <| Col.AllDifferent(v.color, v.color)
+
+            let _ = assertT <| Col.AnySmaller(v.color, 128uy)
+            let _ = assertT <| Col.AnySmaller(128uy, v.color)
+            let _ = assertT <| Col.AnySmaller(v.color, v.color)
+
+            let _ = assertT <| Col.AnySmallerOrEqual(v.color, 128uy)
+            let _ = assertT <| Col.AnySmallerOrEqual(128uy, v.color)
+            let _ = assertT <| Col.AnySmallerOrEqual(v.color, v.color)
+
+            let _ = assertT <| Col.AnyGreater(v.color, 128uy)
+            let _ = assertT <| Col.AnyGreater(128uy, v.color)
+            let _ = assertT <| Col.AnyGreater(v.color, v.color)
+
+            let _ = assertT <| Col.AnyGreaterOrEqual(v.color, 128uy)
+            let _ = assertT <| Col.AnyGreaterOrEqual(128uy, v.color)
+            let _ = assertT <| Col.AnyGreaterOrEqual(v.color, v.color)
+
+            let _ = assertT <| Col.AnyEqual(v.color, 128uy)
+            let _ = assertT <| Col.AnyEqual(128uy, v.color)
+            let _ = assertT <| Col.AnyEqual(v.color, v.color)
+
+            let _ = assertT <| Col.AnyDifferent(v.color, 128uy)
+            let _ = assertT <| Col.AnyDifferent(128uy, v.color)
+            let _ = assertT <| Col.AnyDifferent(v.color, v.color)
+
+            return v
+        }
+
+    GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader] [
+        Regex.Escape "all(lessThan(",         3
+        Regex.Escape "all(lessThanEqual(",    3
+        Regex.Escape "all(greaterThan(",      3
+        Regex.Escape "all(greaterThanEqual(", 3
+        Regex.Escape "==",                    3
+        Regex.Escape "all(notEqual(",         3
+        Regex.Escape "any(lessThan(",         3
+        Regex.Escape "any(lessThanEqual(",    3
+        Regex.Escape "any(greaterThan(",      3
+        Regex.Escape "any(greaterThanEqual(", 3
+        Regex.Escape "any(equal(",            3
+        Regex.Escape "!=",                    3
+    ]
