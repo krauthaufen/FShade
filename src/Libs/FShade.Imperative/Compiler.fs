@@ -620,7 +620,16 @@ module Compiler =
                 | MethodQuote <@ Vec.dot : V4d -> V4d -> float @> _, [l;r]
                 | Method("Dot", [VectorOf _; VectorOf _]), [l;r] ->
                     CDot(ct, l, r) |> Some
-              
+
+                // length (integer-based)
+                | MethodQuote <@ Vec.length : V4d -> float @> [VectorOf (_, Integral)], [v]
+                | Method("Length", [VectorOf (_, Integral)]), [v]
+                | Method("Norm2", [VectorOf (_, Integral)]), [v]
+                | Method("get_Length", [VectorOf (_, Integral)]), [v]
+                | Method("get_Norm2", [VectorOf (_, Integral)]), [v] ->
+                    let t = v.ctype |> CType.withElementType (CFloat 64)
+                    CVecLength(ct, CConvert(t, v)) |> Some
+
                 // length
                 | MethodQuote <@ Vec.length : V4d -> float @> _, [v]
                 | Method("Length", [VectorOf _]), [v]

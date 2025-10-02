@@ -12,7 +12,11 @@ type Vertex =
         [<Color>] c : V4f
         foo : V4f
         what : V4i
+        what2 : V4i
+        whatl : V4l
+        whatl2 : V4l
         whatu : V4ui
+        whatu2 : V4ui
     }
 
 type UniformScope with
@@ -27,19 +31,11 @@ let getVeci() =
     V4i(V3i uniform.SomeUniform, 1)
 
 [<ReflectedDefinition>]
-let assertV2d (v : V2f) = v
+let getVecu() =
+    V4ui(V3ui uniform.SomeUniform, 1u)
 
 [<ReflectedDefinition>]
-let assertV3d (v : V3f) = v
-
-[<ReflectedDefinition>]
-let assertV4d (v : V4f) = v
-
-[<ReflectedDefinition>]
-let assertDbl (d : float32) = d
-
-[<ReflectedDefinition>]
-let assertInt (i : int) = i
+let assertT<'T> (v : 'T) = v
 
 [<Test>]
 let ``Matrix constructors``() =
@@ -47,9 +43,9 @@ let ``Matrix constructors``() =
 
     let shader (v : Vertex) =
         vertex {
-            let m33 = M33f(v.pos.X)
-            let m44 = M44f(m33)
-            let _ = M33f(m44)
+            let m33 = assertT <| M33f(v.pos.X)
+            let m44 = assertT <| M44f(m33)
+            let _ = assertT <| M33f(m44)
             return v.pos
         }
 
@@ -61,19 +57,19 @@ let ``Matrix elements``() =
 
     let shader (v : Vertex) =
         vertex {
-            let m22 = M22f(v.pos.X)
-            let m23 = M23f(v.pos.X)
-            let m33 = M33f(v.pos.X)
-            let m34 = M34f(v.pos.X)
-            let m44 = M44f(m33)
-            let _ = m22.[v.what.X, v.what.Y]
-            let _ = m23.[v.what.X, v.what.Y]
-            let _ = m33.[v.what.X, v.what.Y]
-            let _ = m34.[v.what.X, v.what.Y]
-            let _ = m44.[v.what.X, v.what.Y]
-            let _ = m44.M03
-            let _ = m44.M13
-            let _ = m44.M23
+            let m22 = assertT <| M22f(v.pos.X)
+            let m23 = assertT <| M23f(v.pos.X)
+            let m33 = assertT <| M33f(v.pos.X)
+            let m34 = assertT <| M34f(v.pos.X)
+            let m44 = assertT <| M44f(m33)
+            let _ = assertT <| m22.[v.what.X, v.what.Y]
+            let _ = assertT <| m23.[v.what.X, v.what.Y]
+            let _ = assertT <| m33.[v.what.X, v.what.Y]
+            let _ = assertT <| m34.[v.what.X, v.what.Y]
+            let _ = assertT <| m44.[v.what.X, v.what.Y]
+            let _ = assertT <| m44.M03
+            let _ = assertT <| m44.M13
+            let _ = assertT <| m44.M23
             return v.pos
         }
 
@@ -88,14 +84,14 @@ let ``Matrix columns / rows``() =
             let m33 = M33f(v.pos.X)
             let m34 = M34f(v.pos.X)
             let m44 = M44f(m33)
-            let _ = assertV3d <| m33.C0
-            let _ = assertV3d <| m33.Column(v.what.X)
-            let _ = assertV3d <| m34.C1
-            let _ = assertV3d <| m34.Column(v.what.X)
-            let _ = assertV4d <| m34.R2
-            let _ = assertV4d <| m34.Row(v.what.X)
-            let _ = assertV4d <| m44.R3
-            let _ = assertV4d <| m44.Row(v.what.X)
+            let _ = assertT <| m33.C0
+            let _ = assertT <| m33.Column(v.what.X)
+            let _ = assertT <| m34.C1
+            let _ = assertT <| m34.Column(v.what.X)
+            let _ = assertT <| m34.R2
+            let _ = assertT <| m34.Row(v.what.X)
+            let _ = assertT <| m44.R3
+            let _ = assertT <| m44.Row(v.what.X)
             return v.pos
         }
 
@@ -107,12 +103,12 @@ let ``Vector constructors``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = V3f(v.pos.X)
-            let _ = V4f(v.pos.XY, v.pos.ZW)
-            let _ = V4f(v.pos.X, v.pos.YZW)
-            let _ = V4f(v.pos.XYZ)
-            let _ = V4f(v.pos.XY)
-            let _ = V2f(v.pos.XYZ)
+            let _ = assertT <| V3f(v.pos.X)
+            let _ = assertT <| V4f(v.pos.XY, v.pos.ZW)
+            let _ = assertT <| V4f(v.pos.X, v.pos.YZW)
+            let _ = assertT <| V4f(v.pos.XYZ)
+            let _ = assertT <| V4f(v.pos.XY)
+            let _ = assertT <| V2f(v.pos.XYZ)
             return v.pos
         }
 
@@ -124,25 +120,25 @@ let ``Vector conversion``() =
 
     let fs (v : Vertex) =
         fragment {
-            let _ = v2d v.what
-            let _ = v3d v.what
-            let _ = v3d v.what.XY
-            let _ = v4d v.what
-            let _ = v4d v.what.XY
-            let _ = v4d v.what.XYZ
-            let _ = V4f.op_Explicit v.what
-            let _ = v4d v.c
-            let _ = v2i v.c
-            let _ = v3i v.c
-            let _ = v4i v.c
-            let _ = v2i v.c
-            let _ = v3i v.c.XY
-            let _ = v4i v.c.XY
-            let _ = V4i.op_Explicit v.what.XY
-            let _ = v2ui v.c
-            let _ = v3ui v.c.XY
-            let _ = v4ui v.c.XY
-            let _ = V4ui.op_Explicit v.what.XY
+            let _ = assertT <| v2d v.what
+            let _ = assertT <| v3d v.what
+            let _ = assertT <| v3d v.what.XY
+            let _ = assertT <| v4d v.what
+            let _ = assertT <| v4d v.what.XY
+            let _ = assertT <| v4d v.what.XYZ
+            let _ = assertT <| V4f.op_Explicit v.what
+            let _ = assertT <| v4d v.c
+            let _ = assertT <| v2i v.c
+            let _ = assertT <| v3i v.c
+            let _ = assertT <| v4i v.c
+            let _ = assertT <| v2i v.c
+            let _ = assertT <| v3i v.c.XY
+            let _ = assertT <| v4i v.c.XY
+            let _ = assertT <| V4i.op_Explicit v.what.XY
+            let _ = assertT <| v2ui v.c
+            let _ = assertT <| v3ui v.c.XY
+            let _ = assertT <| v4ui v.c.XY
+            let _ = assertT <| V4ui.op_Explicit v.what.XY
             return v.c
         }
 
@@ -444,18 +440,34 @@ let ``Lerp``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Fun.Lerp(float32 v.c.X, V2f.Zero, V2f.One)
-            let _ = Fun.Lerp(v.c.X, V2f.Zero, V2f.One)
-            let _ = Fun.Lerp(float32 v.c.X, V2f.Zero, V2f.One)
-            let _ = Fun.Lerp(float32 v.c.X, V3f.Zero, V3f.One)
-            let _ = Fun.Lerp(v.c.X, V3f.Zero, V3f.One)
-            let _ = Fun.Lerp(float32 v.c.X, V3f.Zero, V3f.One)
-            let _ = Fun.Lerp(float32 v.c.X, V4f.Zero, V4f.One)
-            let _ = Fun.Lerp(v.c.X, V4f.Zero, V4f.One)
-            let _ = Fun.Lerp(float32 v.c.X, V4f.Zero, V4f.One)
-            let _ = lerp V2i.Zero V2i.One v.c.XY
-            let _ = Fun.Lerp(v.c.X, 0, 1)
-            let _ = Fun.Lerp(v.c, V4i(v.c), V4i(v.c))
+            let _ = assertT <| Fun.Lerp(v.c.X,       float32 v.c.X, float32 v.c.X)
+            let _ = assertT <| Fun.Lerp(v.c.X,       V2f v.c.XY,    V2f v.c.XY)
+            let _ = assertT <| Fun.Lerp(v.c.X,       V3f v.c.XYZ,   V3f v.c.XYZ)
+            let _ = assertT <| Fun.Lerp(v.c.X,       V4f v.c,       V4f v.c)
+            let _ = assertT <| Fun.Lerp(V2f v.c.XY,  V2f v.c.XY,    V2f v.c.XY)
+            let _ = assertT <| Fun.Lerp(V3f v.c.XYZ, V3f v.c.XYZ,   V3f v.c.XYZ)
+            let _ = assertT <| Fun.Lerp(V4f v.c,     V4f v.c,       V4f v.c)
+            let _ = assertT <| Fun.Lerp(float v.c.X, float v.c.X,   float v.c.X)
+            let _ = assertT <| Fun.Lerp(float v.c.X, V2d v.c.XY,    V2d v.c.XY)
+            let _ = assertT <| Fun.Lerp(float v.c.X, V3d v.c.XYZ,   V3d v.c.XYZ)
+            let _ = assertT <| Fun.Lerp(float v.c.X, V4d v.c,       V4d v.c)
+            let _ = assertT <| Fun.Lerp(V2d v.c.XY,  V2d v.c.XY,    V2d v.c.XY)
+            let _ = assertT <| Fun.Lerp(V3d v.c.XYZ, V3d v.c.XYZ,   V3d v.c.XYZ)
+            let _ = assertT <| Fun.Lerp(V4d v.c,     V4d v.c,       V4d v.c)
+            let _ = assertT <| lerp (float32 v.c.X) (float32 v.c.X) (v.c.X)
+            let _ = assertT <| lerp (V2f v.c.XY)    (V2f v.c.XY)    (v.c.X)
+            let _ = assertT <| lerp (V3f v.c.XYZ)   (V3f v.c.XYZ)   (v.c.X)
+            let _ = assertT <| lerp (V4f v.c)       (V4f v.c)       (v.c.X)
+            let _ = assertT <| lerp (V2f v.c.XY)    (V2f v.c.XY)    (V2f v.c.XY)
+            let _ = assertT <| lerp (V3f v.c.XYZ)   (V3f v.c.XYZ)   (V3f v.c.XYZ)
+            let _ = assertT <| lerp (V4f v.c)       (V4f v.c)       (V4f v.c)
+            let _ = assertT <| lerp (float v.c.X)   (float v.c.X)   (float v.c.X)
+            let _ = assertT <| lerp (V2d v.c.XY)    (V2d v.c.XY)    (float v.c.X)
+            let _ = assertT <| lerp (V3d v.c.XYZ)   (V3d v.c.XYZ)   (float v.c.X)
+            let _ = assertT <| lerp (V4d v.c)       (V4d v.c)       (float v.c.X)
+            let _ = assertT <| lerp (V2d v.c.XY)    (V2d v.c.XY)    (V2d v.c.XY)
+            let _ = assertT <| lerp (V3d v.c.XYZ)   (V3d v.c.XYZ)   (V3d v.c.XYZ)
+            let _ = assertT <| lerp (V4d v.c)       (V4d v.c)       (V4d v.c)
             return v.pos
         }
 
@@ -467,13 +479,24 @@ let ``Exp``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Fun.Exp(v.c.XY)
-            let _ = Fun.Exp(V2f(v.c.XY))
-            let _ = Fun.Exp(v.c.XYZ)
-            let _ = Fun.Exp(V3f(v.c.XYZ))
-            let _ = Fun.Exp(v.c)
-            let _ = Fun.Exp(V4f(v.c))
-            let _ = exp v.c
+            let _ = assertT <| Fun.Exp(int8 v.c.X)
+            let _ = assertT <| Fun.Exp(uint8 v.c.X)
+            let _ = assertT <| Fun.Exp(int16 v.c.X)
+            let _ = assertT <| Fun.Exp(uint16 v.c.X)
+            let _ = assertT <| Fun.Exp(int32 v.c.X)
+            let _ = assertT <| Fun.Exp(uint32 v.c.X)
+            let _ = assertT <| Fun.Exp(v.c.XY)
+            let _ = assertT <| Fun.Exp(v.c.XYZ)
+            let _ = assertT <| Fun.Exp(v.c)
+            let _ = assertT <| exp v.c.XY
+            let _ = assertT <| exp v.c.XYZ
+            let _ = assertT <| exp v.c
+            let _ = assertT <| Fun.Exp(V2i v.c.XY)
+            let _ = assertT <| Fun.Exp(V3i v.c.XYZ)
+            let _ = assertT <| Fun.Exp(V4i v.c)
+            let _ = assertT <| Fun.Exp(V2ui v.c.XY)
+            let _ = assertT <| Fun.Exp(V3ui v.c.XYZ)
+            let _ = assertT <| Fun.Exp(V4ui v.c)
             return v.pos
         }
 
@@ -485,22 +508,22 @@ let ``Exp2``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = exp2 v.c.X
-            let _ = exp2 v.c.XY
-            let _ = exp2 v.c.XYZ
-            let _ = exp2 v.c
-            let _ = exp2 (float32 v.c.X)
-            let _ = exp2 (v2f v.c.XY)
-            let _ = exp2 (v3f v.c.XYZ)
-            let _ = exp2 (v4f v.c)
-            let _ = Fun.PowerOfTwo v.c.X
-            let _ = Fun.PowerOfTwo v.c.XY
-            let _ = Fun.PowerOfTwo v.c.XYZ
-            let _ = Fun.PowerOfTwo v.c
-            let _ = Fun.PowerOfTwo (float32 v.c.X)
-            let _ = Fun.PowerOfTwo (v2f v.c.XY)
-            let _ = Fun.PowerOfTwo (v3f v.c.XYZ)
-            let _ = Fun.PowerOfTwo (v4f v.c)
+            let _ = assertT <| exp2 v.c.X
+            let _ = assertT <| exp2 v.c.XY
+            let _ = assertT <| exp2 v.c.XYZ
+            let _ = assertT <| exp2 v.c
+            let _ = assertT <| exp2 (float32 v.c.X)
+            let _ = assertT <| exp2 (v2f v.c.XY)
+            let _ = assertT <| exp2 (v3f v.c.XYZ)
+            let _ = assertT <| exp2 (v4f v.c)
+            let _ = assertT <| Fun.PowerOfTwo v.c.X
+            let _ = assertT <| Fun.PowerOfTwo v.c.XY
+            let _ = assertT <| Fun.PowerOfTwo v.c.XYZ
+            let _ = assertT <| Fun.PowerOfTwo v.c
+            let _ = assertT <| Fun.PowerOfTwo (float32 v.c.X)
+            let _ = assertT <| Fun.PowerOfTwo (v2f v.c.XY)
+            let _ = assertT <| Fun.PowerOfTwo (v3f v.c.XYZ)
+            let _ = assertT <| Fun.PowerOfTwo (v4f v.c)
             return v.pos
         }
 
@@ -512,31 +535,157 @@ let ``Pow``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Fun.Pow(v.c.XY, V2f.II)
-            let _ = Fun.Pow(V2f(v.c.XY), V2f.II)
-            let _ = Fun.Pow(v.c.XY, v.c.XY)
-            let _ = Fun.Pow(V2f(v.c.XY), V2f(v.c.XY))
-            let _ = Fun.Pow(v.c.XYZ, V3f.III)
-            let _ = Fun.Pow(V3f(v.c.XYZ), V3f.III)
-            let _ = Fun.Pow(v.c.XYZ, v.c.XYZ)
-            let _ = Fun.Pow(V3f(v.c.XYZ), V3f(v.c.XYZ))
-            let _ = Fun.Pow(v.c, V4f.IIII)
-            let _ = Fun.Pow(V4f(v.c), V4f.IIII)
-            let _ = Fun.Pow(v.c, v.c)
-            let _ = Fun.Pow(V4f(v.c), V4f(v.c))
-            let _ = Fun.Pow(v.c, 1.0f);
-            let _ = Fun.Pow(1.0f, v.c);
-            let _ = Fun.Pown(v.c.X, int32 v.c.Y);
-            let _ = Fun.Pown(1, V4i(v.c));
-            let _ = Fun.Pown(V2f(v.c.XY), 1);
-            let _ = Fun.Pown(V2i(v.c.XY), 1);
-            let _ = Fun.Pow(V2i(v.c.XY), V2f(v.c.XY))
-            let _ = pow v.c 2.0f
-            let _ = pow v.c v.c
-            let _ = v.c ** 2.0f
-            let _ = v.c ** v.c
-            let _ = pown v.c 2
-            let _ = pown v.c (V4i(v.c))
+            let _ = assertT <| Fun.Pow (1.0f, v.c.X)
+            let _ = assertT <| Fun.Pow (1y,   v.c.X)
+            let _ = assertT <| Fun.Pow (1uy,  v.c.X)
+            let _ = assertT <| Fun.Pow (1s,   v.c.X)
+            let _ = assertT <| Fun.Pow (1us,  v.c.X)
+            let _ = assertT <| Fun.Pow (1,    v.c.X)
+            let _ = assertT <| Fun.Pow (1u,   v.c.X)
+            let _ = assertT <| pow 1.0f v.c.X
+
+            let _ = assertT <| Fun.Pow(V2f v.c.X, v.c.XY)
+            let _ = assertT <| Fun.Pow(V3f v.c.X, v.c.XYZ)
+            let _ = assertT <| Fun.Pow(V4f v.c.X, v.c)
+            let _ = assertT <| Fun.Pow(V2i v.c.X, v.c.XY)
+            let _ = assertT <| Fun.Pow(V3i v.c.X, v.c.XYZ)
+            let _ = assertT <| Fun.Pow(V4i v.c.X, v.c)
+            let _ = assertT <| Fun.Pow(V2ui v.c.X, v.c.XY)
+            let _ = assertT <| Fun.Pow(V3ui v.c.X, v.c.XYZ)
+            let _ = assertT <| Fun.Pow(V4ui v.c.X, v.c)
+            let _ = assertT <| pow (V2f v.c.X) v.c.XY
+            let _ = assertT <| pow (V3f v.c.X) v.c.XYZ
+            let _ = assertT <| pow (V4f v.c.X) v.c
+
+            let _ = assertT <| Fun.Pow(V2f v.c.X, v.c.X)
+            let _ = assertT <| Fun.Pow(V3f v.c.X, v.c.X)
+            let _ = assertT <| Fun.Pow(V4f v.c.X, v.c.X)
+            let _ = assertT <| Fun.Pow(V2i v.c.X, v.c.X)
+            let _ = assertT <| Fun.Pow(V3i v.c.X, v.c.X)
+            let _ = assertT <| Fun.Pow(V4i v.c.X, v.c.X)
+            let _ = assertT <| Fun.Pow(V2ui v.c.X, v.c.X)
+            let _ = assertT <| Fun.Pow(V3ui v.c.X, v.c.X)
+            let _ = assertT <| Fun.Pow(V4ui v.c.X, v.c.X)
+            let _ = assertT <| pow (V2f v.c.X) v.c.X
+            let _ = assertT <| pow (V3f v.c.X) v.c.X
+            let _ = assertT <| pow (V4f v.c.X) v.c.X
+
+            let _ = assertT <| Fun.Pow(v.c.X, V2f v.c.X)
+            let _ = assertT <| Fun.Pow(v.c.X, V3f v.c.X)
+            let _ = assertT <| Fun.Pow(v.c.X, V4f v.c.X)
+            let _ = assertT <| Fun.Pow(int v.c.X, V2f v.c.X)
+            let _ = assertT <| Fun.Pow(int v.c.X, V3f v.c.X)
+            let _ = assertT <| Fun.Pow(int v.c.X, V4f v.c.X)
+            let _ = assertT <| Fun.Pow(uint32 v.c.X, V2f v.c.X)
+            let _ = assertT <| Fun.Pow(uint32 v.c.X, V3f v.c.X)
+            let _ = assertT <| Fun.Pow(uint32 v.c.X, V4f v.c.X)
+
+            let _ = assertT <| Fun.Pown(1y,  int v.c.X)
+            let _ = assertT <| Fun.Pown(1uy, int v.c.X)
+            let _ = assertT <| Fun.Pown(1s,  int v.c.X)
+            let _ = assertT <| Fun.Pown(1us, int v.c.X)
+            let _ = assertT <| Fun.Pown(1,   int v.c.X)
+            let _ = assertT <| Fun.Pown(1u,  int v.c.X)
+            let _ = assertT <| pown 1y  (int v.c.X)
+            let _ = assertT <| pown 1uy (int v.c.X)
+            let _ = assertT <| pown 1s  (int v.c.X)
+            let _ = assertT <| pown 1us (int v.c.X)
+            let _ = assertT <| pown 1   (int v.c.X)
+            let _ = assertT <| pown 1u  (int v.c.X)
+
+            let _ = assertT <| Fun.Pown(1y,  int8 v.c.X)
+            let _ = assertT <| Fun.Pown(1uy, uint8 v.c.X)
+            let _ = assertT <| Fun.Pown(1s,  int16 v.c.X)
+            let _ = assertT <| Fun.Pown(1us, uint16 v.c.X)
+            let _ = assertT <| Fun.Pown(1,   int32 v.c.X)
+            let _ = assertT <| Fun.Pown(1u,  uint32 v.c.X)
+            let _ = assertT <| pown 1y  (int8 v.c.X)
+            let _ = assertT <| pown 1uy (uint8 v.c.X)
+            let _ = assertT <| pown 1s  (int16 v.c.X)
+            let _ = assertT <| pown 1us (uint16 v.c.X)
+            let _ = assertT <| pown 1   (int32 v.c.X)
+            let _ = assertT <| pown 1u  (uint32 v.c.X)
+
+            let _ = assertT <| Fun.Pown(V2i v.c.X, V2i v.c.X)
+            let _ = assertT <| Fun.Pown(V3i v.c.X, V3i v.c.X)
+            let _ = assertT <| Fun.Pown(V4i v.c.X, V4i v.c.X)
+            let _ = assertT <| pown (V2i v.c.X) (V2i v.c.X)
+            let _ = assertT <| pown (V3i v.c.X) (V3i v.c.X)
+            let _ = assertT <| pown (V4i v.c.X) (V4i v.c.X)
+
+            let _ = assertT <| Fun.Pown(V2ui v.c.X, V2ui v.c.X)
+            let _ = assertT <| Fun.Pown(V3ui v.c.X, V3ui v.c.X)
+            let _ = assertT <| Fun.Pown(V4ui v.c.X, V4ui v.c.X)
+            let _ = assertT <| Fun.Pown(V2ui v.c.X, V2i v.c.X)
+            let _ = assertT <| Fun.Pown(V3ui v.c.X, V3i v.c.X)
+            let _ = assertT <| Fun.Pown(V4ui v.c.X, V4i v.c.X)
+            let _ = assertT <| pown (V2ui v.c.X) (V2ui v.c.X)
+            let _ = assertT <| pown (V3ui v.c.X) (V3ui v.c.X)
+            let _ = assertT <| pown (V4ui v.c.X) (V4ui v.c.X)
+            let _ = assertT <| pown (V2ui v.c.X) (V2i v.c.X)
+            let _ = assertT <| pown (V3ui v.c.X) (V3i v.c.X)
+            let _ = assertT <| pown (V4ui v.c.X) (V4i v.c.X)
+
+            let _ = assertT <| Fun.Pown(V2f v.c.X, int v.c.X)
+            let _ = assertT <| Fun.Pown(V3f v.c.X, int v.c.X)
+            let _ = assertT <| Fun.Pown(V4f v.c.X, int v.c.X)
+            let _ = assertT <| Fun.Pown(V2i v.c.X, int v.c.X)
+            let _ = assertT <| Fun.Pown(V3i v.c.X, int v.c.X)
+            let _ = assertT <| Fun.Pown(V4i v.c.X, int v.c.X)
+            let _ = assertT <| Fun.Pown(V2ui v.c.X, int v.c.X)
+            let _ = assertT <| Fun.Pown(V2ui v.c.X, uint v.c.X)
+            let _ = assertT <| Fun.Pown(V3ui v.c.X, int v.c.X)
+            let _ = assertT <| Fun.Pown(V3ui v.c.X, uint v.c.X)
+            let _ = assertT <| Fun.Pown(V4ui v.c.X, int v.c.X)
+            let _ = assertT <| Fun.Pown(V4ui v.c.X, uint v.c.X)
+            let _ = assertT <| pown (V2f v.c.X) (int v.c.X)
+            let _ = assertT <| pown (V3f v.c.X) (int v.c.X)
+            let _ = assertT <| pown (V4f v.c.X) (int v.c.X)
+
+            let _ = assertT <| Fun.Pown(v.c.X, V2i v.c.X)
+            let _ = assertT <| Fun.Pown(v.c.X, V3i v.c.X)
+            let _ = assertT <| Fun.Pown(v.c.X, V4i v.c.X)
+            let _ = assertT <| Fun.Pown(int v.c.X, V2i v.c.X)
+            let _ = assertT <| Fun.Pown(int v.c.X, V3i v.c.X)
+            let _ = assertT <| Fun.Pown(int v.c.X, V4i v.c.X)
+            let _ = assertT <| Fun.Pown(uint32 v.c.X, V2i v.c.X)
+            let _ = assertT <| Fun.Pown(uint32 v.c.X, V3i v.c.X)
+            let _ = assertT <| Fun.Pown(uint32 v.c.X, V4i v.c.X)
+            let _ = assertT <| Fun.Pown(uint32 v.c.X, V2ui v.c.X)
+            let _ = assertT <| Fun.Pown(uint32 v.c.X, V3ui v.c.X)
+            let _ = assertT <| Fun.Pown(uint32 v.c.X, V4ui v.c.X)
+
+            let _ = assertT <| Fun.Pow(v.c.XY, V2f.II)
+            let _ = assertT <| Fun.Pow(V2f(v.c.XY), V2f.II)
+            let _ = assertT <| Fun.Pow(v.c.XY, v.c.XY)
+            let _ = assertT <| Fun.Pow(V2f(v.c.XY), V2f(v.c.XY))
+            let _ = assertT <| Fun.Pow(v.c.XYZ, V3f.III)
+            let _ = assertT <| Fun.Pow(V3f(v.c.XYZ), V3f.III)
+            let _ = assertT <| Fun.Pow(v.c.XYZ, v.c.XYZ)
+            let _ = assertT <| Fun.Pow(V3f(v.c.XYZ), V3f(v.c.XYZ))
+            let _ = assertT <| Fun.Pow(v.c, V4f.IIII)
+            let _ = assertT <| Fun.Pow(V4f(v.c), V4f.IIII)
+            let _ = assertT <| Fun.Pow(v.c, v.c)
+            let _ = assertT <| Fun.Pow(V4f(v.c), V4f(v.c))
+            let _ = assertT <| Fun.Pow(v.c, 1.0f)
+            let _ = assertT <| Fun.Pow(1.0f, v.c)
+            let _ = assertT <| Fun.Pow(1, v.c)
+            let _ = assertT <| Fun.Pow(1u, v.c)
+            let _ = assertT <| Fun.Pown(1, V4i v.c)
+            let _ = assertT <| Fun.Pown(1u, V4i v.c)
+            let _ = assertT <| Fun.Pown(1u, V4ui v.c)
+            let _ = assertT <| Fun.Pown(v.c.X, int32 v.c.Y)
+            let _ = assertT <| Fun.Pown(1, V4i(v.c))
+            let _ = assertT <| Fun.Pown(V2f(v.c.XY), 1)
+            let _ = assertT <| Fun.Pown(V2i(v.c.XY), 1)
+            let _ = assertT <| Fun.Pow(V2i(v.c.XY), V2f(v.c.XY))
+            let _ = assertT <| pow v.c 2.0f
+            let _ = assertT <| pow v.c v.c
+            let _ = assertT <| v.c ** 2.0f
+            let _ = assertT <| v.c ** v.c
+            let _ = assertT <| pown v.c 2
+            let _ = assertT <| pown v.c (V4i(v.c))
+
             return v.pos
         }
 
@@ -548,16 +697,61 @@ let ``Log``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Fun.Log(v.c.XY)
-            let _ = Fun.Log(V2f(v.c.XY))
-            let _ = Fun.Log(v.c.XYZ)
-            let _ = Fun.Log(V3f(v.c.XYZ))
-            let _ = Fun.Log(v.c)
-            let _ = Fun.Log(V4f(v.c))
+            let _ = assertT <| Fun.Log(int8 v.c.X)
+            let _ = assertT <| Fun.Log(uint8 v.c.X)
+            let _ = assertT <| Fun.Log(int16 v.c.X)
+            let _ = assertT <| Fun.Log(uint16 v.c.X)
+            let _ = assertT <| Fun.Log(int32 v.c.X)
+            let _ = assertT <| Fun.Log(uint32 v.c.X)
+            let _ = assertT <| Fun.Log(v.c.X)
+            let _ = assertT <| Fun.Log(v.c.XY)
+            let _ = assertT <| Fun.Log(v.c.XYZ)
+            let _ = assertT <| Fun.Log(v.c)
+            let _ = assertT <| log v.c.X
+            let _ = assertT <| log v.c.XY
+            let _ = assertT <| log v.c.XYZ
+            let _ = assertT <| log v.c
+            let _ = assertT <| Fun.Log(V2i v.c.XY)
+            let _ = assertT <| Fun.Log(V3i v.c.XYZ)
+            let _ = assertT <| Fun.Log(V4i v.c)
+            let _ = assertT <| Fun.Log(V2ui v.c.XY)
+            let _ = assertT <| Fun.Log(V3ui v.c.XYZ)
+            let _ = assertT <| Fun.Log(V4ui v.c)
             return v.pos
         }
 
     GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["log"]
+
+[<Test>]
+let ``Log2``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = assertT <| Fun.Log2(int8 v.c.X)
+            let _ = assertT <| Fun.Log2(uint8 v.c.X)
+            let _ = assertT <| Fun.Log2(int16 v.c.X)
+            let _ = assertT <| Fun.Log2(uint16 v.c.X)
+            let _ = assertT <| Fun.Log2(int32 v.c.X)
+            let _ = assertT <| Fun.Log2(uint32 v.c.X)
+            let _ = assertT <| Fun.Log2(v.c.X)
+            let _ = assertT <| Fun.Log2(v.c.XY)
+            let _ = assertT <| Fun.Log2(v.c.XYZ)
+            let _ = assertT <| Fun.Log2(v.c)
+            let _ = assertT <| log2 v.c.X
+            let _ = assertT <| log2 v.c.XY
+            let _ = assertT <| log2 v.c.XYZ
+            let _ = assertT <| log2 v.c
+            let _ = assertT <| Fun.Log2(V2i v.c.XY)
+            let _ = assertT <| Fun.Log2(V3i v.c.XYZ)
+            let _ = assertT <| Fun.Log2(V4i v.c)
+            let _ = assertT <| Fun.Log2(V2ui v.c.XY)
+            let _ = assertT <| Fun.Log2(V3ui v.c.XYZ)
+            let _ = assertT <| Fun.Log2(V4ui v.c)
+            return v.pos
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["log2"]
 
 [<Test>]
 let ``Sqrt``() =
@@ -565,8 +759,39 @@ let ``Sqrt``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = sqrt v.c
-            let _ = Fun.Sqrt (V2i(v.c.XY))
+            let _ = assertT <| Fun.Sqrt(int8 v.c.X)
+            let _ = assertT <| Fun.Sqrt(uint8 v.c.X)
+            let _ = assertT <| Fun.Sqrt(int16 v.c.X)
+            let _ = assertT <| Fun.Sqrt(uint16 v.c.X)
+            let _ = assertT <| Fun.Sqrt(int32 v.c.X)
+            let _ = assertT <| Fun.Sqrt(uint32 v.c.X)
+            let _ = assertT <| Fun.Sqrt(int64 v.c.X)
+            let _ = assertT <| Fun.Sqrt(uint64 v.c.X)
+            let _ = assertT <| Fun.Sqrt(float v.c.X)
+            let _ = assertT <| Fun.Sqrt(v.c.X)
+            let _ = assertT <| Fun.Sqrt(v.c.XY)
+            let _ = assertT <| Fun.Sqrt(v.c.XYZ)
+            let _ = assertT <| Fun.Sqrt(v.c)
+            let _ = assertT <| Fun.Sqrt(V2d v.c.XY)
+            let _ = assertT <| Fun.Sqrt(V3d v.c.XYZ)
+            let _ = assertT <| Fun.Sqrt(V4d v.c)
+            let _ = assertT <| sqrt (float v.c.X)
+            let _ = assertT <| sqrt v.c.X
+            let _ = assertT <| sqrt v.c.XY
+            let _ = assertT <| sqrt v.c.XYZ
+            let _ = assertT <| sqrt v.c
+            let _ = assertT <| sqrt (V2d v.c.XY)
+            let _ = assertT <| sqrt (V3d v.c.XYZ)
+            let _ = assertT <| sqrt (V4d v.c)
+            let _ = assertT <| Fun.Sqrt(V2i v.c.XY)
+            let _ = assertT <| Fun.Sqrt(V3i v.c.XYZ)
+            let _ = assertT <| Fun.Sqrt(V4i v.c)
+            let _ = assertT <| Fun.Sqrt(V2l v.c.XY)
+            let _ = assertT <| Fun.Sqrt(V3l v.c.XYZ)
+            let _ = assertT <| Fun.Sqrt(V4l v.c)
+            let _ = assertT <| Fun.Sqrt(V2ui v.c.XY)
+            let _ = assertT <| Fun.Sqrt(V3ui v.c.XYZ)
+            let _ = assertT <| Fun.Sqrt(V4ui v.c)
             return v.pos
         }
 
@@ -578,7 +803,26 @@ let ``Cbrt``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = cbrt v.c
+            let _ = assertT <| Fun.Cbrt(int8 v.c.X)
+            let _ = assertT <| Fun.Cbrt(uint8 v.c.X)
+            let _ = assertT <| Fun.Cbrt(int16 v.c.X)
+            let _ = assertT <| Fun.Cbrt(uint16 v.c.X)
+            let _ = assertT <| Fun.Cbrt(int32 v.c.X)
+            let _ = assertT <| Fun.Cbrt(uint32 v.c.X)
+            let _ = assertT <| Fun.Cbrt(v.c.X)
+            let _ = assertT <| Fun.Cbrt(v.c.XY)
+            let _ = assertT <| Fun.Cbrt(v.c.XYZ)
+            let _ = assertT <| Fun.Cbrt(v.c)
+            let _ = assertT <| cbrt v.c.X
+            let _ = assertT <| cbrt v.c.XY
+            let _ = assertT <| cbrt v.c.XYZ
+            let _ = assertT <| cbrt v.c
+            let _ = assertT <| Fun.Cbrt(V2i v.c.XY)
+            let _ = assertT <| Fun.Cbrt(V3i v.c.XYZ)
+            let _ = assertT <| Fun.Cbrt(V4i v.c)
+            let _ = assertT <| Fun.Cbrt(V2ui v.c.XY)
+            let _ = assertT <| Fun.Cbrt(V3ui v.c.XYZ)
+            let _ = assertT <| Fun.Cbrt(V4ui v.c)
             return v.pos
         }
 
@@ -590,12 +834,60 @@ let ``Sqr``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = sqr v.c
-            let _ = sqr (V4i v.c)
-            return v.pos
+            let _ = assertT <| Fun.Square(int8 v.c.X)
+            let _ = assertT <| Fun.Square(uint8 v.c.X)
+            let _ = assertT <| Fun.Square(int16 v.c.X)
+            let _ = assertT <| Fun.Square(uint16 v.c.X)
+            let _ = assertT <| Fun.Square(int32 v.c.X)
+            let _ = assertT <| Fun.Square(uint32 v.c.X)
+            let _ = assertT <| Fun.Square(int64 v.c.X)
+            let _ = assertT <| Fun.Square(uint64 v.c.X)
+            let _ = assertT <| Fun.Square(float v.c.X)
+            let _ = assertT <| Fun.Square(v.c.X)
+            let _ = assertT <| Fun.Square(v.c.XY)
+            let _ = assertT <| Fun.Square(v.c.XYZ)
+            let _ = assertT <| Fun.Square(v.c)
+            let _ = assertT <| Fun.Square(V2d v.c.XY)
+            let _ = assertT <| Fun.Square(V3d v.c.XYZ)
+            let _ = assertT <| Fun.Square(V4d v.c)
+            let _ = assertT <| Fun.Square(V2i v.c.XY)
+            let _ = assertT <| Fun.Square(V3i v.c.XYZ)
+            let _ = assertT <| Fun.Square(V4i v.c)
+            let _ = assertT <| Fun.Square(V2l v.c.XY)
+            let _ = assertT <| Fun.Square(V3l v.c.XYZ)
+            let _ = assertT <| Fun.Square(V4l v.c)
+            let _ = assertT <| Fun.Square(V2ui v.c.XY)
+            let _ = assertT <| Fun.Square(V3ui v.c.XYZ)
+            let _ = assertT <| Fun.Square(V4ui v.c)
+            let _ = assertT <| sqr (int8 v.c.X)
+            let _ = assertT <| sqr (uint8 v.c.X)
+            let _ = assertT <| sqr (int16 v.c.X)
+            let _ = assertT <| sqr (uint16 v.c.X)
+            let _ = assertT <| sqr (int32 v.c.X)
+            let _ = assertT <| sqr (uint32 v.c.X)
+            let _ = assertT <| sqr (int64 v.c.X)
+            let _ = assertT <| sqr (uint64 v.c.X)
+            let _ = assertT <| sqr (float v.c.X)
+            let _ = assertT <| sqr v.c.X
+            let _ = assertT <| sqr v.c.XY
+            let _ = assertT <| sqr v.c.XYZ
+            let _ = assertT <| sqr v.c
+            let _ = assertT <| sqr (V2d v.c.XY)
+            let _ = assertT <| sqr (V3d v.c.XYZ)
+            let _ = assertT <| sqr (V4d v.c)
+            let _ = assertT <| sqr (V2i v.c.XY)
+            let _ = assertT <| sqr (V3i v.c.XYZ)
+            let _ = assertT <| sqr (V4i v.c)
+            let _ = assertT <| sqr (V2l v.c.XY)
+            let _ = assertT <| sqr (V3l v.c.XYZ)
+            let _ = assertT <| sqr (V4l v.c)
+            let _ = assertT <| sqr (V2ui v.c.XY)
+            let _ = assertT <| sqr (V3ui v.c.XYZ)
+            let _ = assertT <| sqr (V4ui v.c)
+            return v
         }
 
-    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["pow"]
+    GLSL.shouldCompile [Effect.ofFunction shader]
 
 [<Test>]
 let ``Signum``() =
@@ -603,9 +895,107 @@ let ``Signum``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = signum v.c
-            let _ = signumi v.c
-            return v.pos
+            let _ = assertT <| Fun.Sign(int8 v.c.X)
+            let _ = assertT <| Fun.Sign(int16 v.c.X)
+            let _ = assertT <| Fun.Sign(int32 v.c.X)
+            let _ = assertT <| Fun.Sign(int64 v.c.X)
+            let _ = assertT <| Fun.Sign(float v.c.X)
+            let _ = assertT <| Fun.Sign(v.c.X)
+            let _ = assertT <| Fun.Sign(v.c.XY)
+            let _ = assertT <| Fun.Sign(v.c.XYZ)
+            let _ = assertT <| Fun.Sign(v.c)
+            let _ = assertT <| Fun.Sign(V2d v.c.XY)
+            let _ = assertT <| Fun.Sign(V3d v.c.XYZ)
+            let _ = assertT <| Fun.Sign(V4d v.c)
+            let _ = assertT <| Fun.Sign(V2i v.c.XY)
+            let _ = assertT <| Fun.Sign(V3i v.c.XYZ)
+            let _ = assertT <| Fun.Sign(V4i v.c)
+            let _ = assertT <| Fun.Sign(V2l v.c.XY)
+            let _ = assertT <| Fun.Sign(V3l v.c.XYZ)
+            let _ = assertT <| Fun.Sign(V4l v.c)
+
+            let _ = assertT <| sign (int8 v.c.X)
+            let _ = assertT <| sign (int16 v.c.X)
+            let _ = assertT <| sign (int32 v.c.X)
+            let _ = assertT <| sign (int64 v.c.X)
+
+            let _ = assertT <| Fun.Signum(int8 v.c.X)
+            let _ = assertT <| Fun.Signum(int16 v.c.X)
+            let _ = assertT <| Fun.Signum(int32 v.c.X)
+            let _ = assertT <| Fun.Signum(int64 v.c.X)
+            let _ = assertT <| Fun.Signum(float v.c.X)
+            let _ = assertT <| Fun.Signum(v.c.X)
+            let _ = assertT <| Fun.Signum(v.c.XY)
+            let _ = assertT <| Fun.Signum(v.c.XYZ)
+            let _ = assertT <| Fun.Signum(v.c)
+            let _ = assertT <| Fun.Signum(V2d v.c.XY)
+            let _ = assertT <| Fun.Signum(V3d v.c.XYZ)
+            let _ = assertT <| Fun.Signum(V4d v.c)
+            let _ = assertT <| Fun.Signum(V2i v.c.XY)
+            let _ = assertT <| Fun.Signum(V3i v.c.XYZ)
+            let _ = assertT <| Fun.Signum(V4i v.c)
+            let _ = assertT <| Fun.Signum(V2l v.c.XY)
+            let _ = assertT <| Fun.Signum(V3l v.c.XYZ)
+            let _ = assertT <| Fun.Signum(V4l v.c)
+
+            let _ = assertT <| signum (int8 v.c.X)
+            let _ = assertT <| signum (int16 v.c.X)
+            let _ = assertT <| signum (int32 v.c.X)
+            let _ = assertT <| signum (int64 v.c.X)
+            let _ = assertT <| signum (float v.c.X)
+            let _ = assertT <| signum v.c.X
+            let _ = assertT <| signum v.c.XY
+            let _ = assertT <| signum v.c.XYZ
+            let _ = assertT <| signum v.c
+            let _ = assertT <| signum (V2d v.c.XY)
+            let _ = assertT <| signum (V3d v.c.XYZ)
+            let _ = assertT <| signum (V4d v.c)
+            let _ = assertT <| signum (V2i v.c.XY)
+            let _ = assertT <| signum (V3i v.c.XYZ)
+            let _ = assertT <| signum (V4i v.c)
+            let _ = assertT <| signum (V2l v.c.XY)
+            let _ = assertT <| signum (V3l v.c.XYZ)
+            let _ = assertT <| signum (V4l v.c)
+
+            let _ = assertT <| Fun.Signumi(int8 v.c.X)
+            let _ = assertT <| Fun.Signumi(int16 v.c.X)
+            let _ = assertT <| Fun.Signumi(int32 v.c.X)
+            let _ = assertT <| Fun.Signumi(int64 v.c.X)
+            let _ = assertT <| Fun.Signumi(float v.c.X)
+            let _ = assertT <| Fun.Signumi(v.c.X)
+            let _ = assertT <| Fun.Signumi(v.c.XY)
+            let _ = assertT <| Fun.Signumi(v.c.XYZ)
+            let _ = assertT <| Fun.Signumi(v.c)
+            let _ = assertT <| Fun.Signumi(V2d v.c.XY)
+            let _ = assertT <| Fun.Signumi(V3d v.c.XYZ)
+            let _ = assertT <| Fun.Signumi(V4d v.c)
+            let _ = assertT <| Fun.Signumi(V2i v.c.XY)
+            let _ = assertT <| Fun.Signumi(V3i v.c.XYZ)
+            let _ = assertT <| Fun.Signumi(V4i v.c)
+            let _ = assertT <| Fun.Signumi(V2l v.c.XY)
+            let _ = assertT <| Fun.Signumi(V3l v.c.XYZ)
+            let _ = assertT <| Fun.Signumi(V4l v.c)
+
+            let _ = assertT <| signumi (int8 v.c.X)
+            let _ = assertT <| signumi (int16 v.c.X)
+            let _ = assertT <| signumi (int32 v.c.X)
+            let _ = assertT <| signumi (int64 v.c.X)
+            let _ = assertT <| signumi (float v.c.X)
+            let _ = assertT <| signumi v.c.X
+            let _ = assertT <| signumi v.c.XY
+            let _ = assertT <| signumi v.c.XYZ
+            let _ = assertT <| signumi v.c
+            let _ = assertT <| signumi (V2d v.c.XY)
+            let _ = assertT <| signumi (V3d v.c.XYZ)
+            let _ = assertT <| signumi (V4d v.c)
+            let _ = assertT <| signumi (V2i v.c.XY)
+            let _ = assertT <| signumi (V3i v.c.XYZ)
+            let _ = assertT <| signumi (V4i v.c)
+            let _ = assertT <| signumi (V2l v.c.XY)
+            let _ = assertT <| signumi (V3l v.c.XYZ)
+            let _ = assertT <| signumi (V4l v.c)
+
+            return v
         }
 
     GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["sign"]
@@ -616,11 +1006,87 @@ let ``Rounding``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = v.c |> floor |> truncate |> ceil |> round
+            let _ = assertT <| Fun.Round(v.c.X)
+            let _ = assertT <| Fun.Round(float v.c.X)
+            let _ = assertT <| Fun.Round(V2d v.c.XY)
+            let _ = assertT <| Fun.Round(V3d v.c.XYZ)
+            let _ = assertT <| Fun.Round(V4d v.c)
+            let _ = assertT <| Fun.Round(v.c.XY)
+            let _ = assertT <| Fun.Round(v.c.XYZ)
+            let _ = assertT <| Fun.Round(v.c)
+            let _ = assertT <| round v.c.X
+            let _ = assertT <| round (float v.c.X)
+            let _ = assertT <| round (V2d v.c.XY)
+            let _ = assertT <| round (V3d v.c.XYZ)
+            let _ = assertT <| round (V4d v.c)
+            let _ = assertT <| round v.c.XY
+            let _ = assertT <| round v.c.XYZ
+            let _ = assertT <| round v.c
+
+            let _ = assertT <| Fun.Floor(v.c.X)
+            let _ = assertT <| Fun.Floor(float v.c.X)
+            let _ = assertT <| Fun.Floor(V2d v.c.XY)
+            let _ = assertT <| Fun.Floor(V3d v.c.XYZ)
+            let _ = assertT <| Fun.Floor(V4d v.c)
+            let _ = assertT <| Fun.Floor(v.c.XY)
+            let _ = assertT <| Fun.Floor(v.c.XYZ)
+            let _ = assertT <| Fun.Floor(v.c)
+            let _ = assertT <| floor v.c.X
+            let _ = assertT <| floor (float v.c.X)
+            let _ = assertT <| floor (V2d v.c.XY)
+            let _ = assertT <| floor (V3d v.c.XYZ)
+            let _ = assertT <| floor (V4d v.c)
+            let _ = assertT <| floor v.c.XY
+            let _ = assertT <| floor v.c.XYZ
+            let _ = assertT <| floor v.c
+
+            let _ = assertT <| Fun.Ceiling(v.c.X)
+            let _ = assertT <| Fun.Ceiling(float v.c.X)
+            let _ = assertT <| Fun.Ceiling(V2d v.c.XY)
+            let _ = assertT <| Fun.Ceiling(V3d v.c.XYZ)
+            let _ = assertT <| Fun.Ceiling(V4d v.c)
+            let _ = assertT <| Fun.Ceiling(v.c.XY)
+            let _ = assertT <| Fun.Ceiling(v.c.XYZ)
+            let _ = assertT <| Fun.Ceiling(v.c)
+            let _ = assertT <| ceil v.c.X
+            let _ = assertT <| ceil (float v.c.X)
+            let _ = assertT <| ceil (V2d v.c.XY)
+            let _ = assertT <| ceil (V3d v.c.XYZ)
+            let _ = assertT <| ceil (V4d v.c)
+            let _ = assertT <| ceil v.c.XY
+            let _ = assertT <| ceil v.c.XYZ
+            let _ = assertT <| ceil v.c
+
+            let _ = assertT <| Fun.Truncate(v.c.X)
+            let _ = assertT <| Fun.Truncate(float v.c.X)
+            let _ = assertT <| Fun.Truncate(V2d v.c.XY)
+            let _ = assertT <| Fun.Truncate(V3d v.c.XYZ)
+            let _ = assertT <| Fun.Truncate(V4d v.c)
+            let _ = assertT <| Fun.Truncate(v.c.XY)
+            let _ = assertT <| Fun.Truncate(v.c.XYZ)
+            let _ = assertT <| Fun.Truncate(v.c)
+            let _ = assertT <| truncate v.c.X
+            let _ = assertT <| truncate (float v.c.X)
+            let _ = assertT <| truncate (V2d v.c.XY)
+            let _ = assertT <| truncate (V3d v.c.XYZ)
+            let _ = assertT <| truncate (V4d v.c)
+            let _ = assertT <| truncate v.c.XY
+            let _ = assertT <| truncate v.c.XYZ
+            let _ = assertT <| truncate v.c
+
+            let _ = assertT <| Fun.Frac(v.c.X)
+            let _ = assertT <| Fun.Frac(float v.c.X)
+            let _ = assertT <| Fun.Frac(V2d v.c.XY)
+            let _ = assertT <| Fun.Frac(V3d v.c.XYZ)
+            let _ = assertT <| Fun.Frac(V4d v.c)
+            let _ = assertT <| Fun.Frac(v.c.XY)
+            let _ = assertT <| Fun.Frac(v.c.XYZ)
+            let _ = assertT <| Fun.Frac(v.c)
+
             return v.pos
         }
 
-    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["floor"; "trunc"; "ceil"; "round"]
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["floor"; "trunc"; "ceil"; "round"; "fract"]
 
 [<GLSLIntrinsic("atomicAdd({0}, {1})")>]
 let atomicAdd (a : ref<int>) (b : int) : int = onlyInShaderCode "atomicAdd"
@@ -691,31 +1157,254 @@ let ``Abs``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = v.c.Abs()
-            let _ = abs v.c
+            let _ = assertT <| (int8    v.c.X).Abs()
+            let _ = assertT <| (int16   v.c.X).Abs()
+            let _ = assertT <| (int32   v.c.X).Abs()
+            let _ = assertT <| (int64   v.c.X).Abs()
+            let _ = assertT <| (float32 v.c.X).Abs()
+            let _ = assertT <| (float   v.c.X).Abs()
+            let _ = assertT <| (V2f v.c).Abs()
+            let _ = assertT <| (V3f v.c).Abs()
+            let _ = assertT <| (V4f v.c).Abs()
+            let _ = assertT <| (V2d v.c).Abs()
+            let _ = assertT <| (V3d v.c).Abs()
+            let _ = assertT <| (V4d v.c).Abs()
+            let _ = assertT <| (V2i v.c).Abs()
+            let _ = assertT <| (V3i v.c).Abs()
+            let _ = assertT <| (V4i v.c).Abs()
+            let _ = assertT <| (V2l v.c).Abs()
+            let _ = assertT <| (V3l v.c).Abs()
+            let _ = assertT <| (V4l v.c).Abs()
+
+            let _ = assertT <| abs (int8    v.c.X)
+            let _ = assertT <| abs (int16   v.c.X)
+            let _ = assertT <| abs (int32   v.c.X)
+            let _ = assertT <| abs (int64   v.c.X)
+            let _ = assertT <| abs (float32 v.c.X)
+            let _ = assertT <| abs (float   v.c.X)
+            let _ = assertT <| abs (V2f v.c)
+            let _ = assertT <| abs (V3f v.c)
+            let _ = assertT <| abs (V4f v.c)
+            let _ = assertT <| abs (V2d v.c)
+            let _ = assertT <| abs (V3d v.c)
+            let _ = assertT <| abs (V4d v.c)
+            let _ = assertT <| abs (V2i v.c)
+            let _ = assertT <| abs (V3i v.c)
+            let _ = assertT <| abs (V4i v.c)
+            let _ = assertT <| abs (V2l v.c)
+            let _ = assertT <| abs (V3l v.c)
+            let _ = assertT <| abs (V4l v.c)
+
             return v.pos
         }
 
     GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["abs"]
 
 [<Test>]
-let ``Min / max``() =
+let ``Min``() =
     Setup.Run()
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Fun.Min(v.c, 1.0f)
-            let _ = Fun.Min(1.0f, v.c)
-            let _ = v.c |> min 1.0f
-            let _ = v.c |> min v.c
-            let _ = Fun.Max(v.c, 1.0f)
-            let _ = Fun.Max(1.0f, v.c)
-            let _ = v.c |> max 1.0f
-            let _ = v.c |> max v.c
+            let _ = assertT <| Fun.Min(int8 v.c.X,      int8 v.c.X)
+            let _ = assertT <| Fun.Min(int16 v.c.X,     int16 v.c.X)
+            let _ = assertT <| Fun.Min(int32 v.c.X,     int32 v.c.X)
+            let _ = assertT <| Fun.Min(int64 v.c.X,     int64 v.c.X)
+            let _ = assertT <| Fun.Min(uint8 v.c.X,     uint8 v.c.X)
+            let _ = assertT <| Fun.Min(uint16 v.c.X,    uint16 v.c.X)
+            let _ = assertT <| Fun.Min(uint32 v.c.X,    uint32 v.c.X)
+            let _ = assertT <| Fun.Min(uint64 v.c.X,    uint64 v.c.X)
+            let _ = assertT <| Fun.Min(float v.c.X,     float v.c.X)
+            let _ = assertT <| Fun.Min(v.c.X,           v.c.X)
+            let _ = assertT <| Fun.Min(v.c.XY,          v.c.XY)
+            let _ = assertT <| Fun.Min(v.c.XYZ,         v.c.XYZ)
+            let _ = assertT <| Fun.Min(v.c,             v.c)
+            let _ = assertT <| Fun.Min(V2d v.c.XY,      V2d v.c.XY)
+            let _ = assertT <| Fun.Min(V3d v.c.XYZ,     V3d v.c.XYZ)
+            let _ = assertT <| Fun.Min(V4d v.c,         V4d v.c)
+            let _ = assertT <| Fun.Min(V2i v.c.XY,      V2i v.c.XY)
+            let _ = assertT <| Fun.Min(V3i v.c.XYZ,     V3i v.c.XYZ)
+            let _ = assertT <| Fun.Min(V4i v.c,         V4i v.c)
+            let _ = assertT <| Fun.Min(V2ui v.c.XY,     V2ui v.c.XY)
+            let _ = assertT <| Fun.Min(V3ui v.c.XYZ,    V3ui v.c.XYZ)
+            let _ = assertT <| Fun.Min(V4ui v.c,        V4ui v.c)
+            let _ = assertT <| Fun.Min(V2l v.c.XY,      V2l v.c.XY)
+            let _ = assertT <| Fun.Min(V3l v.c.XYZ,     V3l v.c.XYZ)
+            let _ = assertT <| Fun.Min(V4l v.c,         V4l v.c)
+            let _ = assertT <| Fun.Min(v.c.X,           v.c.XY)
+            let _ = assertT <| Fun.Min(v.c.X,           v.c.XYZ)
+            let _ = assertT <| Fun.Min(v.c.X,           v.c)
+            let _ = assertT <| Fun.Min(float v.c.X,     V2d v.c.XY)
+            let _ = assertT <| Fun.Min(float v.c.X,     V3d v.c.XYZ)
+            let _ = assertT <| Fun.Min(float v.c.X,     V4d v.c)
+            let _ = assertT <| Fun.Min(int v.c.X,       V2i v.c.XY)
+            let _ = assertT <| Fun.Min(int v.c.X,       V3i v.c.XYZ)
+            let _ = assertT <| Fun.Min(int v.c.X,       V4i v.c)
+            let _ = assertT <| Fun.Min(uint32 v.c.X,    V2ui v.c.XY)
+            let _ = assertT <| Fun.Min(uint32 v.c.X,    V3ui v.c.XYZ)
+            let _ = assertT <| Fun.Min(uint32 v.c.X,    V4ui v.c)
+            let _ = assertT <| Fun.Min(int64 v.c.X,     V2l v.c.XY)
+            let _ = assertT <| Fun.Min(int64 v.c.X,     V3l v.c.XYZ)
+            let _ = assertT <| Fun.Min(int64 v.c.X,     V4l v.c)
+            let _ = assertT <| Fun.Min(v.c.XY,          v.c.X)
+            let _ = assertT <| Fun.Min(v.c.XYZ,         v.c.X)
+            let _ = assertT <| Fun.Min(v.c,             v.c.X)
+            let _ = assertT <| Fun.Min(V2d v.c.XY,      float v.c.X)
+            let _ = assertT <| Fun.Min(V3d v.c.XYZ,     float v.c.X)
+            let _ = assertT <| Fun.Min(V4d v.c,         float v.c.X)
+            let _ = assertT <| Fun.Min(V2i v.c.XY,      int v.c.X)
+            let _ = assertT <| Fun.Min(V3i v.c.XYZ,     int v.c.X)
+            let _ = assertT <| Fun.Min(V4i v.c,         int v.c.X)
+            let _ = assertT <| Fun.Min(V2ui v.c.XY,     uint32 v.c.X)
+            let _ = assertT <| Fun.Min(V3ui v.c.XYZ,    uint32 v.c.X)
+            let _ = assertT <| Fun.Min(V4ui v.c,        uint32 v.c.X)
+            let _ = assertT <| Fun.Min(V2l v.c.XY,      int64 v.c.X)
+            let _ = assertT <| Fun.Min(V3l v.c.XYZ,     int64 v.c.X)
+            let _ = assertT <| Fun.Min(V4l v.c,         int64 v.c.X)
+            let _ = assertT <| min (int8 v.c.X)      (int8 v.c.X)
+            let _ = assertT <| min (int16 v.c.X)     (int16 v.c.X)
+            let _ = assertT <| min (int32 v.c.X)     (int32 v.c.X)
+            let _ = assertT <| min (int64 v.c.X)     (int64 v.c.X)
+            let _ = assertT <| min (uint8 v.c.X)     (uint8 v.c.X)
+            let _ = assertT <| min (uint16 v.c.X)    (uint16 v.c.X)
+            let _ = assertT <| min (uint32 v.c.X)    (uint32 v.c.X)
+            let _ = assertT <| min (uint64 v.c.X)    (uint64 v.c.X)
+            let _ = assertT <| min (float v.c.X)     (float v.c.X)
+            let _ = assertT <| min (v.c.X)           (v.c.X)
+            let _ = assertT <| min (v.c.XY)          (v.c.XY)
+            let _ = assertT <| min (v.c.XYZ)         (v.c.XYZ)
+            let _ = assertT <| min (v.c)             (v.c)
+            let _ = assertT <| min (V2d v.c.XY)      (V2d v.c.XY)
+            let _ = assertT <| min (V3d v.c.XYZ)     (V3d v.c.XYZ)
+            let _ = assertT <| min (V4d v.c)         (V4d v.c)
+            let _ = assertT <| min (V2i v.c.XY)      (V2i v.c.XY)
+            let _ = assertT <| min (V3i v.c.XYZ)     (V3i v.c.XYZ)
+            let _ = assertT <| min (V4i v.c)         (V4i v.c)
+            let _ = assertT <| min (V2ui v.c.XY)     (V2ui v.c.XY)
+            let _ = assertT <| min (V3ui v.c.XYZ)    (V3ui v.c.XYZ)
+            let _ = assertT <| min (V4ui v.c)        (V4ui v.c)
+            let _ = assertT <| min (V2l v.c.XY)      (V2l v.c.XY)
+            let _ = assertT <| min (V3l v.c.XYZ)     (V3l v.c.XYZ)
+            let _ = assertT <| min (V4l v.c)         (V4l v.c)
+            let _ = assertT <| min (v.c.X)           (v.c.XY)
+            let _ = assertT <| min (v.c.X)           (v.c.XYZ)
+            let _ = assertT <| min (v.c.X)           (v.c)
+            let _ = assertT <| min (float v.c.X)     (V2d v.c.XY)
+            let _ = assertT <| min (float v.c.X)     (V3d v.c.XYZ)
+            let _ = assertT <| min (float v.c.X)     (V4d v.c)
+            let _ = assertT <| min (int v.c.X)       (V2i v.c.XY)
+            let _ = assertT <| min (int v.c.X)       (V3i v.c.XYZ)
+            let _ = assertT <| min (int v.c.X)       (V4i v.c)
+            let _ = assertT <| min (int64 v.c.X)     (V2l v.c.XY)
+            let _ = assertT <| min (int64 v.c.X)     (V3l v.c.XYZ)
+            let _ = assertT <| min (int64 v.c.X)     (V4l v.c)
             return v.pos
         }
 
-    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["min"; "max"]
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["min"]
+
+[<Test>]
+let ``Max``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = assertT <| Fun.Max(int8 v.c.X,      int8 v.c.X)
+            let _ = assertT <| Fun.Max(int16 v.c.X,     int16 v.c.X)
+            let _ = assertT <| Fun.Max(int32 v.c.X,     int32 v.c.X)
+            let _ = assertT <| Fun.Max(int64 v.c.X,     int64 v.c.X)
+            let _ = assertT <| Fun.Max(uint8 v.c.X,     uint8 v.c.X)
+            let _ = assertT <| Fun.Max(uint16 v.c.X,    uint16 v.c.X)
+            let _ = assertT <| Fun.Max(uint32 v.c.X,    uint32 v.c.X)
+            let _ = assertT <| Fun.Max(uint64 v.c.X,    uint64 v.c.X)
+            let _ = assertT <| Fun.Max(float v.c.X,     float v.c.X)
+            let _ = assertT <| Fun.Max(v.c.X,           v.c.X)
+            let _ = assertT <| Fun.Max(v.c.XY,          v.c.XY)
+            let _ = assertT <| Fun.Max(v.c.XYZ,         v.c.XYZ)
+            let _ = assertT <| Fun.Max(v.c,             v.c)
+            let _ = assertT <| Fun.Max(V2d v.c.XY,      V2d v.c.XY)
+            let _ = assertT <| Fun.Max(V3d v.c.XYZ,     V3d v.c.XYZ)
+            let _ = assertT <| Fun.Max(V4d v.c,         V4d v.c)
+            let _ = assertT <| Fun.Max(V2i v.c.XY,      V2i v.c.XY)
+            let _ = assertT <| Fun.Max(V3i v.c.XYZ,     V3i v.c.XYZ)
+            let _ = assertT <| Fun.Max(V4i v.c,         V4i v.c)
+            let _ = assertT <| Fun.Max(V2ui v.c.XY,     V2ui v.c.XY)
+            let _ = assertT <| Fun.Max(V3ui v.c.XYZ,    V3ui v.c.XYZ)
+            let _ = assertT <| Fun.Max(V4ui v.c,        V4ui v.c)
+            let _ = assertT <| Fun.Max(V2l v.c.XY,      V2l v.c.XY)
+            let _ = assertT <| Fun.Max(V3l v.c.XYZ,     V3l v.c.XYZ)
+            let _ = assertT <| Fun.Max(V4l v.c,         V4l v.c)
+            let _ = assertT <| Fun.Max(v.c.X,           v.c.XY)
+            let _ = assertT <| Fun.Max(v.c.X,           v.c.XYZ)
+            let _ = assertT <| Fun.Max(v.c.X,           v.c)
+            let _ = assertT <| Fun.Max(float v.c.X,     V2d v.c.XY)
+            let _ = assertT <| Fun.Max(float v.c.X,     V3d v.c.XYZ)
+            let _ = assertT <| Fun.Max(float v.c.X,     V4d v.c)
+            let _ = assertT <| Fun.Max(int v.c.X,       V2i v.c.XY)
+            let _ = assertT <| Fun.Max(int v.c.X,       V3i v.c.XYZ)
+            let _ = assertT <| Fun.Max(int v.c.X,       V4i v.c)
+            let _ = assertT <| Fun.Max(uint32 v.c.X,    V2ui v.c.XY)
+            let _ = assertT <| Fun.Max(uint32 v.c.X,    V3ui v.c.XYZ)
+            let _ = assertT <| Fun.Max(uint32 v.c.X,    V4ui v.c)
+            let _ = assertT <| Fun.Max(int64 v.c.X,     V2l v.c.XY)
+            let _ = assertT <| Fun.Max(int64 v.c.X,     V3l v.c.XYZ)
+            let _ = assertT <| Fun.Max(int64 v.c.X,     V4l v.c)
+            let _ = assertT <| Fun.Max(v.c.XY,          v.c.X)
+            let _ = assertT <| Fun.Max(v.c.XYZ,         v.c.X)
+            let _ = assertT <| Fun.Max(v.c,             v.c.X)
+            let _ = assertT <| Fun.Max(V2d v.c.XY,      float v.c.X)
+            let _ = assertT <| Fun.Max(V3d v.c.XYZ,     float v.c.X)
+            let _ = assertT <| Fun.Max(V4d v.c,         float v.c.X)
+            let _ = assertT <| Fun.Max(V2i v.c.XY,      int v.c.X)
+            let _ = assertT <| Fun.Max(V3i v.c.XYZ,     int v.c.X)
+            let _ = assertT <| Fun.Max(V4i v.c,         int v.c.X)
+            let _ = assertT <| Fun.Max(V2ui v.c.XY,     uint32 v.c.X)
+            let _ = assertT <| Fun.Max(V3ui v.c.XYZ,    uint32 v.c.X)
+            let _ = assertT <| Fun.Max(V4ui v.c,        uint32 v.c.X)
+            let _ = assertT <| Fun.Max(V2l v.c.XY,      int64 v.c.X)
+            let _ = assertT <| Fun.Max(V3l v.c.XYZ,     int64 v.c.X)
+            let _ = assertT <| Fun.Max(V4l v.c,         int64 v.c.X)
+            let _ = assertT <| max (int8 v.c.X)      (int8 v.c.X)
+            let _ = assertT <| max (int16 v.c.X)     (int16 v.c.X)
+            let _ = assertT <| max (int32 v.c.X)     (int32 v.c.X)
+            let _ = assertT <| max (int64 v.c.X)     (int64 v.c.X)
+            let _ = assertT <| max (uint8 v.c.X)     (uint8 v.c.X)
+            let _ = assertT <| max (uint16 v.c.X)    (uint16 v.c.X)
+            let _ = assertT <| max (uint32 v.c.X)    (uint32 v.c.X)
+            let _ = assertT <| max (uint64 v.c.X)    (uint64 v.c.X)
+            let _ = assertT <| max (float v.c.X)     (float v.c.X)
+            let _ = assertT <| max (v.c.X)           (v.c.X)
+            let _ = assertT <| max (v.c.XY)          (v.c.XY)
+            let _ = assertT <| max (v.c.XYZ)         (v.c.XYZ)
+            let _ = assertT <| max (v.c)             (v.c)
+            let _ = assertT <| max (V2d v.c.XY)      (V2d v.c.XY)
+            let _ = assertT <| max (V3d v.c.XYZ)     (V3d v.c.XYZ)
+            let _ = assertT <| max (V4d v.c)         (V4d v.c)
+            let _ = assertT <| max (V2i v.c.XY)      (V2i v.c.XY)
+            let _ = assertT <| max (V3i v.c.XYZ)     (V3i v.c.XYZ)
+            let _ = assertT <| max (V4i v.c)         (V4i v.c)
+            let _ = assertT <| max (V2ui v.c.XY)     (V2ui v.c.XY)
+            let _ = assertT <| max (V3ui v.c.XYZ)    (V3ui v.c.XYZ)
+            let _ = assertT <| max (V4ui v.c)        (V4ui v.c)
+            let _ = assertT <| max (V2l v.c.XY)      (V2l v.c.XY)
+            let _ = assertT <| max (V3l v.c.XYZ)     (V3l v.c.XYZ)
+            let _ = assertT <| max (V4l v.c)         (V4l v.c)
+            let _ = assertT <| max (v.c.X)           (v.c.XY)
+            let _ = assertT <| max (v.c.X)           (v.c.XYZ)
+            let _ = assertT <| max (v.c.X)           (v.c)
+            let _ = assertT <| max (float v.c.X)     (V2d v.c.XY)
+            let _ = assertT <| max (float v.c.X)     (V3d v.c.XYZ)
+            let _ = assertT <| max (float v.c.X)     (V4d v.c)
+            let _ = assertT <| max (int v.c.X)       (V2i v.c.XY)
+            let _ = assertT <| max (int v.c.X)       (V3i v.c.XYZ)
+            let _ = assertT <| max (int v.c.X)       (V4i v.c)
+            let _ = assertT <| max (int64 v.c.X)     (V2l v.c.XY)
+            let _ = assertT <| max (int64 v.c.X)     (V3l v.c.XYZ)
+            let _ = assertT <| max (int64 v.c.X)     (V4l v.c)
+            return v.pos
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["max"]
 
 [<Test>]
 let ``Clamp``() =
@@ -723,9 +1412,182 @@ let ``Clamp``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = v.c |> clamp 1.0f v.c
-            let _ = v.c.XYZ |> clamp v.c.XYZ 1.0f
-            let _ = Fun.Clamp(v.c.XY, 0.0f, 1.0f)
+            let _ = assertT <| Fun.Clamp(int8 v.c.X,   int8 v.c.X,   int8 v.c.X)
+            let _ = assertT <| Fun.Clamp(int16 v.c.X,  int16 v.c.X,  int16 v.c.X)
+            let _ = assertT <| Fun.Clamp(int32 v.c.X,  int32 v.c.X,  int32 v.c.X)
+            let _ = assertT <| Fun.Clamp(int64 v.c.X,  int64 v.c.X,  int64 v.c.X)
+            let _ = assertT <| Fun.Clamp(uint8 v.c.X,  uint8 v.c.X,  uint8 v.c.X)
+            let _ = assertT <| Fun.Clamp(uint16 v.c.X, uint16 v.c.X, uint16 v.c.X)
+            let _ = assertT <| Fun.Clamp(uint32 v.c.X, uint32 v.c.X, uint32 v.c.X)
+            let _ = assertT <| Fun.Clamp(uint64 v.c.X, uint64 v.c.X, uint64 v.c.X)
+            let _ = assertT <| Fun.Clamp(float v.c.X,  float v.c.X,  float v.c.X)
+            let _ = assertT <| Fun.Clamp(v.c.X,        v.c.X,        v.c.X)
+
+            let _ = assertT <| Fun.Clamp(V4f v.c,      V4f v.c,      V4f v.c)
+            let _ = assertT <| Fun.Clamp(V4f v.c,      v.c.X,        v.c.X)
+            let _ = assertT <| Fun.Clamp(V3f v.c,      V3f v.c,      V3f v.c)
+            let _ = assertT <| Fun.Clamp(V3f v.c,      v.c.X,        v.c.X)
+            let _ = assertT <| Fun.Clamp(V2f v.c,      V2f v.c,      V2f v.c)
+            let _ = assertT <| Fun.Clamp(V2f v.c,      v.c.X,        v.c.X)
+
+            let _ = assertT <| Fun.Clamp(V4d v.c,      V4d v.c,      V4d v.c)
+            let _ = assertT <| Fun.Clamp(V4d v.c,      float v.c.X,  float v.c.X)
+            let _ = assertT <| Fun.Clamp(V3d v.c,      V3d v.c,      V3d v.c)
+            let _ = assertT <| Fun.Clamp(V3d v.c,      float v.c.X,  float v.c.X)
+            let _ = assertT <| Fun.Clamp(V2d v.c,      V2d v.c,      V2d v.c)
+            let _ = assertT <| Fun.Clamp(V2d v.c,      float v.c.X,  float v.c.X)
+
+            let _ = assertT <| Fun.Clamp(V4i v.c,      V4i v.c,      V4i v.c)
+            let _ = assertT <| Fun.Clamp(V4i v.c,      int v.c.X,    int v.c.X)
+            let _ = assertT <| Fun.Clamp(V3i v.c,      V3i v.c,      V3i v.c)
+            let _ = assertT <| Fun.Clamp(V3i v.c,      int v.c.X,    int v.c.X)
+            let _ = assertT <| Fun.Clamp(V2i v.c,      V2i v.c,      V2i v.c)
+            let _ = assertT <| Fun.Clamp(V2i v.c,      int v.c.X,    int v.c.X)
+
+            let _ = assertT <| Fun.Clamp(V4ui v.c,     V4ui v.c,     V4ui v.c)
+            let _ = assertT <| Fun.Clamp(V4ui v.c,     uint v.c.X,   uint v.c.X)
+            let _ = assertT <| Fun.Clamp(V3ui v.c,     V3ui v.c,     V3ui v.c)
+            let _ = assertT <| Fun.Clamp(V3ui v.c,     uint v.c.X,   uint v.c.X)
+            let _ = assertT <| Fun.Clamp(V2ui v.c,     V2ui v.c,     V2ui v.c)
+            let _ = assertT <| Fun.Clamp(V2ui v.c,     uint v.c.X,   uint v.c.X)
+
+            let _ = assertT <| Fun.Clamp(V4l v.c,      V4l v.c,      V4l v.c)
+            let _ = assertT <| Fun.Clamp(V4l v.c,      int64 v.c.X,  int64 v.c.X)
+            let _ = assertT <| Fun.Clamp(V3l v.c,      V3l v.c,      V3l v.c)
+            let _ = assertT <| Fun.Clamp(V3l v.c,      int64 v.c.X,  int64 v.c.X)
+            let _ = assertT <| Fun.Clamp(V2l v.c,      V2l v.c,      V2l v.c)
+            let _ = assertT <| Fun.Clamp(V2l v.c,      int64 v.c.X,  int64 v.c.X)
+
+            let _ = assertT <| clamp (int8 v.c.X)   (int8 v.c.X)   (int8 v.c.X)
+            let _ = assertT <| clamp (int16 v.c.X)  (int16 v.c.X)  (int16 v.c.X)
+            let _ = assertT <| clamp (int32 v.c.X)  (int32 v.c.X)  (int32 v.c.X)
+            let _ = assertT <| clamp (int64 v.c.X)  (int64 v.c.X)  (int64 v.c.X)
+            let _ = assertT <| clamp (uint8 v.c.X)  (uint8 v.c.X)  (uint8 v.c.X)
+            let _ = assertT <| clamp (uint16 v.c.X) (uint16 v.c.X) (uint16 v.c.X)
+            let _ = assertT <| clamp (uint32 v.c.X) (uint32 v.c.X) (uint32 v.c.X)
+            let _ = assertT <| clamp (uint64 v.c.X) (uint64 v.c.X) (uint64 v.c.X)
+            let _ = assertT <| clamp (float v.c.X)  (float v.c.X)  (float v.c.X)
+            let _ = assertT <| clamp (v.c.X)        (v.c.X)        (v.c.X)
+
+            let _ = assertT <| clamp (V4f v.c)      (V4f v.c)      (V4f v.c)
+            let _ = assertT <| clamp (v.c.X)        (V4f v.c)      (V4f v.c)
+            let _ = assertT <| clamp (V4f v.c)      (v.c.X)        (V4f v.c)
+            let _ = assertT <| clamp (v.c.X)        (v.c.X)        (V4f v.c)
+            let _ = assertT <| clamp (V3f v.c)      (V3f v.c)      (V3f v.c)
+            let _ = assertT <| clamp (v.c.X)        (V3f v.c)      (V3f v.c)
+            let _ = assertT <| clamp (V3f v.c)      (v.c.X)        (V3f v.c)
+            let _ = assertT <| clamp (v.c.X)        (v.c.X)        (V3f v.c)
+            let _ = assertT <| clamp (V2f v.c)      (V2f v.c)      (V2f v.c)
+            let _ = assertT <| clamp (v.c.X)        (V2f v.c)      (V2f v.c)
+            let _ = assertT <| clamp (V2f v.c)      (v.c.X)        (V2f v.c)
+            let _ = assertT <| clamp (v.c.X)        (v.c.X)        (V2f v.c)
+
+            let _ = assertT <| clamp (V4d v.c)      (V4d v.c)      (V4d v.c)
+            let _ = assertT <| clamp (float v.c.X)  (V4d v.c)      (V4d v.c)
+            let _ = assertT <| clamp (V4d v.c)      (float v.c.X)  (V4d v.c)
+            let _ = assertT <| clamp (float v.c.X)  (float v.c.X)  (V4d v.c)
+            let _ = assertT <| clamp (V3d v.c)      (V3d v.c)      (V3d v.c)
+            let _ = assertT <| clamp (float v.c.X)  (V3d v.c)      (V3d v.c)
+            let _ = assertT <| clamp (V3d v.c)      (float v.c.X)  (V3d v.c)
+            let _ = assertT <| clamp (float v.c.X)  (float v.c.X)  (V3d v.c)
+            let _ = assertT <| clamp (V2d v.c)      (V2d v.c)      (V2d v.c)
+            let _ = assertT <| clamp (float v.c.X)  (V2d v.c)      (V2d v.c)
+            let _ = assertT <| clamp (V2d v.c)      (float v.c.X)  (V2d v.c)
+            let _ = assertT <| clamp (float v.c.X)  (float v.c.X)  (V2d v.c)
+
+            let _ = assertT <| clamp (V4i v.c)      (V4i v.c)      (V4i v.c)
+            let _ = assertT <| clamp (int v.c.X)    (V4i v.c)      (V4i v.c)
+            let _ = assertT <| clamp (V4i v.c)      (int v.c.X)    (V4i v.c)
+            let _ = assertT <| clamp (int v.c.X)    (int v.c.X)    (V4i v.c)
+            let _ = assertT <| clamp (V3i v.c)      (V3i v.c)      (V3i v.c)
+            let _ = assertT <| clamp (int v.c.X)    (V3i v.c)      (V3i v.c)
+            let _ = assertT <| clamp (V3i v.c)      (int v.c.X)    (V3i v.c)
+            let _ = assertT <| clamp (int v.c.X)    (int v.c.X)    (V3i v.c)
+            let _ = assertT <| clamp (V2i v.c)      (V2i v.c)      (V2i v.c)
+            let _ = assertT <| clamp (int v.c.X)    (V2i v.c)      (V2i v.c)
+            let _ = assertT <| clamp (V2i v.c)      (int v.c.X)    (V2i v.c)
+            let _ = assertT <| clamp (int v.c.X)    (int v.c.X)    (V2i v.c)
+
+            let _ = assertT <| clamp (V4ui v.c)     (V4ui v.c)     (V4ui v.c)
+            let _ = assertT <| clamp (V3ui v.c)     (V3ui v.c)     (V3ui v.c)
+            let _ = assertT <| clamp (V2ui v.c)     (V2ui v.c)     (V2ui v.c)
+
+            let _ = assertT <| clamp (V4l v.c)      (V4l v.c)      (V4l v.c)
+            let _ = assertT <| clamp (int64 v.c.X)  (V4l v.c)      (V4l v.c)
+            let _ = assertT <| clamp (V4l v.c)      (int64 v.c.X)  (V4l v.c)
+            let _ = assertT <| clamp (int64 v.c.X)  (int64 v.c.X)  (V4l v.c)
+            let _ = assertT <| clamp (V3l v.c)      (V3l v.c)      (V3l v.c)
+            let _ = assertT <| clamp (int64 v.c.X)  (V3l v.c)      (V3l v.c)
+            let _ = assertT <| clamp (V3l v.c)      (int64 v.c.X)  (V3l v.c)
+            let _ = assertT <| clamp (int64 v.c.X)  (int64 v.c.X)  (V3l v.c)
+            let _ = assertT <| clamp (V2l v.c)      (V2l v.c)      (V2l v.c)
+            let _ = assertT <| clamp (int64 v.c.X)  (V2l v.c)      (V2l v.c)
+            let _ = assertT <| clamp (V2l v.c)      (int64 v.c.X)  (V2l v.c)
+            let _ = assertT <| clamp (int64 v.c.X)  (int64 v.c.X)  (V2l v.c)
+
+            return v.pos
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["clamp"]
+
+[<Test>]
+let ``Saturate``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = assertT <| Fun.Saturate(int8 v.c.X)
+            let _ = assertT <| Fun.Saturate(int16 v.c.X)
+            let _ = assertT <| Fun.Saturate(int32 v.c.X)
+            let _ = assertT <| Fun.Saturate(int64 v.c.X)
+            let _ = assertT <| Fun.Saturate(uint8 v.c.X)
+            let _ = assertT <| Fun.Saturate(uint16 v.c.X)
+            let _ = assertT <| Fun.Saturate(uint32 v.c.X)
+            let _ = assertT <| Fun.Saturate(uint64 v.c.X)
+            let _ = assertT <| Fun.Saturate(float v.c.X)
+            let _ = assertT <| Fun.Saturate(v.c.X)
+            let _ = assertT <| Fun.Saturate(V4f v.c)
+            let _ = assertT <| Fun.Saturate(V3f v.c)
+            let _ = assertT <| Fun.Saturate(V2f v.c)
+            let _ = assertT <| Fun.Saturate(V4d v.c)
+            let _ = assertT <| Fun.Saturate(V3d v.c)
+            let _ = assertT <| Fun.Saturate(V2d v.c)
+            let _ = assertT <| Fun.Saturate(V4i v.c)
+            let _ = assertT <| Fun.Saturate(V3i v.c)
+            let _ = assertT <| Fun.Saturate(V2i v.c)
+            let _ = assertT <| Fun.Saturate(V4ui v.c)
+            let _ = assertT <| Fun.Saturate(V3ui v.c)
+            let _ = assertT <| Fun.Saturate(V2ui v.c)
+            let _ = assertT <| Fun.Saturate(V4l v.c)
+            let _ = assertT <| Fun.Saturate(V3l v.c)
+            let _ = assertT <| Fun.Saturate(V2l v.c)
+
+            let _ = assertT <| saturate (int8 v.c.X)
+            let _ = assertT <| saturate (int16 v.c.X)
+            let _ = assertT <| saturate (int32 v.c.X)
+            let _ = assertT <| saturate (int64 v.c.X)
+            let _ = assertT <| saturate (uint8 v.c.X)
+            let _ = assertT <| saturate (uint16 v.c.X)
+            let _ = assertT <| saturate (uint32 v.c.X)
+            let _ = assertT <| saturate (uint64 v.c.X)
+            let _ = assertT <| saturate (float v.c.X)
+            let _ = assertT <| saturate (v.c.X)
+            let _ = assertT <| saturate (V4f v.c)
+            let _ = assertT <| saturate (V3f v.c)
+            let _ = assertT <| saturate (V2f v.c)
+            let _ = assertT <| saturate (V4d v.c)
+            let _ = assertT <| saturate (V3d v.c)
+            let _ = assertT <| saturate (V2d v.c)
+            let _ = assertT <| saturate (V4i v.c)
+            let _ = assertT <| saturate (V3i v.c)
+            let _ = assertT <| saturate (V2i v.c)
+            let _ = assertT <| saturate (V4ui v.c)
+            let _ = assertT <| saturate (V3ui v.c)
+            let _ = assertT <| saturate (V2ui v.c)
+            let _ = assertT <| saturate (V4l v.c)
+            let _ = assertT <| saturate (V3l v.c)
+            let _ = assertT <| saturate (V2l v.c)
+
             return v.pos
         }
 
@@ -737,34 +1599,34 @@ let ``Step``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = step 0.5f v.c.X
-            let _ = step 0.5f v.c.XY
-            let _ = step 0.5f v.c.XYZ
-            let _ = step 0.5f v.c
-            let _ = step (V2f(0.5)) v.c.XY
-            let _ = step (V3f(0.5)) v.c.XYZ
-            let _ = step (V4f(0.5)) v.c
-            let _ = step 0.5 (float v.c.X)
-            let _ = step 0.5 (v2d v.c.XY)
-            let _ = step 0.5 (v3d v.c.XYZ)
-            let _ = step 0.5 (v4d v.c)
-            let _ = step (V2d(0.5)) (v2d v.c.XY)
-            let _ = step (V3d(0.5)) (v3d v.c.XYZ)
-            let _ = step (V4d(0.5)) (v4d v.c)
-            let _ = Fun.Step(v.c.X, 0.5f)
-            let _ = Fun.Step(v.c.XY, 0.5f)
-            let _ = Fun.Step(v.c.XYZ, 0.5f)
-            let _ = Fun.Step(v.c, 0.5f)
-            let _ = Fun.Step(v.c.XY, V2f(0.5))
-            let _ = Fun.Step(v.c.XYZ, V3f(0.5))
-            let _ = Fun.Step(v.c, V4f(0.5))
-            let _ = Fun.Step((float v.c.X), 0.5)
-            let _ = Fun.Step((v2d v.c.XY), 0.5)
-            let _ = Fun.Step((v3d v.c.XYZ), 0.5)
-            let _ = Fun.Step((v4d v.c), 0.5)
-            let _ = Fun.Step((v2d v.c.XY), V2d(0.5))
-            let _ = Fun.Step((v3d v.c.XYZ), V3d(0.5))
-            let _ = Fun.Step((v4d v.c), V4d(0.5))
+            let _ = assertT <| step 0.5f v.c.X
+            let _ = assertT <| step 0.5f v.c.XY
+            let _ = assertT <| step 0.5f v.c.XYZ
+            let _ = assertT <| step 0.5f v.c
+            let _ = assertT <| step (V2f(0.5)) v.c.XY
+            let _ = assertT <| step (V3f(0.5)) v.c.XYZ
+            let _ = assertT <| step (V4f(0.5)) v.c
+            let _ = assertT <| step 0.5 (float v.c.X)
+            let _ = assertT <| step 0.5 (v2d v.c.XY)
+            let _ = assertT <| step 0.5 (v3d v.c.XYZ)
+            let _ = assertT <| step 0.5 (v4d v.c)
+            let _ = assertT <| step (V2d(0.5)) (v2d v.c.XY)
+            let _ = assertT <| step (V3d(0.5)) (v3d v.c.XYZ)
+            let _ = assertT <| step (V4d(0.5)) (v4d v.c)
+            let _ = assertT <| Fun.Step(v.c.X, 0.5f)
+            let _ = assertT <| Fun.Step(v.c.XY, 0.5f)
+            let _ = assertT <| Fun.Step(v.c.XYZ, 0.5f)
+            let _ = assertT <| Fun.Step(v.c, 0.5f)
+            let _ = assertT <| Fun.Step(v.c.XY, V2f(0.5))
+            let _ = assertT <| Fun.Step(v.c.XYZ, V3f(0.5))
+            let _ = assertT <| Fun.Step(v.c, V4f(0.5))
+            let _ = assertT <| Fun.Step((float v.c.X), 0.5)
+            let _ = assertT <| Fun.Step((v2d v.c.XY), 0.5)
+            let _ = assertT <| Fun.Step((v3d v.c.XYZ), 0.5)
+            let _ = assertT <| Fun.Step((v4d v.c), 0.5)
+            let _ = assertT <| Fun.Step((v2d v.c.XY), V2d(0.5))
+            let _ = assertT <| Fun.Step((v3d v.c.XYZ), V3d(0.5))
+            let _ = assertT <| Fun.Step((v4d v.c), V4d(0.5))
             return v.pos
         }
 
@@ -803,10 +1665,34 @@ let ``Smoothstep``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = v.c |> smoothstep v.c v.c
-            let _ = v.c |> smoothstep 0.0f 1.0f
-            let _ = Fun.Smoothstep(v.c, 0.0f, 1.0f)
-            let _ = Fun.Smoothstep(v.c, v.c, v.c)
+            let _ = assertT <| smoothstep 0.5f 0.5f v.c.X
+            let _ = assertT <| smoothstep 0.5f 0.5f v.c.XY
+            let _ = assertT <| smoothstep 0.5f 0.5f v.c.XYZ
+            let _ = assertT <| smoothstep 0.5f 0.5f v.c
+            let _ = assertT <| smoothstep (V2f(0.5)) (V2f(0.5)) v.c.XY
+            let _ = assertT <| smoothstep (V3f(0.5)) (V3f(0.5)) v.c.XYZ
+            let _ = assertT <| smoothstep (V4f(0.5)) (V4f(0.5)) v.c
+            let _ = assertT <| smoothstep 0.5 0.5 (float v.c.X)
+            let _ = assertT <| smoothstep 0.5 0.5 (v2d v.c.XY)
+            let _ = assertT <| smoothstep 0.5 0.5 (v3d v.c.XYZ)
+            let _ = assertT <| smoothstep 0.5 0.5 (v4d v.c)
+            let _ = assertT <| smoothstep (V2d(0.5)) (V2d(0.5)) (v2d v.c.XY)
+            let _ = assertT <| smoothstep (V3d(0.5)) (V3d(0.5)) (v3d v.c.XYZ)
+            let _ = assertT <| smoothstep (V4d(0.5)) (V4d(0.5)) (v4d v.c)
+            let _ = assertT <| Fun.Smoothstep(v.c.X, 0.5f, 0.5f)
+            let _ = assertT <| Fun.Smoothstep(v.c.XY, 0.5f, 0.5f)
+            let _ = assertT <| Fun.Smoothstep(v.c.XYZ, 0.5f, 0.5f)
+            let _ = assertT <| Fun.Smoothstep(v.c, 0.5f, 0.5f)
+            let _ = assertT <| Fun.Smoothstep(v.c.XY, V2f(0.5), V2f(0.5))
+            let _ = assertT <| Fun.Smoothstep(v.c.XYZ, V3f(0.5), V3f(0.5))
+            let _ = assertT <| Fun.Smoothstep(v.c, V4f(0.5), V4f(0.5))
+            let _ = assertT <| Fun.Smoothstep((float v.c.X), 0.5, 0.5)
+            let _ = assertT <| Fun.Smoothstep((v2d v.c.XY), 0.5, 0.5)
+            let _ = assertT <| Fun.Smoothstep((v3d v.c.XYZ), 0.5, 0.5)
+            let _ = assertT <| Fun.Smoothstep((v4d v.c), 0.5, 0.5)
+            let _ = assertT <| Fun.Smoothstep((v2d v.c.XY), V2d(0.5), V2d(0.5))
+            let _ = assertT <| Fun.Smoothstep((v3d v.c.XYZ), V3d(0.5), V3d(0.5))
+            let _ = assertT <| Fun.Smoothstep((v4d v.c), V4d(0.5), V4d(0.5))
             return v.pos
         }
 
@@ -831,14 +1717,103 @@ let ``MultiplyAdd``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = madd v.c v.c v.c
-            let _ = madd v.c v.c.X v.c
-            let _ = madd v.c.X v.c.X v.c.X
-            let _ = madd (V4i(v.c)) 2 (V4i(v.c))
-            let _ = Fun.MultiplyAdd(v.c.X, v.c, v.c)
-            let _ = Fun.MultiplyAdd(v.c, v.c.X, v.c)
-            let _ = Fun.MultiplyAdd(v.c, v.c, v.c)
-            let _ = Fun.MultiplyAdd(v.c.X, v.c.Y, v.c.Z)
+            let _ = assertT <| Fun.MultiplyAdd(int8 v.c.X,   int8 v.c.X,   int8 v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(int16 v.c.X,  int16 v.c.X,  int16 v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(int32 v.c.X,  int32 v.c.X,  int32 v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(int64 v.c.X,  int64 v.c.X,  int64 v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(uint8 v.c.X,  uint8 v.c.X,  uint8 v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(uint16 v.c.X, uint16 v.c.X, uint16 v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(uint32 v.c.X, uint32 v.c.X, uint32 v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(uint64 v.c.X, uint64 v.c.X, uint64 v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(float v.c.X,  float v.c.X,  float v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(v.c.X,        v.c.X,        v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(V4f v.c,      V4f v.c,      V4f v.c)
+            let _ = assertT <| Fun.MultiplyAdd(V4f v.c,      v.c.X,        V4f v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(v.c.X,        V4f v.c.X,    V4f v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(V3f v.c,      V3f v.c,      V3f v.c)
+            let _ = assertT <| Fun.MultiplyAdd(V3f v.c,      v.c.X,        V3f v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(v.c.X,        V3f v.c.X,    V3f v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(V2f v.c,      V2f v.c,      V2f v.c)
+            let _ = assertT <| Fun.MultiplyAdd(V2f v.c,      v.c.X,        V2f v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(v.c.X,        V2f v.c.X,    V2f v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(V4d v.c,      V4d v.c,      V4d v.c)
+            let _ = assertT <| Fun.MultiplyAdd(V4d v.c,      float v.c.X,  V4d v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(float v.c.X,  V4d v.c.X,    V4d v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(V3d v.c,      V3d v.c,      V3d v.c)
+            let _ = assertT <| Fun.MultiplyAdd(V3d v.c,      float v.c.X,  V3d v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(float v.c.X,  V3d v.c.X,    V3d v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(V2d v.c,      V2d v.c,      V2d v.c)
+            let _ = assertT <| Fun.MultiplyAdd(V2d v.c,      float v.c.X,  V2d v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(float v.c.X,  V2d v.c.X,    V2d v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(V4i v.c,      V4i v.c,      V4i v.c)
+            let _ = assertT <| Fun.MultiplyAdd(V4i v.c,      int32 v.c.X,  V4i v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(int32 v.c.X,  V4i v.c.X,    V4i v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(V3i v.c,      V3i v.c,      V3i v.c)
+            let _ = assertT <| Fun.MultiplyAdd(V3i v.c,      int32 v.c.X,  V3i v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(int32 v.c.X,  V3i v.c.X,    V3i v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(V2i v.c,      V2i v.c,      V2i v.c)
+            let _ = assertT <| Fun.MultiplyAdd(V2i v.c,      int32 v.c.X,  V2i v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(int32 v.c.X,  V2i v.c.X,    V2i v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(V4ui v.c,     V4ui v.c,     V4ui v.c)
+            let _ = assertT <| Fun.MultiplyAdd(V4ui v.c,     uint32 v.c.X, V4ui v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(uint32 v.c.X, V4ui v.c.X,   V4ui v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(V3ui v.c,     V3ui v.c,     V3ui v.c)
+            let _ = assertT <| Fun.MultiplyAdd(V3ui v.c,     uint32 v.c.X, V3ui v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(uint32 v.c.X, V3ui v.c.X,   V3ui v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(V2ui v.c,     V2ui v.c,     V2ui v.c)
+            let _ = assertT <| Fun.MultiplyAdd(V2ui v.c,     uint32 v.c.X, V2ui v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(uint32 v.c.X, V2ui v.c.X,   V2ui v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(V4l v.c,      V4l v.c,      V4l v.c)
+            let _ = assertT <| Fun.MultiplyAdd(V4l v.c,      int64 v.c.X,  V4l v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(int64 v.c.X,  V4l v.c.X,    V4l v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(V3l v.c,      V3l v.c,      V3l v.c)
+            let _ = assertT <| Fun.MultiplyAdd(V3l v.c,      int64 v.c.X,  V3l v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(int64 v.c.X,  V3l v.c.X,    V3l v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(V2l v.c,      V2l v.c,      V2l v.c)
+            let _ = assertT <| Fun.MultiplyAdd(V2l v.c,      int64 v.c.X,  V2l v.c.X)
+            let _ = assertT <| Fun.MultiplyAdd(int64 v.c.X,  V2l v.c.X,    V2l v.c.X)
+            
+            let _ = assertT <| madd (int8 v.c.X)   (int8 v.c.X)   (int8 v.c.X)
+            let _ = assertT <| madd (int16 v.c.X)  (int16 v.c.X)  (int16 v.c.X)
+            let _ = assertT <| madd (int32 v.c.X)  (int32 v.c.X)  (int32 v.c.X)
+            let _ = assertT <| madd (int64 v.c.X)  (int64 v.c.X)  (int64 v.c.X)
+            let _ = assertT <| madd (uint8 v.c.X)  (uint8 v.c.X)  (uint8 v.c.X)
+            let _ = assertT <| madd (uint16 v.c.X) (uint16 v.c.X) (uint16 v.c.X)
+            let _ = assertT <| madd (uint32 v.c.X) (uint32 v.c.X) (uint32 v.c.X)
+            let _ = assertT <| madd (uint64 v.c.X) (uint64 v.c.X) (uint64 v.c.X)
+            let _ = assertT <| madd (float v.c.X)  (float v.c.X)  (float v.c.X)
+            let _ = assertT <| madd (v.c.X)        (v.c.X)        (v.c.X)
+            let _ = assertT <| madd (V4f v.c)      (V4f v.c)      (V4f v.c)
+            let _ = assertT <| madd (V4f v.c)      (v.c.X)        (V4f v.c.X)
+            let _ = assertT <| madd (V3f v.c)      (V3f v.c)      (V3f v.c)
+            let _ = assertT <| madd (V3f v.c)      (v.c.X)        (V3f v.c.X)
+            let _ = assertT <| madd (V2f v.c)      (V2f v.c)      (V2f v.c)
+            let _ = assertT <| madd (V2f v.c)      (v.c.X)        (V2f v.c.X)
+            let _ = assertT <| madd (V4d v.c)      (V4d v.c)      (V4d v.c)
+            let _ = assertT <| madd (V4d v.c)      (float v.c.X)  (V4d v.c.X)
+            let _ = assertT <| madd (V3d v.c)      (V3d v.c)      (V3d v.c)
+            let _ = assertT <| madd (V3d v.c)      (float v.c.X)  (V3d v.c.X)
+            let _ = assertT <| madd (V2d v.c)      (V2d v.c)      (V2d v.c)
+            let _ = assertT <| madd (V2d v.c)      (float v.c.X)  (V2d v.c.X)
+            let _ = assertT <| madd (V4i v.c)      (V4i v.c)      (V4i v.c)
+            let _ = assertT <| madd (V4i v.c)      (int32 v.c.X)  (V4i v.c.X)
+            let _ = assertT <| madd (V3i v.c)      (V3i v.c)      (V3i v.c)
+            let _ = assertT <| madd (V3i v.c)      (int32 v.c.X)  (V3i v.c.X)
+            let _ = assertT <| madd (V2i v.c)      (V2i v.c)      (V2i v.c)
+            let _ = assertT <| madd (V2i v.c)      (int32 v.c.X)  (V2i v.c.X)
+            let _ = assertT <| madd (V4ui v.c)     (V4ui v.c)     (V4ui v.c)
+            let _ = assertT <| madd (V4ui v.c)     (uint32 v.c.X) (V4ui v.c.X)
+            let _ = assertT <| madd (V3ui v.c)     (V3ui v.c)     (V3ui v.c)
+            let _ = assertT <| madd (V3ui v.c)     (uint32 v.c.X) (V3ui v.c.X)
+            let _ = assertT <| madd (V2ui v.c)     (V2ui v.c)     (V2ui v.c)
+            let _ = assertT <| madd (V2ui v.c)     (uint32 v.c.X) (V2ui v.c.X)
+            let _ = assertT <| madd (V4l v.c)      (V4l v.c)      (V4l v.c)
+            let _ = assertT <| madd (V4l v.c)      (int64 v.c.X)  (V4l v.c.X)
+            let _ = assertT <| madd (V3l v.c)      (V3l v.c)      (V3l v.c)
+            let _ = assertT <| madd (V3l v.c)      (int64 v.c.X)  (V3l v.c.X)
+            let _ = assertT <| madd (V2l v.c)      (V2l v.c)      (V2l v.c)
+            let _ = assertT <| madd (V2l v.c)      (int64 v.c.X)  (V2l v.c.X)
+
             return v.pos
         }
 
@@ -850,14 +1825,14 @@ let ``Degrees / radians``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = degrees v.c
-            let _ = degrees v.c.X
-            let _ = v.c.DegreesFromRadians()
-            let _ = v.c.X.DegreesFromRadians()
-            let _ = radians v.c
-            let _ = radians v.c.X
-            let _ = v.c.RadiansFromDegrees()
-            let _ = v.c.X.RadiansFromDegrees()
+            let _ = assertT <| degrees v.c
+            let _ = assertT <| degrees v.c.X
+            let _ = assertT <| v.c.DegreesFromRadians()
+            let _ = assertT <| v.c.X.DegreesFromRadians()
+            let _ = assertT <| radians v.c
+            let _ = assertT <| radians v.c.X
+            let _ = assertT <| v.c.RadiansFromDegrees()
+            let _ = assertT <| v.c.X.RadiansFromDegrees()
             return v.pos
         }
 
@@ -870,34 +1845,68 @@ let ``Length``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Vec.length v.c
-            let _ = Vec.Length v.c
-            let _ = Vec.Length v.c.XYZ
-            let _ = Vec.Length v.c.XY
-            let _ = Vec.Length v.what
-            let _ = Vec.Length v.what.XYZ
-            let _ = Vec.Length v.what.XY
+            let _ = assertT <| Vec.length v.c
+            let _ = assertT <| Vec.Length v.c
+            let _ = assertT <| Vec.Length v.c.XYZ
+            let _ = assertT <| Vec.Length v.c.XY
+            let _ = assertT <| Vec.length (V4d v.c)
+            let _ = assertT <| Vec.Length (V4d v.c)
+            let _ = assertT <| Vec.Length (V3d v.c.XYZ)
+            let _ = assertT <| Vec.Length (V2d v.c.XY)
+            let _ = assertT <| Vec.Length v.what
+            let _ = assertT <| Vec.Length v.what.XYZ
+            let _ = assertT <| Vec.Length v.what.XY
+            let _ = assertT <| Vec.Length v.whatu
+            let _ = assertT <| Vec.Length v.whatu.XYZ
+            let _ = assertT <| Vec.Length v.whatu.XY
+            let _ = assertT <| Vec.Length v.whatl
+            let _ = assertT <| Vec.Length v.whatl.XYZ
+            let _ = assertT <| Vec.Length v.whatl.XY
 
-            let _ = v.c.Length
-            let _ = v.c.XYZ.Length
-            let _ = v.c.XY.Length
-            let _ = v.what.Length
-            let _ = v.what.XYZ.Length
-            let _ = v.what.XY.Length
+            let _ = assertT <| v.c.Length
+            let _ = assertT <| v.c.XYZ.Length
+            let _ = assertT <| v.c.XY.Length
+            let _ = assertT <| (V4d v.c).Length
+            let _ = assertT <| (V3d v.c.XYZ).Length
+            let _ = assertT <| (V2d v.c.XY).Length
+            let _ = assertT <| v.what.Length
+            let _ = assertT <| v.what.XYZ.Length
+            let _ = assertT <| v.what.XY.Length
+            let _ = assertT <| v.whatu.Length
+            let _ = assertT <| v.whatu.XYZ.Length
+            let _ = assertT <| v.whatu.XY.Length
+            let _ = assertT <| v.whatl.Length
+            let _ = assertT <| v.whatl.XYZ.Length
+            let _ = assertT <| v.whatl.XY.Length
 
-            let _ = v.c.Norm2
-            let _ = v.c.XYZ.Norm2
-            let _ = v.c.XY.Norm2
-            let _ = v.what.Norm2
-            let _ = v.what.XYZ.Norm2
-            let _ = v.what.XY.Norm2
+            let _ = assertT <| (V4d v.c).Norm2
+            let _ = assertT <| (V3d v.c.XYZ).Norm2
+            let _ = assertT <| (V2d v.c.XY).Norm2
+            let _ = assertT <| v.what.Norm2
+            let _ = assertT <| v.what.XYZ.Norm2
+            let _ = assertT <| v.what.XY.Norm2
+            let _ = assertT <| v.whatu.Norm2
+            let _ = assertT <| v.whatu.XYZ.Norm2
+            let _ = assertT <| v.whatu.XY.Norm2
+            let _ = assertT <| v.whatl.Norm2
+            let _ = assertT <| v.whatl.XYZ.Norm2
+            let _ = assertT <| v.whatl.XY.Norm2
 
-            let _ = Vec.Norm2 v.c
-            let _ = Vec.Norm2 v.c.XYZ
-            let _ = Vec.Norm2 v.c.XY
-            let _ = Vec.Norm2 v.what
-            let _ = Vec.Norm2 v.what.XYZ
-            let _ = Vec.Norm2 v.what.XY
+            let _ = assertT <| Vec.Norm2 v.c
+            let _ = assertT <| Vec.Norm2 v.c.XYZ
+            let _ = assertT <| Vec.Norm2 v.c.XY
+            let _ = assertT <| Vec.Norm2 (V4d v.c)
+            let _ = assertT <| Vec.Norm2 (V3d v.c.XYZ)
+            let _ = assertT <| Vec.Norm2 (V2d v.c.XY)
+            let _ = assertT <| Vec.Norm2 v.what
+            let _ = assertT <| Vec.Norm2 v.what.XYZ
+            let _ = assertT <| Vec.Norm2 v.what.XY
+            let _ = assertT <| Vec.Norm2 v.whatu
+            let _ = assertT <| Vec.Norm2 v.whatu.XYZ
+            let _ = assertT <| Vec.Norm2 v.whatu.XY
+            let _ = assertT <| Vec.Norm2 v.whatl
+            let _ = assertT <| Vec.Norm2 v.whatl.XYZ
+            let _ = assertT <| Vec.Norm2 v.whatl.XY
 
             return v.pos
         }
@@ -910,21 +1919,27 @@ let ``LengthSquared``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = assertDbl <| Vec.lengthSquared v.c
-            let _ = assertDbl <| Vec.LengthSquared v.c
-            let _ = assertDbl <| Vec.LengthSquared v.c.XYZ
-            let _ = assertDbl <| Vec.LengthSquared v.c.XY
-            let _ = assertInt <| Vec.LengthSquared v.what
-            let _ = assertInt <| Vec.LengthSquared v.what.XYZ
-            let _ = assertInt <| Vec.LengthSquared v.what.XY
+            let _ = assertT <| Vec.lengthSquared v.c
+            let _ = assertT <| Vec.LengthSquared v.c
+            let _ = assertT <| Vec.LengthSquared v.c.XYZ
+            let _ = assertT <| Vec.LengthSquared v.c.XY
+            let _ = assertT <| Vec.LengthSquared v.what
+            let _ = assertT <| Vec.LengthSquared v.what.XYZ
+            let _ = assertT <| Vec.LengthSquared v.what.XY
+            let _ = assertT <| Vec.LengthSquared v.whatu
+            let _ = assertT <| Vec.LengthSquared v.whatu.XYZ
+            let _ = assertT <| Vec.LengthSquared v.whatu.XY
+            let _ = assertT <| Vec.LengthSquared v.whatl
+            let _ = assertT <| Vec.LengthSquared v.whatl.XYZ
+            let _ = assertT <| Vec.LengthSquared v.whatl.XY
 
-            let _ = assertDbl <| Vec.lengthSquared (getVec())
-            let _ = assertDbl <| Vec.LengthSquared(getVec())
-            let _ = assertDbl <| Vec.LengthSquared(getVec().XYZ)
-            let _ = assertDbl <| Vec.LengthSquared(getVec().XY)
-            let _ = assertDbl <| getVec().LengthSquared
-            let _ = assertDbl <| getVec().XYZ.LengthSquared
-            let _ = assertDbl <| getVec().XY.LengthSquared
+            let _ = assertT <| Vec.lengthSquared (getVec())
+            let _ = assertT <| Vec.LengthSquared(getVec())
+            let _ = assertT <| Vec.LengthSquared(getVec().XYZ)
+            let _ = assertT <| Vec.LengthSquared(getVec().XY)
+            let _ = assertT <| getVec().LengthSquared
+            let _ = assertT <| getVec().XYZ.LengthSquared
+            let _ = assertT <| getVec().XY.LengthSquared
 
             return v.pos
         }
@@ -937,18 +1952,24 @@ let ``DistanceSquared``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = assertDbl <| Vec.distanceSquared v.c v.c
-            let _ = assertDbl <| Vec.DistanceSquared(v.c, v.c)
-            let _ = assertDbl <| Vec.DistanceSquared(v.c.XYZ, v.c.XYZ)
-            let _ = assertDbl <| Vec.DistanceSquared(v.c.XY, v.c.XY)
-            let _ = assertInt <| Vec.DistanceSquared(v.what, v.what)
-            let _ = assertInt <| Vec.DistanceSquared(v.what.XYZ, v.what.XYZ)
-            let _ = assertInt <| Vec.DistanceSquared(v.what.XY, v.what.XY)
+            let _ = assertT <| Vec.distanceSquared v.c v.c
+            let _ = assertT <| Vec.DistanceSquared(v.c,         v.c)
+            let _ = assertT <| Vec.DistanceSquared(v.c.XYZ,     v.c.XYZ)
+            let _ = assertT <| Vec.DistanceSquared(v.c.XY,      v.c.XY)
+            let _ = assertT <| Vec.DistanceSquared(v.what,      v.what)
+            let _ = assertT <| Vec.DistanceSquared(v.what.XYZ,  v.what.XYZ)
+            let _ = assertT <| Vec.DistanceSquared(v.what.XY,   v.what.XY)
+            let _ = assertT <| Vec.DistanceSquared(v.whatu,     v.whatu)
+            let _ = assertT <| Vec.DistanceSquared(v.whatu.XYZ, v.whatu.XYZ)
+            let _ = assertT <| Vec.DistanceSquared(v.whatu.XY,  v.whatu.XY)
+            let _ = assertT <| Vec.DistanceSquared(v.whatl,     v.whatl)
+            let _ = assertT <| Vec.DistanceSquared(v.whatl.XYZ, v.whatl.XYZ)
+            let _ = assertT <| Vec.DistanceSquared(v.whatl.XY,  v.whatl.XY)
 
-            let _ = assertDbl <| Vec.distanceSquared (getVec()) (getVec())
-            let _ = assertDbl <| Vec.DistanceSquared(getVec(), getVec())
-            let _ = assertDbl <| Vec.DistanceSquared(getVec().XYZ, getVec().XYZ)
-            let _ = assertDbl <| Vec.DistanceSquared(getVec().XY, getVec().XY)
+            let _ = assertT <| Vec.distanceSquared (getVec()) (getVec())
+            let _ = assertT <| Vec.DistanceSquared(getVec(), getVec())
+            let _ = assertT <| Vec.DistanceSquared(getVec().XYZ, getVec().XYZ)
+            let _ = assertT <| Vec.DistanceSquared(getVec().XY, getVec().XY)
 
             return v.pos
         }
@@ -961,25 +1982,27 @@ let ``Distance1``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = assertDbl <| Vec.Distance1(v.c, v.c)
-            let _ = assertDbl <| Vec.Distance1(v.c.XYZ, v.c.XYZ)
-            let _ = assertDbl <| Vec.Distance1(v.c.XY, v.c.XY)
-            let _ = assertInt <| Vec.Distance1(v.what, v.what)
-            let _ = assertInt <| Vec.Distance1(v.what.XYZ, v.what.XYZ)
-            let _ = assertInt <| Vec.Distance1(v.what.XY, v.what.XY)
+            let _ = assertT <| Vec.Distance1(v.c, v.c)
+            let _ = assertT <| Vec.Distance1(v.c.XYZ,       v.c.XYZ)
+            let _ = assertT <| Vec.Distance1(v.c.XY,        v.c.XY)
+            let _ = assertT <| Vec.Distance1(v.what,        v.what2)
+            let _ = assertT <| Vec.Distance1(v.what.XYZ,    v.what2.XYZ)
+            let _ = assertT <| Vec.Distance1(v.what.XY,     v.what2.XY)
+            let _ = assertT <| Vec.Distance1(getVecu(),     v.whatu2)
+            let _ = assertT <| Vec.Distance1(getVecu().XYZ, v.whatu2.XYZ)
+            let _ = assertT <| Vec.Distance1(getVecu().XY,  v.whatu2.XY)
+            let _ = assertT <| Vec.Distance1(v.whatl,       v.whatl2)
+            let _ = assertT <| Vec.Distance1(v.whatl.XYZ,   v.whatl2.XYZ)
+            let _ = assertT <| Vec.Distance1(v.whatl.XY,    v.whatl2.XY)
 
-            let _ = assertDbl <| Vec.Distance1(getVec(), getVec())
-            let _ = assertDbl <| Vec.Distance1(getVec().XYZ, getVec().XYZ)
-            let _ = assertDbl <| Vec.Distance1(getVec().XY, getVec().XY)
+            let _ = assertT  <| Vec.Distance1(getVec(), getVec())
+            let _ = assertT  <| Vec.Distance1(getVec().XYZ, getVec().XYZ)
+            let _ = assertT  <| Vec.Distance1(getVec().XY, getVec().XY)
 
             return v.pos
         }
 
-    GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader]
-        [
-            "getVec", 7
-            "\(\(tmp[0-9]*\.x \+ tmp[0-9]*\.y\) \+ tmp[0-9]*\.z\) \+ tmp[0-9]*\.w\)", 3
-        ]
+    GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader] ["getVec", 11]
 
 [<Test>]
 let ``Norm1``() =
@@ -987,10 +2010,14 @@ let ``Norm1``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = assertInt <| v.what.Norm1
-            let _ = assertInt <| Vec.Norm1(v.what)
-            let _ = assertDbl <| getVec().Norm1
-            let _ = assertDbl <| Vec.Norm1(getVec())
+            let _ = assertT <| v.what.Norm1
+            let _ = assertT <| v.whatu.Norm1
+            let _ = assertT <| v.whatl.Norm1
+            let _ = assertT <| Vec.Norm1(v.what)
+            let _ = assertT <| Vec.Norm1(v.whatu)
+            let _ = assertT <| Vec.Norm1(v.whatl)
+            let _ = assertT <| getVec().Norm1
+            let _ = assertT <| Vec.Norm1(getVec())
 
             return v.pos
         }
@@ -1003,37 +2030,49 @@ let ``DistanceMin /-Max``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = assertDbl <| Vec.DistanceMin(v.c, v.c)
-            let _ = assertDbl <| Vec.DistanceMin(v.c.XYZ, v.c.XYZ)
-            let _ = assertDbl <| Vec.DistanceMin(v.c.XY, v.c.XY)
-            let _ = assertInt <| Vec.DistanceMin(v.what, v.what)
-            let _ = assertInt <| Vec.DistanceMin(v.what.XYZ, v.what.XYZ)
-            let _ = assertInt <| Vec.DistanceMin(v.what.XY, v.what.XY)
+            let _ = assertT <| Vec.DistanceMin(v.c,           v.c)
+            let _ = assertT <| Vec.DistanceMin(v.c.XYZ,       v.c.XYZ)
+            let _ = assertT <| Vec.DistanceMin(v.c.XY,        v.c.XY)
+            let _ = assertT <| Vec.DistanceMin(v.what,        v.what2)
+            let _ = assertT <| Vec.DistanceMin(v.what.XYZ,    v.what2.XYZ)
+            let _ = assertT <| Vec.DistanceMin(v.what.XY,     v.what2.XY)
+            let _ = assertT <| Vec.DistanceMin(getVecu(),     v.whatu2)
+            let _ = assertT <| Vec.DistanceMin(getVecu().XYZ, v.whatu2.XYZ)
+            let _ = assertT <| Vec.DistanceMin(getVecu().XY,  v.whatu2.XY)
+            let _ = assertT <| Vec.DistanceMin(v.whatl,       v.whatl2)
+            let _ = assertT <| Vec.DistanceMin(v.whatl.XYZ,   v.whatl2.XYZ)
+            let _ = assertT <| Vec.DistanceMin(v.whatl.XY,    v.whatl2.XY)
 
-            let _ = assertDbl <| Vec.DistanceMin(getVec(), getVec())
-            let _ = assertDbl <| Vec.DistanceMin(getVec().XYZ, getVec().XYZ)
-            let _ = assertDbl <| Vec.DistanceMin(getVec().XY, getVec().XY)
+            let _ = assertT <| Vec.DistanceMin(getVec(), getVec())
+            let _ = assertT <| Vec.DistanceMin(getVec().XYZ, getVec().XYZ)
+            let _ = assertT <| Vec.DistanceMin(getVec().XY, getVec().XY)
 
-            let _ = assertDbl <| Vec.DistanceMax(v.c, v.c)
-            let _ = assertDbl <| Vec.DistanceMax(v.c.XYZ, v.c.XYZ)
-            let _ = assertDbl <| Vec.DistanceMax(v.c.XY, v.c.XY)
-            let _ = assertInt <| Vec.DistanceMax(v.what, v.what)
-            let _ = assertInt <| Vec.DistanceMax(v.what.XYZ, v.what.XYZ)
-            let _ = assertInt <| Vec.DistanceMax(v.what.XY, v.what.XY)
+            let _ = assertT <| Vec.DistanceMax(v.c,           v.c)
+            let _ = assertT <| Vec.DistanceMax(v.c.XYZ,       v.c.XYZ)
+            let _ = assertT <| Vec.DistanceMax(v.c.XY,        v.c.XY)
+            let _ = assertT <| Vec.DistanceMax(v.what,        v.what2)
+            let _ = assertT <| Vec.DistanceMax(v.what.XYZ,    v.what2.XYZ)
+            let _ = assertT <| Vec.DistanceMax(v.what.XY,     v.what2.XY)
+            let _ = assertT <| Vec.DistanceMax(getVecu(),     v.whatu2)
+            let _ = assertT <| Vec.DistanceMax(getVecu().XYZ, v.whatu2.XYZ)
+            let _ = assertT <| Vec.DistanceMax(getVecu().XY,  v.whatu2.XY)
+            let _ = assertT <| Vec.DistanceMax(v.whatl,       v.whatl2)
+            let _ = assertT <| Vec.DistanceMax(v.whatl.XYZ,   v.whatl2.XYZ)
+            let _ = assertT <| Vec.DistanceMax(v.whatl.XY,    v.whatl2.XY)
 
-            let _ = assertDbl <| Vec.DistanceMax(getVec(), getVec())
-            let _ = assertDbl <| Vec.DistanceMax(getVec().XYZ, getVec().XYZ)
-            let _ = assertDbl <| Vec.DistanceMax(getVec().XY, getVec().XY)
+            let _ = assertT <| Vec.DistanceMax(getVec(), getVec())
+            let _ = assertT <| Vec.DistanceMax(getVec().XYZ, getVec().XYZ)
+            let _ = assertT <| Vec.DistanceMax(getVec().XY, getVec().XY)
 
             return v.pos
         }
 
     GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader]
         [
-            "getVec", 13
-            "abs\(.*\)", 18
-            "min\(.*\)", 9
-            "max\(.*\)", 9
+            "getVec", 20
+            "abs\(.*\)", 12
+            "min\(.*\)", 15
+            "max\(.*\)", 15
         ]
 
 [<Test>]
@@ -1042,15 +2081,23 @@ let ``NormMin / -Max``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = assertInt <| v.what.NormMin
-            let _ = assertInt <| Vec.NormMin(v.what)
-            let _ = assertDbl <| getVec().NormMin
-            let _ = assertDbl <| Vec.NormMin(getVec())
+            let _ = assertT <| v.what.NormMin
+            let _ = assertT <| v.whatu.NormMin
+            let _ = assertT <| v.whatl.NormMin
+            let _ = assertT <| Vec.NormMin(v.what)
+            let _ = assertT <| Vec.NormMin(v.whatu)
+            let _ = assertT <| Vec.NormMin(v.whatl)
+            let _ = assertT <| getVec().NormMin
+            let _ = assertT <| Vec.NormMin(getVec())
 
-            let _ = assertInt <| v.what.NormMax
-            let _ = assertInt <| Vec.NormMax(v.what)
-            let _ = assertDbl <| getVec().NormMax
-            let _ = assertDbl <| Vec.NormMax(getVec())
+            let _ = assertT <| v.what.NormMax
+            let _ = assertT <| v.whatu.NormMax
+            let _ = assertT <| v.whatl.NormMax
+            let _ = assertT <| Vec.NormMax(v.what)
+            let _ = assertT <| Vec.NormMax(v.whatu)
+            let _ = assertT <| Vec.NormMax(v.whatl)
+            let _ = assertT <| getVec().NormMax
+            let _ = assertT <| Vec.NormMax(getVec())
 
             return v.pos
         }
@@ -1063,10 +2110,14 @@ let ``Reflect / refract``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Vec.reflect v.c v.c
-            let _ = Vec.refract 0.5f v.c v.c
-            let _ = Vec.Reflect(v.c, v.c)
-            let _ = Vec.Refract(v.c, v.c, 0.5f)
+            let _ = assertT <| Vec.reflect v.c v.c
+            let _ = assertT <| Vec.refract 0.5f v.c v.c
+            let _ = assertT <| Vec.Reflect(v.c, v.c)
+            let _ = assertT <| Vec.Refract(v.c, v.c, 0.5f)
+            let _ = assertT <| Vec.reflect (V4d v.c) (V4d v.c)
+            let _ = assertT <| Vec.refract 0.5 (V4d v.c) (V4d v.c)
+            let _ = assertT <| Vec.Reflect(V4d v.c, V4d v.c)
+            let _ = assertT <| Vec.Refract(V4d v.c, V4d v.c, 0.5)
             return v.pos
         }
 
@@ -1078,10 +2129,10 @@ let ``Dot``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = assertDbl <| Vec.dot v.c v.c
-            let _ = assertDbl <| Vec.Dot(v.c, v.c)
-            let _ = assertDbl <| Vec.Dot(v.c.XYZ, v.c.XYZ)
-            let _ = assertDbl <| Vec.Dot(v.c.XY, v.c.XY)
+            let _ = assertT <| Vec.dot v.c v.c
+            let _ = assertT <| Vec.Dot(v.c, v.c)
+            let _ = assertT <| Vec.Dot(v.c.XYZ, v.c.XYZ)
+            let _ = assertT <| Vec.Dot(v.c.XY, v.c.XY)
             return v.pos
         }
 
@@ -1093,10 +2144,10 @@ let ``Dot (int)``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = assertInt <| Vec.dot (getVeci()) v.what
-            let _ = assertInt <| Vec.Dot(getVeci(), v.what)
-            let _ = assertInt <| Vec.Dot(getVeci().XYZ, v.what.XYZ)
-            let _ = assertInt <| Vec.Dot(getVeci().XY, v.what.XY)
+            let _ = assertT <| Vec.dot (getVeci()) v.what
+            let _ = assertT <| Vec.Dot(getVeci(), v.what)
+            let _ = assertT <| Vec.Dot(getVeci().XYZ, v.what.XYZ)
+            let _ = assertT <| Vec.Dot(getVeci().XY, v.what.XY)
             return v.pos
         }
 
@@ -1108,9 +2159,10 @@ let ``Cross``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Vec.cross v.c.XYZ v.c.XYZ
-            let _ = Vec.Cross(v.c.XYZ, v.c.XYZ)
-            let _ = Vec.Cross(v.what.XYZ, v.what.XYZ)
+            let _ = assertT <| Vec.cross v.c.XYZ v.c.XYZ
+            let _ = assertT <| Vec.Cross(v.c.XYZ, v.c.XYZ)
+            let _ = assertT <| Vec.cross v.what.XYZ v.what.XYZ
+            let _ = assertT <| Vec.Cross(v.what.XYZ, v.what.XYZ)
             return v.pos
         }
 
@@ -1123,10 +2175,14 @@ let ``Transpose``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Mat.transpose <| M33f(v.c.X)
-            let _ = Mat.Transposed(M44f(v.c.X))
-            let _ = Mat.Transposed(M33f(v.c.X))
-            let _ = Mat.Transposed(M22f(v.c.X))
+            let _ = assertT <| Mat.transpose (M33f(v.c.X))
+            let _ = assertT <| Mat.Transposed(M44f(v.c.X))
+            let _ = assertT <| Mat.Transposed(M33f(v.c.X))
+            let _ = assertT <| Mat.Transposed(M22f(v.c.X))
+            let _ = assertT <| Mat.transpose (M33d(float v.c.X))
+            let _ = assertT <| Mat.Transposed(M44d(float v.c.X))
+            let _ = assertT <| Mat.Transposed(M33d(float v.c.X))
+            let _ = assertT <| Mat.Transposed(M22d(float v.c.X))
             return v.pos
         }
 
@@ -1138,9 +2194,12 @@ let ``Transform 2x2``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = assertV2d <| Mat.transform (M22f(v.c.X)) V2f.Zero
-            let _ = assertV2d <| Mat.Transform(M22f(v.c.X), V2f.Zero)
-            let _ = assertV2d <| Mat.TransposedTransform(M22f(v.c.X), V2f.Zero)
+            let _ = assertT <| Mat.transform (M22f(v.c.X)) V2f.Zero
+            let _ = assertT <| Mat.Transform(M22f(v.c.X), V2f.Zero)
+            let _ = assertT <| Mat.TransposedTransform(M22f(v.c.X), V2f.Zero)
+            let _ = assertT <| Mat.transform (M22d(float v.c.X)) V2d.Zero
+            let _ = assertT <| Mat.Transform(M22d(float v.c.X), V2d.Zero)
+            let _ = assertT <| Mat.TransposedTransform(M22d(float v.c.X), V2d.Zero)
 
             return 0.0f
         }
@@ -1153,15 +2212,25 @@ let ``Transform 2x3``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = assertV2d <| Mat.transform (M23f(v.c.X)) V3f.Zero
-            let _ = assertV2d <| Mat.Transform(M23f(v.c.X), V3f.Zero)
-            let _ = assertV3d <| Mat.TransposedTransform(M23f(v.c.X), V2f.Zero)
+            let _ = assertT <| Mat.transform (M23f(v.c.X)) V3f.Zero
+            let _ = assertT <| Mat.Transform(M23f(v.c.X), V3f.Zero)
+            let _ = assertT <| Mat.TransposedTransform(M23f(v.c.X), V2f.Zero)
 
-            let _ = assertV2d <| Mat.transformDir (M23f(v.c.X)) v.c.XY
-            let _ = assertV2d <| Mat.TransformDir(M23f(v.c.X), v.c.XY)
+            let _ = assertT <| Mat.transformDir (M23f(v.c.X)) v.c.XY
+            let _ = assertT <| Mat.TransformDir(M23f(v.c.X), v.c.XY)
 
-            let _ = assertV2d <| Mat.transformPos (M23f(v.c.X)) v.c.XY
-            let _ = assertV2d <| Mat.TransformPos(M23f(v.c.X), v.c.XY)
+            let _ = assertT <| Mat.transformPos (M23f(v.c.X)) v.c.XY
+            let _ = assertT <| Mat.TransformPos(M23f(v.c.X), v.c.XY)
+
+            let _ = assertT <| Mat.transform (M23d(float v.c.X)) V3d.Zero
+            let _ = assertT <| Mat.Transform(M23d(float v.c.X), V3d.Zero)
+            let _ = assertT <| Mat.TransposedTransform(M23d(float v.c.X), V2d.Zero)
+
+            let _ = assertT <| Mat.transformDir (M23d(float v.c.X)) (V2d v.c.XY)
+            let _ = assertT <| Mat.TransformDir(M23d(float v.c.X), V2d v.c.XY)
+
+            let _ = assertT <| Mat.transformPos (M23d(float v.c.X)) (V2d v.c.XY)
+            let _ = assertT <| Mat.TransformPos(M23d(float v.c.X), V2d v.c.XY)
 
             return 0.0f
         }
@@ -1174,22 +2243,39 @@ let ``Transform 3x3``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = assertV3d <| Mat.transform (M33f(v.c.X)) V3f.Zero
-            let _ = assertV3d <| Mat.Transform(M33f(v.c.X), V3f.Zero)
-            let _ = assertV3d <| Mat.TransposedTransform(M33f(v.c.X), V3f.Zero)
+            let _ = assertT <| Mat.transform (M33f(v.c.X)) V3f.Zero
+            let _ = assertT <| Mat.Transform(M33f(v.c.X), V3f.Zero)
+            let _ = assertT <| Mat.TransposedTransform(M33f(v.c.X), V3f.Zero)
 
-            let _ = assertV2d <| Mat.transformDir (M33f(v.c.X)) v.c.XY
-            let _ = assertV2d <| Mat.TransformDir(M33f(v.c.X), v.c.XY)
-            let _ = assertV2d <| Mat.TransposedTransformDir(M33f(v.c.X), v.c.XY)
+            let _ = assertT <| Mat.transformDir (M33f(v.c.X)) v.c.XY
+            let _ = assertT <| Mat.TransformDir(M33f(v.c.X), v.c.XY)
+            let _ = assertT <| Mat.TransposedTransformDir(M33f(v.c.X), v.c.XY)
 
-            let _ = assertV2d <| Mat.transformPos (M33f(v.c.X)) v.c.XY
-            let _ = assertV2d <| Mat.TransformPos(M33f(v.c.X), v.c.XY)
-            let _ = assertV2d <| Mat.TransposedTransformPos(M33f(v.c.X), v.c.XY)
+            let _ = assertT <| Mat.transformPos (M33f(v.c.X)) v.c.XY
+            let _ = assertT <| Mat.TransformPos(M33f(v.c.X), v.c.XY)
+            let _ = assertT <| Mat.TransposedTransformPos(M33f(v.c.X), v.c.XY)
 
-            let _ = assertV2d <| Mat.TransformPosProj(M33f(v.c.X), v.c.XY)
-            let _ = assertV3d <| Mat.TransformPosProjFull(M33f(v.c.X), v.c.XY)
-            let _ = assertV2d <| Mat.TransposedTransformPosProj(M33f(v.c.X), v.c.XY)
-            let _ = assertV3d <| Mat.TransposedTransformPosProjFull(M33f(v.c.X), v.c.XY)
+            let _ = assertT <| Mat.TransformPosProj(M33f(v.c.X), v.c.XY)
+            let _ = assertT <| Mat.TransformPosProjFull(M33f(v.c.X), v.c.XY)
+            let _ = assertT <| Mat.TransposedTransformPosProj(M33f(v.c.X), v.c.XY)
+            let _ = assertT <| Mat.TransposedTransformPosProjFull(M33f(v.c.X), v.c.XY)
+
+            let _ = assertT <| Mat.transform (M33d(float v.c.X)) V3d.Zero
+            let _ = assertT <| Mat.Transform(M33d(float v.c.X), V3d.Zero)
+            let _ = assertT <| Mat.TransposedTransform(M33d(float v.c.X), V3d.Zero)
+
+            let _ = assertT <| Mat.transformDir (M33d(float v.c.X)) V2d.Zero
+            let _ = assertT <| Mat.TransformDir(M33d(float v.c.X), V2d.Zero)
+            let _ = assertT <| Mat.TransposedTransformDir(M33d(float v.c.X), V2d.Zero)
+
+            let _ = assertT <| Mat.transformPos (M33d(float v.c.X)) V2d.Zero
+            let _ = assertT <| Mat.TransformPos(M33d(float v.c.X), V2d.Zero)
+            let _ = assertT <| Mat.TransposedTransformPos(M33d(float v.c.X), V2d.Zero)
+
+            let _ = assertT <| Mat.TransformPosProj(M33d(float v.c.X), V2d.Zero)
+            let _ = assertT <| Mat.TransformPosProjFull(M33d(float v.c.X), V2d.Zero)
+            let _ = assertT <| Mat.TransposedTransformPosProj(M33d(float v.c.X), V2d.Zero)
+            let _ = assertT <| Mat.TransposedTransformPosProjFull(M33d(float v.c.X), V2d.Zero)
 
             return 0.0f
         }
@@ -1202,15 +2288,25 @@ let ``Transform 3x4``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = assertV3d <| Mat.transform (M34f(v.c.X)) V4f.Zero
-            let _ = assertV3d <| Mat.Transform(M34f(v.c.X), V4f.Zero)
-            let _ = assertV4d <| Mat.TransposedTransform(M34f(v.c.X), V3f.Zero)
+            let _ = assertT <| Mat.transform (M34f(v.c.X)) V4f.Zero
+            let _ = assertT <| Mat.Transform(M34f(v.c.X), V4f.Zero)
+            let _ = assertT <| Mat.TransposedTransform(M34f(v.c.X), V3f.Zero)
 
-            let _ = assertV3d <| Mat.transformDir (M34f(v.c.X)) v.c.XYZ
-            let _ = assertV3d <| Mat.TransformDir(M34f(v.c.X), v.c.XYZ)
+            let _ = assertT <| Mat.transformDir (M34f(v.c.X)) v.c.XYZ
+            let _ = assertT <| Mat.TransformDir(M34f(v.c.X), v.c.XYZ)
 
-            let _ = assertV3d <| Mat.transformPos (M34f(v.c.X)) v.c.XYZ
-            let _ = assertV3d <| Mat.TransformPos(M34f(v.c.X), v.c.XYZ)
+            let _ = assertT <| Mat.transformPos (M34f(v.c.X)) v.c.XYZ
+            let _ = assertT <| Mat.TransformPos(M34f(v.c.X), v.c.XYZ)
+            
+            let _ = assertT <| Mat.transform (M34d(float v.c.X)) V4d.Zero
+            let _ = assertT <| Mat.Transform(M34d(float v.c.X), V4d.Zero)
+            let _ = assertT <| Mat.TransposedTransform(M34d(float v.c.X), V3d.Zero)
+
+            let _ = assertT <| Mat.transformDir (M34d(float v.c.X)) V3d.Zero
+            let _ = assertT <| Mat.TransformDir(M34d(float v.c.X), V3d.Zero)
+
+            let _ = assertT <| Mat.transformPos (M34d(float v.c.X)) V3d.Zero
+            let _ = assertT <| Mat.TransformPos(M34d(float v.c.X), V3d.Zero)
 
             return 0.0f
         }
@@ -1223,22 +2319,39 @@ let ``Transform 4x4``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = assertV4d <| Mat.transform (M44f(v.c.X)) V4f.Zero
-            let _ = assertV4d <| Mat.Transform(M44f(v.c.X), V4f.Zero)
-            let _ = assertV4d <| Mat.TransposedTransform(M44f(v.c.X), V4f.Zero)
+            let _ = assertT <| Mat.transform (M44f(v.c.X)) V4f.Zero
+            let _ = assertT <| Mat.Transform(M44f(v.c.X), V4f.Zero)
+            let _ = assertT <| Mat.TransposedTransform(M44f(v.c.X), V4f.Zero)
 
-            let _ = assertV3d <| Mat.transformDir (M44f(v.c.X)) v.c.XYZ
-            let _ = assertV3d <| Mat.TransformDir(M44f(v.c.X), v.c.XYZ)
-            let _ = assertV3d <| Mat.TransposedTransformDir(M44f(v.c.X), v.c.XYZ)
+            let _ = assertT <| Mat.transformDir (M44f(v.c.X)) v.c.XYZ
+            let _ = assertT <| Mat.TransformDir(M44f(v.c.X), v.c.XYZ)
+            let _ = assertT <| Mat.TransposedTransformDir(M44f(v.c.X), v.c.XYZ)
 
-            let _ = assertV3d <| Mat.transformPos (M44f(v.c.X)) v.c.XYZ
-            let _ = assertV3d <| Mat.TransformPos(M44f(v.c.X), v.c.XYZ)
-            let _ = assertV3d <| Mat.TransposedTransformPos(M44f(v.c.X), v.c.XYZ)
+            let _ = assertT <| Mat.transformPos (M44f(v.c.X)) v.c.XYZ
+            let _ = assertT <| Mat.TransformPos(M44f(v.c.X), v.c.XYZ)
+            let _ = assertT <| Mat.TransposedTransformPos(M44f(v.c.X), v.c.XYZ)
 
-            let _ = assertV3d <| Mat.TransformPosProj(M44f(v.c.X), v.c.XYZ)
-            let _ = assertV4d <| Mat.TransformPosProjFull(M44f(v.c.X), v.c.XYZ)
-            let _ = assertV3d <| Mat.TransposedTransformPosProj(M44f(v.c.X), v.c.XYZ)
-            let _ = assertV4d <| Mat.TransposedTransformPosProjFull(M44f(v.c.X), v.c.XYZ)
+            let _ = assertT <| Mat.TransformPosProj(M44f(v.c.X), v.c.XYZ)
+            let _ = assertT <| Mat.TransformPosProjFull(M44f(v.c.X), v.c.XYZ)
+            let _ = assertT <| Mat.TransposedTransformPosProj(M44f(v.c.X), v.c.XYZ)
+            let _ = assertT <| Mat.TransposedTransformPosProjFull(M44f(v.c.X), v.c.XYZ)
+            
+            let _ = assertT <| Mat.transform (M44d(float v.c.X)) V4d.Zero
+            let _ = assertT <| Mat.Transform(M44d(float v.c.X), V4d.Zero)
+            let _ = assertT <| Mat.TransposedTransform(M44d(float v.c.X), V4d.Zero)
+
+            let _ = assertT <| Mat.transformDir (M44d(float v.c.X)) V3d.Zero
+            let _ = assertT <| Mat.TransformDir(M44d(float v.c.X), V3d.Zero)
+            let _ = assertT <| Mat.TransposedTransformDir(M44d(float v.c.X), V3d.Zero)
+
+            let _ = assertT <| Mat.transformPos (M44d(float v.c.X)) V3d.Zero
+            let _ = assertT <| Mat.TransformPos(M44d(float v.c.X), V3d.Zero)
+            let _ = assertT <| Mat.TransposedTransformPos(M44d(float v.c.X), V3d.Zero)
+
+            let _ = assertT <| Mat.TransformPosProj(M44d(float v.c.X), V3d.Zero)
+            let _ = assertT <| Mat.TransformPosProjFull(M44d(float v.c.X), V3d.Zero)
+            let _ = assertT <| Mat.TransposedTransformPosProj(M44d(float v.c.X), V3d.Zero)
+            let _ = assertT <| Mat.TransposedTransformPosProjFull(M44d(float v.c.X), V3d.Zero)
 
             return 0.0f
         }
@@ -1251,10 +2364,16 @@ let ``Determinant``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Mat.det <| M44f(v.c.X)
-            let _ = Mat.Determinant(M44f(v.c.X))
-            let _ = Mat.Determinant(M33f(v.c.X))
-            let _ = Mat.Determinant(M22f(v.c.X))
+            let _ = assertT <| Mat.det (M44f(v.c.X))
+            let _ = assertT <| M44f(v.c.X).Determinant
+            let _ = assertT <| Mat.Determinant(M44f(v.c.X))
+            let _ = assertT <| Mat.Determinant(M33f(v.c.X))
+            let _ = assertT <| Mat.Determinant(M22f(v.c.X))
+            let _ = assertT <| Mat.det (M44d(float v.c.X))
+            let _ = assertT <| M44d(float v.c.X).Determinant
+            let _ = assertT <| Mat.Determinant(M44d(float v.c.X))
+            let _ = assertT <| Mat.Determinant(M33d(float v.c.X))
+            let _ = assertT <| Mat.Determinant(M22d(float v.c.X))
             return v.pos
         }
 
@@ -1267,44 +2386,44 @@ let ``Min- / MaxElement``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Vec.MinElement(v.c.XY)
-            let _ = Vec.MinElement(v.c.XYZ)
-            let _ = Vec.MinElement(v.c)
-            let _ = Vec.MinElement(v.what.XY)
-            let _ = Vec.MinElement(v.what.XYZ)
-            let _ = Vec.MinElement(v.what)
-            let _ = v.c.XY.MinElement
-            let _ = v.c.XYZ.MinElement
-            let _ = v.c.MinElement
-            let _ = v.what.XY.MinElement
-            let _ = v.what.XYZ.MinElement
-            let _ = v.what.MinElement
-            let _ = Vec.MaxElement(v.c.XY)
-            let _ = Vec.MaxElement(v.c.XYZ)
-            let _ = Vec.MaxElement(v.c)
-            let _ = Vec.MaxElement(v.what.XY)
-            let _ = Vec.MaxElement(v.what.XYZ)
-            let _ = Vec.MaxElement(v.what)
-            let _ = v.c.XY.MaxElement
-            let _ = v.c.XYZ.MaxElement
-            let _ = v.c.MaxElement
-            let _ = v.what.XY.MaxElement
-            let _ = v.what.XYZ.MaxElement
-            let _ = v.what.MaxElement
+            let _ = assertT <| Vec.MinElement(v.c.XY)
+            let _ = assertT <| Vec.MinElement(v.c.XYZ)
+            let _ = assertT <| Vec.MinElement(v.c)
+            let _ = assertT <| Vec.MinElement(v.what.XY)
+            let _ = assertT <| Vec.MinElement(v.what.XYZ)
+            let _ = assertT <| Vec.MinElement(v.what)
+            let _ = assertT <| v.c.XY.MinElement
+            let _ = assertT <| v.c.XYZ.MinElement
+            let _ = assertT <| v.c.MinElement
+            let _ = assertT <| v.what.XY.MinElement
+            let _ = assertT <| v.what.XYZ.MinElement
+            let _ = assertT <| v.what.MinElement
+            let _ = assertT <| Vec.MaxElement(v.c.XY)
+            let _ = assertT <| Vec.MaxElement(v.c.XYZ)
+            let _ = assertT <| Vec.MaxElement(v.c)
+            let _ = assertT <| Vec.MaxElement(v.what.XY)
+            let _ = assertT <| Vec.MaxElement(v.what.XYZ)
+            let _ = assertT <| Vec.MaxElement(v.what)
+            let _ = assertT <| v.c.XY.MaxElement
+            let _ = assertT <| v.c.XYZ.MaxElement
+            let _ = assertT <| v.c.MaxElement
+            let _ = assertT <| v.what.XY.MaxElement
+            let _ = assertT <| v.what.XYZ.MaxElement
+            let _ = assertT <| v.what.MaxElement
 
-            let _ = Vec.MinElement(getVec().XY)
-            let _ = Vec.MinElement(getVec().XYZ)
-            let _ = Vec.MinElement(getVec())
-            let _ = getVec().XY.MinElement
-            let _ = getVec().XYZ.MinElement
-            let _ = getVec().MinElement
+            let _ = assertT <| Vec.MinElement(getVec().XY)
+            let _ = assertT <| Vec.MinElement(getVec().XYZ)
+            let _ = assertT <| Vec.MinElement(getVec())
+            let _ = assertT <| getVec().XY.MinElement
+            let _ = assertT <| getVec().XYZ.MinElement
+            let _ = assertT <| getVec().MinElement
 
-            let _ = Vec.MaxElement(getVec().XY)
-            let _ = Vec.MaxElement(getVec().XYZ)
-            let _ = Vec.MaxElement(getVec())
-            let _ = getVec().XY.MaxElement
-            let _ = getVec().XYZ.MaxElement
-            let _ = getVec().MaxElement
+            let _ = assertT <| Vec.MaxElement(getVec().XY)
+            let _ = assertT <| Vec.MaxElement(getVec().XYZ)
+            let _ = assertT <| Vec.MaxElement(getVec())
+            let _ = assertT <| getVec().XY.MaxElement
+            let _ = assertT <| getVec().XYZ.MaxElement
+            let _ = assertT <| getVec().MaxElement
 
             return v.pos
         }
@@ -1317,9 +2436,57 @@ let ``Normalize``() =
 
     let shader (v : Vertex) =
         vertex {
-            let normalized = Vec.Normalized v.c
-            let added = normalized + (Vec.normalize V4f.Half)
-            return added
+            let _ = assertT <| Vec.Normalized (V4f v.c)
+            let _ = assertT <| Vec.normalize  (V4f v.c)
+            let _ = assertT <| (V4f v.c).Normalized
+            let _ = assertT <| Vec.Normalized (V3f v.c)
+            let _ = assertT <| Vec.normalize  (V3f v.c)
+            let _ = assertT <| (V3f v.c).Normalized
+            let _ = assertT <| Vec.Normalized (V2f v.c)
+            let _ = assertT <| Vec.normalize  (V2f v.c)
+            let _ = assertT <| (V2f v.c).Normalized
+
+            let _ = assertT <| Vec.Normalized (V4d v.c)
+            let _ = assertT <| Vec.normalize  (V4d v.c)
+            let _ = assertT <| (V4d v.c).Normalized
+            let _ = assertT <| Vec.Normalized (V3d v.c)
+            let _ = assertT <| Vec.normalize  (V3d v.c)
+            let _ = assertT <| (V3d v.c).Normalized
+            let _ = assertT <| Vec.Normalized (V2d v.c)
+            let _ = assertT <| Vec.normalize  (V2d v.c)
+            let _ = assertT <| (V2d v.c).Normalized
+
+            let _ = assertT <| Vec.Normalized (V4i v.c)
+            let _ = assertT <| Vec.normalize  (V4i v.c)
+            let _ = assertT <| (V4i v.c).Normalized
+            let _ = assertT <| Vec.Normalized (V3i v.c)
+            let _ = assertT <| Vec.normalize  (V3i v.c)
+            let _ = assertT <| (V3i v.c).Normalized
+            let _ = assertT <| Vec.Normalized (V2i v.c)
+            let _ = assertT <| Vec.normalize  (V2i v.c)
+            let _ = assertT <| (V2i v.c).Normalized
+
+            let _ = assertT <| Vec.Normalized (V4ui v.c)
+            let _ = assertT <| Vec.normalize  (V4ui v.c)
+            let _ = assertT <| (V4ui v.c).Normalized
+            let _ = assertT <| Vec.Normalized (V3ui v.c)
+            let _ = assertT <| Vec.normalize  (V3ui v.c)
+            let _ = assertT <| (V3ui v.c).Normalized
+            let _ = assertT <| Vec.Normalized (V2ui v.c)
+            let _ = assertT <| Vec.normalize  (V2ui v.c)
+            let _ = assertT <| (V2ui v.c).Normalized
+
+            let _ = assertT <| Vec.Normalized (V4l v.c)
+            let _ = assertT <| Vec.normalize  (V4l v.c)
+            let _ = assertT <| (V4l v.c).Normalized
+            let _ = assertT <| Vec.Normalized (V3l v.c)
+            let _ = assertT <| Vec.normalize  (V3l v.c)
+            let _ = assertT <| (V3l v.c).Normalized
+            let _ = assertT <| Vec.Normalized (V2l v.c)
+            let _ = assertT <| Vec.normalize  (V2l v.c)
+            let _ = assertT <| (V2l v.c).Normalized
+
+            return v
         }
 
     GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["normalize"]
@@ -1330,18 +2497,18 @@ let ``Constant swizzles``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = getVec().XYOI
-            let _ = getVec().OXXX
-            let _ = getVec().ZIXO
-            let _ = getVec().ZYXN
-            let _ = getVec().OXOX
-            let _ = getVec().XOOO
+            let _ = assertT <| getVec().XYOI
+            let _ = assertT <| getVec().OXXX
+            let _ = assertT <| getVec().ZIXO
+            let _ = assertT <| getVec().ZYXN
+            let _ = assertT <| getVec().OXOX
+            let _ = assertT <| getVec().XOOO
 
-            let _ = V3ui(v.whatu.X, 2u, 3u).XYOI
-            let _ = V3ui(v.whatu.X, 2u, 3u).OXXX
-            let _ = V3ui(v.whatu.X, 2u, 3u).ZIXO
-            let _ = V3ui(v.whatu.X, 2u, 3u).OXOX
-            let _ = V3ui(v.whatu.X, 2u, 3u).XOOO
+            let _ = assertT <| V3ui(v.whatu.X, 2u, 3u).XYOI
+            let _ = assertT <| V3ui(v.whatu.X, 2u, 3u).OXXX
+            let _ = assertT <| V3ui(v.whatu.X, 2u, 3u).ZIXO
+            let _ = assertT <| V3ui(v.whatu.X, 2u, 3u).OXOX
+            let _ = assertT <| V3ui(v.whatu.X, 2u, 3u).XOOO
 
             return v.pos
         }
@@ -1354,15 +2521,15 @@ let ``Vector swizzles``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Vec.x v.c
-            let _ = Vec.y v.c.XYZ
-            let _ = Vec.z v.c
-            let _ = Vec.w v.c
-            let _ = Vec.xy v.c
-            let _ = Vec.yz v.c.XYZ
-            let _ = Vec.zw v.c
-            let _ = Vec.xyz v.c
-            let _ = Vec.yzw v.c
+            let _ = assertT <| Vec.x v.c
+            let _ = assertT <| Vec.y v.c.XYZ
+            let _ = assertT <| Vec.z v.c
+            let _ = assertT <| Vec.w v.c
+            let _ = assertT <| Vec.xy v.c
+            let _ = assertT <| Vec.yz v.c.XYZ
+            let _ = assertT <| Vec.zw v.c
+            let _ = assertT <| Vec.xyz v.c
+            let _ = assertT <| Vec.yzw v.c
             return v
         }
 
@@ -1374,29 +2541,29 @@ let ``Vector AnyEqual``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Vec.AnyEqual(v.c, v.c)
-            let _ = v.c.AnyEqual(v.c)
-            let _ = Vec.AnyEqual(v.c, 0.0f)
-            let _ = Vec.AnyEqual(0.0f, v.c)
-            let _ = Vec.anyEqual v.c v.c
-            let _ = Vec.anyEqual v.c 0.0f
-            let _ = Vec.anyEqual 0.0f v.c
+            let _ = assertT <| Vec.AnyEqual(v.c, v.c)
+            let _ = assertT <| v.c.AnyEqual(v.c)
+            let _ = assertT <| Vec.AnyEqual(v.c, 0.0f)
+            let _ = assertT <| Vec.AnyEqual(0.0f, v.c)
+            let _ = assertT <| Vec.anyEqual v.c v.c
+            let _ = assertT <| Vec.anyEqual v.c 0.0f
+            let _ = assertT <| Vec.anyEqual 0.0f v.c
 
-            let _ = Vec.AnyEqual(v.what, v.what)
-            let _ = v.what.AnyEqual(v.what)
-            let _ = Vec.AnyEqual(v.what, 0)
-            let _ = Vec.AnyEqual(0, v.what)
-            let _ = Vec.anyEqual v.what v.what
-            let _ = Vec.anyEqual v.what 0
-            let _ = Vec.anyEqual 0 v.what
+            let _ = assertT <| Vec.AnyEqual(v.what, v.what)
+            let _ = assertT <| v.what.AnyEqual(v.what)
+            let _ = assertT <| Vec.AnyEqual(v.what, 0)
+            let _ = assertT <| Vec.AnyEqual(0, v.what)
+            let _ = assertT <| Vec.anyEqual v.what v.what
+            let _ = assertT <| Vec.anyEqual v.what 0
+            let _ = assertT <| Vec.anyEqual 0 v.what
 
-            let _ = Vec.AnyEqual(v.whatu, v.whatu)
-            let _ = v.whatu.AnyEqual(v.whatu)
-            let _ = Vec.AnyEqual(v.whatu, 0u)
-            let _ = Vec.AnyEqual(0u, v.whatu)
-            let _ = Vec.anyEqual v.whatu v.whatu
-            let _ = Vec.anyEqual v.whatu 0u
-            let _ = Vec.anyEqual 0u v.whatu
+            let _ = assertT <| Vec.AnyEqual(v.whatu, v.whatu)
+            let _ = assertT <| v.whatu.AnyEqual(v.whatu)
+            let _ = assertT <| Vec.AnyEqual(v.whatu, 0u)
+            let _ = assertT <| Vec.AnyEqual(0u, v.whatu)
+            let _ = assertT <| Vec.anyEqual v.whatu v.whatu
+            let _ = assertT <| Vec.anyEqual v.whatu 0u
+            let _ = assertT <| Vec.anyEqual 0u v.whatu
 
             return v
         }
@@ -1409,13 +2576,13 @@ let ``Vector AllEqual``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Vec.AllEqual(v.c, v.c)
-            let _ = v.c.AllEqual(v.c)
-            let _ = Vec.AllEqual(v.c, 0.0f)
-            let _ = Vec.AllEqual(0.0f, v.c)
-            let _ = Vec.allEqual v.c v.c
-            let _ = Vec.allEqual v.c 0.0f
-            let _ = Vec.allEqual 0.0f v.c
+            let _ = assertT <| Vec.AllEqual(v.c, v.c)
+            let _ = assertT <| v.c.AllEqual(v.c)
+            let _ = assertT <| Vec.AllEqual(v.c, 0.0f)
+            let _ = assertT <| Vec.AllEqual(0.0f, v.c)
+            let _ = assertT <| Vec.allEqual v.c v.c
+            let _ = assertT <| Vec.allEqual v.c 0.0f
+            let _ = assertT <| Vec.allEqual 0.0f v.c
             return v
         }
 
@@ -1427,13 +2594,13 @@ let ``Vector AnyDifferent``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Vec.AnyDifferent(v.c, v.c)
-            let _ = v.c.AnyDifferent(v.c)
-            let _ = Vec.AnyDifferent(v.c, 0.0f)
-            let _ = Vec.AnyDifferent(0.0f, v.c)
-            let _ = Vec.anyDifferent v.c v.c
-            let _ = Vec.anyDifferent v.c 0.0f
-            let _ = Vec.anyDifferent 0.0f v.c
+            let _ = assertT <| Vec.AnyDifferent(v.c, v.c)
+            let _ = assertT <| v.c.AnyDifferent(v.c)
+            let _ = assertT <| Vec.AnyDifferent(v.c, 0.0f)
+            let _ = assertT <| Vec.AnyDifferent(0.0f, v.c)
+            let _ = assertT <| Vec.anyDifferent v.c v.c
+            let _ = assertT <| Vec.anyDifferent v.c 0.0f
+            let _ = assertT <| Vec.anyDifferent 0.0f v.c
             return v
         }
 
@@ -1445,13 +2612,13 @@ let ``Vector AllDifferent``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Vec.AllDifferent(v.c, v.c)
-            let _ = v.c.AllDifferent(v.c)
-            let _ = Vec.AllDifferent(v.c, 0.0f)
-            let _ = Vec.AllDifferent(0.0f, v.c)
-            let _ = Vec.allDifferent v.c v.c
-            let _ = Vec.allDifferent v.c 0.0f
-            let _ = Vec.allDifferent 0.0f v.c
+            let _ = assertT <| Vec.AllDifferent(v.c, v.c)
+            let _ = assertT <| v.c.AllDifferent(v.c)
+            let _ = assertT <| Vec.AllDifferent(v.c, 0.0f)
+            let _ = assertT <| Vec.AllDifferent(0.0f, v.c)
+            let _ = assertT <| Vec.allDifferent v.c v.c
+            let _ = assertT <| Vec.allDifferent v.c 0.0f
+            let _ = assertT <| Vec.allDifferent 0.0f v.c
             return v
         }
 
@@ -1463,13 +2630,13 @@ let ``Vector AnySmaller``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Vec.AnySmaller(v.c, v.c)
-            let _ = v.c.AnySmaller(v.c)
-            let _ = Vec.AnySmaller(v.c, 0.0f)
-            let _ = Vec.AnySmaller(0.0f, v.c)
-            let _ = Vec.anySmaller v.c v.c
-            let _ = Vec.anySmaller v.c 0.0f
-            let _ = Vec.anySmaller 0.0f v.c
+            let _ = assertT <| Vec.AnySmaller(v.c, v.c)
+            let _ = assertT <| v.c.AnySmaller(v.c)
+            let _ = assertT <| Vec.AnySmaller(v.c, 0.0f)
+            let _ = assertT <| Vec.AnySmaller(0.0f, v.c)
+            let _ = assertT <| Vec.anySmaller v.c v.c
+            let _ = assertT <| Vec.anySmaller v.c 0.0f
+            let _ = assertT <| Vec.anySmaller 0.0f v.c
             return v
         }
 
@@ -1481,13 +2648,13 @@ let ``Vector AllSmaller``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Vec.AllSmaller(v.c, v.c)
-            let _ = v.c.AllSmaller(v.c)
-            let _ = Vec.AllSmaller(v.c, 0.0f)
-            let _ = Vec.AllSmaller(0.0f, v.c)
-            let _ = Vec.allSmaller v.c v.c
-            let _ = Vec.allSmaller v.c 0.0f
-            let _ = Vec.allSmaller 0.0f v.c
+            let _ = assertT <| Vec.AllSmaller(v.c, v.c)
+            let _ = assertT <| v.c.AllSmaller(v.c)
+            let _ = assertT <| Vec.AllSmaller(v.c, 0.0f)
+            let _ = assertT <| Vec.AllSmaller(0.0f, v.c)
+            let _ = assertT <| Vec.allSmaller v.c v.c
+            let _ = assertT <| Vec.allSmaller v.c 0.0f
+            let _ = assertT <| Vec.allSmaller 0.0f v.c
             return v
         }
 
@@ -1499,13 +2666,13 @@ let ``Vector AnySmallerOrEqual``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Vec.AnySmallerOrEqual(v.c, v.c)
-            let _ = v.c.AnySmallerOrEqual(v.c)
-            let _ = Vec.AnySmallerOrEqual(v.c, 0.0f)
-            let _ = Vec.AnySmallerOrEqual(0.0f, v.c)
-            let _ = Vec.anySmallerOrEqual v.c v.c
-            let _ = Vec.anySmallerOrEqual v.c 0.0f
-            let _ = Vec.anySmallerOrEqual 0.0f v.c
+            let _ = assertT <| Vec.AnySmallerOrEqual(v.c, v.c)
+            let _ = assertT <| v.c.AnySmallerOrEqual(v.c)
+            let _ = assertT <| Vec.AnySmallerOrEqual(v.c, 0.0f)
+            let _ = assertT <| Vec.AnySmallerOrEqual(0.0f, v.c)
+            let _ = assertT <| Vec.anySmallerOrEqual v.c v.c
+            let _ = assertT <| Vec.anySmallerOrEqual v.c 0.0f
+            let _ = assertT <| Vec.anySmallerOrEqual 0.0f v.c
             return v
         }
 
@@ -1517,13 +2684,13 @@ let ``Vector AllSmallerOrEqual``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Vec.AllSmallerOrEqual(v.c, v.c)
-            let _ = v.c.AllSmallerOrEqual(v.c)
-            let _ = Vec.AllSmallerOrEqual(v.c, 0.0f)
-            let _ = Vec.AllSmallerOrEqual(0.0f, v.c)
-            let _ = Vec.allSmallerOrEqual v.c v.c
-            let _ = Vec.allSmallerOrEqual v.c 0.0f
-            let _ = Vec.allSmallerOrEqual 0.0f v.c
+            let _ = assertT <| Vec.AllSmallerOrEqual(v.c, v.c)
+            let _ = assertT <| v.c.AllSmallerOrEqual(v.c)
+            let _ = assertT <| Vec.AllSmallerOrEqual(v.c, 0.0f)
+            let _ = assertT <| Vec.AllSmallerOrEqual(0.0f, v.c)
+            let _ = assertT <| Vec.allSmallerOrEqual v.c v.c
+            let _ = assertT <| Vec.allSmallerOrEqual v.c 0.0f
+            let _ = assertT <| Vec.allSmallerOrEqual 0.0f v.c
             return v
         }
 
@@ -1535,13 +2702,13 @@ let ``Vector AnyGreater``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Vec.AnyGreater(v.c, v.c)
-            let _ = v.c.AnyGreater(v.c)
-            let _ = Vec.AnyGreater(v.c, 0.0f)
-            let _ = Vec.AnyGreater(0.0f, v.c)
-            let _ = Vec.anyGreater v.c v.c
-            let _ = Vec.anyGreater v.c 0.0f
-            let _ = Vec.anyGreater 0.0f v.c
+            let _ = assertT <| Vec.AnyGreater(v.c, v.c)
+            let _ = assertT <| v.c.AnyGreater(v.c)
+            let _ = assertT <| Vec.AnyGreater(v.c, 0.0f)
+            let _ = assertT <| Vec.AnyGreater(0.0f, v.c)
+            let _ = assertT <| Vec.anyGreater v.c v.c
+            let _ = assertT <| Vec.anyGreater v.c 0.0f
+            let _ = assertT <| Vec.anyGreater 0.0f v.c
             return v
         }
 
@@ -1553,13 +2720,13 @@ let ``Vector AllGreater``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Vec.AllGreater(v.c, v.c)
-            let _ = v.c.AllGreater(v.c)
-            let _ = Vec.AllGreater(v.c, 0.0f)
-            let _ = Vec.AllGreater(0.0f, v.c)
-            let _ = Vec.allGreater v.c v.c
-            let _ = Vec.allGreater v.c 0.0f
-            let _ = Vec.allGreater 0.0f v.c
+            let _ = assertT <| Vec.AllGreater(v.c, v.c)
+            let _ = assertT <| v.c.AllGreater(v.c)
+            let _ = assertT <| Vec.AllGreater(v.c, 0.0f)
+            let _ = assertT <| Vec.AllGreater(0.0f, v.c)
+            let _ = assertT <| Vec.allGreater v.c v.c
+            let _ = assertT <| Vec.allGreater v.c 0.0f
+            let _ = assertT <| Vec.allGreater 0.0f v.c
             return v
         }
 
@@ -1571,13 +2738,13 @@ let ``Vector AnyGreaterOrEqual``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Vec.AnyGreaterOrEqual(v.c, v.c)
-            let _ = v.c.AnyGreaterOrEqual(v.c)
-            let _ = Vec.AnyGreaterOrEqual(v.c, 0.0f)
-            let _ = Vec.AnyGreaterOrEqual(0.0f, v.c)
-            let _ = Vec.anyGreaterOrEqual v.c v.c
-            let _ = Vec.anyGreaterOrEqual v.c 0.0f
-            let _ = Vec.anyGreaterOrEqual 0.0f v.c
+            let _ = assertT <| Vec.AnyGreaterOrEqual(v.c, v.c)
+            let _ = assertT <| v.c.AnyGreaterOrEqual(v.c)
+            let _ = assertT <| Vec.AnyGreaterOrEqual(v.c, 0.0f)
+            let _ = assertT <| Vec.AnyGreaterOrEqual(0.0f, v.c)
+            let _ = assertT <| Vec.anyGreaterOrEqual v.c v.c
+            let _ = assertT <| Vec.anyGreaterOrEqual v.c 0.0f
+            let _ = assertT <| Vec.anyGreaterOrEqual 0.0f v.c
             return v
         }
 
@@ -1589,13 +2756,13 @@ let ``Vector AllGreaterOrEqual``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Vec.AllGreaterOrEqual(v.c, v.c)
-            let _ = v.c.AllGreaterOrEqual(v.c)
-            let _ = Vec.AllGreaterOrEqual(v.c, 0.0f)
-            let _ = Vec.AllGreaterOrEqual(0.0f, v.c.XY)
-            let _ = Vec.allGreaterOrEqual v.c v.c
-            let _ = Vec.allGreaterOrEqual v.c 0.0f
-            let _ = Vec.allGreaterOrEqual 0.0f v.c
+            let _ = assertT <| Vec.AllGreaterOrEqual(v.c, v.c)
+            let _ = assertT <| v.c.AllGreaterOrEqual(v.c)
+            let _ = assertT <| Vec.AllGreaterOrEqual(v.c, 0.0f)
+            let _ = assertT <| Vec.AllGreaterOrEqual(0.0f, v.c.XY)
+            let _ = assertT <| Vec.allGreaterOrEqual v.c v.c
+            let _ = assertT <| Vec.allGreaterOrEqual v.c 0.0f
+            let _ = assertT <| Vec.allGreaterOrEqual 0.0f v.c
             return v
         }
 
@@ -1608,11 +2775,11 @@ let ``Vector AnyInfinity``() =
     let shader (v : Vertex) =
         vertex {
             let v = v.c
-            let _ = v.IsInfinity
-            let _ = v.AnyInfinity
-            let _ = isInfinity v
-            let _ = Fun.IsInfinity v
-            let _ = Vec.AnyInfinity v
+            let _ = assertT <| v.IsInfinity
+            let _ = assertT <| v.AnyInfinity
+            let _ = assertT <| isInfinity v
+            let _ = assertT <| Fun.IsInfinity v
+            let _ = assertT <| Vec.AnyInfinity v
             return v
         }
 
@@ -1625,8 +2792,8 @@ let ``Vector AllInfinity``() =
     let shader (v : Vertex) =
         vertex {
             let v = v.c
-            let _ = v.AllInfinity
-            let _ = Vec.AllInfinity v
+            let _ = assertT <| v.AllInfinity
+            let _ = assertT <| Vec.AllInfinity v
             return v
         }
 
@@ -1639,8 +2806,8 @@ let ``Vector AnyPositiveInfinity``() =
     let shader (v : Vertex) =
         vertex {
             let v = v.c
-            let _ = v.AnyPositiveInfinity
-            let _ = Vec.AnyPositiveInfinity v
+            let _ = assertT <| v.AnyPositiveInfinity
+            let _ = assertT <| Vec.AnyPositiveInfinity v
             return v
         }
 
@@ -1653,8 +2820,8 @@ let ``Vector AllPositiveInfinity``() =
     let shader (v : Vertex) =
         vertex {
             let v = v.c
-            let _ = v.AllPositiveInfinity
-            let _ = Vec.AllPositiveInfinity v
+            let _ = assertT <| v.AllPositiveInfinity
+            let _ = assertT <| Vec.AllPositiveInfinity v
             return v
         }
 
@@ -1667,8 +2834,8 @@ let ``Vector AnyNegativeInfinity``() =
     let shader (v : Vertex) =
         vertex {
             let v = v.c
-            let _ = v.AnyNegativeInfinity
-            let _ = Vec.AnyNegativeInfinity v
+            let _ = assertT <| v.AnyNegativeInfinity
+            let _ = assertT <| Vec.AnyNegativeInfinity v
             return v
         }
 
@@ -1681,8 +2848,8 @@ let ``Vector AllNegativeInfinity``() =
     let shader (v : Vertex) =
         vertex {
             let v = v.c
-            let _ = v.AllNegativeInfinity
-            let _ = Vec.AllNegativeInfinity v
+            let _ = assertT <| v.AllNegativeInfinity
+            let _ = assertT <| Vec.AllNegativeInfinity v
             return v
         }
 
@@ -1695,11 +2862,11 @@ let ``Vector AnyFinite``() =
     let shader (v : Vertex) =
         vertex {
             let v = v.c
-            let _ = v.IsFinite
-            let _ = v.AnyFinite
-            let _ = isFinite v
-            let _ = Fun.IsFinite v
-            let _ = Vec.AnyFinite v
+            let _ = assertT <| v.IsFinite
+            let _ = assertT <| v.AnyFinite
+            let _ = assertT <| isFinite v
+            let _ = assertT <| Fun.IsFinite v
+            let _ = assertT <| Vec.AnyFinite v
             return v
         }
 
@@ -1712,8 +2879,8 @@ let ``Vector AllFinite``() =
     let shader (v : Vertex) =
         vertex {
             let v = v.c
-            let _ = v.AllFinite
-            let _ = Vec.AllFinite v
+            let _ = assertT <| v.AllFinite
+            let _ = assertT <| Vec.AllFinite v
             return v
         }
 
@@ -1726,11 +2893,11 @@ let ``Vector AnyNaN``() =
     let shader (v : Vertex) =
         vertex {
             let v = v.c
-            let _ = v.IsNaN
-            let _ = v.AnyNaN
-            let _ = isNaN v
-            let _ = Fun.IsNaN v
-            let _ = Vec.AnyNaN v
+            let _ = assertT <| v.IsNaN
+            let _ = assertT <| v.AnyNaN
+            let _ = assertT <| isNaN v
+            let _ = assertT <| Fun.IsNaN v
+            let _ = assertT <| Vec.AnyNaN v
             return v
         }
 
@@ -1743,8 +2910,8 @@ let ``Vector AllNaN``() =
     let shader (v : Vertex) =
         vertex {
             let v = v.c
-            let _ = v.AllNaN
-            let _ = Vec.AllNaN v
+            let _ = assertT <| v.AllNaN
+            let _ = assertT <| Vec.AllNaN v
             return v
         }
 
@@ -1756,13 +2923,13 @@ let ``Matrix AnyEqual``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Mat.AnyEqual((M34f(v.c.X)), (M34f(v.c.X)))
-            let _ = (M34f(v.c.X)).AnyEqual((M34f(v.c.X)))
-            let _ = Mat.AnyEqual((M34f(v.c.X)), 0.0f)
-            let _ = Mat.AnyEqual(0.0f, (M34f(v.c.X)))
-            let _ = Mat.anyEqual (M34f(v.c.X)) (M34f(v.c.X))
-            let _ = Mat.anyEqual (M34f(v.c.X)) 0.0f
-            let _ = Mat.anyEqual 0.0f (M34f(v.c.X))
+            let _ = assertT <| Mat.AnyEqual((M34f(v.c.X)), (M34f(v.c.X)))
+            let _ = assertT <| (M34f(v.c.X)).AnyEqual((M34f(v.c.X)))
+            let _ = assertT <| Mat.AnyEqual((M34f(v.c.X)), 0.0f)
+            let _ = assertT <| Mat.AnyEqual(0.0f, (M34f(v.c.X)))
+            let _ = assertT <| Mat.anyEqual (M34f(v.c.X)) (M34f(v.c.X))
+            let _ = assertT <| Mat.anyEqual (M34f(v.c.X)) 0.0f
+            let _ = assertT <| Mat.anyEqual 0.0f (M34f(v.c.X))
             return v
         }
 
@@ -1774,13 +2941,13 @@ let ``Matrix AllEqual``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Mat.AllEqual((M34f(v.c.X)), (M34f(v.c.X)))
-            let _ = (M34f(v.c.X)).AllEqual((M34f(v.c.X)))
-            let _ = Mat.AllEqual((M34f(v.c.X)), 0.0f)
-            let _ = Mat.AllEqual(0.0f, (M34f(v.c.X)))
-            let _ = Mat.allEqual (M34f(v.c.X)) (M34f(v.c.X))
-            let _ = Mat.allEqual (M34f(v.c.X)) 0.0f
-            let _ = Mat.allEqual 0.0f (M34f(v.c.X))
+            let _ = assertT <| Mat.AllEqual((M34f(v.c.X)), (M34f(v.c.X)))
+            let _ = assertT <| (M34f(v.c.X)).AllEqual((M34f(v.c.X)))
+            let _ = assertT <| Mat.AllEqual((M34f(v.c.X)), 0.0f)
+            let _ = assertT <| Mat.AllEqual(0.0f, (M34f(v.c.X)))
+            let _ = assertT <| Mat.allEqual (M34f(v.c.X)) (M34f(v.c.X))
+            let _ = assertT <| Mat.allEqual (M34f(v.c.X)) 0.0f
+            let _ = assertT <| Mat.allEqual 0.0f (M34f(v.c.X))
             return v
         }
 
@@ -1792,13 +2959,13 @@ let ``Matrix AnyDifferent``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Mat.AnyDifferent((M34f(v.c.X)), (M34f(v.c.X)))
-            let _ = (M34f(v.c.X)).AnyDifferent((M34f(v.c.X)))
-            let _ = Mat.AnyDifferent((M34f(v.c.X)), 0.0f)
-            let _ = Mat.AnyDifferent(0.0f, (M34f(v.c.X)))
-            let _ = Mat.anyDifferent (M34f(v.c.X)) (M34f(v.c.X))
-            let _ = Mat.anyDifferent (M34f(v.c.X)) 0.0f
-            let _ = Mat.anyDifferent 0.0f (M34f(v.c.X))
+            let _ = assertT <| Mat.AnyDifferent((M34f(v.c.X)), (M34f(v.c.X)))
+            let _ = assertT <| (M34f(v.c.X)).AnyDifferent((M34f(v.c.X)))
+            let _ = assertT <| Mat.AnyDifferent((M34f(v.c.X)), 0.0f)
+            let _ = assertT <| Mat.AnyDifferent(0.0f, (M34f(v.c.X)))
+            let _ = assertT <| Mat.anyDifferent (M34f(v.c.X)) (M34f(v.c.X))
+            let _ = assertT <| Mat.anyDifferent (M34f(v.c.X)) 0.0f
+            let _ = assertT <| Mat.anyDifferent 0.0f (M34f(v.c.X))
             return v
         }
 
@@ -1810,13 +2977,13 @@ let ``Matrix AllDifferent``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Mat.AllDifferent((M34f(v.c.X)), (M34f(v.c.X)))
-            let _ = (M34f(v.c.X)).AllDifferent((M34f(v.c.X)))
-            let _ = Mat.AllDifferent((M34f(v.c.X)), 0.0f)
-            let _ = Mat.AllDifferent(0.0f, (M34f(v.c.X)))
-            let _ = Mat.allDifferent (M34f(v.c.X)) (M34f(v.c.X))
-            let _ = Mat.allDifferent (M34f(v.c.X)) 0.0f
-            let _ = Mat.allDifferent 0.0f (M34f(v.c.X))
+            let _ = assertT <| Mat.AllDifferent((M34f(v.c.X)), (M34f(v.c.X)))
+            let _ = assertT <| (M34f(v.c.X)).AllDifferent((M34f(v.c.X)))
+            let _ = assertT <| Mat.AllDifferent((M34f(v.c.X)), 0.0f)
+            let _ = assertT <| Mat.AllDifferent(0.0f, (M34f(v.c.X)))
+            let _ = assertT <| Mat.allDifferent (M34f(v.c.X)) (M34f(v.c.X))
+            let _ = assertT <| Mat.allDifferent (M34f(v.c.X)) 0.0f
+            let _ = assertT <| Mat.allDifferent 0.0f (M34f(v.c.X))
             return v
         }
 
@@ -1828,13 +2995,13 @@ let ``Matrix AnySmaller``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Mat.AnySmaller((M34f(v.c.X)), (M34f(v.c.Y)))
-            let _ = (M34f(v.c.X)).AnySmaller((M34f(v.c.Y)))
-            let _ = Mat.AnySmaller((M34f(v.c.X)), 0.0f)
-            let _ = Mat.AnySmaller(0.0f, (M34f(v.c.X)))
-            let _ = Mat.anySmaller (M34f(v.c.X)) (M34f(v.c.Y))
-            let _ = Mat.anySmaller (M34f(v.c.X)) 0.0f
-            let _ = Mat.anySmaller 0.0f (M34f(v.c.X))
+            let _ = assertT <| Mat.AnySmaller((M34f(v.c.X)), (M34f(v.c.Y)))
+            let _ = assertT <| (M34f(v.c.X)).AnySmaller((M34f(v.c.Y)))
+            let _ = assertT <| Mat.AnySmaller((M34f(v.c.X)), 0.0f)
+            let _ = assertT <| Mat.AnySmaller(0.0f, (M34f(v.c.X)))
+            let _ = assertT <| Mat.anySmaller (M34f(v.c.X)) (M34f(v.c.Y))
+            let _ = assertT <| Mat.anySmaller (M34f(v.c.X)) 0.0f
+            let _ = assertT <| Mat.anySmaller 0.0f (M34f(v.c.X))
             return v
         }
 
@@ -1846,13 +3013,13 @@ let ``Matrix AllSmaller``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Mat.AllSmaller((M34f(v.c.X)), (M34f(v.c.X)))
-            let _ = (M34f(v.c.X)).AllSmaller((M34f(v.c.X)))
-            let _ = Mat.AllSmaller((M34f(v.c.X)), 0.0f)
-            let _ = Mat.AllSmaller(0.0f, (M34f(v.c.X)))
-            let _ = Mat.allSmaller (M34f(v.c.X)) (M34f(v.c.X))
-            let _ = Mat.allSmaller (M34f(v.c.X)) 0.0f
-            let _ = Mat.allSmaller 0.0f (M34f(v.c.X))
+            let _ = assertT <| Mat.AllSmaller((M34f(v.c.X)), (M34f(v.c.X)))
+            let _ = assertT <| (M34f(v.c.X)).AllSmaller((M34f(v.c.X)))
+            let _ = assertT <| Mat.AllSmaller((M34f(v.c.X)), 0.0f)
+            let _ = assertT <| Mat.AllSmaller(0.0f, (M34f(v.c.X)))
+            let _ = assertT <| Mat.allSmaller (M34f(v.c.X)) (M34f(v.c.X))
+            let _ = assertT <| Mat.allSmaller (M34f(v.c.X)) 0.0f
+            let _ = assertT <| Mat.allSmaller 0.0f (M34f(v.c.X))
             return v
         }
 
@@ -1864,13 +3031,13 @@ let ``Matrix AnySmallerOrEqual``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Mat.AnySmallerOrEqual((M34f(v.c.X)), (M34f(v.c.X)))
-            let _ = (M34f(v.c.X)).AnySmallerOrEqual((M34f(v.c.X)))
-            let _ = Mat.AnySmallerOrEqual((M34f(v.c.X)), 0.0f)
-            let _ = Mat.AnySmallerOrEqual(0.0f, (M34f(v.c.X)))
-            let _ = Mat.anySmallerOrEqual (M34f(v.c.X)) (M34f(v.c.X))
-            let _ = Mat.anySmallerOrEqual (M34f(v.c.X)) 0.0f
-            let _ = Mat.anySmallerOrEqual 0.0f (M34f(v.c.X))
+            let _ = assertT <| Mat.AnySmallerOrEqual((M34f(v.c.X)), (M34f(v.c.X)))
+            let _ = assertT <| (M34f(v.c.X)).AnySmallerOrEqual((M34f(v.c.X)))
+            let _ = assertT <| Mat.AnySmallerOrEqual((M34f(v.c.X)), 0.0f)
+            let _ = assertT <| Mat.AnySmallerOrEqual(0.0f, (M34f(v.c.X)))
+            let _ = assertT <| Mat.anySmallerOrEqual (M34f(v.c.X)) (M34f(v.c.X))
+            let _ = assertT <| Mat.anySmallerOrEqual (M34f(v.c.X)) 0.0f
+            let _ = assertT <| Mat.anySmallerOrEqual 0.0f (M34f(v.c.X))
             return v
         }
 
@@ -1882,13 +3049,13 @@ let ``Matrix AllSmallerOrEqual``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Mat.AllSmallerOrEqual((M34f(v.c.X)), (M34f(v.c.X)))
-            let _ = (M34f(v.c.X)).AllSmallerOrEqual((M34f(v.c.X)))
-            let _ = Mat.AllSmallerOrEqual((M34f(v.c.X)), 0.0f)
-            let _ = Mat.AllSmallerOrEqual(0.0f, (M34f(v.c.X)))
-            let _ = Mat.allSmallerOrEqual (M34f(v.c.X)) (M34f(v.c.X))
-            let _ = Mat.allSmallerOrEqual (M34f(v.c.X)) 0.0f
-            let _ = Mat.allSmallerOrEqual 0.0f (M34f(v.c.X))
+            let _ = assertT <| Mat.AllSmallerOrEqual((M34f(v.c.X)), (M34f(v.c.X)))
+            let _ = assertT <| (M34f(v.c.X)).AllSmallerOrEqual((M34f(v.c.X)))
+            let _ = assertT <| Mat.AllSmallerOrEqual((M34f(v.c.X)), 0.0f)
+            let _ = assertT <| Mat.AllSmallerOrEqual(0.0f, (M34f(v.c.X)))
+            let _ = assertT <| Mat.allSmallerOrEqual (M34f(v.c.X)) (M34f(v.c.X))
+            let _ = assertT <| Mat.allSmallerOrEqual (M34f(v.c.X)) 0.0f
+            let _ = assertT <| Mat.allSmallerOrEqual 0.0f (M34f(v.c.X))
             return v
         }
 
@@ -1900,13 +3067,13 @@ let ``Matrix AnyGreater``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Mat.AnyGreater((M34f(v.c.X)), (M34f(v.c.X)))
-            let _ = (M34f(v.c.X)).AnyGreater((M34f(v.c.X)))
-            let _ = Mat.AnyGreater((M34f(v.c.X)), 0.0f)
-            let _ = Mat.AnyGreater(0.0f, (M34f(v.c.X)))
-            let _ = Mat.anyGreater (M34f(v.c.X)) (M34f(v.c.X))
-            let _ = Mat.anyGreater (M34f(v.c.X)) 0.0f
-            let _ = Mat.anyGreater 0.0f (M34f(v.c.X))
+            let _ = assertT <| Mat.AnyGreater((M34f(v.c.X)), (M34f(v.c.X)))
+            let _ = assertT <| (M34f(v.c.X)).AnyGreater((M34f(v.c.X)))
+            let _ = assertT <| Mat.AnyGreater((M34f(v.c.X)), 0.0f)
+            let _ = assertT <| Mat.AnyGreater(0.0f, (M34f(v.c.X)))
+            let _ = assertT <| Mat.anyGreater (M34f(v.c.X)) (M34f(v.c.X))
+            let _ = assertT <| Mat.anyGreater (M34f(v.c.X)) 0.0f
+            let _ = assertT <| Mat.anyGreater 0.0f (M34f(v.c.X))
             return v
         }
 
@@ -1918,13 +3085,13 @@ let ``Matrix AllGreater``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Mat.AllGreater((M34f(v.c.X)), (M34f(v.c.X)))
-            let _ = (M34f(v.c.X)).AllGreater((M34f(v.c.X)))
-            let _ = Mat.AllGreater((M34f(v.c.X)), 0.0f)
-            let _ = Mat.AllGreater(0.0f, (M34f(v.c.X)))
-            let _ = Mat.allGreater (M34f(v.c.X)) (M34f(v.c.X))
-            let _ = Mat.allGreater (M34f(v.c.X)) 0.0f
-            let _ = Mat.allGreater 0.0f (M34f(v.c.X))
+            let _ = assertT <| Mat.AllGreater((M34f(v.c.X)), (M34f(v.c.X)))
+            let _ = assertT <| (M34f(v.c.X)).AllGreater((M34f(v.c.X)))
+            let _ = assertT <| Mat.AllGreater((M34f(v.c.X)), 0.0f)
+            let _ = assertT <| Mat.AllGreater(0.0f, (M34f(v.c.X)))
+            let _ = assertT <| Mat.allGreater (M34f(v.c.X)) (M34f(v.c.X))
+            let _ = assertT <| Mat.allGreater (M34f(v.c.X)) 0.0f
+            let _ = assertT <| Mat.allGreater 0.0f (M34f(v.c.X))
             return v
         }
 
@@ -1936,13 +3103,13 @@ let ``Matrix AnyGreaterOrEqual``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Mat.AnyGreaterOrEqual((M34f(v.c.X)), (M34f(v.c.X)))
-            let _ = (M34f(v.c.X)).AnyGreaterOrEqual((M34f(v.c.X)))
-            let _ = Mat.AnyGreaterOrEqual((M34f(v.c.X)), 0.0f)
-            let _ = Mat.AnyGreaterOrEqual(0.0f, (M34f(v.c.X)))
-            let _ = Mat.anyGreaterOrEqual (M34f(v.c.X)) (M34f(v.c.X))
-            let _ = Mat.anyGreaterOrEqual (M34f(v.c.X)) 0.0f
-            let _ = Mat.anyGreaterOrEqual 0.0f (M34f(v.c.X))
+            let _ = assertT <| Mat.AnyGreaterOrEqual((M34f(v.c.X)), (M34f(v.c.X)))
+            let _ = assertT <| (M34f(v.c.X)).AnyGreaterOrEqual((M34f(v.c.X)))
+            let _ = assertT <| Mat.AnyGreaterOrEqual((M34f(v.c.X)), 0.0f)
+            let _ = assertT <| Mat.AnyGreaterOrEqual(0.0f, (M34f(v.c.X)))
+            let _ = assertT <| Mat.anyGreaterOrEqual (M34f(v.c.X)) (M34f(v.c.X))
+            let _ = assertT <| Mat.anyGreaterOrEqual (M34f(v.c.X)) 0.0f
+            let _ = assertT <| Mat.anyGreaterOrEqual 0.0f (M34f(v.c.X))
             return v
         }
 
@@ -1954,13 +3121,13 @@ let ``Matrix AllGreaterOrEqual``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = Mat.AllGreaterOrEqual((M34f(v.c.X)), (M34f(v.c.X)))
-            let _ = (M34f(v.c.X)).AllGreaterOrEqual((M34f(v.c.X)))
-            let _ = Mat.AllGreaterOrEqual((M34f(v.c.X)), 0.0f)
-            let _ = Mat.AllGreaterOrEqual(0.0f, (M34f(v.c.X)))
-            let _ = Mat.allGreaterOrEqual (M34f(v.c.X)) (M34f(v.c.X))
-            let _ = Mat.allGreaterOrEqual (M34f(v.c.X)) 0.0f
-            let _ = Mat.allGreaterOrEqual 0.0f (M34f(v.c.X))
+            let _ = assertT <| Mat.AllGreaterOrEqual((M34f(v.c.X)), (M34f(v.c.X)))
+            let _ = assertT <| (M34f(v.c.X)).AllGreaterOrEqual((M34f(v.c.X)))
+            let _ = assertT <| Mat.AllGreaterOrEqual((M34f(v.c.X)), 0.0f)
+            let _ = assertT <| Mat.AllGreaterOrEqual(0.0f, (M34f(v.c.X)))
+            let _ = assertT <| Mat.allGreaterOrEqual (M34f(v.c.X)) (M34f(v.c.X))
+            let _ = assertT <| Mat.allGreaterOrEqual (M34f(v.c.X)) 0.0f
+            let _ = assertT <| Mat.allGreaterOrEqual 0.0f (M34f(v.c.X))
             return v
         }
 
@@ -1972,12 +3139,12 @@ let ``Matrix AnyInfinity``() =
 
     let shader (v : Vertex) =
         vertex {
-            let m = M34f(v.c.X)
-            let _ = m.IsInfinity
-            let _ = m.AnyInfinity
-            let _ = isInfinity m
-            let _ = Fun.IsInfinity m
-            let _ = Mat.AnyInfinity m
+            let m = assertT <| M34f(v.c.X)
+            let _ = assertT <| m.IsInfinity
+            let _ = assertT <| m.AnyInfinity
+            let _ = assertT <| isInfinity m
+            let _ = assertT <| Fun.IsInfinity m
+            let _ = assertT <| Mat.AnyInfinity m
             return v.pos
         }
 
@@ -1990,8 +3157,8 @@ let ``Matrix AllInfinity``() =
     let shader (v : Vertex) =
         vertex {
             let m = M34f(v.c.X)
-            let _ = m.AllInfinity
-            let _ = Mat.AllInfinity m
+            let _ = assertT <| m.AllInfinity
+            let _ = assertT <| Mat.AllInfinity m
             return v.pos
         }
 
@@ -2004,8 +3171,8 @@ let ``Matrix AnyPositiveInfinity``() =
     let shader (v : Vertex) =
         vertex {
             let m = M34f(v.c.X)
-            let _ = m.AnyPositiveInfinity
-            let _ = Mat.AnyPositiveInfinity m
+            let _ = assertT <| m.AnyPositiveInfinity
+            let _ = assertT <| Mat.AnyPositiveInfinity m
             return v.pos
         }
 
@@ -2018,8 +3185,8 @@ let ``Matrix AllPositiveInfinity``() =
     let shader (v : Vertex) =
         vertex {
             let m = M34f(v.c.X)
-            let _ = m.AllPositiveInfinity
-            let _ = Mat.AllPositiveInfinity m
+            let _ = assertT <| m.AllPositiveInfinity
+            let _ = assertT <| Mat.AllPositiveInfinity m
             return v.pos
         }
 
@@ -2032,8 +3199,8 @@ let ``Matrix AnyNegativeInfinity``() =
     let shader (v : Vertex) =
         vertex {
             let m = M34f(v.c.X)
-            let _ = m.AnyNegativeInfinity
-            let _ = Mat.AnyNegativeInfinity m
+            let _ = assertT <| m.AnyNegativeInfinity
+            let _ = assertT <| Mat.AnyNegativeInfinity m
             return v.pos
         }
 
@@ -2046,8 +3213,8 @@ let ``Matrix AllNegativeInfinity``() =
     let shader (v : Vertex) =
         vertex {
             let m = M34f(v.c.X)
-            let _ = m.AllNegativeInfinity
-            let _ = Mat.AllNegativeInfinity m
+            let _ = assertT <| m.AllNegativeInfinity
+            let _ = assertT <| Mat.AllNegativeInfinity m
             return v.pos
         }
 
@@ -2060,11 +3227,11 @@ let ``Matrix AnyFinite``() =
     let shader (v : Vertex) =
         vertex {
             let m = M34f(v.c.X)
-            let _ = m.IsFinite
-            let _ = m.AnyFinite
-            let _ = isFinite m
-            let _ = Fun.IsFinite m
-            let _ = Mat.AnyFinite m
+            let _ = assertT <| m.IsFinite
+            let _ = assertT <| m.AnyFinite
+            let _ = assertT <| isFinite m
+            let _ = assertT <| Fun.IsFinite m
+            let _ = assertT <| Mat.AnyFinite m
             return v.pos
         }
 
@@ -2077,8 +3244,8 @@ let ``Matrix AllFinite``() =
     let shader (v : Vertex) =
         vertex {
             let m = M34f(v.c.X)
-            let _ = m.AllFinite
-            let _ = Mat.AllFinite m
+            let _ = assertT <| m.AllFinite
+            let _ = assertT <| Mat.AllFinite m
             return v.pos
         }
 
@@ -2091,11 +3258,11 @@ let ``Matrix AnyNaN``() =
     let shader (v : Vertex) =
         vertex {
             let m = M34f(v.c.X)
-            let _ = m.IsNaN
-            let _ = m.AnyNaN
-            let _ = isNaN m
-            let _ = Fun.IsNaN m
-            let _ = Mat.AnyNaN m
+            let _ = assertT <| m.IsNaN
+            let _ = assertT <| m.AnyNaN
+            let _ = assertT <| isNaN m
+            let _ = assertT <| Fun.IsNaN m
+            let _ = assertT <| Mat.AnyNaN m
             return v.pos
         }
 
@@ -2108,8 +3275,8 @@ let ``Matrix AllNaN``() =
     let shader (v : Vertex) =
         vertex {
             let m = M34f(v.c.X)
-            let _ = m.AllNaN
-            let _ = Mat.AllNaN m
+            let _ = assertT <| m.AllNaN
+            let _ = assertT <| Mat.AllNaN m
             return v.pos
         }
 
@@ -2121,10 +3288,10 @@ let ``IsInfinity``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = isInfinity v.c
-            let _ = isInfinity v.c.X
-            let _ = Fun.IsInfinity v.c
-            let _ = Fun.IsInfinity v.c.X
+            let _ = assertT <| isInfinity v.c
+            let _ = assertT <| isInfinity v.c.X
+            let _ = assertT <| Fun.IsInfinity v.c
+            let _ = assertT <| Fun.IsInfinity v.c.X
             return v.pos
         }
 
@@ -2136,10 +3303,10 @@ let ``IsInfinity (signed)``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = isPositiveInfinity (getVec().X)
-            let _ = isNegativeInfinity (getVec().X)
-            let _ = Fun.IsPositiveInfinity (getVec().X)
-            let _ = Fun.IsNegativeInfinity (getVec().X)
+            let _ = assertT <| isPositiveInfinity (getVec().X)
+            let _ = assertT <| isNegativeInfinity (getVec().X)
+            let _ = assertT <| Fun.IsPositiveInfinity (getVec().X)
+            let _ = assertT <| Fun.IsNegativeInfinity (getVec().X)
             return v.pos
         }
 
@@ -2151,10 +3318,10 @@ let ``IsNaN``() =
 
     let shader (v : Vertex) =
         vertex {
-            let _ = isNaN v.c
-            let _ = isNaN v.c.X
-            let _ = Fun.IsNaN v.c
-            let _ = Fun.IsNaN v.c.X
+            let _ = assertT <| isNaN v.c
+            let _ = assertT <| isNaN v.c.X
+            let _ = assertT <| Fun.IsNaN v.c
+            let _ = assertT <| Fun.IsNaN v.c.X
             return v.pos
         }
 

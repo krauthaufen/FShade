@@ -225,9 +225,22 @@ module Preprocessor =
             match t with
             | TypeMeta.Patterns.Enum
             | TypeMeta.Patterns.Integral
-            | TypeMeta.Patterns.ColorOf(_, Integral) -> ValueSome ()
-            | TypeMeta.Patterns.VectorOf(_, Integral) -> ValueSome ()
+            | TypeMeta.Patterns.ColorOf(_, Integral)
+            | TypeMeta.Patterns.VectorOf(_, Integral)
             | TypeMeta.Patterns.MatrixOf(_, Integral) -> ValueSome ()
+            | _ -> ValueNone
+
+        [<return: Struct>]
+        let rec (|UnsignedIntegral|_|) (t : Type) =
+            match t with
+            | TypeMeta.Patterns.UInt8
+            | TypeMeta.Patterns.UInt16
+            | TypeMeta.Patterns.UInt32
+            | TypeMeta.Patterns.UInt64
+            | TypeMeta.Patterns.ColorOf(_, UnsignedIntegral)
+            | TypeMeta.Patterns.VectorOf(_, UnsignedIntegral)
+            | TypeMeta.Patterns.MatrixOf(_, UnsignedIntegral) -> ValueSome ()
+            | TypeMeta.Patterns.Enum -> match Enum.GetUnderlyingType t with UnsignedIntegral -> ValueSome() | _ -> ValueNone
             | _ -> ValueNone
 
         [<return: Struct>]
@@ -235,8 +248,8 @@ module Preprocessor =
             match t with
             | TypeMeta.Patterns.Float32
             | TypeMeta.Patterns.Float64
-            | TypeMeta.Patterns.ColorOf(_, (TypeMeta.Patterns.Float32 | TypeMeta.Patterns.Float64)) -> ValueSome ()
-            | TypeMeta.Patterns.VectorOf(_, (TypeMeta.Patterns.Float32 | TypeMeta.Patterns.Float64)) -> ValueSome ()
+            | TypeMeta.Patterns.ColorOf(_, (TypeMeta.Patterns.Float32 | TypeMeta.Patterns.Float64))
+            | TypeMeta.Patterns.VectorOf(_, (TypeMeta.Patterns.Float32 | TypeMeta.Patterns.Float64))
             | TypeMeta.Patterns.MatrixOf(_, (TypeMeta.Patterns.Float32 | TypeMeta.Patterns.Float64)) -> ValueSome ()
             | _ -> ValueNone
 
@@ -575,7 +588,6 @@ module Preprocessor =
 
     [<AutoOpen>]
     module private ComplexIntrinsicPatterns =
-        open TypeInfo.Patterns
 
         let private vectorFields =
             ["X"; "Y"; "Z"; "W"]
@@ -595,32 +607,47 @@ module Preprocessor =
             System.Text.RegularExpressions.Regex @"^([iI]s|Any|All)(PositiveInfinity|NegativeInfinity|Finite)$"
 
         [<return: Struct>]
+        let private (|IntegralExpr|_|) (e : Expr) =
+            match e.Type with
+            | Integral -> ValueSome e
+            | _ -> ValueNone
+
+        [<return: Struct>]
         let private (|FloatingPointExpr|_|) (e : Expr) =
             match e.Type with
-            | Float32 | Float64 -> ValueSome e
+            | FloatingPoint -> ValueSome e
             | _ -> ValueNone
 
         [<return: Struct>]
         let private (|ColorExpr|_|) (e : Expr) =
             match e.Type with
-            | ColorOf(d, t) -> ValueSome (e, d, t)
+            | TypeMeta.Patterns.ColorOf(d, t) -> ValueSome (e, d, t)
             | _ -> ValueNone
 
         [<return: Struct>]
         let private (|VectorExpr|_|) (e : Expr) =
             match e.Type with
-            | VectorOf(d, t) -> ValueSome (e, d, t)
+            | TypeMeta.Patterns.VectorOf(d, t) -> ValueSome (e, d, t)
             | _ -> ValueNone
 
         [<return: Struct>]
         let private (|MatrixExpr|_|) (e : Expr) =
             match e.Type with
-            | MatrixOf(d, t) -> ValueSome (e, d, t)
+            | TypeMeta.Patterns.MatrixOf(d, t) -> ValueSome (e, d, t)
             | _ -> ValueNone
 
         [<return: Struct>]
         let private (|Property|_|) (pi : PropertyInfo) =
             ValueSome pi.Name
+
+        [<return: Struct>]
+        let (|AbsInt|_|) (e : Expr) =
+            match e with
+            | Call(_, MethodQuote <@ abs : int -> _ @> _, [IntegralExpr a])
+            | Call(_, Method("Abs", _), [IntegralExpr a]) ->
+                ValueSome a
+            | _ ->
+                ValueNone
 
         [<return: Struct>]
         let (|ConstantSwizzle|_|) (e : Expr) =
@@ -640,11 +667,20 @@ module Preprocessor =
                 ValueNone
 
         [<return: Struct>]
+        let (|CrossInt|_|) (e : Expr) =
+            match e with
+            | Call(_, MethodQuote <@ Vec.cross : V3d -> V3d -> _ @> _, [VectorExpr (a, _, Integral); VectorExpr (b, _, _)])
+            | Call(_, Method("Cross", _), [VectorExpr (a, _, Integral); VectorExpr (b, _, _)]) ->
+                ValueSome (a, b)
+            | _ ->
+                ValueNone
+
+        [<return: Struct>]
         let (|LengthSquared|_|) (e : Expr) =
             match e with
-            | Call(_, MethodQuote <@ Vec.lengthSquared : V4d -> float @> _, [VectorExpr (v, d, ft)])
-            | Call(_, Method("LengthSquared", _), [VectorExpr (v, d, ft)])
-            | PropertyGet(Some (VectorExpr (v, d, ft)), Property "LengthSquared", _) ->
+            | Call(_, MethodQuote <@ Vec.lengthSquared : V4d -> float @> _, [VectorExpr (v, _, _)])
+            | Call(_, Method("LengthSquared", _), [VectorExpr (v, _, _)])
+            | PropertyGet(Some (VectorExpr (v, _, _)), Property "LengthSquared", _) ->
                 ValueSome v
             | _ ->
                 ValueNone
@@ -704,6 +740,30 @@ module Preprocessor =
             | Call(_, Method("MaxElement", _), [VectorExpr (v, d, ft)])
             | PropertyGet(Some (VectorExpr (v, d, ft)), Property "MaxElement", _) ->
                 ValueSome (v, "Max", ft, vectorFields |> List.take d)
+
+            | _ ->
+                ValueNone
+
+        [<return: Struct>]
+        let (|Square|_|) (e : Expr) =
+            match e with
+            | Call(_, MethodQuote <@ sqr : float -> float @> _, [x]) ->
+                ValueSome x
+
+            | Call(_, (Method("Square", _) as mi), [x]) when mi.DeclaringType = typeof<Fun> ->
+                ValueSome x
+
+            | _ ->
+                ValueNone
+
+        [<return: Struct>]
+        let (|MultiplyAddInt|_|) (e : Expr) =
+            match e with
+            | Call(_, MethodQuote <@ madd : float -> float -> float -> _ @> _, [IntegralExpr x; IntegralExpr y; IntegralExpr z]) ->
+                ValueSome (x, y, z)
+
+            | Call(_, (Method("MultiplyAdd", _) as mi), [IntegralExpr x; IntegralExpr y; IntegralExpr z]) when mi.DeclaringType = typeof<Fun> ->
+                ValueSome (x, y, z)
 
             | _ ->
                 ValueNone
@@ -1185,6 +1245,7 @@ module Preprocessor =
         let op_logicalOr   = getMethodInfo <@ (||) : bool -> bool -> bool @>
         let op_lessThan    = getMethodInfo <@ (<) : float -> float -> bool @>
         let op_greaterThan = getMethodInfo <@ (>) : float -> float -> bool @>
+        let op_negation    = getMethodInfo <@ (~-) : int -> int @>
 
         let not = getMethodInfo <@ not : bool -> bool @>
         let defaultOf = getMethodInfo <@ Unchecked.defaultof<int> @>
@@ -1206,7 +1267,7 @@ module Preprocessor =
 
     [<AutoOpen>]
     module private ExprExtensions =
-        open TypeInfo.Patterns
+        open TypeMeta.Patterns
 
         let private doubleVecType = [|
                 typeof<V2d>
@@ -1285,6 +1346,10 @@ module Preprocessor =
                 let mi = MethodInfo.op_greaterThan.MakeGenericMethod(a.Type)
                 Expr.Call(mi, [a; b])
 
+            static member Negate(e : Expr) =
+                let mi = MethodInfo.op_negation.MakeGenericMethod(e.Type)
+                Expr.Call(mi, [e])
+
             static member Not(e : Expr) =
                 Expr.Call(MethodInfo.not, [e])
 
@@ -1300,19 +1365,61 @@ module Preprocessor =
                 let mi = MethodInfo.round.MakeGenericMethod(e.Type)
                 Expr.Call(mi, [e])
 
+            static member AbsDiff(a : Expr, b : Expr) =
+                match a.Type with
+                | _ when a.Type <> b.Type ->
+                    failwithf "[FShade] Expr.AbsDiff with diverging types: %A, %A" a.Type b.Type
+
+                | VectorOf (d, (UnsignedIntegral as ft)) as t ->
+                    let tmpa = Var("tmpa", a.Type)
+                    let tmpb = Var("tmpb", b.Type)
+
+                    let args =
+                        let fields = Meta.VecFields |> Array.toList |> List.take d |> List.map t.GetField
+
+                        fields |> List.map (fun fi ->
+                            Expr.AbsDiff(
+                                Expr.FieldGet(Expr.Var tmpa, fi),
+                                Expr.FieldGet(Expr.Var tmpb, fi)
+                            )
+                        )
+
+                    let expr =
+                        let ci = t.GetConstructor(Array.replicate d ft)
+                        Expr.NewObject(ci, args)
+
+                    Expr.Let(tmpa, a, Expr.Let(tmpb, b, expr))
+
+                | UnsignedIntegral ->
+                    let tmpa = Var("tmpa", a.Type)
+                    let tmpb = Var("tmpb", b.Type)
+
+                    let expr =
+                        Expr.IfThenElse(
+                            Expr.GreaterThan(Expr.Var tmpa, Expr.Var tmpb),
+                            Expr.Subtract(Expr.Var tmpa, Expr.Var tmpb),
+                            Expr.Subtract(Expr.Var tmpb, Expr.Var tmpa)
+                        )
+
+                    Expr.Let(tmpa, a, Expr.Let(tmpb, b, expr))
+
+                | t ->
+                    let abs = typeof<Fun>.GetMethod("Abs", [| t |])
+                    Expr.Call(abs, [Expr.Subtract(a, b)])
+
             static member Convert(e : Expr, typ : Type) =
                 let mi =
                     match typ with
-                    | TypeMeta.Patterns.Int8    -> MethodInfo.toInt8.MakeGenericMethod e.Type
-                    | TypeMeta.Patterns.UInt8   -> MethodInfo.toUInt8.MakeGenericMethod e.Type
-                    | TypeMeta.Patterns.Int16   -> MethodInfo.toInt16.MakeGenericMethod e.Type
-                    | TypeMeta.Patterns.UInt16  -> MethodInfo.toUInt16.MakeGenericMethod e.Type
-                    | TypeMeta.Patterns.Int32   -> MethodInfo.toInt32.MakeGenericMethod e.Type
-                    | TypeMeta.Patterns.UInt32  -> MethodInfo.toUInt32.MakeGenericMethod e.Type
-                    | TypeMeta.Patterns.Int64   -> MethodInfo.toInt64.MakeGenericMethod e.Type
-                    | TypeMeta.Patterns.UInt64  -> MethodInfo.toUInt64.MakeGenericMethod e.Type
-                    | TypeMeta.Patterns.Float32 -> MethodInfo.toFloat32.MakeGenericMethod e.Type
-                    | TypeMeta.Patterns.Float64 -> MethodInfo.toFloat64.MakeGenericMethod e.Type
+                    | Int8    -> MethodInfo.toInt8.MakeGenericMethod e.Type
+                    | UInt8   -> MethodInfo.toUInt8.MakeGenericMethod e.Type
+                    | Int16   -> MethodInfo.toInt16.MakeGenericMethod e.Type
+                    | UInt16  -> MethodInfo.toUInt16.MakeGenericMethod e.Type
+                    | Int32   -> MethodInfo.toInt32.MakeGenericMethod e.Type
+                    | UInt32  -> MethodInfo.toUInt32.MakeGenericMethod e.Type
+                    | Int64   -> MethodInfo.toInt64.MakeGenericMethod e.Type
+                    | UInt64  -> MethodInfo.toUInt64.MakeGenericMethod e.Type
+                    | Float32 -> MethodInfo.toFloat32.MakeGenericMethod e.Type
+                    | Float64 -> MethodInfo.toFloat64.MakeGenericMethod e.Type
                     | _ ->
                         let op = typ.GetMethod("op_Explicit", [| e.Type |])
                         if op = null then
@@ -1743,6 +1850,32 @@ module Preprocessor =
                 | PropertyGet(Some _, pi, _) -> return Expr.PropertyGet(arr, pi, [index])
                 | _ -> return failwithf "[FShade] Unexpected array get: %A" e
 
+            // GLSL abs() is only defined for float and double.
+            // Using the float overload for int32 and int64 could potentially lead to wrong results.
+            // Here we emulate the abs() function with if-else expressions.
+            | AbsInt v ->
+                let tmp = Var("tmp", v.Type)
+
+                let expr =
+                    let abs v =
+                        Expr.IfThenElse(
+                            Expr.LessThan(v, Expr.Zero v.Type),
+                            Expr.Negate v, v
+                        )
+
+                    match v.Type with
+                    | TypeMeta.Patterns.VectorOf (d, ft) ->
+                        let fields = Meta.VecFields |> Array.toList |> List.take d |> List.map v.Type.GetField
+                        let args = fields |> List.map (fun fi -> abs <| Expr.FieldGet(Expr.Var tmp, fi))
+
+                        let ci = v.Type.GetConstructor (Array.replicate d ft)
+                        Expr.NewObject(ci, args)
+
+                    | _ ->
+                        abs (Expr.Var tmp)
+
+                return! preprocessNormalS <| Expr.Let(tmp, v, expr)
+
             | ColorIntScale(col, scalar, multiply, flip, fields) ->
                 let! col = preprocessNormalS col
                 let! scalar = preprocessNormalS scalar
@@ -1830,6 +1963,32 @@ module Preprocessor =
                 let! b = preprocessNormalS b
                 return Expr.Let(ta, a, Expr.Let(tb, b, expr))
 
+            | CrossInt (a, b) ->
+                let ta = Var("ta", a.Type)
+                let tb = Var("tb", b.Type)
+
+                let x = a.Type.GetField "X"
+                let y = a.Type.GetField "Y"
+                let z = a.Type.GetField "Z"
+
+                let args = [
+                    Expr.Subtract(
+                        Expr.Multiply(Expr.FieldGet(Expr.Var ta, y), Expr.FieldGet(Expr.Var tb, z)),
+                        Expr.Multiply(Expr.FieldGet(Expr.Var ta, z), Expr.FieldGet(Expr.Var tb, y))
+                    )
+                    Expr.Subtract(
+                        Expr.Multiply(Expr.FieldGet(Expr.Var ta, z), Expr.FieldGet(Expr.Var tb, x)),
+                        Expr.Multiply(Expr.FieldGet(Expr.Var ta, x), Expr.FieldGet(Expr.Var tb, z))
+                    )
+                    Expr.Subtract(
+                        Expr.Multiply(Expr.FieldGet(Expr.Var ta, x), Expr.FieldGet(Expr.Var tb, y)),
+                        Expr.Multiply(Expr.FieldGet(Expr.Var ta, y), Expr.FieldGet(Expr.Var tb, x))
+                    )
+                ]
+
+                let ci = a.Type.GetConstructor [| x.FieldType; y.FieldType; z.FieldType; |]
+                return! preprocessNormalS <| Expr.Let(ta, a, Expr.Let(tb, b, Expr.NewObject(ci, args)))
+
             | LengthSquared v ->
                 let dot = typeof<Vec>.GetMethod("Dot", [| v.Type; v.Type |])
 
@@ -1842,71 +2001,74 @@ module Preprocessor =
             | DistanceSquared (a, b) ->
                 let dot = typeof<Vec>.GetMethod("Dot", [| a.Type; a.Type |])
 
+                let diff (a : Expr) (b : Expr) =
+                    match a.Type with
+                    | UnsignedIntegral -> Expr.AbsDiff(a, b)
+                    | _ -> Expr.Subtract(a, b)
+
                 let tmp = Var("tmp", a.Type)
                 let expr =
                     Expr.Let(tmp,
-                        Expr.Subtract(a, b),
+                        diff a b,
                         Expr.Call(dot, [Expr.Var tmp; Expr.Var tmp])
                     )
 
                 return! preprocessNormalS expr
 
             | Distance1 (a, b, fields) ->
-                let abs = typeof<Fun>.GetMethod("Abs", [| a.Type |])
+                let expr =
+                    let tmp = Var("tmp", a.Type)
 
-                let tmp = Var("tmp", a.Type)
+                    let sum =
+                        fields |> List.map (fun f ->
+                            Expr.FieldGet(Expr.Var tmp, a.Type.GetField f)
+                        )
+                        |> List.reduce (fun x y -> Expr.Add(x, y))
 
-                let sumExpr =
-                    fields |> List.map (fun f ->
-                        Expr.FieldGet(Expr.Var tmp, a.Type.GetField f)
-                    )
-                    |> List.reduce (fun x y -> Expr.Add(x, y))
+                    Expr.Let(tmp, Expr.AbsDiff(a, b), sum)
 
-                let! a = preprocessNormalS a
-                let! b = preprocessNormalS b
-                return Expr.Let(tmp, Expr.Call(abs, [Expr.Subtract(a, b)]), sumExpr)
+                return! preprocessNormalS expr
 
             | DistanceMinMax (a, b, name) ->
-                let abs = typeof<Fun>.GetMethod("Abs", [| a.Type |])
                 let minMax = typeof<Vec>.GetMethod(name + "Element", [| a.Type |])
-
-                let expr =
-                    Expr.Call(minMax, [
-                        Expr.Call(abs, [Expr.Subtract(a, b)])
-                    ])
-
+                let expr = Expr.Call(minMax, [Expr.AbsDiff(a, b)])
                 return! preprocessNormalS expr
 
             | Norm (v, name) ->
                 let expr =
-                    if name = "Min" || name = "Max" then
-                        let abs = typeof<Fun>.GetMethod("Abs", [| v.Type |])
-                        let minMax = typeof<Vec>.GetMethod(name + "Element", [| v.Type |])
-                        Expr.Call(minMax, [Expr.Call(abs, [v])])
-                    else
-                        let dist = typeof<Vec>.GetMethod("Distance" + name, [| v.Type; v.Type |])
-                        Expr.Call(dist, [v; Expr.Zero v.Type])
+                    let dist = typeof<Vec>.GetMethod("Distance" + name, [| v.Type; v.Type |])
+                    Expr.Call(dist, [v; Expr.Zero v.Type])
 
                 return! preprocessNormalS expr
 
             | MinMaxElement(v, name, fieldType, fields) ->
-                let mi = typeof<Fun>.GetMethod(name, [| fieldType; fieldType |])
-
                 let tmp = Var("tmp", v.Type)
 
                 let minMaxExpr =
+                    let mi = typeof<Fun>.GetMethod(name, [| fieldType; fieldType |])
+
                     fields
                     |> List.map (fun f ->
                         Expr.FieldGet(Expr.Var tmp, v.Type.GetField f)
                     )
                     |> List.reduce (fun a b -> Expr.Call(mi, [a; b]))
 
-                let! v = preprocessNormalS v
-                return Expr.Let(tmp, v, minMaxExpr)
+                return! preprocessNormalS <| Expr.Let(tmp, v, minMaxExpr)
+
+            | Square x ->
+                let! x = preprocessNormalS x
+                let tmp = Var("tmp", x.Type)
+                return Expr.Let(tmp, x, Expr.Multiply(Expr.Var tmp, Expr.Var tmp))
+
+            | MultiplyAddInt (x, y, z) ->
+                let! x = preprocessNormalS x
+                let! y = preprocessNormalS y
+                let! z = preprocessNormalS z
+                return Expr.Add(Expr.Multiply(x, y), z)
 
             | InvLerp [a; b; y] ->
                 // Convert to floating point if input is integral
-                // E.g invLerp : int32 -> int32 -> int32 -> float
+                // E.g. invLerp : int32 -> int32 -> int32 -> float
                 let! a = preprocessNormalS (Expr.ToDouble a)
                 let! b = preprocessNormalS (Expr.ToDouble b)
                 let! y = preprocessNormalS (Expr.ToDouble y)
