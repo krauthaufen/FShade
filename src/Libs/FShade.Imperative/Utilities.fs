@@ -157,7 +157,7 @@ module Peano =
 
 [<AutoOpen>]
 module ReflectionPatterns =
-    open Aardvark.Base.TypeInfo.Patterns
+    open TypeMeta.Patterns
 
     type Type with
         member x.IsArr = x.IsGenericType && x.GetGenericTypeDefinition() = typedefof<Arr<_,_>>

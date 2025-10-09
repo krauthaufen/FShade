@@ -1668,7 +1668,7 @@ module Assembler =
 
 [<AutoOpen>]
 module private TextureFunctions =
-    open Aardvark.Base.TypeInfo.Patterns
+    open TypeMeta.Patterns
 
     [<return: Struct>]
     let (|TextureLookup|_|) (mi : MethodInfo) : ValueOption<CIntrinsic> =
@@ -1974,7 +1974,7 @@ module private TextureFunctions =
 
 
 
-open Aardvark.Base.TypeInfo.Patterns
+open TypeMeta.Patterns
 
 type Backend private() =
     inherit Compiler.Backend()

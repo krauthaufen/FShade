@@ -30,7 +30,7 @@ type EffectInputLayout =
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module EffectInputLayout =
-    open Aardvark.Base.TypeInfo.Patterns
+    open TypeMeta.Patterns
 
     module private UniformLayout =
 

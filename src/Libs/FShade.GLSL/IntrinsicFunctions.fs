@@ -924,6 +924,9 @@ module IntrinsicFunctions =
                 exactly <@ min : int32   -> V2i  -> _ @>
                 exactly <@ min : int32   -> V3i  -> _ @>
                 exactly <@ min : int32   -> V4i  -> _ @>
+                exactly <@ min : uint32  -> V2ui -> _ @>
+                exactly <@ min : uint32  -> V3ui -> _ @>
+                exactly <@ min : uint32  -> V4ui -> _ @>
                 exactly <@ min : float32 -> V2f  -> _ @>
                 exactly <@ min : float32 -> V3f  -> _ @>
                 exactly <@ min : float32 -> V4f  -> _ @>
@@ -1065,15 +1068,18 @@ module IntrinsicFunctions =
                 exactly <@ Fun.Max : float   * V2d  -> _ @>
                 exactly <@ Fun.Max : float   * V3d  -> _ @>
                 exactly <@ Fun.Max : float   * V4d  -> _ @>
-                exactly <@ max : int32   -> V2i -> _ @>
-                exactly <@ max : int32   -> V3i -> _ @>
-                exactly <@ max : int32   -> V4i -> _ @>
-                exactly <@ max : float32 -> V2f -> _ @>
-                exactly <@ max : float32 -> V3f -> _ @>
-                exactly <@ max : float32 -> V4f -> _ @>
-                exactly <@ max : float   -> V2d -> _ @>
-                exactly <@ max : float   -> V3d -> _ @>
-                exactly <@ max : float   -> V4d -> _ @>
+                exactly <@ max : int32   -> V2i  -> _ @>
+                exactly <@ max : int32   -> V3i  -> _ @>
+                exactly <@ max : int32   -> V4i  -> _ @>
+                exactly <@ max : uint32  -> V2ui -> _ @>
+                exactly <@ max : uint32  -> V3ui -> _ @>
+                exactly <@ max : uint32  -> V4ui -> _ @>
+                exactly <@ max : float32 -> V2f  -> _ @>
+                exactly <@ max : float32 -> V3f  -> _ @>
+                exactly <@ max : float32 -> V4f  -> _ @>
+                exactly <@ max : float   -> V2d  -> _ @>
+                exactly <@ max : float   -> V3d  -> _ @>
+                exactly <@ max : float   -> V4d  -> _ @>
             ]
 
             CIntrinsic.tagged "i64vec2(max({1}, {0}))", [
