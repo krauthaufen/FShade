@@ -3552,6 +3552,7 @@ module Shader =
             (typeof<V4f>, typeof<C3f>),     fun value -> <@@ C3f(%%value : V4f) @@>
             (typeof<V4f>, typeof<C4f>),     fun value -> <@@ C4f(%%value : V4f) @@>
 
+            // Float32 color
             (typeof<C3f>, typeof<float32>), fun value -> <@@ (%%value : C3f).R @@>
             (typeof<C3f>, typeof<V2f>),     fun value -> <@@ V2f((%%value : C3f).R, (%%value : C3f).G) @@>
             (typeof<C3f>, typeof<V3f>),     fun value -> <@@ V3f(%%value : C3f) @@>
@@ -3563,6 +3564,20 @@ module Shader =
             (typeof<C4f>, typeof<V3f>),     fun value -> <@@ V3f(%%value : C4f) @@>
             (typeof<C4f>, typeof<C3f>),     fun value -> <@@ C3f(%%value : C4f) @@>
             (typeof<C4f>, typeof<V4f>),     fun value -> <@@ V4f(%%value : C4f) @@>
+
+            (typeof<C3f>, typeof<C3b>),     fun value -> <@@ C3b (%%value : C3f) @@>
+            (typeof<C3f>, typeof<C3us>),    fun value -> <@@ C3us(%%value : C3f) @@>
+            (typeof<C3f>, typeof<C3ui>),    fun value -> <@@ C3ui(%%value : C3f) @@>
+            (typeof<C3f>, typeof<C4b>),     fun value -> <@@ C4b (%%value : C3f) @@>
+            (typeof<C3f>, typeof<C4us>),    fun value -> <@@ C4us(%%value : C3f) @@>
+            (typeof<C3f>, typeof<C4ui>),    fun value -> <@@ C4ui(%%value : C3f) @@>
+
+            (typeof<C4f>, typeof<C3b>),     fun value -> <@@ C3b (%%value : C4f) @@>
+            (typeof<C4f>, typeof<C3us>),    fun value -> <@@ C3us(%%value : C4f) @@>
+            (typeof<C4f>, typeof<C3ui>),    fun value -> <@@ C3ui(%%value : C4f) @@>
+            (typeof<C4f>, typeof<C4b>),     fun value -> <@@ C4b (%%value : C4f) @@>
+            (typeof<C4f>, typeof<C4us>),    fun value -> <@@ C4us(%%value : C4f) @@>
+            (typeof<C4f>, typeof<C4ui>),    fun value -> <@@ C4ui(%%value : C4f) @@>
 
             // Float64
             (typeof<V2d>, typeof<float>), fun value -> <@@ (%%value : V2d).X @@>
@@ -3579,6 +3594,7 @@ module Shader =
             (typeof<V4d>, typeof<C3d>),   fun value -> <@@ C3d(%%value : V4d) @@>
             (typeof<V4d>, typeof<C4d>),   fun value -> <@@ C4d(%%value : V4d) @@>
 
+            // Float64 color
             (typeof<C3d>, typeof<float>), fun value -> <@@ (%%value : C3d).R @@>
             (typeof<C3d>, typeof<V2d>),   fun value -> <@@ V2d((%%value : C3d).R, (%%value : C3d).G) @@>
             (typeof<C3d>, typeof<V3d>),   fun value -> <@@ V3d(%%value : C3d) @@>
@@ -3591,19 +3607,87 @@ module Shader =
             (typeof<C4d>, typeof<C3d>),   fun value -> <@@ C3d(%%value : C4d) @@>
             (typeof<C4d>, typeof<V4d>),   fun value -> <@@ V4d(%%value : C4d) @@>
 
-            // UInt8
-            (typeof<C3b>, typeof<uint8>), fun value -> <@@ (%%value : C3b).R @@>
-            (typeof<C3b>, typeof<C4b>),   fun value -> <@@ C4b(%%value : C3b) @@>
+            (typeof<C3d>, typeof<C3b>),   fun value -> <@@ C3b (%%value : C3d) @@>
+            (typeof<C3d>, typeof<C3us>),  fun value -> <@@ C3us(%%value : C3d) @@>
+            (typeof<C3d>, typeof<C3ui>),  fun value -> <@@ C3ui(%%value : C3d) @@>
+            (typeof<C3d>, typeof<C4b>),   fun value -> <@@ C4b (%%value : C3d) @@>
+            (typeof<C3d>, typeof<C4us>),  fun value -> <@@ C4us(%%value : C3d) @@>
+            (typeof<C3d>, typeof<C4ui>),  fun value -> <@@ C4ui(%%value : C3d) @@>
 
-            (typeof<C4b>, typeof<uint8>), fun value -> <@@ (%%value : C4b).R @@>
-            (typeof<C4b>, typeof<C3b>),   fun value -> <@@ C3b(%%value : C4b) @@>
+            (typeof<C4d>, typeof<C3b>),   fun value -> <@@ C3b (%%value : C4d) @@>
+            (typeof<C4d>, typeof<C3us>),  fun value -> <@@ C3us(%%value : C4d) @@>
+            (typeof<C4d>, typeof<C3ui>),  fun value -> <@@ C3ui(%%value : C4d) @@>
+            (typeof<C4d>, typeof<C4b>),   fun value -> <@@ C4b (%%value : C4d) @@>
+            (typeof<C4d>, typeof<C4us>),  fun value -> <@@ C4us(%%value : C4d) @@>
+            (typeof<C4d>, typeof<C4ui>),  fun value -> <@@ C4ui(%%value : C4d) @@>
 
-            // UInt16
+            // UInt8 color
+            (typeof<C3b>, typeof<uint8>),  fun value -> <@@ (%%value : C3b).R @@>
+            (typeof<C3b>, typeof<uint16>), fun value -> <@@ uint16 (%%value : C3b).R @@>
+            (typeof<C3b>, typeof<uint32>), fun value -> <@@ uint32 (%%value : C3b).R @@>
+            (typeof<C3b>, typeof<V2ui>),   fun value -> <@@ V2ui(uint32 (%%value : C3b).R, uint32 (%%value : C3b).G) @@>
+            (typeof<C3b>, typeof<V3ui>),   fun value -> <@@ V3ui(%%value : C3b) @@>
+            (typeof<C3b>, typeof<V4ui>),   fun value -> <@@ V4ui(%%value : C3b) @@>
+            (typeof<C3b>, typeof<C4b>),    fun value -> <@@ C4b(%%value : C3b) @@>
+
+            (typeof<C4b>, typeof<uint8>),  fun value -> <@@ (%%value : C4b).R @@>
+            (typeof<C4b>, typeof<uint16>), fun value -> <@@ uint16 (%%value : C4b).R @@>
+            (typeof<C4b>, typeof<uint32>), fun value -> <@@ uint32 (%%value : C4b).R @@>
+            (typeof<C4b>, typeof<V2ui>),   fun value -> <@@ V2ui(uint32 (%%value : C4b).R, uint32 (%%value : C4b).G) @@>
+            (typeof<C4b>, typeof<V3ui>),   fun value -> <@@ V3ui(%%value : C4b) @@>
+            (typeof<C4b>, typeof<C3b>),    fun value -> <@@ C3b(%%value : C4b) @@>
+            (typeof<C4b>, typeof<V4ui>),   fun value -> <@@ V4ui(%%value : C4b) @@>
+
+            (typeof<C3b>, typeof<C3us>),   fun value -> <@@ C3us(%%value : C3b) @@>
+            (typeof<C3b>, typeof<C3ui>),   fun value -> <@@ C3ui(%%value : C3b) @@>
+            (typeof<C3b>, typeof<C3f>),    fun value -> <@@ C3f (%%value : C3b) @@>
+            (typeof<C3b>, typeof<C3d>),    fun value -> <@@ C3d (%%value : C3b) @@>
+            (typeof<C3b>, typeof<C4us>),   fun value -> <@@ C4us(%%value : C3b) @@>
+            (typeof<C3b>, typeof<C4ui>),   fun value -> <@@ C4ui(%%value : C3b) @@>
+            (typeof<C3b>, typeof<C4f>),    fun value -> <@@ C4f (%%value : C3b) @@>
+            (typeof<C3b>, typeof<C4d>),    fun value -> <@@ C4d (%%value : C3b) @@>
+
+            (typeof<C4b>, typeof<C3us>),   fun value -> <@@ C3us(%%value : C4b) @@>
+            (typeof<C4b>, typeof<C3ui>),   fun value -> <@@ C3ui(%%value : C4b) @@>
+            (typeof<C4b>, typeof<C3f>),    fun value -> <@@ C3f (%%value : C4b) @@>
+            (typeof<C4b>, typeof<C3d>),    fun value -> <@@ C3d (%%value : C4b) @@>
+            (typeof<C4b>, typeof<C4us>),   fun value -> <@@ C4us(%%value : C4b) @@>
+            (typeof<C4b>, typeof<C4ui>),   fun value -> <@@ C4ui(%%value : C4b) @@>
+            (typeof<C4b>, typeof<C4f>),    fun value -> <@@ C4f (%%value : C4b) @@>
+            (typeof<C4b>, typeof<C4d>),    fun value -> <@@ C4d (%%value : C4b) @@>
+
+            // UInt16 color
             (typeof<C3us>, typeof<uint16>), fun value -> <@@ (%%value : C3us).R @@>
+            (typeof<C3us>, typeof<uint32>), fun value -> <@@ uint32 (%%value : C3us).R @@>
+            (typeof<C3us>, typeof<V2ui>),   fun value -> <@@ V2ui(uint32 (%%value : C3us).R, uint32 (%%value : C3us).G) @@>
+            (typeof<C3us>, typeof<V3ui>),   fun value -> <@@ V3ui(%%value : C3us) @@>
+            (typeof<C3us>, typeof<V4ui>),   fun value -> <@@ V4ui(%%value : C3us) @@>
             (typeof<C3us>, typeof<C4us>),   fun value -> <@@ C4us(%%value : C3us) @@>
 
             (typeof<C4us>, typeof<uint16>), fun value -> <@@ (%%value : C4us).R @@>
+            (typeof<C4us>, typeof<uint32>), fun value -> <@@ uint32 (%%value : C4us).R @@>
+            (typeof<C4us>, typeof<V2ui>),   fun value -> <@@ V2ui(uint32 (%%value : C4us).R, uint32 (%%value : C4us).G) @@>
+            (typeof<C4us>, typeof<V3ui>),   fun value -> <@@ V3ui(%%value : C4us) @@>
             (typeof<C4us>, typeof<C3us>),   fun value -> <@@ C3us(%%value : C4us) @@>
+            (typeof<C4us>, typeof<V4ui>),   fun value -> <@@ V4ui(%%value : C4us) @@>
+
+            (typeof<C3us>, typeof<C3b>),    fun value -> <@@ C3b (%%value : C3us) @@>
+            (typeof<C3us>, typeof<C3ui>),   fun value -> <@@ C3ui(%%value : C3us) @@>
+            (typeof<C3us>, typeof<C3f>),    fun value -> <@@ C3f (%%value : C3us) @@>
+            (typeof<C3us>, typeof<C3d>),    fun value -> <@@ C3d (%%value : C3us) @@>
+            (typeof<C3us>, typeof<C4b>),    fun value -> <@@ C4b (%%value : C3us) @@>
+            (typeof<C3us>, typeof<C4ui>),   fun value -> <@@ C4ui(%%value : C3us) @@>
+            (typeof<C3us>, typeof<C4f>),    fun value -> <@@ C4f (%%value : C3us) @@>
+            (typeof<C3us>, typeof<C4d>),    fun value -> <@@ C4d (%%value : C3us) @@>
+
+            (typeof<C4us>, typeof<C3b>),    fun value -> <@@ C3b (%%value : C4us) @@>
+            (typeof<C4us>, typeof<C3ui>),   fun value -> <@@ C3ui(%%value : C4us) @@>
+            (typeof<C4us>, typeof<C3f>),    fun value -> <@@ C3f (%%value : C4us) @@>
+            (typeof<C4us>, typeof<C3d>),    fun value -> <@@ C3d (%%value : C4us) @@>
+            (typeof<C4us>, typeof<C4b>),    fun value -> <@@ C4b (%%value : C4us) @@>
+            (typeof<C4us>, typeof<C4ui>),   fun value -> <@@ C4ui(%%value : C4us) @@>
+            (typeof<C4us>, typeof<C4f>),    fun value -> <@@ C4f (%%value : C4us) @@>
+            (typeof<C4us>, typeof<C4d>),    fun value -> <@@ C4d (%%value : C4us) @@>
 
             // Int32
             (typeof<V2i>, typeof<int32>), fun value -> <@@ (%%value : V2i).X @@>
@@ -3629,6 +3713,7 @@ module Shader =
             (typeof<V4ui>, typeof<C3ui>),   fun value -> <@@ C3ui(%%value : V4ui) @@>
             (typeof<V4ui>, typeof<C4ui>),   fun value -> <@@ C4ui(%%value : V4ui) @@>
 
+            // UInt32 color
             (typeof<C3ui>, typeof<uint32>), fun value -> <@@ (%%value : C3ui).R @@>
             (typeof<C3ui>, typeof<V2ui>),   fun value -> <@@ V2ui((%%value : C3ui).R, (%%value : C3ui).G) @@>
             (typeof<C3ui>, typeof<V3ui>),   fun value -> <@@ V3ui(%%value : C3ui) @@>
@@ -3640,6 +3725,24 @@ module Shader =
             (typeof<C4ui>, typeof<V3ui>),   fun value -> <@@ V3ui(%%value : C4ui) @@>
             (typeof<C4ui>, typeof<C3ui>),   fun value -> <@@ C3ui(%%value : C4ui) @@>
             (typeof<C4ui>, typeof<V4ui>),   fun value -> <@@ V4ui(%%value : C4ui) @@>
+
+            (typeof<C3ui>, typeof<C3b>),    fun value -> <@@ C3b (%%value : C3ui) @@>
+            (typeof<C3ui>, typeof<C3us>),   fun value -> <@@ C3us(%%value : C3ui) @@>
+            (typeof<C3ui>, typeof<C3f>),    fun value -> <@@ C3f (%%value : C3ui) @@>
+            (typeof<C3ui>, typeof<C3d>),    fun value -> <@@ C3d (%%value : C3ui) @@>
+            (typeof<C3ui>, typeof<C4b>),    fun value -> <@@ C4b (%%value : C3ui) @@>
+            (typeof<C3ui>, typeof<C4us>),   fun value -> <@@ C4us(%%value : C3ui) @@>
+            (typeof<C3ui>, typeof<C4f>),    fun value -> <@@ C4f (%%value : C3ui) @@>
+            (typeof<C3ui>, typeof<C4d>),    fun value -> <@@ C4d (%%value : C3ui) @@>
+
+            (typeof<C4ui>, typeof<C3b>),    fun value -> <@@ C3b (%%value : C4ui) @@>
+            (typeof<C4ui>, typeof<C3us>),   fun value -> <@@ C3us(%%value : C4ui) @@>
+            (typeof<C4ui>, typeof<C3f>),    fun value -> <@@ C3f (%%value : C4ui) @@>
+            (typeof<C4ui>, typeof<C3d>),    fun value -> <@@ C3d (%%value : C4ui) @@>
+            (typeof<C4ui>, typeof<C4b>),    fun value -> <@@ C4b (%%value : C4ui) @@>
+            (typeof<C4ui>, typeof<C4us>),   fun value -> <@@ C4us(%%value : C4ui) @@>
+            (typeof<C4ui>, typeof<C4f>),    fun value -> <@@ C4f (%%value : C4ui) @@>
+            (typeof<C4ui>, typeof<C4d>),    fun value -> <@@ C4d (%%value : C4ui) @@>
         ]
 
     let private converter (semantic : string) (inType : Type) (outType : Type) : Expr -> Expr =

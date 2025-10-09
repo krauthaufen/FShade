@@ -8,8 +8,14 @@ open FShade.Tests
 
 type Vertex =
     {
-        [<Position>] pos : V4f
-        color : C3b
+        [<Position>] pos   : V4f
+        [<Color>]    color : C3b
+    }
+
+type Vertexui =
+    {
+        [<Position>] pos   : V4f
+        [<Color>]    color : C4ui
     }
 
 [<ReflectedDefinition>]
@@ -19,12 +25,23 @@ let assertT<'T> (v : 'T) = v
 let ``Color vertex attribute``() =
     Setup.Run()
 
-    let shader (v : Vertex) =
-        fragment {
-            return v.color
+    let vs1 (v : Vertex) =
+        vertex {
+            return v
         }
 
-    GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] [ ]
+    let vs2 (v : Vertexui) =
+        vertex {
+            return v
+        }
+
+    let effect =
+        Effect.compose [
+            Effect.ofFunction vs1
+            Effect.ofFunction vs2
+        ]
+
+    GLSL.shouldCompileAndContainRegex [effect] [ Regex.Escape "uvec4((uvec3(Colors) * 16843009u), 4294967295u)" ]
 
 [<Test>]
 let ``Color from RGB``() =
