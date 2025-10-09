@@ -602,6 +602,10 @@ module Preprocessor =
             System.Text.RegularExpressions.Regex
                 @"^([iI]s|[aA]ny|[aA]ll)(Infinity|PositiveInfinity|NegativeInfinity|NaN|Finite|Equal|Different|Smaller|Greater|SmallerOrEqual|GreaterOrEqual)$"
 
+        let private clampedColorConversion =
+            let types = [ "Byte"; "UShort"; "UInt"; "Half"; "Float"; "Double" ] |> String.concat "|"
+            System.Text.RegularExpressions.Regex $"^(?<name>(?:{types})To(?:{types}))Clamped$"
+
         // These require the input expression to be duplicated and must be handled differently.
         let private emulatedSpecialFloatingPointCheck =
             System.Text.RegularExpressions.Regex @"^([iI]s|Any|All)(PositiveInfinity|NegativeInfinity|Finite)$"
@@ -883,6 +887,19 @@ module Preprocessor =
             match e with
             | ScalarOrVectorAllEmulatedSpecialFloatingPointCheck (e, isVector, "Finite") -> ValueSome (e, isVector)
             | _ -> ValueNone
+
+        // returns (name, value)
+        [<return: Struct>]
+        let (|ColorToColorClamped|_|) (e : Expr) =
+            match e with
+            | Call(None, (Method(name, _) as mi), [FloatingPointExpr value]) when mi.DeclaringType = typeof<Col> ->
+                let m = clampedColorConversion.Match name
+                if m.Success then
+                    ValueSome (m.Groups.["name"].Value, value)
+                else
+                    ValueNone
+            | _ ->
+                ValueNone
 
         // returns (color, scalar, multiply, flip, fields)
         [<return: Struct>]
@@ -1275,6 +1292,15 @@ module Preprocessor =
                 typeof<V4d>
             |]
 
+        let private getColorElementType = function
+            | UInt8   -> "Byte"
+            | UInt16  -> "UShort"
+            | UInt32  -> "UInt"
+            | Float16 -> "Half"
+            | Float32 -> "Float"
+            | Float64 -> "Double"
+            | t -> failwith $"[FShade] Invalid color element type: {t}."
+
         [<return: Struct>]
         let private (|TensorOp|_|) (a : Expr, b : Expr) =
             match a.Type, b.Type with
@@ -1429,6 +1455,12 @@ module Preprocessor =
 
                 Expr.Call(mi, [e])
 
+            static member ConvertColor(e : Expr, typ : Type, clamp : bool) =
+                let src = getColorElementType e.Type
+                let dst = getColorElementType typ
+                let clamped = if clamp then "Clamped" else ""
+                let mi = typeof<Col>.GetMethod($"{src}To{dst}{clamped}", [| e.Type |])
+                Expr.Call(mi, [e])
 
     let rec preprocessRaytracingS (stage : ShaderStage) (e : Expr) : Preprocess<Expr> =
         state {
@@ -1876,16 +1908,22 @@ module Preprocessor =
 
                 return! preprocessNormalS <| Expr.Let(tmp, v, expr)
 
-            | ColorIntScale(col, scalar, multiply, flip, fields) ->
-                let! col = preprocessNormalS col
-                let! scalar = preprocessNormalS scalar
+            | ColorToColorClamped(name, value) ->
+                let convert = typeof<Col>.GetMethod(name, [| value.Type |])
+                let saturate = typeof<Fun>.GetMethod("Saturate", [| value.Type |])
+                let expr = Expr.Call(convert, [Expr.Call(saturate, [value])])
+                return! preprocessNormalS expr
 
-                let tmp = Var("tmp", col.Type)
+            | ColorIntScale(color, scalar, multiply, flip, fields) ->
+                let tmp = Var("tmp", color.Type)
 
                 let args =
                     fields |> List.map (fun f ->
-                        let f = Expr.FieldGet(Expr.Var tmp, col.Type.GetField f)
+                        let f = Expr.FieldGet(Expr.Var tmp, color.Type.GetField f)
+
                         let s =
+                            let f = Expr.ConvertColor(f, scalar.Type, false)
+
                             if multiply then
                                 Expr.Multiply(f, scalar)
                             else
@@ -1894,17 +1932,17 @@ module Preprocessor =
                                 else
                                     Expr.Division(f, scalar)
 
-                        Expr.Convert(Expr.Round s, f.Type)
+                        Expr.ConvertColor(s, f.Type, true)
                     )
 
-                let ci =
-                    let types = args |> List.toArray |> Array.map _.Type
-                    col.Type.GetConstructor types
+                let expr =
+                    let ci =
+                        let types = args |> List.toArray |> Array.map _.Type
+                        color.Type.GetConstructor types
 
-                return Expr.Let(
-                    tmp, col,
-                    Expr.NewObject(ci, args)
-                )
+                    Expr.Let(tmp, color,Expr.NewObject(ci, args))
+
+                return! preprocessNormalS expr
 
             | ConstantSwizzle(v, prop, baseType) ->
                 let tmp = Var("tmp", v.Type)

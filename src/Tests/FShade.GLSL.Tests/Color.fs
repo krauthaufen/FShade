@@ -181,11 +181,21 @@ let ``Color channel conversions``() =
             let _ = assertT <| Col.FloatToHalf   (float32 v.color.R)
             let _ = assertT <| Col.FloatToDouble (float32 v.color.R)
 
+            let _ = assertT <| Col.FloatToByteClamped   (float32 v.color.R)
+            let _ = assertT <| Col.FloatToUShortClamped (float32 v.color.R)
+            let _ = assertT <| Col.FloatToUIntClamped   (float32 v.color.R)
+            let _ = assertT <| Col.FloatToDoubleClamped (float32 v.color.R)
+
             let _ = assertT <| Col.DoubleToByte   (float v.color.R)
             let _ = assertT <| Col.DoubleToUShort (float v.color.R)
             let _ = assertT <| Col.DoubleToUInt   (float v.color.R)
             let _ = assertT <| Col.DoubleToHalf   (float v.color.R)
             let _ = assertT <| Col.DoubleToFloat  (float v.color.R)
+
+            let _ = assertT <| Col.DoubleToByteClamped   (float v.color.R)
+            let _ = assertT <| Col.DoubleToUShortClamped (float v.color.R)
+            let _ = assertT <| Col.DoubleToUIntClamped   (float v.color.R)
+            let _ = assertT <| Col.DoubleToFloatClamped  (float v.color.R)
 
             return v
         }
