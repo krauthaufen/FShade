@@ -1,5 +1,11 @@
+### 5.7.0-prerelease0014
 - Simplified for-loop unrolling
 - Added RayFlags.ForceOpacityMicromap2State
+- Added support for integer-based border colors
+- Added support for color types
+- [Raytracing] Reworked handling of ids, string, and Symbols
+- [GLSL] Added missing keywords for name mangling
+- [GLSL] Fixed intrinsics for non-standard types 
 
 ### 5.7.0-prerelease0013
 - [ComputeShader] fixed ordering of UtilityFunctions and storage buffers in compute shaders
