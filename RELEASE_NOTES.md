@@ -1,3 +1,5 @@
+- [Debugger] Fixed handling of forward slashes in file paths
+
 ### 5.7.0-prerelease0014
 - Simplified for-loop unrolling
 - Added RayFlags.ForceOpacityMicromap2State

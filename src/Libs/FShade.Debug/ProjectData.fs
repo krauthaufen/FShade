@@ -24,14 +24,19 @@ type internal ProjectData =
     member x.Name =
         Path.GetFileNameWithoutExtension x.Path
 
+[<AutoOpen>]
+module internal Utilities =
+
+    module String =
+
+        /// Replaces back and forward slashes in a path with environment's directory separator.
+        let normalizePath (path : string) =
+            let separator = string Path.DirectorySeparatorChar
+            Regex.Replace(path, @"\\|\/", separator)
+
 module internal ProjectData =
 
     let private cache = Dictionary<string, ProjectData>()
-
-    // Replaces back and forward slashes in a path with environment's directory separator.
-    let private normalizePath (path : string) =
-        let separator = string Path.DirectorySeparatorChar
-        Regex.Replace(path, @"\\|\/", separator)
 
     let rec tryLoad (path : string) =
         match cache.TryGetValue path with
@@ -51,7 +56,7 @@ module internal ProjectData =
                     let getFilePaths (xpath : string) =
                         xml.SelectNodes xpath
                         |> Seq.cast<XmlAttribute>
-                        |> Seq.map (fun attr -> Path.GetFullPath <| Path.Combine(rootDir, normalizePath attr.Value))
+                        |> Seq.map (fun attr -> Path.GetFullPath <| Path.Combine(rootDir, String.normalizePath attr.Value))
                         |> Seq.toList
 
                     let files = getFilePaths "//Compile/@Include"

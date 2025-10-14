@@ -141,6 +141,7 @@ module ShaderDebugger =
                 | _ ->
                     match definition.Expression.DebugRange with
                     | Some (srcFile, startLine, startCol, _endLine, _endCol) ->
+                        let srcFile = String.normalizePath srcFile
                         let location = { File = srcFile; Line = startLine; Column = startCol }
 
                         let result =
