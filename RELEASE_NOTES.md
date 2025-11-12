@@ -1,4 +1,21 @@
+### 5.7.0
+- Removed double as float feature
+- Added basic support for 8-bit, 16-bit, and 64-bit data types
+- Added support for color types
+- Added support for integer-based border colors
+- Added support for push constants
+- Added support for GL_EXT_ray_tracing_position_fetch
+- Added support for GL_NV_shader_invocation_reorder
+- Added UniformDecoration.BufferAccess properly
+- Simplified for-loop unrolling
+- [Raytracing] Changed type of object-world transforms to M34f
+- [Raytracing] Added RayId, MissId, and CallableId
+- [GLSL] Improved name mangling for invalid characters
+- [GLSL] Added `Config.separateTexturesAndSamplers` for automatically splitting samplers into separate texture/sampler uniforms for better interop with Vulkan/WGSL
+- [Optimizer] Added step for simplifying raytracing writes
+- [Optimizer] Fixed issue with dead-code elimination and utility functions
 - [Debugger] Fixed handling of forward slashes in file paths
+- [fshadeaot] Added double checking feature
 
 ### 5.7.0-prerelease0014
 - Simplified for-loop unrolling
