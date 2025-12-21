@@ -1772,53 +1772,57 @@ module Preprocessor =
                 | PropertyGet(Some (ValueWithName(v, t, name)), prop, []) when t.IsArray && (prop.Name = "Length" || prop.Name = "LongLength") ->
                     return Expr.ReadInput(ParameterKind.Uniform, typeof<int>, "cs_" + name + "_length")
 
-                // Handle direct field writes to storage buffer elements: buffer[i].field <- value
+                // Track writes to storage buffer fields: buffer[i].field <- value
                 | PropertySet(Some (GetArray(ValueWithName(v, t, name), index)), prop, [], value) ->
                     let! index = preprocessComputeS index
                     let! value = preprocessComputeS value
                     do! State.addStorageAccess name StorageAccess.Write
                     match t with
                     | ArrOf(_,elemType) | ArrayOf elemType ->
-                        let arrInput = Expr.ReadInput(ParameterKind.Input, elemType, name, index)
-                        return Expr.PropertySet(arrInput, prop, value, [])
+                        let arr = Expr.ReadInput(ParameterKind.Input, t, name)
+                        let arrElem = Expr.PropertyGet(arr, t.GetProperty("Item"), [index])
+                        return Expr.PropertySet(arrElem, prop, value, [])
                     | _ ->
-                        return failwithf "[FShade] Expected array type for storage buffer %s, got %A" name t
+                        return failwithf "[FShade] Expected array type for storage buffer %s" name
 
-                // Handle nested field writes: buffer[i].struct.field <- value
+                // Track writes to nested storage buffer fields: buffer[i].struct.field <- value
                 | PropertySet(Some (PropertyGet(Some (GetArray(ValueWithName(v, t, name), index)), innerProp, [])), prop, [], value) ->
                     let! index = preprocessComputeS index
                     let! value = preprocessComputeS value
                     do! State.addStorageAccess name StorageAccess.Write
                     match t with
                     | ArrOf(_,elemType) | ArrayOf elemType ->
-                        let arrInput = Expr.ReadInput(ParameterKind.Input, elemType, name, index)
-                        let innerAccess = Expr.PropertyGet(arrInput, innerProp, [])
+                        let arr = Expr.ReadInput(ParameterKind.Input, t, name)
+                        let arrElem = Expr.PropertyGet(arr, t.GetProperty("Item"), [index])
+                        let innerAccess = Expr.PropertyGet(arrElem, innerProp, [])
                         return Expr.PropertySet(innerAccess, prop, value, [])
                     | _ ->
-                        return failwithf "[FShade] Expected array type for storage buffer %s, got %A" name t
+                        return failwithf "[FShade] Expected array type for storage buffer %s" name
 
-                // Handle direct field reads from storage buffer elements: buffer[i].field
+                // Track reads from storage buffer fields: buffer[i].field
                 | PropertyGet(Some (GetArray(ValueWithName(v, t, name), index)), prop, []) ->
                     let! index = preprocessComputeS index
                     do! State.addStorageAccess name StorageAccess.Read
                     match t with
                     | ArrOf(_,elemType) | ArrayOf elemType ->
-                        let arrInput = Expr.ReadInput(ParameterKind.Input, elemType, name, index)
-                        return Expr.PropertyGet(arrInput, prop, [])
+                        let arr = Expr.ReadInput(ParameterKind.Input, t, name)
+                        let arrElem = Expr.PropertyGet(arr, t.GetProperty("Item"), [index])
+                        return Expr.PropertyGet(arrElem, prop, [])
                     | _ ->
-                        return failwithf "[FShade] Expected array type for storage buffer %s, got %A" name t
+                        return failwithf "[FShade] Expected array type for storage buffer %s" name
 
-                // Handle nested field reads: buffer[i].struct.field
+                // Track reads from nested storage buffer fields: buffer[i].struct.field
                 | PropertyGet(Some (PropertyGet(Some (GetArray(ValueWithName(v, t, name), index)), innerProp, [])), prop, []) ->
                     let! index = preprocessComputeS index
                     do! State.addStorageAccess name StorageAccess.Read
                     match t with
                     | ArrOf(_,elemType) | ArrayOf elemType ->
-                        let arrInput = Expr.ReadInput(ParameterKind.Input, elemType, name, index)
-                        let innerAccess = Expr.PropertyGet(arrInput, innerProp, [])
+                        let arr = Expr.ReadInput(ParameterKind.Input, t, name)
+                        let arrElem = Expr.PropertyGet(arr, t.GetProperty("Item"), [index])
+                        let innerAccess = Expr.PropertyGet(arrElem, innerProp, [])
                         return Expr.PropertyGet(innerAccess, prop, [])
                     | _ ->
-                        return failwithf "[FShade] Expected array type for storage buffer %s, got %A" name t
+                        return failwithf "[FShade] Expected array type for storage buffer %s" name
 
                 | ValueWithName(v,t,name) ->
                     return Expr.ReadInput(ParameterKind.Uniform, t, "cs_" + name)
