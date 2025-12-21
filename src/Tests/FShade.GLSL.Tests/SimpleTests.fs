@@ -413,6 +413,55 @@ let ``Ref storage buffer modification``() =
     GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [ "atomicAdd" ]
 
 
+type DrawInfo =
+    {
+        InstanceCount : int
+        BaseInstance : int
+    }
+
+type BoundingBox =
+    {
+        Min : V3f
+        Max : V3f
+    }
+
+type DrawInfoWithBounds =
+    {
+        InstanceCount : int
+        Bounds : BoundingBox
+    }
+
+type UniformScope with
+    member x.DrawInfos : DrawInfo[] = uniform?StorageBuffer?DrawInfos
+    member x.DrawInfosWithBounds : DrawInfoWithBounds[] = uniform?StorageBuffer?DrawInfosWithBounds
+
+[<Test>]
+let ``Storage buffer direct field write``() =
+    Setup.Run()
+
+    let frag (v : Vertex) =
+        fragment {
+            uniform.DrawInfos.[0].InstanceCount <- 5
+            return v.c
+        }
+
+    // Should compile successfully - will fail if buffer is incorrectly marked readonly
+    GLSL.shouldCompile [ Effect.ofFunction frag ]
+
+[<Test>]
+let ``Storage buffer nested field write``() =
+    Setup.Run()
+
+    let frag (v : Vertex) =
+        fragment {
+            uniform.DrawInfosWithBounds.[0].Bounds.Min <- V3f.Zero
+            return v.c
+        }
+
+    // Should compile successfully - will fail if buffer is incorrectly marked readonly
+    GLSL.shouldCompile [ Effect.ofFunction frag ]
+
+
 
 
 type Shader private () =
