@@ -415,20 +415,20 @@ let ``Ref storage buffer modification``() =
 
 type DrawInfo =
     {
-        InstanceCount : int
-        BaseInstance : int
+        mutable InstanceCount : int
+        mutable BaseInstance : int
     }
 
 type BoundingBox =
     {
-        Min : V3f
-        Max : V3f
+        mutable Min : V3f
+        mutable Max : V3f
     }
 
 type DrawInfoWithBounds =
     {
-        InstanceCount : int
-        Bounds : BoundingBox
+        mutable InstanceCount : int
+        mutable Bounds : BoundingBox
     }
 
 type UniformScope with
