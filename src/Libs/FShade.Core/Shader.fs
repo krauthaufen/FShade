@@ -1772,57 +1772,22 @@ module Preprocessor =
                 | PropertyGet(Some (ValueWithName(v, t, name)), prop, []) when t.IsArray && (prop.Name = "Length" || prop.Name = "LongLength") ->
                     return Expr.ReadInput(ParameterKind.Uniform, typeof<int>, "cs_" + name + "_length")
 
-                // Track writes to storage buffer fields: buffer[i].field <- value
-                | PropertySet(Some (GetArray(ValueWithName(v, t, name), index)), prop, [], value) ->
-                    let! index = preprocessComputeS index
-                    let! value = preprocessComputeS value
+                // Track writes to storage buffer fields without transforming
+                | PropertySet(Some (GetArray(ValueWithName(_, _, name), _)), _, _, _)
+                | PropertySet(Some (PropertyGet(Some (GetArray(ValueWithName(_, _, name), _)), _, _)), _, _, _)
+                | PropertySet(Some (FieldGet(Some (GetArray(ValueWithName(_, _, name), _)), _)), _, _, _) ->
                     do! State.addStorageAccess name StorageAccess.Write
-                    match t with
-                    | ArrOf(_,elemType) | ArrayOf elemType ->
-                        let arr = Expr.ReadInput(ParameterKind.Input, t, name)
-                        let arrElem = Expr.PropertyGet(arr, t.GetProperty("Item"), [index])
-                        return Expr.PropertySet(arrElem, prop, value, [])
-                    | _ ->
-                        return failwithf "[FShade] Expected array type for storage buffer %s" name
+                    return! Preprocessor.rebuild e
 
-                // Track writes to nested storage buffer fields: buffer[i].struct.field <- value
-                | PropertySet(Some (PropertyGet(Some (GetArray(ValueWithName(v, t, name), index)), innerProp, [])), prop, [], value) ->
-                    let! index = preprocessComputeS index
-                    let! value = preprocessComputeS value
-                    do! State.addStorageAccess name StorageAccess.Write
-                    match t with
-                    | ArrOf(_,elemType) | ArrayOf elemType ->
-                        let arr = Expr.ReadInput(ParameterKind.Input, t, name)
-                        let arrElem = Expr.PropertyGet(arr, t.GetProperty("Item"), [index])
-                        let innerAccess = Expr.PropertyGet(arrElem, innerProp, [])
-                        return Expr.PropertySet(innerAccess, prop, value, [])
-                    | _ ->
-                        return failwithf "[FShade] Expected array type for storage buffer %s" name
-
-                // Track reads from storage buffer fields: buffer[i].field
-                | PropertyGet(Some (GetArray(ValueWithName(v, t, name), index)), prop, []) ->
-                    let! index = preprocessComputeS index
+                // Track reads from storage buffer fields without transforming
+                | PropertyGet(Some (GetArray(ValueWithName(_, _, name), _)), _, _)
+                | PropertyGet(Some (PropertyGet(Some (GetArray(ValueWithName(_, _, name), _)), _, _)), _, _)
+                | PropertyGet(Some (FieldGet(Some (GetArray(ValueWithName(_, _, name), _)), _)), _, _)
+                | FieldGet(Some (GetArray(ValueWithName(_, _, name), _)), _)
+                | FieldGet(Some (PropertyGet(Some (GetArray(ValueWithName(_, _, name), _)), _, _)), _)
+                | FieldGet(Some (FieldGet(Some (GetArray(ValueWithName(_, _, name), _)), _)), _) ->
                     do! State.addStorageAccess name StorageAccess.Read
-                    match t with
-                    | ArrOf(_,elemType) | ArrayOf elemType ->
-                        let arr = Expr.ReadInput(ParameterKind.Input, t, name)
-                        let arrElem = Expr.PropertyGet(arr, t.GetProperty("Item"), [index])
-                        return Expr.PropertyGet(arrElem, prop, [])
-                    | _ ->
-                        return failwithf "[FShade] Expected array type for storage buffer %s" name
-
-                // Track reads from nested storage buffer fields: buffer[i].struct.field
-                | PropertyGet(Some (PropertyGet(Some (GetArray(ValueWithName(v, t, name), index)), innerProp, [])), prop, []) ->
-                    let! index = preprocessComputeS index
-                    do! State.addStorageAccess name StorageAccess.Read
-                    match t with
-                    | ArrOf(_,elemType) | ArrayOf elemType ->
-                        let arr = Expr.ReadInput(ParameterKind.Input, t, name)
-                        let arrElem = Expr.PropertyGet(arr, t.GetProperty("Item"), [index])
-                        let innerAccess = Expr.PropertyGet(arrElem, innerProp, [])
-                        return Expr.PropertyGet(innerAccess, prop, [])
-                    | _ ->
-                        return failwithf "[FShade] Expected array type for storage buffer %s" name
+                    return! Preprocessor.rebuild e
 
                 | ValueWithName(v,t,name) ->
                     return Expr.ReadInput(ParameterKind.Uniform, t, "cs_" + name)
@@ -1953,61 +1918,23 @@ module Preprocessor =
                 | PropertyGet(Some _, pi, _) -> return Expr.PropertyGet(arr, pi, [index])
                 | _ -> return failwithf "[FShade] Unexpected array get: %A" e
 
-            // Handle direct field writes to storage buffer elements: buffer[i].field <- value
-            | PropertySet(Some (GetArray(StorageBuffer u, index)), prop, [], value) ->
-                let! index = preprocessNormalS index
-                let! value = preprocessNormalS value
+            // Track writes to storage buffer fields without transforming
+            | PropertySet(Some (GetArray(StorageBuffer u, _)), _, _, _)
+            | PropertySet(Some (PropertyGet(Some (GetArray(StorageBuffer u, _)), _, _)), _, _, _) | PropertySet(Some (FieldGet(Some (GetArray(StorageBuffer u, _)), _)), _, _, _) ->
                 do! u |> State.readUniform true
                 do! State.addStorageAccess u.uniformName StorageAccess.Write
-                let arr = Expr.ReadInput(ParameterKind.Uniform, u.uniformType, u.uniformName)
-                match u.uniformType with
-                | ArrayOf elemType ->
-                    let arrElem = Expr.PropertyGet(arr, u.uniformType.GetProperty("Item"), [index])
-                    return Expr.PropertySet(arrElem, prop, value, [])
-                | _ ->
-                    return failwithf "[FShade] Unexpected storage buffer type: %A" u.uniformType
+                return! Preprocessor.rebuild e
 
-            // Handle nested field writes: buffer[i].struct.field <- value
-            | PropertySet(Some (PropertyGet(Some (GetArray(StorageBuffer u, index)), innerProp, [])), prop, [], value) ->
-                let! index = preprocessNormalS index
-                let! value = preprocessNormalS value
-                do! u |> State.readUniform true
-                do! State.addStorageAccess u.uniformName StorageAccess.Write
-                let arr = Expr.ReadInput(ParameterKind.Uniform, u.uniformType, u.uniformName)
-                match u.uniformType with
-                | ArrayOf elemType ->
-                    let arrElem = Expr.PropertyGet(arr, u.uniformType.GetProperty("Item"), [index])
-                    let innerAccess = Expr.PropertyGet(arrElem, innerProp, [])
-                    return Expr.PropertySet(innerAccess, prop, value, [])
-                | _ ->
-                    return failwithf "[FShade] Unexpected storage buffer type: %A" u.uniformType
-
-            // Handle direct field reads from storage buffer elements: buffer[i].field
-            | PropertyGet(Some (GetArray(StorageBuffer u, index)), prop, []) ->
-                let! index = preprocessNormalS index
+            // Track reads from storage buffer fields without transforming
+            | PropertyGet(Some (GetArray(StorageBuffer u, _)), _, _)
+            | PropertyGet(Some (PropertyGet(Some (GetArray(StorageBuffer u, _)), _, _)), _, _)
+            | PropertyGet(Some (FieldGet(Some (GetArray(StorageBuffer u, _)), _)), _, _)
+            | FieldGet(Some (GetArray(StorageBuffer u, _)), _)
+            | FieldGet(Some (PropertyGet(Some (GetArray(StorageBuffer u, _)), _, _)), _)
+            | FieldGet(Some (FieldGet(Some (GetArray(StorageBuffer u, _)), _)), _) ->
                 do! u |> State.readUniform true
                 do! State.addStorageAccess u.uniformName StorageAccess.Read
-                let arr = Expr.ReadInput(ParameterKind.Uniform, u.uniformType, u.uniformName)
-                match u.uniformType with
-                | ArrayOf elemType ->
-                    let arrElem = Expr.PropertyGet(arr, u.uniformType.GetProperty("Item"), [index])
-                    return Expr.PropertyGet(arrElem, prop, [])
-                | _ ->
-                    return failwithf "[FShade] Unexpected storage buffer type: %A" u.uniformType
-
-            // Handle nested field reads: buffer[i].struct.field
-            | PropertyGet(Some (PropertyGet(Some (GetArray(StorageBuffer u, index)), innerProp, [])), prop, []) ->
-                let! index = preprocessNormalS index
-                do! u |> State.readUniform true
-                do! State.addStorageAccess u.uniformName StorageAccess.Read
-                let arr = Expr.ReadInput(ParameterKind.Uniform, u.uniformType, u.uniformName)
-                match u.uniformType with
-                | ArrayOf elemType ->
-                    let arrElem = Expr.PropertyGet(arr, u.uniformType.GetProperty("Item"), [index])
-                    let innerAccess = Expr.PropertyGet(arrElem, innerProp, [])
-                    return Expr.PropertyGet(innerAccess, prop, [])
-                | _ ->
-                    return failwithf "[FShade] Unexpected storage buffer type: %A" u.uniformType
+                return! Preprocessor.rebuild e
 
             // GLSL abs() is only defined for float and double.
             // Using the float overload for int32 and int64 could potentially lead to wrong results.
