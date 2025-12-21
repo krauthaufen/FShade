@@ -1926,32 +1926,45 @@ module Preprocessor =
                 | PropertyGet(Some _, pi, _) -> return Expr.PropertyGet(arr, pi, [index])
                 | _ -> return failwithf "[FShade] Unexpected array get: %A" e
 
-            // Track writes to storage buffer fields without transforming
-            | PropertySet(Some (GetArray(StorageBuffer u, _)), _, _, _)
-            | PropertySet(Some (PropertyGet(Some (GetArray(StorageBuffer u, _)), _, _)), _, _, _)
-            | PropertySet(Some (FieldGet(Some (GetArray(StorageBuffer u, _)), _)), _, _, _) ->
+            // Handle: buffer[i].nested.field <- value (deeper nesting, must come before single-level)
+            | PropertySet(Some (PropertyGet(Some (GetArray(StorageBuffer u, index)), nestedProp, [])), prop, [], value) ->
+                let! value = preprocessNormalS value
+                let! index = preprocessNormalS index
+                let arr = Expr.ReadInput(ParameterKind.Uniform, u.uniformType, u.uniformName)
+
                 do! u |> State.readUniform true
                 do! State.addStorageAccess u.uniformName StorageAccess.Write
-                match e with
-                | ShapeCombination(o, args) ->
-                    let! args = args |> List.mapS preprocessNormalS
-                    return RebuildShapeCombination(o, args)
-                | _ -> return e
 
-            // Track reads from storage buffer fields without transforming
-            | PropertyGet(Some (GetArray(StorageBuffer u, _)), _, _)
-            | PropertyGet(Some (PropertyGet(Some (GetArray(StorageBuffer u, _)), _, _)), _, _)
-            | PropertyGet(Some (FieldGet(Some (GetArray(StorageBuffer u, _)), _)), _, _)
-            | FieldGet(Some (GetArray(StorageBuffer u, _)), _)
-            | FieldGet(Some (PropertyGet(Some (GetArray(StorageBuffer u, _)), _, _)), _)
-            | FieldGet(Some (FieldGet(Some (GetArray(StorageBuffer u, _)), _)), _) ->
-                do! u |> State.readUniform true
-                do! State.addStorageAccess u.uniformName StorageAccess.Read
                 match e with
-                | ShapeCombination(o, args) ->
-                    let! args = args |> List.mapS preprocessNormalS
-                    return RebuildShapeCombination(o, args)
-                | _ -> return e
+                | PropertySet(Some (PropertyGet(Some (PropertyGet(Some _, itemProp, _)), _, _)), fieldProp, _, _) ->
+                    let arrElement = Expr.PropertyGet(arr, itemProp, [index])
+                    let nestedElement = Expr.PropertyGet(arrElement, nestedProp, [])
+                    return Expr.PropertySet(nestedElement, fieldProp, value, [])
+                | PropertySet(Some (PropertyGet(Some (Call(None, mi, _)), _, _)), fieldProp, _, _) ->
+                    let arrElement = Expr.Call(mi, [arr; index])
+                    let nestedElement = Expr.PropertyGet(arrElement, nestedProp, [])
+                    return Expr.PropertySet(nestedElement, fieldProp, value, [])
+                | _ ->
+                    return failwithf "[FShade] Unexpected storage buffer nested field set: %A" e
+
+            // Handle: buffer[i].field <- value
+            | PropertySet(Some (GetArray(StorageBuffer u, index)), prop, [], value) ->
+                let! value = preprocessNormalS value
+                let! index = preprocessNormalS index
+                let arr = Expr.ReadInput(ParameterKind.Uniform, u.uniformType, u.uniformName)
+
+                do! u |> State.readUniform true
+                do! State.addStorageAccess u.uniformName StorageAccess.Write
+
+                match e with
+                | PropertySet(Some (PropertyGet(Some _, itemProp, _)), fieldProp, _, _) ->
+                    let arrElement = Expr.PropertyGet(arr, itemProp, [index])
+                    return Expr.PropertySet(arrElement, fieldProp, value, [])
+                | PropertySet(Some (Call(None, mi, _)), fieldProp, _, _) ->
+                    let arrElement = Expr.Call(mi, [arr; index])
+                    return Expr.PropertySet(arrElement, fieldProp, value, [])
+                | _ ->
+                    return failwithf "[FShade] Unexpected storage buffer field set: %A" e
 
             // GLSL abs() is only defined for float and double.
             // Using the float overload for int32 and int64 could potentially lead to wrong results.
