@@ -1732,6 +1732,15 @@ module Preprocessor =
                 return RebuildShapeCombination(o, args)
         }
 
+    // Helper to recursively find ValueWithName pattern in expression
+    let rec findValueWithName (e : Expr) : option<obj * Type * string> =
+        match e with
+        | ValueWithName(v, t, name) -> Some(v, t, name)
+        | GetArray(target, _) -> findValueWithName target
+        | PropertyGet(Some target, _, _) -> findValueWithName target
+        | FieldGet(Some target, _) -> findValueWithName target
+        | _ -> None
+
     let rec preprocessComputeS (e : Expr) : Preprocess<Expr> =
         state {
             match e with
@@ -1758,9 +1767,64 @@ module Preprocessor =
                         return Expr.RefOf(Expr.ReadInput(ParameterKind.Input, t, name, i))
                     | _ ->
                         return e
-                
+
+                // Special case: array Length property (metadata access, not buffer access)
                 | PropertyGet(Some (ValueWithName(v, t, name)), prop, []) when t.IsArray && (prop.Name = "Length" || prop.Name = "LongLength") ->
                     return Expr.ReadInput(ParameterKind.Uniform, typeof<int>, "cs_" + name + "_length")
+
+                // Handle PropertySet on storage buffer fields (e.g., buffer[i].field <- value)
+                | PropertySet(Some target, prop, indices, value) ->
+                    match findValueWithName target with
+                    | Some(_, _, name) ->
+                        do! State.addStorageAccess name StorageAccess.Write
+                        let! target = preprocessComputeS target
+                        let! value = preprocessComputeS value
+                        let! indices = indices |> List.mapS preprocessComputeS
+                        return Expr.PropertySet(target, prop, value, indices)
+                    | None ->
+                        let! target = target |> Option.mapS preprocessComputeS
+                        let! value = preprocessComputeS value
+                        let! indices = indices |> List.mapS preprocessComputeS
+                        match target with
+                        | Some t -> return Expr.PropertySet(t, prop, value, indices)
+                        | None -> return Expr.PropertySet(prop, value, indices)
+
+                // Handle FieldSet on storage buffer fields (e.g., buffer[i].field <- value)
+                | FieldSet(Some target, field, value) ->
+                    match findValueWithName target with
+                    | Some(_, _, name) ->
+                        do! State.addStorageAccess name StorageAccess.Write
+                        let! target = preprocessComputeS target
+                        let! value = preprocessComputeS value
+                        return Expr.FieldSet(target, field, value)
+                    | None ->
+                        let! target = preprocessComputeS target
+                        let! value = preprocessComputeS value
+                        return Expr.FieldSet(target, field, value)
+
+                // Handle PropertyGet on storage buffer fields (e.g., buffer[i].field)
+                | PropertyGet(Some target, prop, indices) ->
+                    match findValueWithName target with
+                    | Some(_, _, name) ->
+                        do! State.addStorageAccess name StorageAccess.Read
+                        let! target = preprocessComputeS target
+                        let! indices = indices |> List.mapS preprocessComputeS
+                        return Expr.PropertyGet(target, prop, indices)
+                    | None ->
+                        let! target = preprocessComputeS target
+                        let! indices = indices |> List.mapS preprocessComputeS
+                        return Expr.PropertyGet(target, prop, indices)
+
+                // Handle FieldGet on storage buffer fields (e.g., buffer[i].field)
+                | FieldGet(Some target, field) ->
+                    match findValueWithName target with
+                    | Some(_, _, name) ->
+                        do! State.addStorageAccess name StorageAccess.Read
+                        let! target = preprocessComputeS target
+                        return Expr.FieldGet(target, field)
+                    | None ->
+                        let! target = preprocessComputeS target
+                        return Expr.FieldGet(target, field)
 
                 | ValueWithName(v,t,name) ->
                     return Expr.ReadInput(ParameterKind.Uniform, t, "cs_" + name)
@@ -1839,6 +1903,15 @@ module Preprocessor =
 
         }
 
+    // Helper to recursively find StorageBuffer pattern in expression
+    let rec findStorageBuffer (e : Expr) : option<UniformParameter> =
+        match e with
+        | StorageBuffer u -> Some u
+        | GetArray(target, _) -> findStorageBuffer target
+        | PropertyGet(Some target, _, _) -> findStorageBuffer target
+        | FieldGet(Some target, _) -> findStorageBuffer target
+        | _ -> None
+
     let rec preprocessNormalS (e : Expr) : Preprocess<Expr> =
         state {
             let! vertexType = State.vertexType
@@ -1854,7 +1927,7 @@ module Preprocessor =
                     | Call(None, mi, _) -> Expr.Call(mi, [arr; index])
                     | PropertyGet(Some _, pi, _) -> Expr.PropertyGet(arr, pi, [index])
                     | _ -> failwithf "[FShade] Unexpected array get: %A" e
-                
+
                 return Expr.RefOf(access)
 
             | SetArray(StorageBuffer u, index, value) ->
@@ -1881,6 +1954,64 @@ module Preprocessor =
                 | Call(None, mi, _) -> return Expr.Call(mi, [arr; index])
                 | PropertyGet(Some _, pi, _) -> return Expr.PropertyGet(arr, pi, [index])
                 | _ -> return failwithf "[FShade] Unexpected array get: %A" e
+
+            // Handle PropertySet on storage buffer fields (e.g., buffer[i].field <- value)
+            | PropertySet(Some target, prop, indices, value) ->
+                match findStorageBuffer target with
+                | Some u ->
+                    do! u |> State.readUniform true
+                    do! State.addStorageAccess u.uniformName StorageAccess.Write
+                    let! target = preprocessNormalS target
+                    let! value = preprocessNormalS value
+                    let! indices = indices |> List.mapS preprocessNormalS
+                    return Expr.PropertySet(target, prop, value, indices)
+                | None ->
+                    let! target = target |> Option.mapS preprocessNormalS
+                    let! value = preprocessNormalS value
+                    let! indices = indices |> List.mapS preprocessNormalS
+                    match target with
+                    | Some t -> return Expr.PropertySet(t, prop, value, indices)
+                    | None -> return Expr.PropertySet(prop, value, indices)
+
+            // Handle FieldSet on storage buffer fields (e.g., buffer[i].field <- value)
+            | FieldSet(Some target, field, value) ->
+                match findStorageBuffer target with
+                | Some u ->
+                    do! u |> State.readUniform true
+                    do! State.addStorageAccess u.uniformName StorageAccess.Write
+                    let! target = preprocessNormalS target
+                    let! value = preprocessNormalS value
+                    return Expr.FieldSet(target, field, value)
+                | None ->
+                    let! target = preprocessNormalS target
+                    let! value = preprocessNormalS value
+                    return Expr.FieldSet(target, field, value)
+
+            // Handle PropertyGet on storage buffer fields (e.g., buffer[i].field)
+            | PropertyGet(Some target, prop, indices) ->
+                match findStorageBuffer target with
+                | Some u ->
+                    do! u |> State.readUniform true
+                    do! State.addStorageAccess u.uniformName StorageAccess.Read
+                    let! target = preprocessNormalS target
+                    let! indices = indices |> List.mapS preprocessNormalS
+                    return Expr.PropertyGet(target, prop, indices)
+                | None ->
+                    let! target = preprocessNormalS target
+                    let! indices = indices |> List.mapS preprocessNormalS
+                    return Expr.PropertyGet(target, prop, indices)
+
+            // Handle FieldGet on storage buffer fields (e.g., buffer[i].field)
+            | FieldGet(Some target, field) ->
+                match findStorageBuffer target with
+                | Some u ->
+                    do! u |> State.readUniform true
+                    do! State.addStorageAccess u.uniformName StorageAccess.Read
+                    let! target = preprocessNormalS target
+                    return Expr.FieldGet(target, field)
+                | None ->
+                    let! target = preprocessNormalS target
+                    return Expr.FieldGet(target, field)
 
             // GLSL abs() is only defined for float and double.
             // Using the float overload for int32 and int64 could potentially lead to wrong results.
