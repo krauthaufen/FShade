@@ -1777,7 +1777,11 @@ module Preprocessor =
                 | PropertySet(Some (PropertyGet(Some (GetArray(ValueWithName(_, _, name), _)), _, _)), _, _, _)
                 | PropertySet(Some (FieldGet(Some (GetArray(ValueWithName(_, _, name), _)), _)), _, _, _) ->
                     do! State.addStorageAccess name StorageAccess.Write
-                    return! Preprocessor.rebuild e
+                    match e with
+                    | ShapeCombination(o, args) ->
+                        let! args = args |> List.mapS preprocessComputeS
+                        return RebuildShapeCombination(o, args)
+                    | _ -> return e
 
                 // Track reads from storage buffer fields without transforming
                 | PropertyGet(Some (GetArray(ValueWithName(_, _, name), _)), _, _)
@@ -1787,7 +1791,11 @@ module Preprocessor =
                 | FieldGet(Some (PropertyGet(Some (GetArray(ValueWithName(_, _, name), _)), _, _)), _)
                 | FieldGet(Some (FieldGet(Some (GetArray(ValueWithName(_, _, name), _)), _)), _) ->
                     do! State.addStorageAccess name StorageAccess.Read
-                    return! Preprocessor.rebuild e
+                    match e with
+                    | ShapeCombination(o, args) ->
+                        let! args = args |> List.mapS preprocessComputeS
+                        return RebuildShapeCombination(o, args)
+                    | _ -> return e
 
                 | ValueWithName(v,t,name) ->
                     return Expr.ReadInput(ParameterKind.Uniform, t, "cs_" + name)
@@ -1920,10 +1928,15 @@ module Preprocessor =
 
             // Track writes to storage buffer fields without transforming
             | PropertySet(Some (GetArray(StorageBuffer u, _)), _, _, _)
-            | PropertySet(Some (PropertyGet(Some (GetArray(StorageBuffer u, _)), _, _)), _, _, _) | PropertySet(Some (FieldGet(Some (GetArray(StorageBuffer u, _)), _)), _, _, _) ->
+            | PropertySet(Some (PropertyGet(Some (GetArray(StorageBuffer u, _)), _, _)), _, _, _)
+            | PropertySet(Some (FieldGet(Some (GetArray(StorageBuffer u, _)), _)), _, _, _) ->
                 do! u |> State.readUniform true
                 do! State.addStorageAccess u.uniformName StorageAccess.Write
-                return! Preprocessor.rebuild e
+                match e with
+                | ShapeCombination(o, args) ->
+                    let! args = args |> List.mapS preprocessNormalS
+                    return RebuildShapeCombination(o, args)
+                | _ -> return e
 
             // Track reads from storage buffer fields without transforming
             | PropertyGet(Some (GetArray(StorageBuffer u, _)), _, _)
@@ -1934,7 +1947,11 @@ module Preprocessor =
             | FieldGet(Some (FieldGet(Some (GetArray(StorageBuffer u, _)), _)), _) ->
                 do! u |> State.readUniform true
                 do! State.addStorageAccess u.uniformName StorageAccess.Read
-                return! Preprocessor.rebuild e
+                match e with
+                | ShapeCombination(o, args) ->
+                    let! args = args |> List.mapS preprocessNormalS
+                    return RebuildShapeCombination(o, args)
+                | _ -> return e
 
             // GLSL abs() is only defined for float and double.
             // Using the float overload for int32 and int64 could potentially lead to wrong results.
