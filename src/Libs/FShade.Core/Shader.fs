@@ -1926,27 +1926,6 @@ module Preprocessor =
                 | PropertyGet(Some _, pi, _) -> return Expr.PropertyGet(arr, pi, [index])
                 | _ -> return failwithf "[FShade] Unexpected array get: %A" e
 
-            // Handle: buffer[i].nested.field <- value (deeper nesting, must come before single-level)
-            | PropertySet(Some (PropertyGet(Some (GetArray(StorageBuffer u, index)), nestedProp, [])), prop, [], value) ->
-                let! value = preprocessNormalS value
-                let! index = preprocessNormalS index
-                let arr = Expr.ReadInput(ParameterKind.Uniform, u.uniformType, u.uniformName)
-
-                do! u |> State.readUniform true
-                do! State.addStorageAccess u.uniformName StorageAccess.Write
-
-                match e with
-                | PropertySet(Some (PropertyGet(Some (PropertyGet(Some _, itemProp, _)), _, _)), fieldProp, _, _) ->
-                    let arrElement = Expr.PropertyGet(arr, itemProp, [index])
-                    let nestedElement = Expr.PropertyGet(arrElement, nestedProp, [])
-                    return Expr.PropertySet(nestedElement, fieldProp, value, [])
-                | PropertySet(Some (PropertyGet(Some (Call(None, mi, _)), _, _)), fieldProp, _, _) ->
-                    let arrElement = Expr.Call(mi, [arr; index])
-                    let nestedElement = Expr.PropertyGet(arrElement, nestedProp, [])
-                    return Expr.PropertySet(nestedElement, fieldProp, value, [])
-                | _ ->
-                    return failwithf "[FShade] Unexpected storage buffer nested field set: %A" e
-
             // Handle: buffer[i].field <- value
             | PropertySet(Some (GetArray(StorageBuffer u, index)), prop, [], value) ->
                 let! value = preprocessNormalS value
