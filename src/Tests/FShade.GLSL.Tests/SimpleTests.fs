@@ -1329,3 +1329,33 @@ let ``Push constants``() =
         }
 
     GLSL.shouldCompileAndContainRegex' glslVulkan [ Effect.ofFunction fs ] [ "push_constant" ]
+    
+type Draw =
+    {
+        mutable FaceVertexCount : int
+        mutable InstanceCount : int
+    }
+    
+[<Test>]
+let ``Field Update in StorageBuffer CS``() =
+    Setup.Run()
+    
+    let cs (draws : Draw[]) =
+        compute {
+            draws.[0].FaceVertexCount <- 100
+        }
+
+    GLSL.shouldCompileComputeAndContainRegex (ComputeShader.ofFunction (V3i(1)) cs) []
+    
+[<Test>]
+let ``Field Update in StorageBuffer FS``() =
+    Setup.Run()
+    
+    let fs(v : Vertex)  =
+        fragment {
+            (uniform?StorageBuffer?Draws : Draw[]).[0].FaceVertexCount <- 100
+            return V4f.IIII
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction fs] []
+    

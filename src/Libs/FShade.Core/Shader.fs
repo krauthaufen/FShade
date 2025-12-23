@@ -1732,9 +1732,41 @@ module Preprocessor =
                 return RebuildShapeCombination(o, args)
         }
 
-    let rec preprocessComputeS (e : Expr) : Preprocess<Expr> =
+    [<return: Struct>]
+    let rec (|ComputeStorageBufferOrField|_|) (e : Expr) =
+        match e with
+        | GetArray(ValueWithName(v, t, name), index) ->
+            let rebuild (access : StorageAccess)  =
+                state {
+                    do! State.addStorageAccess name access
+                    let! index = preprocessComputeS index
+                    let arr = Expr.ReadInput(ParameterKind.Uniform, t, name, index)
+                    match e with
+                    | Call(None, mi, _) -> return Expr.Call(mi, [arr; index])
+                    | PropertyGet(Some _, pi, _) -> return Expr.PropertyGet(arr, pi, [index])
+                    | _ -> return failwithf "[FShade] Unexpected array get: %A" e
+                }
+                
+            ValueSome(name, rebuild)
+        | PropertyGet(Some (ComputeStorageBufferOrField(u, rebuild)), pi, []) ->
+            let rebuild (access : StorageAccess) =
+                state {
+                    let! target = rebuild access
+                    return Expr.PropertyGet(target, pi, [])
+                }
+            ValueSome (u, rebuild)
+        | _ ->
+            ValueNone
+    
+    
+    and preprocessComputeS (e : Expr) : Preprocess<Expr> =
         state {
             match e with
+                | PropertySet(Some (ComputeStorageBufferOrField(u, rebuild)), pi, [], value) ->
+                    let! target = rebuild StorageAccess.ReadWrite
+                    let! value = preprocessComputeS value
+                    return Expr.PropertySet(target, pi, value)
+                    
                 | GetArray(ValueWithName(v, t, name), i) ->
                     let! i = preprocessComputeS i
                     do! State.addStorageAccess name StorageAccess.Read
@@ -1839,11 +1871,44 @@ module Preprocessor =
 
         }
 
-    let rec preprocessNormalS (e : Expr) : Preprocess<Expr> =
+    
+    [<return: Struct>]
+    let rec (|StorageBufferOrField|_|) (e : Expr) =
+        match e with
+        | GetArray(StorageBuffer u, index) ->
+            let rebuild (access : StorageAccess)  =
+                state {
+                    let! index = preprocessNormalS index
+                    do! u |> State.readUniform true
+                    do! State.addStorageAccess u.uniformName access
+                    let arr = Expr.ReadInput(ParameterKind.Uniform, u.uniformType, u.uniformName)
+                    match e with
+                    | Call(None, mi, _) -> return Expr.Call(mi, [arr; index])
+                    | PropertyGet(Some _, pi, _) -> return Expr.PropertyGet(arr, pi, [index])
+                    | _ -> return failwithf "[FShade] Unexpected array get: %A" e
+                }
+                
+            ValueSome(u, rebuild)
+        | PropertyGet(Some (StorageBufferOrField(u, rebuild)), pi, []) ->
+            let rebuild (access : StorageAccess) =
+                state {
+                    let! target = rebuild access
+                    return Expr.PropertyGet(target, pi, [])
+                }
+            ValueSome (u, rebuild)
+        | _ ->
+            ValueNone
+    
+    and preprocessNormalS (e : Expr) : Preprocess<Expr> =
         state {
             let! vertexType = State.vertexType
 
             match e with
+            | PropertySet(Some (StorageBufferOrField(u, rebuild)), pi, [], value) ->
+                let! value = preprocessNormalS value
+                let! target = rebuild StorageAccess.Write
+                return Expr.PropertySet(target, pi, value, [])
+            
             | RefOf (GetArray(StorageBuffer u, index) as e) ->
                 let! index = preprocessNormalS index
                 do! u |> State.readUniform true
@@ -1882,6 +1947,19 @@ module Preprocessor =
                 | PropertyGet(Some _, pi, _) -> return Expr.PropertyGet(arr, pi, [index])
                 | _ -> return failwithf "[FShade] Unexpected array get: %A" e
 
+            | PropertySet(Some (GetArray(StorageBuffer u, index) as e), pi, [], value) ->
+                let! index = preprocessNormalS index
+                let arr = Expr.ReadInput(ParameterKind.Uniform, u.uniformType, u.uniformName)
+                let! value = preprocessNormalS value
+                
+                do! u |> State.readUniform true
+                do! State.addStorageAccess u.uniformName StorageAccess.Write
+
+                match e with
+                | Call(None, mi, _) -> return Expr.PropertySet(Expr.Call(mi, [arr; index]), pi, value)
+                | PropertyGet(Some _, pi, _) -> return Expr.PropertySet(Expr.PropertyGet(arr, pi, [index]), pi, value)
+                | _ -> return failwithf "[FShade] Unexpected array get: %A" e
+            
             // GLSL abs() is only defined for float and double.
             // Using the float overload for int32 and int64 could potentially lead to wrong results.
             // Here we emulate the abs() function with if-else expressions.
