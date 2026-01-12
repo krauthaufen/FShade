@@ -1237,10 +1237,15 @@ let ``Enum with non-int32 underlying type``() =
 
     let fs (v : Vertex) =
         fragment {
-            return V2ui(uint32 v.myenum, uint32 MyEnum.A)
+            if v.myenum.HasFlag (v.myenum ^^^ MyEnum.B) then
+                return V2ui(uint32 v.myenum, uint32 MyEnum.A)
+            else
+                return V2ui.Zero
         }
 
-    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction fs ] [ Regex.Escape "uint(fs_myenum)"; "1234u" ]
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction fs ] [
+        Regex.Escape "uint(fs_myenum)"; "1234u"; Regex.Escape "(fs_myenum & tmp) == tmp)"
+    ]
 
 type UniformScope with
     member x.SomeVector : V3f = x?Foo?Bar?MyVector

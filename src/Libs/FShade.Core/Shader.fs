@@ -920,6 +920,15 @@ module Preprocessor =
             | _ ->
                 ValueNone
 
+        [<return: Struct>]
+        let (|HasFlag|_|) (e : Expr) =
+            match e with
+            | Call(Some this, (Method("HasFlag", _) as mi), [Coerce(value, _)]) when mi.DeclaringType = typeof<Enum> ->
+                ValueSome (this, value)
+
+            | _ ->
+                ValueNone
+
     // Used to determine which preprocess function to call
     [<RequireQualifiedAccess>]
     type ShaderExpressionType =
@@ -1259,7 +1268,9 @@ module Preprocessor =
         let op_multiply    = getMethodInfo <@ (*) : float -> float -> float @>
         let op_division    = getMethodInfo <@ (/) : float -> float -> float @>
         let op_logicalAnd  = getMethodInfo <@ (&&) : bool -> bool -> bool @>
+        let op_bitwiseAnd  = getMethodInfo <@ (&&&) : int -> int -> int @>
         let op_logicalOr   = getMethodInfo <@ (||) : bool -> bool -> bool @>
+        let op_equals      = getMethodInfo <@ (=) : float -> float -> bool @>
         let op_lessThan    = getMethodInfo <@ (<) : float -> float -> bool @>
         let op_greaterThan = getMethodInfo <@ (>) : float -> float -> bool @>
         let op_negation    = getMethodInfo <@ (~-) : int -> int @>
@@ -1361,8 +1372,16 @@ module Preprocessor =
             static member And(a : Expr, b : Expr) =
                 Expr.Call(MethodInfo.op_logicalAnd, [a; b])
 
+            static member BitwiseAnd(a : Expr, b : Expr) =
+                let mi = MethodInfo.op_bitwiseAnd.MakeGenericMethod(a.Type)
+                Expr.Call(mi, [a; b])
+
             static member Or(a : Expr, b : Expr) =
                 Expr.Call(MethodInfo.op_logicalOr, [a; b])
+
+            static member Equals(a : Expr, b : Expr) =
+                let mi = MethodInfo.op_equals.MakeGenericMethod(a.Type)
+                Expr.Call(mi, [a; b])
 
             static member LessThan(a : Expr, b : Expr) =
                 let mi = MethodInfo.op_lessThan.MakeGenericMethod(a.Type)
@@ -1940,7 +1959,18 @@ module Preprocessor =
                         let types = args |> List.toArray |> Array.map _.Type
                         color.Type.GetConstructor types
 
-                    Expr.Let(tmp, color,Expr.NewObject(ci, args))
+                    Expr.Let(tmp, color, Expr.NewObject(ci, args))
+
+                return! preprocessNormalS expr
+
+            | HasFlag(this, value) ->
+                let tmp = Var("tmp", this.Type)
+
+                let expr =
+                    Expr.Let(
+                        tmp, value,
+                        Expr.Equals(Expr.BitwiseAnd(this, Expr.Var tmp), Expr.Var tmp)
+                    )
 
                 return! preprocessNormalS expr
 

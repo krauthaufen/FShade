@@ -1,3 +1,5 @@
+- Added support for Enum.HasFlag
+
 ### 5.7.0
 - Removed double as float feature
 - Added basic support for 8-bit, 16-bit, and 64-bit data types
