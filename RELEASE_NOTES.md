@@ -1,4 +1,5 @@
 - Added support for Enum.HasFlag
+- Added support for LanguagePrimitives.EnumToValue, LanguagePrimitives.EnumOfValue, and enum
 
 ### 5.7.0
 - Removed double as float feature

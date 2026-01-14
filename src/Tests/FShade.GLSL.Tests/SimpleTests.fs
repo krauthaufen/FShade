@@ -8,9 +8,13 @@ open NUnit.Framework
 open FsUnit
 open FShade.Tests
 
-type MyEnum =
+type Enum16ui =
     | A = 1234us
     | B = 4321us
+
+type Enum32i =
+    | C = 43
+    | D = -22
 
 type Vertex =
     {
@@ -23,7 +27,8 @@ type Vertex =
         [<Semantic("Id")>] id : int
         [<PrimitiveId>] primId : int
         [<Semantic("uid")>] uid : uint
-        myenum : MyEnum
+        enum16ui : Enum16ui
+        enum32i  : Enum32i
     }
 
 type F32Vertex =
@@ -37,6 +42,8 @@ type IntVertex =
         [<Color>] c : int
     }
 
+[<ReflectedDefinition>]
+let assertT<'T> (v : 'T) = v
 
 [<Test>]
 let ``Reserved Names``() =
@@ -1237,15 +1244,36 @@ let ``Enum with non-int32 underlying type``() =
 
     let fs (v : Vertex) =
         fragment {
-            if v.myenum.HasFlag (v.myenum ^^^ MyEnum.B) then
-                return V2ui(uint32 v.myenum, uint32 MyEnum.A)
+            if v.enum16ui.HasFlag (v.enum16ui ^^^ Enum16ui.B) then
+                return V2ui(uint32 v.enum16ui, uint32 Enum16ui.A)
             else
                 return V2ui.Zero
         }
 
     GLSL.shouldCompileAndContainRegex [ Effect.ofFunction fs ] [
-        Regex.Escape "uint(fs_myenum)"; "1234u"; Regex.Escape "(fs_myenum & tmp) == tmp)"
+        Regex.Escape "uint(fs_enum16ui)"; "1234u"; Regex.Escape "(fs_enum16ui & tmp) == tmp)"
     ]
+
+[<Test>]
+let ``Enum integer conversions``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            let _ = assertT <| uint32 v.enum32i
+            let _ = assertT <| uint32 Enum16ui.B
+
+            let _ = assertT <| LanguagePrimitives.EnumToValue v.enum32i
+            let _ : Enum32i = assertT <| LanguagePrimitives.EnumOfValue v.id
+            let _ = assertT <| enum<Enum32i> v.id
+
+            let _ = assertT <| LanguagePrimitives.EnumToValue v.enum16ui
+            let _ : Enum16ui = assertT <| LanguagePrimitives.EnumOfValue (uint16 v.id)
+
+            return 0
+        }
+
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction fs ] [ Regex.Escape "(4321u)" ]
 
 type UniformScope with
     member x.SomeVector : V3f = x?Foo?Bar?MyVector

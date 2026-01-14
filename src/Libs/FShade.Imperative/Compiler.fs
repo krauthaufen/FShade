@@ -1687,6 +1687,11 @@ module Compiler =
 
                     return CDebugPrintf(fmt, values)
 
+                | Call(None, MethodQuote <@ enum : int -> ShaderStage @> _, [value])
+                | Call(None, MethodQuote <@ LanguagePrimitives.EnumOfValue : int -> ShaderStage @> _, [value])
+                | Call(None, MethodQuote <@ LanguagePrimitives.EnumToValue : ShaderStage -> int @> _, [value]) ->
+                    return! toCExprS value
+
                 | Call(None, mi, t :: args) | Call(Some t, mi, args) ->
                     let args = t :: args
                     let! args = args |> List.mapS toCExprS
