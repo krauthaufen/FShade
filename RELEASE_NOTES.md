@@ -1,3 +1,4 @@
+### 5.7.1
 - Added support for Enum.HasFlag
 - Added support for LanguagePrimitives.EnumToValue, LanguagePrimitives.EnumOfValue, and enum
 
