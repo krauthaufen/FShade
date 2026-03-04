@@ -64,9 +64,6 @@ module DynamicHostInvocation =
             invalid.Push false
             let result = f()
 
-            if invalid.Count > 1 then
-                Log.warn "[FShade] Stack for invalid host invocations has %d values (should be 1)" invalid.Count
-
             if invalid.Pop() then None
             else Some result
 
