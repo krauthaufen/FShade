@@ -1278,7 +1278,6 @@ module Preprocessor =
         let not = getMethodInfo <@ not : bool -> bool @>
         let defaultOf = getMethodInfo <@ Unchecked.defaultof<int> @>
         let zero = getMethodInfo <@ LanguagePrimitives.GenericZero : int @>
-        let one = getMethodInfo <@ LanguagePrimitives.GenericOne : int @>
 
         let round = getMethodInfo <@ round : float -> float @>
 
@@ -1400,10 +1399,6 @@ module Preprocessor =
 
             static member Zero(t : Type) =
                 let mi = MethodInfo.zero.MakeGenericMethod t
-                Expr.Call(mi, [])
-
-            static member One(t : Type) =
-                let mi = MethodInfo.one.MakeGenericMethod t
                 Expr.Call(mi, [])
 
             static member Round(e : Expr) =

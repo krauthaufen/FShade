@@ -1628,14 +1628,45 @@ module Optimizer =
                         let! step = evaluateConstantsS step
                         let! last = evaluateConstantsS last
 
+                        let unroll (values: 'T list) =
+                            values |> List.mapS (fun i ->
+                                let value = Expr.Value(i, typeof<'T>)
+                                let body = body.Substitute(fun vi -> if vi = v then Some value else None)
+                                evaluateConstantsS body
+                            )
+
+                        // Could not think of a generic way, but this should cover most use cases anyway.
                         match first, step, last with
+                        | SByte f, SByte s, SByte l ->
+                            let! unrolled = unroll [f .. s .. l]
+                            return Expr.Seq unrolled
+
+                        | Byte f, Byte s, Byte l ->
+                            let! unrolled = unroll [f .. s .. l]
+                            return Expr.Seq unrolled
+
+                        | Int16 f, Int16 s, Int16 l ->
+                            let! unrolled = unroll [f .. s .. l]
+                            return Expr.Seq unrolled
+
+                        | UInt16 f, UInt16 s, UInt16 l ->
+                            let! unrolled = unroll [f .. s .. l]
+                            return Expr.Seq unrolled
+
                         | Int32 f, Int32 s, Int32 l ->
-                            let! unrolled =
-                                [f .. s .. l] |> List.mapS (fun i ->
-                                    let value = Expr.Value(i)
-                                    let body = body.Substitute(fun vi -> if vi = v then Some value else None)
-                                    evaluateConstantsS body
-                                )
+                            let! unrolled = unroll [f .. s .. l]
+                            return Expr.Seq unrolled
+
+                        | UInt32 f, UInt32 s, UInt32 l ->
+                            let! unrolled = unroll [f .. s .. l]
+                            return Expr.Seq unrolled
+
+                        | Single f, Single s, Single l ->
+                            let! unrolled = unroll [f .. s .. l]
+                            return Expr.Seq unrolled
+
+                        | Double f, Double s, Double l ->
+                            let! unrolled = unroll [f .. s .. l]
                             return Expr.Seq unrolled
 
                         | _ ->

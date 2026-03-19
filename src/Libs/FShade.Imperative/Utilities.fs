@@ -508,6 +508,7 @@ module ExprExtensions =
         let setArray = getMethodInfo <@ Microsoft.FSharp.Core.LanguagePrimitives.IntrinsicFunctions.SetArray @>
         let unboxGeneric = getArray.DeclaringType.GetMethod "UnboxGeneric"
 
+        let one = getMethodInfo <@ LanguagePrimitives.GenericOne : int @>
         let opRangeStep = operators.GetMethod("op_RangeStep")
         let ignore = getMethodInfo <@ ignore @>
 
@@ -666,18 +667,28 @@ module ExprExtensions =
                 )
             )
 
-        static member ForInteger(v : Var, first : Expr, step : Expr, last : Expr, body : Expr) =
-            match step with
-                | Value((:? int as i), _) when i = 1 -> 
-                    Expr.ForIntegerRangeLoop(v, first, last, body)
+        static member One(t : Type) =
+            let mi = Methods.one.MakeGenericMethod t
+            Expr.Call(mi, [])
 
-                | _ ->
-                    let seq = Expr.Call(Methods.opRangeStep.MakeGenericMethod [| first.Type; step.Type |], [first;step;last])
-                    let inputSequence = Var("inputSequence", seq.Type)
-                    Expr.Let(
-                        inputSequence, seq, 
-                        Expr.ForEach(v, Expr.Var inputSequence, body)
-                    )
+        static member ForInteger(v : Var, first : Expr, step : Expr, last : Expr, body : Expr) =
+            let step =
+                Expr.TryEval step
+                |> Option.map (fun value -> Expr.Value(value, step.Type))
+                |> Option.defaultValue step
+
+            match step with
+            | Value((:? int as i), _) when i = 1 ->
+                Expr.ForIntegerRangeLoop(v, first, last, body)
+
+            | _ ->
+                let seq = Expr.Call(Methods.opRangeStep.MakeGenericMethod [| first.Type; step.Type |], [first;step;last])
+                let inputSequence = Var("inputSequence", seq.Type)
+
+                Expr.Let(
+                    inputSequence, seq,
+                    Expr.ForEach(v, Expr.Var inputSequence, body)
+                )
 
         static member CompileWitness(e : Expr) =
             Witness.compile e
@@ -691,7 +702,7 @@ module ExprExtensions =
                 None
 
         /// tries to evaluate the supplied expression and returns its value on success
-        static member TryEval(e : Expr) =
+        static member TryEval(e : Expr) : obj option =
             match e with
             | Patterns.PropertyGet(t, p, args) ->
                 match t with
@@ -1106,7 +1117,7 @@ module ExprExtensions =
     let (|CreateRange|_|) (e : Expr) =
         match e with
         | Call(None, Method("op_RangeStep",_), [first; step; last]) -> ValueSome(first, step, last)
-        | Call(None, Method("op_Range",_), [first; last]) -> ValueSome(first, Expr.Value(1), last)
+        | Call(None, Method("op_Range",_), [first; last]) -> ValueSome(first, Expr.One(first.Type), last)
         | _ -> ValueNone
 
     [<return: Struct>]

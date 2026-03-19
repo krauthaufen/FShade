@@ -1942,38 +1942,40 @@ module Compiler =
 
                             let increment =
                                 match cstep with
-                                    | CValue(_, CIntegral 1L)   -> CIncrement(false, CLVar v)   // i++
-                                    | CValue(_, CIntegral -1L)  -> CDecrement(false, CLVar v)   // i--
-                                    | CNeg(_,step)              -> CWrite(CLVar v, CExpr.CSub(v.ctype, CVar v, cstep))   // i = i - <step>
-                                    | step                      -> CWrite(CLVar v, CExpr.CAdd(v.ctype, CVar v, cstep))   // i = i + <step>
+                                | CValue(_, (CIntegral 1L | CFractional 1.0))   -> CIncrement(false, CLVar v)   // i++
+                                | CValue(_, (CIntegral -1L | CFractional -1.0)) -> CDecrement(false, CLVar v)   // i--
+                                | CNeg _               -> CWrite(CLVar v, CExpr.CSub(v.ctype, CVar v, cstep))   // i = i - <step>
+                                | _                    -> CWrite(CLVar v, CExpr.CAdd(v.ctype, CVar v, cstep))   // i = i + <step>
 
                             let stepPositive =
                                 match cstep with
-                                    | CValue(_, CIntegral v) -> 
-                                        if v = 0L then failwithf "[FShade] infinite loop detected: %A" e
-                                        Some (v > 0L)
-                                    | _ ->
-                                        None
+                                | CValue(_, CIntegral v) ->
+                                    if v = 0L then failwithf "[FShade] infinite loop detected: %A" e
+                                    Some (v > 0L)
+                                | CValue(_, CFractional v) ->
+                                    if v = 0.0 then failwithf "[FShade] infinite loop detected: %A" e
+                                    Some (v > 0.0)
+                                | _ ->
+                                    None
 
                             let condition =
                                 match stepPositive with
-                                    | Some true ->
-                                        match clast with
-                                            // i <= last - 1 --> i < last
-                                            | CValue(ct, CIntegral value) -> CLess(CVar v, CValue(ct, CIntegral (value + 1L)))
-                                            | CSub(_, last, CValue(ct, CIntegral 1L)) -> CLess(CVar v, last)
-                                            | _ -> CLequal(CVar v, clast)
+                                | Some true ->
+                                    match clast with
+                                    // i <= last - 1 --> i < last
+                                    | CValue(ct, CIntegral value) -> CLess(CVar v, CValue(ct, CIntegral (value + 1L)))
+                                    | CSub(_, last, CValue(ct, CIntegral 1L)) -> CLess(CVar v, last)
+                                    | _ -> CLequal(CVar v, clast)
 
-                                    | Some false ->
-                                        match clast with
-                                            // i >= last + 1 --> i > last
-                                            | CAdd(_, last, CValue(ct, CIntegral 1L)) -> CGreater(CVar v, last)
-                                            | _ -> CGequal(CVar v, clast)
-                                
-                                    | None -> 
-                                        // i <> last
-                                        CNotEqual(CVar v, clast)
+                                | Some false ->
+                                    match clast with
+                                    // i >= last + 1 --> i > last
+                                    | CAdd(_, last, CValue(ct, CIntegral 1L)) -> CGreater(CVar v, last)
+                                    | _ -> CGequal(CVar v, clast)
 
+                                | None ->
+                                    // i <> last
+                                    CNotEqual(CVar v, clast)
 
                             return 
                                 CFor(
