@@ -1,3 +1,7 @@
+### 5.7.2
+- Removed warning related to `onlyInShaderCode`
+- Fixed non-int32 `for` loops
+
 ### 5.7.1
 - Added support for Enum.HasFlag
 - Added support for LanguagePrimitives.EnumToValue, LanguagePrimitives.EnumOfValue, and enum
