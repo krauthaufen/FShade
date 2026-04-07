@@ -1,3 +1,7 @@
+### 5.7.3
+- Fixed computation of required slots for 64-bit attributes
+- Added implicit `flat` interpolation for double-based attributes
+
 ### 5.7.2
 - Removed warning related to `onlyInShaderCode`
 - Fixed non-int32 `for` loops
