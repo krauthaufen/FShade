@@ -247,10 +247,13 @@ module Preprocessor =
         let rec (|FloatingPoint|_|) (t : Type) =
             match t with
             | TypeMeta.Patterns.Float32
+            | TypeMeta.Patterns.ColorOf(_, TypeMeta.Patterns.Float32)
+            | TypeMeta.Patterns.VectorOf(_, TypeMeta.Patterns.Float32)
+            | TypeMeta.Patterns.MatrixOf(_, TypeMeta.Patterns.Float32) -> ValueSome 32
             | TypeMeta.Patterns.Float64
-            | TypeMeta.Patterns.ColorOf(_, (TypeMeta.Patterns.Float32 | TypeMeta.Patterns.Float64))
-            | TypeMeta.Patterns.VectorOf(_, (TypeMeta.Patterns.Float32 | TypeMeta.Patterns.Float64))
-            | TypeMeta.Patterns.MatrixOf(_, (TypeMeta.Patterns.Float32 | TypeMeta.Patterns.Float64)) -> ValueSome ()
+            | TypeMeta.Patterns.ColorOf(_, TypeMeta.Patterns.Float64)
+            | TypeMeta.Patterns.VectorOf(_, TypeMeta.Patterns.Float64)
+            | TypeMeta.Patterns.MatrixOf(_, TypeMeta.Patterns.Float64) -> ValueSome 64
             | _ -> ValueNone
 
         [<return: Struct>]
@@ -619,7 +622,7 @@ module Preprocessor =
         [<return: Struct>]
         let private (|FloatingPointExpr|_|) (e : Expr) =
             match e.Type with
-            | FloatingPoint -> ValueSome e
+            | FloatingPoint _ -> ValueSome e
             | _ -> ValueNone
 
         [<return: Struct>]
@@ -1064,7 +1067,7 @@ module Preprocessor =
         let readInput (name : string) (desc : ParameterDescription) =
             let implicitInterp =
                 match desc.paramType with
-                | Integral -> InterpolationMode.Flat
+                | Integral | FloatingPoint 64 -> InterpolationMode.Flat
                 | _ -> InterpolationMode.Default
 
             State.modify (fun s ->
@@ -1357,7 +1360,7 @@ module Preprocessor =
 
             static member ToDouble(expr : Expr) =
                 match expr.Type with
-                | FloatingPoint -> expr
+                | FloatingPoint _ -> expr
 
                 | VectorOf(dim, _) ->
                     let vdt = doubleVecType.[dim - 2]

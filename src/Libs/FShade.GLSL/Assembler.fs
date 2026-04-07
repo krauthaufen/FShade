@@ -791,27 +791,33 @@ module AssemblerState =
 
     let rec private neededLocations (rev : bool) (t : CType) =
         match t with
-            | CPointer(_,et) -> 
-                neededLocations rev et
+        | CPointer(_, et) ->
+            neededLocations rev et
 
-            | CType.CBool | CType.CFloat _ | CType.CInt _ ->
-                1
+        | CType.CBool | CType.CFloat _ | CType.CInt _ ->
+            1
 
-            | CMatrix(et, rows, cols) ->
-                if rev then
-                    let l = CVector(et, cols) |> neededLocations rev
-                    l * rows
-                else
-                    let l = CVector(et, rows) |> neededLocations rev
-                    l * cols
-            | CVector _ | CColor _->
-                1
-            | CArray(et, len) ->
-                let inner = neededLocations rev et
-                inner * len
+        | CMatrix(et, rows, cols) ->
+            if rev then
+                let l = CVector(et, cols) |> neededLocations rev
+                l * rows
+            else
+                let l = CVector(et, rows) |> neededLocations rev
+                l * cols
 
-            | CStruct _ | CIntrinsic _ | CVoid ->
-                1 //failwith "[GLSL] no struct inputs allowed"
+        | CVector((CFloat 64 | CInt (_, 64)), (3 | 4))
+        | CColor ((CFloat 64 | CInt (_, 64)), (3 | 4)) ->
+            2
+
+        | CVector _ | CColor _ ->
+            1
+
+        | CArray(et, len) ->
+            let inner = neededLocations rev et
+            inner * len
+
+        | CStruct _ | CIntrinsic _ | CVoid ->
+            1
 
     let newLocation (kind : ParameterKind) (t : CType) =
         State.custom (fun s ->
