@@ -246,12 +246,16 @@ let main argv =
     let doubleCheck =
         argv |> Array.exists (function "-d" | "--double-check" -> true | _ -> false)
 
+    let singleAssembly =
+        argv |> Array.exists (function "-s" | "--single" -> true | _ -> false)
+
     Log.verbose <-
         argv |> Array.exists (function "-v" | "--verbose" -> true | _ -> false)
-        
+
     match entry with
     | None ->
-        Log.error "usage: fshadeaot <entrydllpath> [--verbose] [--double-check]"
+        Log.error "usage: fshadeaot <entrydllpath> [--verbose] [--double-check] [--single]"
+        Log.error "  --single   only patch the entry assembly; do not walk references"
         exit -1
     | _ ->
         ()
@@ -301,32 +305,41 @@ let main argv =
 
             let allAssDefs =
                 let entryDef = Cecil.read config.Entry (Some readerParams)
-                // Collect transitive references that mention FShade.Core.
-                let state = System.Collections.Generic.Dictionary<string, AssemblyDefinition * string>()
-                let entryName = AssemblyNameReference(entryDef.Name.Name, entryDef.Name.Version).ToString()
-                state.[entryName] <- (entryDef, config.Entry)
-                let rec load (name : AssemblyNameReference) =
-                    let key = name.FullName
-                    if not (state.ContainsKey key) then
-                        match Cecil.resolveAssembly config.Dirs (Some readerParams) name with
-                        | Some (path, ad) ->
-                            state.[key] <- (ad, path)
-                            for m in ad.Modules do
-                                for r in m.AssemblyReferences do load r
-                        | None -> ()
-                for m in entryDef.Modules do
-                    for r in m.AssemblyReferences do load r
-                state.Values
-                |> Seq.toArray
-                |> Array.filter (fun (ad, _) ->
+                let isPatchable (ad : AssemblyDefinition) =
                     ad.Name.Name <> "FShade.Core"
                     && ad.Name.Name <> "FShade.GLSL"
                     && ad.Name.Name <> "FShade.SpirV"
                     && ad.Name.Name <> "FShade.Imperative"
-                    && ad.Modules |> Seq.exists (fun m -> m.AssemblyReferences |> Seq.exists (fun r -> r.Name = "FShade.Core")))
-                // Dedup by short assembly name. Some assemblies are reachable via multiple
-                // version-qualified names (entry's own name + same name via references).
-                |> Array.distinctBy (fun (ad, _) -> ad.Name.Name)
+                    && ad.Modules |> Seq.exists (fun m -> m.AssemblyReferences |> Seq.exists (fun r -> r.Name = "FShade.Core"))
+                if singleAssembly then
+                    // --single: just the entry assembly. Useful as a postbuild step where
+                    // each project's deploy already gets fshadeaot run on it.
+                    if isPatchable entryDef then [| (entryDef, config.Entry) |]
+                    else
+                        Log.warn "%s does not reference FShade.Core; nothing to patch" entryDef.Name.Name
+                        [||]
+                else
+                    // Walk transitive references that mention FShade.Core.
+                    let state = System.Collections.Generic.Dictionary<string, AssemblyDefinition * string>()
+                    let entryName = AssemblyNameReference(entryDef.Name.Name, entryDef.Name.Version).ToString()
+                    state.[entryName] <- (entryDef, config.Entry)
+                    let rec load (name : AssemblyNameReference) =
+                        let key = name.FullName
+                        if not (state.ContainsKey key) then
+                            match Cecil.resolveAssembly config.Dirs (Some readerParams) name with
+                            | Some (path, ad) ->
+                                state.[key] <- (ad, path)
+                                for m in ad.Modules do
+                                    for r in m.AssemblyReferences do load r
+                            | None -> ()
+                    for m in entryDef.Modules do
+                        for r in m.AssemblyReferences do load r
+                    state.Values
+                    |> Seq.toArray
+                    |> Array.filter (fun (ad, _) -> isPatchable ad)
+                    // Dedup by short assembly name. Some assemblies are reachable via multiple
+                    // version-qualified names (entry's own name + same name via references).
+                    |> Array.distinctBy (fun (ad, _) -> ad.Name.Name)
 
             let changed = System.Collections.Generic.List<string * AssemblyDefinition>()
 
