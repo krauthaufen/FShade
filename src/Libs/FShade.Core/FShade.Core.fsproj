@@ -33,6 +33,7 @@
     <Compile Include="RaytracingEffect.fs" />
     <Compile Include="EffectInputLayout.fs" />
     <Compile Include="Effect.fs" />
+    <Compile Include="Aot.fs" />
     <Compile Include="ComputeShader.fs" />
     <Compile Include="ShaderDebugger.fs" />
     <Compile Include="TopLevelOperators.fs" />

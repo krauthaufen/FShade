@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>FShade.Aot.Tests.Runner</RootNamespace>
+    <AssemblyName>FShade.Aot.Tests.Runner</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Runner.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Libs\FShade.Core\FShade.Core.fsproj" />
+    <ProjectReference Include="..\..\..\Libs\FShade.GLSL\FShade.GLSL.fsproj" />
+  </ItemGroup>
+</Project>

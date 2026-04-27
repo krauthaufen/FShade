@@ -260,7 +260,7 @@ module EffectConfig =
 /// the Effect module provides functions for accessing, creating and modifying effects.
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Effect =
-    let private effectCache = System.Collections.Concurrent.ConcurrentDictionary<string, Effect>()
+    let internal effectCache = System.Collections.Concurrent.ConcurrentDictionary<string, Effect>()
     let private composeCache = System.Collections.Concurrent.ConcurrentDictionary<string, Effect>()
 
 
@@ -455,18 +455,18 @@ module Effect =
     let mutable UsePrecompiled = true
     
 
-    type private EffectKey =
+    type internal EffectKey =
         {
             inputSemantics : Map<string, InterpolationMode>
             outputSemantics : Map<string, InterpolationMode * DepthWriteMode>
             body : Expr
         }
 
-    module private EffectKey =
+    module internal EffectKey =
         open System.IO
         open System.Security.Cryptography
 
-        let computeHash (e : EffectKey) =  
+        let computeHash (e : EffectKey) =
             use hash = System.Security.Cryptography.SHA1.Create()
             use ms = new MemoryStream()
             use h = new CryptoStream(ms, hash, CryptoStreamMode.Write)
@@ -481,15 +481,31 @@ module Effect =
             h.FlushFinalBlock()
             hash.Hash |> Convert.ToBase64String
 
-    let rec private getRecordFields (t : Type) =
-        if FSharpType.IsRecord(t, true) then 
+    let rec internal getRecordFields (t : Type) =
+        if FSharpType.IsRecord(t, true) then
             FSharpType.GetRecordFields(t, true)
         elif t.IsGenericType then
             match t.GetGenericArguments() with
                 | [| t |] -> getRecordFields t
                 | _ -> [||]
-        else 
+        else
             [||]
+
+    /// Compute the canonical Effect id for a shader function whose body is `body` and
+    /// whose input record is `inputType`. Includes input/output semantics
+    /// (Semantic, Interpolation, DepthWrite attributes) — same hash that
+    /// `Effect.ofExpr`/`Effect.ofFunction` produces, so AOT-precomputed effects
+    /// share the backend cache with non-AOT-built ones.
+    let internal computeEffectIdFromBody (inputType : Type) (body : Expr) : string =
+        let inputFields = getRecordFields inputType
+        let outputFields = getRecordFields body.Type
+        let key =
+            {
+                inputSemantics = inputFields |> Seq.map (fun f -> f.Semantic, f.Interpolation) |> Map.ofSeq
+                outputSemantics = outputFields |> Seq.map (fun f -> f.Semantic, (f.Interpolation, f.DepthWriteMode)) |> Map.ofSeq
+                body = body.WithAttributes []
+            }
+        EffectKey.computeHash key
 
     /// creates an effect from an expression (assuming expressions as returned by shader-functions)
     let ofExpr (inputType : Type) (e : Expr) =

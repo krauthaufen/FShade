@@ -24,9 +24,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Log.fs" />
-    <Compile Include="Interpreter.fs" />
     <Compile Include="Cecil.fs" />
     <Compile Include="Double.fs" />
+    <Compile Include="AotRewrite.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />

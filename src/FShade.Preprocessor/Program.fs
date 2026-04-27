@@ -2,6 +2,7 @@
 open System.IO
 open System.Reflection
 open System.Runtime.Loader
+open Microsoft.FSharp.Quotations
 open Mono.Cecil
 open Mono.Cecil.Cil
 
@@ -274,384 +275,226 @@ let main argv =
         if doubleCheck then
             DoubleChecker.run entry
         else
-            Log.start "searching for patchable methods"
-            let shaderCompileMethods =
-                getReplacableShaderCompileMethods ctx
+            // ============================================================
+            // Marker-based AOT (universal-rewrite, no constant folding).
+            // Replaces the legacy try-to-constant-fold-call-sites approach.
+            // ============================================================
+            Log.start "scanning for shader functions"
 
-
-
-            for (mi, _, replacement) in shaderCompileMethods do
-                match replacement with
-                | Some repl ->
-                    Log.line "%s.%s -> %s.%s" mi.DeclaringTypeName mi.MethodName repl.DeclaringTypeName repl.MethodName
-                | None ->
-                    Log.line "%s.%s" mi.DeclaringTypeName mi.MethodName
-
-            Log.stop()
+            // Load FShade.Core to get Aot helpers at build time.
+            // We can't cast across ALC boundaries, so we go through obj+reflection.
+            let fshadeCore = ctx.LoadFromAssemblyName(AssemblyName "FShade.Core")
+            let aotType = fshadeCore.GetType("FShade.Aot")
+            let mNormalizeAndHash = aotType.GetMethod("normalizeAndHash")
+            let mPrecomputeShader = aotType.GetMethod("precomputeShader")
+            let normalizeAndHash (carriers : (string * Type)[]) (inputType : Type) (rawExpr : obj) =
+                mNormalizeAndHash.Invoke(null, [| box carriers; box inputType; rawExpr |]) :?> string
+            // returns (id, byte[]) — the precomputed Effect ready to embed as resource.
+            let precomputeShader (inputType : Type) (rawExpr : obj) : string * byte[] =
+                let result = mPrecomputeShader.Invoke(null, [| box inputType; rawExpr |])
+                let t = result.GetType()
+                let id = t.GetProperty("Item1").GetValue(result) :?> string
+                let bin = t.GetProperty("Item2").GetValue(result) :?> byte[]
+                id, bin
 
             let readerParams = Cecil.readerParams config.Dirs
 
-            let tokenSet =
-                shaderCompileMethods |> Seq.map (fun (mi,_,_) -> mi.AssemblyName, mi.Token) |> Set.ofSeq
-
-
-            let fshade = ctx.LoadFromAssemblyName(AssemblyName "FShade.Core")
-            let tEffect = fshade.GetType("FShade.Effect")
-            let tEffectModule = fshade.GetType("FShade.EffectModule")
-            let mOfExpr = tEffectModule.GetMethod("ofExpr")
-            let mPickle = tEffectModule.GetMethod("pickle")
-            let pId = tEffect.GetProperty("Id")
-
-            let legacy, allDefs =
-
-                let rec load (set : System.Collections.Generic.Dictionary<string, option<string * AssemblyDefinition>>) (name : AssemblyNameReference) =
-                    let strName = name.FullName
-                    if not (set.ContainsKey strName) then
-                        let res = Cecil.resolveAssembly config.Dirs (Some readerParams) name
-                        set.[strName] <- res
-
-                        match res with
-                        | Some (_, res) ->
-
-                            let refs = res.Modules |> Seq.collect (fun m -> m.AssemblyReferences)
-                            for r in refs do load set r
-                        | None ->
-                            ()
-
-                let state = System.Collections.Generic.Dictionary()
-
-                let entryDef = Cecil.read config.Entry (Some readerParams) //AssemblyDefinition.ReadAssembly(config.Entry, readerParams)
-
-                let framework =
-                    entryDef.CustomAttributes |> Seq.pick (fun a ->
-                        let name = typeof<System.Runtime.Versioning.TargetFrameworkAttribute>.FullName
-                        if a.AttributeType.FullName = name then
-                            a.ConstructorArguments |> Seq.tryPick (fun a ->
-                                match a.Value with
-                                | :? string as s -> Some s
-                                | _ -> None
-                            )
-                        else
-                            None
-                    )
-
-                let legacy = framework.ToLower().Contains "netframework"
-
-                state.[AssemblyNameReference(entryDef.Name.Name, entryDef.Name.Version).ToString()] <- Some (config.Entry, entryDef)
+            let allAssDefs =
+                let entryDef = Cecil.read config.Entry (Some readerParams)
+                // Collect transitive references that mention FShade.Core.
+                let state = System.Collections.Generic.Dictionary<string, AssemblyDefinition * string>()
+                let entryName = AssemblyNameReference(entryDef.Name.Name, entryDef.Name.Version).ToString()
+                state.[entryName] <- (entryDef, config.Entry)
+                let rec load (name : AssemblyNameReference) =
+                    let key = name.FullName
+                    if not (state.ContainsKey key) then
+                        match Cecil.resolveAssembly config.Dirs (Some readerParams) name with
+                        | Some (path, ad) ->
+                            state.[key] <- (ad, path)
+                            for m in ad.Modules do
+                                for r in m.AssemblyReferences do load r
+                        | None -> ()
                 for m in entryDef.Modules do
-                    for r in m.AssemblyReferences do load state r
-
-                legacy,
+                    for r in m.AssemblyReferences do load r
                 state.Values
-                |> Seq.choose id
                 |> Seq.toArray
-                |> Array.filter (fun (_, ass) ->
-                    ass.Name.Name <> "FShade.GLSL" &&
-                    ass.Modules |> Seq.exists (fun m -> m.AssemblyReferences |> Seq.exists (fun r -> r.Name = "FShade.Core"))
-                )
+                |> Array.filter (fun (ad, _) ->
+                    ad.Name.Name <> "FShade.Core"
+                    && ad.Name.Name <> "FShade.GLSL"
+                    && ad.Name.Name <> "FShade.SpirV"
+                    && ad.Name.Name <> "FShade.Imperative"
+                    && ad.Modules |> Seq.exists (fun m -> m.AssemblyReferences |> Seq.exists (fun r -> r.Name = "FShade.Core")))
+                // Dedup by short assembly name. Some assemblies are reachable via multiple
+                // version-qualified names (entry's own name + same name via references).
+                |> Array.distinctBy (fun (ad, _) -> ad.Name.Name)
 
-            if legacy then
-                Log.error "netframework dlls cannot be patched atm."
-                exit -1
+            let changed = System.Collections.Generic.List<string * AssemblyDefinition>()
 
-            Log.start "processing %d assemblies" allDefs.Length
-
-            let fshadeDef =
-                Cecil.resolveAssembly config.Dirs (Some readerParams) (AssemblyNameReference("FShade.Core", Version(0,0,0,0)))
-                |> Option.get
-                |> snd
-
-            let rtDef =
-                let name = AssemblyNameReference("System.Private.CoreLib", Version(0,0,0,0))
-                Cecil.resolveAssembly config.Dirs (Some readerParams) name
-                |> Option.get
-                |> snd
-
-            let aardvarkBase =
-                Cecil.resolveAssembly config.Dirs (Some readerParams) (AssemblyNameReference("Aardvark.Base", Version(0,0,0,0)))
-                |> Option.get
-                |> snd
-
-            let read =
-                fshadeDef.Modules |> Seq.pick (fun m ->
-                    let r = m.GetType "FShade.EffectModule"
-                    if not (isNull r) then
-                        let d = r.Resolve()
-
-                        let unpickleResource = d.Methods |> Seq.tryFind (fun m -> m.Name = "unpickleResource")
-                        match unpickleResource with
-                        | Some m -> Some (Choice1Of4 m)
-                        | None ->
-                            let unpickleInternal = d.Methods |> Seq.tryFind (fun m -> m.Name = "unpickleInternal")
-                            match unpickleInternal with
-                            | Some m -> Some (Choice2Of4 m)
-                            | None ->
-                                let unpickleWithId = d.Methods |> Seq.tryFind (fun m -> m.Name = "unpickleWithId")
-                                match unpickleWithId with
-                                | Some m -> Some (Choice3Of4 m)
-                                | None ->
-                                    let read = d.Methods |> Seq.tryFind (fun m -> m.Name = "read")
-                                    match read with
-                                    | Some r -> Some (Choice4Of4 r)
-                                    | None -> None
-
-                    else
-                        None
-                )
-
-            let fromBase64 =
-                rtDef.Modules |> Seq.pick (fun m ->
-                    let r = m.GetType "System.Convert"
-                    if not (isNull r) then
-                        let d = r.Resolve()
-                        d.Methods |> Seq.tryFind (fun m -> m.Name = "FromBase64String")
-                    else
-                        None
-                )
-
-            //let tObject =
-            //    rtDef.Modules |> Seq.pick (fun m ->
-            //        let r = m.GetType "System.Object"
-            //        if not (isNull r) then
-            //            Some r
-            //        else
-            //            None
-            //    )
-
-            //Report.Line(4, "", [||])
-            //let reportLine =
-            //    aardvarkBase.Modules |> Seq.pick (fun m ->
-            //        let r = m.GetType "Aardvark.Base.Report"
-            //        if not (isNull r) then
-            //            let d = r.Resolve()
-            //            d.Methods |> Seq.tryFind (fun m ->
-            //                m.Name = "Line" && m.Parameters.Count = 3 &&
-            //                m.Parameters.[0].ParameterType.Name = "Int32" &&
-            //                m.Parameters.[1].ParameterType.Name = "String" &&
-            //                m.Parameters.[2].ParameterType.IsArray
-            //            )
-            //        else
-            //            None
-            //    )
-
-
-
-
-
-            let changedAssemblies = System.Collections.Generic.List<string * AssemblyDefinition>()
-
-            for (path, assdef) in allDefs do
+            for (assdef, path) in allAssDefs do
                 Log.start "%s" assdef.Name.Name
 
-                let mutable changed = 0
-
+                // Resolve refs once per module.
+                let mutable patchedHere = 0
+                let cecilResolver : AotRewrite.Rewrite.Resolver =
+                    fun name ->
+                        match Cecil.resolveAssembly config.Dirs (Some readerParams) (AssemblyNameReference(name, Version(0,0,0,0))) with
+                        | Some (_, ad) -> ad
+                        | None -> null
                 for mod_ in assdef.Modules do
-                    let fromBase64 =
-                        lazy (mod_.ImportReference(fromBase64))
+                    let refs =
+                        try Some (AotRewrite.Rewrite.resolveRefs cecilResolver mod_)
+                        with e ->
+                            Log.warn "could not resolve FShade.Aot refs in %s: %s" mod_.Name e.Message
+                            None
+                    match refs with
+                    | None -> ()
+                    | Some refs ->
+                        // mod_.GetTypes() already enumerates nested types — don't recurse.
+                        let allTypes = mod_.GetTypes() |> Seq.toArray
 
-                    let read =
-                        lazy (
-                            match read with
-                            | Choice1Of4 r -> Choice1Of4(mod_.ImportReference r)
-                            | Choice2Of4 r -> Choice2Of4(mod_.ImportReference r)
-                            | Choice3Of4 r -> Choice3Of4(mod_.ImportReference r)
-                            | Choice4Of4 r -> Choice4Of4(mod_.ImportReference r)
-                        )
+                        let allMethods =
+                            allTypes
+                            |> Array.collect (fun t -> t.Methods |> Seq.toArray)
+                        Log.debug "  scanning %d methods across %d types" allMethods.Length allTypes.Length
+                        let candidates =
+                            allMethods
+                            |> Array.filter AotRewrite.Detect.isShaderFunction
+                            |> Array.filter AotRewrite.Rewrite.canRewrite
+                        Log.debug "  %d shader functions to patch" candidates.Length
 
-                    //let reportLine =
-                    //    lazy (
-                    //        mod_.ImportReference reportLine
-                    //    )
-
-                    let allTypes =
-                        let rec collect (t : TypeDefinition) =
-                            Seq.append
-                                (Seq.singleton t)
-                                (t.NestedTypes |> Seq.collect collect)
-                        mod_.GetTypes() |> Seq.collect collect |> System.Collections.Generic.HashSet
-
-                    for typ in allTypes do
-                        for meth in typ.Methods do
-                            try
-                                let body = meth.Body.Instructions
-
-                                let mutable bodyChanged = false
-                                let mutable idx = 0
-                                let mutable found = false
-                                while idx < body.Count do
-                                    let i = body.[idx]
-                                    if i.OpCode = Mono.Cecil.Cil.OpCodes.Call || i.OpCode = Mono.Cecil.Cil.OpCodes.Callvirt then
-                                        match i.Operand with
-                                        | :? Mono.Cecil.MethodReference as m ->
-                                            let def = m.Resolve()
-                                            let t = def.MetadataToken.ToInt32()
-                                            if Set.contains (def.Module.Assembly.Name.Name, t) tokenSet then
-                                                found <- true
-
-                                                let arr = Seq.toArray body
-
-                                                let parameterIndex, call =
-                                                    shaderCompileMethods |> Array.pick (fun (m, pi, r) ->
-                                                        let m =
-                                                            let a = Cecil.readAssembly (Some readerParams) m.AssemblyPath
-                                                            a.Modules |> Seq.pick (fun mm ->
-                                                                let d = mm.LookupToken(m.Token)
-                                                                if isNull d then None
-                                                                else Some (d :?> MethodDefinition)
-                                                            )
-                                                        if def = m then
-                                                            match r with
-                                                            | Some r ->
-                                                                let r =
-                                                                    let a = Cecil.readAssembly (Some readerParams) r.AssemblyPath
-                                                                    a.Modules |> Seq.pick (fun m ->
-                                                                        let d = m.LookupToken(r.Token)
-                                                                        if isNull d then None
-                                                                        else Some (d :?> MethodDefinition)
-                                                                    )
-                                                                Some (pi, Some r)
-                                                            | None ->
-                                                                Some (pi, None)
-                                                        else
-                                                            None
-
-                                                    )
-
-                                                let after = def.Parameters.Count - parameterIndex - 1
-                                                match Interpreter.tryFindParameterPushLocation ctx after arr idx with
-                                                | Some pushIndex ->
-                                                    let res =
-                                                        try
-                                                            Interpreter.tryGetTopOfStack ctx (Seq.toArray body) pushIndex
-                                                        with e ->
-                                                            Log.error "%A" e
-                                                            None
-
-                                                    match res with
-                                                    | Some res when not (isNull res) ->
-                                                        let result =
+                        // For each candidate, reflectively invoke + hash + rewrite.
+                        // Load runtime assembly + find MethodInfo to invoke.
+                        let runtimeAss =
+                            try Some (ctx.LoadFromAssemblyPath path)
+                            with e ->
+                                Log.warn "load failed for %s: %s" path e.Message
+                                None
+                        match runtimeAss with
+                        | None -> ()
+                        | Some runtimeAss ->
+                            for md in candidates do
+                                try
+                                    let typeFullName = md.DeclaringType.FullName.Replace('/', '+')
+                                    let runtimeType = runtimeAss.GetType(typeFullName)
+                                    if isNull runtimeType then
+                                        Log.debug "skip %s.%s (runtime type not found)" md.DeclaringType.FullName md.Name
+                                    else
+                                        // Resolve each formal parameter type to its runtime System.Type by
+                                        // walking the (already loaded) referenced assemblies. We can't rely
+                                        // on Cecil's Resolve() telling us a runtime assembly that's loadable
+                                        // (e.g. System.Runtime → System.Private.CoreLib at runtime).
+                                        let rec resolveParam (pt : Mono.Cecil.TypeReference) : Type =
+                                            match pt with
+                                            | :? Mono.Cecil.GenericInstanceType as gt ->
+                                                let openT = resolveParam gt.ElementType
+                                                if isNull openT then null
+                                                else
+                                                    let args = gt.GenericArguments |> Seq.map resolveParam |> Seq.toArray
+                                                    if args |> Array.exists isNull then null
+                                                    else
+                                                        try openT.MakeGenericType(args)
+                                                        with _ -> null
+                                            | _ ->
+                                                // For open generics, FullName ends with `1, `2 etc — that's fine,
+                                                // BCL's Assembly.GetType accepts it. Replace nested-class '/' with '+'.
+                                                let nm = pt.FullName.Replace('/', '+')
+                                                let mutable found : Type = null
+                                                for ass in ctx.Assemblies do
+                                                    if isNull found then
+                                                        let t = ass.GetType(nm)
+                                                        if not (isNull t) then found <- t
+                                                if isNull found then
+                                                    try
+                                                        let r = pt.Resolve()
+                                                        if not (isNull r) then
+                                                            let asmName = r.Module.Assembly.Name.Name
                                                             try
-                                                                let t = res.GetType()
-                                                                let invoke = t.GetMethod("Invoke")
-                                                                let quotation = invoke.Invoke(res, [|null|])
-                                                                let tVertex = invoke.GetParameters().[0].ParameterType
-
-                                                                let effect = mOfExpr.Invoke(null, [| tVertex; quotation |])
-                                                                let binary = mPickle.Invoke(null, [|effect|]) :?> byte[]
-                                                                let id = pId.GetValue(effect) :?> string
-                                                                Some (id, binary)
-                                                            with _ ->
-                                                                None
-
-                                                        match result with
-                                                        | Some (id, binary) ->
-                                                            Log.line "patching %s.%s: { Id = %A }" meth.DeclaringType.Name meth.Name id
-
-                                                            // cleanup old call: also remove "tail." instruction if one exists
-                                                            let isTail = idx > 0 && body.[idx - 1].OpCode = OpCodes.Tail
-                                                            if isTail then
-                                                                body.[idx - 1] <- Instruction.Create(OpCodes.Nop)
-
-                                                            match call with
-                                                            | Some call ->
-                                                                let call = mod_.ImportReference call
-                                                                body.[idx] <- Instruction.Create(OpCodes.Call, call)
-                                                            | None ->
-                                                                body.[idx] <- Instruction.Create(OpCodes.Nop)
-
-
-                                                            // mod_.Resources.Add(new EmbeddedResource(id, ManifestResourceAttributes.Public, binary))
-
-                                                            let replacement =
-                                                                [
-                                                                    match read.Value with
-                                                                    | Choice1Of4 read ->
-                                                                        // unpickleResource
-                                                                        mod_.Resources.Add(new EmbeddedResource(id, ManifestResourceAttributes.Public, binary))
-                                                                        Instruction.Create(OpCodes.Ldstr, id)
-                                                                        Instruction.Create(OpCodes.Ldstr, assdef.FullName)
-                                                                        Instruction.Create(OpCodes.Call, read)
-
-                                                                    | Choice2Of4 read ->
-                                                                        // unpickleInternal
-                                                                        Instruction.Create(OpCodes.Ldstr, id)
-                                                                        Instruction.Create(OpCodes.Ldstr, System.Convert.ToBase64String binary)
-                                                                        Instruction.Create(OpCodes.Call, read)
-
-                                                                    | Choice3Of4 read ->
-                                                                        // unpickleWithId
-                                                                        Instruction.Create(OpCodes.Pop)
-                                                                        Instruction.Create(OpCodes.Ldstr, id)
-                                                                        Instruction.Create(OpCodes.Ldstr, System.Convert.ToBase64String binary)
-                                                                        Instruction.Create(OpCodes.Call, read)
-
-                                                                    | Choice4Of4 read ->
-                                                                        // read
-                                                                        Instruction.Create(OpCodes.Pop)
-                                                                        Instruction.Create(OpCodes.Ldstr, System.Convert.ToBase64String binary)
-                                                                        Instruction.Create(OpCodes.Call, fromBase64.Value)
-                                                                        Instruction.Create(OpCodes.Call, read)
-
-                                                                ]
-
-                                                            // insert replacement
-                                                            let mutable pi = pushIndex
-                                                            for inst in replacement do
-                                                                body.Insert(pi, inst)
-                                                                pi <- pi + 1
-                                                                idx <- idx + 1
-
-                                                            bodyChanged <- true
-                                                            changed <- changed + 1
-
-                                                        | None ->
-                                                            Log.debug "effect-creation failed for: %s.%s" meth.DeclaringType.Name meth.Name
-
-                                                    | _ ->
-                                                        Log.debug "non-constant argument in: %s.%s" meth.DeclaringType.Name meth.Name
-
+                                                                let a = ctx.LoadFromAssemblyName(AssemblyName asmName)
+                                                                if not (isNull a) then
+                                                                    let t = a.GetType(nm)
+                                                                    if not (isNull t) then found <- t
+                                                            with _ -> ()
+                                                    with _ -> ()
+                                                if isNull found then
+                                                    try found <- Type.GetType(nm)
+                                                    with _ -> ()
+                                                found
+                                        let paramTypes = md.Parameters |> Seq.map (fun p -> resolveParam p.ParameterType) |> Seq.toArray
+                                        let badIdx = paramTypes |> Array.tryFindIndex isNull
+                                        match badIdx with
+                                        | Some i ->
+                                            Log.debug "skip %s.%s (param[%d] type %s not resolvable)" md.DeclaringType.FullName md.Name i md.Parameters.[i].ParameterType.FullName
+                                        | None ->
+                                            let bindingFlags =
+                                                let access = BindingFlags.Public ||| BindingFlags.NonPublic
+                                                if md.IsStatic then access ||| BindingFlags.Static
+                                                else access ||| BindingFlags.Instance
+                                            let mi =
+                                                runtimeType.GetMethod(
+                                                    md.Name, bindingFlags, null, paramTypes, null)
+                                            if isNull mi then
+                                                Log.debug "skip %s.%s (MethodInfo not found)" md.DeclaringType.FullName md.Name
+                                            else
+                                                let inputType = paramTypes.[paramTypes.Length - 1]
+                                                let model = AotRewrite.Rewrite.carrierModel md
+                                                let totalRuntimeArgs = model.ClosureFields.Length + (paramTypes.Length - 1)
+                                                // Resolve closure-field types via the same resolver used for params.
+                                                let closureFieldsRuntime =
+                                                    model.ClosureFields
+                                                    |> Array.map (fun f -> f.Name, resolveParam f.FieldType)
+                                                let closureFieldFails =
+                                                    closureFieldsRuntime |> Array.tryFindIndex (fun (_, t) -> isNull t)
+                                                match closureFieldFails with
+                                                | Some i ->
+                                                    Log.debug "skip %s.%s (closure field[%d] %s not resolvable)" md.DeclaringType.FullName md.Name i model.ClosureFields.[i].Name
                                                 | None ->
-                                                    Log.debug "found no argument push in: %s.%s" meth.DeclaringType.Name meth.Name
+                                                    if md.IsStatic && totalRuntimeArgs = 0 then
+                                                        // STATIC + ZERO-arg shader: precompute the entire Effect.
+                                                        try
+                                                            let placeholderInput = AotRewrite.Hashing.placeholder inputType
+                                                            let rawExpr = mi.Invoke(null, [| placeholderInput |])
+                                                            if isNull rawExpr then
+                                                                Log.debug "skip %s.%s: returned null" md.DeclaringType.FullName md.Name
+                                                            else
+                                                                let id, binary = precomputeShader inputType rawExpr
+                                                                AotRewrite.Rewrite.rewriteShaderFunctionPrecomputed refs md id id binary
+                                                                Log.line "patched %s.%s : %s (precomputed, %d bytes)" md.DeclaringType.FullName md.Name id binary.Length
+                                                                patchedHere <- patchedHere + 1
+                                                        with e ->
+                                                            let inner =
+                                                                match e with
+                                                                | :? TargetInvocationException as t when not (isNull t.InnerException) -> t.InnerException
+                                                                | _ -> e
+                                                            Log.warn "precompute of %s.%s failed: %s: %s" md.DeclaringType.FullName md.Name (inner.GetType().Name) inner.Message
+                                                    else
+                                                        // Deferred marker. Carriers = closure fields + formal params.
+                                                        match AotRewrite.Hashing.tryHashShaderFunction normalizeAndHash mi closureFieldsRuntime inputType with
+                                                        | Result.Error e ->
+                                                            Log.debug "skip %s.%s: %s" md.DeclaringType.FullName md.Name e
+                                                        | Result.Ok (_, bodyHash) ->
+                                                            try
+                                                                AotRewrite.Rewrite.rewriteShaderFunction cecilResolver refs md bodyHash
+                                                                let kind = if md.IsStatic then "deferred" else "deferred-closure"
+                                                                Log.line "patched %s.%s : %s (%s)" md.DeclaringType.FullName md.Name bodyHash kind
+                                                                patchedHere <- patchedHere + 1
+                                                            with e ->
+                                                                Log.warn "IL rewrite of %s.%s failed: %s" md.DeclaringType.FullName md.Name e.Message
+                                                                Log.warn "  %s" (if isNull e.StackTrace then "<no stack>" else (e.StackTrace.Split('\n') |> Array.head))
+                                with e ->
+                                    Log.warn "outer failure on %s.%s: %s" md.DeclaringType.FullName md.Name e.Message
 
-                                        | _ ->
-                                            ()
-
-                                    idx <- idx + 1
-
-                                // fix _S jumps that now might be larger than +127/-128
-                                if bodyChanged then
-                                    for i in 0..body.Count-1 do
-                                        let op = body.[i].OpCode
-                                        if op = OpCodes.Br_S then body[i] <- Instruction.Create(OpCodes.Br, body[i].Operand :?> Instruction)
-                                        elif op = OpCodes.Beq_S then body[i] <- Instruction.Create(OpCodes.Beq, body[i].Operand :?> Instruction)
-                                        elif op = OpCodes.Bge_S then body[i] <- Instruction.Create(OpCodes.Bge, body[i].Operand :?> Instruction)
-                                        elif op = OpCodes.Bge_Un_S then body[i] <- Instruction.Create(OpCodes.Bge_Un, body[i].Operand :?> Instruction)
-                                        elif op = OpCodes.Bgt_S then body[i] <- Instruction.Create(OpCodes.Bgt, body[i].Operand :?> Instruction)
-                                        elif op = OpCodes.Bgt_Un_S then body[i] <- Instruction.Create(OpCodes.Bgt_Un, body[i].Operand :?> Instruction)
-                                        elif op = OpCodes.Ble_S then body[i] <- Instruction.Create(OpCodes.Ble, body[i].Operand :?> Instruction)
-                                        elif op = OpCodes.Ble_Un_S then body[i] <- Instruction.Create(OpCodes.Ble_Un, body[i].Operand :?> Instruction)
-                                        elif op = OpCodes.Blt_S then body[i] <- Instruction.Create(OpCodes.Blt, body[i].Operand :?> Instruction)
-                                        elif op = OpCodes.Blt_Un_S then body[i] <- Instruction.Create(OpCodes.Blt_Un, body[i].Operand :?> Instruction)
-                                        elif op = OpCodes.Bne_Un_S then body[i] <- Instruction.Create(OpCodes.Bne_Un, body[i].Operand :?> Instruction)
-                                        elif op = OpCodes.Brfalse_S then body[i] <- Instruction.Create(OpCodes.Brfalse, body[i].Operand :?> Instruction)
-                                        elif op = OpCodes.Brtrue_S then body[i] <- Instruction.Create(OpCodes.Brtrue, body[i].Operand :?> Instruction)
-
-                                ()
-                            with _ ->
-                                ()
-
-                if changed > 0 then
-                    Log.line "patched %d effect-creations" changed
-                    changedAssemblies.Add (path, assdef)
+                if patchedHere > 0 then
+                    Log.line "patched %d shader functions" patchedHere
+                    changed.Add (path, assdef)
                 else
-                    Log.line "no patchable effect-creations found"
+                    Log.line "no shader functions"
                 Log.stop()
 
             ctx.Unload()
 
-            if changedAssemblies.Count > 0 then
+            if changed.Count > 0 then
                 Log.start "saving assemblies"
-                for (path, c) in changedAssemblies do
+                for (path, c) in changed do
                     let tmpFile = Path.ChangeExtension(Path.GetTempFileName(), ".dll")
                     try
                         let rel =
@@ -659,7 +502,6 @@ let main argv =
                             let rel = path.Substring(tmp.Length)
                             if rel.Length > 0 && (rel.[0] = Path.DirectorySeparatorChar || rel.[0] = Path.AltDirectorySeparatorChar) then rel.Substring 1
                             else rel
-
                         let dst = Path.Combine(dir, rel)
                         Log.line "%s -> %s" c.Name.Name rel
                         try
@@ -668,10 +510,9 @@ let main argv =
                         with e ->
                             Log.error "%A" e
                     finally
-                        try File.Delete tmpFile
-                        with _ -> ()
-
+                        try File.Delete tmpFile with _ -> ()
                 Log.stop()
+            Log.stop()
     finally
         try Directory.Delete(tmp, true)
         with _ -> ()
