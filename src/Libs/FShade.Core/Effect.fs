@@ -19,8 +19,117 @@ type WithEffectAttribute() =
     inherit System.Attribute()
 
 
+/// Per-output dependency record. Lists the EXTERNAL inputs (vertex attributes
+/// for primitive-stage outputs; varyings for fragment-stage outputs) and the
+/// uniforms that the producing pipeline needs to compute that one output.
+/// Internal intermediates (let-bindings, uniforms not actually read, etc.)
+/// are pruned by FShade's existing optimizer — this record only contains the
+/// transitive closure of what a consumer must supply to obtain the output.
+type OutputDeps =
+    {
+        Inputs   : Map<string, Type>
+        Uniforms : Map<string, Type>
+    }
+
+/// Effect-level dependency map. The primitive pipeline (vertex / tess / geom)
+/// is treated as one collapsed unit — for the purposes of this map a downstream
+/// fragment input named X is satisfied by either a primitive-pipeline output
+/// of the same name or a true vertex attribute. We do NOT model the GS / tess
+/// boundary in deps space; that would force us to mirror FShade's full
+/// composition algebra (gsvs / vsgs etc). The collapsed view stays correct
+/// for the common case (vs+fs, no gs/tess) and over-reports — never
+/// under-reports — for the rare case of cross-stage composes.
+type EffectDeps =
+    {
+        Primitive : Map<string, OutputDeps>
+        Fragment  : Map<string, OutputDeps>
+    }
+
+[<RequireQualifiedAccess>]
+module OutputDeps =
+    let empty = { Inputs = Map.empty; Uniforms = Map.empty }
+
+    let union (a : OutputDeps) (b : OutputDeps) =
+        { Inputs   = Map.union a.Inputs   b.Inputs
+          Uniforms = Map.union a.Uniforms b.Uniforms }
+
+[<RequireQualifiedAccess>]
+module EffectDeps =
+    let empty : EffectDeps = { Primitive = Map.empty; Fragment = Map.empty }
+
+    /// Compose two single-stage dep maps as if `l` runs first, then `r`. Inputs
+    /// of `r` that are satisfied by an output of `l` get substituted by `l`'s
+    /// deps for that output (transitive). Inputs of `r` not produced by `l`
+    /// stay as raw inputs. Outputs that `l` produces and `r` doesn't replace
+    /// pass through unchanged.
+    let composeStage (l : Map<string, OutputDeps>)
+                     (r : Map<string, OutputDeps>) : Map<string, OutputDeps> =
+        let overridden =
+            r |> Map.map (fun _ rDep ->
+                let mutable acc = { Inputs = Map.empty; Uniforms = rDep.Uniforms }
+                for KeyValue(name, t) in rDep.Inputs do
+                    match Map.tryFind name l with
+                    | Some lDep -> acc <- OutputDeps.union acc lDep
+                    | None      -> acc <- { acc with Inputs = Map.add name t acc.Inputs }
+                acc)
+        let passthrough = l |> Map.filter (fun n _ -> not (Map.containsKey n r))
+        Map.union passthrough overridden
+
+    /// Compose two effects' dep maps. Pure operation on the maps — no shader
+    /// analysis at compose time. Both Primitive and Fragment stages compose
+    /// independently with the same per-stage rule.
+    let compose (a : EffectDeps) (b : EffectDeps) : EffectDeps =
+        { Primitive = composeStage a.Primitive b.Primitive
+          Fragment  = composeStage a.Fragment  b.Fragment }
+
+    /// User-facing resolved view: for each top fragment output, the set of
+    /// vertex attributes + uniforms a renderer must supply. Walks the
+    /// fragment deps and substitutes any input matched by a primitive output
+    /// with that primitive output's deps.
+    let resolveTop (d : EffectDeps) : Map<string, OutputDeps> =
+        d.Fragment |> Map.map (fun _ fDep ->
+            let mutable acc = { Inputs = Map.empty; Uniforms = fDep.Uniforms }
+            for KeyValue(name, t) in fDep.Inputs do
+                match Map.tryFind name d.Primitive with
+                | Some pDep -> acc <- OutputDeps.union acc pDep
+                | None      -> acc <- { acc with Inputs = Map.add name t acc.Inputs }
+            acc)
+
+    /// Compute deps from a fully-realised set of shaders. Forces shader
+    /// bodies (calls into Shader.withOutputs per output). Used at leaf
+    /// Effect construction; composed effects derive their deps via `compose`
+    /// without ever forcing shaders.
+    let ofShaders (shaders : Map<ShaderStage, Shader>) : EffectDeps =
+        let perOutputDeps (shader : Shader) : Map<string, OutputDeps> =
+            shader.shaderOutputs |> Map.map (fun name p ->
+                let isolated = Shader.withOutputs (Map.ofList [name, p.paramType]) shader
+                { Inputs   = Shader.neededInputs isolated
+                  Uniforms = isolated.shaderUniforms |> Map.map (fun _ u -> u.uniformType) })
+
+        let primitiveOrder =
+            [ ShaderStage.Vertex
+              ShaderStage.TessControl
+              ShaderStage.TessEval
+              ShaderStage.Geometry ]
+        let primitiveStages =
+            primitiveOrder |> List.choose (fun s -> Map.tryFind s shaders)
+
+        let primitive =
+            match primitiveStages with
+            | [] -> Map.empty
+            | first :: rest ->
+                rest |> List.fold (fun acc s -> composeStage acc (perOutputDeps s)) (perOutputDeps first)
+
+        let fragment =
+            match Map.tryFind ShaderStage.Fragment shaders with
+            | Some fs -> perOutputDeps fs
+            | None    -> Map.empty
+
+        { Primitive = primitive; Fragment = fragment }
+
+
 /// Effect encapsulates a set of shaders for the various ShaderStages defined by FShade.
-type Effect(id : string, shaders : Lazy<Map<ShaderStage, Shader>>, composedOf : list<Effect>) =
+type Effect(id : string, shaders : Lazy<Map<ShaderStage, Shader>>, composedOf : list<Effect>, dependencies : Lazy<EffectDeps>) =
     let mutable sourceDefinition : SourceDefinition option = None
 
     let inputToplogy =
@@ -110,6 +219,16 @@ type Effect(id : string, shaders : Lazy<Map<ShaderStage, Shader>>, composedOf : 
     /// gets the optional FragmentShader for the effect.
     member x.FragmentShader     = shaders.Value |> Map.tryFind ShaderStage.Fragment
 
+    /// Per-output dependency map. Available without forcing shaders for
+    /// composed effects (deps are composed map-only). For leaf effects this
+    /// forces the shader bodies once on first access.
+    member x.Dependencies       = dependencies.Value
+
+    new(id : string, m : Lazy<Map<ShaderStage, Shader>>, o : list<Effect>) =
+        // Default: derive deps lazily from shaders. This forces shaders on
+        // first access — composed effects override this with a pre-composed
+        // deps map so they never have to.
+        Effect(id, m, o, lazy (EffectDeps.ofShaders m.Value))
     new(m, o) = Effect(Effect.NewId(), m, o)
     new(m) = Effect(Effect.NewId(), m, [])
 
@@ -274,26 +393,83 @@ module Effect =
 
     open System.IO
 
+    /// Effect blob format version. Bump when the on-disk format changes.
+    /// v1 added the EffectDeps header block right after the Id.
+    let private blobFormatVersion = 1uy
+
+    let private writeOutputDepsMap (typeState : Serializer.Type.SerializerState) (dst : BinaryWriter) (m : Map<string, OutputDeps>) =
+        dst.Write (Map.count m)
+        for KeyValue(name, deps) in m do
+            dst.Write name
+            dst.Write (Map.count deps.Inputs)
+            for KeyValue(n, t) in deps.Inputs do
+                dst.Write n
+                Serializer.Type.serializeInternal typeState dst t
+            dst.Write (Map.count deps.Uniforms)
+            for KeyValue(n, t) in deps.Uniforms do
+                dst.Write n
+                Serializer.Type.serializeInternal typeState dst t
+
+    let private readOutputDepsMap (typeState : Serializer.Type.DeserializerState) (src : BinaryReader) =
+        let cnt = src.ReadInt32()
+        List.init cnt (fun _ ->
+            let name = src.ReadString()
+            let inputCnt = src.ReadInt32()
+            let inputs =
+                List.init inputCnt (fun _ ->
+                    let n = src.ReadString()
+                    let t = Serializer.Type.deserializeInternal typeState src
+                    n, t)
+                |> Map.ofList
+            let uniformCnt = src.ReadInt32()
+            let uniforms =
+                List.init uniformCnt (fun _ ->
+                    let n = src.ReadString()
+                    let t = Serializer.Type.deserializeInternal typeState src
+                    n, t)
+                |> Map.ofList
+            name, { Inputs = inputs; Uniforms = uniforms })
+        |> Map.ofList
+
+    let private writeEffectDeps (typeState : Serializer.Type.SerializerState) (dst : BinaryWriter) (deps : EffectDeps) =
+        writeOutputDepsMap typeState dst deps.Primitive
+        writeOutputDepsMap typeState dst deps.Fragment
+
+    let private readEffectDeps (typeState : Serializer.Type.DeserializerState) (src : BinaryReader) =
+        let primitive = readOutputDepsMap typeState src
+        let fragment  = readOutputDepsMap typeState src
+        { Primitive = primitive; Fragment = fragment }
+
     let internal serializeInternal (state : Shader.SerializerState) (dst : BinaryWriter) (effect : Effect) =
+        // v1 layout: version byte | id | EffectDeps | shader count | shaders
+        // The deps block is eager so consumers can read effect.Dependencies
+        // without forcing the lazy shader bodies. Old (pre-v1) blobs have no
+        // version byte and will fail to deserialize cleanly — by intent, we
+        // do not deserialize old blobs anywhere in the wild.
+        dst.Write blobFormatVersion
         dst.Write effect.Id
+        writeEffectDeps state.TypeState dst effect.Dependencies
         let shaders = effect.Shaders
         dst.Write (Map.count shaders)
         for KeyValue(stage, shader) in shaders do
             dst.Write (int stage)
             Shader.serializeInternal state dst shader
-        
+
     let internal deserializeInternal (state : Shader.DeserializerState) (src : BinaryReader) =
+        let version = src.ReadByte()
+        if version <> blobFormatVersion then
+            failwithf "[FShade] effect blob format version mismatch: got %d, expected %d" version blobFormatVersion
         let id = src.ReadString()
+        let deps = readEffectDeps state.TypeState src
         let shaders =
             let cnt = src.ReadInt32()
             List.init cnt (fun _ ->
                 let stage = src.ReadInt32() |> unbox<ShaderStage>
                 let shader = Shader.deserializeInternal state src
-                stage, shader
-            )
+                stage, shader)
             |> Map.ofList
 
-        Effect(id, lazy shaders, [])
+        Effect(id, lazy shaders, [], lazy deps)
 
 
     let serialize (dst : Stream) (e : Effect) =
@@ -305,10 +481,20 @@ module Effect =
         deserializeInternal (Shader.DeserializerState()) r
          
     let read (src : byte[]) =
-        let id = 
+        // Eager header read: version + Id + EffectDeps. Shader payload stays
+        // lazy so consumers that only want the deps map don't pay for shader
+        // body deserialization (the whole point of the eager-deps design —
+        // makes AOT/cached effect blobs cheap to inspect).
+        let version, id, deps =
             use ms = new MemoryStream(src)
             use r = new BinaryReader(ms, System.Text.Encoding.UTF8, true)
-            r.ReadString()
+            let v = r.ReadByte()
+            if v <> blobFormatVersion then
+                failwithf "[FShade] effect blob format version mismatch: got %d, expected %d" v blobFormatVersion
+            let id = r.ReadString()
+            let typeState = Serializer.Type.DeserializerState()
+            let d = readEffectDeps typeState r
+            v, id, d
 
         let shaders =
             lazy (
@@ -316,42 +502,62 @@ module Effect =
                     use ms = new MemoryStream(src)
                     use src = new BinaryReader(ms, System.Text.Encoding.UTF8, true)
                     let state = Shader.DeserializerState()
+                    let _v = src.ReadByte()
                     let _id = src.ReadString()
+                    // skip the eagerly-read deps block — same readers, throw away result
+                    let _deps = readEffectDeps state.TypeState src
                     let cnt = src.ReadInt32()
                     List.init cnt (fun _ ->
                         let stage = src.ReadInt32() |> unbox<ShaderStage>
                         let shader = Shader.deserializeInternal state src
-                        stage, shader
-                    )
+                        stage, shader)
                     |> Map.ofList
                 with _ ->
                     let b64 = System.Convert.ToBase64String src
                     failwithf "Failed to read effect base64: \"%s\"" b64
             )
 
-        Effect(id, shaders, [])
+        Effect(id, shaders, [], lazy deps)
 
     let unpickleWithId (id : string) (data : string) =
+        // Same lazy-shaders pattern as `read`. Unlike `read` we don't peek
+        // the eager header here because the caller already supplied `id`
+        // out-of-band; the deps map similarly stays inside the lazy block
+        // for callers that don't care about it.
+        let binary = System.Convert.FromBase64String data
         let shaders =
             lazy (
                 try
-                    let binary = System.Convert.FromBase64String data
                     use ms = new MemoryStream(binary)
                     use src = new BinaryReader(ms, System.Text.Encoding.UTF8, true)
                     let state = Shader.DeserializerState()
+                    let _v = src.ReadByte()
                     let _id = src.ReadString()
+                    let _deps = readEffectDeps state.TypeState src
                     let cnt = src.ReadInt32()
                     List.init cnt (fun _ ->
                         let stage = src.ReadInt32() |> unbox<ShaderStage>
                         let shader = Shader.deserializeInternal state src
-                        stage, shader
-                    )
+                        stage, shader)
                     |> Map.ofList
                 with e ->
                     failwithf "Failed to read effect base64: \"%s\"" data
             )
 
-        Effect(id, shaders, [])
+        let deps =
+            lazy (
+                try
+                    use ms = new MemoryStream(binary)
+                    use src = new BinaryReader(ms, System.Text.Encoding.UTF8, true)
+                    let typeState = Serializer.Type.DeserializerState()
+                    let _v = src.ReadByte()
+                    let _id = src.ReadString()
+                    readEffectDeps typeState src
+                with _ ->
+                    failwithf "Failed to read effect deps base64: \"%s\"" data
+            )
+
+        Effect(id, shaders, [], deps)
 
     let pickle (e : Effect) =
         use ms = new MemoryStream()
@@ -891,7 +1097,14 @@ module Effect =
                         
                         shaders |> Seq.map (fun s -> s.shaderStage, s) |> Map.ofSeq
                     )
-                Effect(resultId, shaders, [l;r])
+                // Compose dependency maps purely on the existing maps — no
+                // shader analysis at compose time. Forcing this lazy walks
+                // back through the compose chain and only forces shaders at
+                // the leaves (where deps were originally derived from
+                // shaders via EffectDeps.ofShaders).
+                let composedDeps =
+                    lazy (EffectDeps.compose l.Dependencies r.Dependencies)
+                Effect(resultId, shaders, [l;r], composedDeps)
              
             )
 

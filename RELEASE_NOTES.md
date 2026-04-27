@@ -1,3 +1,7 @@
+### 5.7.4
+- Added `Effect.Dependencies : EffectDeps` — per-output input + uniform tracking, eagerly serialized in the binary header alongside `Id`. Composed effects derive their deps via pure map operations (no shader force at compose time); leaf effects analyse via `Shader.withOutputs` per-output. AOT/cached blobs carry the deps map and expose it without ever forcing the lazy shader bodies. Cross-validated against `Effect.toModule` linking — the deps map is exact (predicted vertex inputs == linker-demanded vertex inputs) for arbitrary subsets of requested outputs.
+- Bumped binary effect blob format to v1 (added a leading version byte). Old (pre-v1) blobs fail with a clear error on deserialize — by intent, no backward-compat handling.
+
 ### 5.7.3
 - Fixed computation of required slots for 64-bit attributes
 - Added implicit `flat` interpolation for double-based attributes
