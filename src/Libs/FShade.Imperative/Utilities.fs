@@ -546,6 +546,12 @@ module ExprExtensions =
                     let m = buildFun.MakeGenericMethod [|e.Type|]
                     m.Invoke(null, [|null; mi|])
                 )
+            | Patterns.Lambda(v, Patterns.Call(Some (Patterns.Var vi), mi, [])) when v = vi ->
+                witnessTable.GetOrAdd(mi, fun mi ->
+                    FSharpValue.MakeFunction(e.Type, fun a ->
+                        mi.Invoke(a, [||])
+                    )
+                )
             | _ ->
                 failwith "bad witness"
 

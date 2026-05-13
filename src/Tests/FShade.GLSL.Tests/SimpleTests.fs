@@ -74,6 +74,22 @@ let ``Reserved Names``() =
 
     GLSL.shouldCompile [Effect.ofFunction shader]
 
+
+let shaderConstantNormalized (v : Vertex) =
+    vertex {
+        let a = V4f(1.0f,2.0f,3.0f,4.1f).Normalized
+        let b = V3f(-1.0f, 1.0f, 1.4142f) |> Vec.normalize
+        return { v with pos = a * b.XYZI * v.pos }
+    }
+    
+[<Test>]
+let ``[OfFunction] Normalize a constant``() =
+    Setup.Run()
+    let e = Effect.ofFunction shaderConstantNormalized
+    GLSL.shouldCompile [e]
+    
+
+
 [<Test>]
 let ``Broken GLSL Shader``() =
     Setup.Run()
