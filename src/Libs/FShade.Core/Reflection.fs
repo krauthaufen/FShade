@@ -149,19 +149,24 @@ module BasicQuotationPatterns =
                 match t with
                 | ArrayOf(SamplerType _) ->
                     let arr = sam |> unbox<Array>
-                    let samplers = 
-                        List.init arr.Length (fun i -> 
+                    let samplers =
+                        List.init arr.Length (fun i ->
                             let sam1 = arr.GetValue i |> unbox<ISampler>
                             let tex = sam1.Texture
                             tex.Semantic, sam1.State
                         )
 
-                    let t = Peano.getArrayType arr.Length t
+                    // unbounded (count -1): keep the F# array type -> CPointer (`[]`)
+                    let unbounded =
+                        arr.Length > 0 &&
+                        (match (arr.GetValue 0 |> unbox<ISampler>).Texture with
+                         | :? ShaderTextureHandle as h -> h.Unbounded | _ -> false)
+                    let t = if unbounded then t else Peano.getArrayType arr.Length t
                     ValueSome {
                         uniformName = name
                         uniformType = t
                         uniformValue = SamplerArray(List.toArray samplers)
-                    } 
+                    }
                 | _ ->
                     ValueNone
 
@@ -185,19 +190,24 @@ module BasicQuotationPatterns =
                 match Expr.TryEval e with
                 | Some sam ->
                     let arr = sam |> unbox<Array>
-                    let samplers = 
-                        List.init arr.Length (fun i -> 
+                    let samplers =
+                        List.init arr.Length (fun i ->
                             let sam1 = arr.GetValue i |> unbox<ISampler>
                             let tex = sam1.Texture
                             tex.Semantic, sam1.State
                         )
 
-                    let t = Peano.getArrayType arr.Length t
+                    // unbounded (count -1): element-array type -> CPointer (`[]`)
+                    let unbounded =
+                        arr.Length > 0 &&
+                        (match (arr.GetValue 0 |> unbox<ISampler>).Texture with
+                         | :? ShaderTextureHandle as h -> h.Unbounded | _ -> false)
+                    let t = if unbounded then t.MakeArrayType() else Peano.getArrayType arr.Length t
                     ValueSome {
                         uniformName = pi.Name
                         uniformType = t
                         uniformValue = SamplerArray(List.toArray samplers)
-                    } 
+                    }
 
                 | None -> 
                     ValueNone

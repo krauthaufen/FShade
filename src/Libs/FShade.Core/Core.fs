@@ -222,16 +222,24 @@ type ISampler =
 type IImage =
     interface end
 
-type ShaderTextureHandle(semantic : string, scope : UniformScope) =
-    static member CreateUniform(semantic : string, scope : UniformScope) = ShaderTextureHandle(semantic, scope)
+type ShaderTextureHandle(semantic : string, scope : UniformScope, unbounded : bool) =
+    static member CreateUniform(semantic : string, scope : UniformScope) = ShaderTextureHandle(semantic, scope, false)
     interface ISemanticValue with
         member x.Semantic = semantic
         member x.Scope = scope
 
-    member x.WithIndex (i : int) =
-        ShaderTextureHandle(semantic + string i, scope)
+    /// True for runtime-sized (bindless) sampler arrays declared with count -1.
+    member x.Unbounded = unbounded
 
-    new() = ShaderTextureHandle(null, Unchecked.defaultof<UniformScope>)       
+    member x.WithIndex (i : int) =
+        ShaderTextureHandle(semantic + string i, scope, false)
+
+    /// Mark this handle as the base of an unbounded (runtime-sized) sampler array.
+    member x.WithUnbounded () =
+        ShaderTextureHandle(semantic, scope, true)
+
+    new(semantic : string, scope : UniformScope) = ShaderTextureHandle(semantic, scope, false)
+    new() = ShaderTextureHandle(null, Unchecked.defaultof<UniformScope>, false)
     
 
 type TextureMustBeSpecified = TextureMustBeSpecified

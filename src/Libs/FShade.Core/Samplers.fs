@@ -1646,7 +1646,10 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler2d(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
-            Array.init count (fun i -> Sampler2d(t.WithIndex(i), s))
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
+            if count < 0 then [| Sampler2d(t.WithUnbounded(), s) |]
+            else Array.init count (fun i -> Sampler2d(t.WithIndex(i), s))
 
     let sampler2d = Sampler2dBuilder()
     

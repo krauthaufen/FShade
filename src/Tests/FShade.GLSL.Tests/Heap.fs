@@ -153,3 +153,21 @@ let ``Bindless: constant sampler-array index stays plain``() =
     let frag (v : TexVertex) = fragment { return bindlessTextures.[2].Sample(v.tc) }        // constant index
     let glsl, _ = GLSL.compile' glslVulkan [ Effect.ofFunction frag ]
     if glsl.code.Contains "nonuniformEXT" then failwithf "constant index must NOT use nonuniformEXT:\n%s" glsl.code
+
+// ── Unbounded (runtime-sized) sampler array via the -1 count hack ────────
+let private bindlessUnbounded =
+    sampler2d { textureArray uniform?Tex -1 }   // -1 == unbounded
+
+[<Test>]
+let ``Bindless: unbounded array (-1) emits sampler[] not a UBO field``() =
+    Setup.Run()
+    let frag (v : TexVertex) = fragment { return bindlessUnbounded.[v.tid].Sample(v.tc) }
+    let glsl, _ = GLSL.compile' glslVulkan [ Effect.ofFunction frag ]
+    let code = glsl.code
+    if not (code.Contains "sampler2D bindlessUnbounded[]") then failwithf "expected unbounded 'sampler2D bindlessUnbounded[]':\n%s" code
+    if not (code.Contains "nonuniformEXT") then failwithf "expected nonuniformEXT:\n%s" code
+    // glslang would REJECT a sampler inside a uniform block, so a clean compile
+    // proves it is a proper top-level sampler array.
+    match GLSL.glslang ShaderStage.Fragment code with
+    | Error e -> failwithf "glslang rejected unbounded sampler array: %s" e
+    | _ -> ()
