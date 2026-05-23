@@ -1822,9 +1822,23 @@ module Assembler =
                     
 
                 | CItem(_, v, i) ->
-                    let! v = assembleExprS v
-                    let! i = assembleExprS i
-                    return sprintf "%s[%s]" v i
+                    // Non-uniform descriptor indexing: a DYNAMIC index into a
+                    // sampler/image array must use nonuniformEXT (else it is
+                    // undefined behaviour in Vulkan). Constant indices and
+                    // non-texture arrays are emitted unchanged.
+                    let isTextureArray =
+                        match v.ctype with
+                        | CArray(CIntrinsic { tag = (:? GLSLTextureLike) }, _)
+                        | CPointer(_, CIntrinsic { tag = (:? GLSLTextureLike) }) -> true
+                        | _ -> false
+                    let isDynamic = match i with | CValue _ -> false | _ -> true
+                    let! vs = assembleExprS v
+                    let! is = assembleExprS i
+                    if isTextureArray && isDynamic then
+                        do! AssemblerState.useExtension "GL_EXT_nonuniform_qualifier"
+                        return sprintf "%s[nonuniformEXT(%s)]" vs is
+                    else
+                        return sprintf "%s[%s]" vs is
 
                 | CMatrixFromCols(t,cols) ->
                     let! cols = cols |> List.mapS assembleExprS

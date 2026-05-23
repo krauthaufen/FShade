@@ -120,3 +120,36 @@ let ``Heap rewrite: uniforms become arena gathers``() =
         match GLSL.glslang stage code with
         | Error e -> failwithf "glslang rejected %A stage: %s" stage e
         | _ -> ()
+
+// ── Bindless: non-uniform descriptor indexing ───────────────────────────
+// A DYNAMIC index into a sampler array must be wrapped in nonuniformEXT (+
+// the GL_EXT_nonuniform_qualifier extension); a CONSTANT index must not.
+type TexVertex =
+    { [<Position>]                                                pos : V4f
+      [<Semantic("Tc")>]                                         tc  : V2f
+      [<Semantic("TexId"); Interpolation(InterpolationMode.Flat)>] tid : int }
+
+let private bindlessTextures =
+    sampler2d {
+        textureArray uniform?Textures 16
+        filter Filter.MinMagMipLinear
+    }
+
+[<Test>]
+let ``Bindless: dynamic sampler-array index uses nonuniformEXT``() =
+    Setup.Run()
+    let frag (v : TexVertex) = fragment { return bindlessTextures.[v.tid].Sample(v.tc) }   // dynamic index
+    let glsl, _ = GLSL.compile' glslVulkan [ Effect.ofFunction frag ]
+    let code = glsl.code
+    if not (code.Contains "nonuniformEXT") then failwithf "expected nonuniformEXT for dynamic sampler index:\n%s" code
+    if not (code.Contains "GL_EXT_nonuniform_qualifier") then failwithf "expected the extension:\n%s" code
+    match GLSL.glslang ShaderStage.Fragment code with
+    | Error e -> failwithf "glslang rejected bindless fragment: %s" e
+    | _ -> ()
+
+[<Test>]
+let ``Bindless: constant sampler-array index stays plain``() =
+    Setup.Run()
+    let frag (v : TexVertex) = fragment { return bindlessTextures.[2].Sample(v.tc) }        // constant index
+    let glsl, _ = GLSL.compile' glslVulkan [ Effect.ofFunction frag ]
+    if glsl.code.Contains "nonuniformEXT" then failwithf "constant index must NOT use nonuniformEXT:\n%s" glsl.code
