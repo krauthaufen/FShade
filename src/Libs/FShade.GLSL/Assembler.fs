@@ -1287,9 +1287,12 @@ module Assembler =
 
         [<return: Struct>]
         let (|CTexture|_|) (t : CType) =
-            match t with   
+            match t with
             | CIntrinsic { tag = (:? GLSLTextureLike as t)} -> ValueSome (t, 1)
             | CArray(CIntrinsic { tag = (:? GLSLTextureLike as t)}, len) -> ValueSome (t, len)
+            // unbounded (runtime-sized) sampler/image array: `sampler2D X[]`.
+            // count -1 marks "unbounded" for the backend (variable descriptor count).
+            | CPointer(_, CIntrinsic { tag = (:? GLSLTextureLike as t)}) -> ValueSome (t, -1)
             | _ -> ValueNone
 
         [<return: Struct>]
