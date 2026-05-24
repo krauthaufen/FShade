@@ -4040,12 +4040,25 @@ module Shader =
                             | None -> { uniformName = name; uniformType = t; uniformValue = UniformValue.Attribute(uniform, name) }
             )
 
+        // Re-derive storage-buffer access from the NEW body. Without this, a buffer
+        // read SPLICED in via substituteReads (e.g. heap bindless vertex-pull) keeps the
+        // original (empty) access and is emitted as a read-write SSBO instead of
+        // `readonly`, which mis-binds at runtime. Merge with the original so accesses
+        // for buffers not present in the new body survive.
+        let newStorageAccess =
+            (shader.shaderStorageBufferAccess, state.storageBufferAccess)
+            ||> Map.fold (fun acc name access ->
+                match Map.tryFind name acc with
+                | Some existing -> Map.add name (existing ||| access) acc
+                | None -> Map.add name access acc)
+
         optimize
             { shader with
                 shaderUniforms          = newUniforms
                 shaderInputs            = newInputs
                 shaderOutputs           = newOutputs
                 shaderBody              = newBody
+                shaderStorageBufferAccess = newStorageAccess
             }
 
 

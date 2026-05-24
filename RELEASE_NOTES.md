@@ -1,3 +1,6 @@
+### 5.7.7
+- Fixed `Shader.withBody`/`substituteReads` dropping per-buffer storage access: a storage-buffer read spliced into a shader (e.g. bindless vertex-pull rewrites that replace input reads with `buffer[...]` gathers) now re-derives `StorageAccess` from the new body, so the buffer is emitted as `readonly` instead of read-write
+
 ### 5.7.6
 - Unbounded (runtime-sized, count -1) sampler/image arrays via descriptor indexing, with `nonuniformEXT` for dynamic indices
 - Unbounded (bindless) storage-buffer ARRAYS: a `T[][]` storage buffer assembles to `buffer { T[] data; } X[];`, indexed `X[i].data[j]`; `GLSLStorageBuffer.ssbCount` reports the count (-1 = unbounded array, 1 = single) so descriptor-indexing backends can bind an array of storage buffers; `nonuniformEXT` emitted for dynamic outer indices
