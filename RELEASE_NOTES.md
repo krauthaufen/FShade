@@ -1,3 +1,7 @@
+### 5.7.6
+- Unbounded (runtime-sized, count -1) sampler/image arrays via descriptor indexing, with `nonuniformEXT` for dynamic indices
+- Unbounded (bindless) storage-buffer ARRAYS: a `T[][]` storage buffer assembles to `buffer { T[] data; } X[];`, indexed `X[i].data[j]`; `GLSLStorageBuffer.ssbCount` reports the count (-1 = unbounded array, 1 = single) so descriptor-indexing backends can bind an array of storage buffers; `nonuniformEXT` emitted for dynamic outer indices
+
 ### 5.7.5
 - Fixed constant folding for non-static members (.Normalized etc.)
 
