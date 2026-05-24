@@ -1818,10 +1818,18 @@ module Assembler =
                     return sprintf "%s.%s" v f.Name
 
                 | CItem(_, CItem(_, (CReadInput _ as v), i), j) ->
-                    let! v = assembleExprS v
-                    let! i = assembleExprS i
-                    let! j = assembleExprS j
-                    return sprintf "%s[%s].data[%s]" v i j
+                    // bindless storage-buffer ARRAY access: Geom[i].data[j]. A DYNAMIC
+                    // outer index into the SSBO descriptor array must use nonuniformEXT
+                    // (required to index a runtime descriptor array in Vulkan GLSL).
+                    let isDynamic = match i with | CValue _ -> false | _ -> true
+                    let! vs = assembleExprS v
+                    let! is = assembleExprS i
+                    let! js = assembleExprS j
+                    if isDynamic then
+                        do! AssemblerState.useExtension "GL_EXT_nonuniform_qualifier"
+                        return sprintf "%s[nonuniformEXT(%s)].data[%s]" vs is js
+                    else
+                        return sprintf "%s[%s].data[%s]" vs is js
                     
 
                 | CItem(_, v, i) ->
