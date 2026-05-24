@@ -442,6 +442,10 @@ type GLSLStorageBuffer =
         ssbName         : string
         ssbType         : GLSLType
         ssbAccess       : StorageAccess
+        /// Number of buffers in the binding. 1 = a single SSBO; -1 = an UNBOUNDED
+        /// (bindless) array of SSBOs ('buffer { T[] data; } X[]', from a `T[][]`
+        /// storage buffer) requiring descriptor indexing. Mirrors GLSLSampler.samplerCount.
+        ssbCount        : int
     }
 
 type GLSLUniformBufferField =
@@ -1527,7 +1531,8 @@ module GLSLProgramInterface =
             dst.Write ssb.ssbSet
             GLSLType.serializeInternal dst ssb.ssbType
             dst.Write (int ssb.ssbAccess)
-            
+            dst.Write ssb.ssbCount
+
         dst.Write program.uniformBuffers.Count
         for KeyValue(name, ub) in program.uniformBuffers do
             dst.Write name
@@ -1704,12 +1709,14 @@ module GLSLProgramInterface =
                 let ssbSet = src.ReadInt32()
                 let ssbType = GLSLType.deserializeInternal src
                 let ssbAccess = src.ReadInt32() |> unbox<StorageAccess>
+                let ssbCount = src.ReadInt32()
                 name, {
                     ssbBinding = ssbBinding
                     ssbName = ssbName
                     ssbSet = ssbSet
                     ssbType = ssbType
                     ssbAccess = ssbAccess
+                    ssbCount = ssbCount
                 }
             )   
             |> MapExt.ofList

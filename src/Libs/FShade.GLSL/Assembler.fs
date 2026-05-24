@@ -2224,21 +2224,26 @@ module Assembler =
                                             
                                             match field.cUniformType with
                                             | CType.CPointer(_,ct) ->
+                                                // ct is CPointer for a `T[][]` storage buffer (an UNBOUNDED
+                                                // array of SSBOs); otherwise it's a single SSBO of element ct.
+                                                let isArray, elemCt =
+                                                    match ct with
+                                                    | CType.CPointer(_, inner) -> true, inner
+                                                    | _ -> false, ct
                                                 do! Interface.addStorageBuffer {
                                                     ssbSet = set
                                                     ssbBinding = binding
                                                     ssbName = name.Name
-                                                    ssbType = GLSLType.ofCType config.reverseMatrixLogic ct
+                                                    ssbType = GLSLType.ofCType config.reverseMatrixLogic elemCt
                                                     ssbAccess = access
-                                                }                      
-                                                match ct with
-                                                | CType.CPointer(_,ct) ->
-                                                    let! typ = assembleTypeS config.reverseMatrixLogic ct
+                                                    ssbCount = (if isArray then -1 else 1)
+                                                }
+                                                let! typ = assembleTypeS config.reverseMatrixLogic elemCt
+                                                if isArray then
                                                     return sprintf "%sbuffer %sBuffer { %s[] data; } %s[];" prefix name.Name typ.Name name.Name
-                                                | ct ->
-                                                    let! typ = assembleTypeS config.reverseMatrixLogic ct
+                                                else
                                                     return sprintf "%sbuffer %sBuffer { %s[] %s; };" prefix name.Name typ.Name name.Name
-                                            
+
                                             | ct ->
                                                 return failwithf "[GLSL] not a storage buffer type: %A" ct
 
@@ -2581,6 +2586,7 @@ module Assembler =
                                     ssbName = p.cParamName
                                     ssbType = GLSLType.ofCType config.reverseMatrixLogic ct
                                     ssbAccess = access
+                                    ssbCount = 1
                                 }
                             | _ ->
                                 failwithf "[GLSL] not a storage buffer type: %A" p.cParamType
