@@ -1820,12 +1820,14 @@ module Assembler =
                 | CItem(_, CItem(_, (CReadInput _ as v), i), j) ->
                     // bindless storage-buffer ARRAY access: Geom[i].data[j]. A DYNAMIC
                     // outer index into the SSBO descriptor array must use nonuniformEXT
-                    // (required to index a runtime descriptor array in Vulkan GLSL).
+                    // (required to index a runtime descriptor array in Vulkan GLSL). On GL
+                    // (no descriptor sets) there is no GL_EXT_nonuniform_qualifier, and a
+                    // dynamically-uniform index needs none — so emit plain indexing there.
                     let isDynamic = match i with | CValue _ -> false | _ -> true
                     let! vs = assembleExprS v
                     let! is = assembleExprS i
                     let! js = assembleExprS j
-                    if isDynamic then
+                    if isDynamic && config.createDescriptorSets then
                         do! AssemblerState.useExtension "GL_EXT_nonuniform_qualifier"
                         return sprintf "%s[nonuniformEXT(%s)].data[%s]" vs is js
                     else
@@ -1845,7 +1847,7 @@ module Assembler =
                     let isDynamic = match i with | CValue _ -> false | _ -> true
                     let! vs = assembleExprS v
                     let! is = assembleExprS i
-                    if isTextureArray && isDynamic then
+                    if isTextureArray && isDynamic && config.createDescriptorSets then
                         do! AssemblerState.useExtension "GL_EXT_nonuniform_qualifier"
                         return sprintf "%s[nonuniformEXT(%s)]" vs is
                     else

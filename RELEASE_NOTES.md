@@ -1,3 +1,6 @@
+### 5.7.8
+- GLSL: only emit `nonuniformEXT` (and require `GL_EXT_nonuniform_qualifier`) for dynamic descriptor-array indexing when the target uses descriptor sets (Vulkan, `createDescriptorSets = true`). On the GL backend there is no such extension and a dynamically-uniform index needs no qualifier, so bindless storage-buffer arrays (`X[i].data[j]`) and sampler/image arrays now compile on GL instead of failing with `undefined variable "nonuniformEXT"`
+
 ### 5.7.7
 - Fixed `Shader.withBody`/`substituteReads` dropping per-buffer storage access: a storage-buffer read spliced into a shader (e.g. bindless vertex-pull rewrites that replace input reads with `buffer[...]` gathers) now re-derives `StorageAccess` from the new body, so the buffer is emitted as `readonly` instead of read-write
 
