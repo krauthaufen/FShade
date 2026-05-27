@@ -761,17 +761,25 @@ module AssemblerState =
     let newBinding (kind : InputKind) (cnt : int) =
         State.custom (fun s ->
             let c = s.config
+            // `cnt` is the element count for array uniforms (samplers/images).
+            // Unbounded arrays come through as `cnt = -1` (FShade's sentinel for
+            // a bindless `T[]`). They still consume exactly ONE binding slot, so
+            // advance the counter by at least 1 — otherwise a sampler array
+            // with cnt=-1 DECREMENTS the global counter and the next
+            // allocation collides with already-used bindings (image vs SSBO
+            // collisions in composed effects).
+            let step = max 1 cnt
             match c.bindingMode with
                 | BindingMode.None ->
                     s, -1
 
                 | BindingMode.Global ->
                     let b = Map.tryFind InputKind.Any s.currentBinding |> Option.defaultValue 0
-                    { s with currentBinding = Map.add InputKind.Any (b + cnt) s.currentBinding }, b
+                    { s with currentBinding = Map.add InputKind.Any (b + step) s.currentBinding }, b
                 | _ -> //BindingMode.PerKind ->
-                    
+
                     let b = Map.tryFind kind s.currentBinding |> Option.defaultValue 0
-                    { s with currentBinding = Map.add kind (b + cnt) s.currentBinding }, b
+                    { s with currentBinding = Map.add kind (b + step) s.currentBinding }, b
 
         )
 
