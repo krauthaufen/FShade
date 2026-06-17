@@ -595,7 +595,7 @@ let ``Write to payload fields partial``() =
 
     GLSL.shouldCompileRaytracingAndContainRegex effect [
         @"\{\s*rayPayload0.depth =.+;\s+traceRayEXT"
-        @"\{\s*rayPayloadIn.color = .+;\s*\}"
+        @"rayPayloadIn.color = \(inner \+ \(rayPayloadIn.color \* 0\.5\)\);\s*\}"
     ]
 
 [<Test>]

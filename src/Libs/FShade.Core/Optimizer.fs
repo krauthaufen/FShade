@@ -375,6 +375,12 @@ module Optimizer =
             | _ -> ValueNone
 
         [<return: Struct>]
+        let (|NonLExpr|_|) (e : Expr) =
+            match e with
+            | LExpr _ -> ValueNone
+            | _ -> ValueSome ()
+
+        [<return: Struct>]
         let rec (|MutableArgument|_|) (e : Expr) =
             match e with
             | Var v -> 
@@ -399,6 +405,16 @@ module Optimizer =
                 ValueSome ()
             | _ ->
                 ValueNone
+
+        /// Determines if the address of the given variable is taken in the given expression.
+        let rec takesAddressOf (v: Var) (e: Expr) =
+            match e with
+            | RefOf (Var r)
+            | AddressOf (Var r) when v = r -> true
+            | ShapeVar _ -> false
+            | CallFunction (_, args)
+            | ShapeCombination (_, args) -> args |> List.exists (takesAddressOf v)
+            | ShapeLambda(_, b) -> takesAddressOf v b
 
     /// The dead code elimination removes unused bindings from the code
     /// e.g. `let a = someFunction(x,y) in 10` gets reduced to `10` assuming
@@ -1608,6 +1624,10 @@ module Optimizer =
                         let! e = evaluateConstantsS e
                         return Expr.AddressOf(e)
 
+                    | RefOf e ->
+                        let! e = evaluateConstantsS e
+                        return Expr.RefOf(e)
+
                     | AddressSet(v, e) ->
                         let! v = evaluateConstantsS v
                         let! e = evaluateConstantsS e
@@ -1903,7 +1923,7 @@ module Optimizer =
                     | Let(v, e, b) ->
                         let! e = evaluateConstantsS e
                         match e with
-                            | Value(value,_) when not v.IsMutable ->
+                            | Value(value,_) when not v.IsMutable && not <| takesAddressOf v b ->
                                 do! State.setVar v value
                                 return! evaluateConstantsS b
                             | _ ->
@@ -2794,8 +2814,13 @@ module Optimizer =
                             let! pattern = State.letValuePattern
                             match pattern e with
                                 | ValueSome () ->
-                                    let b = b.Substitute(fun vi -> if vi = v then Some e else None)
-                                    return! inlineS b
+                                    match e with
+                                    | NonLExpr when takesAddressOf v b ->
+                                        let! b = inlineS b
+                                        return Expr.Let(v, e, b)
+                                    | _ ->
+                                        let b = b.Substitute(fun vi -> if vi = v then Some e else None)
+                                        return! inlineS b
                                 | ValueNone ->
                                     let nonMutable = state.nonMutable
                                     let rec canInline (e : Expr) =
@@ -2821,18 +2846,18 @@ module Optimizer =
                                                 | WriteOutputs _ ->
                                                     false
 
-
-
-
                                                 | Call(None, mi, args) ->
                                                     if state.isSideEffect mi then false
                                                     else args |> List.forall canInline
+
+                                                | CallFunction(f, args) ->
+                                                    f.functionBody::args |> List.forall canInline
 
                                                 | ShapeVar v -> Set.contains v nonMutable || not v.IsMutable
                                                 | ShapeCombination (_,args) -> args |> List.forall canInline
                                                 | ShapeLambda(_,b) -> canInline b
 
-                                    if canInline e then
+                                    if canInline e && not <| takesAddressOf v b then
                                         let mutable cnt = 0
                                         let nb = b.Substitute(fun vi -> if vi = v then cnt <- cnt + 1; Some e else None)
                                         if cnt = 1 then

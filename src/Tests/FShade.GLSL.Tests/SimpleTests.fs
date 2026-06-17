@@ -416,6 +416,22 @@ let ``Ref translated to inout``() =
 
     GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [rx "util"; rx "util2"]
 
+[<ReflectedDefinition>]
+let util3 (a: ref<float32>) (b: ref<float32>) =
+    1.0f + !a + !b
+
+[<Test>]
+let ``Address-of with function call``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            let a = assertT v.c.X
+            let b = 0.0f
+            return util3 &&a &&b
+        }
+
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction fs ] ["float a ="; "float b ="]
 
 [<GLSLIntrinsic("atomicAdd({0}, {1})")>]
 let atomicAdd (r : ref<int>) (v : int) = onlyInShaderCode "atomicAdd"
