@@ -2321,6 +2321,12 @@ module Preprocessor =
                 else
                     return! preprocessNormalS (Expr.Coerce(v, e.Type))
 
+            | Call(None, MethodQuote <@ fst @> _, [t]) ->
+                return! preprocessNormalS (Expr.TupleGet(t, 0))
+
+            | Call(None, MethodQuote <@ snd @> _, [t]) ->
+                return! preprocessNormalS (Expr.TupleGet(t, 1))
+
             | Pipe(e) ->
                 return! preprocessNormalS e
 

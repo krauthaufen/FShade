@@ -1,4 +1,5 @@
 - Fixed issue with inlining and address-of operator
+- Added support for `fst` and `snd`
 
 ### 5.7.9
 - GLSL: fixed binding allocator decrementing the global counter when an unbounded sampler/image array (`cnt = -1`, the bindless-array sentinel) was allocated. A `Backend.Create` with `BindingMode.Global` would silently produce overlapping bindings between images, samplers, SSBOs and UBOs whenever a composed effect mixed storage images, an unbounded sampler array and SSBOs on the same set — Vulkan validation flagged it with `VUID-VkDescriptorSetLayoutCreateInfo-binding-00279`, NVIDIA tolerated the collision by overwriting descriptors at runtime (so e.g. an `imageStore` to a storage image whose binding collided with an SSBO would silently land on the SSBO and the write was lost). The allocator now advances by `max 1 cnt` so an unbounded array consumes exactly one slot regardless of its element count.

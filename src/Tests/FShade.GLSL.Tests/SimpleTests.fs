@@ -1322,3 +1322,15 @@ let ``Push constants``() =
         }
 
     GLSL.shouldCompileAndContainRegex' glslVulkan [ Effect.ofFunction fs ] [ "push_constant" ]
+
+[<Test>]
+let ``Tuple item access (fst, snd)``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            let r = v.c.X, v.c.Y * v.c.Z
+            return fst r + snd r
+        }
+
+    GLSL.shouldCompile [ Effect.ofFunction fs ]
