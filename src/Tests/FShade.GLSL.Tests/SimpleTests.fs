@@ -1334,3 +1334,33 @@ let ``Tuple item access (fst, snd)``() =
         }
 
     GLSL.shouldCompile [ Effect.ofFunction fs ]
+
+
+type TupleRecord =
+    { st: float32 * float32 }
+
+type UniformScope with
+    member x.TupleArr : TupleRecord[] = x?StorageBuffer?TupleArr
+
+[<ReflectedDefinition>]
+let nestedTupleInput ((s, t) : float32 * float32) =
+    pow s t
+
+[<ReflectedDefinition>]
+let tupleInput ((x, (y, z)) : float32 * (float32 * float32)) ((u, v) : float32 * float32) (st : float32 * float32) =
+    x + y * y * z - u / v + nestedTupleInput st
+
+[<Test>]
+let ``Tuple function arguments``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            let xyz = v.c.X, (v.c.Y, v.c.Z)
+            let uv = v.foo.X, v.foo.Y
+            uniform.TupleArr.[0] <- { st = v.hugo.X, v.hugo.Y }
+            let r = uniform.TupleArr.[1]
+            return tupleInput xyz uv r.st
+        }
+
+    GLSL.shouldCompile [ Effect.ofFunction fs ]

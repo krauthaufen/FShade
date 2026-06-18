@@ -497,6 +497,13 @@ module ReflectionPatterns =
         else
             ValueNone
 
+    [<return: Struct>]
+    let (|TupleType|_|) (t: Type) =
+        if FSharpType.IsTuple t then
+            ValueSome <| FSharpType.GetTupleElements t
+        else
+            ValueNone
+
 [<AutoOpen>]
 module ExprExtensions =
 

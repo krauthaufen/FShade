@@ -1,4 +1,5 @@
-- Fixed issue with inlining and address-of operator
+- Fixed invalid inlining in presence of address-of operators
+- Fixed handling of functions with tuple arguments
 - Added support for `fst` and `snd`
 
 ### 5.7.9

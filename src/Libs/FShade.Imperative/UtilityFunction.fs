@@ -73,11 +73,28 @@ module UtilityFunction =
                             let args =
                                 args |> List.filter (fun a -> a.Type <> typeof<unit>)
 
+                            // At call-site tuple arguments will be flattened
+                            let untupledArgs =
+                                args |> List.collect (fun a ->
+                                    match a.Type with
+                                    | TupleType elements -> elements |> List.ofArray |> List.mapi (fun i t -> Var($"{a.Name}_{i}", t))
+                                    | _ -> [a]
+                                )
+
+                            let rec replaceTuples (e: Expr) =
+                                match e with
+                                | TupleGet(Var v, i) when args |> List.contains v ->
+                                    let var = untupledArgs |> List.find (_.Name >> (=) $"{v.Name}_{i}")
+                                    Expr.Var var
+                                | ShapeVar _ -> e
+                                | ShapeLambda(v, b) -> Expr.Lambda(v, replaceTuples b)
+                                | ShapeCombination (o, args) -> RebuildShapeCombination(o, args |> List.map replaceTuples)
+
                             Some {
                                 functionId = Expr.ComputeHash e
                                 functionName = methodName m
-                                functionArguments = args
-                                functionBody = body
+                                functionArguments = untupledArgs
+                                functionBody = if args = untupledArgs then body else replaceTuples body
                                 functionMethod = Some m
                                 functionTag = null
                                 functionIsInline = isInline
@@ -106,12 +123,16 @@ module UtilityFunctionExpressionExtensions =
     type Expr with
 
         static member CallFunction(f : UtilityFunction, args : list<Expr>) =
-            assert ( List.forall2 (fun (v : Var) (e : Expr) -> v.Type.IsAssignableFrom e.Type) f.functionArguments args )
+            let pts = f.functionArguments |> List.map _.Type
+            let ats = args |> List.map _.Type
+
+            if pts.Length <> ats.Length || (pts, ats) ||> List.exists2 (fun p a -> not <| p.IsAssignableFrom a) then
+                failwith $"Function {f.functionName} requires parameters {pts} but given {ats}"
 
             let args =
                 match args with
-                    | [] -> Expr.Unit
-                    | args -> Expr.NewTuple args
+                | [] -> Expr.Unit
+                | args -> Expr.NewTuple args
 
             Expr.Coerce(
                 Expr.NewTuple [Expr.Value "__FUNCTIONCALL__"; Expr.Value f; args ], 
