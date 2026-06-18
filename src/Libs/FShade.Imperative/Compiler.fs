@@ -147,12 +147,18 @@ module Compiler =
                 let cName = 
                     "new_" + typeName t
 
-                let cFields = 
-                    FSharpType.GetRecordFields(t, true)
+                let cFields =
+                    if FSharpType.IsRecord t then
+                        FSharpType.GetRecordFields(t, true)
+                        |> Array.map (fun pi -> struct {| Name = pi.Name; Type = pi.PropertyType |})
+                    else
+                        // Structs are constructed with a NewRecord expression as well, but they are not F# types
+                        t.GetFields(BindingFlags.Public ||| BindingFlags.NonPublic ||| BindingFlags.Instance)
+                        |> Array.map (fun fi -> struct {| Name = fi.Name; Type = fi.FieldType |})
 
                 let cParameters =
                     cFields |> Array.map (fun pi ->
-                        { name = pi.Name; ctype = CType.ofType b pi.PropertyType; modifier = CParameterModifier.In }
+                        { name = pi.Name; ctype = CType.ofType b pi.Type; modifier = CParameterModifier.In }
                     )   
                     
                 let cType =
@@ -237,31 +243,44 @@ module Compiler =
                 failwithf "[FShade] cannot compile constructor for OOP-style type inheriting from a different class"
 
             let preprocessCtor (e : Expr) =
-                let rec preprocess (this : Var) (arg : Var) (e : Expr) =
+                let rec preprocess (this : Var option) (arg : Var) (e : Expr) =
                     match e with
-                        | Let(v, TupleGet(Var(a), i), e) when a = arg ->
-                            let args, body = preprocess this arg e
-                            v::args, body
+                    | Let(v, TupleGet(Var a, _), e) when a = arg ->
+                        let args, body = preprocess this arg e
+                        v::args, body
 
-                        | Sequential(NewObject(ctor, args), rest) when ctor.DeclaringType = baseType ->
-                            [], Expr.Let(this, Expr.DefaultValue(this.Type), rest)
+                    | Sequential(NewObject(ctor, _), rest) when ctor.DeclaringType = baseType ->
+                        match this with
+                        | Some this -> [], Expr.Let(this, Expr.DefaultValue(this.Type), rest)
+                        | _ -> [], rest
 
-                        | _ -> 
-                            failwithf "[FShade] unexpected constructor definition %A" e
-
-                let this = e.GetFreeVars() |> Seq.exactlyOne
+                    | _ -> 
+                        [], e
+                            
+                let this = e.GetFreeVars() |> Seq.tryExactlyOne
                 match e with
-                    | Lambda(arg, body) -> 
-                        preprocess this arg body
-                    | _ ->
-                        failwithf "[FShade] unexpected constructor definition %A" e
+                | Lambda(arg, body) ->
+                    let args, body = preprocess this arg body
+
+                    let args =
+                        match args with
+                        | [] -> match arg.Type with Unit -> [] | _ -> [arg]
+                        | _ -> args
+
+                    args, body
+                | _ ->
+                    failwithf "[FShade] unexpected constructor definition %A" e
 
             ctorCache.GetOrAdd((b,ctor), fun (b, ctor) ->
                 match ExprWorkardound.TryGetReflectedDefinition ctor with
                     | Some e ->
                         let args, body = preprocessCtor e
-                        let argTypeNames = args |> List.map (fun a -> typeName a.Type) |> String.concat "_"
-                        let cName = "new_" + typeName ctor.DeclaringType + "_of_" + argTypeNames
+
+                        let suffix =
+                            let names = args |> List.map (_.Type >> typeName) |> String.concat "_"
+                            if names = "" then "" else $"_of_{names}"
+                                
+                        let cName = "new_" + typeName ctor.DeclaringType + suffix
                         ManagedFunction(cName, args, body)
                     | None ->
                         failwithf "[FShade] cannot compile constructor without reflected definition %A" ctor
@@ -1620,7 +1639,7 @@ module Compiler =
                     let! ct = toCTypeS e.Type
                     let! t = toCExprS t
                     return CField(ct, t, sprintf "Item%d" i)
-                
+
 
 
                 | Call(None, mi, []) ->

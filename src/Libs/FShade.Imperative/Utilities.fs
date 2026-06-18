@@ -831,19 +831,11 @@ module ExprExtensions =
 
     [<return: Struct>]
     let (|NewFixedArray|_|) (e : Expr) =
-        match e with
-        | NewObject(ctor, []) ->
-            let targs = ctor.DeclaringType.GetGenericArguments()
-            let len = Peano.getSize (targs.[0])
-            let et = targs.[1]
+        match e.Type, e with
+        | TypeMeta.Patterns.ArrOf (len, et), NewObject(_, []) ->
             ValueSome(len, et, [])
-
-        | NewObject(ctor, [Coerce(NewArray(et, args),_)]) ->
-            if ctor.DeclaringType.IsGenericType && ctor.DeclaringType.GetGenericTypeDefinition() = typedefof<Arr<_,_>> then
-                let len = Peano.getSize (ctor.DeclaringType.GetGenericArguments().[0])
-                ValueSome(len, et, args)
-            else 
-                ValueNone
+        | TypeMeta.Patterns.ArrOf (len, et), NewObject(_, [Coerce(NewArray(_, args),_)]) ->
+            ValueSome(len, et, args)
         | _ ->
             ValueNone
 
@@ -1265,7 +1257,7 @@ module private Helpers =
 
     let private builtIn =
         [
-            typeof<unit>, "bool"
+            typeof<unit>, "void"
             typeof<System.Void>, "void"
             typeof<bool>, "bool"
 

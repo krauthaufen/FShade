@@ -1209,6 +1209,22 @@ module Optimizer =
                 | Value(h,_), AllConstant t -> ValueSome (h :: t)
                 | _ -> ValueNone
 
+        [<return: Struct>]
+        let private (|DeconstructibleType|_|) (t : Type) =
+            if t.IsEnum || FSharpType.IsUnion t || FSharpType.IsTuple t || FSharpType.IsRecord t then
+                ValueSome ()
+            else
+                match t with
+                | RaytracingId
+                | TypeMeta.Patterns.Unit
+                | TypeMeta.Patterns.Numeric
+                | TypeMeta.Patterns.String
+                | TypeMeta.Patterns.Color _
+                | TypeMeta.Patterns.Vector _
+                | TypeMeta.Patterns.Matrix _ ->
+                    ValueSome ()
+                | _ ->
+                    ValueNone
 
         let functionTable (l : list<string * obj>) =
             let table = Dictionary.empty
@@ -1952,11 +1968,13 @@ module Optimizer =
 
                     | NewObject(ctor, args) ->
                         let! args = args |> List.mapS evaluateConstantsS
-                        match args with
-                            | AllConstant args ->
-                                return Expr.Value(ctor.Invoke(List.toArray args), e.Type)
-                            | _ ->
-                                return Expr.NewObject(ctor, args)
+
+                        // Only evaluate if the type can be deconstructed again, otherwise we may end up with a useless value
+                        match args, ctor.DeclaringType with
+                        | AllConstant args, DeconstructibleType ->
+                            return Expr.Value(ctor.Invoke(List.toArray args), e.Type)
+                        | _ ->
+                            return Expr.NewObject(ctor, args)
                         
                     | NewRecord(t, args) ->
                         let! args = args |> List.mapS evaluateConstantsS
@@ -2803,8 +2821,9 @@ module Optimizer =
                     //    return Expr.Let(v, e, b)
 
                     | Let(v, e, b) ->
-                        //let! nonMutable = State.get |> State.map (fun s -> Set.contains v s.nonMutable)
-                        if v.IsMutable || v.Type.IsRef || v.Type = typeof<HitObject> then
+                        // Only inline if immutable and not a default declaration.
+                        // The latter case is important for HitObject and structs.
+                        if v.IsMutable || v.Type.IsRef || e = Expr.DefaultValue e.Type then
                             let! e = inlineS e
                             let! b = inlineS b
                             return Expr.Let(v, e, b)
