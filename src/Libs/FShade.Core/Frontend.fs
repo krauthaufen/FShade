@@ -322,9 +322,9 @@ module Primitives =
             onlyInShaderCode "debugPrintf"
 
         /// Print to the debug output (only Vulkan with validation layers)
-        [<ReflectedDefinition; KeepCall; Inline>]
+        [<KeepCall>]
         static member Printfn(format : string, [<ParamArray>] values : obj[]) : unit =
-            Debug.Printf(format + @"\n", values)
+            onlyInShaderCode "debugPrintfn"
 
 
     [<Literal>]

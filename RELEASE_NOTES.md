@@ -1,5 +1,6 @@
 - Fixed invalid inlining in presence of address-of operators
 - Fixed handling of functions with tuple arguments
+- Fixed `Debug.Printfn` for compute shaders
 - Added support for `fst` and `snd`
 - Improved support for custom structs and classes
 

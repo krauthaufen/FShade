@@ -117,6 +117,7 @@ module CType =
                     | MatrixOf(s, t)    -> CMatrix(ofTypeInternal seen b t, s.Y, s.X)
                     | ArrOf(len, t)     -> CArray(ofTypeInternal seen b t, len)
                     | Ref t             -> ofTypeInternal seen b t
+                    | String            -> failwith "[FShade] encountered string type, but strings can only be literals"
                     | t when t.IsArray  -> CType.CPointer(CPointerModifier.None, ofTypeInternal seen b (t.GetElementType()))
                     | t                 -> ofCustomType seen b t
             )

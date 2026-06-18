@@ -1087,6 +1087,9 @@ module Compiler =
                 | "One"     -> one t |> Some
                 | _         -> None
 
+        module DebugPrintf =
+            let private debugPrintfStub (newLine: bool) (format: string) (values: obj[]) = onlyInShaderCode "debugPrintfStub"
+            let stub = getMethodInfo <@ debugPrintfStub @>
 
     type ModuleState =
         {
@@ -1678,11 +1681,19 @@ module Compiler =
                             let! def = FunctionDefinition.Utility f |> CompilerState.useGlobalFunction f.uniqueName
                             return CCall(def, List.toArray args)
 
-                | Call(None, (Method("Printf", _) as mi), [fmt; values]) when mi.DeclaringType.Name = "Debug" ->
+                | Call(None, mi, [newLine; fmt; values]) when mi = Helpers.DebugPrintf.stub ->
+                    let newLine =
+                        match Expr.TryEval newLine with
+                        | Some (:? bool as newLine) -> newLine
+                        | _ -> false
+
                     let fmt =
                         match Expr.TryEval fmt with
-                        | Some (:? string as fmt) -> CExpr.CValue(CType.CVoid, CLiteral.CString fmt)
-                        | _ -> failwithf "[FShade] Failed to evaluate format expression"
+                        | Some (:? string as fmt) ->
+                            let fmt = if newLine then fmt + @"\n" else fmt
+                            CExpr.CValue(CType.CVoid, CLiteral.CString fmt)
+                        | _ ->
+                            failwithf "[FShade] Failed to evaluate Debug.Printf format expression"
 
                     let removeCoerce = function
                         | Coerce(e, _) -> e
@@ -1703,7 +1714,13 @@ module Compiler =
                     let! values =
                         values |> Array.mapS toCExprS
 
-                    return CDebugPrintf(fmt, values)
+                    return CDebugPrintf(fmt, values)    
+
+                | Call(None, (Method("Printf", _) as mi), [fmt; values]) when mi.DeclaringType.Name = "Debug" ->
+                    return! toCExprS <| Expr.Call(Helpers.DebugPrintf.stub, [ Expr.Value false; fmt; values ])
+
+                | Call(None, (Method("Printfn", _) as mi), [fmt; values]) when mi.DeclaringType.Name = "Debug" ->
+                    return! toCExprS <| Expr.Call(Helpers.DebugPrintf.stub, [ Expr.Value true; fmt; values ])
 
                 | Call(None, MethodQuote <@ enum : int -> ShaderStage @> _, [value])
                 | Call(None, MethodQuote <@ LanguagePrimitives.EnumOfValue : int -> ShaderStage @> _, [value])

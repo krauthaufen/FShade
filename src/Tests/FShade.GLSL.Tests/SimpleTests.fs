@@ -1131,7 +1131,7 @@ let ``Primitive id``() =
 let ``Debug output``() =
     Setup.Run()
 
-    let formatStr = "This is a format string"
+    let formatStr = "This is a format string" // Compute shaders do not perform inlining, so this won't work there
 
     let fs (v : Vertex) =
         fragment {
@@ -1152,9 +1152,23 @@ let ``Debug output``() =
             return V4i.Zero
         }
 
-    GLSL.shouldCompile [
-        Effect.ofFunction fs
-    ]
+    let cs (v: V4f[]) =
+        compute {
+            Debug.Printf("Hello" + " my " +  "World!")
+            Debug.Printf("Hello, look at my float32: %f", 0.0)
+            Debug.Printf("Hello, look at my float32: %f", 0.0)
+            Debug.Printf("Hello, look at my float32: %f", v.[0].X)
+            Debug.Printf("Hello, look at my vector: %v4f", v.[0])
+
+            Debug.Printfn("Hello" + " my " +  "World!")
+            Debug.Printfn("Hello, look at my float32: %f", 0.0)
+            Debug.Printfn("Hello, look at my float32: %f", 0.0)
+            Debug.Printfn("Hello, look at my float32: %f", v.[0].X)
+            Debug.Printfn("Hello, look at my vector: %v4f", v.[0])
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction fs] ["debugPrintfEXT"]
+    GLSL.shouldCompileComputeAndContainRegex (ComputeShader.ofFunction (V3i(128)) cs) ["debugPrintfEXT"]
 
 [<Test>]
 let ``UInt32 literals``() =
