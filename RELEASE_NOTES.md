@@ -1,3 +1,4 @@
+### 5.7.10
 - Fixed invalid inlining in presence of address-of operators
 - Fixed handling of functions with tuple arguments
 - Fixed `Debug.Printfn` for compute shaders
