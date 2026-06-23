@@ -2170,39 +2170,68 @@ module Assembler =
         state {
             let! s = State.get
             let! config = AssemblerState.config
+
+            // Vulkan VK_EXT_descriptor_indexing: a binding declared
+            // VARIABLE_DESCRIPTOR_COUNT must be the LAST binding in its set
+            // (spec VUID 03004). NVIDIA tolerates violations; AMD/RADV does
+            // not — multiple unbounded arrays in one set would silently land
+            // on fixed-size partially-bound fallbacks. We give EVERY truly
+            // unbounded (count = -1) sampler/image array or SSBO-array its
+            // own descriptor set so each one really is the last binding.
+            // Fixed-size uniforms keep the original shared-set grouping.
+            let isUnbounded (u : CUniform) =
+                match u.cUniformType with
+                | CTexture (_, cnt) -> cnt < 0
+                | CType.CPointer(_, CType.CPointer(_, _)) -> true
+                | _ -> false
+
             let buffers =
-                uniforms 
+                uniforms
                     |> List.map (fun u -> match u.cUniformType with | CIntrinsic { tag = (:? GLSLTextureLike) } -> { u with cUniformBuffer = None } | _ -> u)
                     |> List.groupBy (fun u -> u.cUniformBuffer)
                     |> List.collect (function (Some a, f) -> [Some a, f] | (None, f) -> f |> List.map (fun f -> None, [f]))
 
+            // Split each group into a fixed-size sub-group (kept together)
+            // and one single-field group per unbounded uniform.
+            let buffers =
+                buffers |> List.collect (fun (name, fields) ->
+                    let unb, bnd = List.partition isUnbounded fields
+                    let bndPart = if List.isEmpty bnd then [] else [name, bnd]
+                    let unbPart = unb |> List.map (fun u -> name, [u])
+                    bndPart @ unbPart
+                )
+
             let allHaveSets =
                 buffers |> List.forall (fun (name, fields) ->
-                    fields |> List.exists (fun u -> 
-                        u.cUniformDecorations |> List.exists (function 
+                    fields |> List.exists (fun u ->
+                        u.cUniformDecorations |> List.exists (function
                             | UniformDecoration.BufferDescriptorSet s -> true
                             | _ -> false
                         )
                     )
                 )
-            let! set = 
+            let! sharedSet =
                 if allHaveSets then State.value 0
                 else AssemblerState.newSet
 
             let! definitions =
                 buffers |> List.mapS (fun (name, fields) ->
                     state {
-                        let set =
-                            let userSet = 
-                                fields |> List.tryPick (fun u -> 
-                                    u.cUniformDecorations |> List.tryPick (function 
+                        let! set =
+                            let userSet =
+                                fields |> List.tryPick (fun u ->
+                                    u.cUniformDecorations |> List.tryPick (function
                                         | UniformDecoration.BufferDescriptorSet s -> Some s
                                         | _ -> None
                                     )
                                 )
                             match userSet with
-                            | Some set -> set
-                            | None -> set
+                            | Some s -> State.value s
+                            | None when fields |> List.exists isUnbounded ->
+                                // unbounded → own set (variable-count must be last)
+                                AssemblerState.newSet
+                            | None ->
+                                State.value sharedSet
 
                         let getBinding (kind : InputKind) (cnt : int) (fields : list<CUniform>) =
                             let userGiven =     
