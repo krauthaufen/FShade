@@ -191,21 +191,24 @@ let ``Fill Array with Function``() =
         }
 
     let expectedFillArrayGLSL =
-        sprintf "
-void .*_fillArray_.*\(vec4 array\[10], float denom\)
-{
-    for\(int i = 0; \(i < 10\); i\+\+\)
-    {
-        array\[i] = vec4\(\(float\(i\) \/ denom\)\);
-    }
-}"
+        [
+            "void .*_fillArray_.*\(vec4 array\[10], float denom\)"
+            "{"
+            "    for\(int i = 0; \(i < 10\); i\+\+\)"
+            "    {"
+            "        array\[i] = vec4\(\(float\(i\) \/ denom\)\);"
+            "    }"
+            "}"
+        ]
+        |> String.concat "\\s*"
 
     let expectedMainGLSL =
-        sprintf "
-    vec4 array\[10\];
-    .*_fillArray_.*\(array, 10\.0\);
-    ColorsOut = array\[color\]"
-
+        [
+            "vec4 array\[10\];"
+            ".*_fillArray_.*\(array, 10\.0\);"
+            "ColorsOut = array\[color\]"
+        ]
+        |> String.concat "\\s*"
 
     GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [ expectedFillArrayGLSL; expectedMainGLSL ]
 
@@ -233,21 +236,25 @@ let ``Fill Array with Return Function``() =
         }
 
     let expectedFillArrayGLSL =
-        sprintf "
-vec4\[10\] .*_fillArrayReturn_.*\(vec4 array\[10], float denom\)
-{
-    for\(int i = 0; \(i < 10\); i\+\+\)
-    {
-        array\[i] = vec4\(\(float\(i\) \/ denom\)\);
-    }
-    return array;
-}"
+        [
+            "vec4\[10\] .*_fillArrayReturn_.*\(vec4 array\[10], float denom\)"
+            "{"
+            "    for\(int i = 0; \(i < 10\); i\+\+\)"
+            "    {"
+            "        array\[i] = vec4\(\(float\(i\) \/ denom\)\);"
+            "    }"
+            "    return array;"
+            "}"
+        ]
+        |> String.concat "\\s*"
 
     let expectedMainGLSL =
-        sprintf "
-    vec4 array\[10\];
-    vec4 array1\[10\] = .*_fillArrayReturn_.*\(array, 10\.0\);
-    ColorsOut = array1\[color\]"
+        [
+            "vec4 array\[10\];"
+            "vec4 array1\[10\] = .*_fillArrayReturn_.*\(array, 10\.0\);"
+            "ColorsOut = array1\[color\]"
+        ]
+        |> String.concat "\\s*"
 
 
     GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [ expectedFillArrayGLSL; expectedMainGLSL ]
@@ -275,13 +282,15 @@ let ``Fill Array with Inline Function``() =
         }
 
     let expectedGLSL =
-        sprintf "
-    vec4 array\[10];
-    for\(int i = 0; \(i < 10\); i\+\+\)
-    {
-        array\[i\] = vec4\(\(float\(i\) \/ 10\.0\)\);
-    }
-    ColorsOut = array\[color\];"
+        [
+            "vec4 array\[10];"
+            "for\(int i = 0; \(i < 10\); i\+\+\)"
+            "{"
+            "    array\[i\] = vec4\(\(float\(i\) \/ 10\.0\)\);"
+            "}"
+            "ColorsOut = array\[color\];"
+        ]
+        |> String.concat "\\s*"
 
     GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [ expectedGLSL ]
 
