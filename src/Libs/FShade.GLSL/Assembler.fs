@@ -579,10 +579,10 @@ type Backend private(config : Config) =
     override x.TryGetIntrinsicMethod (c : MethodInfo) =
         match c with
             | IntrinsicFunction f -> Some f
-            | TextureLookup (fmt, exts, isSampler) -> Some ({ CIntrinsic.tagged fmt with additional = exts; isSamplerFunction = isSampler })
+            | TextureLookup (fmt, exts, isSampler) -> Some { CIntrinsic.tagged fmt with additional = exts; isSamplerFunction = isSampler }
             | _ -> c.Intrinsic<GLSLIntrinsicAttribute>()
 
-    override x.TryGetIntrinsicCtor (c : ConstructorInfo) =
+    override x.TryGetIntrinsicCtor (_ : ConstructorInfo) =
         None
 
     override x.TryGetIntrinsicType (t : Type) =
@@ -1296,17 +1296,17 @@ module Assembler =
         [<return: Struct>]
         let (|CTexture|_|) (t : CType) =
             match t with
-            | CIntrinsic { tag = (:? GLSLTextureLike as t)} -> ValueSome (t, 1)
-            | CArray(CIntrinsic { tag = (:? GLSLTextureLike as t)}, len) -> ValueSome (t, len)
+            | CIntrinsic { tag = :? GLSLTextureLike as t} -> ValueSome (t, 1)
+            | CArray(CIntrinsic { tag = :? GLSLTextureLike as t}, len) -> ValueSome (t, len)
             // unbounded (runtime-sized) sampler/image array: `sampler2D X[]`.
             // count -1 marks "unbounded" for the backend (variable descriptor count).
-            | CPointer(_, CIntrinsic { tag = (:? GLSLTextureLike as t)}) -> ValueSome (t, -1)
+            | CPointer(_, CIntrinsic { tag = :? GLSLTextureLike as t}) -> ValueSome (t, -1)
             | _ -> ValueNone
 
         [<return: Struct>]
         let (|CAccelerationStructure|_|) (t : CType) =
             match t with
-            | CIntrinsic { tag = (:? Type as t) } when t = typeof<Scene> -> ValueSome ()
+            | CIntrinsic { tag = :? Type as t } when t = typeof<Scene> -> ValueSome ()
             | _ -> ValueNone
 
     let private invalidCharsRx = Regex(@"[^_a-zA-Z0-9]|__+")
@@ -2008,7 +2008,7 @@ module Assembler =
                             | None -> name.Name
 
                     match value with
-                        | CRArray(t, args) ->
+                        | CRArray(_, args) ->
                             let! args = args |> List.mapS assembleExprS
                             return args |> Seq.mapi (sprintf "%s[%d] = %s;" name) |> seq
                         | CRExpr e ->
@@ -2094,7 +2094,7 @@ module Assembler =
                     let! e = assembleStatementS false e
                     return sprintf "if(%s)\r\n{\r\n%s\r\n}\r\nelse\r\n{\r\n%s\r\n}" cond (String.indent i) (String.indent e)
 
-                | CSwitch(value, cases) ->
+                | CSwitch _ ->
                     return failwith "[GLSL] switch not implemented"
 
         }
@@ -2131,10 +2131,7 @@ module Assembler =
                 match d with
                 | UniformDecoration.Format t -> Some <| imageFormat t
                 | UniformDecoration.PushConstant -> Some "push_constant"
-                | UniformDecoration.BufferBinding _
-                | UniformDecoration.BufferDescriptorSet _
-                | UniformDecoration.FieldIndex _ -> None
-                | UniformDecoration.BufferAccess _ -> None
+                | _ -> None
             )
 
         let decorations =
@@ -2168,7 +2165,6 @@ module Assembler =
 
     let assembleUniformsS (uniforms : list<CUniform>) =
         state {
-            let! s = State.get
             let! config = AssemblerState.config
 
             // Vulkan VK_EXT_descriptor_indexing: a binding declared
@@ -2182,14 +2178,14 @@ module Assembler =
             let isUnbounded (u : CUniform) =
                 match u.cUniformType with
                 | CTexture (_, cnt) -> cnt < 0
-                | CType.CPointer(_, CType.CPointer(_, _)) -> true
+                | CType.CPointer(_, CType.CPointer _) -> true
                 | _ -> false
 
             let buffers =
                 uniforms
                     |> List.map (fun u -> match u.cUniformType with | CIntrinsic { tag = (:? GLSLTextureLike) } -> { u with cUniformBuffer = None } | _ -> u)
-                    |> List.groupBy (fun u -> u.cUniformBuffer)
-                    |> List.collect (function (Some a, f) -> [Some a, f] | (None, f) -> f |> List.map (fun f -> None, [f]))
+                    |> List.groupBy _.cUniformBuffer
+                    |> List.collect (function Some a, f -> [Some a, f] | None, f -> f |> List.map (fun f -> None, [f]))
 
             // Split each group into a fixed-size sub-group (kept together)
             // and one single-field group per unbounded uniform.
@@ -2201,46 +2197,17 @@ module Assembler =
                     bndPart @ unbPart
                 )
 
-            let allHaveSets =
-                buffers |> List.forall (fun (name, fields) ->
-                    fields |> List.exists (fun u ->
-                        u.cUniformDecorations |> List.exists (function
-                            | UniformDecoration.BufferDescriptorSet s -> true
-                            | _ -> false
-                        )
-                    )
-                )
-            let! sharedSet =
-                if allHaveSets then State.value 0
-                else AssemblerState.newSet
+            let! sharedSet = AssemblerState.newSet
 
             let! definitions =
                 buffers |> List.mapS (fun (name, fields) ->
                     state {
                         let! set =
-                            let userSet =
-                                fields |> List.tryPick (fun u ->
-                                    u.cUniformDecorations |> List.tryPick (function
-                                        | UniformDecoration.BufferDescriptorSet s -> Some s
-                                        | _ -> None
-                                    )
-                                )
-                            match userSet with
-                            | Some s -> State.value s
-                            | None when fields |> List.exists isUnbounded ->
+                            if fields |> List.exists isUnbounded then
                                 // unbounded → own set (variable-count must be last)
                                 AssemblerState.newSet
-                            | None ->
+                            else
                                 State.value sharedSet
-
-                        let getBinding (kind : InputKind) (cnt : int) (fields : list<CUniform>) =
-                            let userGiven =     
-                                fields |> List.tryPick (fun f ->
-                                    f.cUniformDecorations |> List.tryPick (function UniformDecoration.BufferBinding b -> Some b | _ -> None)
-                                )
-                            match userGiven with
-                            | Some u -> State.value u
-                            | None -> AssemblerState.newBinding kind cnt
                         
                         match name with
                             | Some "SharedMemory" ->
@@ -2258,7 +2225,7 @@ module Assembler =
                                 let! buffers =
                                     fields |> List.mapS (fun field ->
                                         state {
-                                            let! binding = getBinding InputKind.StorageBuffer 1 [field]
+                                            let! binding = AssemblerState.newBinding InputKind.StorageBuffer 1
                                             let prefix = uniformLayout Layout.Std430 field.cUniformDecorations set binding
                                             let name = checkName field.cUniformName
 
@@ -2308,7 +2275,7 @@ module Assembler =
                                             let prefix = uniformLayout Layout.Std140 [UniformDecoration.PushConstant] -1 -1
                                             return -1, -1, prefix
                                         else
-                                            let! binding = getBinding InputKind.UniformBuffer 1 fields
+                                            let! binding = AssemblerState.newBinding InputKind.UniformBuffer 1
                                             let prefix = uniformLayout Layout.Std140 [] set binding
                                             return set, binding, prefix
                                     }
@@ -2344,7 +2311,7 @@ module Assembler =
                                                 match t with
                                               
                                                     | GLSLTextureLike.GLSLSamplerState isShadow ->
-                                                        let! binding = getBinding InputKind.Sampler cnt [u]
+                                                        let! binding = AssemblerState.newBinding InputKind.Sampler cnt
                                                         prefix <- uniformLayout Layout.None u.cUniformDecorations set binding
 
                                                         do! Interface.addSamplerState {
@@ -2357,7 +2324,7 @@ module Assembler =
                                                     
                                                     
                                                     | GLSLTextureLike.GLSLTexture tex ->
-                                                        let! binding = getBinding InputKind.Sampler cnt [u]
+                                                        let! binding = AssemblerState.newBinding InputKind.Sampler cnt
                                                         prefix <- uniformLayout Layout.None u.cUniformDecorations set binding
 
                                                         do! Interface.addTexture {
@@ -2369,7 +2336,7 @@ module Assembler =
                                                         }
                                                     
                                                     | GLSLTextureLike.GLSLSampler samplerType -> 
-                                                        let! binding = getBinding InputKind.Sampler cnt [u]
+                                                        let! binding = AssemblerState.newBinding InputKind.Sampler cnt
                                                         prefix <- uniformLayout Layout.None u.cUniformDecorations set binding
 
                                                         do! Interface.addSampler { 
@@ -2382,7 +2349,7 @@ module Assembler =
                                                         }
                                                            
                                                     | GLSLTextureLike.GLSLImage imageType ->
-                                                        let! binding = getBinding InputKind.Image cnt [u]
+                                                        let! binding = AssemblerState.newBinding InputKind.Image cnt
                                                         prefix <- uniformLayout Layout.None u.cUniformDecorations set binding
 
                                                         do! Interface.addImage { 
@@ -2393,7 +2360,7 @@ module Assembler =
                                                         }
 
                                             | CAccelerationStructure ->
-                                                let! binding = getBinding InputKind.AccelerationStructure 1 [u]
+                                                let! binding = AssemblerState.newBinding InputKind.AccelerationStructure 1
                                                 prefix <- uniformLayout Layout.None u.cUniformDecorations set binding
 
                                                 do! Interface.addAccelerationStructure {
@@ -2403,7 +2370,7 @@ module Assembler =
                                                 }
 
                                             | _ ->
-                                                let! binding = getBinding InputKind.UniformBuffer 1 [u]
+                                                let! binding = AssemblerState.newBinding InputKind.UniformBuffer 1
                                                 prefix <- uniformLayout Layout.None u.cUniformDecorations set binding
 
                                                 ()
@@ -2495,31 +2462,17 @@ module Assembler =
                         return None
 
                 | None ->
-                    let! set = 
-                        if config.createDescriptorSets then AssemblerState.newSet
-                        else State.value -1
-
-                    let mutable bSet = -1
-                    let mutable bBinding = -1
-
                     let! decorations =
                         p.cParamDecorations 
                         |> Set.toList
                         |> List.collectS (fun d ->
                             state {
                                 match d with
-                                | ParameterDecoration.DepthWrite _ ->
-                                    return []
-
-                                | ParameterDecoration.Const -> 
-                                    return ["const"]
-
                                 | ParameterDecoration.Interpolation m ->
-                                        
                                     let isFragmentInput =
                                         (selfStage = ShaderStage.Fragment && kind = ParameterKind.Input) ||
                                         (nextStage = Some ShaderStage.Fragment && kind = ParameterKind.Output)
-                            
+
                                     let isTessPatch =
                                         (selfStage = ShaderStage.TessEval && kind = ParameterKind.Input) ||
                                         (selfStage = ShaderStage.TessControl && kind = ParameterKind.Output)
@@ -2529,44 +2482,14 @@ module Assembler =
                                         | true, _, mode when mode.HasFlag InterpolationMode.PerPatch -> return ["patch"]
                                         | _ -> return []
 
-                                | ParameterDecoration.StorageBuffer(access) ->
-                                    let! binding = AssemblerState.newBinding InputKind.StorageBuffer 1
-
-                                    let args = []
-
-                                    let args =
-                                        if set >= 0 then sprintf "set=%d" set :: args
-                                        else args
-
-                                    let args =
-                                        if binding >= 0 then sprintf "binding=%d" binding :: args
-                                        else args
-
-                                    bSet <- set
-                                    bBinding <- binding
-
-                                    let args = "std430" :: args |> String.concat ","
-
-                                    let rw =
-                                        match access with
-                                        | StorageAccess.Read -> "readonly "
-                                        | StorageAccess.Write -> "writeonly "
-                                        | StorageAccess.ReadWrite -> ""
-                                        | _ -> ""
-
-                                    return [sprintf "layout(%s) %sbuffer " args rw + (p.cParamSemantic + "_ssb")]
-
                                 | ParameterDecoration.Shared -> 
                                     return ["shared"]
 
-                                | ParameterDecoration.Memory _ | ParameterDecoration.Slot _ ->
+                                | _ ->
                                     return []
                             }
 
                         )
-
-
-                    let isBuffer = p.cParamDecorations |> Seq.exists (function ParameterDecoration.StorageBuffer  _-> true | _ -> false)
 
                     let slot =
                         p.cParamDecorations |> Seq.tryPick (function
@@ -2607,38 +2530,13 @@ module Assembler =
                             match kind with
                             | ParameterKind.Input -> decorations, "in ", ""
                             | ParameterKind.Output -> decorations, "out ", ""
-                            | _ -> 
-                                if isBuffer then decorations, " { ", " };"
-                                else decorations, "", ""
+                            | _ -> decorations, "", ""
                         else
                             match kind with
                             | ParameterKind.Input when selfStage = ShaderStage.Vertex -> decorations, "attribute ", ""
                             | ParameterKind.Input -> decorations, "varying ", ""
                             | ParameterKind.Output -> decorations, "varying ", ""
                             | _ -> decorations, "", ""
-                    
-
-                    if isBuffer then
-                        match p.cParamType with
-                            | CType.CPointer(_,ct) ->
-                                let access =
-                                    p.cParamDecorations |> Seq.tryPick (function
-                                        | ParameterDecoration.StorageBuffer access -> Some access
-                                        | _ -> None
-                                    ) |> Option.defaultValue StorageAccess.None
-                                
-                                do! Interface.addStorageBuffer {
-                                    ssbSet = bSet
-                                    ssbBinding = bBinding
-                                    ssbName = p.cParamName
-                                    ssbType = GLSLType.ofCType config.reverseMatrixLogic ct
-                                    ssbAccess = access
-                                    ssbCount = 1
-                                }
-                            | _ ->
-                                failwithf "[GLSL] not a storage buffer type: %A" p.cParamType
-                       
-
 
                     if kind = ParameterKind.Input then
                         do! Interface.addInput location name.Name p
@@ -2899,7 +2797,7 @@ module Assembler =
             state <- 
                 { state with 
                     textureInfos =
-                        e.Uniforms |> Map.choose (fun name p ->
+                        e.Uniforms |> Map.choose (fun _ p ->
                             match p.uniformValue with
                             | UniformValue.Sampler(name, s) -> Some [name, s]
                             | UniformValue.SamplerArray arr -> Some (Array.toList arr)
@@ -2911,7 +2809,7 @@ module Assembler =
             state <-
                 { state with 
                     textureInfos =
-                        e.Uniforms |> Map.choose (fun name p ->
+                        e.Uniforms |> Map.choose (fun _ p ->
                             match p.uniformValue with
                             | UniformValue.Sampler(name, s) -> Some [name, s]
                             | UniformValue.SamplerArray arr -> Some (Array.toList arr)

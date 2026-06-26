@@ -14,19 +14,19 @@ open FShade
 [<RequireQualifiedAccess>]
 type ParameterDecoration =
     | Interpolation of InterpolationMode
-    | Memory of MemoryType
-    | Const
+    | [<Obsolete("Unused")>] Memory of MemoryType
+    | [<Obsolete("Unused")>] Const
     | Slot of int
-    | StorageBuffer of access : StorageAccess
+    | [<Obsolete("Unused")>] StorageBuffer of access : StorageAccess
     | Shared
     | DepthWrite of DepthWriteMode
 
 [<RequireQualifiedAccess>]
 type UniformDecoration =
     | Format of System.Type
-    | FieldIndex of int
-    | BufferDescriptorSet of int
-    | BufferBinding of int
+    | [<Obsolete("Unused")>] FieldIndex of int
+    | [<Obsolete("Unused")>] BufferDescriptorSet of int
+    | [<Obsolete("Unused")>] BufferBinding of int
     | BufferAccess of StorageAccess
     | PushConstant
 
