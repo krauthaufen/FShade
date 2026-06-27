@@ -1460,3 +1460,50 @@ let ``Custom class with constructors``() =
         @"CVector2f_of_Aardvark_Base_V2f\(fs_hugo\.xy\)"
         @"\+ new_SingleEffects_CVector2f_of_int32\(3\)\.X"
     ]
+
+let boundedSampler1 =
+    sampler2d {
+        textureArray uniform?Texture1 512
+    }
+
+let unboundedSampler2 =
+    sampler2d {
+        textureArray uniform?Texture2 -1
+    }
+
+let unboundedSampler3 =
+    sampler2d {
+        textureArray uniform?Texture3 -1
+    }
+
+[<Test>]
+let ``Unbounded sampler arrays``() =
+     Setup.Run()
+
+     let fs (v : Vertex) =
+         fragment {
+             let p1 = boundedSampler1.[uniform.Test.[v.id]].Sample v.foo.XY
+             let p2 = unboundedSampler2.[uniform.Test.[v.id]].Sample v.foo.XY
+             let p3 = unboundedSampler3.[uniform.Test.[v.id]].Sample v.foo.XY
+             return p1 + p2 + p3 + uniform.SomeUniformArr.[v.id].X
+         }
+
+     // All descriptors in Vulkan take up exactly one slot (even sampler arrays).
+     // Unbounded sampler arrays must be the last binding in the set.
+     // If there are multiple unbounded arrays, they are put into separate sets.
+     GLSL.shouldCompileAndContainRegex' glslVulkan [ Effect.ofFunction fs ] [
+            [
+                "layout\(set = 0, binding = 2\)"
+                "uniform sampler2D boundedSampler1\[512\];"
+            ] |> String.concat "\\s*"
+
+            [
+                "layout\(set = 0, binding = 3\)"
+                "uniform sampler2D unboundedSampler2\[\];"
+            ] |> String.concat "\\s*"
+
+            [
+                "layout\(set = 1, binding = 0\)"
+                "uniform sampler2D unboundedSampler3\[\];"
+            ] |> String.concat "\\s*"
+     ]

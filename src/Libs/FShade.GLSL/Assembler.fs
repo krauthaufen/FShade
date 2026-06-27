@@ -692,7 +692,7 @@ type AssemblerState =
         stages                  : ShaderStageDescription
 
         currentDescriptorSet    : int
-        currentBinding          : Map<InputKind, int>
+        currentBinding          : Map<int * InputKind, int>
         currentInputLocation    : int
         currentOutputLocation   : int
         requiredExtensions      : Set<string>
@@ -758,43 +758,41 @@ module AssemblerState =
     let reverseMatrixLogic = State.get |> State.map (fun s -> s.config.reverseMatrixLogic)
     let config = State.get |> State.map (fun s -> s.config)
 
-    let newBinding (kind : InputKind) (cnt : int) =
+    let newBinding (set : int) (kind : InputKind) (cnt : int) =
         State.custom (fun s ->
             let c = s.config
-            // `cnt` is the element count for array uniforms (samplers/images).
-            // Unbounded arrays come through as `cnt = -1` (FShade's sentinel for
-            // a bindless `T[]`). They still consume exactly ONE binding slot, so
-            // advance the counter by at least 1 — otherwise a sampler array
-            // with cnt=-1 DECREMENTS the global counter and the next
-            // allocation collides with already-used bindings (image vs SSBO
-            // collisions in composed effects).
-            let step = max 1 cnt
+
+            // Unlike OpenGL, Vulkan descriptors occupy a single binding slot regardless of count
+            let step =
+                if c.createDescriptorSets then 1
+                else max 1 cnt
+
             match c.bindingMode with
-                | BindingMode.None ->
-                    s, -1
+            | BindingMode.None ->
+                s, -1
 
-                | BindingMode.Global ->
-                    let b = Map.tryFind InputKind.Any s.currentBinding |> Option.defaultValue 0
-                    { s with currentBinding = Map.add InputKind.Any (b + step) s.currentBinding }, b
-                | _ -> //BindingMode.PerKind ->
-
-                    let b = Map.tryFind kind s.currentBinding |> Option.defaultValue 0
-                    { s with currentBinding = Map.add kind (b + step) s.currentBinding }, b
-
+            | _ ->
+                let kind = if c.bindingMode = BindingMode.Global then InputKind.Any else kind
+                let b = Map.tryFind (set, kind) s.currentBinding |> Option.defaultValue 0
+                { s with currentBinding = Map.add (set, kind) (b + step) s.currentBinding }, b
         )
 
-    let newSet =
+    let finishSet =
         State.custom (fun s ->
             let c = s.config
             if c.createDescriptorSets then
                 let set = s.currentDescriptorSet
                 if c.stepDescriptorSets then
-                    { s with currentDescriptorSet = set + 1; currentBinding = Map.empty }, set
+                    { s with currentDescriptorSet = min (set + 1) 31 }, set //TODO: Add a maxDescriptorSets field to Config (breaking change)
                 else
                     s, set
-                    
             else
                 s, -1
+        )
+
+    let currentSet =
+        State.get<AssemblerState> |> State.map (fun s ->
+            if s.config.createDescriptorSets then s.currentDescriptorSet else -1
         )
 
     let rec private neededLocations (rev : bool) (t : CType) =
@@ -2197,18 +2195,15 @@ module Assembler =
                     bndPart @ unbPart
                 )
 
-            let! sharedSet = AssemblerState.newSet
-
             let! definitions =
                 buffers |> List.mapS (fun (name, fields) ->
                     state {
                         let! set =
                             if fields |> List.exists isUnbounded then
-                                // unbounded → own set (variable-count must be last)
-                                AssemblerState.newSet
+                                AssemblerState.finishSet // Unbounded descriptor must be last binding in set
                             else
-                                State.value sharedSet
-                        
+                                AssemblerState.currentSet
+
                         match name with
                             | Some "SharedMemory" ->
                                 let! defs =
@@ -2225,7 +2220,7 @@ module Assembler =
                                 let! buffers =
                                     fields |> List.mapS (fun field ->
                                         state {
-                                            let! binding = AssemblerState.newBinding InputKind.StorageBuffer 1
+                                            let! binding = AssemblerState.newBinding set InputKind.StorageBuffer 1
                                             let prefix = uniformLayout Layout.Std430 field.cUniformDecorations set binding
                                             let name = checkName field.cUniformName
 
@@ -2275,7 +2270,7 @@ module Assembler =
                                             let prefix = uniformLayout Layout.Std140 [UniformDecoration.PushConstant] -1 -1
                                             return -1, -1, prefix
                                         else
-                                            let! binding = AssemblerState.newBinding InputKind.UniformBuffer 1
+                                            let! binding = AssemblerState.newBinding set InputKind.UniformBuffer 1
                                             let prefix = uniformLayout Layout.Std140 [] set binding
                                             return set, binding, prefix
                                     }
@@ -2311,7 +2306,7 @@ module Assembler =
                                                 match t with
                                               
                                                     | GLSLTextureLike.GLSLSamplerState isShadow ->
-                                                        let! binding = AssemblerState.newBinding InputKind.Sampler cnt
+                                                        let! binding = AssemblerState.newBinding set InputKind.Sampler cnt
                                                         prefix <- uniformLayout Layout.None u.cUniformDecorations set binding
 
                                                         do! Interface.addSamplerState {
@@ -2324,7 +2319,7 @@ module Assembler =
                                                     
                                                     
                                                     | GLSLTextureLike.GLSLTexture tex ->
-                                                        let! binding = AssemblerState.newBinding InputKind.Sampler cnt
+                                                        let! binding = AssemblerState.newBinding set InputKind.Sampler cnt
                                                         prefix <- uniformLayout Layout.None u.cUniformDecorations set binding
 
                                                         do! Interface.addTexture {
@@ -2336,7 +2331,7 @@ module Assembler =
                                                         }
                                                     
                                                     | GLSLTextureLike.GLSLSampler samplerType -> 
-                                                        let! binding = AssemblerState.newBinding InputKind.Sampler cnt
+                                                        let! binding = AssemblerState.newBinding set InputKind.Sampler cnt
                                                         prefix <- uniformLayout Layout.None u.cUniformDecorations set binding
 
                                                         do! Interface.addSampler { 
@@ -2349,7 +2344,7 @@ module Assembler =
                                                         }
                                                            
                                                     | GLSLTextureLike.GLSLImage imageType ->
-                                                        let! binding = AssemblerState.newBinding InputKind.Image cnt
+                                                        let! binding = AssemblerState.newBinding set InputKind.Image cnt
                                                         prefix <- uniformLayout Layout.None u.cUniformDecorations set binding
 
                                                         do! Interface.addImage { 
@@ -2360,7 +2355,7 @@ module Assembler =
                                                         }
 
                                             | CAccelerationStructure ->
-                                                let! binding = AssemblerState.newBinding InputKind.AccelerationStructure 1
+                                                let! binding = AssemblerState.newBinding set InputKind.AccelerationStructure 1
                                                 prefix <- uniformLayout Layout.None u.cUniformDecorations set binding
 
                                                 do! Interface.addAccelerationStructure {
@@ -2370,7 +2365,7 @@ module Assembler =
                                                 }
 
                                             | _ ->
-                                                let! binding = AssemblerState.newBinding InputKind.UniformBuffer 1
+                                                let! binding = AssemblerState.newBinding set InputKind.UniformBuffer 1
                                                 prefix <- uniformLayout Layout.None u.cUniformDecorations set binding
 
                                                 ()
