@@ -1565,6 +1565,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler1dArrayShadow(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| Sampler1dArrayShadow(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> Sampler1dArrayShadow(t.WithIndex(i), s))
 
@@ -1575,6 +1577,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler1dArray(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| Sampler1dArray(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> Sampler1dArray(t.WithIndex(i), s))
 
@@ -1585,6 +1589,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler1dShadow(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| Sampler1dShadow(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> Sampler1dShadow(t.WithIndex(i), s))
 
@@ -1595,6 +1601,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler1d(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| Sampler1d(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> Sampler1d(t.WithIndex(i), s))
 
@@ -1605,6 +1613,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler2dArrayMS(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| Sampler2dArrayMS(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> Sampler2dArrayMS(t.WithIndex(i), s))
 
@@ -1615,6 +1625,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler2dArrayShadow(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| Sampler2dArrayShadow(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> Sampler2dArrayShadow(t.WithIndex(i), s))
 
@@ -1625,6 +1637,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler2dArray(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| Sampler2dArray(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> Sampler2dArray(t.WithIndex(i), s))
 
@@ -1635,6 +1649,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler2dMS(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| Sampler2dMS(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> Sampler2dMS(t.WithIndex(i), s))
 
@@ -1645,6 +1661,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler2dShadow(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| Sampler2dShadow(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> Sampler2dShadow(t.WithIndex(i), s))
 
@@ -1667,6 +1685,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             Sampler3d(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| Sampler3d(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> Sampler3d(t.WithIndex(i), s))
 
@@ -1677,6 +1697,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             SamplerCubeArrayShadow(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| SamplerCubeArrayShadow(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> SamplerCubeArrayShadow(t.WithIndex(i), s))
 
@@ -1687,6 +1709,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             SamplerCubeArray(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| SamplerCubeArray(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> SamplerCubeArray(t.WithIndex(i), s))
 
@@ -1697,6 +1721,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             SamplerCubeShadow(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| SamplerCubeShadow(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> SamplerCubeShadow(t.WithIndex(i), s))
 
@@ -1707,6 +1733,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             SamplerCube(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| SamplerCube(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> SamplerCube(t.WithIndex(i), s))
 
@@ -1717,6 +1745,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             IntSampler1dArray(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| IntSampler1dArray(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> IntSampler1dArray(t.WithIndex(i), s))
 
@@ -1727,6 +1757,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             IntSampler1d(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| IntSampler1d(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> IntSampler1d(t.WithIndex(i), s))
 
@@ -1737,6 +1769,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             IntSampler2dArrayMS(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| IntSampler2dArrayMS(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> IntSampler2dArrayMS(t.WithIndex(i), s))
 
@@ -1747,6 +1781,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             IntSampler2dArray(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| IntSampler2dArray(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> IntSampler2dArray(t.WithIndex(i), s))
 
@@ -1757,6 +1793,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             IntSampler2dMS(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| IntSampler2dMS(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> IntSampler2dMS(t.WithIndex(i), s))
 
@@ -1767,6 +1805,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             IntSampler2d(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| IntSampler2d(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> IntSampler2d(t.WithIndex(i), s))
 
@@ -1777,6 +1817,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             IntSampler3d(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| IntSampler3d(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> IntSampler3d(t.WithIndex(i), s))
 
@@ -1787,6 +1829,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             IntSamplerCubeArray(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| IntSamplerCubeArray(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> IntSamplerCubeArray(t.WithIndex(i), s))
 
@@ -1797,6 +1841,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             IntSamplerCube(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| IntSamplerCube(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> IntSamplerCube(t.WithIndex(i), s))
 
@@ -1807,6 +1853,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             UIntSampler1dArray(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| UIntSampler1dArray(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> UIntSampler1dArray(t.WithIndex(i), s))
 
@@ -1817,6 +1865,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             UIntSampler1d(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| UIntSampler1d(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> UIntSampler1d(t.WithIndex(i), s))
 
@@ -1827,6 +1877,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             UIntSampler2dArrayMS(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| UIntSampler2dArrayMS(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> UIntSampler2dArrayMS(t.WithIndex(i), s))
 
@@ -1837,6 +1889,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             UIntSampler2dArray(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| UIntSampler2dArray(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> UIntSampler2dArray(t.WithIndex(i), s))
 
@@ -1847,6 +1901,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             UIntSampler2dMS(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| UIntSampler2dMS(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> UIntSampler2dMS(t.WithIndex(i), s))
 
@@ -1857,6 +1913,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             UIntSampler2d(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| UIntSampler2d(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> UIntSampler2d(t.WithIndex(i), s))
 
@@ -1867,6 +1925,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             UIntSampler3d(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| UIntSampler3d(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> UIntSampler3d(t.WithIndex(i), s))
 
@@ -1877,6 +1937,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             UIntSamplerCubeArray(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| UIntSamplerCubeArray(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> UIntSamplerCubeArray(t.WithIndex(i), s))
 
@@ -1887,6 +1949,8 @@ module SamplerBuilders =
         member x.Run((t : ShaderTextureHandle, s : SamplerState)) =
             UIntSamplerCube(t, s)
         member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) =
+            // count < 0  ->  unbounded (bindless) runtime-sized array: one base
+            // element carrying the unbounded flag; reflection lowers it to `[]`.
             if count < 0 then [| UIntSamplerCube(t.WithUnbounded(), s) |]
             else Array.init count (fun i -> UIntSamplerCube(t.WithIndex(i), s))
 

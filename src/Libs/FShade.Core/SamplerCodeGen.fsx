@@ -1,10 +1,10 @@
 ﻿#r "netstandard.dll"
-#r @"..\..\..\packages\Aardvark.Base\lib\netstandard2.0\Aardvark.Base.dll"
-#r @"..\..\..\packages\Aardvark.Base.TypeProviders\lib\netstandard2.0\Aardvark.Base.TypeProviders.dll"
-#r @"..\..\..\packages\Aardvark.Base.FSharp\lib\netstandard2.0\Aardvark.Base.FSharp.dll"
-#r @"..\..\..\packages\FSharp.Data.Adaptive\lib\netstandard2.0\FSharp.Data.Adaptive.dll"
-#r @"..\..\..\bin\Debug\netstandard2.0\FShade.Imperative.dll"
-#r @"..\..\..\bin\Debug\netstandard2.0\FShade.Core.dll"
+#r @"../../../packages/Aardvark.Base/lib/netstandard2.0/Aardvark.Base.dll"
+#r @"../../../packages/Aardvark.Base.TypeProviders/lib/netstandard2.0/Aardvark.Base.TypeProviders.dll"
+#r @"../../../packages/Aardvark.Base.FSharp/lib/netstandard2.0/Aardvark.Base.FSharp.dll"
+#r @"../../../packages/FSharp.Data.Adaptive/lib/netstandard2.0/FSharp.Data.Adaptive.dll"
+#r @"../../../bin/Debug/netstandard2.0/FShade.Imperative.dll"
+#r @"../../../bin/Debug/netstandard2.0/FShade.Core.dll"
 
 open System
 open System.IO
@@ -439,7 +439,10 @@ let run() =
         line  "member x.Run((t : ShaderTextureHandle, s : SamplerState)) ="
         line  "    %s(t, s)" typeName
         line  "member x.Run(((t : ShaderTextureHandle, count : int), s : SamplerState)) ="
-        line  "    Array.init count (fun i -> %s(t.WithIndex(i), s))" typeName
+        line  "    // count < 0  ->  unbounded (bindless) runtime-sized array: one base"
+        line  "    // element carrying the unbounded flag; reflection lowers it to `[]`."
+        line  "    if count < 0 then [| %s(t.WithUnbounded(), s) |]" typeName
+        line  "    else Array.init count (fun i -> %s(t.WithIndex(i), s))" typeName
         stop  ()
         line  "let %s = %s()" valueName builderName
         line  ""
