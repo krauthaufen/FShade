@@ -1,3 +1,7 @@
+### 5.7.12
+- Fix descriptor binding computation. Descriptors occupy a single slot regardless of count.
+- Optimize descriptor set computation for unbounded descriptors arrays.
+
 ### 5.7.11
 - GLSL: every truly UNBOUNDED uniform (sampler/image array with `cnt = -1`, or `T[][]` storage-buffer array) now lands in its OWN descriptor set. Vulkan's `VK_EXT_descriptor_indexing` requires that the binding declared with `VARIABLE_DESCRIPTOR_COUNT_BIT` is the LAST binding in its set (spec VUID 03004). When multiple unbounded arrays shared one set, only one could be true variable-count; the others silently fell back to a fixed-capacity reserve. NVIDIA tolerated this; AMD/RADV did not — degrading bindless heap paths to slow / undefined behaviour. The fix splits each unbounded uniform into a single-field group with a freshly allocated descriptor set; fixed-size uniforms keep the shared-set grouping.
 
