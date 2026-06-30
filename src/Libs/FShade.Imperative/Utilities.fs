@@ -102,9 +102,8 @@ module ExprWorkardound =
     let lockObj = obj()
 
     let TryGetReflectedDefinition (mb : MethodBase) =
-        lock lockObj (fun _ -> 
-            try Expr.TryGetReflectedDefinition mb
-            with e -> None
+        lock lockObj (fun _ ->
+            Expr.TryGetReflectedDefinition mb
         )
 
 [<Sealed; AbstractClass; Extension>]

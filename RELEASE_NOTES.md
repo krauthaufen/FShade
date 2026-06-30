@@ -1,3 +1,6 @@
+### 5.7.13
+- Revert the try/with around `Expr.TryGetReflectedDefinition` (4bdd37b): it swallowed the exception for internal `[<ReflectedDefinition>]` functions reached via the effect-rewrite/heap compile path, resolving them to `None` ("cannot call function … not reflectable"). Internal reflected functions resolve again.
+
 ### 5.7.12
 - Fix descriptor binding computation. Descriptors occupy a single slot regardless of count.
 - Optimize descriptor set computation for unbounded descriptors arrays.
