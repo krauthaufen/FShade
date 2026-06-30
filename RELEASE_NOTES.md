@@ -1,5 +1,8 @@
+### 5.7.14
+- Restore the try/with around `Expr.TryGetReflectedDefinition` (reverts 5.7.13): the "not reflectable" issue it chased was a dotnet-8-vs-10 / FSharp.Core reflected-definition pickle mismatch, not this lookup.
+
 ### 5.7.13
-- Revert the try/with around `Expr.TryGetReflectedDefinition` (4bdd37b): it swallowed the exception for internal `[<ReflectedDefinition>]` functions reached via the effect-rewrite/heap compile path, resolving them to `None` ("cannot call function … not reflectable"). Internal reflected functions resolve again.
+- Removed the try/with around `Expr.TryGetReflectedDefinition` (reverted in 5.7.14).
 
 ### 5.7.12
 - Fix descriptor binding computation. Descriptors occupy a single slot regardless of count.
