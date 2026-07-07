@@ -992,16 +992,19 @@ module Effect =
                     
                             let inputs =
                                 match last with
-                                    | Some last -> 
+                                    | Some last ->
                                         shader.shaderInputs |> Map.map (fun sem i ->
-                                            if i.paramInterpolation = InterpolationMode.Default then
-                                                match Map.tryFind sem last.shaderOutputs with
-                                                    | Some { paramInterpolation = outMode } ->
+                                            match Map.tryFind sem last.shaderOutputs with
+                                                | Some { paramInterpolation = outMode } ->
+                                                    if i.paramInterpolation = InterpolationMode.Default then
                                                         { i with paramInterpolation = outMode }
-                                                    | _ ->
+                                                    elif outMode.HasFlag InterpolationMode.PerPrimitive then
+                                                        // per-primitive-ness is dictated by the producing mesh-shader
+                                                        { i with paramInterpolation = i.paramInterpolation ||| InterpolationMode.PerPrimitive }
+                                                    else
                                                         i
-                                            else
-                                                i
+                                                | _ ->
+                                                    i
                                         )
                                     | None ->
                                         shader.shaderInputs

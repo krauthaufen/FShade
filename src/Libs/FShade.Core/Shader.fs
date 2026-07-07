@@ -1901,7 +1901,12 @@ module Preprocessor =
 
                 | Call(None, mi, [index; value]) when mi.Name = "writeVertex" ->
                     let! index = preprocessMeshS index
-                    let! values = getMeshValuesS Intrinsics.Position value
+                    let! values = getMeshValuesS Intrinsics.Position InterpolationMode.Default value
+                    return Expr.WriteOutputsRaw(values |> List.map (fun (name, v) -> name, Some index, v))
+
+                | Call(None, mi, [index; value]) when mi.Name = "writePerPrimitive" ->
+                    let! index = preprocessMeshS index
+                    let! values = getMeshValuesS "PerPrimitiveAttribute" InterpolationMode.PerPrimitive value
                     return Expr.WriteOutputsRaw(values |> List.map (fun (name, v) -> name, Some index, v))
 
                 | Call(None, mi, [index; value]) when mi.Name = "writeTriangle" || mi.Name = "writeLine" || mi.Name = "writePoint" ->
@@ -1924,7 +1929,7 @@ module Preprocessor =
                     if payload.Type = typeof<unit> then
                         return emit
                     else
-                        let! values = getMeshValuesS "Payload" payload
+                        let! values = getMeshValuesS "Payload" InterpolationMode.Default payload
                         return Expr.Sequential(
                             Expr.WriteOutputsRaw(values |> List.map (fun (name, v) -> name, None, v)),
                             emit
@@ -1943,7 +1948,7 @@ module Preprocessor =
         }
 
     /// decomposes a vertex-/payload-record into per-semantic values (registering them as outputs)
-    and getMeshValuesS (defaultSem : string) (value : Expr) : Preprocess<list<string * Expr>> =
+    and getMeshValuesS (defaultSem : string) (interpolation : InterpolationMode) (value : Expr) : Preprocess<list<string * Expr>> =
         state {
             if FSharpType.IsRecord(value.Type, true) then
                 let fields = FSharpType.GetRecordFields(value.Type, true) |> Array.toList
@@ -1954,7 +1959,7 @@ module Preprocessor =
                         List.zip fields args |> List.mapS (fun (f, v) ->
                             state {
                                 let! v = preprocessMeshS v
-                                do! State.writeOutput f.Semantic { paramType = f.PropertyType; paramInterpolation = f.Interpolation }
+                                do! State.writeOutput f.Semantic { paramType = f.PropertyType; paramInterpolation = f.Interpolation ||| interpolation }
                                 return f.Semantic, v
                             }
                         )
@@ -1963,13 +1968,13 @@ module Preprocessor =
                     return!
                         fields |> List.mapS (fun f ->
                             state {
-                                do! State.writeOutput f.Semantic { paramType = f.PropertyType; paramInterpolation = f.Interpolation }
+                                do! State.writeOutput f.Semantic { paramType = f.PropertyType; paramInterpolation = f.Interpolation ||| interpolation }
                                 return f.Semantic, Expr.PropertyGet(value, f)
                             }
                         )
             else
                 let! value = preprocessMeshS value
-                do! State.writeOutput defaultSem { paramType = value.Type; paramInterpolation = InterpolationMode.Default }
+                do! State.writeOutput defaultSem { paramType = value.Type; paramInterpolation = interpolation }
                 return [defaultSem, value]
         }
 
@@ -4503,8 +4508,18 @@ module Shader =
                             |> write
                 )
 
-            { shader with
-                shaderOutputs = outputs |> Map.map (fun _ -> ParameterDescription.ofType) }
+            let newOutputs =
+                if shader.shaderStage = ShaderStage.Mesh || shader.shaderStage = ShaderStage.Task then
+                    // keep interpolation flags (e.g. PerPrimitive) of surviving outputs
+                    outputs |> Map.map (fun n t ->
+                        match Map.tryFind n shader.shaderOutputs with
+                        | Some od when od.paramType = t -> od
+                        | _ -> ParameterDescription.ofType t
+                    )
+                else
+                    outputs |> Map.map (fun _ -> ParameterDescription.ofType)
+
+            { shader with shaderOutputs = newOutputs }
 
     /// creates a new shader by removing all outputs given in semantics
     let removeOutputs (semantics : Set<string>) (shader : Shader) =
@@ -4793,10 +4808,16 @@ module Shader =
         /// vertex-shader into every writeVertex-site (the per-vertex values are
         /// statically known there, unlike gsvs there is no provenance problem)
         let msvs (lShader : Shader) (rShader : Shader) =
+            let isPerPrimitive (name : string) =
+                name = Intrinsics.PrimitiveIndices ||
+                (match Map.tryFind name lShader.shaderOutputs with
+                 | Some p -> p.paramInterpolation.HasFlag InterpolationMode.PerPrimitive
+                 | None -> false)
+
             let needed  = Map.intersect lShader.shaderOutputs rShader.shaderInputs
 
-            // primitive-indices are written by their own (untouched) write-sites
-            let passed  = Map.difference lShader.shaderOutputs rShader.shaderOutputs |> Map.remove Intrinsics.PrimitiveIndices
+            // primitive-indices and per-primitive attributes are written by their own (untouched) write-sites
+            let passed  = Map.difference lShader.shaderOutputs rShader.shaderOutputs |> Map.filter (fun n _ -> not (isPerPrimitive n))
             let unknown = Map.difference rShader.shaderInputs lShader.shaderOutputs
 
             if not (Map.isEmpty unknown) then
@@ -4804,8 +4825,8 @@ module Shader =
 
             let lBody =
                 lShader.shaderBody.SubstituteWrites (fun values ->
-                    // primitive-index writes stay untouched
-                    if Map.containsKey Intrinsics.PrimitiveIndices values then
+                    // primitive-index and per-primitive writes stay untouched
+                    if values |> Map.exists (fun n _ -> isPerPrimitive n) then
                         None
                     else
                         let index = values |> Map.toSeq |> Seq.tryPick (fun (_, (i, _)) -> i)

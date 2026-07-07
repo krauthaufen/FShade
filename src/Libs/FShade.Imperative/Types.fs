@@ -18,6 +18,7 @@ type InterpolationMode =
     | Centroid          = 4
     | Sample            = 8
     | PerPatch          = 16
+    | PerPrimitive      = 32
 
 type MemoryType =
     | None = 0

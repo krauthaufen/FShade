@@ -1,6 +1,7 @@
 ### 5.8.0
 - Added task-/mesh-shader support (`GL_EXT_mesh_shader`, Vulkan): `task`/`meshTriangle|meshLine|meshPoint` builders, `writeVertex`/`writeTriangle`/`setMeshOutputs`/`emitMeshTasks` intrinsics, `MeshOutputs`-attribute.
 - Mesh shaders are Effect-integrated: `compose [mesh; vs; fs]` splices vertex shaders per `writeVertex`, fragment composition and linking DCE (incl. field-wise task-payload pruning) work as usual.
+- Per-primitive outputs (`perprimitiveEXT`) via `writePerPrimitive`; fragment shaders consume them like ordinary inputs, the qualifier is derived at link-time.
 - Effect blob format bumped to v2 (new `shaderLocalSize` field).
 
 ### 5.7.14

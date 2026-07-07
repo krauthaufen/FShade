@@ -2470,7 +2470,8 @@ module Assembler =
             | _ -> "depth_any"
 
     let assembleInterpolationMode (mode : InterpolationMode) =
-        [ if mode.HasFlag InterpolationMode.Centroid then "centroid"
+        [ if mode.HasFlag InterpolationMode.PerPrimitive then "perprimitiveEXT"
+          if mode.HasFlag InterpolationMode.Centroid then "centroid"
           if mode.HasFlag InterpolationMode.Flat then "flat"
           if mode.HasFlag InterpolationMode.NoPerspective then "noperspective"
           if mode.HasFlag InterpolationMode.Sample then "sample" ]

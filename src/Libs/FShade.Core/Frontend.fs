@@ -318,6 +318,9 @@ module Primitives =
     /// writes all outputs for the vertex at the given index in a mesh shader
     let writeVertex (index : int) (vertex : 'a) : unit = onlyInShaderCode "writeVertex"
 
+    /// writes all per-primitive outputs (perprimitiveEXT) for the primitive at the given index in a mesh shader
+    let writePerPrimitive (index : int) (value : 'a) : unit = onlyInShaderCode "writePerPrimitive"
+
     /// writes the vertex-indices for the triangle at the given index in a mesh shader
     let writeTriangle (index : int) (indices : V3i) : unit = onlyInShaderCode "writeTriangle"
 

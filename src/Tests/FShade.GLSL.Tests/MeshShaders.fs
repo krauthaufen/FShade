@@ -191,6 +191,73 @@ let ``MeshShader effect serialization round-trip``() =
     let glsl2, _ = GLSL.compile' glslVulkan [ loaded ]
     glsl1.code |> should equal glsl2.code
 
+type PrimitiveAttributes =
+    {
+        [<Semantic("MeshletId")>] meshletId : int
+        [<Semantic("MaterialId")>] materialId : int
+    }
+
+type MeshletFragment =
+    {
+        [<Semantic("MeshletId")>] fMeshletId : int
+        [<Color>] fColor : V4f
+    }
+
+let meshletFrag (v : MeshletFragment) =
+    fragment {
+        return v.fColor * (float32 v.fMeshletId)
+    }
+
+[<LocalSize(X = 32); MeshOutputs(MaxVertices = 64, MaxPrimitives = 32)>]
+let heapMesh (input : MeshInput<Payload>) =
+    meshTriangle {
+        let positions : V4f[] = uniform?StorageBuffer?HeapData
+
+        setMeshOutputs 64 32
+
+        let id = getLocalId().X
+        if id < 32 then
+            writeVertex (2 * id) { pos = positions.[input.Payload.offset + 2 * id]; n = V3f.OOI; color = V4f.IIII }
+            writeVertex (2 * id + 1) { pos = positions.[input.Payload.offset + 2 * id + 1]; n = V3f.OOI; color = V4f.IIII }
+            writeTriangle id (V3i(2 * id, 2 * id + 1, (2 * id + 2) % 64))
+            writePerPrimitive id { meshletId = getWorkGroupId().X; materialId = input.Payload.offset }
+    }
+
+[<Test>]
+let ``Per-primitive outputs``() =
+    Setup.Run()
+    let glsl, res = GLSL.compile' glslVulkan [ Effect.ofFunction cullTask; Effect.ofFunction heapMesh; Effect.ofFunction meshletFrag ]
+    for (_, r) in res do
+        match r with
+        | Error e -> failwithf "%s" e
+        | _ -> ()
+
+    [
+        @"perprimitiveEXT out int \w*MeshletId\[\];", None
+        @"perprimitiveEXT flat in int \w*MeshletId;", None
+        @"HeapData", None
+    ]
+    |> GLSL.shouldContainRegex glsl
+
+    // MaterialId is not consumed by the fragment shader -> pruned
+    if glsl.code.Contains "MaterialId" then
+        failwithf "unused per-primitive output 'MaterialId' was not removed:\n%s" glsl.code
+
+[<Test>]
+let ``Per-primitive outputs with composed VertexShader``() =
+    Setup.Run()
+    let glsl, res = GLSL.compile' glslVulkan [ Effect.ofFunction heapMesh; Effect.ofFunction trafo; Effect.ofFunction meshletFrag ]
+    for (_, r) in res do
+        match r with
+        | Error e -> failwithf "%s" e
+        | _ -> ()
+
+    [
+        @"perprimitiveEXT out int \w*MeshletId\[\];", None
+        "ModelTrafo", None
+    ]
+    |> GLSL.shouldContainRegex glsl
+
 [<Test>]
 let ``MeshShader linking drops unused outputs``() =
     Setup.Run()
