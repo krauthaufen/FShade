@@ -488,6 +488,7 @@ type GLSLShaderDecoration =
     | GLSLSpacing of GLSLSpacing
     | GLSLWinding of GLSLWinding
     | GLSLLocalSize of V3i
+    | GLSLMaxPrimitives of int
 
 [<AutoOpen>]
 module private Tools =
@@ -684,6 +685,7 @@ type GLSLShaderInterface =
                                 | GLSLLocalSize d -> yield sprintf "    local-size: %dx%dx%d" d.X d.Y d.Z |> Some
                                 | GLSLSpacing d -> yield sprintf "    spacing: %A" d |> Some
                                 | GLSLWinding d -> yield sprintf "    winding: %A" d |> Some
+                                | GLSLMaxPrimitives d -> yield sprintf "    max-primitives: %d" d |> Some
                         yield "}" |> Some
 
 
@@ -1086,6 +1088,9 @@ module GLSLShaderInterface =
                 dst.Write s.X
                 dst.Write s.Y
                 dst.Write s.Z
+            | GLSLMaxPrimitives p ->
+                dst.Write 7uy
+                dst.Write p
 
         dst.Write (s.shaderBuiltIns.Count)
         for KeyValue(kind, m) in s.shaderBuiltIns do
@@ -1175,8 +1180,10 @@ module GLSLShaderInterface =
                     match src.ReadByte() with
                     | 0uy -> GLSLWinding GLSLWinding.CW
                     | _ -> GLSLWinding GLSLWinding.CCW
-                | _ ->
+                | 6uy ->
                     GLSLLocalSize(V3i(src.ReadInt32(), src.ReadInt32(), src.ReadInt32()))
+                | _ ->
+                    GLSLMaxPrimitives (src.ReadInt32())
             )
             
         let shaderBuiltIns =

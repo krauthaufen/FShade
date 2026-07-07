@@ -125,10 +125,25 @@ type ShaderStage =
     | ClosestHit    = -5
     | Miss          = -6
     | Callable      = -7
+    // Task < Mesh so map-/composition-ordering matches the pipeline order
+    | Task          = -9
+    | Mesh          = -8
 
 module ShaderStage =
     let isCompute (stage : ShaderStage) =
         stage = ShaderStage.Compute
+
+    let isTask (stage : ShaderStage) =
+        stage = ShaderStage.Task
+
+    let isMesh (stage : ShaderStage) =
+        stage = ShaderStage.Mesh
+
+    /// stages executing as workgroups (compute-like intrinsics apply)
+    let isWorkgroup (stage : ShaderStage) =
+        match stage with
+        | ShaderStage.Compute | ShaderStage.Task | ShaderStage.Mesh -> true
+        | _ -> false
 
     let isRaytracing (stage : ShaderStage) =
         match stage with
@@ -172,6 +187,8 @@ module ShaderStage =
             ShaderStage.ClosestHit,     "rchit"
             ShaderStage.Miss,           "rmiss"
             ShaderStage.Callable,       "rcall"
+            ShaderStage.Task,           "ts"
+            ShaderStage.Mesh,           "ms"
         ]
 
 [<RequireQualifiedAccess>]
@@ -182,6 +199,8 @@ type ShaderSlot =
     | Geometry
     | Fragment
     | Compute
+    | Task
+    | Mesh
     | RayGeneration
     | Miss          of name: Symbol
     | Callable      of name: Symbol
@@ -197,6 +216,8 @@ type ShaderSlot =
         | Geometry       -> ShaderStage.Geometry
         | Fragment       -> ShaderStage.Fragment
         | Compute        -> ShaderStage.Compute
+        | Task           -> ShaderStage.Task
+        | Mesh           -> ShaderStage.Mesh
         | RayGeneration  -> ShaderStage.RayGeneration
         | Miss _         -> ShaderStage.Miss
         | Callable _     -> ShaderStage.Callable

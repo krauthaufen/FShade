@@ -966,6 +966,7 @@ module Interface =
                     | EntryDecoration.LocalSize t -> GLSLLocalSize t |> Some
                     | EntryDecoration.OutputTopology t -> GLSLOutputTopology t |> Some
                     | EntryDecoration.OutputVertices t -> GLSLMaxVertices t |> Some
+                    | EntryDecoration.OutputPrimitives t -> GLSLMaxPrimitives t |> Some
                     | EntryDecoration.Stages _ -> None
             )
 
@@ -1309,6 +1310,14 @@ module Assembler =
 
     let private invalidCharsRx = Regex(@"[^_a-zA-Z0-9]|__+")
 
+    /// name of the taskPayloadSharedEXT variable shared by task-/mesh-shaders
+    [<Literal>]
+    let taskPayloadName = "_payload"
+
+    /// name of the taskPayloadSharedEXT struct shared by task-/mesh-shaders
+    [<Literal>]
+    let taskPayloadTypeName = "MeshTaskPayload"
+
     let checkName (name : string) =
         let invalid = invalidCharsRx.Matches name
         if invalid.Count > 0 then
@@ -1545,6 +1554,12 @@ module Assembler =
                     return sprintf "%s(%s)" name.Name args
 
                 | CReadInput(kind, _, name, index) ->
+                    let! s = State.get
+                    if kind = ParameterKind.Input && s.stages.Stage = ShaderStage.Mesh then
+                        // mesh-shader inputs are the task-payload fields
+                        return sprintf "%s.%s" taskPayloadName (checkName name).Name
+                    else
+
                     let! name = parameterNameS kind name
                     let! s = State.get
                     if kind = ParameterKind.Uniform || s.stages.Slot = ShaderSlot.Compute then
@@ -1993,17 +2008,45 @@ module Assembler =
                         | None -> return sprintf "%s;" decl
 
                 | CWriteOutput(name, index, value) ->
+                    let! s = State.get
+
+                    if s.stages.Stage = ShaderStage.Task then
+                        // task-shader outputs are the payload fields
+                        match value with
+                        | CRExpr e ->
+                            let! value = assembleExprS e
+                            return sprintf "%s.%s = %s;" taskPayloadName (checkName name).Name value
+                        | CRArray _ ->
+                            return failwithf "[FShade] cannot write array-valued payload field %A" name
+                    else
+
                     let! name = parameterNameS ParameterKind.Output name
                     let! index = index |> Option.mapS assembleExprS
 
                     let! s = State.get
                     if s.stages.Stage = ShaderStage.Compute then
                         do! Interface.useUniform name.Name
-                    
-                    let name =
-                        match index with
-                            | Some index -> sprintf "%s[%s]" name.Name index
-                            | None -> name.Name
+
+                    // mesh-shader builtin outputs need special names/conversions
+                    let name, valueFormat =
+                        if s.stages.Stage = ShaderStage.Mesh then
+                            match index with
+                            | Some index ->
+                                if name.Name = "gl_Position" then
+                                    sprintf "gl_MeshVerticesEXT[%s].gl_Position" index, "%s"
+                                elif name.Name = "gl_PrimitiveTriangleIndicesEXT" then
+                                    match value.ctype with
+                                    | CVector(_, 3) -> sprintf "gl_PrimitiveTriangleIndicesEXT[%s]" index, "uvec3(%s)"
+                                    | CVector(_, 2) -> sprintf "gl_PrimitiveLineIndicesEXT[%s]" index, "uvec2(%s)"
+                                    | _ -> sprintf "gl_PrimitivePointIndicesEXT[%s]" index, "uint(%s)"
+                                else
+                                    sprintf "%s[%s]" name.Name index, "%s"
+                            | None ->
+                                name.Name, "%s"
+                        else
+                            match index with
+                            | Some index -> sprintf "%s[%s]" name.Name index, "%s"
+                            | None -> name.Name, "%s"
 
                     match value with
                         | CRArray(_, args) ->
@@ -2011,7 +2054,7 @@ module Assembler =
                             return args |> Seq.mapi (sprintf "%s[%d] = %s;" name) |> seq
                         | CRExpr e ->
                             let! value = assembleExprS e
-                            return sprintf "%s = %s;" name value
+                            return sprintf "%s = %s;" name (sprintf (Printf.StringFormat<_> valueFormat) value)
 
                 | CWrite(l, r) ->
                     let! l = assembleLExprS l
@@ -2548,6 +2591,10 @@ module Assembler =
                     | CPointer(_, t) ->
                         let! t = assembleTypeS config.reverseMatrixLogic t
                         return sprintf "%s%s%s %s[];%s" decorations prefix t.Name name.Name suffix |> Some
+                    | _ when selfStage = ShaderStage.Mesh && kind = ParameterKind.Output ->
+                        // per-vertex outputs are unsized arrays (implicitly sized by max_vertices)
+                        let! t = assembleTypeS config.reverseMatrixLogic p.cParamType
+                        return sprintf "%s%s%s %s[];%s" decorations prefix t.Name name.Name suffix |> Some
                     | _ ->
                         let! t = assembleTypeS config.reverseMatrixLogic p.cParamType
                         return sprintf "%s%s%s %s;%s" decorations prefix t.Name name.Name suffix |> Some
@@ -2570,6 +2617,8 @@ module Assembler =
             | ShaderStageDescription.Raytracing _ ->
                 do! AssemblerState.useExtension GLSLExtension.EXTRayTracing
                 do! AssemblerState.useExtension GLSLExtension.EXTOpacityMicromap
+            | ShaderStageDescription.Graphics g when g.self = ShaderStage.Task || g.self = ShaderStage.Mesh ->
+                do! AssemblerState.useExtension GLSLExtension.EXTMeshShader
             | _ -> ()
 
             let entryName = checkName e.cEntryName
@@ -2653,25 +2702,75 @@ module Assembler =
 
 
                     | ShaderStage.Compute ->
-                        let localSize = e.cDecorations |> List.tryPick (function EntryDecoration.LocalSize s when s.AllGreater 0 -> Some s | _ -> None) 
+                        let localSize = e.cDecorations |> List.tryPick (function EntryDecoration.LocalSize s when s.AllGreater 0 -> Some s | _ -> None)
                         [
                             match localSize with
                                 | Some s -> yield sprintf "layout (local_size_x = %d, local_size_y = %d, local_size_z = %d) in;" s.X s.Y s.Z
-                                | None -> yield "layout( local_size_variable ) in;" 
+                                | None -> yield "layout( local_size_variable ) in;"
+                        ]
+
+                    | ShaderStage.Task ->
+                        let localSize = e.cDecorations |> List.tryPick (function EntryDecoration.LocalSize s when s.AllGreater 0 -> Some s | _ -> None) |> Option.defaultValue V3i.One
+                        [
+                            sprintf "layout(local_size_x = %d, local_size_y = %d, local_size_z = %d) in;" localSize.X localSize.Y localSize.Z
+                        ]
+
+                    | ShaderStage.Mesh ->
+                        let localSize = e.cDecorations |> List.tryPick (function EntryDecoration.LocalSize s when s.AllGreater 0 -> Some s | _ -> None) |> Option.defaultValue V3i.One
+                        let outputTopology = e.cDecorations |> List.tryPick (function EntryDecoration.OutputTopology(t) -> Some(t) | _ -> None) |> Option.get
+                        let maxVertices = e.cDecorations |> List.tryPick (function EntryDecoration.OutputVertices(t) -> Some(t) | _ -> None) |> Option.get
+                        let maxPrimitives = e.cDecorations |> List.tryPick (function EntryDecoration.OutputPrimitives(t) -> Some(t) | _ -> None) |> Option.defaultValue maxVertices
+
+                        let outputPrimitive =
+                            match outputTopology with
+                                | OutputTopology.Points -> "points"
+                                | OutputTopology.LineStrip -> "lines"
+                                | OutputTopology.TriangleStrip -> "triangles"
+
+                        [
+                            sprintf "layout(local_size_x = %d, local_size_y = %d, local_size_z = %d) in;" localSize.X localSize.Y localSize.Z
+                            sprintf "layout(%s, max_vertices = %d, max_primitives = %d) out;" outputPrimitive maxVertices maxPrimitives
                         ]
 
                     | _ ->
                         []
 
-            let! inputs = e.cInputs |> List.chooseS (assembleEntryParameterS ParameterKind.Input)
-            let! outputs = e.cOutputs |> List.chooseS (assembleEntryParameterS ParameterKind.Output)
+            // task-shader outputs / mesh-shader inputs form the shared task-payload
+            let payloadFields =
+                match stages.Stage with
+                | ShaderStage.Task -> e.cOutputs
+                | ShaderStage.Mesh -> e.cInputs
+                | _ -> []
+
+            let! payload =
+                match payloadFields with
+                | [] ->
+                    State.value []
+                | fields ->
+                    state {
+                        let! decls =
+                            fields |> List.mapS (fun p ->
+                                state {
+                                    let! d = assembleDeclarationS config.reverseMatrixLogic p.cParamType (checkName p.cParamName)
+                                    return sprintf "    %s;" d
+                                }
+                            )
+                        return [
+                            sprintf "struct %s\r\n{\r\n%s\r\n};" taskPayloadTypeName (String.concat "\r\n" decls)
+                            sprintf "taskPayloadSharedEXT %s %s;" taskPayloadTypeName taskPayloadName
+                        ]
+                    }
+
+            let! inputs = (if stages.Stage = ShaderStage.Mesh then [] else e.cInputs) |> List.chooseS (assembleEntryParameterS ParameterKind.Input)
+            let! outputs = (if stages.Stage = ShaderStage.Task then [] else e.cOutputs) |> List.chooseS (assembleEntryParameterS ParameterKind.Output)
             let! args = e.cArguments |> List.chooseS (assembleEntryParameterS ParameterKind.Argument)
             let! body = assembleStatementS false e.cBody
             let! t = assembleTypeS config.reverseMatrixLogic e.cReturnType
 
-            return 
+            return
                 String.concat "\r\n" [
                     yield! prefix
+                    yield! payload
                     yield! inputs
                     yield! outputs
                     yield! args

@@ -61,6 +61,10 @@ module Intrinsics =
     [<Literal>]
     let SourceVertexIndex = "GeometrySourceVertexIndex"
 
+    // mesh shader primitive indices
+    [<Literal>]
+    let PrimitiveIndices = "MeshPrimitiveIndices"
+
     [<Literal>]
     let FragmentPosition = "Positions0"
 

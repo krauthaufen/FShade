@@ -311,6 +311,31 @@ module Primitives =
     let barrier() : unit = onlyInShaderCode "barrier"
     let allocateShared<'a when 'a : unmanaged> (size : int) : 'a[] =  onlyInShaderCode "allocateShared"
 
+    /// sets the actual vertex- and primitive-count for a mesh shader workgroup (SetMeshOutputsEXT)
+    [<KeepCall>]
+    let setMeshOutputs (vertexCount : int) (primitiveCount : int) : unit = onlyInShaderCode "setMeshOutputs"
+
+    /// writes all outputs for the vertex at the given index in a mesh shader
+    let writeVertex (index : int) (vertex : 'a) : unit = onlyInShaderCode "writeVertex"
+
+    /// writes the vertex-indices for the triangle at the given index in a mesh shader
+    let writeTriangle (index : int) (indices : V3i) : unit = onlyInShaderCode "writeTriangle"
+
+    /// writes the vertex-indices for the line at the given index in a mesh shader
+    let writeLine (index : int) (indices : V2i) : unit = onlyInShaderCode "writeLine"
+
+    /// writes the vertex-index for the point at the given index in a mesh shader
+    let writePoint (index : int) (indices : int) : unit = onlyInShaderCode "writePoint"
+
+    /// launches the given number of mesh shader workgroups passing the payload (EmitMeshTasksEXT).
+    /// must be the last operation of a task shader.
+    let emitMeshTasks (count : V3i) (payload : 'p) : unit = onlyInShaderCode "emitMeshTasks"
+
+    /// launches the given number of mesh shader workgroups without a payload (EmitMeshTasksEXT).
+    /// must be the last operation of a task shader.
+    [<KeepCall>]
+    let emitMeshTasksXYZ (x : int) (y : int) (z : int) : unit = onlyInShaderCode "emitMeshTasksXYZ"
+
 
     [<Sealed; AbstractClass>]
     type Debug private() =
@@ -353,6 +378,30 @@ module Primitives =
 
         override __.ToString() =
             sprintf "LocalSize(X=%d, Y=%d, Z=%d)" x y z
+
+    type MeshOutputsAttribute() =
+        inherit System.Attribute()
+
+        let mutable maxVertices = 1
+        let mutable maxPrimitives = 1
+
+        member __.MaxVertices
+            with get() = maxVertices
+            and set v = maxVertices <- v
+
+        member __.MaxPrimitives
+            with get() = maxPrimitives
+            and set v = maxPrimitives <- v
+
+        override __.ToString() =
+            sprintf "MeshOutputs(MaxVertices=%d, MaxPrimitives=%d)" maxVertices maxPrimitives
+
+    /// input for task shaders (workgroup builtins are available via getGlobalId() etc.)
+    type TaskInput = class end
+
+    /// input for mesh shaders carrying the (optional) task payload
+    type MeshInput<'p>() =
+        member x.Payload : 'p = onlyInShaderCode "Payload"
 
     type TessCoord<'a> = class end
 
@@ -479,6 +528,20 @@ module ShaderBuilders =
             member x.ShaderStage = ShaderStage.Compute
             member x.OutputTopology = None
 
+    type TaskBuilder() =
+        inherit ComputeBuilder()
+
+        interface IShaderBuilder with
+            member x.ShaderStage = ShaderStage.Task
+            member x.OutputTopology = None
+
+    type MeshBuilder(top : OutputTopology) =
+        inherit ComputeBuilder()
+
+        interface IShaderBuilder with
+            member x.ShaderStage = ShaderStage.Mesh
+            member x.OutputTopology = Some top
+
     type RayGenerationBuilder() =
         inherit BaseBuilder()
 
@@ -552,6 +615,11 @@ module ShaderBuilders =
     let triangle = GeometryBuilder(None, OutputTopology.TriangleStrip)
     let line = GeometryBuilder(None, OutputTopology.LineStrip)
     let point = GeometryBuilder(None, OutputTopology.Points)
+
+    let task = TaskBuilder()
+    let meshTriangle = MeshBuilder(OutputTopology.TriangleStrip)
+    let meshLine = MeshBuilder(OutputTopology.LineStrip)
+    let meshPoint = MeshBuilder(OutputTopology.Points)
 
     let _triangle<'d> = GeometryBuilder(Some typeSize<'d>, OutputTopology.TriangleStrip)
     let _line<'d> = GeometryBuilder(Some typeSize<'d>, OutputTopology.LineStrip)

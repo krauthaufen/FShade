@@ -620,12 +620,19 @@ module Serializer =
                         | ShaderStage.ClosestHit -> closestHit :> obj
                         | ShaderStage.Miss -> miss :> obj
                         | ShaderStage.Callable -> callable :> obj
+                        | ShaderStage.Task -> task :> obj
                         | _ -> failwith "bad shader-builder value"
                     | _ ->
-                        match src.ReadByte() with
-                        | 0uy -> point :> obj
-                        | 1uy -> line :> obj
-                        | _ -> triangle :> obj
+                        if stage = ShaderStage.Mesh then
+                            match src.ReadByte() with
+                            | 0uy -> meshPoint :> obj
+                            | 1uy -> meshLine :> obj
+                            | _ -> meshTriangle :> obj
+                        else
+                            match src.ReadByte() with
+                            | 0uy -> point :> obj
+                            | 1uy -> line :> obj
+                            | _ -> triangle :> obj
                     
                 elif typ.IsValueType && isBlittable typ then    
                     let data = src.ReadBytes(Marshal.SizeOf typ)
@@ -2011,6 +2018,10 @@ module Serializer =
             | Some p -> dst.Write 1uy; dst.Write p
             | None -> dst.Write 0uy
 
+            match shader.shaderLocalSize with
+            | Some s -> dst.Write 1uy; dst.Write s.X; dst.Write s.Y; dst.Write s.Z
+            | None -> dst.Write 0uy
+
             dst.Write shader.shaderInvocations
 
             Expr.serializeInternal state.ExprState dst shader.shaderBody
@@ -2137,7 +2148,16 @@ module Serializer =
                 match src.ReadByte() with
                 | 0uy -> None
                 | _ -> Some (src.ReadInt32())
-                
+
+            let localSize =
+                match src.ReadByte() with
+                | 0uy -> None
+                | _ ->
+                    let x = src.ReadInt32()
+                    let y = src.ReadInt32()
+                    let z = src.ReadInt32()
+                    Some (V3i(x, y, z))
+
             let invocations = src.ReadInt32()
 
             let body = Expr.deserializeInternal state.ExprState src
@@ -2216,6 +2236,7 @@ module Serializer =
                 shaderOutputTopology = outputTopology
                 shaderOutputVertices = outputVertices
                 shaderOutputPrimitives = outputPrimitives
+                shaderLocalSize = localSize
                 shaderInvocations = invocations
                 shaderBody = body
                 shaderDebugRange = debugRange

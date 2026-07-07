@@ -218,6 +218,10 @@ type Effect(id : string, shaders : Lazy<Map<ShaderStage, Shader>>, composedOf : 
     member x.GeometryShader     = shaders.Value |> Map.tryFind ShaderStage.Geometry
     /// gets the optional FragmentShader for the effect.
     member x.FragmentShader     = shaders.Value |> Map.tryFind ShaderStage.Fragment
+    /// gets the optional TaskShader for the effect.
+    member x.TaskShader         = shaders.Value |> Map.tryFind ShaderStage.Task
+    /// gets the optional MeshShader for the effect.
+    member x.MeshShader         = shaders.Value |> Map.tryFind ShaderStage.Mesh
 
     /// Per-output dependency map. Available without forcing shaders for
     /// composed effects (deps are composed map-only). For leaf effects this
@@ -395,7 +399,8 @@ module Effect =
 
     /// Effect blob format version. Bump when the on-disk format changes.
     /// v1 added the EffectDeps header block right after the Id.
-    let private blobFormatVersion = 1uy
+    /// v2 added the shaderLocalSize field (task-/mesh-shaders).
+    let private blobFormatVersion = 2uy
 
     let private writeOutputDepsMap (typeState : Serializer.Type.SerializerState) (dst : BinaryWriter) (m : Map<string, OutputDeps>) =
         dst.Write (Map.count m)
@@ -618,14 +623,25 @@ module Effect =
     let inline uniforms (effect : Effect) = effect.Uniforms
 
     /// creates an effect from a Map<ShaderStage,Shader>.
+    let private validateStages (shaders : Map<ShaderStage, Shader>) =
+        if Map.containsKey ShaderStage.Task shaders || Map.containsKey ShaderStage.Mesh shaders then
+            let invalid =
+                [ ShaderStage.Vertex; ShaderStage.TessControl; ShaderStage.TessEval; ShaderStage.Geometry ]
+                |> List.filter (fun s -> Map.containsKey s shaders)
+            match invalid with
+            | [] -> shaders
+            | invalid -> failwithf "[FShade] effects cannot combine task-/mesh-shaders with %A shaders" invalid
+        else
+            shaders
+
     let ofMap (shaders : Map<ShaderStage, Shader>) =
         Serializer.Init()
         for (stage, shader) in Map.toSeq shaders do
-            if stage <> shader.shaderStage then 
+            if stage <> shader.shaderStage then
                 failwithf "[FShade] inconsistent shader-map: %A claims to be %A" shader.shaderStage stage
 
-        Effect (Lazy<Map<ShaderStage, Shader>>.CreateFromValue(shaders))
-        
+        Effect (Lazy<Map<ShaderStage, Shader>>.CreateFromValue(validateStages shaders))
+
     /// creates an effect from a sequence of shaders
     let ofSeq (shaders : seq<Shader>) =
         Serializer.Init()
@@ -634,11 +650,11 @@ module Effect =
                 let mutable map = Map.empty
                 for shader in shaders do
                     match Map.tryFind shader.shaderStage map with
-                        | Some prev -> 
+                        | Some prev ->
                             failwithf "[FShade] conflicting shaders for stage: %A" shader.shaderStage
                         | None ->
                             map <- Map.add shader.shaderStage shader map
-                map
+                validateStages map
             )
         Effect map
            
@@ -866,13 +882,18 @@ module Effect =
                     newCurrent :: newBefore
                              
 
-        effect 
+        let addVertexIfNeeded (effect : Effect) =
+            // mesh pipelines have no vertex-stage
+            if Option.isSome effect.MeshShader || Option.isSome effect.TaskShader then effect
+            else effect |> addIfNotPresent ShaderStage.Vertex (Shader.passing Map.empty)
+
+        effect
             // add the final desired stage passing all desired
             // outputs (if not yet present)
             |> addIfNotPresent stage (Shader.passing outputs)
 
             // add an empty vertex shader when none is present
-            |> addIfNotPresent ShaderStage.Vertex (Shader.passing Map.empty)
+            |> addVertexIfNeeded
 
             // link all shaders (backward)
             |> toList
@@ -1076,7 +1097,14 @@ module Effect =
                                     match r with
                                         | [] -> [l]
                                         | rh :: _ ->
-                                            if l.shaderStage < rh.shaderStage then
+                                            // mesh followed by vertex merges (per-vertex splice) instead of concatenating
+                                            let merge = l.shaderStage = ShaderStage.Mesh && rh.shaderStage = ShaderStage.Vertex
+
+                                            // mesh pipelines cannot contain other vertex-group stages
+                                            if (l.shaderStage = ShaderStage.Task || l.shaderStage = ShaderStage.Mesh) && rh.shaderStage >= ShaderStage.Vertex && not merge then
+                                                failwithf "[FShade] cannot compose %AShader with %AShader" l.shaderStage rh.shaderStage
+
+                                            if l.shaderStage < rh.shaderStage && not merge then
                                                 l :: r
                                             else
                                                 let mutable res = l
@@ -1345,6 +1373,7 @@ module Effect =
                 shaderOutputTopology = None
                 shaderOutputVertices = ShaderOutputVertices.Unknown
                 shaderOutputPrimitives = None
+                shaderLocalSize = None
                 shaderInvocations = 1
                 shaderDebugRange = None
                 shaderPayloads = Map.empty

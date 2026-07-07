@@ -171,6 +171,9 @@ module IntrinsicParameters =
                     Intrinsics.LaunchId, "ivec3(gl_LaunchIDEXT)"
                     Intrinsics.LaunchSize, "ivec3(gl_LaunchSizeEXT)"
                 ]
+
+            ShaderStage.Task, Map.empty
+            ShaderStage.Mesh, Map.empty
         ]
 
 
@@ -215,4 +218,11 @@ module IntrinsicParameters =
             ShaderStage.ClosestHit, Map.empty
             ShaderStage.Miss, Map.empty
             ShaderStage.Callable, Map.empty
+
+            ShaderStage.Task, Map.empty
+            ShaderStage.Mesh,
+                Map.ofList [
+                    // rendered by the mesh-specific CWriteOutput handling (topology-dependent)
+                    Intrinsics.PrimitiveIndices, "gl_PrimitiveTriangleIndicesEXT"
+                ]
         ]

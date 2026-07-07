@@ -11,6 +11,7 @@ module GLSLExtension =
     let [<Literal>] ARBShadingLanguage420pack               = "GL_ARB_shading_language_420pack"
     let [<Literal>] ARBTessellationShader                   = "GL_ARB_tessellation_shader"
     let [<Literal>] EXTDebugPrintf                          = "GL_EXT_debug_printf"
+    let [<Literal>] EXTMeshShader                           = "GL_EXT_mesh_shader"
     let [<Literal>] EXTOpacityMicromap                      = "GL_EXT_opacity_micromap"
     let [<Literal>] EXTRayTracing                           = "GL_EXT_ray_tracing"
     let [<Literal>] EXTRayTracingPositionFetch              = "GL_EXT_ray_tracing_position_fetch"

@@ -84,6 +84,8 @@ type GraphicsStageDescription =
         | ShaderStage.TessEval    -> ShaderSlot.TessEval
         | ShaderStage.Geometry    -> ShaderSlot.Geometry
         | ShaderStage.Fragment    -> ShaderSlot.Fragment
+        | ShaderStage.Task        -> ShaderSlot.Task
+        | ShaderStage.Mesh        -> ShaderSlot.Mesh
         | s -> failwithf "invalid graphics stage %A" s
 
 [<RequireQualifiedAccess>]
@@ -117,6 +119,7 @@ type EntryDecoration =
     | InputTopology of InputTopology
     | OutputTopology of OutputTopology
     | OutputVertices of int
+    | OutputPrimitives of int
     | LocalSize of V3i
     | Invocations of int
 

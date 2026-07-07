@@ -40,6 +40,8 @@ module GLSL =
             ShaderStage.ClosestHit, GLSLang.ShaderStage.ClosestHit
             ShaderStage.Miss, GLSLang.ShaderStage.Miss
             ShaderStage.Callable, GLSLang.ShaderStage.Callable
+            ShaderStage.Task, GLSLang.ShaderStage.Task
+            ShaderStage.Mesh, GLSLang.ShaderStage.Mesh
         ]
 
     let glslangWithTarget (target : GLSLang.Target) (stage : ShaderStage) (defines : List<string>) (code : string) =
@@ -98,11 +100,22 @@ module GLSL =
 
         let glsl = ModuleCompiler.compileGLSL backend module_
 
-        glsl,
-        module_.Entries |> List.map (fun e ->
-            let stage = e.decorations |> List.tryPick (function FShade.Imperative.EntryDecoration.Stages s -> Some s.Stage | _ -> None) |> Option.get
+        let stages =
+            module_.Entries |> List.map (fun e ->
+                e.decorations |> List.tryPick (function FShade.Imperative.EntryDecoration.Stages s -> Some s.Stage | _ -> None) |> Option.get
+            )
 
-            let res = glslang stage glsl.code
+        // GL_EXT_mesh_shader requires SPIR-V 1.4 (for all stages of the module)
+        let isMeshPipeline =
+            stages |> List.exists (fun s -> s = ShaderStage.Task || s = ShaderStage.Mesh)
+
+        glsl,
+        stages |> List.map (fun stage ->
+            let res =
+                if isMeshPipeline then
+                    glslangWithTarget GLSLang.Target.SPIRV_1_4 stage [sprintf "%A" stage] glsl.code
+                else
+                    glslang stage glsl.code
 
             stage, res
         )

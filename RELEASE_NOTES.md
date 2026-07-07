@@ -1,3 +1,8 @@
+### 5.8.0
+- Added task-/mesh-shader support (`GL_EXT_mesh_shader`, Vulkan): `task`/`meshTriangle|meshLine|meshPoint` builders, `writeVertex`/`writeTriangle`/`setMeshOutputs`/`emitMeshTasks` intrinsics, `MeshOutputs`-attribute.
+- Mesh shaders are Effect-integrated: `compose [mesh; vs; fs]` splices vertex shaders per `writeVertex`, fragment composition and linking DCE (incl. field-wise task-payload pruning) work as usual.
+- Effect blob format bumped to v2 (new `shaderLocalSize` field).
+
 ### 5.7.14
 - Restore the try/with around `Expr.TryGetReflectedDefinition` (reverts 5.7.13): the "not reflectable" issue it chased was a dotnet-8-vs-10 / FSharp.Core reflected-definition pickle mismatch, not this lookup.
 

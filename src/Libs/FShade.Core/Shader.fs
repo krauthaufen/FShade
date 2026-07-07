@@ -41,6 +41,8 @@ type Shader =
         shaderOutputVertices : ShaderOutputVertices
         /// the optional maximal vertex-count for the shader
         shaderOutputPrimitives : Option<int>
+        /// the workgroup-size (only useful for task-/mesh-shaders)
+        shaderLocalSize : Option<V3i>
         /// the number of shader invocations (only useful for some stages)
         shaderInvocations : int
         /// the body for the shader
@@ -214,6 +216,12 @@ module Preprocessor =
         let (|RaytracingBuilder|_|) (e : Expr) =
             match e with
             | ShaderBuilder b when ShaderStage.isRaytracing b.ShaderStage -> ValueSome b
+            | _ -> ValueNone
+
+        [<return: Struct>]
+        let (|TaskOrMeshBuilder|_|) (e : Expr) =
+            match e with
+            | ShaderBuilder b when ShaderStage.isTask b.ShaderStage || ShaderStage.isMesh b.ShaderStage -> ValueSome b
             | _ -> ValueNone
 
 
@@ -937,6 +945,7 @@ module Preprocessor =
     type ShaderExpressionType =
         | Normal
         | Compute
+        | Mesh
         | Raytracing of ShaderStage
 
     type State =
@@ -1856,6 +1865,114 @@ module Preprocessor =
 
         }
 
+    [<return: Struct>]
+    let private (|MeshInputPayload|_|) (pi : PropertyInfo) =
+        if pi.Name = "Payload" && pi.DeclaringType.IsGenericType && pi.DeclaringType.GetGenericTypeDefinition() = typedefof<MeshInput<_>> then
+            ValueSome ()
+        else
+            ValueNone
+
+    let rec preprocessMeshS (e : Expr) : Preprocess<Expr> =
+        state {
+            match e with
+                | PropertyGet(None, pi, []) when pi.Name = "LocalSize" ->
+                    let! s = State.get
+                    return Expr.Value(s.localSize)
+
+                | FieldGet(None, pi) when pi.Name = "LocalSize" ->
+                    let! s = State.get
+                    return Expr.Value(s.localSize)
+
+                // input.Payload.field -> field-wise payload read
+                | PropertyGet(Some (PropertyGet(Some _, MeshInputPayload, [])), f, []) ->
+                    return Expr.ReadInput(ParameterKind.Input, f.PropertyType, f.Semantic)
+
+                // input.Payload -> whole payload (rebuilt from field-wise reads)
+                | PropertyGet(Some _, (MeshInputPayload as pi), []) ->
+                    let t = pi.PropertyType
+                    if FSharpType.IsRecord(t, true) then
+                        let args =
+                            FSharpType.GetRecordFields(t, true)
+                            |> Array.toList
+                            |> List.map (fun f -> Expr.ReadInput(ParameterKind.Input, f.PropertyType, f.Semantic))
+                        return Expr.NewRecord(t, args)
+                    else
+                        return Expr.ReadInput(ParameterKind.Input, t, "Payload")
+
+                | Call(None, mi, [index; value]) when mi.Name = "writeVertex" ->
+                    let! index = preprocessMeshS index
+                    let! values = getMeshValuesS Intrinsics.Position value
+                    return Expr.WriteOutputsRaw(values |> List.map (fun (name, v) -> name, Some index, v))
+
+                | Call(None, mi, [index; value]) when mi.Name = "writeTriangle" || mi.Name = "writeLine" || mi.Name = "writePoint" ->
+                    let! index = preprocessMeshS index
+                    let! value = preprocessMeshS value
+                    do! State.writeOutput Intrinsics.PrimitiveIndices { paramType = value.Type; paramInterpolation = InterpolationMode.Default }
+                    return Expr.WriteOutputsRaw [Intrinsics.PrimitiveIndices, Some index, value]
+
+                | Call(None, mi, [count; payload]) when mi.Name = "emitMeshTasks" ->
+                    let! count = preprocessMeshS count
+                    let cVar = Var("meshTaskCount", typeof<V3i>)
+                    let ce = Expr.Var cVar
+
+                    let emit =
+                        Expr.Let(
+                            cVar, count,
+                            <@@ emitMeshTasksXYZ (%%ce : V3i).X (%%ce : V3i).Y (%%ce : V3i).Z @@>
+                        )
+
+                    if payload.Type = typeof<unit> then
+                        return emit
+                    else
+                        let! values = getMeshValuesS "Payload" payload
+                        return Expr.Sequential(
+                            Expr.WriteOutputsRaw(values |> List.map (fun (name, v) -> name, None, v)),
+                            emit
+                        )
+
+                | ShapeLambda(v, b) ->
+                    let! b = preprocessMeshS b
+                    return Expr.Lambda(v, b)
+
+                | ShapeVar(v) ->
+                    return e
+
+                | ShapeCombination(o, args) ->
+                    let! args = args |> List.mapS preprocessMeshS
+                    return RebuildShapeCombination(o, args)
+        }
+
+    /// decomposes a vertex-/payload-record into per-semantic values (registering them as outputs)
+    and getMeshValuesS (defaultSem : string) (value : Expr) : Preprocess<list<string * Expr>> =
+        state {
+            if FSharpType.IsRecord(value.Type, true) then
+                let fields = FSharpType.GetRecordFields(value.Type, true) |> Array.toList
+
+                match value with
+                | NewRecord(_, args) ->
+                    return!
+                        List.zip fields args |> List.mapS (fun (f, v) ->
+                            state {
+                                let! v = preprocessMeshS v
+                                do! State.writeOutput f.Semantic { paramType = f.PropertyType; paramInterpolation = f.Interpolation }
+                                return f.Semantic, v
+                            }
+                        )
+                | _ ->
+                    let! value = preprocessMeshS value
+                    return!
+                        fields |> List.mapS (fun f ->
+                            state {
+                                do! State.writeOutput f.Semantic { paramType = f.PropertyType; paramInterpolation = f.Interpolation }
+                                return f.Semantic, Expr.PropertyGet(value, f)
+                            }
+                        )
+            else
+                let! value = preprocessMeshS value
+                do! State.writeOutput defaultSem { paramType = value.Type; paramInterpolation = InterpolationMode.Default }
+                return [defaultSem, value]
+        }
+
     let rec preprocessNormalS (e : Expr) : Preprocess<Expr> =
         state {
             let! vertexType = State.vertexType
@@ -2740,6 +2857,7 @@ module Preprocessor =
                 match typ with
                 | ShaderExpressionType.Normal -> State.value e
                 | ShaderExpressionType.Compute -> preprocessComputeS e
+                | ShaderExpressionType.Mesh -> preprocessMeshS e
                 | ShaderExpressionType.Raytracing s -> preprocessRaytracingS s e
 
             let! e1 = preprocessNormalS e0
@@ -2750,6 +2868,7 @@ module Preprocessor =
         let typ =
             match e with
             | ComputeBuilder _ -> ShaderExpressionType.Compute
+            | TaskOrMeshBuilder _ -> ShaderExpressionType.Mesh
             | RaytracingBuilder b -> ShaderExpressionType.Raytracing b.ShaderStage
             | _ -> ShaderExpressionType.Normal
 
@@ -2814,14 +2933,23 @@ module Preprocessor =
         }
 
     and toShaders (inputTypes : List<Type>) (vertexIndex : Map<Var, Expr>) (e : Expr) =
+        let attLocalSize =
+            match e.Method with
+            | Some m ->
+                match m.GetCustomAttributes(typeof<LocalSizeAttribute>, true) |> Seq.tryHead with
+                | Some (:? LocalSizeAttribute as att) -> Some (V3i(att.X, att.Y, att.Z))
+                | _ -> None
+            | None -> None
+
         let run = preprocessS e
-        let mutable state = { State.ofInputTypes inputTypes with vertexIndex = vertexIndex }
+        let mutable state = { State.ofInputTypes inputTypes with vertexIndex = vertexIndex; localSize = defaultArg attLocalSize V3i.Zero }
         let body = run.Run(&state)
 
         // figure out the used builder-type
         let builder =
             match e with
             | ComputeBuilder sb
+            | TaskOrMeshBuilder sb
             | RaytracingBuilder sb -> sb
             | _ ->
                 match state.builder with
@@ -2857,14 +2985,38 @@ module Preprocessor =
                 | _ -> 
                     body, state.outputs
 
-        let outputVertices =
+        let outputVertices, outputPrimitives =
             match builder with
-                | :? GeometryBuilder as b -> 
+                | :? GeometryBuilder as b ->
                     match b.Size with
-                        | Some s -> ShaderOutputVertices.UserGiven s
-                        | None -> ShaderOutputVertices.Unknown
+                        | Some s -> ShaderOutputVertices.UserGiven s, None
+                        | None -> ShaderOutputVertices.Unknown, None
+                | :? MeshBuilder ->
+                    let att =
+                        e.Method |> Option.bind (fun m ->
+                            m.GetCustomAttributes(typeof<MeshOutputsAttribute>, true)
+                            |> Seq.tryHead
+                            |> Option.map unbox<MeshOutputsAttribute>
+                        )
+                    match att with
+                    | Some att -> ShaderOutputVertices.UserGiven att.MaxVertices, Some att.MaxPrimitives
+                    | None -> failwith "[FShade] mesh shaders need a MeshOutputs-attribute declaring MaxVertices/MaxPrimitives"
                 | _ ->
-                    ShaderOutputVertices.Unknown
+                    ShaderOutputVertices.Unknown, None
+
+        let localSize =
+            if ShaderStage.isWorkgroup builder.ShaderStage then
+                match attLocalSize with
+                | Some s when s.AnyEqual MaxLocalSize ->
+                    failwithf "[FShade] %A shaders do not support MaxLocalSize" builder.ShaderStage
+                | Some s when s.AllGreater 0 ->
+                    Some s
+                | _ ->
+                    if builder.ShaderStage <> ShaderStage.Compute then
+                        Log.warn "[FShade] %A shader without (explicit) local-size" builder.ShaderStage
+                    Some V3i.One
+            else
+                None
 
         let inverseMap =
             Seq.map (fun (typ, (name, location)) ->
@@ -2880,7 +3032,8 @@ module Preprocessor =
                 shaderInputTopology       = state.inputTopology
                 shaderOutputTopology      = builder.OutputTopology
                 shaderOutputVertices      = outputVertices
-                shaderOutputPrimitives    = None
+                shaderOutputPrimitives    = outputPrimitives
+                shaderLocalSize           = localSize
                 shaderInvocations         = 1
                 shaderBody                = body
                 shaderDebugRange          = None
@@ -3509,6 +3662,9 @@ module Shader =
                     Intrinsics.LaunchId, typeof<V3i>
                     Intrinsics.LaunchSize, typeof<V3i>
                 ]
+
+            ShaderStage.Task, Map.empty
+            ShaderStage.Mesh, Map.empty
         ]
 
     let private builtInOutputs =
@@ -3568,6 +3724,14 @@ module Shader =
             ShaderStage.Callable,
                 Map.ofList [
                 ]
+
+            ShaderStage.Task,
+                Map.ofList [
+                ]
+
+            ShaderStage.Mesh,
+                Map.ofList [
+                ]
         ]
 
     let private sideEffects =
@@ -3604,6 +3768,18 @@ module Shader =
             ShaderStage.Compute,
                 HashSet.ofList [
                     getMethodInfo <@ barrier @>
+                ]
+
+            ShaderStage.Task,
+                HashSet.ofList [
+                    getMethodInfo <@ barrier @>
+                    getMethodInfo <@ emitMeshTasksXYZ @>
+                ]
+
+            ShaderStage.Mesh,
+                HashSet.ofList [
+                    getMethodInfo <@ barrier @>
+                    getMethodInfo <@ setMeshOutputs @>
                 ]
         ]
 
@@ -3904,6 +4080,11 @@ module Shader =
     let systemOutputs (shader : Shader) =
         let builtIn = builtInOutputs.[shader.shaderStage]
         shader.shaderOutputs |> Map.choose (fun name p ->
+            // primitive-index type depends on the output-topology
+            if shader.shaderStage = ShaderStage.Mesh && name = Intrinsics.PrimitiveIndices then
+                Some p.paramType
+            else
+
             match Map.tryFind name builtIn with
                 | Some neededType ->
                     let typesValid =
@@ -4196,7 +4377,24 @@ module Shader =
 
             let shader =
                 shader |> substituteWrites (fun values ->
-                    let isPatchOutput = 
+                    // mesh-/task-shaders cannot pass unwritten outputs through; writes are
+                    // simply restricted to the desired set (writeVertex writes all per-vertex
+                    // outputs at once, so dropping a semantic here drops it everywhere)
+                    if shader.shaderStage = ShaderStage.Mesh || shader.shaderStage = ShaderStage.Task then
+                        values
+                        |> Map.choose (fun n v ->
+                            match Map.tryFind n outputs with
+                            | Some t ->
+                                if t = v.Type then Some v
+                                else v |> ShaderOutputValue.withValue (converter n v.Type t v.Value) |> Some
+                            | None ->
+                                None
+                        )
+                        |> Expr.WriteOutputs
+                        |> Some
+                    else
+
+                    let isPatchOutput =
                         if shader.shaderStage = ShaderStage.TessControl then
                             values |> Map.exists (fun _ v -> v.Interpolation.HasFlag InterpolationMode.PerPatch)
                         else
@@ -4428,6 +4626,15 @@ module Shader =
                         | ShaderOutputVertices.Unknown -> ()
                         | ShaderOutputVertices.Computed v | ShaderOutputVertices.UserGiven v ->
                             yield EntryDecoration.OutputVertices v
+
+                    if s.shaderStage = ShaderStage.Mesh then
+                        match s.shaderOutputPrimitives with
+                            | Some p -> yield EntryDecoration.OutputPrimitives p
+                            | None -> ()
+
+                    match s.shaderLocalSize with
+                        | Some size -> yield EntryDecoration.LocalSize size
+                        | None -> ()
                 ]
         }
 
@@ -4452,6 +4659,7 @@ module Shader =
                 shaderOutputTopology      = None
                 shaderOutputVertices      = ShaderOutputVertices.Unknown
                 shaderOutputPrimitives    = None
+                shaderLocalSize           = None
                 shaderInvocations         = 1
                 shaderBody                = body
                 shaderDebugRange          = None
@@ -4579,6 +4787,77 @@ module Shader =
                     shaderBody = lBody
                     shaderDebugRange = None
                     shaderDepthWriteMode = depthWrite
+                }
+
+        /// composes a mesh-shader with a following vertex-shader by splicing the
+        /// vertex-shader into every writeVertex-site (the per-vertex values are
+        /// statically known there, unlike gsvs there is no provenance problem)
+        let msvs (lShader : Shader) (rShader : Shader) =
+            let needed  = Map.intersect lShader.shaderOutputs rShader.shaderInputs
+
+            // primitive-indices are written by their own (untouched) write-sites
+            let passed  = Map.difference lShader.shaderOutputs rShader.shaderOutputs |> Map.remove Intrinsics.PrimitiveIndices
+            let unknown = Map.difference rShader.shaderInputs lShader.shaderOutputs
+
+            if not (Map.isEmpty unknown) then
+                failwithf "[FShade] cannot compose MeshShader with VertexShader reading %A (not written per-vertex by the mesh-shader)" (unknown |> Map.toList |> List.map fst)
+
+            let lBody =
+                lShader.shaderBody.SubstituteWrites (fun values ->
+                    // primitive-index writes stay untouched
+                    if Map.containsKey Intrinsics.PrimitiveIndices values then
+                        None
+                    else
+                        let index = values |> Map.toSeq |> Seq.tryPick (fun (_, (i, _)) -> i)
+                        let values = values |> Map.map (fun _ (_,v) -> v)
+
+                        let variables =
+                            needed |> Map.map (fun name (lv, rv) ->
+                                let variable = Var(name + "C", rv.paramType)
+                                let converter = converter name lv.paramType rv.paramType
+                                variable, converter
+                            )
+
+                        let rBody =
+                            rShader.shaderBody
+                                |> Expr.substituteReads (fun kind t name idx slot ->
+                                    match kind with
+                                        | ParameterKind.Input ->
+                                            match Map.tryFind name variables with
+                                                | Some(v,_) -> Expr.Var v |> Some
+                                                | _ -> None
+                                        | _ ->
+                                            None
+                                )
+
+                        let passedValues =
+                            passed |> Map.map (fun name p ->
+                                index, Map.find name values
+                            )
+
+                        let rBody =
+                            rBody
+                                |> Expr.substituteWrites (fun rValues ->
+                                    let rValues = rValues |> Map.map (fun _ (_,v) -> index, v)
+                                    Map.union passedValues rValues
+                                        |> Expr.WriteOutputs
+                                        |> Some
+                                )
+
+                        let rBody =
+                            variables |> Map.fold (fun b name (var, convert) ->
+                                Expr.Let(var, convert (Map.find name values), b)
+                            ) rBody
+
+                        rBody |> Some
+                )
+
+            optimize
+                { lShader with
+                    shaderOutputs = Map.union lShader.shaderOutputs rShader.shaderOutputs
+                    shaderUniforms = Map.union lShader.shaderUniforms rShader.shaderUniforms
+                    shaderBody = lBody
+                    shaderDebugRange = None
                 }
 
         let gsvs (lShader : Shader) (rShader : Shader) =
@@ -5179,6 +5458,10 @@ module Shader =
             // harder case: left is geometry and right is vertex
             | ShaderStage.Geometry, ShaderStage.Vertex ->
                 Composition.gsvs l r
+
+            // mesh-shader followed by a per-vertex transformation
+            | ShaderStage.Mesh, ShaderStage.Vertex ->
+                Composition.msvs l r
 
             | ShaderStage.Geometry, ShaderStage.Geometry ->
                 Composition.gsgs l r
