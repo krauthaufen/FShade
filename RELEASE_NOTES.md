@@ -1,3 +1,6 @@
+### 5.7.15
+- GLSL: Vulkan specialization constants via the magic `SpecConstants` uniform scope — members emit `layout(constant_id = N) const` with zero defaults (no descriptor binding), name-keyed ids stable across stages, reported through `GLSLProgramInterface.specConstants`; `Config.specConstants` gates emission (Vulkan on; GL backends fall through to an ordinary uniform buffer).
+
 ### 5.7.14
 - Restore the try/with around `Expr.TryGetReflectedDefinition` (reverts 5.7.13): the "not reflectable" issue it chased was a dotnet-8-vs-10 / FSharp.Core reflected-definition pickle mismatch, not this lookup.
 
