@@ -471,6 +471,16 @@ type GLSLAccelerationStructure =
         accelName       : string
     }
 
+/// a Vulkan specialization constant declared via the magic `SpecConstants`
+/// uniform scope: `layout(constant_id = specId) const <specType> <specName> = 0;`
+/// Backends fill VkSpecializationInfo by looking the constant_id up by NAME here.
+type GLSLSpecConstant =
+    {
+        specId          : int
+        specName        : string
+        specType        : GLSLType
+    }
+
 type GLSLWinding =
     | CCW
     | CW
@@ -862,6 +872,7 @@ and [<StructuredFormatDisplay("{AsString}")>] GLSLProgramInterface =
         storageBuffers          : MapExt<string, GLSLStorageBuffer>
         uniformBuffers          : MapExt<string, GLSLUniformBuffer>
         accelerationStructures  : MapExt<string, GLSLAccelerationStructure>
+        specConstants           : MapExt<string, GLSLSpecConstant>
         samplerStates           : MapExt<string, GLSLSamplerState>
         textures                : MapExt<string, GLSLTexture>
         shaders                 : GLSLProgramShaders
@@ -1370,6 +1381,7 @@ module GLSLProgramInterface =
     let inline storageBuffers (i : GLSLProgramInterface) = i.storageBuffers
     let inline uniformBuffers (i : GLSLProgramInterface) = i.uniformBuffers
     let inline accelerationStructures (i : GLSLProgramInterface) = i.accelerationStructures
+    let inline specConstants (i : GLSLProgramInterface) = i.specConstants
     let inline shaders (i : GLSLProgramInterface) = i.shaders
 
     let usesDiscard (iface : GLSLProgramInterface) =
@@ -1552,6 +1564,13 @@ module GLSLProgramInterface =
             dst.Write acc.accelBinding
             dst.Write acc.accelName
             dst.Write acc.accelSet
+
+        dst.Write program.specConstants.Count
+        for KeyValue(name, sc) in program.specConstants do
+            dst.Write name
+            dst.Write sc.specId
+            dst.Write sc.specName
+            GLSLType.serializeInternal dst sc.specType
 
         match program.shaders with
         | GLSLProgramShaders.Graphics gr ->
@@ -1757,6 +1776,17 @@ module GLSLProgramInterface =
             )
             |> MapExt.ofList
 
+        let specConstants =
+            let cnt = src.ReadInt32()
+            List.init cnt (fun _ ->
+                let name = src.ReadString()
+                let specId = src.ReadInt32()
+                let specName = src.ReadString()
+                let specType = GLSLType.deserializeInternal src
+                name, { specId = specId; specName = specName; specType = specType }
+            )
+            |> MapExt.ofList
+
         let shaders = 
             match src.ReadByte() with
             | 0uy ->
@@ -1894,6 +1924,7 @@ module GLSLProgramInterface =
                 uniformBuffers = uniformBuffers
                 shaders = shaders
                 accelerationStructures = accelerationStructures
+                specConstants = specConstants
                 samplerStates = samplerStates
                 textures = textures
             }
