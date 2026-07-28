@@ -1176,8 +1176,17 @@ let ``Debug output``() =
             Debug.Printfn("Hello, look at my vector: %v4f", v.[0])
         }
 
+    let backend =
+        GLSL.Backend.Create {
+            glslVulkan.Config with availableExtensions = Map.ofList [ GLSL.GLSLExtension.EXTDebugPrintf, false ]
+        }
+
+    let notAvailableMessage = Regex.Escape $"/* {GLSL.GLSLExtension.EXTDebugPrintf} not available */"
+
     GLSL.shouldCompileAndContainRegex [Effect.ofFunction fs] ["debugPrintfEXT"]
+    GLSL.shouldCompileAndContainRegex' backend [Effect.ofFunction fs] [notAvailableMessage]
     GLSL.shouldCompileComputeAndContainRegex (ComputeShader.ofFunction (V3i(128)) cs) ["debugPrintfEXT"]
+    GLSL.shouldCompileComputeAndContainRegex' backend (ComputeShader.ofFunction (V3i(128)) cs) [notAvailableMessage]
 
 [<Test>]
 let ``UInt32 literals``() =

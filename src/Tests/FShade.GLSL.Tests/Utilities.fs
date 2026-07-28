@@ -107,12 +107,12 @@ module GLSL =
             stage, res
         )
 
-    let compileCompute (c : ComputeShader) =
+    let compileCompute' (backend : Backend) (c : ComputeShader) =
         Console.WriteLine("COMPILE {0}", c.csId)
         let module_ =
             c |> ComputeShader.toModule
 
-        let glsl = ModuleCompiler.compileGLSLVulkan module_
+        let glsl = ModuleCompiler.compileGLSL backend module_
 
         glsl,
         module_.Entries |> List.map (fun e ->
@@ -122,7 +122,10 @@ module GLSL =
 
             stage, res
         )
-        
+
+    let compileCompute (c : ComputeShader) =
+        compileCompute' glslVulkan c
+
     let compile (e : list<Effect>) =
         compile' glsl430 e
 
@@ -213,11 +216,14 @@ module GLSL =
         printResults (Some e) res glsl
         s |> List.map (fun s -> s, None) |> shouldContainRegex glsl
 
-    let shouldCompileComputeAndContainRegex (c : ComputeShader) (s : list<string>) =
+    let shouldCompileComputeAndContainRegex' (backend : Backend) (c : ComputeShader) (s : list<string>) =
         let s = s |> List.map (fun s -> s, None)
-        let glsl, res = compileCompute c
+        let glsl, res = compileCompute' backend c
         shouldContainRegex glsl s
         printResults None res glsl
+
+    let shouldCompileComputeAndContainRegex (c : ComputeShader) (s : list<string>) =
+        shouldCompileComputeAndContainRegex' glslVulkan c s
 
 type Setup() =
     static let initialized = ref false

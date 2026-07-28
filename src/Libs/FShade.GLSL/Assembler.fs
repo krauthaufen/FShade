@@ -1933,15 +1933,24 @@ module Assembler =
 
                 | CDebugPrintf(fmt, values) ->
                     do! AssemblerState.useExtension GLSLExtension.EXTDebugPrintf
+                    let! config = AssemblerState.config
 
-                    let! fmt = assembleExprS fmt
-                    let! values = values |> Array.mapS assembleExprS
+                    let supported =
+                        config.availableExtensions
+                        |> Map.tryFindV GLSLExtension.EXTDebugPrintf
+                        |> ValueOption.defaultValue true
 
-                    if values.Length = 0 then
-                        return sprintf "debugPrintfEXT(%s)" fmt
+                    if supported then
+                        let! fmt = assembleExprS fmt
+                        let! values = values |> Array.mapS assembleExprS
+
+                        if values.Length = 0 then
+                            return sprintf "debugPrintfEXT(%s)" fmt
+                        else
+                            let values = values |> String.concat ", "
+                            return sprintf "debugPrintfEXT(%s, %s)" fmt values
                     else
-                        let values = values |> String.concat ", "
-                        return sprintf "debugPrintfEXT(%s, %s)" fmt values
+                        return $"/* {GLSLExtension.EXTDebugPrintf} not available */"
         }
     
     and assembleExprsS (join : string) (args : seq<CExpr>) =
