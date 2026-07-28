@@ -52,11 +52,18 @@ module UtilityFunction =
         else
             match ExprWorkardound.TryGetReflectedDefinition m with
                 | Some e ->
-                    let isInline = m.GetCustomAttributes(typeof<InlineAttribute>, true) |> Seq.isEmpty |> not
+                    let mutable isInline = m.GetCustomAttributes(typeof<InlineAttribute>, true) |> Seq.isEmpty |> not
 
                     match e with
                         | Lambdas(args, body) ->
                             let args = List.concat args
+
+                            // Do not inline functions with pass-by-reference arguments
+                            // See: https://github.com/krauthaufen/FShade/issues/38
+                            isInline <- isInline && args |> List.forall (fun arg ->
+                                let isRef = arg.Type.IsGenericType && arg.Type.GetGenericTypeDefinition() = typedefof<ref<_>>
+                                not isRef
+                            )
 
                             let args, body = 
                                 if m.IsStatic then 
