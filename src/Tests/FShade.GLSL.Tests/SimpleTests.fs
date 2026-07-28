@@ -1176,8 +1176,17 @@ let ``Debug output``() =
             Debug.Printfn("Hello, look at my vector: %v4f", v.[0])
         }
 
+    let backend =
+        GLSL.Backend.Create {
+            glslVulkan.Config with availableExtensions = Map.ofList [ GLSL.GLSLExtension.EXTDebugPrintf, false ]
+        }
+
+    let notAvailableMessage = Regex.Escape $"/* {GLSL.GLSLExtension.EXTDebugPrintf} not available */"
+
     GLSL.shouldCompileAndContainRegex [Effect.ofFunction fs] ["debugPrintfEXT"]
+    GLSL.shouldCompileAndContainRegex' backend [Effect.ofFunction fs] [notAvailableMessage]
     GLSL.shouldCompileComputeAndContainRegex (ComputeShader.ofFunction (V3i(128)) cs) ["debugPrintfEXT"]
+    GLSL.shouldCompileComputeAndContainRegex' backend (ComputeShader.ofFunction (V3i(128)) cs) [notAvailableMessage]
 
 [<Test>]
 let ``UInt32 literals``() =
@@ -1507,3 +1516,38 @@ let ``Unbounded sampler arrays``() =
                 "uniform sampler2D unboundedSampler3\[\];"
             ] |> String.concat "\\s*"
      ]
+
+[<Test>]
+let ``Special floating-point constants``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            let _ = nanf
+            let _ = nan
+            let _ = infinityf
+            let _ = infinity
+            let _ = -infinityf
+            let _ = -infinity
+            return v.c
+        }
+
+    GLSL.shouldCompile [ Effect.ofFunction fs ]
+
+[<ReflectedDefinition; Inline>]
+let myMethod (variable: ref<int>) : unit =
+    variable.Value <- variable.Value + 1
+
+[<Test>]
+let ``Inlining of pass-by-reference method``() =
+    Setup.Run()
+
+    let frag () =
+        fragment {
+            let variable = 0
+            myMethod &&variable
+            myMethod &&variable
+            return variable
+        }
+
+    GLSL.shouldCompileAndContainRegexWithCount [ Effect.ofFunction frag ] [ "myMethod[_a-zA-Z0-9]*\(variable\)", 2 ]

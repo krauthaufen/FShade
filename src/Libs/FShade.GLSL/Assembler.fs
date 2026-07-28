@@ -1530,9 +1530,31 @@ module Assembler =
                     | CType.CFloat(64) -> "lf"
                     | _ -> ""
 
-                let str = v.ToString(System.Globalization.CultureInfo.InvariantCulture)
-                if str.Contains "." || str.Contains "E" || str.Contains "e" then return $"{str}{suffix}"
-                else return $"{str}.0{suffix}"
+                let value =
+                    if isPositiveInfinity v then
+                        match t with
+                        | CType.CFloat 32 -> "uintBitsToFloat(0x7F800000u)"
+                        | CType.CFloat 64 -> "packDouble2x32(uvec2(0x00000000u, 0x7FF00000u))"
+                        | _ -> $"(1.0{suffix} / 0.0{suffix})"
+
+                    elif isNegativeInfinity v then
+                        match t with
+                        | CType.CFloat 32 -> "uintBitsToFloat(0xFF800000u)"
+                        | CType.CFloat 64 -> "packDouble2x32(uvec2(0x00000000u, 0xFFF00000u))"
+                        | _ -> $"(-1.0{suffix} / 0.0{suffix})"
+
+                    elif isNaN v then
+                        match t with
+                        | CType.CFloat 32 -> "uintBitsToFloat(0x7FC00000u)"
+                        | CType.CFloat 64 -> "packDouble2x32(uvec2(0x00000000u, 0x7FF80000u))"
+                        | _ -> $"(0.0{suffix} / 0.0{suffix})"
+
+                    else
+                        let str = v.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                        if str.Contains "." || str.Contains "E" || str.Contains "e" then $"{str}{suffix}"
+                        else $"{str}.0{suffix}"
+
+                return value
 
             | CLiteral.CString v -> return "\"" + v + "\""
         }
@@ -1951,15 +1973,24 @@ module Assembler =
 
                 | CDebugPrintf(fmt, values) ->
                     do! AssemblerState.useExtension GLSLExtension.EXTDebugPrintf
+                    let! config = AssemblerState.config
 
-                    let! fmt = assembleExprS fmt
-                    let! values = values |> Array.mapS assembleExprS
+                    let supported =
+                        config.availableExtensions
+                        |> Map.tryFindV GLSLExtension.EXTDebugPrintf
+                        |> ValueOption.defaultValue true
 
-                    if values.Length = 0 then
-                        return sprintf "debugPrintfEXT(%s)" fmt
+                    if supported then
+                        let! fmt = assembleExprS fmt
+                        let! values = values |> Array.mapS assembleExprS
+
+                        if values.Length = 0 then
+                            return sprintf "debugPrintfEXT(%s)" fmt
+                        else
+                            let values = values |> String.concat ", "
+                            return sprintf "debugPrintfEXT(%s, %s)" fmt values
                     else
-                        let values = values |> String.concat ", "
-                        return sprintf "debugPrintfEXT(%s, %s)" fmt values
+                        return $"/* {GLSLExtension.EXTDebugPrintf} not available */"
         }
     
     and assembleExprsS (join : string) (args : seq<CExpr>) =

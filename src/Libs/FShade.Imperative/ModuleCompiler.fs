@@ -217,7 +217,7 @@ module ModuleCompiler =
                     |> HashMap.toArray 
                     |> Array.choose (fun (e, g) ->
                         match e with
-                        | Some e -> Some (e, g)
+                        | Some e -> Some (e.conditional, g) // Conditional should be unique, using whole EntryPoint is problematic if body contains nan
                         | None -> None
                     )
                     |> HashMap.ofArray
@@ -270,7 +270,7 @@ module ModuleCompiler =
 
 
                     for (entry, _, _) in graphs do
-                        match HashMap.tryFind entry entryGroups with
+                        match HashMap.tryFind entry.conditional entryGroups with
                         | Some g ->
                             let definitions =
                                 let ray, defs =
