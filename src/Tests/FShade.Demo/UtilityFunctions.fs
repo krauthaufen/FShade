@@ -183,7 +183,6 @@ module UtiliyFunctions =
                         availableExtensions         = Map.empty
                         createUniformBuffers        = true
                         pushConstants               = false
-                        specConstants = false
                         bindingMode                 = GLSL.BindingMode.PerKind
                         createDescriptorSets        = true
                         stepDescriptorSets          = false

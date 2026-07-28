@@ -59,10 +59,6 @@ type Config =
         availableExtensions         : Map<string, bool>
         createUniformBuffers        : bool
         pushConstants               : bool
-        /// emit members of the magic `SpecConstants` uniform scope as Vulkan
-        /// specialization constants (layout(constant_id=N) const ...). When
-        /// false (GL backends) they fall through to an ordinary uniform buffer.
-        specConstants               : bool
 
         bindingMode                 : BindingMode
         createDescriptorSets        : bool
@@ -737,7 +733,6 @@ module AssemblerState =
                     storageBuffers          = MapExt.empty
                     uniformBuffers          = MapExt.empty
                     accelerationStructures  = MapExt.empty
-                    specConstants           = MapExt.empty
                     samplerStates           = MapExt.empty
                     textures                = MapExt.empty
                     shaders                 = GLSLProgramShaders.Graphics { stages = MapExt.empty }
@@ -1186,19 +1181,6 @@ module Interface =
                 }
                 
             { s with ifaceNew = iface; images = MapExt.add image.imageName image s.images }
-        )
-
-    /// register a specialization constant; idempotent per NAME (all stages of a
-    /// pipeline share one constant_id namespace, so a re-declaration in another
-    /// stage must reuse the same id). Returns the constant_id.
-    let addSpecConstant (name : string) (typ : GLSLType) =
-        State.custom (fun (s : AssemblerState) ->
-            match MapExt.tryFind name s.ifaceNew.specConstants with
-            | Some sc -> s, sc.specId
-            | None ->
-                let sc = { specId = s.ifaceNew.specConstants.Count; specName = name; specType = typ }
-                let iface = { s.ifaceNew with specConstants = MapExt.add name sc s.ifaceNew.specConstants }
-                { s with ifaceNew = iface }, sc.specId
         )
 
     let addAccelerationStructure (accel : GLSLAccelerationStructure) =
@@ -2279,31 +2261,6 @@ module Assembler =
 
                                 return buffers |> String.concat "\r\n"
                                 
-                            | Some "SpecConstants" when config.specConstants ->
-                                // SPECIALIZATION CONSTANTS (magic scope, like "StorageBuffer"):
-                                // each member becomes a pipeline-time constant with a stable,
-                                // name-keyed constant_id; NO descriptor binding is allocated.
-                                // Zero defaults by design: consumers use zero-means-unspecialized
-                                // semantics (e.g. bitmasks of DISABLED features), so a pipeline
-                                // created without VkSpecializationInfo behaves exactly like the
-                                // unspecialized shader. Sorted by name for deterministic ids.
-                                let! defs =
-                                    fields |> List.sortBy (fun u -> u.cUniformName) |> List.mapS (fun u ->
-                                        state {
-                                            let name = checkName u.cUniformName
-                                            let dflt =
-                                                match u.cUniformType with
-                                                | CType.CInt _ -> "0"
-                                                | CType.CFloat _ -> "0.0"
-                                                | CType.CBool -> "false"
-                                                | t -> failwithf "[GLSL] specialization constants must be scalar int/float/bool, %s is %A" name.Name t
-                                            let! typ = assembleTypeS config.reverseMatrixLogic u.cUniformType
-                                            let! id = Interface.addSpecConstant name.Name (GLSLType.ofCType config.reverseMatrixLogic u.cUniformType)
-                                            return sprintf "layout(constant_id = %d) const %s %s = %s;" id typ.Name name.Name dflt
-                                        }
-                                    )
-                                return String.concat "\r\n" defs
-
                             | Some bufferName when config.createUniformBuffers ->
                                 let bufferName = checkName bufferName
 
