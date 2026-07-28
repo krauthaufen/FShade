@@ -255,6 +255,7 @@ let main args =
             useInOut                    = true
             separateTexturesAndSamplers = true
             pushConstants = false
+            specConstants               = false
             availableExtensions = Map.empty
         }
     let glsl = 
