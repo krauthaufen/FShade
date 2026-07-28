@@ -1516,3 +1516,20 @@ let ``Unbounded sampler arrays``() =
                 "uniform sampler2D unboundedSampler3\[\];"
             ] |> String.concat "\\s*"
      ]
+
+[<Test>]
+let ``Special floating-point constants``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            let _ = nanf
+            let _ = nan
+            let _ = infinityf
+            let _ = infinity
+            let _ = -infinityf
+            let _ = -infinity
+            return v.c
+        }
+
+    GLSL.shouldCompile [ Effect.ofFunction fs ]
