@@ -1,3 +1,6 @@
+### 5.8.0-prerelease0001
+- GLSL: Vulkan specialization constants via the magic `SpecConstants` uniform scope — members emit `layout(constant_id = N) const` with zero defaults (no descriptor binding), name-keyed ids stable across stages, reported through `GLSLProgramInterface.specConstants`; `Config.specConstants` gates emission (Vulkan on; GL backends fall through to an ordinary uniform buffer).
+
 ### 5.7.15
 - GLSL: Vulkan specialization constants via the magic `SpecConstants` uniform scope — members emit `layout(constant_id = N) const` with zero defaults (no descriptor binding), name-keyed ids stable across stages, reported through `GLSLProgramInterface.specConstants`; `Config.specConstants` gates emission (Vulkan on; GL backends fall through to an ordinary uniform buffer).
 
