@@ -2844,27 +2844,17 @@ module Assembler =
                 }
 
         | :? ComputeShader as c ->
-            let res = 
-                c.csSamplerStates |> Map.toList |> List.map (fun ((samName,index), state) ->
-                    let texName =
-                        match Map.tryFind (samName,index) c.csTextureNames with
-                        | Some name -> name
-                        | None -> samName
-                                
-                    (samName, (index, texName, state))
-                )
-                |> List.groupBy fst
-                |> List.map (fun (samName, elements) ->
-                    let elems = 
-                        elements
-                        |> List.sortBy (fun (_,(i,_,_)) -> i)
-                        |> List.map (fun (_,(_,n,s)) -> n,s)
-                    samName, elems
-                )
-                |> Map.ofList
+            state <-
+                { state with
+                    textureInfos =
+                        c.csUniforms |> Map.choose (fun _ p ->
+                            match p.uniformValue with
+                            | UniformValue.Sampler(name, s) -> Some [name, s]
+                            | UniformValue.SamplerArray arr -> Some (Array.toList arr)
+                            | _ -> None
+                        )
+                }
 
-            state <- { state with textureInfos = res }
-                
         | _ ->
             ()
 

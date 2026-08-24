@@ -98,21 +98,20 @@ module ComputeShader =
                             buffers <- Map.add name { b with ComputeBuffer.access = b.access ||| access } buffers
                         | None ->
                             buffers <- Map.add name { ComputeBuffer.contentType = arrayType.GetElementType(); ComputeBuffer.access = access } buffers
-            
+
                 let setSamplerState (name : string) (index : int) (state : SamplerState) =
                     match Map.tryFind (name, index) samplerStates with
                         | Some _ -> ()
                         | None ->
                             samplerStates <- Map.add (name, index) state samplerStates
-                    
+
                 let setTextureName (name : string) (index : int) (textureName : string) =
                     match Map.tryFind (name, index) textureNames with
                         | Some _ -> ()
                         | None ->
                             textureNames <- Map.add (name, index) textureName textureNames
 
-
-                for (name, p) in Map.toSeq state.inputs do
+                for name, p in Map.toSeq state.inputs do
                     match p.paramType with
                         | ImageType(fmt, dim, isArr, isMS, valueType) ->
                             addImage fmt name p.paramType dim isArr isMS valueType
@@ -123,9 +122,7 @@ module ComputeShader =
                             | None ->
                                 uniforms <- Map.add name { uniformType = t; uniformName = name; uniformValue = UniformValue.Attribute(uniform?Arguments, name) } uniforms
 
-
-                for (name, p) in Map.toSeq state.outputs do
-                    
+                for name, p in Map.toSeq state.outputs do
                     match Map.tryFind name state.storageBufferAccess with
                     | Some access ->
                         addBuffer name p.paramType access
@@ -133,51 +130,42 @@ module ComputeShader =
                         Log.warn "unknown output: %A" name
                         addBuffer name p.paramType StorageAccess.Write
 
-
-
-
-                for (name, p) in Map.toSeq state.uniforms do
+                for name, p in Map.toSeq state.uniforms do
                     let isArgument, name = 
                         if name.StartsWith "cs_" then true, name
                         else false, name
 
                     match p.uniformType with
-                        | ImageType(fmt, dim, isArr, isMS, valueType) ->
-                            addImage fmt name p.uniformType dim isArr isMS valueType
+                    | ImageType(fmt, dim, isArr, isMS, valueType) ->
+                        addImage fmt name p.uniformType dim isArr isMS valueType
 
-                        | SamplerType(dim, isArray, isShadow, isMS, valueType) ->
-                            match p.uniformValue with
-                                | UniformValue.Sampler(texName, state) ->
-                                    setSamplerState name 0 state
-                                    setTextureName name 0 texName
-
-                                | UniformValue.SamplerArray arr ->
-                                    for i in 0 .. arr.Length - 1 do
-                                        let (texName, state) = arr.[i]
-                                        setSamplerState name i state
-                                        setTextureName name i texName
-
-                                | _ ->
-                                    ()
-
+                    | ArrayOf _ ->
+                        match Map.tryFind name state.storageBufferAccess with
+                        | Some access ->
+                            addBuffer name p.uniformType access
+                        | None ->
+                            Log.warn "unknown array uniform: %A" name
                             uniforms <- Map.add name p uniforms
 
-                        | ArrayOf _ ->
-                            match Map.tryFind name state.storageBufferAccess with
-                            | Some access ->
-                                addBuffer name p.uniformType access
-                            | None ->
-                                Log.warn "unknown array uniform: %A" name
-                                uniforms <- Map.add name p uniforms
-                                
-                        
+                    | _ ->
+                        match p.uniformValue with
+                        | UniformValue.Sampler(texName, state) ->
+                            setSamplerState name 0 state
+                            setTextureName name 0 texName
+
+                        | UniformValue.SamplerArray arr ->
+                            for i in 0 .. arr.Length - 1 do
+                                let texName, state = arr.[i]
+                                setSamplerState name i state
+                                setTextureName name i texName
+
                         | _ ->
-                            if isArgument then
-                                uniforms <- Map.add name { p with uniformValue = UniformValue.Attribute(uniform?Arguments, name) } uniforms
-                            else
-                                uniforms <- Map.add name p uniforms
-            
-                    ()
+                            ()
+
+                        if isArgument then
+                            uniforms <- Map.add name { p with uniformValue = UniformValue.Attribute(uniform?Arguments, name) } uniforms
+                        else
+                            uniforms <- Map.add name p uniforms
 
                 {
                     csBuffers       = buffers
@@ -189,7 +177,6 @@ module ComputeShader =
                     csShared        = Map.empty
                 }
             )
-        
 
         ComputeShader(hash, meth, localSize, data, definition)
 
@@ -246,7 +233,6 @@ module ComputeShader =
     let toEntryPoint (s : ComputeShader) =
         let bufferArguments = 
             s.csBuffers |> Map.toList |> List.map (fun (n,i) ->
-                
                 { 
                     uniformName = n
                     uniformType = i.contentType.MakeArrayType()

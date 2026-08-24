@@ -1518,6 +1518,27 @@ let ``Unbounded sampler arrays``() =
      ]
 
 [<Test>]
+let ``Unbounded sampler arrays (compute)``() =
+    Setup.Run()
+
+    let cs (mybuffer : V4f[]) =
+         compute {
+             let id = getGlobalId().X
+             let p1 = boundedSampler1.[uniform.Test.[id]].Sample V2f.Zero
+             let p2 = unboundedSampler2.[uniform.Test.[id]].Sample V2f.Zero
+             let p3 = unboundedSampler3.[uniform.Test.[id]].Sample V2f.Zero
+             mybuffer.[id] <- p1 + p2 + p3 + uniform.SomeUniformArr.[id].X
+         }
+
+    let module_ = cs |> ComputeShader.ofFunction (V3i 128) |> ComputeShader.toModule
+    let glsl = ModuleCompiler.compileGLSL glslVulkan module_
+
+    glsl.iface.samplers |> MapExt.containsKey "boundedSampler1" |> should be True
+    glsl.iface.samplers |> MapExt.find "boundedSampler1" |> _.samplerTextures |> _.Length |> should equal 512
+    glsl.iface.samplers |> MapExt.containsKey "unboundedSampler2" |> should be True
+    glsl.iface.samplers |> MapExt.containsKey "unboundedSampler3" |> should be True
+
+[<Test>]
 let ``Special floating-point constants``() =
     Setup.Run()
 
