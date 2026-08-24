@@ -1,3 +1,4 @@
+### 5.7.16
 - [GLSL] Avoid emitting `debugPrintfEXT` if unsupported
 - [GLSL] Add support for special floating-point constants
 - Prevent inlining of functions with pass-by-reference arguments
