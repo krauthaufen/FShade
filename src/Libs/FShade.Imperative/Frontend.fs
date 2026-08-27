@@ -176,9 +176,11 @@ module ExpressionExtensions =
         static member ReadInput<'a>(kind : ParameterKind, name : string, index : int, slot : Option<ShaderSlot>) : 'a =
             onlyInShaderCode "ReadInput"
 
+        [<KeepCall>]
         static member WriteOutputs(values : array<string * int * obj>) : unit =
             onlyInShaderCode "WriteOutputs"
 
+        [<KeepCall>]
         static member UnsafeWrite(dst : 'a, value : 'a) : unit =
             onlyInShaderCode "UnsafeWrite"
 

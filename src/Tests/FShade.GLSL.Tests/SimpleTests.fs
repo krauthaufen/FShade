@@ -1573,11 +1573,11 @@ let ``Inlining of pass-by-reference method``() =
 
     GLSL.shouldCompileAndContainRegexWithCount [ Effect.ofFunction frag ] [ "myMethod[_a-zA-Z0-9]*\(variable\)", 2 ]
 
-[<ReflectedDefinition; KeepCall>]
+[<ReflectedDefinition>]
 let inc (x: int ref) =
     x.Value <- x.Value + 1
 
-[<ReflectedDefinition; KeepCall>]
+[<ReflectedDefinition>]
 let weirdInc () (_: unit) (x: int ref) () =
     inc x
 
@@ -1598,6 +1598,45 @@ let ``Function with unit arguments``() =
             ".+_inc_.+\(value\);"
             ".+_weirdInc_.+\(value\);"
             "ColorsOut = value;"
+        ]
+        |> String.concat "\\s*"
+
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [ expected ]
+
+[<ReflectedDefinition>]
+let incAndRet (x: int ref) =
+    x.Value <- x.Value + 1
+    x.Value
+
+[<ReflectedDefinition>]
+let return2ndArg x y z =
+    y
+
+type UniformScope with
+    member _.V3iArr : V3i[] = uniform?StorageBuffer?V3iArr
+
+[<Test>]
+let ``Dead-code elimination of utility functions``() =
+    Setup.Run()
+
+    let frag (v: Vertex) =
+        fragment {
+            uniform.V3iArr.[0] <- V3i.Zero // TODO: This is currently necessary to prevent the storage buffer from becoming readonly
+            let a = v.id
+            return2ndArg (incAndRet &&uniform.V3iArr.[v.id].X) v.what.Y (incAndRet &&a) |> ignore
+            let b = return2ndArg (incAndRet &&uniform.V3iArr.[v.id].X) v.what.X (incAndRet &&a)
+            return a + b
+        }
+
+    let expected =
+        [
+            "int a = fs_Id;"
+            ".+_incAndRet_.+\(V3iArr\[fs_Id\]\.x\);"
+            ".+_incAndRet_.+\(a\);"
+            ".+_incAndRet_.+\(V3iArr\[fs_Id\]\.x\);"
+            ".+_incAndRet_.+\(a\);"
+            "int b = .+_return2ndArg_.+\(fs_what\.x\);"
+            "ColorsOut = \(a \+ b\);"
         ]
         |> String.concat "\\s*"
 

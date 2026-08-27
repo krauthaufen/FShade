@@ -32,6 +32,7 @@ type UtilityFunction =
     }
     member x.uniqueName = x.functionName + "_" + cleanHash x.functionId
     member x.returnType = x.functionBody.Type
+    member x.functionMethodInfo = match x.functionMethod with Some (:? MethodInfo as mi) -> Some mi | _ -> None
     
     override x.GetHashCode() = x.uniqueName.GetHashCode()
     override x.Equals(o) =

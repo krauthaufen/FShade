@@ -1,3 +1,6 @@
+- Improve handling of functions with unit arguments
+- Fix various issues with dead-code elimination
+
 ### 5.7.16
 - [GLSL] Avoid emitting `debugPrintfEXT` if unsupported
 - [GLSL] Add support for special floating-point constants

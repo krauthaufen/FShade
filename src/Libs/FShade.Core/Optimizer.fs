@@ -366,12 +366,11 @@ module Optimizer =
 
         [<return: Struct>]
         let rec (|LExpr|_|) (e : Expr) =
-            // TODO: complete?
             match e with
-            | Var v -> ValueSome v
-            | FieldGet(Some (LExpr v), fi) -> ValueSome v
-            | PropertyGet(Some (LExpr v), _, _) -> ValueSome v
-            | GetArray(LExpr a, i) -> ValueSome a
+            | Var v
+            | FieldGet(Some (LExpr v), _)
+            | PropertyGet(Some (LExpr v), _, _)
+            | GetArray(LExpr v, _) -> ValueSome v
             | _ -> ValueNone
 
         [<return: Struct>]
@@ -381,30 +380,13 @@ module Optimizer =
             | _ -> ValueSome ()
 
         [<return: Struct>]
-        let rec (|MutableArgument|_|) (e : Expr) =
+        let rec (|StorageExpr|_|) (e : Expr) =
             match e with
-            | Var v -> 
-                if v.IsMutable then
-                    ValueSome v
-                else
-                    match v.Type with
-                    | ArrOf _ -> ValueSome v
-                    | ArrayOf _ -> ValueSome v
-                    | Ref _ -> ValueSome v
-                    | _ -> ValueNone
-            | GetArray(Var v, _) -> ValueSome v
-
-            | RefOf (MutableArgument v) -> ValueSome v
-            | AddressOf (MutableArgument v) -> ValueSome v
+            | ReadInputOrRaytracingData (t, _, _, _) when t <> ParameterKind.Input -> ValueSome ()
+            | FieldGet(Some StorageExpr, _)
+            | PropertyGet(Some StorageExpr, _, _)
+            | GetArray (StorageExpr, _) -> ValueSome ()
             | _ -> ValueNone
-
-        [<return: Struct>]
-        let rec (|StorageArgument|_|) (e : Expr) =
-            match e with
-            | RefOf (GetArray(ReadInputOrRaytracingData(ParameterKind.Uniform, _, _, _), _)) ->
-                ValueSome ()
-            | _ ->
-                ValueNone
 
         /// Determines if the address of the given variable is taken in the given expression.
         let rec takesAddressOf (v: Var) (e: Expr) =
@@ -439,8 +421,21 @@ module Optimizer =
             let useVar (v : Var) = State.modify (fun s -> { s with usedVariables = Set.add v s.usedVariables })
             let remVar (v : Var) = State.modify (fun s -> { s with usedVariables = Set.remove v s.usedVariables })
             let isUsed (v : Var) = State.get |> State.map (fun s -> Set.contains v s.usedVariables)
+            let isGlobalSideEffect (mi : MethodInfo) = State.get |> State.map (fun s -> s.isGlobalSideEffect mi)
             let useVars (vars : seq<Var>) = State.modify (fun s -> { s with usedVariables = Set.union (Set.ofSeq vars) s.usedVariables })
-       
+
+            let isUsedAndMutable (e : Expr) =
+                State.get |> State.map (fun s ->
+                    let isUsed =
+                        match e with
+                        | LExpr v
+                        | RefOf (LExpr v) -> Set.contains v s.usedVariables
+                        | StorageExpr
+                        | RefOf StorageExpr -> true
+                        | _ -> false
+
+                    isUsed && (e.Type.IsArr || e.Type.IsArray || e.Type.IsRef)
+                )
 
             let merge (l : EliminationState) (r : EliminationState) =
                 {
@@ -456,7 +451,19 @@ module Optimizer =
                     if initial.usedVariables = final.usedVariables then return res
                     else return! fix m
                 }
-                
+
+            let callFunction (f : UtilityFunction) (args : Expr list) =
+                State.get |> State.map (fun s ->
+                    let mutable inner = { empty with isGlobalSideEffect = s.isGlobalSideEffect }
+
+                    for v, a in List.zip f.functionArguments args do
+                        let used = isUsedAndMutable a
+                        if used |> State.evaluate s then
+                            inner <- { inner with usedVariables = inner.usedVariables |> Set.add v  }
+
+                    inner
+                )
+
         [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
         module List =
             let rec existsS (f : 'a -> State<'s, bool>) (l : list<'a>) =
@@ -471,68 +478,46 @@ module Optimizer =
                                 return! existsS f t
                 }
 
-        let private staticallyNeededCalls =
-            HashSet.ofList [
-                MethodInfo.WriteOutputs
-            ]
-
-        let private callNeededS (t : Option<Expr>) (mi : MethodInfo) (args : list<Expr>) =
+        let private callNeededS (this : Expr option) (mi : MethodInfo) (args : Expr list) =
             state {
-                let! state = State.get
-
-                if state.isGlobalSideEffect mi || staticallyNeededCalls.Contains mi then
-                    return true
-                else
-                    let needsMutableParameter (p : ParameterInfo) (v : Expr) =
-                        let pt = p.ParameterType
-                        if pt.IsByRef || pt.IsArray || pt.IsArr || pt.IsRef then
-                            match v with
-                                | MutableArgument v -> Set.contains v state.usedVariables
-                                | StorageArgument -> true
-                                | _ -> false
-                        else
-                            false
-
-                    let parameters = mi.GetParameters() |> Array.toList
-                    match t with
-                        | Some t ->
-                            match t with
-                                | MutableArgument v when Set.contains v state.usedVariables -> 
-                                    return true
-                                | StorageArgument -> 
-                                    return true
-                                | _ -> 
-                                    return List.exists2 needsMutableParameter parameters args
-                        | None ->
-                            return List.exists2 needsMutableParameter parameters args
+                match! EliminationState.isGlobalSideEffect mi with
+                | true -> return true
+                | _ ->
+                    match! this |> Option.mapS EliminationState.isUsedAndMutable with
+                    | Some true -> return true
+                    | _ -> return! args |> List.existsS (EliminationState.isUsedAndMutable)
             }
 
-        let rec private hasSideEffectsS (e : Expr) =
+        let rec private callUtilityNeededS (f : UtilityFunction) (args : Expr list) =
+            state {
+                match! f.functionMethodInfo |> Option.mapS EliminationState.isGlobalSideEffect with
+                | Some true -> return true
+                | _ ->
+                    let! inner = EliminationState.callFunction f args
+                    return hasSideEffectsS f.functionBody |> State.evaluate inner
+            }
+
+        and private hasSideEffectsS (e : Expr) =
             state {
                 match e with
                     | CallFunction(utility, args) ->
-                        let! aa = args |> List.existsS hasSideEffectsS
-                        if aa then
-                            return true
-                        else
-                            return! hasSideEffectsS utility.functionBody
+                        match! args |> List.existsS hasSideEffectsS with
+                        | true -> return true
+                        | _ -> return! callUtilityNeededS utility args
 
                     | Call(t, mi, args) ->
-                        let! ts = t |> Option.mapS hasSideEffectsS
-                        match ts with
-                            | Some true -> 
-                                return true
-                            | _ ->
-                                let! aa = args |> List.existsS hasSideEffectsS
-                                if aa then 
-                                    return true
-                                else
-                                    let! state = State.get
+                        match! t |> Option.mapS hasSideEffectsS with
+                        | Some true -> return true
+                        | _ ->
+                            match! args |> List.existsS hasSideEffectsS with
+                            | true -> return true
+                            | _ -> return! callNeededS t mi args
 
-                                    if state.isGlobalSideEffect mi || staticallyNeededCalls.Contains mi then
-                                        return true
-                                    else
-                                        return false
+                    | SetRef(LExpr v, _)
+                    | SetArray(LExpr v, _, _)
+                    | FieldSet(Some (LExpr v), _, _)
+                    | PropertySet(Some (LExpr v), _, _, _) ->
+                        return! EliminationState.isUsed v
 
                     | PropertySet(t, p, idx, value) ->
                         let call =
@@ -585,15 +570,14 @@ module Optimizer =
                         return Expr.Application(l, a)
 
                     | CallFunction(utility, args) ->
-                        let! sideEffects = hasSideEffectsS utility.functionBody
-                        if sideEffects then
+                        let! needed = callUtilityNeededS utility args
+
+                        if needed then
                             let! self = eliminateDeadCodeS e
-                            if self.Type = typeof<unit> then
-                                return self
-                            else
-                                return Expr.Ignore self
+                            return Expr.Ignore self
                         else
-                            return Expr.Unit
+                            let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+                            return Expr.Seq args
 
                     | CallWithWitnesses(t, oi, mi, ws, args) ->
                         let! needed = callNeededS t oi args
@@ -611,9 +595,7 @@ module Optimizer =
 
                             match t with
                                 | Some t -> return Expr.Seq (t :: args)
-                                | None -> return Expr.Seq args            
-
-                        
+                                | None -> return Expr.Seq args
 
                     | Call(t, mi, args) ->
                         let! needed = callNeededS t mi args
@@ -631,7 +613,7 @@ module Optimizer =
 
                             match t with
                                 | Some t -> return Expr.Seq (t :: args)
-                                | None -> return Expr.Seq args            
+                                | None -> return Expr.Seq args
 
 
                     | Coerce(e,t) ->
@@ -918,48 +900,52 @@ module Optimizer =
                         return Expr.Application(l, a)
            
                     | CallFunction(utility, args) ->
-                        // TODO: is the call needed???
-                        let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
-                        let! s = State.get
+                        let! needed =
+                            if e.Type <> typeof<unit> then State.value true
+                            else callUtilityNeededS utility args
 
-                        let utility =
-                            utility |> UtilityFunction.map (fun b ->
-                                let mutable innerState = { EliminationState.empty with isGlobalSideEffect = s.isGlobalSideEffect }
+                        if needed then
+                            let! remArgs =
+                                args
+                                |> List.rev |> List.mapS withoutValueS
+                                |> State.map (List.rev >> List.zip utility.functionArguments)
 
-                                for (v, a) in List.zip args utility.functionArguments do
-                                    let isMutable = a.IsMutable || a.Type.IsArr || a.Type.IsArray || a.Type.IsRef
-                                    let isUsed =
-                                        match v with
-                                            | LExpr v 
-                                            | RefOf (LExpr v) -> Set.contains v s.usedVariables
-                                            | _ -> false
-
-                                    if isMutable && isUsed then
-                                        innerState <- { innerState with usedVariables = Set.add a innerState.usedVariables }
-                                        
-
-                                let res = eliminateDeadCodeS(b).Run(&innerState)
-                                res
-                            )
-
-                        let usedVariables = utility.functionBody.GetFreeVars() |> Set.ofSeq
-                        let allArgsUsed = List.forall (fun v -> Set.contains v usedVariables) utility.functionArguments
-
-                        if allArgsUsed then
-                            return Expr.CallFunction(utility, args)
-                        else
-                            let args, values = 
-                                List.zip utility.functionArguments args
-                                    |> List.filter (fun (v,_) -> Set.contains v usedVariables)
-                                    |> List.unzip
+                            let! args = args |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
+                            let! inner = EliminationState.callFunction utility args
 
                             let utility =
-                                { utility with
-                                    functionArguments = args
-                                    functionTag = null   
-                                }
+                                utility |> UtilityFunction.map (fun b ->
+                                    eliminateDeadCodeS b |> State.evaluate inner
+                                )
 
-                            return Expr.CallFunction(utility, values)
+                            let usedVariables = utility.functionBody.GetFreeVars() |> Set.ofSeq
+                            let allArgsUsed = List.forall (fun v -> Set.contains v usedVariables) utility.functionArguments
+
+                            if allArgsUsed then
+                                return Expr.CallFunction(utility, args)
+                            else
+                                let argVars, argValues =
+                                    List.zip utility.functionArguments args
+                                    |> List.filter (fst >> flip Set.contains usedVariables)
+                                    |> List.unzip
+
+                                let utility =
+                                    { utility with
+                                        functionArguments = argVars
+                                        functionTag = null
+                                    }
+
+                                let args =
+                                    remArgs |> List.choose (fun (v, a) ->
+                                        if argVars |> List.contains v then None
+                                        else Some a
+                                    )
+
+                                let call = Expr.CallFunction(utility, argValues)
+                                return Expr.Seq (args @ [call])
+                        else
+                            let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+                            return Expr.Seq args
 
                     | SetArray(arr, idx, value) ->
                         let! s = State.get
@@ -975,7 +961,10 @@ module Optimizer =
                             let! arr = eliminateDeadCodeS arr
                             return Expr.ArraySet(arr, idx, value)
                         else
-                            return Expr.Unit
+                            let! value = withoutValueS value
+                            let! idx = withoutValueS idx
+                            let! arr = withoutValueS arr
+                            return Expr.Seq [arr; idx; value]
 
                     | CallWithWitnesses(t, oi, mi, ws, args) ->
                         let! needed = 
@@ -990,7 +979,12 @@ module Optimizer =
                                 | Some t -> return Expr.CallWithWitnesses(t, oi, mi, ws, args)
                                 | None -> return Expr.CallWithWitnesses(oi, mi, ws, args)
                         else
-                            return Expr.Unit
+                            let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+                            let! t = t |> Option.mapS withoutValueS
+
+                            match t with
+                                | Some t -> return Expr.Seq (t :: args)
+                                | None -> return Expr.Seq args
 
                     | Call(t, mi, args) ->
                         let! needed = 
@@ -1005,7 +999,12 @@ module Optimizer =
                                 | Some t -> return Expr.Call(t, mi, args)
                                 | None -> return Expr.Call(mi, args)
                         else
-                            return Expr.Unit
+                            let! args = args |> List.rev |> List.mapS withoutValueS |> State.map List.rev
+                            let! t = t |> Option.mapS withoutValueS
+
+                            match t with
+                                | Some t -> return Expr.Seq (t :: args)
+                                | None -> return Expr.Seq args
 
                     | Coerce(e,t) ->
                         let! e = eliminateDeadCodeS e

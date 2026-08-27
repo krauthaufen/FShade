@@ -1291,10 +1291,12 @@ module private Helpers =
                 else
                     let selfName = 
                         if t.IsGenericType then
-                            let m = rx.Match t.Name
                             let targs = t.GetGenericArguments()
                             let targstr = targs |> Seq.map typeName |> String.concat "_"
-                            m.Groups.["name"].Value + string targs.Length + "_" + targstr
+                            let name =
+                                let m = rx.Match t.Name
+                                if m.Success then m.Groups.["name"].Value else t.Name
+                            name + string targs.Length + "_" + targstr
                         else
                             t.Name
 
@@ -1311,21 +1313,21 @@ module private Helpers =
                 | :? MethodInfo as mi -> 
                     let selfName =
                         if mi.IsGenericMethod then
-                            let m = rx.Match mi.Name
                             let targs = mi.GetGenericArguments() |> Seq.map typeName |> String.concat "_"
-                            m.Groups.["name"].Value + "_" + targs
+                            let name =
+                                let m = rx.Match mi.Name
+                                if m.Success then m.Groups.["name"].Value else mi.Name
+                            name + "_" + targs
                         else
                             mi.Name
                     (typeName mi.DeclaringType) + "_" + selfName
 
                 | :? ConstructorInfo as ci ->
-                    
                     let args = ci.GetParameters() |> Array.map (fun p -> typeName p.ParameterType) |> String.concat "_"
                     "new_" + (typeName mi.DeclaringType) + "_" + args
 
                 | _ ->
                     failwithf "[FShade] cannot get method name for unknown method-type %A" mi
-                    
         )
 
     let inline (>>=) (m : State<'s, 'a>) (f : 'a -> State<'s, 'b>) =

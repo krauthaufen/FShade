@@ -10,8 +10,10 @@ open FsUnit
 
 open Aardvark.Base
 open Aardvark.Base.Monads.State
+open System.Text.RegularExpressions
 
 open FShade
+open FShade.Imperative
 open NUnit.Framework.Constraints
 
 #nowarn "4321"
@@ -20,8 +22,10 @@ open NUnit.Framework.Constraints
 module Utilities = 
     do Serializer.Init()
 
+    [<KeepCall>]
     let keep a = ()
 
+    [<KeepCall>]
     let produce<'a>() : 'a = onlyInShaderCode "produce"
 
 
@@ -62,16 +66,28 @@ module Utilities =
     let exprEqual (r : Expr) = 
         exprComparer r
 
+    let hasCall (nameRx : string) (e : Expr) =
+        let rec get (e : Expr) =
+            match e with
+            | Call(this, mi, args) -> mi.Name :: List.collect get (Option.toList this @ args)
+            | CallFunction(f, args) -> f.functionName :: List.collect get (f.functionBody :: args)
+            | ShapeVar _ -> []
+            | ShapeLambda(_, b) -> b |> get
+            | ShapeCombination(_, args) -> args |> List.collect get
+
+        e |> get |> List.exists (fun str -> Regex.IsMatch(str, nameRx))
+
     module Opt =
         open System.Reflection
 
-        let private keepMeth = getMethodInfo <@ keep @>
-        let private produceMeth = getMethodInfo <@ produce @>
-
         let isSideEffect (mi : MethodInfo) =
-            mi.IsGenericMethod && (mi.GetGenericMethodDefinition() = keepMeth || mi.GetGenericMethodDefinition() = produceMeth)
+            mi.GetCustomAttributes<KeepCallAttribute>()
+            |> Seq.isEmpty
+            |> not
 
         let run (expression : Expr) =
+            Serializer.Init()
+
             expression
                 |> Preprocessor.preprocess V3i.Zero
                 |> fst

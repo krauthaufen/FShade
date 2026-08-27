@@ -399,7 +399,325 @@ let ``[Dead] keeping used array writes``() =
         @>
 
     input |> Opt.run |> should exprEqual input
-    
+
+[<Test>]
+let ``[Dead] eliminate method in unused let bindings (intrinsic, nop)``() =
+    let input =
+        <@
+            fun (a : int) ->
+                let unused = printfn ""
+                a
+        @>
+
+    let expected =
+        <@
+            fun (a : int) ->
+                a
+        @>
+
+    input |> Opt.run |> should exprEqual expected
+
+[<ReflectedDefinition>]
+let nop() = ()
+
+[<Test>]
+let ``[Dead] eliminate method in unused let bindings (utility, nop)``() =
+    let input =
+        <@
+            fun (a : int) ->
+                let unused = nop()
+                a
+        @>
+
+    let expected =
+        <@
+            fun (a : int) ->
+                a
+        @>
+
+    input |> Opt.run |> should exprEqual expected
+
+
+[<Test>]
+let ``[Dead] eliminate method in unused let bindings (intrinsic)``() =
+    let input =
+        <@
+            fun (a : int) ->
+                let unused = id a
+                a
+        @>
+
+    let expected =
+        <@
+            fun (a : int) ->
+                a
+        @>
+
+    input |> Opt.run |> should exprEqual expected
+
+
+[<ReflectedDefinition>]
+let util2 x = x
+
+[<Test>]
+let ``[Dead] eliminate method in unused let bindings (utility)``() =
+    let input =
+        <@
+            fun (a : int) ->
+                let unused = util2 a
+                a
+        @>
+
+    let expected =
+        <@
+            fun (a : int) ->
+                a
+        @>
+
+    input |> Opt.run |> should exprEqual expected
+
+[<ReflectedDefinition>]
+let inc (x : int ref) =
+    x.Value <- x.Value + 1
+
+[<ReflectedDefinition>]
+let incWrapper (x : int ref) =
+    inc x
+
+[<Test>]
+let ``[Dead] eliminate method modifying an unused by-ref variable``() =
+    let input =
+        <@
+            fun (a : int) ->
+                incWrapper &&a
+                1
+        @>
+
+    let expected =
+        <@
+            fun (a : int) ->
+                1
+        @>
+
+    input |> Opt.run |> should exprEqual expected
+
+[<Test>]
+let ``[Dead] keep method modifying a used by-ref variable``() =
+    let input =
+        <@
+            fun (a : int) ->
+                incWrapper &&a
+                a
+        @>
+
+    let result = input |> Opt.run
+    result |> hasCall "incWrapper" |> should be True
+
+[<Test>]
+let ``[Dead] keep method with side-effects in unused let bindings (KeepCall, intrinsic)``() =
+    let input =
+        <@
+            fun (a : int) ->
+                let unused = keep()
+                a
+        @>
+
+    let expected =
+        <@
+            fun (a : int) ->
+                keep()
+                a
+        @>
+
+    input |> Opt.run |> should exprEqual expected
+
+[<ReflectedDefinition; KeepCall>]
+let keepReflected() = ()
+
+[<Test>]
+let ``[Dead] keep method with side-effects in unused let bindings (KeepCall, utility)``() =
+    let input =
+        <@
+            fun (a : int) ->
+                let unused = keepReflected()
+                a
+        @>
+
+    let result = input |> Opt.run
+    result |> hasCall "keepReflected" |> should be True
+
+let inc2 (v : int ref) =
+    v.Value <- v.Value + 1
+    v.Value
+
+[<Test>]
+let ``[Dead] keep method with side-effects in unused let bindings (by-ref argument, intrinsic)``() =
+    let input =
+        <@
+            fun (a : int) ->
+                let v = a
+                let unused = inc2 &&v
+                v
+        @>
+
+    let expected =
+        <@
+            fun (a : int) ->
+                ignore (inc2 &&a)
+                a
+        @>
+
+    input |> Opt.run |> should exprEqual expected
+
+[<Test>]
+let ``[Dead] keep method with side-effects in unused let bindings (by-ref argument, utility)``() =
+    let input =
+        <@
+            fun (a : int) ->
+                let v = a
+                let unused = inc &&v
+                let unused = inc2 &&v
+                v
+        @>
+
+    let result = input |> Opt.run
+    result |> hasCall "inc$" |> should be True
+    result |> hasCall "inc2$" |> should be True
+
+[<ReflectedDefinition>]
+let incWrapper2 (v : int ref) =
+    inc2 v
+
+[<Test>]
+let ``[Dead] keep method with side-effects in unused let bindings (by-ref argument, nested utility)``() =
+    let input =
+        <@
+            fun (a : int) ->
+                let v = a
+                let unused = incWrapper &&v
+                let unused = incWrapper2 &&v
+                v
+        @>
+
+    let result = input |> Opt.run
+    result |> hasCall "incWrapper$" |> should be True
+    result |> hasCall "incWrapper2$" |> should be True
+    result |> hasCall "inc$" |> should be True
+    result |> hasCall "inc2$" |> should be True
+
+type UniformScope with
+    member _.MyBuffer : Arr<N<6>, int> = uniform?StorageBuffer?MyBuffer
+    member _.MyVecBuffer : Arr<N<6>, V3i> = uniform?StorageBuffer?MyBuffer
+
+[<Test>]
+let ``[Dead] keep method with side-effects in unused let bindings (by-ref argument of storage buffer, nested utility)``() =
+    let input =
+        <@
+            fun (a : int) ->
+                let unused = incWrapper &&uniform.MyBuffer.[2]
+                let unused = incWrapper2 &&uniform.MyBuffer.[3]
+                ()
+        @>
+
+    let result = input |> Opt.run
+    result |> hasCall "incWrapper$" |> should be True
+    result |> hasCall "incWrapper2$" |> should be True
+    result |> hasCall "inc$" |> should be True
+    result |> hasCall "inc2$" |> should be True
+
+[<Test>]
+let ``[Dead] keep method with side-effects in unused let bindings (by-ref argument of storage buffer field, nested utility)``() =
+    let input =
+        <@
+            fun (a : int) ->
+                let unused = incWrapper &&uniform.MyVecBuffer.[2].X
+                let unused = incWrapper2 &&uniform.MyVecBuffer.[3].X
+                ()
+        @>
+
+    let result = input |> Opt.run
+    result |> hasCall "incWrapper$" |> should be True
+    result |> hasCall "incWrapper2$" |> should be True
+    result |> hasCall "inc$" |> should be True
+    result |> hasCall "inc2$" |> should be True
+
+[<KeepCall; ReflectedDefinition>]
+let veryImportantUtility() = ()
+
+[<ReflectedDefinition>]
+let doImportantStuff x =
+    veryImportantUtility()
+    x
+
+[<Test>]
+let ``[Dead] keep method with side-effects in unused let bindings (utility with side-effects)``() =
+    let input =
+        <@
+            fun (a : int) ->
+                let v = a
+                let unused = doImportantStuff v
+                v
+        @>
+
+    let result = input |> Opt.run
+    result |> hasCall "doImportantStuff" |> should be True
+    result |> hasCall "veryImportantUtility" |> should be True
+
+let nop2 x = ()
+
+[<Test>]
+let ``[Dead] keep arguments with side-effects for unneeded method call (intrinsic)``() =
+    let input =
+        <@
+            fun (a : int) ->
+                let v = a
+                let unused = nop2 (inc &&v)
+                let unused = nop2 (inc2 &&v)
+                v
+        @>
+
+    let result = input |> Opt.run
+    result |> hasCall "inc$" |> should be True
+    result |> hasCall "inc2$" |> should be True
+    result |> hasCall "nop2$" |> should be False
+
+[<ReflectedDefinition>]
+let nop3 x = ()
+
+[<Test>]
+let ``[Dead] keep arguments with side-effects for unneeded method call (utility)``() =
+    let input =
+        <@
+            fun (a : int) ->
+                let v = a
+                let unused = nop3 (inc &&v)
+                let unused = nop3 (inc2 &&v)
+                v
+        @>
+
+    let result = input |> Opt.run
+    result |> hasCall "inc$" |> should be True
+    result |> hasCall "inc2$" |> should be True
+    result |> hasCall "nop3$" |> should be False
+
+[<ReflectedDefinition; KeepCall>]
+let nop4 x = ()
+
+[<Test>]
+let ``[Dead] keep arguments with side-effects even if unused inside utility function``() =
+    let input =
+        <@
+            fun (a : int) ->
+                let v = a
+                let unused = nop4 (inc &&v)
+                let unused = nop4 (inc2 &&v)
+                v
+        @>
+
+    let result = input |> Opt.run
+    result |> hasCall "inc$" |> should be True
+    result |> hasCall "inc2$" |> should be True
+    result |> hasCall "nop4$" |> should be False
 
 [<Inline; ReflectedDefinition>]
 let funny (a : int) =
