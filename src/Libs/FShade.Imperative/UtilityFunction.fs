@@ -130,6 +130,8 @@ module UtilityFunctionExpressionExtensions =
     type Expr with
 
         static member CallFunction(f : UtilityFunction, args : list<Expr>) =
+            let args, unitArgs = args |> List.partition (_.Type >> (<>) typeof<unit>)
+
             let pts = f.functionArguments |> List.map _.Type
             let ats = args |> List.map _.Type
 
@@ -141,10 +143,13 @@ module UtilityFunctionExpressionExtensions =
                 | [] -> Expr.Unit
                 | args -> Expr.NewTuple args
 
-            Expr.Coerce(
-                Expr.NewTuple [Expr.Value "__FUNCTIONCALL__"; Expr.Value f; args ], 
-                f.returnType
-            )
+            let call =
+                Expr.Coerce(
+                    Expr.NewTuple [Expr.Value "__FUNCTIONCALL__"; Expr.Value f; args ],
+                    f.returnType
+                )
+
+            Expr.Seq (unitArgs @ [call])
 
     [<return: Struct>]
     let (|CallFunction|_|) (e : Expr) =

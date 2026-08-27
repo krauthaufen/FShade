@@ -1572,3 +1572,33 @@ let ``Inlining of pass-by-reference method``() =
         }
 
     GLSL.shouldCompileAndContainRegexWithCount [ Effect.ofFunction frag ] [ "myMethod[_a-zA-Z0-9]*\(variable\)", 2 ]
+
+[<ReflectedDefinition; KeepCall>]
+let inc (x: int ref) =
+    x.Value <- x.Value + 1
+
+[<ReflectedDefinition; KeepCall>]
+let weirdInc () (_: unit) (x: int ref) () =
+    inc x
+
+[<Test>]
+let ``Function with unit arguments``() =
+    Setup.Run()
+
+    let frag (v: Vertex) =
+        fragment {
+            let value = v.id
+            weirdInc () (inc &&value) &&value ()
+            return value
+        }
+
+    let expected =
+        [
+            "int value = fs_Id;"
+            ".+_inc_.+\(value\);"
+            ".+_weirdInc_.+\(value\);"
+            "ColorsOut = value;"
+        ]
+        |> String.concat "\\s*"
+
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [ expected ]
