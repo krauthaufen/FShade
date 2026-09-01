@@ -293,11 +293,16 @@ module BasicQuotationPatterns =
 
 
     [<return: Struct>]
+    let (|StorageBufferScope|_|) (scope: UniformScope) =
+        if scope.Name = "StorageBuffer" then ValueSome()
+        else ValueNone
+
+    [<return: Struct>]
     let (|StorageBuffer|_|) (e : Expr) =
         match e with
         | Uniform u ->
             match u.uniformValue with
-            | UniformValue.Attribute(scope, name) when scope.Name = "StorageBuffer" ->
+            | UniformValue.Attribute(StorageBufferScope, _) ->
                 ValueSome u
             | _ ->
                 ValueNone

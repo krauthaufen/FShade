@@ -25,6 +25,18 @@ type ComputeBuffer =
         access : StorageAccess
     }
 
+type ComputeBuffer2 =
+    {
+        arrayType : Type
+        access : StorageAccess
+    }
+
+module internal ComputeBuffer2 =
+    let toComputeBuffer (b: ComputeBuffer2) =
+        match b.arrayType with
+        | ArrayOf ct | ArrOf(_, ct) -> { contentType = ct; access = b.access }
+        | _ -> { contentType = b.arrayType; access = b.access }
+
 type ComputeImage =
     {
         imageType : Type
@@ -38,7 +50,7 @@ type ComputeImage =
 
 type internal ComputeShaderData =
     {
-        csBuffers       : Map<string, ComputeBuffer>
+        csBuffers       : Map<string, ComputeBuffer2>
         csImages        : Map<string, ComputeImage>
         csSamplerStates : Map<string * int, SamplerState>
         csTextureNames  : Map<string * int, string>
@@ -51,7 +63,8 @@ type ComputeShader internal(id : string, method : MethodBase, localSize : V3i, d
     member x.csId = id
     member x.csMethod = method
     member x.csLocalSize = localSize
-    member x.csBuffers = data.Value.csBuffers
+    member x.csBuffers = data.Value.csBuffers |> Map.map (fun _ -> ComputeBuffer2.toComputeBuffer)
+    member x.csBuffers2 = data.Value.csBuffers
     member x.csImages = data.Value.csImages
     member x.csSamplerStates = data.Value.csSamplerStates
     member x.csTextureNames = data.Value.csTextureNames
@@ -70,7 +83,7 @@ module ComputeShader =
                 let body2 = Optimizer.ConstantFolding.evaluateConstants'' (fun m -> m.DeclaringType.FullName = "FShade.Primitives") body1
                 let body2 = Optimizer.liftInputs body2
 
-                let mutable buffers = Map.empty
+                let mutable buffers = Map.empty<string, ComputeBuffer2>
                 let mutable images = Map.empty
                 let mutable uniforms = Map.empty
                 let mutable samplerStates = Map.empty
@@ -95,9 +108,9 @@ module ComputeShader =
                 let addBuffer (name : string) (arrayType : Type) (access : StorageAccess) =
                     match Map.tryFind name buffers with
                         | Some b ->
-                            buffers <- Map.add name { b with ComputeBuffer.access = b.access ||| access } buffers
+                            buffers <- Map.add name { b with access = b.access ||| access } buffers
                         | None ->
-                            buffers <- Map.add name { ComputeBuffer.contentType = arrayType.GetElementType(); ComputeBuffer.access = access } buffers
+                            buffers <- Map.add name { arrayType = arrayType; access = access } buffers
 
                 let setSamplerState (name : string) (index : int) (state : SamplerState) =
                     match Map.tryFind (name, index) samplerStates with
@@ -135,11 +148,14 @@ module ComputeShader =
                         if name.StartsWith "cs_" then true, name
                         else false, name
 
-                    match p.uniformType with
-                    | ImageType(fmt, dim, isArr, isMS, valueType) ->
+                    match p.uniformType, p.uniformValue with
+                    | ImageType(fmt, dim, isArr, isMS, valueType), _ ->
                         addImage fmt name p.uniformType dim isArr isMS valueType
 
-                    | ArrayOf _ ->
+                    // Fixed-size array can either be a storage buffer or uniform
+                    // Only treat as storage buffer if the scope correct -> fixed-size array as compute argument will always be treated as uniform
+                    | ArrayOf _, UniformValue.Attribute _
+                    | ArrOf _, UniformValue.Attribute(StorageBufferScope, _) ->
                         match Map.tryFind name state.storageBufferAccess with
                         | Some access ->
                             addBuffer name p.uniformType access
@@ -232,10 +248,10 @@ module ComputeShader =
 
     let toEntryPoint (s : ComputeShader) =
         let bufferArguments = 
-            s.csBuffers |> Map.toList |> List.map (fun (n,i) ->
+            s.csBuffers2 |> Map.toList |> List.map (fun (n,i) ->
                 { 
                     uniformName = n
-                    uniformType = i.contentType.MakeArrayType()
+                    uniformType = i.arrayType
                     uniformBuffer = Some "StorageBuffer"
                     uniformDecorations = [UniformDecoration.BufferAccess i.access] 
                     uniformTextureInfo = []

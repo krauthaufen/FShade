@@ -1,4 +1,5 @@
 - Add static class `Atomic` containing atomic integer operation intrinsics
+- Add support for fixed-size arrays in storage buffers
 
 ### 5.7.17
 - Improve handling of functions with unit arguments

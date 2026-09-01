@@ -2247,7 +2247,6 @@ module Assembler =
                                 return String.concat "\r\n" defs
 
                             | Some "StorageBuffer" ->
-                               
                                 let! buffers =
                                     fields |> List.mapS (fun field ->
                                         state {
@@ -2255,38 +2254,41 @@ module Assembler =
                                             let prefix = uniformLayout Layout.Std430 field.cUniformDecorations set binding
                                             let name = checkName field.cUniformName
 
-                                            
                                             let access =
                                                 field.cUniformDecorations |> List.tryPick (function
                                                     | UniformDecoration.BufferAccess a -> Some a
                                                     | _ -> None
                                                 ) |> Option.defaultValue StorageAccess.None
-                                            
-                                            match field.cUniformType with
-                                            | CType.CPointer(_,ct) ->
-                                                // ct is CPointer for a `T[][]` storage buffer (an UNBOUNDED
-                                                // array of SSBOs); otherwise it's a single SSBO of element ct.
-                                                let isArray, elemCt =
-                                                    match ct with
-                                                    | CType.CPointer(_, inner) -> true, inner
-                                                    | _ -> false, ct
-                                                do! Interface.addStorageBuffer {
-                                                    ssbSet = set
-                                                    ssbBinding = binding
-                                                    ssbName = name.Name
-                                                    ssbType = GLSLType.ofCType config.reverseMatrixLogic elemCt
-                                                    ssbAccess = access
-                                                    ssbCount = (if isArray then -1 else 1)
-                                                }
-                                                let! typ = assembleTypeS config.reverseMatrixLogic elemCt
-                                                if isArray then
-                                                    return sprintf "%sbuffer %sBuffer { %s[] data; } %s[];" prefix name.Name typ.Name name.Name
-                                                else
-                                                    return sprintf "%sbuffer %sBuffer { %s[] %s; };" prefix name.Name typ.Name name.Name
 
-                                            | ct ->
-                                                return failwithf "[GLSL] not a storage buffer type: %A" ct
+                                            let ct, innerCount =
+                                                match field.cUniformType with
+                                                | CType.CPointer(_, inner) -> inner, -1
+                                                | CType.CArray(inner, count) -> inner, count
+                                                | ct -> failwithf "[GLSL] not a valid storage buffer type: %A" ct
 
+                                            let ct, outerCount =
+                                                match ct with
+                                                | CType.CPointer(_, inner) -> inner, -1
+                                                | CType.CArray(inner, count) -> inner, count
+                                                | _ -> ct, 0
+
+                                            do! Interface.addStorageBuffer {
+                                                ssbSet = set
+                                                ssbBinding = binding
+                                                ssbName = name.Name
+                                                ssbType = GLSLType.ofCType config.reverseMatrixLogic ct
+                                                ssbAccess = access
+                                                ssbCount = outerCount
+                                            }
+
+                                            let! typ = assembleTypeS config.reverseMatrixLogic ct
+                                            let innerCount = if innerCount < 0 then "" else string innerCount
+
+                                            if outerCount = 0 then
+                                                return $"{prefix}buffer {name.Name}Buffer {{ {typ.Name}[{innerCount}] {name.Name}; }};"
+                                            else
+                                                let outerCount = if outerCount < 0 then "" else string outerCount
+                                                return $"{prefix}buffer {name.Name}Buffer {{ {typ.Name}[{innerCount}] data; }} {name.Name}[{outerCount}];"
                                         }
                                     )
 
