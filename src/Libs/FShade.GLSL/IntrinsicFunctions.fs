@@ -1980,6 +1980,49 @@ module IntrinsicFunctions =
             ]
 
             // ==========================================================================
+            // ATOMIC
+            // ==========================================================================
+            CIntrinsic.simple "atomicAdd", [
+                exactly <@ Atomic.Add : int ref * _ -> _ @>
+                exactly <@ Atomic.Add : uint ref * _ -> _ @>
+            ]
+
+            CIntrinsic.simple "atomicMin", [
+                exactly <@ Atomic.Min : int ref * _ -> _ @>
+                exactly <@ Atomic.Min : uint ref * _ -> _ @>
+            ]
+
+            CIntrinsic.simple "atomicMax", [
+                exactly <@ Atomic.Max : int ref * _ -> _ @>
+                exactly <@ Atomic.Max : uint ref * _ -> _ @>
+            ]
+
+            CIntrinsic.simple "atomicAnd", [
+                exactly <@ Atomic.And : int ref * _ -> _ @>
+                exactly <@ Atomic.And : uint ref * _ -> _ @>
+            ]
+
+            CIntrinsic.simple "atomicOr", [
+                exactly <@ Atomic.Or : int ref * _ -> _ @>
+                exactly <@ Atomic.Or : uint ref * _ -> _ @>
+            ]
+
+            CIntrinsic.simple "atomicXor", [
+                exactly <@ Atomic.Xor : int ref * _ -> _ @>
+                exactly <@ Atomic.Xor : uint ref * _ -> _ @>
+            ]
+
+            CIntrinsic.simple "atomicExchange", [
+                exactly <@ Atomic.Exchange : int ref * _ -> _ @>
+                exactly <@ Atomic.Exchange : uint ref * _ -> _ @>
+            ]
+
+            CIntrinsic.simple "atomicCompSwap", [
+                exactly <@ Atomic.CompareExchange : int ref * _ * _ -> _ @>
+                exactly <@ Atomic.CompareExchange : uint ref * _ * _ -> _ @>
+            ]
+
+            // ==========================================================================
             // BITWISE stuff
             // ==========================================================================
             CIntrinsic.simple "bitfieldExtract", [

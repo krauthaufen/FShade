@@ -1,3 +1,5 @@
+- Add static class `Atomic` containing atomic integer operation intrinsics
+
 ### 5.7.17
 - Improve handling of functions with unit arguments
 - Fix various issues with dead-code elimination

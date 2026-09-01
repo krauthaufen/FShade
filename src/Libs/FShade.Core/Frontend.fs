@@ -263,6 +263,32 @@ module Primitives =
         V4f(2.0f * x - 1.0f, 2.0f * y - 1.0f, 2.0f * z - 1.0f, 2.0f * w - 1.0f)
 
     [<AbstractClass; Sealed>]
+    type Atomic =
+        static member Add(mem: int ref, data: int) : int    = onlyInShaderCode "Atomic.Add"
+        static member Add(mem: uint ref, data: uint) : uint = onlyInShaderCode "Atomic.Add"
+
+        static member Min(mem: int ref, data: int) : int    = onlyInShaderCode "Atomic.Min"
+        static member Min(mem: uint ref, data: uint) : uint = onlyInShaderCode "Atomic.Min"
+
+        static member Max(mem: int ref, data: int) : int    = onlyInShaderCode "Atomic.Max"
+        static member Max(mem: uint ref, data: uint) : uint = onlyInShaderCode "Atomic.Max"
+
+        static member And(mem: int ref, data: int) : int    = onlyInShaderCode "Atomic.And"
+        static member And(mem: uint ref, data: uint) : uint = onlyInShaderCode "Atomic.And"
+
+        static member Or(mem: int ref, data: int) : int     = onlyInShaderCode "Atomic.Or"
+        static member Or(mem: uint ref, data: uint) : uint  = onlyInShaderCode "Atomic.Or"
+
+        static member Xor(mem: int ref, data: int) : int    = onlyInShaderCode "Atomic.Xor"
+        static member Xor(mem: uint ref, data: uint) : uint = onlyInShaderCode "Atomic.Xor"
+
+        static member Exchange(mem: int ref, data: int) : int    = onlyInShaderCode "Atomic.Exchange"
+        static member Exchange(mem: uint ref, data: uint) : uint = onlyInShaderCode "Atomic.Exchange"
+
+        static member CompareExchange(mem: int ref, compare: int, data: int) : int    = onlyInShaderCode "Atomic.CompareExchange"
+        static member CompareExchange(mem: uint ref, compare: uint, data: uint) : uint = onlyInShaderCode "Atomic.CompareExchange"
+
+    [<AbstractClass; Sealed>]
     type Bitwise private() = 
         static member BitFieldExtract (v : uint32, offset : int, bits : int) : uint32 = onlyInShaderCode "BitFieldExtract"
         static member BitFieldExtract (v : int, offset : int, bits : int) : int = onlyInShaderCode "BitFieldExtract"

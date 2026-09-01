@@ -22,6 +22,9 @@ type Vertex =
 type UniformScope with
     member x.SomeUniform : V3f = uniform?SomeUniform
     member x.Storage : int[] = uniform?StorageBuffer?Storage
+    member x.V3iStorage : V3i[] = uniform?StorageBuffer?V3iStorage
+    member x.V3uiStorage : V3ui[] = uniform?StorageBuffer?V3Storage
+
 [<ReflectedDefinition>]
 let getVec() =
     V4f(uniform.SomeUniform, 1.0f)
@@ -3332,3 +3335,39 @@ let ``IsNaN``() =
         }
 
     GLSL.shouldCompileAndContainRegex [Effect.ofFunction shader] ["isnan"]
+
+[<Test>]
+let ``Atomic``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            uniform.V3iStorage.[0] <- V3i.Zero
+            uniform.V3uiStorage.[0] <- V3ui.Zero // TODO: Remove when storage access computation is fixed
+            let _ = assertT <| Atomic.Add(&&uniform.V3iStorage.[0].X, 1)
+            let _ = assertT <| Atomic.Add(&&uniform.V3uiStorage.[0].X, 1u)
+            let _ = assertT <| Atomic.Min(&&uniform.V3iStorage.[0].X, 1)
+            let _ = assertT <| Atomic.Min(&&uniform.V3uiStorage.[0].X, 1u)
+            let _ = assertT <| Atomic.Max(&&uniform.V3iStorage.[0].X, 1)
+            let _ = assertT <| Atomic.Max(&&uniform.V3uiStorage.[0].X, 1u)
+            let _ = assertT <| Atomic.And(&&uniform.V3iStorage.[0].X, 1)
+            let _ = assertT <| Atomic.And(&&uniform.V3uiStorage.[0].X, 1u)
+            let _ = assertT <| Atomic.Or(&&uniform.V3iStorage.[0].X, 1)
+            let _ = assertT <| Atomic.Or(&&uniform.V3uiStorage.[0].X, 1u)
+            let _ = assertT <| Atomic.Xor(&&uniform.V3iStorage.[0].X, 1)
+            let _ = assertT <| Atomic.Xor(&&uniform.V3uiStorage.[0].X, 1u)
+            let _ = assertT <| Atomic.Exchange(&&uniform.V3iStorage.[0].X, 1)
+            let _ = assertT <| Atomic.Exchange(&&uniform.V3uiStorage.[0].X, 1u)
+            let _ = assertT <| Atomic.CompareExchange(&&uniform.V3iStorage.[0].X, 0, 1)
+            let _ = assertT <| Atomic.CompareExchange(&&uniform.V3uiStorage.[0].X, 0u, 1u)
+            return uniform.V3iStorage.[0] + V3i uniform.V3uiStorage.[0]
+        }
+
+    let expected =
+        [
+            "atomicAdd"; "atomicMin"; "atomicMax"
+            "atomicAnd"; "atomicOr"; "atomicXor"
+            "atomicExchange"; "atomicCompSwap"
+        ] |> List.map (fun n -> n, 2)
+
+    GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader] expected
