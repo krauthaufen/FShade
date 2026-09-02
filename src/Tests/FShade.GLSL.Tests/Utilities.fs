@@ -185,13 +185,13 @@ module GLSL =
         regexList |> List.iter (fun (regex, count) ->
             match count with
             | Some n ->
-                let actual = Regex.Matches(shader.code, regex).Count
+                let actual = Regex.Matches(shader.code, regex, RegexOptions.Multiline).Count
 
                 if n <> actual then
                     failwithf "ERROR: Expected compiled shader to contain '%s' %d times (encountered %d times)" regex n actual
 
             | _ ->
-                if not <| Regex.Match(shader.code, regex).Success then
+                if not <| Regex.Match(shader.code, regex, RegexOptions.Multiline).Success then
                     failwithf "ERROR: Compiled shader did not contain '%s'" regex
         )
 
@@ -219,8 +219,8 @@ module GLSL =
     let shouldCompileComputeAndContainRegex' (backend : Backend) (c : ComputeShader) (s : list<string>) =
         let s = s |> List.map (fun s -> s, None)
         let glsl, res = compileCompute' backend c
-        shouldContainRegex glsl s
         printResults None res glsl
+        shouldContainRegex glsl s
 
     let shouldCompileComputeAndContainRegex (c : ComputeShader) (s : list<string>) =
         shouldCompileComputeAndContainRegex' glslVulkan c s

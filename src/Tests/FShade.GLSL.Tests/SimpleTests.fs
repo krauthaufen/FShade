@@ -1621,7 +1621,6 @@ let ``Dead-code elimination of utility functions``() =
 
     let frag (v: Vertex) =
         fragment {
-            uniform.V3iArr.[0] <- V3i.Zero // TODO: This is currently necessary to prevent the storage buffer from becoming readonly
             let a = v.id
             return2ndArg (incAndRet &&uniform.V3iArr.[v.id].X) v.what.Y (incAndRet &&a) |> ignore
             let b = return2ndArg (incAndRet &&uniform.V3iArr.[v.id].X) v.what.X (incAndRet &&a)

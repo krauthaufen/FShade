@@ -365,6 +365,24 @@ module Preprocessor =
                 ValueNone
 
         [<return: Struct>]
+        let rec (|StorageRead|_|) (e : Expr) =
+            match e with
+            | FieldGet(Some (StorageRead(name, args)), _) -> ValueSome (name, args)
+            | PropertyGet(Some (StorageRead(name, args)), _, idx) -> ValueSome (name, idx @ args)
+            | GetArray(ReadInput(ParameterKind.Uniform, name, None), idx) -> ValueSome (name, [idx])
+            | ReadInput(ParameterKind.Uniform, name, idx) -> ValueSome (name, Option.toList idx)
+            | _ -> ValueNone
+
+        [<return: Struct>]
+        let (|StorageWrite|_|) (e : Expr) =
+            match e with
+            | FieldSet(Some (StorageRead(name, args)), _, value) -> ValueSome (name, value::args)
+            | PropertySet(Some (StorageRead(name, args)), _, idx, value) -> ValueSome(name, value :: idx @ args)
+            | SetArray(ReadInput(ParameterKind.Uniform, name, None), idx, value) -> ValueSome (name, [value; idx])
+            | SetArray(StorageRead(name, args), idx, value) -> ValueSome (name, [value; idx] @ args)
+            | _ -> ValueNone
+
+        [<return: Struct>]
         let (|RemoveBuilder|_|) (e : Expr) =
             match e with
             | BuilderCombine(_, l, r) -> Expr.Seq [l;r] |> ValueSome
@@ -1752,30 +1770,6 @@ module Preprocessor =
     let rec preprocessComputeS (e : Expr) : Preprocess<Expr> =
         state {
             match e with
-                | GetArray(ValueWithName(v, t, name), i) ->
-                    let! i = preprocessComputeS i
-                    do! State.addStorageAccess name StorageAccess.Read
-                    match t with
-                        | ArrOf(_,t) | ArrayOf t ->
-                            return Expr.ReadInput(ParameterKind.Input, t, name, i)
-                        | _ ->
-                            return e
-
-                | SetArray(ValueWithName(v, t, name), i, e) ->
-                    let! i = preprocessComputeS i
-                    let! e = preprocessComputeS e
-                    do! State.addStorageAccess name StorageAccess.Write
-                    return Expr.WriteOutputsRaw([name, Some i, e])
-
-                | RefOf(GetArray(ValueWithName(v, t, name), i)) ->
-                    let! i = preprocessComputeS i
-                    do! State.addStorageAccess name StorageAccess.ReadWrite
-                    match t with
-                    | ArrOf(_,t) | ArrayOf t ->
-                        return Expr.RefOf(Expr.ReadInput(ParameterKind.Input, t, name, i))
-                    | _ ->
-                        return e
-                
                 | PropertyGet(Some (ValueWithName(v, t, name)), prop, []) when t.IsArray && (prop.Name = "Length" || prop.Name = "LongLength") ->
                     return Expr.ReadInput(ParameterKind.Uniform, typeof<int>, "cs_" + name + "_length")
 
@@ -1861,44 +1855,6 @@ module Preprocessor =
             let! vertexType = State.vertexType
 
             match e with
-            | RefOf (GetArray(StorageBuffer u, index) as e) ->
-                let! index = preprocessNormalS index
-                do! u |> State.readUniform true
-                do! State.addStorageAccess u.uniformName StorageAccess.ReadWrite
-                let arr = Expr.ReadInput(ParameterKind.Uniform, u.uniformType, u.uniformName)
-                let access =
-                    match e with
-                    | Call(None, mi, _) -> Expr.Call(mi, [arr; index])
-                    | PropertyGet(Some _, pi, _) -> Expr.PropertyGet(arr, pi, [index])
-                    | _ -> failwithf "[FShade] Unexpected array get: %A" e
-                
-                return Expr.RefOf(access)
-
-            | SetArray(StorageBuffer u, index, value) ->
-                let! value = preprocessNormalS value
-                let! index = preprocessNormalS index
-                let arr = Expr.ReadInput(ParameterKind.Uniform, u.uniformType, u.uniformName)
-
-                do! u |> State.readUniform true
-                do! State.addStorageAccess u.uniformName StorageAccess.Write
-
-                match e with
-                | Call(None, mi, _) -> return Expr.Call(mi, [arr; index; value])
-                | PropertySet(Some _, pi, _, _) -> return Expr.PropertySet(arr, pi, value, [index])
-                | _ -> return failwithf "[FShade] Unexpected array set: %A" e
-
-            | GetArray(StorageBuffer u, index) ->
-                let! index = preprocessNormalS index
-                let arr = Expr.ReadInput(ParameterKind.Uniform, u.uniformType, u.uniformName)
-
-                do! u |> State.readUniform true
-                do! State.addStorageAccess u.uniformName StorageAccess.Read
-
-                match e with
-                | Call(None, mi, _) -> return Expr.Call(mi, [arr; index])
-                | PropertyGet(Some _, pi, _) -> return Expr.PropertyGet(arr, pi, [index])
-                | _ -> return failwithf "[FShade] Unexpected array get: %A" e
-
             // GLSL abs() is only defined for float and double.
             // Using the float overload for int32 and int64 could potentially lead to wrong results.
             // Here we emulate the abs() function with if-else expressions.
@@ -2732,6 +2688,46 @@ module Preprocessor =
                 return Expr.Lambda(v, b)
         }
 
+    and private computeStorageAccessS (e : Expr) : Preprocess<unit> =
+        state {
+            match e with
+            | StorageWrite(name, args) ->
+                do! State.addStorageAccess name StorageAccess.Write
+                for arg in args do do! computeStorageAccessS arg
+
+            | StorageRead(name, args) ->
+                do! State.addStorageAccess name StorageAccess.Read
+                for arg in args do do! computeStorageAccessS arg
+
+            | Call(this, _, args) ->
+                match this with
+                | Some this -> do! computeStorageAccessS this
+                | _ -> ()
+
+                for arg in args do
+                    match arg with
+                    | RefOf (StorageRead(name, args)) ->
+                        do! State.addStorageAccess name StorageAccess.ReadWrite
+                        for arg in args do do! computeStorageAccessS arg
+                    | _ ->
+                        do! computeStorageAccessS arg
+
+            | CallFunction(f, args) ->
+                for arg in args do
+                    match arg with
+                    | RefOf (StorageRead(name, args)) ->
+                        do! State.addStorageAccess name StorageAccess.ReadWrite
+                        for arg in args do do! computeStorageAccessS arg
+                    | _ ->
+                        do! computeStorageAccessS arg
+
+                do! computeStorageAccessS f.functionBody
+
+            | ShapeVar _ -> ()
+            | ShapeLambda(_, b) -> do! computeStorageAccessS b
+            | ShapeCombination(_, args) -> for arg in args do do! computeStorageAccessS arg
+        }
+
     and preprocessByTypeS (typ : ShaderExpressionType) (e : Expr) =
         state {
             do! State.setExpressionType typ
@@ -2743,6 +2739,7 @@ module Preprocessor =
                 | ShaderExpressionType.Raytracing s -> preprocessRaytracingS s e
 
             let! e1 = preprocessNormalS e0
+            do! computeStorageAccessS e1 // At this point storage buffer access is normalized to Expr.ReadInput
             return Optimizer.hoistImperativeConstructs e1
         }
 
@@ -4366,12 +4363,12 @@ module Shader =
                         | UniformValue.Sampler (n,s) -> [n,s :> obj]
                         | UniformValue.SamplerArray arr -> Array.toList arr |> List.map (fun (n,s) -> n, s :> obj)
                         | _ -> []
-                        
+
                 let decorations =
                     match Map.tryFind n s.shaderStorageBufferAccess with
-                    | Some acc -> UniformDecoration.BufferAccess acc :: u.decorations
-                    | None -> u.decorations
-                        
+                    | Some acc when uniformBuffer |> Option.contains "StorageBuffer" -> UniformDecoration.BufferAccess acc :: u.decorations
+                    | _ -> u.decorations
+
                 {
                     uniformName = u.uniformName
                     uniformType = u.uniformType
