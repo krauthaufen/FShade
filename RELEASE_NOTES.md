@@ -1,3 +1,4 @@
+### 5.7.17
 - Improve handling of functions with unit arguments
 - Fix various issues with dead-code elimination
 - Fix AOT unpickle paths not consuming blob version/deps header (AOT silently fell back to runtime compile since 5.7.4)
