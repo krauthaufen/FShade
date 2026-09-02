@@ -15,6 +15,7 @@ open FShade
 open FShade.Imperative
 
 #nowarn "4321"
+#nowarn "1337"
 
 type Vertex =
     {
@@ -269,6 +270,17 @@ let ``[Deps] read accesses Dependencies without forcing shaders``() =
     // Touch Dependencies but never Shaders; should not throw and returns the right map.
     let pidDep = Map.find "PickId" loaded.Dependencies.Fragment
     pidDep.Inputs |> Map.containsKey "PickPartIndex" |> should equal true
+
+[<Test>]
+let ``[AOT] unpickleInternal reads pickled blob without fallback``() =
+    setup()
+    let original = Effect.ofFunction pickFrag
+    let b64 = System.Convert.ToBase64String (Effect.pickle original)
+    // lambda = null: if the blob can't be deserialized the fallback has
+    // nothing to recreate from and throws — so this test only passes when
+    // the AOT read path actually consumes the v1 layout correctly.
+    let loaded = Effect.unpickleInternal null original.Id b64
+    Set.ofSeq (Map.keys loaded.Shaders) |> should equal (Set.ofSeq (Map.keys original.Shaders))
 
 // ----------------------------------------------------------------------------
 // [Deps] cross-check against actual Effect.toModule linking

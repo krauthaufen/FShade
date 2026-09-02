@@ -1458,7 +1458,11 @@ module Effect =
                         use ms = ass.GetManifestResourceStream(id)
                         use src = new BinaryReader(ms, System.Text.Encoding.UTF8, true)
                         let state = Shader.DeserializerState()
+                        let v = src.ReadByte()
+                        if v <> blobFormatVersion then
+                            failwithf "[FShade] effect blob format version mismatch: got %d, expected %d" v blobFormatVersion
                         let _id = src.ReadString()
+                        let _deps = readEffectDeps state.TypeState src
                         let cnt = src.ReadInt32()
                         List.init cnt (fun _ ->
                             let stage = src.ReadInt32() |> unbox<ShaderStage>
@@ -1514,7 +1518,11 @@ module Effect =
                         use ms = new MemoryStream(binary)
                         use src = new BinaryReader(ms, System.Text.Encoding.UTF8, true)
                         let state = Shader.DeserializerState()
+                        let v = src.ReadByte()
+                        if v <> blobFormatVersion then
+                            failwithf "[FShade] effect blob format version mismatch: got %d, expected %d" v blobFormatVersion
                         let _id = src.ReadString()
+                        let _deps = readEffectDeps state.TypeState src
                         let cnt = src.ReadInt32()
                         List.init cnt (fun _ ->
                             let stage = src.ReadInt32() |> unbox<ShaderStage>
