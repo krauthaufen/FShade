@@ -1,6 +1,7 @@
 - Add static class `Atomic` containing atomic integer operation intrinsics
 - Add support for fixed-size arrays in storage buffers
 - Fix computation of storage buffer access (field and property access, access in utility functions)
+- Simplify complex RHS expressions to avoid emitting helper functions (https://github.com/krauthaufen/FShade/issues/37)
 
 ### 5.7.17
 - Improve handling of functions with unit arguments

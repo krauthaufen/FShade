@@ -83,8 +83,7 @@ let ``Reflected functions``() =
              hitgroup "Shadow" hitgroupShadow
          }
 
-    let regex = "helper\(vec3 WorldRayDirection, vec3 WorldRayOrigin\)"
-    GLSL.shouldCompileRaytracingAndContainRegex effect [regex]
+    GLSL.shouldCompileRaytracingAndContainRegex effect [ "_trace_"; "_whatever_"]
 
 [<Test>]
 let ``Simple uniform access in reflected function``() =
@@ -594,7 +593,7 @@ let ``Write to payload fields partial``() =
          }
 
     GLSL.shouldCompileRaytracingAndContainRegex effect [
-        @"\{\s*rayPayload0.depth =.+;\s+traceRayEXT"
+        @"rayPayload0.depth =.+;\s+traceRayEXT"
         @"rayPayloadIn.color = \(inner \+ \(rayPayloadIn.color \* 0\.5\)\);\s*\}"
     ]
 

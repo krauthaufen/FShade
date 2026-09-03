@@ -1916,27 +1916,40 @@ module Compiler =
         | e ->
             ValueSome(e, [])
 
+    [<return: Struct>]
+    let rec private (|CHelperExpression|_|) (e : CExpr) =
+        match e with
+        | CCall(f, _) when Regex.IsMatch(f.name, "helper[0-9]*") -> ValueSome ()
+        | CConditional(_, _, CHelperExpression, _)
+        | CConditional(_, _, _, CHelperExpression) -> ValueSome ()
+        | _ -> ValueNone
 
-    let rec toCStatementS (isLast : bool) (e : Expr) =
+    module private State =
+        let run' s = State.get |> State.map (flip State.run s)
+
+    module private CStatement =
+        let write lhs value = CWrite(lhs, value)
+        let writeOutput name index value = CWriteOutput(name, index, CRExpr.ofExpr value)
+
+    let rec toCStatementS (write : Option<CExpr -> CStatement>) (e : Expr) =
         state {
             match e with
                 | Ignore e ->
-                    return! toCStatementS false e
+                    return! toCStatementS None e
 
                 | ReducibleExpression e ->
-                    return! toCStatementS isLast e
+                    return! toCStatementS write e
 
                 | Quotations.DerivedPatterns.Unit ->
                     return CNop
                     
                 | Sequential(Sequential(a,b), c) ->
-                    return! toCStatementS isLast (Expr.Sequential(a, Expr.Sequential(b, c)))
+                    return! toCStatementS write (Expr.Sequential(a, Expr.Sequential(b, c)))
 
                 | SetRef(ref, value) ->
                     let! r = toCLExprS ref
-                    let! v = toCExprS value
                     match r with
-                        | Some r -> return CWrite(r, v)
+                        | Some r -> return! toCStatementS (Some <| CStatement.write r) value
                         | None -> return failwith "[FShade] refs can only by variables"
 
                 | ForEach(v, seq, body) ->
@@ -1946,7 +1959,7 @@ module Compiler =
                         | CArray(et, len) ->
                             let! i = freshCVarS (Var("i", typeof<int>, true))
                             let! v = freshCVarS v
-                            let! cbody = toCStatementS false body
+                            let! cbody = toCStatementS None body
 
                             let tint32 = CType.CInt(true, 32)
                             let condition = CLess(CVar i, CValue(tint32, CIntegral (int64 len)))
@@ -1973,7 +1986,7 @@ module Compiler =
                             let! cstep = toCExprS step
                             let! clast = toCExprS last
                             let! v = freshCVarS v
-                            let! cbody = toCStatementS false b
+                            let! cbody = toCStatementS None b
 
                             let increment =
                                 match cstep with
@@ -2021,16 +2034,16 @@ module Compiler =
                                 )
                         | Trivial, last ->
                             let vLast = Var("last", last.Type)
-                            return! toCStatementS isLast (Expr.Let(vLast, last, Expr.ForInteger(v, first, step, Expr.Var vLast, b)))
+                            return! toCStatementS write (Expr.Let(vLast, last, Expr.ForInteger(v, first, step, Expr.Var vLast, b)))
 
                         | step, TrivialOp -> 
                             let vStep = Var("step", step.Type)
-                            return! toCStatementS isLast (Expr.Let(vStep, step, Expr.ForInteger(v, first, Expr.Var vStep, last, b)))
+                            return! toCStatementS write (Expr.Let(vStep, step, Expr.ForInteger(v, first, Expr.Var vStep, last, b)))
 
                         | step, last ->
                             let vStep = Var("step", step.Type)
                             let vLast = Var("last", last.Type)
-                            return! toCStatementS isLast (Expr.Let(vStep, step, Expr.Let(vLast, last, Expr.ForInteger(v, first, Expr.Var vStep, Expr.Var vLast, b))))
+                            return! toCStatementS write (Expr.Let(vStep, step, Expr.Let(vLast, last, Expr.ForInteger(v, first, Expr.Var vStep, Expr.Var vLast, b))))
                             
 
                             
@@ -2043,10 +2056,17 @@ module Compiler =
                                         | Some index -> toCExprS index |> State.map Some
                                         | _ -> State.value None
 
-                                let! value = toCRExprS value
-                                match value with
-                                    | Some value -> return CWriteOutput(name, index, value) |> Some
-                                    | None -> return None
+                                let! state, rvalue = toCRExprS value |> State.run'
+
+                                match rvalue with
+                                | Some (CRArray _ as rvalue) ->
+                                    do! State.put state
+                                    return CWriteOutput(name, index, rvalue) |> Some
+                                | Some _ ->
+                                    return! toCStatementS (Some <| CStatement.writeOutput name index) value |> State.map Some
+                                | _ ->
+                                    do! State.put state
+                                    return None
                             }
                         )
 
@@ -2066,10 +2086,9 @@ module Compiler =
 
                 | AddressSet(a, v) ->
                     let! a = toCLExprS a
-                    let! v = toCExprS v
                     match a with
                         | Some a ->
-                            return CWrite(a, v)
+                            return! toCStatementS (Some <| CStatement.write a) v
                         | None ->
                             return failwithf "[FShade] cannot set value for ptr %A" e
 
@@ -2077,8 +2096,7 @@ module Compiler =
                     let! t = toCLExprS (Expr.FieldGet(t, f))
                     match t with
                         | Some t ->
-                            let! value = toCExprS value
-                            return CWrite(t, value)
+                            return! toCStatementS (Some <| CStatement.write t) value
                         | None ->
                             return failwithf "[FShade] cannot set field %A" e
 
@@ -2087,17 +2105,28 @@ module Compiler =
 
 
                 | Let(v, e, b) ->
-                    let! e = toCRExprS e
-                    let! v = 
-                        match e with
-                            | Some e -> freshCVarOfTypeS v e.ctype
-                            | None -> freshCVarS v
+                    let! v = freshCVarS v
+                    let! state, re = toCRExprS e |> State.run'
 
-                    let! body = toCStatementS isLast b
-                    return CSequential [
-                        CDeclare(v, e)
-                        body
-                    ]
+                    // Check if there is a helper expression that can be simplified
+                    // If so, discard the state and rewrite the let binding
+                    match re with
+                    | Some (CRExpr CHelperExpression) ->
+                        let! e = toCStatementS (Some <| CStatement.write (CLVar v)) e
+                        let! b = toCStatementS write b
+                        return CSequential [
+                            CDeclare(v, None)
+                            e
+                            b
+                        ]
+
+                    | _ ->
+                        do! State.put state
+                        let! b = toCStatementS write b
+                        return CSequential [
+                            CDeclare(v, re)
+                            b
+                        ]
 
                 | LetRecursive(bindings, b) ->
                     return failwithf "[FShade] cannot compile recursice bindings %A" bindings
@@ -2107,16 +2136,13 @@ module Compiler =
                     return failwithf "[FShade] cannot compile exception handlers %A" e
 
                 | Sequential(l, r) ->
-                    let! l = toCStatementS false l
-                    let! r = toCStatementS isLast r
+                    let! l = toCStatementS None l
+                    let! r = toCStatementS write r
                     return CSequential [l;r]
 
                 | VarSet(v, value) ->
                     let! v = toCVarS v
-                    let! value = toCExprS value
-                    return CWrite(CLVar v, value)
-
-                
+                    return! toCStatementS (Some <| CStatement.write (CLVar v)) value
 
 //                | SetArray(ReadInput(kind, name, None), index, value) ->
 //                    return! toCStatementS isLast (Expr.WriteOutputs [name, Some index, value])
@@ -2125,8 +2151,8 @@ module Compiler =
                 | SetArray(arr, index, value) ->
                     let! carr = toCExprS arr
                     let! ci = toCExprS index
-                    let! cvalue = toCExprS value
-                    return CWrite(CLExpr.CLItem(cvalue.ctype, carr, ci), cvalue)
+                    let! ct = toCTypeS value.Type
+                    return! toCStatementS (Some <| CStatement.write (CLExpr.CLItem(ct, carr, ci))) value
 
                 | PropertySet(None, pi, i, a) ->
                     return failwithf "[FShade] cannot set static property %A" pi
@@ -2135,60 +2161,58 @@ module Compiler =
                     let! lexpr = Expr.PropertyGet(t, pi, i) |> toCLExprS
                     match lexpr with
                         | Some l ->
-                            let! a = toCExprS a
-                            return CWrite(l, a)
+                            return! toCStatementS (Some <| CStatement.write l) a
                         | None ->
-                            return! Expr.Call(t, pi.SetMethod, i @ [a]) |> toCStatementS isLast
+                            return! Expr.Call(t, pi.SetMethod, i @ [a]) |> toCStatementS write
 
                 | UnsafeWrite(t, a) ->
                     let! lexpr = t |> toCLExprS
                     match lexpr with
                     | Some l ->
-                        let! a = toCExprS a
-                        return CWrite(l, a)
+                        return! toCStatementS (Some <| CStatement.write l) a
                     | None ->
                         return failwithf "[FShade] cannot write to expression %A" t 
 
 
                 | WhileLoop(guard, body) ->
                     let! guard = toCExprS guard
-                    let! body = toCStatementS false body
+                    let! body = toCStatementS None body
                     return CWhile(guard, body)
 
                 | IfThenElse(c, i, e) ->
                     let! c = toCExprS c
-                    let! i = toCStatementS isLast i
-                    let! e = toCStatementS isLast e
+                    let! i = toCStatementS write i
+                    let! e = toCStatementS write e
                     return CIfThenElse(c, i, e)
 
                 | e ->
                     let! ce = toCRExprS e
                     match ce with
                         | Some (CRExpr e) ->
-                            if isLast && e.ctype <> CType.CVoid then
-                                return CReturnValue e
+                            if write.IsSome && e.ctype <> CType.CVoid then
+                                return write.Value e
                             else
                                 return CDo e
                             
                         | Some (CRArray(t,_) as rhs) -> 
-                            if isLast then 
+                            if write.IsSome then
                                 let! name = CompilerState.newName "temp"
                                 let cVar = { name = name; ctype = t }
                                 return CSequential [
                                     CDeclare(cVar, Some rhs)
-                                    CReturnValue(CVar cVar)
+                                    write.Value (CVar cVar)
                                 ]
                             else
                                 return CNop
 
                         | None ->
-                            if isLast then
+                            if write.IsSome then
                                 let! name = CompilerState.newName "temp"
                                 let! t = toCTypeS e.Type
                                 let cVar = { name = name; ctype = t }
                                 return CSequential [
                                     CDeclare(cVar, None)
-                                    CReturnValue(CVar cVar)
+                                    write.Value (CVar cVar)
                                 ]
                                 
                             else
@@ -2222,7 +2246,7 @@ module Compiler =
             let! args       = f.arguments |> List.mapS toCEntryParameterS
 
             // compile the body
-            let! body = toCStatementS true f.body
+            let! body = toCStatementS (Some CReturnValue) f.body
             let! ret = toCTypeS f.body.Type
 
             return
@@ -2243,7 +2267,7 @@ module Compiler =
                 | ManagedFunction(name, args, body) ->
                     let! s = State.get
                     let signature = f.Signature s.moduleState.backend
-                    let! body = toCStatementS true body
+                    let! body = toCStatementS (Some CReturnValue) body
                    
                     do! State.modify (fun s -> 
                             let mutable ni = s.nameIndices
@@ -2268,7 +2292,7 @@ module Compiler =
                             vs <- Map.add a { name = a.Name; ctype = CType.ofType s.moduleState.backend a.Type } vs
                         { s with nameIndices = ni; variables = vs }
                     )
-                    let! body = toCStatementS true body
+                    let! body = toCStatementS (Some CReturnValue) body
                     return CFunctionDef(signature, body)
 
                 | Utility u ->
@@ -2285,7 +2309,7 @@ module Compiler =
                         { s with nameIndices = ni; variables = vs }
                     )
 
-                    let! body = toCStatementS true u.functionBody
+                    let! body = toCStatementS (Some CReturnValue) u.functionBody
                     return CFunctionDef(signature, body)
 
 

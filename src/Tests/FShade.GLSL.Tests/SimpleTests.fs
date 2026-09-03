@@ -1640,3 +1640,55 @@ let ``Dead-code elimination of utility functions``() =
         |> String.concat "\\s*"
 
     GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [ expected ]
+
+[<KeepCall; ReflectedDefinition>]
+let id x = x
+
+[<Test>]
+let ``Simplify complex RHS expressions``() =
+    Setup.Run()
+
+    let frag (v: Vertex) =
+        fragment {
+            let mutable x = 0.0f
+            x <-
+                if v.what.X > 0 then
+                    if v.id = 0 then
+                        let a = id v.foo
+                        a.X * a.Y
+                    else
+                        0.0f
+                else
+                    -1.0f
+
+            let mutable y =
+                if v.id = 0 then
+                    let a = id v.c
+                    a.Z * a.W
+                else
+                   0.0f
+
+            let mutable u = V3f.Zero
+            u.X <-
+                if v.id = 0 then
+                    let a = id v.hugo2
+                    a.X + a.Y
+                else
+                    0.0f
+
+            uniform.V3iArr.[0] <-
+                if v.id = 0 then
+                    let a = id v.what
+                    a.XYZ
+                else
+                    V3i.Zero
+
+            return
+                if v.id = 0 then
+                    let a = id v.hugo
+                    a.X * a.Z * u.X
+                else
+                    x * y
+        }
+
+    GLSL.shouldCompileAndContainRegexWithCount [ Effect.ofFunction frag ] [ "helper", 0 ]
