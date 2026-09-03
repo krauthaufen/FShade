@@ -128,7 +128,7 @@ module PrettyPrinter =
                 $"{ci.DeclaringType.Name}({args})"
 
             | NewRecord(typ, args) ->
-                let fields = FSharpType.GetRecordFields typ
+                let fields = FSharpType.GetRecordFields(typ, true)
                 let data =
                     args
                     |> List.mapi (fun i arg -> String.indent 2 $"{fields.[i].Name} = {print arg}")
@@ -1210,7 +1210,7 @@ module Optimizer =
 
         [<return: Struct>]
         let private (|DeconstructibleType|_|) (t : Type) =
-            if t.IsEnum || FSharpType.IsUnion t || FSharpType.IsTuple t || FSharpType.IsRecord t then
+            if t.IsEnum || FSharpType.IsUnion(t, true) || FSharpType.IsTuple t || FSharpType.IsRecord(t, true) then
                 ValueSome ()
             else
                 match t with

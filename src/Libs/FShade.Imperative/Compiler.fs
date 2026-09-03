@@ -148,7 +148,7 @@ module Compiler =
                     "new_" + typeName t
 
                 let cFields =
-                    if FSharpType.IsRecord t then
+                    if FSharpType.IsRecord(t, true) then
                         FSharpType.GetRecordFields(t, true)
                         |> Array.map (fun pi -> struct {| Name = pi.Name; Type = pi.PropertyType |})
                     else

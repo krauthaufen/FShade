@@ -509,7 +509,7 @@ module Preprocessor =
         [<return: Struct>]
         let (|SemanticInput|_|) (e : Expr) =
             match e with
-            | PropertyGet(Some t, pi, []) when FSharpType.IsRecord t.Type ->
+            | PropertyGet(Some t, pi, []) when FSharpType.IsRecord(t.Type, true) ->
                 match pi with
                 | SemanticProperty semantic ->
                     let parameter = { paramType = pi.PropertyType; paramInterpolation = InterpolationMode.Default }
