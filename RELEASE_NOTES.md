@@ -3,6 +3,7 @@
 - Fix computation of storage buffer access (field and property access, access in utility functions)
 - Simplify complex RHS expressions to avoid emitting helper functions (https://github.com/krauthaufen/FShade/issues/37)
 - Fix issues with private records and unions
+- Enable full optimization pass for compute shaders
 
 ### 5.7.17
 - Improve handling of functions with unit arguments

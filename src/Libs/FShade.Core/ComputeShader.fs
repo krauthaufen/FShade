@@ -30,6 +30,7 @@ type ComputeBuffer2 =
         arrayType : Type
         access : StorageAccess
     }
+    member this.contentType = match this.arrayType with ArrayOf ct | ArrOf(_, ct) | ct -> ct
 
 module internal ComputeBuffer2 =
     let toComputeBuffer (b: ComputeBuffer2) =
@@ -76,12 +77,47 @@ type ComputeShader internal(id : string, method : MethodBase, localSize : V3i, d
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module ComputeShader =
 
-    let private ofExprInternal (meth : MethodBase) (hash : string) (localSize : V3i) (definition : SourceDefinition) (body0 : Expr) =
+    let private sideEffects =
+        HashSet.ofList [
+            getMethodInfo <@ barrier @>
+        ]
+
+    let private isSideEffect (m : MethodInfo) =
+        if sideEffects.Contains m then
+            true
+        else
+            m.GetCustomAttributes<KeepCallAttribute>()
+            |> Seq.isEmpty
+            |> not
+
+    let private ofExprInternal (meth : MethodBase) (hash : string) (localSize : V3i) (definition : SourceDefinition) (body : Expr) =
         let data =
             lazy (
-                let body1, state = Preprocessor.preprocess localSize body0
-                let body2 = Optimizer.ConstantFolding.evaluateConstants'' (fun m -> m.DeclaringType.FullName = "FShade.Primitives") body1
-                let body2 = Optimizer.liftInputs body2
+                let body, state = body |> Preprocessor.preprocess localSize
+
+                let bodyOpt, stateOpt =
+                    body
+                    |> Optimizer.inlining isSideEffect
+                    |> Optimizer.hoistImperativeConstructs
+                    |> Optimizer.evaluateConstants' isSideEffect
+                    |> Optimizer.eliminateDeadCode' isSideEffect
+                    |> Optimizer.evaluateConstants' isSideEffect
+                    |> Optimizer.liftInputs
+                    |> Preprocessor.preprocess localSize
+
+                let bodyOpt =
+                    if bodyOpt.Type <> typeof<unit> then
+                        Expr.Ignore bodyOpt
+                    else
+                        bodyOpt
+
+                let state =
+                    let filter a b = a |> Map.filter (fun n _ -> Map.containsKey n b)
+
+                    { state with
+                        inputs = filter state.inputs stateOpt.inputs
+                        outputs = filter state.outputs stateOpt.outputs
+                        uniforms = filter state.uniforms stateOpt.uniforms }
 
                 let mutable buffers = Map.empty<string, ComputeBuffer2>
                 let mutable images = Map.empty
@@ -189,7 +225,7 @@ module ComputeShader =
                     csSamplerStates = samplerStates
                     csTextureNames  = textureNames
                     csUniforms      = uniforms
-                    csBody          = body2
+                    csBody          = bodyOpt
                     csShared        = Map.empty
                 }
             )

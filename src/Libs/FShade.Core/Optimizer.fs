@@ -2646,8 +2646,9 @@ module Optimizer =
                         let! e = inlineS e
                         return Expr.AddressSet(v,e)
 
-                    | Application(Lambda(v,b), e) ->
-                        let r = Expr.Let(v, e, b)
+                    | SaturatedLambda(bindings, body) ->
+                        let mutable r = body
+                        for v, e in bindings do r <- Expr.Let(v, e, r)
                         return! inlineS r
 
                     | Application(lambda, arg) ->

@@ -3597,11 +3597,6 @@ module Shader =
                     getMethodInfo <@ discard @>
                     getMethodInfo <@ barrier @>
                 ]
-
-            ShaderStage.Compute,
-                HashSet.ofList [
-                    getMethodInfo <@ barrier @>
-                ]
         ]
 
     let private typeConversions =
