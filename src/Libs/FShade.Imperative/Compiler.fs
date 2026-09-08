@@ -240,7 +240,7 @@ module Compiler =
         let custom (b : IBackend) (ctor : ConstructorInfo) =
             let baseType = ctor.DeclaringType.BaseType
             if baseType <> typeof<obj> && baseType <> typeof<ValueType> then
-                failwithf "[FShade] cannot compile constructor for OOP-style type inheriting from a different class"
+                failwith $"[FShade] cannot compile constructor for OOP-style type {ctor.DeclaringType} inheriting from {baseType}"
 
             let preprocessCtor (e : Expr) =
                 let rec preprocess (this : Var option) (arg : Var) (e : Expr) =
@@ -271,7 +271,7 @@ module Compiler =
                 | _ ->
                     failwithf "[FShade] unexpected constructor definition %A" e
 
-            ctorCache.GetOrAdd((b,ctor), fun (b, ctor) ->
+            ctorCache.GetOrAdd((b, ctor), fun (_, ctor) ->
                 match ExprWorkardound.TryGetReflectedDefinition ctor with
                     | Some e ->
                         let args, body = preprocessCtor e
@@ -279,11 +279,12 @@ module Compiler =
                         let suffix =
                             let names = args |> List.map (_.Type >> typeName) |> String.concat "_"
                             if names = "" then "" else $"_of_{names}"
-                                
+
                         let cName = "new_" + typeName ctor.DeclaringType + suffix
                         ManagedFunction(cName, args, body)
                     | None ->
-                        failwithf "[FShade] cannot compile constructor without reflected definition %A" ctor
+                        let args = ctor.GetParameters() |> Array.map (fun p -> $"{p.Name}: {p.ParameterType}") |> String.concat ", "
+                        failwith $"[FShade] cannot compile constructor without reflected definition {ctor.DeclaringType}({args})"
             )
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
