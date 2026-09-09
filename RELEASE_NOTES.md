@@ -5,6 +5,7 @@
 - Fix issues with private records and unions
 - Enable full optimization pass for compute shaders
 - Fix handling of pass-by-reference arguments in dead-code elimination
+- Add full support for custom properties
 
 ### 5.7.17
 - Improve handling of functions with unit arguments

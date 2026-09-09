@@ -46,14 +46,14 @@ type UtilityFunction =
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module UtilityFunction =
-    let tryCreate (m : MethodBase) =
+    let tryCreate' (isInline : bool) (m : MethodBase) =
         let intrinsic = m.GetCustomAttributes<IntrinsicAttribute>(true) |> Seq.isEmpty |> not
         if intrinsic then
             None
         else
             match ExprWorkardound.TryGetReflectedDefinition m with
                 | Some e ->
-                    let mutable isInline = m.GetCustomAttributes(typeof<InlineAttribute>, true) |> Seq.isEmpty |> not
+                    let mutable isInline = isInline
 
                     match e with
                         | Lambdas(args, body) ->
@@ -111,6 +111,8 @@ module UtilityFunction =
                             None
                 | None ->
                     None
+    let tryCreate (m : MethodBase) =
+        tryCreate' m.IsInline m
 
     let ofMethodBase (m : MethodBase) =
         match tryCreate m with

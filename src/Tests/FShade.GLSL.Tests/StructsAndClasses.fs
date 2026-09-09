@@ -21,6 +21,8 @@ type Vector2f =
     new (v)      = { X = v; Y = v }
     new (v: int) = Vector2f(float32 v)
     new (v: V2f) = Vector2f(v.X, v.Y)
+    [<Inline>] static member Zero = Vector2f 0f
+    static member One = Vector2f 1f
 
 [<ReflectedDefinition>]
 type CVector2f =
@@ -33,6 +35,12 @@ type CVector2f =
     new (v: V2f) = CVector2f(v.X, v.Y)
     member this.SetX x = this.X <- x
     [<Inline>] member this.SetY y = this.X <- y
+    member this.Length = sqrt (sqr this.X + sqr this.Y)
+    [<Inline>]
+    member this.Item
+        with get idx = if idx = 0 then this.X else this.Y
+        and set idx value = if idx = 0 then this.X <- value else this.Y <- value
+
 
 [<ReflectedDefinition>]
 let vectorDot2 (a: Vector2f) (b: Vector2f) =
@@ -104,4 +112,24 @@ let ``Custom class with instance methods``() =
         @"void .+_CVector2f_SetX_.+\(inout .+_CVector2f _this, float x\)"
         @".+_CVector2f_SetX_.+\(a, fs_foo\.x\);"
         @"a\.X = fs_foo\.y;"
+    ]
+
+[<Test>]
+let ``Custom class and struct with properties``() =
+    Setup.Run()
+
+    let fs (v : Vertex) =
+        fragment {
+            let zero = Vector2f.Zero
+            let one = Vector2f.One
+            let a = CVector2f v.hugo.XY
+            a.[0] <- a.[1] + zero.Y + one.X
+            return a.Length + zero.X + one.Y
+        }
+
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction fs ] [
+        @".+_Vector2f zero = new_.+_Vector2f_of_float32\(0\.0\);"
+        @".+_Vector2f one = .+_Vector2f_get_One_.+\(\);"
+        @"a\.X = \(\(a\.Y \+ zero\.Y\) \+ one\.X\);"
+        @"ColorsOut = \(\(.+_CVector2f_get_Length_.+\(a\) \+ zero\.X\) \+ one\.Y\);"
     ]

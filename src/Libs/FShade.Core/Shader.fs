@@ -318,6 +318,18 @@ module Preprocessor =
             | _ ->
                 ValueNone
 
+        [<return: Struct>]
+        let (|PropertyAccessReflectable|_|) (e: Expr) =
+            let get (isInline: bool) (mi: MethodInfo) (args: Expr list)  =
+                match UtilityFunction.tryCreate' (isInline || mi.IsInline) mi with
+                | Some utility -> ValueSome (utility, args)
+                | _ -> ValueNone
+
+            match e with
+            | PropertyGet(t, pi, idx) -> get pi.IsInline pi.GetMethod (Option.toList t @ idx)
+            | PropertySet(t, pi, idx, value) -> get pi.IsInline pi.SetMethod (Option.toList t @ idx @ [value])
+            | _ -> ValueNone
+
         let private (|Cons|Nil|Other|) (u : UnionCaseInfo) =
             if u.DeclaringType.IsGenericType && u.DeclaringType.GetGenericTypeDefinition() = typedefof<list<_>> then
                 if u.GetFields().Length = 2 then
@@ -2576,35 +2588,16 @@ module Preprocessor =
             | CallFunction(utility, args) ->
                 let! args = args |> List.mapS preprocessNormalS
                 match utility.functionTag with
-                    | :? State as innerState ->
-                        do! State.modify (fun s -> { s with uniforms = Map.union s.uniforms innerState.uniforms })
-                        return Expr.CallFunction(utility, args)
+                | :? State as innerState ->
+                    do! State.mergeInner innerState
+                    return Expr.CallFunction(utility, args)
 
-                    | _ ->
-                        let! state = State.get
-
-                        let mutable innerState = State.createInner state
-                        let processedF =
-                            utility |> UtilityFunction.map (fun b -> 
-                                let run : Preprocess<Expr> = preprocessByTypeS state.expressionType b
-                                run.Run(&innerState)
-                            )
-
-                        let processedF = { processedF with functionTag = innerState }
-                        do! State.mergeInner innerState
-
-                        return Expr.CallFunction(processedF, args)
-
-            | CallWithWitnesses(t, original, m, ws, args) ->
-                let! args = args |> List.mapS preprocessNormalS
-                let! t = t |> Option.mapS preprocessNormalS
-                    
-                match UtilityFunction.tryCreate original with
-                | Some utility ->
+                | _ ->
                     let! state = State.get
+
                     let mutable innerState = State.createInner state
                     let processedF =
-                        utility |> UtilityFunction.map (fun b -> 
+                        utility |> UtilityFunction.map (fun b ->
                             let run : Preprocess<Expr> = preprocessByTypeS state.expressionType b
                             run.Run(&innerState)
                         )
@@ -2612,55 +2605,35 @@ module Preprocessor =
                     let processedF = { processedF with functionTag = innerState }
                     do! State.mergeInner innerState
 
-                    match t with    
-                        | Some t -> return Expr.CallFunction(processedF, t :: args)
-                        | None -> return Expr.CallFunction(processedF, args)
+                    return Expr.CallFunction(processedF, args)
 
-                | None -> 
+            | CallWithWitnesses(t, original, m, ws, args) ->
+                match UtilityFunction.tryCreate original with
+                | Some utility -> return! preprocessNormalS <| Expr.CallFunction(utility, Option.toList t @ args)
+                | _ ->
+                    let! args = args |> List.mapS preprocessNormalS
+                    let! t = t |> Option.mapS preprocessNormalS
+
                     match t with
                     | Some t -> return Expr.CallWithWitnesses(t, original, m, ws, args)
                     | None -> return Expr.CallWithWitnesses(original, m, ws, args)
-                    
 
             | Call(t, mi, args) ->
                 let! args = args |> List.mapS preprocessNormalS
                 let! t = t |> Option.mapS preprocessNormalS
 
                 match UtilityFunction.tryCreate mi with
-                    | Some utility ->
-                        let! state = State.get
-                        let mutable innerState = State.createInner state
-                        let processedF =
-                            utility |> UtilityFunction.map (fun b -> 
-                                let run : Preprocess<Expr> = preprocessByTypeS state.expressionType b
-                                run.Run(&innerState)
-                            )
+                | Some utility -> return! preprocessNormalS <| Expr.CallFunction(utility, Option.toList t @ args)
+                | _ ->
+                    let! args = args |> List.mapS preprocessNormalS
+                    let! t = t |> Option.mapS preprocessNormalS
 
-                        let processedF = { processedF with functionTag = innerState }
-                        do! State.mergeInner innerState
+                    match t with
+                    | Some t -> return Expr.Call(t, mi, args)
+                    | None -> return Expr.Call(mi, args)
 
-                        match t with    
-                            | Some t -> return Expr.CallFunction(processedF, t :: args)
-                            | None -> return Expr.CallFunction(processedF, args)
-
-                    | None -> 
-                        match t with
-                            | Some t -> return Expr.Call(t, mi, args)
-                            | None -> return Expr.Call(mi, args)
-//                            
-//                    let! s = State.get
-//                    match preprocessMethod s.localSize mi with
-//                        | Some(_, innerState) ->
-//                            do! State.modify (fun s -> { s with uniforms = Map.union s.uniforms innerState.uniforms })
-//                        | None ->
-//                            ()
-//
-//                    let! args = args |> List.mapS preprocessNormalS
-//                    let! t = t |> Option.mapS preprocessNormalS
-//
-//                    match t with
-//                        | Some t -> return Expr.Call(t, mi, args)
-//                        | None -> return Expr.Call(mi, args)
+            | PropertyAccessReflectable(utility, args) ->
+                return! preprocessNormalS <| Expr.CallFunction(utility, args)
 
             | NewArr(t, l, []) ->
                 return Expr.DefaultValue(e.Type)

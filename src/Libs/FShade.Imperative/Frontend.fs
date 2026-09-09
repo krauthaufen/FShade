@@ -404,6 +404,11 @@ module ExpressionExtensions =
         static member NewRef = newref
         static member DeRef = deref
 
+    type MemberInfo with
+        member this.IsInline =
+            try this.GetCustomAttributes(typeof<InlineAttribute>, true) |> Seq.isEmpty |> not
+            with _ -> false
+
 module private Affected =
     open Aardvark.Base.Monads.State
     
