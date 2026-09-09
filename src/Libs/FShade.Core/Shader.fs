@@ -3938,6 +3938,7 @@ module Shader =
                 |> Optimizer.evaluateConstants' isSideEffect
                 |> Optimizer.eliminateDeadCode' isSideEffect
                 |> Optimizer.evaluateConstants' isSideEffect
+                |> Optimizer.inlining isSideEffect
                 |> Optimizer.liftInputs
                 |> Preprocessor.preprocess V3i.Zero
 
