@@ -223,7 +223,6 @@ module ModuleCompiler =
                     |> HashMap.ofArray
 
                 let toposort (set : HashSet<GraphNode>) =
-                    
                     let outEdges = 
                         let mutable outEdges = HashMap.empty
                         let rec run (g : GraphNode) =
@@ -242,17 +241,20 @@ module ModuleCompiler =
                             acc
                         else
                             let terminals = set |> HashSet.filter (fun n -> not (HashMap.containsKey n outEdges))
-                            let rest = HashSet.difference set terminals
 
-                            let newEdges =
-                                outEdges |> HashMap.choose (fun _ ds ->
-                                    let rest = HashSet.difference ds terminals
-                                    if HashSet.isEmpty rest then None
-                                    else Some rest
-                                )
+                            if HashSet.isEmpty terminals then
+                                failwith "[FShade] topological sort failed due to a cyclic dependency"
+                            else
+                                let rest = HashSet.difference set terminals
 
+                                let newEdges =
+                                    outEdges |> HashMap.choose (fun _ ds ->
+                                        let rest = HashSet.difference ds terminals
+                                        if HashSet.isEmpty rest then None
+                                        else Some rest
+                                    )
 
-                            run (terminals :: acc) newEdges rest
+                                run (terminals :: acc) newEdges rest
 
                     run [] outEdges set
 
