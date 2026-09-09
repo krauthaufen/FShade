@@ -4,6 +4,7 @@
 - Simplify complex RHS expressions to avoid emitting helper functions (https://github.com/krauthaufen/FShade/issues/37)
 - Fix issues with private records and unions
 - Enable full optimization pass for compute shaders
+- Fix handling of pass-by-reference arguments in dead-code elimination
 
 ### 5.7.17
 - Improve handling of functions with unit arguments

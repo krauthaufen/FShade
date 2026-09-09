@@ -424,7 +424,7 @@ module Optimizer =
             let isGlobalSideEffect (mi : MethodInfo) = State.get |> State.map (fun s -> s.isGlobalSideEffect mi)
             let useVars (vars : seq<Var>) = State.modify (fun s -> { s with usedVariables = Set.union (Set.ofSeq vars) s.usedVariables })
 
-            let isUsedAndMutable (e : Expr) =
+            let isUsedAndMutable (isInOut: bool) (e : Expr) =
                 State.get |> State.map (fun s ->
                     let isUsed =
                         match e with
@@ -434,7 +434,10 @@ module Optimizer =
                         | RefOf StorageExpr -> true
                         | _ -> false
 
-                    isUsed && (e.Type.IsArr || e.Type.IsArray || e.Type.IsRef)
+                    // Parameter is only passed by reference when the type is a ref cell or the
+                    // corresponding variable of a utility function is mutable (isInOut). In GLSL, arrays are
+                    // passed by value.
+                    isUsed && (isInOut || e.Type.IsRef)
                 )
 
             let merge (l : EliminationState) (r : EliminationState) =
@@ -457,7 +460,7 @@ module Optimizer =
                     let mutable inner = { empty with isGlobalSideEffect = s.isGlobalSideEffect }
 
                     for v, a in List.zip f.functionArguments args do
-                        let used = isUsedAndMutable a
+                        let used = isUsedAndMutable v.IsMutable a // Mutable parameters are compiled to inout
                         if used |> State.evaluate s then
                             inner <- { inner with usedVariables = inner.usedVariables |> Set.add v  }
 
@@ -483,9 +486,9 @@ module Optimizer =
                 match! EliminationState.isGlobalSideEffect mi with
                 | true -> return true
                 | _ ->
-                    match! this |> Option.mapS EliminationState.isUsedAndMutable with
+                    match! this |> Option.mapS (EliminationState.isUsedAndMutable false) with
                     | Some true -> return true
-                    | _ -> return! args |> List.existsS (EliminationState.isUsedAndMutable)
+                    | _ -> return! args |> List.existsS (EliminationState.isUsedAndMutable false)
             }
 
         let rec private callUtilityNeededS (f : UtilityFunction) (args : Expr list) =
