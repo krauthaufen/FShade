@@ -423,6 +423,8 @@ type CExpr =
     | CField of t : CType * target : CExpr * fieldName : string
     | CItem of t : CType * target : CExpr * index : CExpr
 
+    | CNewStruct of t : CType * args : list<CExpr>
+
     | CDebugPrintf of format : CExpr * values : CExpr[]
 
     member x.ctype =
@@ -478,11 +480,11 @@ type CExpr =
 
             | CVecLength(t,_) -> t
 
-
-
             | CAddressOf(t,_) -> t
             | CField(t,_,_) -> t
             | CItem(t,_,_) -> t
+
+            | CNewStruct(t,_) -> t
 
             | CDebugPrintf _ -> CType.CVoid
 
@@ -642,6 +644,10 @@ module CExpr =
                 used.AddType t
                 visit used target
                 visit used index
+
+            | CNewStruct(t, args) ->
+                used.AddType t
+                for a in args do visit used a
 
             | CDebugPrintf(fmt, values) ->
                 visit used fmt

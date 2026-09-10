@@ -99,95 +99,8 @@ module Compiler =
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module Constructors =
-        
-        let cache = System.Collections.Concurrent.ConcurrentDictionary<IBackend * Type, FunctionDefinition>()
-        let unionCache = System.Collections.Concurrent.ConcurrentDictionary<IBackend * Type, HashMap<UnionCaseInfo, FunctionDefinition>>()
-        let ctorCache = System.Collections.Concurrent.ConcurrentDictionary<IBackend * ConstructorInfo, FunctionDefinition>()
-
-        let tuple (b : IBackend) (t : Type) =
-            cache.GetOrAdd((b,t), fun (b,t) ->
-                let cName = 
-                    "new_" + typeName t
-
-                let cParameters = 
-                    FSharpType.GetTupleElements t
-                        |> Array.map (CType.ofType b)
-                        |> Array.mapi (fun i ct -> { name = sprintf "item%d" i; ctype = ct; modifier = CParameterModifier.In })
-
-                let cType =
-                    CType.ofType b t
-            
-                let cSignature =
-                    {
-                        name = cName
-                        parameters = cParameters
-                        returnType = cType
-                    }
-
-                let cDefinition =
-                    let res = { name = "res"; ctype = cType }
-                    let writeArgs = 
-                        cParameters
-                        |> Array.toList
-                        |> List.mapi (fun i p -> 
-                            let v = { name = sprintf "item%d" i; ctype = p.ctype }
-                            CWrite(CLField(p.ctype, CLVar res, sprintf "Item%d" i), CExpr.CVar v)
-                        )
-                    CSequential [
-                        yield CDeclare(res, None)
-                        yield! writeArgs
-                        yield CReturnValue (CExpr.CVar res)
-                    ]
-
-                CompiledFunction(cSignature, cDefinition)
-            )
-
-        let record (b : IBackend) (t : Type) =
-            cache.GetOrAdd((b,t), fun (b,t) ->
-                let cName = 
-                    "new_" + typeName t
-
-                let cFields =
-                    if FSharpType.IsRecord(t, true) then
-                        FSharpType.GetRecordFields(t, true)
-                        |> Array.map (fun pi -> struct {| Name = pi.Name; Type = pi.PropertyType |})
-                    else
-                        // Structs are constructed with a NewRecord expression as well, but they are not F# types
-                        t.GetFields(BindingFlags.Public ||| BindingFlags.NonPublic ||| BindingFlags.Instance)
-                        |> Array.map (fun fi -> struct {| Name = fi.Name; Type = fi.FieldType |})
-
-                let cParameters =
-                    cFields |> Array.map (fun pi ->
-                        { name = pi.Name; ctype = CType.ofType b pi.Type; modifier = CParameterModifier.In }
-                    )   
-                    
-                let cType =
-                    CType.ofType b t
-            
-                let cSignature =
-                    {
-                        name = cName
-                        parameters = cParameters
-                        returnType = cType
-                    }
-
-                let cDefinition =
-                    let res = { name = "res"; ctype = cType }
-                    let writeArgs = 
-                        Array.zip cFields cParameters
-                        |> Array.toList
-                        |> List.mapi (fun i (f, p) -> 
-                            let v = { name = p.name; ctype = p.ctype }
-                            CWrite(CLField(p.ctype, CLVar res, f.Name), CExpr.CVar v)
-                        )
-                    CSequential [
-                        yield CDeclare(res, None)
-                        yield! writeArgs
-                        yield CReturnValue (CExpr.CVar res)
-                    ]
-
-                CompiledFunction(cSignature, cDefinition)
-            )
+        let private unionCache = System.Collections.Concurrent.ConcurrentDictionary<IBackend * Type, HashMap<UnionCaseInfo, FunctionDefinition>>()
+        let private ctorCache = System.Collections.Concurrent.ConcurrentDictionary<IBackend * ConstructorInfo, FunctionDefinition option>()
 
         let union (b : IBackend) (t : Type) =
             unionCache.GetOrAdd((b,t), fun (b,t) ->
@@ -273,18 +186,22 @@ module Compiler =
 
             ctorCache.GetOrAdd((b, ctor), fun (_, ctor) ->
                 match ExprWorkardound.TryGetReflectedDefinition ctor with
-                    | Some e ->
-                        let args, body = preprocessCtor e
+                | Some e ->
+                    let args, body = preprocessCtor e
 
+                    match body with
+                    | NewRecord(_, args') when args' = (args |> List.map Expr.Var) ->
+                        None // Default GLSL constructor
+                    | _ ->
                         let suffix =
                             let names = args |> List.map (_.Type >> typeName) |> String.concat "_"
                             if names = "" then "" else $"_of_{names}"
 
                         let cName = "new_" + typeName ctor.DeclaringType + suffix
-                        ManagedFunction(cName, args, body)
-                    | None ->
-                        let args = ctor.GetParameters() |> Array.map (fun p -> $"{p.Name}: {p.ParameterType}") |> String.concat ", "
-                        failwith $"[FShade] cannot compile constructor without reflected definition {ctor.DeclaringType}({args})"
+                        Some <| ManagedFunction(cName, args, body)
+                | None ->
+                    let args = ctor.GetParameters() |> Array.map (fun p -> $"{p.Name}: {p.ParameterType}") |> String.concat ", "
+                    failwith $"[FShade] cannot compile constructor without reflected definition {ctor.DeclaringType}({args})"
             )
 
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -1592,16 +1509,14 @@ module Compiler =
                     return CItem(ct, arr, i)
 
                 | NewTuple(fields) ->
-                    let! s = State.get
-                    let! ctor = e.Type |> Constructors.tuple s.moduleState.backend |> CompilerState.useCtor (typeName e.Type)
-                    let! fields = fields |> List.mapS toCExprS |>> List.toArray
-                    return CCall(ctor, fields)
+                    let! ct = toCTypeS e.Type
+                    let! fields = fields |> List.mapS toCExprS
+                    return CNewStruct(ct, fields)
 
                 | NewRecord(t, fields) ->
-                    let! s = State.get
-                    let! ctor = t |> Constructors.record s.moduleState.backend |> CompilerState.useCtor (typeName t)
-                    let! fields = fields |> List.mapS toCExprS |>> List.toArray
-                    return CCall(ctor, fields)
+                    let! ct = toCTypeS t
+                    let! fields = fields |> List.mapS toCExprS
+                    return CNewStruct(ct, fields)
 
                 | NewUnionCase(ci, fields) ->
                     let! s = State.get
@@ -1614,17 +1529,21 @@ module Compiler =
                     let! s = State.get
                     let! args = args  |> List.mapS toCExprS
                     match Helpers.tryGetBuiltInCtor s.moduleState.backend ctor args with
-                        | Some b ->
-                            return b
-                        | None -> 
-                            let! ct = toCTypeS e.Type
-                            let! intrinsic = CompilerState.tryGetIntrinsic ctor
-                            match intrinsic with
-                                | Some i -> 
-                                    return CCallIntrinsic(ct, i, List.toArray args)
-                                | None -> 
-                                    let! ctor = ctor |> Constructors.custom s.moduleState.backend |> CompilerState.useGlobalFunction ctor
-                                    return CCall(ctor, List.toArray args)
+                    | Some b ->
+                        return b
+                    | None ->
+                        let! ct = toCTypeS e.Type
+                        let! intrinsic = CompilerState.tryGetIntrinsic ctor
+                        match intrinsic with
+                        | Some i ->
+                            return CCallIntrinsic(ct, i, List.toArray args)
+                        | None ->
+                            match ctor |> Constructors.custom s.moduleState.backend with
+                            | Some def ->
+                                let! ctor = CompilerState.useGlobalFunction ctor def
+                                return CCall(ctor, List.toArray args)
+                            | _ ->
+                                return CNewStruct(ct, args)
 
 
                 | UnionCaseTest(e, ci) ->

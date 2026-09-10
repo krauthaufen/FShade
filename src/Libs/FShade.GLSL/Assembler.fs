@@ -440,6 +440,8 @@ module SamplerSplitter =
                 CExpr.CField(typ, splitTexturesAndSamplers target, fieldName)
             | CExpr.CItem(typ, target, index) ->
                 CExpr.CItem(typ, splitTexturesAndSamplers target, splitTexturesAndSamplers index)
+            | CExpr.CNewStruct(typ, args) ->
+                CExpr.CNewStruct(typ, args |> List.map splitTexturesAndSamplers)
             | CExpr.CDebugPrintf(format, values) ->
                 let newValues = values |> Array.map splitTexturesAndSamplers
                 CExpr.CDebugPrintf(splitTexturesAndSamplers format, newValues)
@@ -1952,6 +1954,11 @@ module Assembler =
                                 return sprintf "%s[%s]" m col
                         | _ ->
                             return failwith "sadsadsad"
+
+                | CNewStruct(t, args) ->
+                    let! args = assembleExprsS ", " args
+                    let! t = assembleTypeS config.reverseMatrixLogic t
+                    return sprintf "%s(%s)" t.Name args
 
                 | CDebugPrintf(fmt, values) ->
                     do! AssemblerState.useExtension GLSLExtension.EXTDebugPrintf

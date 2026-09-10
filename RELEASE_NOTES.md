@@ -6,6 +6,7 @@
 - Enable full optimization pass for compute shaders
 - Fix handling of pass-by-reference arguments in dead-code elimination
 - Add full support for custom properties
+- Use built-in GLSL constructors for records, tuples, structs, and classes
 
 ### 5.7.17
 - Improve handling of functions with unit arguments
