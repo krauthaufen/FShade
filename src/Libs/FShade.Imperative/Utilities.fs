@@ -1090,8 +1090,21 @@ module ExprExtensions =
         | Pipe e                -> ValueSome e
         | LambdaApp e           -> ValueSome e
         | Ignore e              -> ValueSome e
-
         | _                     -> ValueNone
+
+    [<return: Struct>]
+    let rec (|ArrayExpression|_|) (e : Expr) =
+        match e with
+        | NewFixedArray(_, _, []) -> ValueNone
+        | NewFixedArray(cnt, et, args) -> ValueSome (et, cnt, args)
+        | NewArray(et, args) -> ValueSome (et, List.length args, args)
+        | Value(v, EnumerableOf et) when notNull v ->
+            let enumerable = v |> unbox<System.Collections.IEnumerable>
+            let values = System.Collections.Generic.List<Expr>()
+            let e = enumerable.GetEnumerator()
+            while e.MoveNext() do values.Add(Expr.Value(e.Current, et))
+            ValueSome (et, values.Count, CSharpList.toList values)
+        | _ -> ValueNone
 
     [<return: Struct>]
     let (|OptionalCoerce|_|) (e : Expr) =

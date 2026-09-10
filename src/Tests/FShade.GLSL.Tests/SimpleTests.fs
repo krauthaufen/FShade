@@ -1547,8 +1547,9 @@ let ``Simplify complex RHS expressions``() =
 
             let mutable y =
                 if v.id = 0 then
-                    let a = id v.c
-                    a.Z * a.W
+                    let mutable value = V3f.Zero
+                    value <- V3f.One
+                    value.X + value.Y
                 else
                    0.0f
 

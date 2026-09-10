@@ -1397,13 +1397,21 @@ module Compiler =
             }
         }
 
+    let asConstantS (e : Expr) =
+        state {
+            match e with
+            | ArrayExpression _ ->
+                let hash = Expr.ComputeHash e
+                return! CompilerState.useConstant hash e
+            | _ ->
+                return failwith $"[FShade] cannot compile constant: {e}"
+        }
+
     let rec asExternalS (e : Expr) =
         state {
             let mutable variables = HashMap.empty
             let mutable inputValues = HashMap.empty
-            let! globals = State.get |> State.map (fun s -> s.moduleState.globalParameters)
-
-
+            let! globals = State.get |> State.map _.moduleState.globalParameters
 
             let getVar (kind : ParameterKind) (name : string) (typ : Type) (idx : Option<Expr>) (slot : Option<ShaderSlot>) =
                 let key = (kind, name, typ, idx, slot)
@@ -1419,104 +1427,93 @@ module Compiler =
                         inputValues <- HashMap.add v key inputValues
                         v
 
-            let mutable usesGlobal = false
             let e = 
                 e.SubstituteReads (fun kind typ name idx slot ->
                     // Is the check in the global name set really necessary for uniforms?
                     // Since raytracing data is not in that set anyway, we never replace those reads
-                    if kind = ParameterKind.RaytracingData || (kind = ParameterKind.Uniform && Set.contains name globals) then 
-                        usesGlobal <- true
+                    if kind = ParameterKind.RaytracingData || (kind = ParameterKind.Uniform && Set.contains name globals) then
                         None
                     else
                         let v = getVar kind name typ idx slot
                         Some (Expr.Var v)
                 )
 
-            let free = e.GetFreeVars() |> HashSet.ofSeq
-            if not usesGlobal && HashSet.isEmpty free then
-                let hash = Expr.ComputeHash e
-                return! CompilerState.useConstant hash e
-            else
-                let free = 
+            let free =
+                e.GetFreeVars()
+                |> HashSet.ofSeq
+                |> HashSet.toArray
+                |> Array.sortBy (fun v ->
+                    match HashMap.tryFind v inputValues with
+                    | Some (_, n, _, _, _) -> 0, n
+                    | None -> 1, v.Name
+                )
+
+            let! oldState = State.get
+            let parameters, newState =
+                let parameters =
                     free
-                        |> HashSet.toArray
-                        |> Array.sortBy (fun v -> 
-                            match HashMap.tryFind v inputValues with
-                                | Some (_,n,_,_,_) -> 0, n
-                                | None -> 1, v.Name
-                            )
- 
-                    
-                let! oldState = State.get
-                let parameters, newState = 
-                    let parameters =
-                        free 
-                        |> Array.mapS (fun v ->
-                            state {
-                                let! v1 = toCVarS v
-                                return { name = v1.name; ctype = v1.ctype; modifier = (if v.IsMutable then CParameterModifier.ByRef else CParameterModifier.In) }
-                            }
-                        )   
-
-                    let mutable oldState =
-                        {
-                            nameIndices         = Map.empty
-                            variables           = Map.empty
-                            reservedNames       = oldState.reservedNames
-                            usedGlobalFunctions = HashSet.empty
-                            usedFunctions       = HashMap.empty
-                            usedConstants       = HashSet.empty
-                            usedGlobals         = HashSet.empty
-                            moduleState         = oldState.moduleState
-                        }
-                    parameters.Run(&oldState), oldState.moduleState 
-                do! State.modify (fun s -> { s with moduleState = newState })
-
-
-                let! args = 
-                    free |> Array.mapS (fun f ->
+                    |> Array.mapS (fun v ->
                         state {
-                            match HashMap.tryFind f inputValues with
-                                | Some (kind, n, t, idx, slot) ->
-                                    match kind with
-                                        | ParameterKind.Input | ParameterKind.Uniform | ParameterKind.RaytracingData ->
-                                            let expression = 
-                                                match idx with
-                                                    | Some idx -> Expr.ReadInput(kind, t, n, idx, slot)
-                                                    | None -> Expr.ReadInput(kind, t, n, slot)
-                                            let! e = toCExprS expression
-                                            return e
-                                        | _ ->
-                                            return failwithf "[FShade] cannot use output %A as closure in function" n
-                                    
-                                | None ->
-                                    let! v = toCVarS f
-                                    return CVar v
-
+                            let! v1 = toCVarS v
+                            return { name = v1.name; ctype = v1.ctype; modifier = (if v.IsMutable then CParameterModifier.ByRef else CParameterModifier.In) }
                         }
-                    ) 
-                    
+                    )
 
-                let! name = CompilerState.newGlobalName "helper"
-                let! returnType = toCTypeS e.Type
-
-                let signature =
+                let mutable oldState =
                     {
-                        name = name
-                        returnType = returnType
-                        parameters = parameters
+                        nameIndices         = Map.empty
+                        variables           = Map.empty
+                        reservedNames       = oldState.reservedNames
+                        usedGlobalFunctions = HashSet.empty
+                        usedFunctions       = HashMap.empty
+                        usedConstants       = HashSet.empty
+                        usedGlobals         = HashSet.empty
+                        moduleState         = oldState.moduleState
                     }
+                parameters.Run(&oldState), oldState.moduleState
 
-               
+            do! State.modify (fun s -> { s with moduleState = newState })
 
-                let definition = ManagedFunctionWithSignature(signature, e)
+            let! args =
+                free |> Array.mapS (fun f ->
+                    state {
+                        match HashMap.tryFind f inputValues with
+                            | Some (kind, n, t, idx, slot) ->
+                                match kind with
+                                    | ParameterKind.Input | ParameterKind.Uniform | ParameterKind.RaytracingData ->
+                                        let expression =
+                                            match idx with
+                                                | Some idx -> Expr.ReadInput(kind, t, n, idx, slot)
+                                                | None -> Expr.ReadInput(kind, t, n, slot)
+                                        let! e = toCExprS expression
+                                        return e
+                                    | _ ->
+                                        return failwithf "[FShade] cannot use output %A as closure in function" n
 
-                let! signature = 
-                    if HashMap.isEmpty inputValues then CompilerState.useGlobalFunction (e :> obj) definition
-                    else CompilerState.useLocalFunction (e :> obj) definition
+                            | None ->
+                                let! v = toCVarS f
+                                return CVar v
 
+                    }
+                )
 
-                return CCall(signature, args)
+            let! name = CompilerState.newGlobalName "helper"
+            let! returnType = toCTypeS e.Type
+
+            let signature =
+                {
+                    name = name
+                    returnType = returnType
+                    parameters = parameters
+                }
+
+            let definition = ManagedFunctionWithSignature(signature, e)
+
+            let! signature =
+                if HashMap.isEmpty inputValues then CompilerState.useGlobalFunction (e :> obj) definition
+                else CompilerState.useLocalFunction (e :> obj) definition
+
+            return CCall(signature, args)
         }
 
     and toCExprS (e : Expr) : State<_, CExpr> =
@@ -1528,13 +1525,15 @@ module Compiler =
                     return! toCExprS e
 
                 | NewFixedArray _
+                | NewArray _ ->
+                    return! asConstantS e
+
                 | AddressSet _
                 | DefaultValue _
                 | FieldSet _
                 | ForInteger _
                 | LetRecursive _
                 | Let _
-                | NewArray _
                 | PropertySet _
                 | Sequential _
                 | TryFinally _
@@ -1569,17 +1568,11 @@ module Compiler =
                 | Value(v, t) ->
                     let! ct = toCTypeS t
                     match CLiteral.tryCreate v with
-                        | Some literal -> 
-                            return CValue(ct, literal)
-
-                        | None ->
-                            match Helpers.tryDeconstructValue t v with
-                                | Some e -> 
-                                    return! toCExprS e
-
-                                | _ -> 
-                                    let! e = asExternalS e
-                                    return e
+                    | Some literal -> return CValue(ct, literal)
+                    | None ->
+                        match Helpers.tryDeconstructValue t v with
+                        | Some e -> return! toCExprS e
+                        | _ -> return! asConstantS e
 
                 | NewRef value ->
                     return! toCExprS value
@@ -1859,42 +1852,23 @@ module Compiler =
     let rec toCRExprS (e : Expr) =
         state {
             match e with
-                | ReducibleExpression(e) ->
-                    return! toCRExprS e
+            | ReducibleExpression e ->
+                return! toCRExprS e
 
-                | NewFixedArray(cnt, et, args) ->
-                    let! ct = toCTypeS et
-                    let! args = args |> List.mapS toCExprS
-                    match args with
-                        | [] -> return None
-                        | args -> return CRArray(CArray(ct, cnt), args) |> Some
+            | ArrayExpression(et, cnt, args) ->
+                let! ct = toCTypeS et
+                let! args = args |> List.mapS toCExprS
+                return CRArray(CArray(ct, cnt), args) |> Some
 
-                | NewArray(et, args) ->
-                    let! ct = toCTypeS et
-                    let cnt = List.length args
-                    let! args = args |> List.mapS toCExprS
-                    return CRArray(CArray(ct, cnt), args) |> Some
+            | Value(null, _) ->
+                return None
 
+            | DefaultValue t ->
+                return None
 
-                | Value(null, _) ->
-                    return None
-
-                | Value(v, EnumerableOf et) ->
-                    let! ct = toCTypeS et
-                    let enumerable = v |> unbox<System.Collections.IEnumerable>
-                    let values = System.Collections.Generic.List<Expr>()
-                    let e = enumerable.GetEnumerator()
-                    while e.MoveNext() do
-                        values.Add(Expr.Value(e.Current, et))
-                    
-                    return! Expr.NewFixedArray(et, CSharpList.toList values) |> toCRExprS
-
-                | DefaultValue t ->
-                    return None
-
-                | _ ->
-                    let! res = e |> toCExprS
-                    return CRExpr.ofExpr res |> Some
+            | _ ->
+                let! res = e |> toCExprS
+                return CRExpr.ofExpr res |> Some
         }
 
     [<return: Struct>]
@@ -1954,7 +1928,7 @@ module Compiler =
                         | None -> return failwith "[FShade] refs can only by variables"
 
                 | ForEach(v, seq, body) ->
-                    let! e = asExternalS seq
+                    let! e = asConstantS seq
 
                     match e.ctype with
                         | CArray(et, len) ->
