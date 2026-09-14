@@ -19,6 +19,31 @@ let sampler1 =
         addressV WrapMode.Wrap
     }
 
+[<LocalSize(X = 8, Y = 4, Z = 2)>]
+let shaderNop () =
+    compute {
+        ()
+    }
+
+[<Test>]
+let ``Local size``() =
+    let localSize = V3i(8, 4, 2)
+    let shader = ComputeShader.ofFunction V3i.MaxValue shaderNop
+
+    shader.csLocalSize |> should equal localSize
+
+    let glsl =
+        shader
+        |> ComputeShader.toModule
+        |> ModuleCompiler.compileGLSLVulkan
+
+    glsl.iface.shaders.[ShaderSlot.Compute].shaderDecorations
+    |> List.exists (function
+        GLSL.GLSLLocalSize s -> s = localSize
+        | _ -> false
+    )
+    |> should be True
+
 [<Test>]
 let ``Includes samplerInfo``() =
     let shader (v : V4f[]) =

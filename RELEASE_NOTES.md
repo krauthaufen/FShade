@@ -7,6 +7,7 @@
 - Fix handling of pass-by-reference arguments in dead-code elimination
 - Add full support for custom properties
 - Use built-in GLSL constructors for records, tuples, structs, and classes
+- Fix issue with missing compute shader local size information for Debug builds with .NET SDK 10.0.401
 
 ### 5.7.17
 - Improve handling of functions with unit arguments

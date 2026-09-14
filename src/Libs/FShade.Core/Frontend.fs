@@ -1,6 +1,7 @@
 ﻿namespace FShade
 
 open System
+open System.Diagnostics
 open System.Reflection
 
 open Aardvark.Base
@@ -495,11 +496,24 @@ module ShaderBuilders =
         member x.Quote() = ()
 
         member inline x.Run(e : Expr<'a>) : Expr<'a> =
-            let m = MethodBase.GetCurrentMethod()
-            if isNull m then
+            try
+                let mb = MethodBase.GetCurrentMethod()
+                if isNull mb then
+                    Log.warn "[FShade] Cannot determine function of compute shader"
+                    e
+                else
+                    // .NET SDK 10.0.401 compiler does not inline for Debug builds
+                    let mb =
+                        if mb.DeclaringType = typeof<ComputeBuilder> && mb.Name = "Run" then
+                            let frame = StackFrame(1, false)
+                            frame.GetMethod()
+                        else
+                            mb
+
+                    e.WithAttributes(Expr.NewTuple [ Expr.Value "Method"; Expr.Value mb] :: e.CustomAttributes) |> Expr.Cast
+            with exn ->
+                Log.error "[FShade] Failed to determine function of compute shader: %A" exn
                 e
-            else
-                e.WithAttributes(Expr.NewTuple [ Expr.Value "Method"; Expr.Value m] :: e.CustomAttributes) |> Expr.Cast
 
         interface IShaderBuilder with
             member x.ShaderStage = ShaderStage.Compute
