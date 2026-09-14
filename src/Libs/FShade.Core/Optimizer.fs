@@ -796,9 +796,12 @@ module Optimizer =
                         return Expr.FieldSet(t, f, value)
 
                     | PropertySet(Some t, pi, idx, value) ->
-                        match t.Type with
-                        | ImageType _ -> ()
-                        | _ -> Log.warn "[FShade] found PropertySet on unknown expression: %A" t
+                        match t with
+                        | ReadInputOrRaytracingData(ParameterKind.Uniform, _, _, _) -> ()
+                        | _ ->
+                            match t.Type with
+                            | ImageType _ -> ()
+                            | _ -> Log.warn "[FShade] found PropertySet on unknown expression: %A" t
 
                         let! idx = idx |> List.rev |> List.mapS eliminateDeadCodeS |> State.map List.rev
                         let! value = eliminateDeadCodeS value
