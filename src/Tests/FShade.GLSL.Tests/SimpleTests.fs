@@ -1577,3 +1577,50 @@ let ``Simplify complex RHS expressions``() =
         }
 
     GLSL.shouldCompileAndContainRegexWithCount [ Effect.ofFunction frag ] [ "helper", 0 ]
+
+[<Test>]
+let ``Do not emit return statement for compute, geometry, raygen, and intersection shaders``() =
+    Setup.Run()
+
+    let gs (t : Triangle<Vertex>) =
+        triangle {
+            if t.P0.primId = 0 then
+                yield t.P0
+                yield t.P1
+                yield t.P2
+            let _ = uniform.Test.[t.P0.primId]
+            ()
+        }
+
+    let cs (data: int[]) =
+        compute {
+            let _ = data.[getGlobalId().X]
+            ()
+        }
+
+    let rgen (input: RayGenerationInput) =
+        raygen {
+            let _ = uniform.Test.[input.work.id.X]
+            ()
+        }
+
+    let rint (_: RayIntersectionInput) =
+        intersection {
+            let _ = Intersection.Report(0.5f, RayHitKind.FrontFacingTriangle)
+            ()
+        }
+
+    let rtx =
+        let defaultHitGroup =
+            hitgroup {
+                intersection rint
+            }
+
+        raytracingEffect {
+            raygen rgen
+            hitgroup "Main" defaultHitGroup
+        }
+
+    GLSL.shouldCompile [ Effect.ofFunction gs ]
+    GLSL.shouldCompileCompute (ComputeShader.ofFunction V3i.MaxValue cs)
+    GLSL.shouldCompileRaytracing rtx

@@ -3572,6 +3572,12 @@ module Shader =
                 ]
         ]
 
+    let private ignoreReturnValue (stage: ShaderStage) =
+        match stage with
+        | ShaderStage.Geometry | ShaderStage.Compute
+        | ShaderStage.RayGeneration | ShaderStage.Intersection -> true
+        | _ -> false
+
     let private typeConversions =
         LookupTable.tryLookup [
             // Float32
@@ -3914,6 +3920,12 @@ module Shader =
                 |> Optimizer.inlining isSideEffect
                 |> Optimizer.liftInputs
                 |> Preprocessor.preprocess V3i.Zero
+
+        let newBody =
+            if ignoreReturnValue shader.shaderStage && newBody.Type <> typeof<unit> then
+                Expr.Ignore newBody
+            else
+                newBody
 
         let newOutputVertices, newOutputPrimitives =
             match shader.shaderStage with
