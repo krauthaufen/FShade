@@ -1,3 +1,4 @@
+### 5.7.18
 - Add static class `Atomic` containing atomic integer operation intrinsics
 - Add support for fixed-size arrays in storage buffers
 - Fix computation of storage buffer access (field and property access, access in utility functions)
