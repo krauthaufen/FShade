@@ -2547,7 +2547,6 @@ module Preprocessor =
 
                 return! preprocessNormalS real
 
-                    
             | BuilderYield(b, _, value) ->
                 do! State.setBuilder b
                 let! value = preprocessNormalS value
@@ -2555,13 +2554,8 @@ module Preprocessor =
                     if b.Type = typeof<FragmentBuilder> then Intrinsics.Color
                     else Intrinsics.Position
 
-                let! values = getOutputValues defaultSem value
-
-                return 
-                    Expr.Sequential(
-                        Expr.WriteOutputs values,
-                        <@ emitVertex() @>
-                    )
+                let! write = writeOutputValuesS defaultSem value
+                return Expr.Sequential(write, <@ emitVertex() @>)
 
             | BuilderReturn(b, _, value) ->
                 do! State.setBuilder b
@@ -2570,15 +2564,13 @@ module Preprocessor =
                     if b.Type = typeof<FragmentBuilder> then Intrinsics.Color
                     else Intrinsics.Position
 
-                let! values = getOutputValues defaultSem value
-
-                return Expr.WriteOutputs values
+                return! writeOutputValuesS defaultSem value
 
             | Sequential(l, r) ->
                 let! l = preprocessNormalS l
                 let! r = preprocessNormalS r
                 return Expr.Seq [l;r]
-                    
+
             | IfThenElse(cond, i, e) ->
                 let! cond = preprocessNormalS cond
                 let! i = preprocessNormalS i
@@ -2731,50 +2723,39 @@ module Preprocessor =
         | TypeMeta.Patterns.Int32 | TypeMeta.Patterns.UInt32 -> ValueSome ()
         | _ -> ValueNone
 
-    and getOutputValues (sem : string) (value : Expr) : Preprocess<list<string * Option<Expr> * Expr>> =
+    and private writeOutputValuesS (defaultSem : string) (value : Expr) : Preprocess<Expr> =
         state {
             match value.Type with
             | PrimitiveOutputType
             | TypeMeta.Patterns.ColorOf (_, PrimitiveOutputType)
             | TypeMeta.Patterns.VectorOf (_, PrimitiveOutputType) ->
-                let! value = preprocessS value
-                do! State.writeOutput sem { paramType = value.Type; paramInterpolation = InterpolationMode.Default }
-                return [sem, None, value]
+                do! State.writeOutput defaultSem { paramType = value.Type; paramInterpolation = InterpolationMode.Default }
+                return Expr.WriteOutputs [defaultSem, None, value]
 
             | _ when FSharpType.IsRecord(value.Type, true) ->
                 let fields = FSharpType.GetRecordFields(value.Type, true) |> Array.toList
 
-                let! values = 
-                    match value with
-                    | NewRecord(_,args) ->
-                        List.zip fields args |> List.mapS (fun (f,v) ->
-                            state {
-                                let sem = f.Semantic
-                                let i = f.Interpolation
-                                let p = { paramType = f.PropertyType; paramInterpolation = i }
-                                do! State.writeOutput sem p
+                let! sems =
+                    fields |> List.mapS (fun f ->
+                        state {
+                            let sem = f.Semantic
+                            let p = { paramType = f.PropertyType; paramInterpolation = f.Interpolation }
+                            do! State.writeOutput sem p
+                            if sem = Intrinsics.Depth then do! State.setDepthWriteMode f.DepthWriteMode
+                            return sem
+                        }
+                    )
 
-                                if sem = "Depth" then
-                                    do! State.setDepthWriteMode f.DepthWriteMode
+                match value with
+                | NewRecord(_, args) ->
+                    let values = (sems, args) ||> List.map2 (fun s v -> s, None, v)
+                    return Expr.WriteOutputs values
 
-                                let! real = preprocessS v
-                                return sem, None, real
-                            }
-                        )
-                    | _ -> 
-                        fields |> List.mapS (fun f ->
-                            state {
-                                let sem = f.Semantic
-                                let i = f.Interpolation
-                                let p = { paramType = f.PropertyType; paramInterpolation = i }
-                                do! State.writeOutput sem p
-
-                                let! real = preprocessS (Expr.PropertyGet(value, f))
-                                return sem, None, real
-                            }
-                        )
-
-                return values
+                | _ ->
+                    let tmp = Var("tmp", value.Type)
+                    let! args = fields |> List.mapS (fun f -> preprocessNormalS <| Expr.PropertyGet(Expr.Var tmp, f))
+                    let values = (sems, args) ||> List.map2 (fun s v -> s, None, v)
+                    return Expr.Let(tmp, value, Expr.WriteOutputs values)
 
             | _ ->
                 return failwithf "[FShade] invalid vertex type: %A" value.Type

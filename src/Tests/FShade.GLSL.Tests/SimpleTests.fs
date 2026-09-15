@@ -603,10 +603,29 @@ type Fragment =
         [<Depth(DepthWriteMode.OnlyLess)>] d : float32
     }
 
+type DepthFragment =
+    {
+        [<Depth(DepthWriteMode.OnlyLess)>] d : float32
+    }
+
+[<ReflectedDefinition>]
+let makeFragment d =
+    {
+        c = V4f.IIII
+        d = d
+    }
+
+[<ReflectedDefinition>]
+let makeDepthFragment d =
+    {
+        d = d
+    }
+
+[<Test>]
 let ``Depth Only Less``() =
     Setup.Run()
 
-    let fraggy (v : Vertex) =
+    let fs1 (v : Vertex) =
         fragment {
             return {
                 c = V4f.IIII
@@ -614,7 +633,21 @@ let ``Depth Only Less``() =
             }
         }
 
-    GLSL.shouldCompile [ Effect.ofFunction (fraggy) ]
+    let fs2 (v : Vertex) =
+        fragment {
+            return makeFragment v.pos.Z
+        }
+
+    let fs3 (v : Vertex) =
+        fragment {
+            return makeDepthFragment v.pos.Z
+        }
+
+    let expected = "layout\(depth_less\) out float gl_FragDepth;"
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction fs1 ] [ expected; "gl_FragDepth = 0\.5;" ]
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction fs2 ] [ expected; "gl_FragDepth = tmp.d;" ]
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction fs3 ] [ expected; "gl_FragDepth = .+_makeDepthFragment_.+\(fs_Positions.z\)\.d;" ]
+
 [<ReflectedDefinition>] [<Inline>]
 let createTuple(x : V3f) : (Arr<N<5>,V3f> * int) =
     let arr = Arr<N<5>, V3f>()
@@ -626,6 +659,7 @@ let createTuple(x : V3f) : (Arr<N<5>,V3f> * int) =
 
     (arr, cnt)
 
+[<Test>]
 let ``Tuple Inline`` () =
     Setup.Run()
 
