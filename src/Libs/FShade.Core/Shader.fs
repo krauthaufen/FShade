@@ -1049,17 +1049,17 @@ module Preprocessor =
         let mergeInner (inner : State) =
             State.modify (fun s ->
                 { s with
-                    payloads            = inner.payloads
-                    payloadIn           = inner.payloadIn
-                    callableData        = inner.callableData
-                    callableDataIn      = inner.callableDataIn
-                    hitAttribute        = inner.hitAttribute
-                    hitObjectAttributes = inner.hitObjectAttributes
-                    uniforms            = inner.uniforms
-                    rayTypes            = inner.rayTypes
-                    missShaders         = inner.missShaders
-                    callableShaders     = inner.callableShaders
-                    storageBufferAccess = inner.storageBufferAccess }
+                    payloads            = HashMap.union s.payloads inner.payloads
+                    payloadIn           = Option.orElse s.payloadIn inner.payloadIn
+                    callableData        = HashMap.union s.callableData inner.callableData
+                    callableDataIn      = Option.orElse s.callableDataIn inner.callableDataIn
+                    hitAttribute        = Option.orElse s.hitAttribute inner.hitAttribute
+                    hitObjectAttributes = HashMap.union s.hitObjectAttributes inner.hitObjectAttributes
+                    uniforms            = Map.union s.uniforms inner.uniforms
+                    rayTypes            = Set.union s.rayTypes inner.rayTypes
+                    missShaders         = Set.union s.missShaders inner.missShaders
+                    callableShaders     = Set.union s.callableShaders inner.callableShaders
+                    storageBufferAccess = Map.union s.storageBufferAccess inner.storageBufferAccess }
             )
 
         let ofInputTypes (types : List<Type>) =
@@ -2611,22 +2611,19 @@ module Preprocessor =
                 match UtilityFunction.tryCreate original with
                 | Some utility -> return! preprocessNormalS <| Expr.CallFunction(utility, Option.toList t @ args)
                 | _ ->
-                    let! args = args |> List.mapS preprocessNormalS
                     let! t = t |> Option.mapS preprocessNormalS
+                    let! args = args |> List.mapS preprocessNormalS
 
                     match t with
                     | Some t -> return Expr.CallWithWitnesses(t, original, m, ws, args)
                     | None -> return Expr.CallWithWitnesses(original, m, ws, args)
 
             | Call(t, mi, args) ->
-                let! args = args |> List.mapS preprocessNormalS
-                let! t = t |> Option.mapS preprocessNormalS
-
                 match UtilityFunction.tryCreate mi with
                 | Some utility -> return! preprocessNormalS <| Expr.CallFunction(utility, Option.toList t @ args)
                 | _ ->
-                    let! args = args |> List.mapS preprocessNormalS
                     let! t = t |> Option.mapS preprocessNormalS
+                    let! args = args |> List.mapS preprocessNormalS
 
                     match t with
                     | Some t -> return Expr.Call(t, mi, args)
@@ -3954,9 +3951,13 @@ module Shader =
                 | _ ->
                     shader.shaderOutputVertices, shader.shaderOutputPrimitives
 
+        // Do not use uniform information from the optimization pass, will not be accurate since uniforms
+        // are replaced by Expr.ReadInput lacking a UniformValue. Only check for its existence.
+        // The same applies for inputs regarding the InterpolationMode; this assumes that the optimization pass
+        // cannot result in the usage of new uniforms or inputs.
         { shader with
-            shaderInputs = state.inputs |> Map.map (fun name desc -> match Map.tryFind name shader.shaderInputs with | Some od when od.paramType = desc.paramType -> od | _ -> desc) //shader.shaderInputs |> Map.filter (fun n _ -> state.inputs.ContainsKey n)
-            shaderUniforms = state.uniforms |> Map.map (fun name u -> match Map.tryFind name shader.shaderUniforms with Some ou -> ou | _ -> u) //shader.shaderUniforms |> Map.filter (fun n _ -> state.uniforms.ContainsKey n)
+            shaderInputs = shader.shaderInputs |> Map.filter (fun n _ -> state.inputs.ContainsKey n)
+            shaderUniforms = shader.shaderUniforms |> Map.filter (fun n _ -> state.uniforms.ContainsKey n)
             shaderOutputVertices = newOutputVertices
             shaderOutputPrimitives = newOutputPrimitives
             shaderBody = newBody

@@ -1,3 +1,5 @@
+- Fix utility function calls erasing uniform information in some edge cases
+
 ### 5.7.18
 - Add static class `Atomic` containing atomic integer operation intrinsics
 - Add support for fixed-size arrays in storage buffers

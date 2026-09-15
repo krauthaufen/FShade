@@ -1624,3 +1624,38 @@ let ``Do not emit return statement for compute, geometry, raygen, and intersecti
     GLSL.shouldCompile [ Effect.ofFunction gs ]
     GLSL.shouldCompileCompute (ComputeShader.ofFunction V3i.MaxValue cs)
     GLSL.shouldCompileRaytracing rtx
+
+[<Test>]
+let ``Sampler information is not destroyed by saved utility function state`` () =
+    Setup.Run()
+
+    let sammy =
+        sampler2d {
+            texture uniform?Texture
+            filter Filter.MinMagPoint
+            addressU WrapMode.Wrap
+            addressV WrapMode.Wrap
+        }
+
+    let fs (v : Vertex) =
+        fragment {
+            return sammy.Sample(id V2f.Zero)
+        }
+
+    let e = Effect.ofFunction fs
+
+    let module_ =
+        e |> Effect.toModule {
+            depthRange = Range1f(-1.0f, 1.0f)
+            flipHandedness = false;
+            lastStage = ShaderStage.Fragment;
+            outputs = Map.ofList ["Colors", (typeof<V4f>, 0)]
+        }
+
+    GLSL.shouldCompile [ e ]
+
+    let glsl = ModuleCompiler.compileGLSL glsl430 module_
+
+    glsl.iface.samplers.["sammy"].samplerTextures
+    |> List.exists (fst >> (=) "Texture")
+    |> should be True
