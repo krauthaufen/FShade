@@ -63,15 +63,15 @@ let ``Storage buffer read and write``() =
         }
 
     let expected = [
-        "^readonly buffer (cs_)?[fF]loatInputBuffer {"
-        "^writeonly buffer (cs_)?[fF]loatOutputBuffer {"
-        "^buffer (cs_)?[fF]loatScratchBuffer {"
-        "^readonly buffer (cs_)?[vV]3fInputBuffer {"
-        "^writeonly buffer (cs_)?[vV]3fOutputBuffer {"
-        "^buffer (cs_)?[vV]3fScratchBuffer {"
-        "^readonly buffer (cs_)?[sS]tructInputBuffer {"
-        "^writeonly buffer (cs_)?[sS]tructOutputBuffer {"
-        "^buffer (cs_)?[sS]tructScratchBuffer {"
+        "^readonly buffer [fF]loatInputBuffer {"
+        "^writeonly buffer [fF]loatOutputBuffer {"
+        "^buffer [fF]loatScratchBuffer {"
+        "^readonly buffer [vV]3fInputBuffer {"
+        "^writeonly buffer [vV]3fOutputBuffer {"
+        "^buffer [vV]3fScratchBuffer {"
+        "^readonly buffer [sS]tructInputBuffer {"
+        "^writeonly buffer [sS]tructOutputBuffer {"
+        "^buffer [sS]tructScratchBuffer {"
     ]
 
     GLSL.shouldCompileAndContainRegex [Effect.ofFunction fs] expected
@@ -99,9 +99,9 @@ let ``Storage buffer as by-ref argument of intrinsic``() =
         }
 
     let expected = [
-        "^buffer (cs_)?[iI]ntScratchBuffer {"
-        "^buffer (cs_)?[vV]3iScratchBuffer {"
-        "^buffer (cs_)?[sS]tructScratchBuffer {"
+        "^buffer [iI]ntScratchBuffer {"
+        "^buffer [vV]3iScratchBuffer {"
+        "^buffer [sS]tructScratchBuffer {"
         "atomicAdd"
     ]
 
@@ -133,9 +133,9 @@ let ``Storage buffer read and write in utility function``() =
         }
 
     let expected = [
-        "^readonly buffer (cs_)?[iI]ntInputBuffer {"
-        "^writeonly buffer (cs_)?[vV]3iOutputBuffer {"
-        "^buffer (cs_)?[sS]tructScratchBuffer {"
+        "^readonly buffer [iI]ntInputBuffer {"
+        "^writeonly buffer [vV]3iOutputBuffer {"
+        "^buffer [sS]tructScratchBuffer {"
         "doSomething"
         "doSomethingInner"
     ]

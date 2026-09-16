@@ -1782,11 +1782,11 @@ module Preprocessor =
     let rec preprocessComputeS (e : Expr) : Preprocess<Expr> =
         state {
             match e with
-                | PropertyGet(Some (ValueWithName(v, t, name)), prop, []) when t.IsArray && (prop.Name = "Length" || prop.Name = "LongLength") ->
-                    return Expr.ReadInput(ParameterKind.Uniform, typeof<int>, "cs_" + name + "_length")
-
-                | ValueWithName(v,t,name) ->
-                    return Expr.ReadInput(ParameterKind.Uniform, t, "cs_" + name)
+                | ValueWithName(_, t, name) ->
+                    // TODO: Drop the cs_ prefix entirely with the next major version
+                    // This behavior exists only for backwards compatibility
+                    let name = if e.Type.IsArray then name else $"cs_{name}"
+                    return Expr.ReadInput(ParameterKind.Uniform, t, name)
 
                 | PropertyGet(None, pi, []) when pi.Name = "LocalSize" ->
                     let! s = State.get
@@ -2453,7 +2453,6 @@ module Preprocessor =
                 let! guard = preprocessNormalS guard
                 let! body = preprocessNormalS body
                 return Expr.WhileLoop(guard, body)
-                    
 
             | Uniform u ->
                 do! u |> State.readUniform true

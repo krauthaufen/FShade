@@ -1102,7 +1102,7 @@ let ``Atomics on Argument-Storage``() =
         compute {
             atomicAdd &&a.[0] 1 |> ignore
         }
-    GLSL.shouldCompileComputeAndContainRegex (ComputeShader.ofFunction (V3i(1024, 1024, 1024)) shader) [@"^buffer cs_aBuffer"]
+    GLSL.shouldCompileComputeAndContainRegex (ComputeShader.ofFunction (V3i(1024, 1024, 1024)) shader) [@"^buffer aBuffer"]
 
 [<Test>]
 let ``Atomics on Uniform-Storage``() =
@@ -1122,7 +1122,7 @@ let ``Write on Argument-Storage``() =
         compute {
             a.[0] <- 1
         }
-    GLSL.shouldCompileComputeAndContainRegex (ComputeShader.ofFunction (V3i(1024, 1024, 1024)) shader) [@"^writeonly buffer cs_aBuffer"]
+    GLSL.shouldCompileComputeAndContainRegex (ComputeShader.ofFunction (V3i(1024, 1024, 1024)) shader) [@"^writeonly buffer aBuffer"]
 
 [<Test>]
 let ``Write on Uniform-Storage``() =
@@ -1142,7 +1142,7 @@ let ``Read on Argument-Storage``() =
         compute {
             x.[0] <- a.[0]
         }
-    GLSL.shouldCompileComputeAndContainRegex (ComputeShader.ofFunction (V3i(1024, 1024, 1024)) shader) [@"^readonly buffer cs_aBuffer"]
+    GLSL.shouldCompileComputeAndContainRegex (ComputeShader.ofFunction (V3i(1024, 1024, 1024)) shader) [@"^readonly buffer aBuffer"]
 
 [<Test>]
 let ``Read on Uniform-Storage``() =

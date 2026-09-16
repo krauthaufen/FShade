@@ -84,3 +84,34 @@ let ``Spliced expressions``() =
         }
 
     GLSL.shouldCompileCompute (ComputeShader.ofFunction (V3i(128)) (shader <@ min @>))
+
+[<Test>]
+let ``Arguments``() =
+    Setup.Run()
+
+    let shader (fixedData: Arr<N<2>, int>) (dynamicData: float32[]) (simpleValue: bool) (imageData: IntImage1dArray<Formats.rgba8i>) =
+        compute {
+            let id = getGlobalId()
+            let x = float32 fixedData.[0]
+            let y = dynamicData.[0]
+            let z = if simpleValue then 0f else 1f
+            let w = float32 <| imageData.Load(id.X, id.Y).X
+            uniform.Output.[id.X] <- V4f(x, y, z, w)
+        }
+
+    let glsl, res = GLSL.compileCompute (ComputeShader.ofFunction (V3i(128)) shader)
+    GLSL.printResults None res glsl
+
+    // Only arguments that are not storage buffers are prefixed with cs_
+    // This behavior is ridiculous and should be changed with a major version change
+    // Best thing would be to drop the prefix entirely...
+    glsl.iface.images |> MapExt.containsKey "cs_imageData" |> should be True
+    glsl.iface.storageBuffers |> MapExt.containsKey "dynamicData" |> should be True
+    glsl.iface.storageBuffers |> MapExt.containsKey "Output" |> should be True
+
+    match glsl.iface.uniformBuffers |> MapExt.tryFind "Arguments" with
+    | Some buf ->
+        buf.ubFields |> List.exists (fun f -> f.ufName = "cs_fixedData") |> should be True
+        buf.ubFields |> List.exists (fun f -> f.ufName = "cs_simpleValue") |> should be True
+    | _ ->
+        failwith "Does not contain Arguments buffer"

@@ -1,6 +1,7 @@
 - Fix utility function calls erasing uniform information in some edge cases
 - Fix depth write ignoring `DepthWriteMode` when returning a non-expression vertex record value
 - Avoid duplicate evaluation of complex vertex record expressions when writing output values
+- Remove `cs_` prefix for storage buffers declared as compute arguments
 
 ### 5.7.18
 - Add static class `Atomic` containing atomic integer operation intrinsics

@@ -129,7 +129,7 @@ module GLSL =
     let compile (e : list<Effect>) =
         compile' glsl430 e
 
-    let private printResults (rtx: RaytracingEffect option) (res : List<ShaderStage * CompilerResult>) (glsl : GLSLShader) =
+    let printResults (rtx: RaytracingEffect option) (res : List<ShaderStage * CompilerResult>) (glsl : GLSLShader) =
         Console.WriteLine("====================== CODE ======================")
         Console.WriteLine(String.withLineNumbers glsl.code)
         Console.WriteLine("====================== CODE ======================")

@@ -113,12 +113,7 @@ module ComputeShader =
                         bodyOpt
 
                 let state =
-                    let filter a b = a |> Map.filter (fun n _ -> Map.containsKey n b)
-
-                    { state with
-                        inputs = filter state.inputs stateOpt.inputs
-                        outputs = filter state.outputs stateOpt.outputs
-                        uniforms = filter state.uniforms stateOpt.uniforms }
+                    { state with uniforms = state.uniforms |> Map.filter (fun n _ -> stateOpt.uniforms.ContainsKey n) }
 
                 let mutable buffers = Map.empty<string, ComputeBuffer2>
                 let mutable images = Map.empty
@@ -161,29 +156,17 @@ module ComputeShader =
                         | None ->
                             textureNames <- Map.add (name, index) textureName textureNames
 
-                for name, p in Map.toSeq state.inputs do
-                    match p.paramType with
-                        | ImageType(fmt, dim, isArr, isMS, valueType) ->
-                            addImage fmt name p.paramType dim isArr isMS valueType
-                        | t ->
-                            match Map.tryFind name state.storageBufferAccess with
-                            | Some access ->
-                                addBuffer name t access
-                            | None ->
-                                uniforms <- Map.add name { uniformType = t; uniformName = name; uniformValue = UniformValue.Attribute(uniform?Arguments, name) } uniforms
-
-                for name, p in Map.toSeq state.outputs do
-                    match Map.tryFind name state.storageBufferAccess with
-                    | Some access ->
-                        addBuffer name p.paramType access
-                    | None ->
-                        Log.warn "unknown output: %A" name
-                        addBuffer name p.paramType StorageAccess.Write
+                let isArgument =
+                    let args = meth.GetParameters() |> Array.map (fun p -> p.Name, p.ParameterType) |> Map.ofArray
+                    fun name typ ->
+                        match args |> Map.tryFindV name with
+                        | ValueSome t -> t = typ
+                        | _ -> false
 
                 for name, p in Map.toSeq state.uniforms do
-                    let isArgument, name = 
-                        if name.StartsWith "cs_" then true, name
-                        else false, name
+                    let isArgument =
+                        isArgument name p.uniformType ||
+                        (name.StartsWith "cs_" && isArgument (name.Substring(3)) p.uniformType)
 
                     match p.uniformType, p.uniformValue with
                     | ImageType(fmt, dim, isArr, isMS, valueType), _ ->
