@@ -121,18 +121,20 @@ let ``[While] counting and changing used/unused values``() =
 
 
 [<Test>]
-let ``[This] mutable this preseved``() =
+let ``[This] mutable this preserved if modified``() =
     let v = V2f(1.0f, 1.0f)
     let input =
         <@
             let mutable a = v
             let b = a.Dot(a)
+            a.X <- 1f
             keep a
         @>
 
     let expected =
         <@
             let mutable a = v
+            a.X <- 1f
             keep a
         @>
 
@@ -171,18 +173,91 @@ let ``[Let] immutable binding inlined``() =
 
     input |> Opt.run |> should exprEqual expected
 
+[<ReflectedDefinition>]
+let idRef (v: int ref) =
+    v
+
 [<Test>]
-let ``[Let] mutable binding preserved``() =
+let ``[Let] mutable binding inlined``() =
     let input =
         <@
-            let mutable a = 1
+            fun x ->
+                let mutable a = x
+                let b = idRef &&a
+                keep b
+        @>
+
+    let expected =
+        <@
+            fun x ->
+                let b = idRef &&x
+                keep b
+        @>
+
+    input |> Opt.run |> should exprEqual expected
+
+[<Test>]
+let ``[Let] mutable binding preserved if modified``() =
+    let input =
+        <@
+            let mutable a = 0f
+            a <- 1f
             keep a
         @>
 
     let expected =
         <@
-            let mutable a = 1
+            let mutable a = 0f
+            a <- 1f
             keep a
+        @>
+
+    input |> Opt.run |> should exprEqual expected
+
+[<ReflectedDefinition>]
+let dec (x : int ref) =
+    x.Value <- x.Value - 1
+    x
+
+[<Test>]
+let ``[Let] mutable binding preserved if modified inside utility function``() =
+    let input =
+        <@
+            fun (x : V3i) ->
+                let mutable a = x
+                let b = dec &&a.X
+                keep b
+        @>
+
+    let expected =
+        <@
+            fun (x : V3i) ->
+                let mutable a = x
+                let b = dec &&a.X
+                keep b
+        @>
+
+    input |> Opt.run |> should exprEqual expected
+
+[<ReflectedDefinition; Inline>]
+let returnTup () =
+    let mutable a = 1
+    a <- 0
+    a, a
+
+[<Test>]
+let ``[Let] result tuple of inlined utility function inlined``() =
+    let input =
+        <@
+            let a, b = returnTup ()
+            keep (a + b)
+        @>
+
+    let expected =
+        <@
+            let mutable a = 1
+            a <- 0
+            keep (a + a)
         @>
 
     input |> Opt.run |> should exprEqual expected
@@ -199,12 +274,10 @@ let ``[Hoist] lifting bindings``() =
 
     let expected =
         <@
-            let mutable b = 10
-            let a = b
-            keep a
+            keep 10
         @>
     input |> Opt.run |> should exprEqual expected
-    
+
 [<Test>]
 let ``[Hoist] preserving order``() =
     let input =
@@ -225,12 +298,10 @@ let ``[Hoist] preserving order``() =
             b <- b + 1.0
             b <- b + 2.0
             if b > 10.0 then keep b
-            let a =
-                b * b
-            keep a
+            keep (b * b)
             keep b
         @>
-    let res = input |> Opt.run 
+    let res = input |> Opt.run
     res |> should exprEqual expected
 
 [<Test>]
@@ -238,8 +309,8 @@ let ``[Hoist] nested lets``() =
     let input =
         <@
             let a =
-                let b = 
-                    let c = 
+                let b =
+                    let c =
                         let d = produce<float32>()
                         d * d
                     c * c
@@ -256,7 +327,7 @@ let ``[Hoist] nested lets``() =
             let a = b * b
             keep (a * a)
         @>
-    let res = input |> Opt.run 
+    let res = input |> Opt.run
     res |> should exprEqual expected
 
 [<Test>]
@@ -276,8 +347,7 @@ let ``[Hoist] lifting for loops``() =
             let mutable b = 10
             for i in 0 .. 10 do
                 b <- b + 1
-            let a = b
-            keep a
+            keep b
         @>
     input |> Opt.run |> should exprEqual expected
 
@@ -315,7 +385,7 @@ let ``[Hoist] if in expression``() =
         <@
             fun x y ->
                 let mutable c = x + 2*y
-                let a = 
+                let a =
                     if x < 10 then
                         c <- 5
                     c
@@ -328,8 +398,7 @@ let ``[Hoist] if in expression``() =
                 let mutable c = x + 2*y
                 if x < 10 then
                     c <- 5
-                let a = c
-                keep a
+                keep c
         @>
     input |> Opt.run |> should exprEqual expected
 

@@ -2479,7 +2479,6 @@ module Optimizer =
                 variables       : bool
                 trivial         : bool
                 inputs          : bool
-                nonMutable      : Set<Var>
                 isSideEffect    : MethodInfo -> bool
                 functions       : UtilityFunction -> bool
             }
@@ -2492,7 +2491,6 @@ module Optimizer =
                     variables = true
                     trivial = true
                     inputs = true
-                    nonMutable = Set.empty
                     isSideEffect = isSideEffect
                     functions = fun f -> f.functionIsInline
                 }
@@ -2507,10 +2505,10 @@ module Optimizer =
             let swizzle = System.Text.RegularExpressions.Regex @"[xyzw]+"
 
             [<return: Struct>]
-            let rec (|TrivialOrInput|_|) (nonMutable : Set<Var>) (e : Expr) =
+            let rec (|TrivialOrInput|_|) (isMutated : Var -> bool) (e : Expr) =
                 match e with
                 | Var v when v.IsMutable -> 
-                    if Set.contains v nonMutable then ValueSome ()
+                    if not <| isMutated v then ValueSome ()
                     else ValueNone
 
                 | Var _
@@ -2518,14 +2516,14 @@ module Optimizer =
                 | FieldGet(None, _)
                 | PropertyGet(None, _, [])
                 | TupleGet(Trivial, _)
-                | PropertyGet(Some (TrivialOrInput nonMutable), (FSharpTypeProperty | ArrayLengthProperty), [])
-                | FieldGet(Some (TrivialOrInput nonMutable), _)
+                | PropertyGet(Some (TrivialOrInput isMutated), (FSharpTypeProperty | ArrayLengthProperty), [])
+                | FieldGet(Some (TrivialOrInput isMutated), _)
                 | Unchanged
                 | ReadInputOrRaytracingData(_, _, None, _)
-                | ReadInputOrRaytracingData(_, _, Some (TrivialOrInput nonMutable), _) ->
+                | ReadInputOrRaytracingData(_, _, Some (TrivialOrInput isMutated), _) ->
                     ValueSome()
 
-                | PropertyGet(Some (TrivialOrInput nonMutable as t), prop, []) ->
+                | PropertyGet(Some (TrivialOrInput isMutated as t), prop, []) ->
                     match t.Type with
                     | TypeMeta.Patterns.VectorOf _ ->
                         if swizzle.IsMatch (prop.Name.ToLower()) then ValueSome ()
@@ -2537,10 +2535,10 @@ module Optimizer =
                     ValueNone
 
             [<return: Struct>]
-            let rec (|OnlyVar|_|) (nonMutable : Set<Var>)  (e : Expr) =
+            let rec (|OnlyVar|_|) (isMutated : Var -> bool) (e : Expr) =
                 match e with
                 | Var v when v.IsMutable -> 
-                    if Set.contains v nonMutable then ValueSome ()
+                    if not <| isMutated v then ValueSome ()
                     else ValueNone
 
                 | Var _ 
@@ -2558,10 +2556,10 @@ module Optimizer =
                     ValueNone
                         
             [<return: Struct>]
-            let rec (|InputOrVar|_|)  (nonMutable : Set<Var>)   (e : Expr) =
+            let rec (|InputOrVar|_|) (isMutated : Var -> bool) (e : Expr) =
                 match e with
                 | Var v when v.IsMutable -> 
-                    if Set.contains v nonMutable then ValueSome ()
+                    if not <| isMutated v then ValueSome ()
                     else ValueNone
                 | ReadInputOrRaytracingData _
                 | Var _ ->
@@ -2580,24 +2578,24 @@ module Optimizer =
                 | _ ->
                     ValueNone
 
-            let letValuePattern =
+            let letValuePattern (isMutated : Var -> bool) =
                 State.get |> State.map (fun s ->
                     let pat = 
                         match s.variables, s.trivial, s.inputs with
                         | (false | true), true, true ->
-                            (|TrivialOrInput|_|) s.nonMutable
+                            (|TrivialOrInput|_|) isMutated
 
                         | (false | true), true, false ->
                             (|Trivial|_|)
 
                         | true, false, false ->
-                            (|OnlyVar|_|) s.nonMutable
+                            (|OnlyVar|_|) isMutated
 
                         | false, false, true ->
                             (|OnlyInputs|_|)
 
                         | true, false, true ->
-                            (|InputOrVar|_|) s.nonMutable
+                            (|InputOrVar|_|) isMutated
 
                         | false, false, false ->
                             fun _ -> ValueNone
@@ -2621,6 +2619,47 @@ module Optimizer =
             | _ ->
                 ValueNone
 
+        let rec private isMutated (v : Var) (e : Expr) =
+            if v.IsMutable || v.Type.IsRef || v.Type.IsArr || v.Type.IsArray then
+                match e with
+                | VarSet (o, e)
+                | SetRef (LExpr o, e)
+                | FieldSet(Some (LExpr o), _, e) ->
+                    o = v || isMutated v e
+
+                | SetArray(LExpr o, idx, e) ->
+                    o = v || isMutated v idx || isMutated v e
+
+                | PropertySet(Some (LExpr o), _, idx, e) ->
+                    o = v || idx |> List.exists (isMutated v) || isMutated v e
+
+                | CallFunction(utility, args) ->
+                    (utility.functionArguments, args) ||> List.zip |> List.exists (fun (var, arg) ->
+                        match arg with
+                        | RefOf (LExpr o) when o = v -> isMutated var utility.functionBody
+                        | _ -> isMutated v arg
+                    )
+
+                | Call(t, _, args) ->
+                    match t |> Option.map (isMutated v) with
+                    | Some true -> true
+                    | _ ->
+                        args |> List.exists (fun a ->
+                            match a with
+                            | RefOf (LExpr o) when o = v -> true
+                            | _ -> isMutated v a
+                        )
+
+                | ShapeLambda(_, b) ->
+                    isMutated v b
+
+                | ShapeVar _ ->
+                    false
+
+                | ShapeCombination(_, args) ->
+                    List.exists (isMutated v) args
+            else
+                false
 
         let rec inlineS (e : Expr) =
             state {
@@ -2692,21 +2731,15 @@ module Optimizer =
                                     state {
                                         match ret with
                                         | NewTuple args ->
-                                            let! s = State.get
-                                            let mutable nonMutable = s.nonMutable
                                             let elems =
                                                 args |> List.mapi (fun i a ->
                                                     match a with
-                                                    | Var v -> 
-                                                        nonMutable <- Set.add v nonMutable
-                                                        None, a
                                                     | Trivial -> None, a
                                                     | e -> 
                                                         let v = Var(sprintf "t%d" i, a.Type)
                                                         Some (v,e), Expr.Var v
                                                 )
-                                                
-                                            do! State.modify (fun s -> { s with nonMutable = nonMutable })
+
                                             let bindings = elems |> List.choose fst
                                             let mapping = elems |> List.map snd |> List.toArray
 
@@ -2829,14 +2862,14 @@ module Optimizer =
                     | Let(v, e, b) ->
                         // Only inline if immutable and not a default declaration.
                         // The latter case is important for HitObject and structs.
-                        if v.IsMutable || v.Type.IsRef || e = Expr.DefaultValue e.Type then
+                        if isMutated v b || e = Expr.DefaultValue e.Type then
                             let! e = inlineS e
                             let! b = inlineS b
                             return Expr.Let(v, e, b)
                         else
                             let! e = inlineS e
                             let! state = State.get
-                            let! pattern = State.letValuePattern
+                            let! pattern = State.letValuePattern (flip isMutated b)
                             match pattern e with
                                 | ValueSome () ->
                                     match e with
@@ -2847,11 +2880,10 @@ module Optimizer =
                                         let b = b.Substitute(fun vi -> if vi = v then Some e else None)
                                         return! inlineS b
                                 | ValueNone ->
-                                    let nonMutable = state.nonMutable
                                     let rec canInline (e : Expr) =
                                         if e.Type.IsRef || e.Type.IsArr || e.Type.IsArray then
                                             match e with
-                                            | Var v -> Set.contains v nonMutable
+                                            | Var v -> not <| isMutated v b
                                             | _ -> false
                                         else
                                             match e with
@@ -2878,7 +2910,7 @@ module Optimizer =
                                                 | CallFunction(f, args) ->
                                                     f.functionBody::args |> List.forall canInline
 
-                                                | ShapeVar v -> Set.contains v nonMutable || not v.IsMutable
+                                                | ShapeVar v -> not <| isMutated v b
                                                 | ShapeCombination (_,args) -> args |> List.forall canInline
                                                 | ShapeLambda(_,b) -> canInline b
 
