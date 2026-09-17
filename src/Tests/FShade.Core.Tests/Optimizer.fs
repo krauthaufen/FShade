@@ -510,8 +510,14 @@ let ``[Dead] keep method modifying a used by-ref variable``() =
                 a
         @>
 
-    let result = input |> Opt.run
-    result |> hasCall "incWrapper" |> should be True
+    let expected =
+        <@
+            fun (a : int) ->
+                incWrapper &&a
+                a
+        @>
+
+    input |> Opt.run |> should exprEqual expected
 
 [<Test>]
 let ``[Dead] keep method with side-effects in unused let bindings (KeepCall, intrinsic)``() =
@@ -543,8 +549,14 @@ let ``[Dead] keep method with side-effects in unused let bindings (KeepCall, uti
                 a
         @>
 
-    let result = input |> Opt.run
-    result |> hasCall "keepReflected" |> should be True
+    let expected =
+        <@
+            fun (a : int) ->
+                keepReflected()
+                a
+        @>
+
+    input |> Opt.run |> should exprEqual expected
 
 let inc2 (v : int ref) =
     v.Value <- v.Value + 1
@@ -580,9 +592,15 @@ let ``[Dead] keep method with side-effects in unused let bindings (by-ref argume
                 v
         @>
 
-    let result = input |> Opt.run
-    result |> hasCall "inc$" |> should be True
-    result |> hasCall "inc2$" |> should be True
+    let expected =
+        <@
+            fun (a : int) ->
+                inc &&a
+                ignore (inc2 &&a)
+                a
+        @>
+
+    input |> Opt.run |> should exprEqual expected
 
 [<ReflectedDefinition>]
 let incWrapper2 (v : int ref) =
@@ -599,7 +617,16 @@ let ``[Dead] keep method with side-effects in unused let bindings (by-ref argume
                 v
         @>
 
+    let expected =
+        <@
+            fun (a : int) ->
+                incWrapper &&a
+                ignore (incWrapper2 &&a)
+                a
+        @>
+
     let result = input |> Opt.run
+    result |> should exprEqual expected
     result |> hasCall "incWrapper$" |> should be True
     result |> hasCall "incWrapper2$" |> should be True
     result |> hasCall "inc$" |> should be True
@@ -619,7 +646,16 @@ let ``[Dead] keep method with side-effects in unused let bindings (by-ref argume
                 ()
         @>
 
+    let expected =
+        <@
+            fun (a : int) ->
+                incWrapper &&uniform.MyBuffer.[2]
+                ignore (incWrapper2 &&uniform.MyBuffer.[3])
+                ()
+        @>
+
     let result = input |> Opt.run
+    result |> should exprEqual expected
     result |> hasCall "incWrapper$" |> should be True
     result |> hasCall "incWrapper2$" |> should be True
     result |> hasCall "inc$" |> should be True
@@ -635,7 +671,16 @@ let ``[Dead] keep method with side-effects in unused let bindings (by-ref argume
                 ()
         @>
 
+    let expected =
+        <@
+            fun (a : int) ->
+                incWrapper &&uniform.MyVecBuffer.[2].X
+                ignore (incWrapper2 &&uniform.MyVecBuffer.[3].X)
+                ()
+        @>
+
     let result = input |> Opt.run
+    result |> should exprEqual expected
     result |> hasCall "incWrapper$" |> should be True
     result |> hasCall "incWrapper2$" |> should be True
     result |> hasCall "inc$" |> should be True
@@ -659,7 +704,15 @@ let ``[Dead] keep method with side-effects in unused let bindings (utility with 
                 v
         @>
 
+    let expected =
+        <@
+            fun (a : int) ->
+                ignore (doImportantStuff a)
+                a
+        @>
+
     let result = input |> Opt.run
+    result |> should exprEqual expected
     result |> hasCall "doImportantStuff" |> should be True
     result |> hasCall "veryImportantUtility" |> should be True
 
@@ -676,10 +729,19 @@ let ``[Dead] keep arguments with side-effects for unneeded method call (intrinsi
                 v
         @>
 
+    let expected =
+        <@
+            fun (a : int) ->
+                inc &&a
+                ignore (inc2 &&a)
+                a
+        @>
+
     let result = input |> Opt.run
+    result |> should exprEqual expected
     result |> hasCall "inc$" |> should be True
     result |> hasCall "inc2$" |> should be True
-    result |> hasCall "nop2$" |> should be False
+    result |> hasCall "nop2_.+$" |> should be False
 
 [<ReflectedDefinition>]
 let nop3 x = ()
@@ -695,29 +757,19 @@ let ``[Dead] keep arguments with side-effects for unneeded method call (utility)
                 v
         @>
 
-    let result = input |> Opt.run
-    result |> hasCall "inc$" |> should be True
-    result |> hasCall "inc2$" |> should be True
-    result |> hasCall "nop3$" |> should be False
-
-[<ReflectedDefinition; KeepCall>]
-let nop4 x = ()
-
-[<Test>]
-let ``[Dead] keep arguments with side-effects even if unused inside utility function``() =
-    let input =
+    let expected =
         <@
             fun (a : int) ->
-                let v = a
-                let unused = nop4 (inc &&v)
-                let unused = nop4 (inc2 &&v)
-                v
+                inc &&a
+                ignore (inc2 &&a)
+                a
         @>
 
     let result = input |> Opt.run
+    result |> should exprEqual expected
     result |> hasCall "inc$" |> should be True
     result |> hasCall "inc2$" |> should be True
-    result |> hasCall "nop4$" |> should be False
+    result |> hasCall "nop3_.+$" |> should be False
 
 [<Inline; ReflectedDefinition>]
 let funny (a : int) =

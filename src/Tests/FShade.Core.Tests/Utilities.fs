@@ -2,14 +2,9 @@
 
 open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Quotations.Patterns
-open Microsoft.FSharp.Quotations.DerivedPatterns
 open Microsoft.FSharp.Quotations.ExprShape
 
-open NUnit.Framework
-open FsUnit
-
 open Aardvark.Base
-open Aardvark.Base.Monads.State
 open System.Text.RegularExpressions
 
 open FShade
@@ -28,42 +23,65 @@ module Utilities =
     [<KeepCall>]
     let produce<'a>() : 'a = onlyInShaderCode "produce"
 
-
-    let rec normalize (e : Expr) =
+    let rec private normalize (e : Expr) =
         match e with
-            | Sequential(Sequential(a,b), c) ->
-                normalize (Expr.Sequential(a, Expr.Sequential(b,c)))
-            | ShapeCombination(o, args) ->
-                RebuildShapeCombination(o, args |> List.map normalize)
-            | ShapeVar v ->
-                e
-            | ShapeLambda(v,b) ->
-                Expr.Lambda(v, normalize b)
+        | CallFunction(utility, args) ->
+            let args = args |> List.map normalize
 
-    let exprComparer l = 
-        { new Constraint() with
-            override x.ApplyTo<'B>(other : 'B) =    
-                match other :> obj with
-                | :? Expr as r -> 
-                    if Expr.computeHash (normalize l) = Expr.computeHash (normalize r) then
-                        ConstraintResult(x, other, true)
+            match utility.functionMethodInfo with
+            | Some mi ->
+                if mi.IsStatic then
+                    if args.Length = mi.GetParameters().Length then
+                        Expr.Call(mi, args)
                     else
-                        ConstraintResult(x, other, false)
+                        e
+                else
+                    match args with
+                    | t :: args ->
+                        if args.Length = mi.GetParameters().Length then
+                            Expr.Call(t, mi, args)
+                        else
+                            e
+                    | _ ->
+                        e
+            | _ ->
+                e
+
+        | Uniform u ->
+            Expr.ReadInput(ParameterKind.Uniform, e.Type, u.uniformName)
+
+        | LetCopyOfStruct e ->
+            normalize e
+
+        | Sequential(Sequential(a, b), c) ->
+            normalize (Expr.Sequential(a, Expr.Sequential(b, c)))
+
+        | ShapeCombination(o, args) ->
+            RebuildShapeCombination(o, args |> List.map normalize)
+
+        | ShapeVar _ ->
+            e
+
+        | ShapeLambda(v, b) ->
+            Expr.Lambda(v, normalize b)
+
+    let private exprComparer l =
+        { new Constraint() with
+            override x.ApplyTo<'B>(other : 'B) =
+                match other :> obj with
+                | :? Expr as r ->
+                    let l = normalize l
+                    let r = normalize r
+
+                    if Expr.computeHash l = Expr.computeHash r then
+                        ConstraintResult(x, r, true)
+                    else
+                        ConstraintResult(x, r, false)
                 | _ ->
                     ConstraintResult(x, other, false)
         }
-        //{ new NHamcrest.Core.IsEqualMatcher<obj>(l) with
-        
-        //    override x.Matches(r : obj) =
-        //        match r with
-        //            | :? Expr as r ->
-        //                Expr.ComputeHash (normalize l) = Expr.ComputeHash (normalize r)
-        //            | _ ->
-        //                false
-        //        //l.ToString() = r.ToString()
-        //}
 
-    let exprEqual (r : Expr) = 
+    let exprEqual (r : Expr) =
         exprComparer r
 
     let hasCall (nameRx : string) (e : Expr) =
