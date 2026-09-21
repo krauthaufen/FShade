@@ -2625,17 +2625,6 @@ module Preprocessor =
 
             | NewArr(t, l, []) ->
                 return Expr.DefaultValue(e.Type)
-
-            | NewArr(t, l, args) ->
-                let! args = args |> List.mapS preprocessNormalS
-                let t = Var("arr", e.Type, false)
-                return Expr.Let(
-                    t, Expr.DefaultValue(e.Type),
-                    Expr.Seq [
-                        args |> List.mapi (fun i a -> Expr.ArraySet(Expr.Var t, Expr.Value i, a)) |> Expr.Seq
-                        Expr.Var t
-                    ]
-                )             
                                    
             | ShapeCombination(o, args) ->
                 let! args = args |> List.mapS preprocessNormalS
@@ -4475,10 +4464,10 @@ module Shader =
                     |> Map.map (fun _ p -> p.paramType)
         
 
-    module internal Composition = 
+    module internal Composition =
         let simple (l : Shader) (r : Shader) =
-            let needed  = Map.intersect l.shaderOutputs r.shaderInputs
-            let passed  = Map.difference l.shaderOutputs r.shaderOutputs
+            let needed = Map.intersect l.shaderOutputs r.shaderInputs
+            let passed = Map.difference l.shaderOutputs r.shaderOutputs
 
             let depthWrite =
                 if r.shaderDepthWriteMode <> DepthWriteMode.None then r.shaderDepthWriteMode
@@ -4490,10 +4479,16 @@ module Shader =
                     let values = values |> Map.map (fun _ (_,v) -> v)
 
                     let variables =
-                        needed |> Map.map (fun name (lv, rv) -> 
-                            let variable = Var(name + "C", rv.paramType)
-                            let converter = converter name lv.paramType rv.paramType
-                            variable, converter
+                        needed |> Map.map (fun name (lv, rv) ->
+                            match values.[name] with
+                            | NewArray (et, args) ->
+                                let arr = Peano.getArrayType args.Length et
+                                Var(name + "C", arr), fun _ -> Expr.NewFixedArray(et, args)
+
+                            | _ ->
+                                let variable = Var(name + "C", rv.paramType)
+                                let converter = converter name lv.paramType rv.paramType
+                                variable, converter
                         )
 
                     let rBody =
@@ -4530,7 +4525,7 @@ module Shader =
                             |> Some
                 )
 
-            optimize 
+            optimize
                 { l with
                     shaderInputs = Map.union r.shaderInputs l.shaderInputs
                     shaderOutputs = Map.union l.shaderOutputs r.shaderOutputs

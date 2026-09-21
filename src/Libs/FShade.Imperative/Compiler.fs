@@ -1823,7 +1823,16 @@ module Compiler =
 
     module private CStatement =
         let write lhs value = CWrite(lhs, value)
-        let writeOutput name index value = CWriteOutput(name, index, CRExpr.ofExpr value)
+        let writeOutput name (index: CExpr option) (value: CExpr) =
+            match value.ctype with
+            | CArray(et, len) when index.IsNone ->
+                List.init len (fun i ->
+                    let index = CValue(CInt(true, 32), CLiteral.CIntegral (int64 i))
+                    let value = CExpr.CItem(et, value, index)
+                    CWriteOutput(name, Some index, CRExpr value)
+                ) |> CSequential
+            | _ ->
+                CWriteOutput(name, index, CRExpr.ofExpr value)
 
     let rec toCStatementS (write : Option<CExpr -> CStatement>) (e : Expr) =
         state {

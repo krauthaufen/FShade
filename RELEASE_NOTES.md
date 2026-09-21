@@ -3,6 +3,7 @@
 - Avoid duplicate evaluation of complex vertex record expressions when writing output values
 - Remove `cs_` prefix for storage buffers declared as compute arguments
 - Allow inlining of mutable variables if not mutated in body
+- Fix issue related to pass-through of ClipDistance between vertex and fragment shaders
 
 ### 5.7.18
 - Add static class `Atomic` containing atomic integer operation intrinsics

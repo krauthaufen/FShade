@@ -743,6 +743,33 @@ let ``ClipDistance Pass-Through`` () =
 
     GLSL.shouldCompile [ Effect.ofFunction vs; Effect.ofFunction gs; Effect.ofFunction frag ]
 
+[<Test>]
+let ``ClipDistance composition`` () =
+    Setup.Run()
+
+    let vs1 (v : VertexClip) =
+        vertex {
+            let plane : V4f = uniform?ClipPlane
+            let cd = Vec.dot v.pos plane
+            if plane.X > 0.0f then
+                return { pos = v.pos; c = v.c ; cd = [| cd |] }
+            else
+                return { pos = v.pos; c = v.c ; cd = [| cd; cd |] }
+        }
+
+    let vs2 (v : VertexClip) =
+        vertex {
+            return { v with pos = v.pos * 0.5f }
+        }
+
+    GLSL.shouldCompileAndContainRegex [
+        Effect.ofFunction vs1
+        Effect.ofFunction vs2
+    ] [
+        "gl_ClipDistance\[0\] = ClipDistanceC\[0\];"
+        "gl_ClipDistance\[0\] = ClipDistanceC1\[0\];"
+        "gl_ClipDistance\[1\] = ClipDistanceC1\[1\];"
+    ]
 
 type VertexWithPid =
     {
