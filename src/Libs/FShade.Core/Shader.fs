@@ -4465,7 +4465,7 @@ module Shader =
         
 
     module internal Composition =
-        let simple (l : Shader) (r : Shader) =
+        let simpleInlined (l : Shader) (r : Shader) =
             let needed = Map.intersect l.shaderOutputs r.shaderInputs
             let passed = Map.difference l.shaderOutputs r.shaderOutputs
 
@@ -4534,6 +4534,91 @@ module Shader =
                     shaderDebugRange = None
                     shaderDepthWriteMode = depthWrite
                 }
+
+        let private simpleFlat (l : Shader) (r : Shader) =
+            let needed = Map.intersect l.shaderOutputs r.shaderInputs
+            let passed = Map.difference l.shaderOutputs r.shaderOutputs
+
+            let depthWrite =
+                if r.shaderDepthWriteMode <> DepthWriteMode.None then r.shaderDepthWriteMode
+                else l.shaderDepthWriteMode
+
+            let lvars =
+                l.shaderOutputs |> Map.map (fun name desc ->
+                    Var(name + "C", desc.paramType, true)
+                )
+
+            let rvars =
+                needed |> Map.map (fun name (lv, rv) ->
+                    let rvar = Var(name + "C", rv.paramType)
+                    rvar, converter name lv.paramType rv.paramType
+                )
+
+            let lBody =
+                l.shaderBody.SubstituteWrites (fun values ->
+                    values |> Map.map (fun name (_, value) -> Expr.VarSet(lvars.[name], value))
+                    |> Map.toList
+                    |> List.map snd
+                    |> Expr.Seq
+                    |> Some
+                )
+
+            let rBody =
+                r.shaderBody.SubstituteReads (fun kind _ name _ _ ->
+                    match kind with
+                    | ParameterKind.Input ->
+                        match Map.tryFind name rvars with
+                        | Some (var, _) -> Expr.Var var |> Some
+                        | _ -> None
+                    | _ ->
+                        None
+                )
+
+            let rBody =
+                if passed.IsEmpty then rBody
+                else
+                    rBody.SubstituteWrites (fun values ->
+                        passed
+                        |> Map.map (fun name _ -> None, Expr.Var lvars.[name])
+                        |> Map.union values
+                        |> Expr.WriteOutputs
+                        |> Some
+                    )
+
+            let rBody =
+                rvars |> Map.fold (fun b name (rvar, convert) ->
+                    Expr.Let(rvar, convert (Expr.Var lvars.[name]), b)
+                ) rBody
+
+            let body =
+                lvars |> Map.fold (fun b _ lvar ->
+                    Expr.Let(lvar, Expr.DefaultValue lvar.Type, b)
+                ) (Expr.Sequential(lBody, rBody))
+
+            optimize
+                { l with
+                    shaderInputs = Map.union r.shaderInputs l.shaderInputs
+                    shaderOutputs = Map.union l.shaderOutputs r.shaderOutputs
+                    shaderUniforms = Map.union l.shaderUniforms r.shaderUniforms
+                    shaderBody = body
+                    shaderDebugRange = None
+                    shaderDepthWriteMode = depthWrite
+                }
+
+        let simple (l : Shader) (r : Shader) =
+            let writesUnsizedArray =
+                l.shaderOutputs |> Map.exists (fun _ desc ->
+                    match desc.paramType with ArrayOf _ -> true | _ -> false
+                )
+
+            // Fallback for cases where the left shader writes gl_ClipDistance which is
+            // an unsized array. Cannot be evacuated to a local variable since local arrays
+            // must be of fixed size in GLSL. The inlined variant may lead to problems
+            // when the left shader has multiple returns (https://github.com/krauthaufen/FShade/issues/39)
+            if writesUnsizedArray then
+                simpleInlined l r
+            else
+                simpleFlat l r
 
         let gsvs (lShader : Shader) (rShader : Shader) =
             // matched values (left-out <-> right-in)

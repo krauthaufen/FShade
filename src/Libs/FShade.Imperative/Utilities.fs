@@ -963,23 +963,6 @@ module ExprExtensions =
 
         | _ -> ValueNone
 
-    /// F# creates mutable copies for structs when accessing properties/methods
-    /// since mutating the original is not possible (and not desired).
-    /// since everything is mutable in C we don't care for those copies making the
-    /// code less readable and more complicated
-    [<return: Struct>]
-    let (|LetCopyOfStruct|_|) (e : Expr) =
-        match e with
-        | Let(v, e, b) when v.Name = "copyOfStruct" && v.Type.IsValueType ->
-            // TODO: find a better way for detecting this
-            let mutable count = 0
-            let newBody = b.Substitute(fun vi -> if v = vi then count <- count + 1; Some e else None) 
-            if count = 0 then ValueSome b
-            elif count = 1 then ValueSome newBody
-            else ValueNone
-        | _ ->
-            ValueNone
-
     /// detects a trivial (low runtime) expression like Var/Value/FieldGet/PropertyGet(for f# types)/etc.
     [<return: Struct>]
     let rec (|Trivial|_|) (e : Expr) =
@@ -992,6 +975,26 @@ module ExprExtensions =
         | PropertyGet(Some Trivial, (FSharpTypeProperty | ArrayLengthProperty), [])
         | FieldGet(Some Trivial, _) ->
             ValueSome ()
+        | _ ->
+            ValueNone
+
+    /// F# creates mutable copies for structs when accessing properties/methods
+    /// since mutating the original is not possible (and not desired).
+    /// since everything is mutable in C we don't care for those copies making the
+    /// code less readable and more complicated
+    [<return: Struct>]
+    let (|LetCopyOfStruct|_|) (e : Expr) =
+        match e with
+        | Let(v, e, b) when v.Name = "copyOfStruct" && v.Type.IsValueType ->
+            // TODO: find a better way for detecting this
+            let mutable count = 0
+            let newBody = b.Substitute(fun vi -> if v = vi then count <- count + 1; Some e else None)
+            match e with
+            | Trivial -> ValueSome newBody
+            | _ ->
+                if count = 0 then ValueSome b
+                elif count = 1 then ValueSome newBody
+                else ValueNone
         | _ ->
             ValueNone
 

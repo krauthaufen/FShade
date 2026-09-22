@@ -2661,6 +2661,69 @@ module Optimizer =
             else
                 false
 
+        let rec private usesVar (v : Var) (e : Expr) =
+            match e with
+            | ShapeVar o -> o = v
+            | ShapeLambda(_, b) -> usesVar v b
+            | ShapeCombination(_, args) -> List.exists (usesVar v) args
+
+        let rec private canInline (isSideEffect : MethodInfo -> bool) (body : Expr) (e : Expr) =
+            if e.Type.IsRef || e.Type.IsArr || e.Type.IsArray then
+                match e with
+                | Var v -> not <| isMutated v body
+                | _ -> false
+            else
+                match e with
+                | ReadInputOrRaytracingData(_, _, None, _) -> true
+                | ReadInputOrRaytracingData(_, _, Some idx, _) -> canInline isSideEffect body idx
+
+                | GetArray(e, i) ->
+                    canInline isSideEffect body e && canInline isSideEffect body i
+
+                | RefOf _
+                | VarSet _
+                | SetArray _
+                | AddressOf _
+                | AddressSet _
+                | FieldSet _
+                | PropertySet _
+                | WriteOutputs _ ->
+                    false
+
+                | Call(None, mi, args) ->
+                    if isSideEffect mi then false
+                    else args |> List.forall (canInline isSideEffect body)
+
+                | CallFunction(f, args) ->
+                    f.functionBody::args |> List.forall (canInline isSideEffect body)
+
+                | ShapeVar v -> not <| isMutated v body
+                | ShapeCombination(_, args) -> args |> List.forall (canInline isSideEffect body)
+                | ShapeLambda(_, b) -> canInline isSideEffect body b
+
+        let rec private tryInlineMutableDecl (v : Var) (e : Expr) (cont : Expr) =
+            match e with
+            | VarSet(o, e) when o = v ->
+                ValueSome <| Expr.Let(v, e, cont)
+
+            | Sequential(x, y) ->
+                match tryInlineMutableDecl v x (Expr.Seq [y; cont]) with
+                | ValueSome e -> ValueSome e
+                | _ ->
+                    if usesVar v x then ValueNone
+                    else
+                        match tryInlineMutableDecl v y cont with
+                        | ValueSome y -> ValueSome <| Expr.Seq [x; y]
+                        | _ -> ValueNone
+
+            | Let(o, e, b) when not <| usesVar v e ->
+                match tryInlineMutableDecl v b cont with
+                | ValueSome b -> ValueSome <| Expr.Let(o, e, b)
+                | _ -> ValueNone
+
+            | _ ->
+                ValueNone
+
         let rec inlineS (e : Expr) =
             state {
                 match e with
@@ -2859,6 +2922,13 @@ module Optimizer =
                     //    let! b = inlineS b
                     //    return Expr.Let(v, e, b)
 
+                    | Let(v, (DefaultValue _ as e), b) when v.IsMutable ->
+                        match tryInlineMutableDecl v b Expr.Unit with
+                        | ValueSome b -> return! inlineS b
+                        | _ ->
+                            let! b = inlineS b
+                            return Expr.Let(v, e, b)
+
                     | Let(v, e, b) ->
                         // Only inline if immutable and not a default declaration.
                         // The latter case is important for HitObject and structs.
@@ -2880,41 +2950,7 @@ module Optimizer =
                                         let b = b.Substitute(fun vi -> if vi = v then Some e else None)
                                         return! inlineS b
                                 | ValueNone ->
-                                    let rec canInline (e : Expr) =
-                                        if e.Type.IsRef || e.Type.IsArr || e.Type.IsArray then
-                                            match e with
-                                            | Var v -> not <| isMutated v b
-                                            | _ -> false
-                                        else
-                                            match e with
-                                                | ReadInputOrRaytracingData(_, _, None, _) -> true
-                                                | ReadInputOrRaytracingData(_, _, Some idx, _) -> canInline idx
-                                        
-                                                | GetArray(e,i) ->
-                                                    let res = canInline e && canInline i
-                                                    res
-                                                | RefOf _
-                                                | VarSet _ 
-                                                | SetArray _
-                                                | AddressOf _ 
-                                                | AddressSet _
-                                                | FieldSet _
-                                                | PropertySet _
-                                                | WriteOutputs _ ->
-                                                    false
-
-                                                | Call(None, mi, args) ->
-                                                    if state.isSideEffect mi then false
-                                                    else args |> List.forall canInline
-
-                                                | CallFunction(f, args) ->
-                                                    f.functionBody::args |> List.forall canInline
-
-                                                | ShapeVar v -> not <| isMutated v b
-                                                | ShapeCombination (_,args) -> args |> List.forall canInline
-                                                | ShapeLambda(_,b) -> canInline b
-
-                                    if canInline e && not <| takesAddressOf v b then
+                                    if canInline state.isSideEffect b e && not <| takesAddressOf v b then
                                         let mutable cnt = 0
                                         let nb = b.Substitute(fun vi -> if vi = v then cnt <- cnt + 1; Some e else None)
                                         if cnt = 1 then

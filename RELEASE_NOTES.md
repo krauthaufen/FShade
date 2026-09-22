@@ -4,6 +4,7 @@
 - Remove `cs_` prefix for storage buffers declared as compute arguments
 - Allow inlining of mutable variables if not mutated in body
 - Fix issue related to pass-through of ClipDistance between vertex and fragment shaders
+- Improve composition of vertex and fragment shaders with multiple returns (https://github.com/krauthaufen/FShade/issues/39)
 
 ### 5.7.18
 - Add static class `Atomic` containing atomic integer operation intrinsics

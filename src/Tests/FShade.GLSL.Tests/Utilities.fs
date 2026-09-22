@@ -80,13 +80,14 @@ module GLSL =
 
         glsl, results
 
-    let compile' (backend : Backend) (e : list<Effect>) =
+    let compileWithOutputs (backend : Backend) (outputs : (string * Type) list) (e : list<Effect>) =
         let e = Effect.compose e
         Console.WriteLine("COMPILE {0}", e.Id)
-        let outputs, lastStage =
+
+        let lastStage =
             e.LastShader
-                |> Option.map (fun s -> (s.shaderOutputs |> Map.map (fun k v -> v.paramType) |> Map.toList), s.shaderStage)
-                |> Option.defaultValue (["Colors", typeof<V4f>], ShaderStage.Fragment)
+            |> Option.map _.shaderStage
+            |> Option.defaultValue ShaderStage.Fragment
 
         let module_ =
             e |> Effect.toModule {
@@ -106,6 +107,16 @@ module GLSL =
 
             stage, res
         )
+
+    let compile' (backend : Backend) (e : list<Effect>) =
+        let e = Effect.compose e
+
+        let outputs =
+            e.LastShader
+            |> Option.map (fun s -> (s.shaderOutputs |> Map.map (fun k v -> v.paramType) |> Map.toList))
+            |> Option.defaultValue ["Colors", typeof<V4f>]
+
+        compileWithOutputs backend outputs [e]
 
     let compileCompute' (backend : Backend) (c : ComputeShader) =
         Console.WriteLine("COMPILE {0}", c.csId)

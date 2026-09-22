@@ -1241,12 +1241,20 @@ let ``Float32 vertex types``() =
             return v.whatever - 1.0f
         }
 
-    GLSL.shouldCompile [
+    let expected =
+        [
+            "float whateverC = float((((fs_Colors + vec4(1.0, 0.0, 0.0, 0.0)).yxzw + vec4(0.0, 2.0, 0.0, 0.0)).xyz + 2.0).y);"
+            "whateverOut = whateverC;"
+            "ColorsOut = (whateverC - 1.0);"
+        ]
+        |> List.map Regex.Escape
+
+    GLSL.shouldCompileAndContainRegex [
         Effect.ofFunction fs1
         Effect.ofFunction fs2
         Effect.ofFunction fs3
         Effect.ofFunction fs4
-    ]
+    ] expected
 
 [<Test>]
 let ``Enum with non-int32 underlying type``() =
@@ -1720,3 +1728,54 @@ let ``Sampler information is not destroyed by saved utility function state`` () 
     glsl.iface.samplers.["sammy"].samplerTextures
     |> List.exists (fst >> (=) "Texture")
     |> should be True
+
+type Frag1 =
+    {
+        [<Semantic("Color1")>] c1 : V4f
+        [<Semantic("Color2")>] c2 : V4f
+        [<FragCoord>] fc : V4f
+    }
+
+type Frag2 =
+    {
+        [<Semantic("Color1")>] c1 : V3f
+        [<Semantic("Color3")>] c3 : V3f
+        [<FragCoord>] fc : V4f
+    }
+
+[<Test>]
+let ``Composition of fragment shaders with multiple returns`` () =
+    Setup.Run()
+
+    let fs0 (f: Frag1) = fragment { if f.fc.X > 0.0f then return { f with c1 = f.c1 * 1.01f; c2 = f.c2 + 1.01f; fc = f.fc * 2.0f } else return f }
+    let fs1 (f: Frag1) = fragment { return { f with c1 = f.c1 * 0.5f } }
+    let fs2 (f: Frag1) = fragment { return { f with c1 = f.c1 * 1.02f; c2 = f.c2 + f.c1 } }
+    let fs3 (f: Frag2) = fragment { if f.fc.X > 0.1f then return { f with c1 = f.c1 * 1.03f; c3 = f.c3 + 1.03f } else return f }
+
+    let effects = [
+        Effect.ofFunction fs0
+        Effect.ofFunction fs1
+        Effect.ofFunction fs2
+        Effect.ofFunction fs3
+    ]
+
+    let outputs = [
+        "Color1", typeof<V3f>
+        "Color2", typeof<V3f>
+        "Color3", typeof<V3f>
+    ]
+
+    let glsl, res = GLSL.compileWithOutputs glsl430 outputs effects
+    GLSL.printResults None res glsl
+
+    GLSL.shouldContainRegex glsl [
+        "Color1C = \(fs_Color1 \* 1\.[0-9]+\);", Some 1
+        "Color2C = \(fs_Color2 \+ 1\.[0-9]+\);", Some 1
+        "FragCoordC = \(gl_FragCoord \* 2\.0\);", Some 1
+        "vec4 Color1C1 = \(Color1C \* 0\.5\);", Some 1
+        "vec4 Color2C1 = \(Color2C \+ Color1C1\);", Some 1
+        "vec3 Color1C2 = \(Color1C1 \* 1\.[0-9]+\).xyz;", Some 1
+        "Color1Out = \(Color1C2 \* 1\.[0-9]+\);", Some 1
+        "Color2Out = Color2C1\.xyz;", Some 2
+        "Color3Out = \(fs_Color3 \+ 1\.[0-9]+\);", Some 1
+    ]
