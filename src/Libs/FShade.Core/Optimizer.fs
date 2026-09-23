@@ -368,6 +368,7 @@ module Optimizer =
         let rec (|LExpr|_|) (e : Expr) =
             match e with
             | Var v
+            | DeRef (LExpr v)
             | FieldGet(Some (LExpr v), _)
             | PropertyGet(Some (LExpr v), _, _)
             | GetArray(LExpr v, _) -> ValueSome v

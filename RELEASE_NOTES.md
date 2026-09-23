@@ -1,3 +1,5 @@
+- Fix dead-code elimination to properly handle deprecated `ref` operators
+
 ### 5.7.19
 - Fix utility function calls erasing uniform information in some edge cases
 - Fix depth write ignoring `DepthWriteMode` when returning a non-expression vertex record value

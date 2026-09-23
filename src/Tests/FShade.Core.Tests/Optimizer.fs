@@ -553,6 +553,14 @@ let inc (x : int ref) =
 let incWrapper (x : int ref) =
     inc x
 
+[<ReflectedDefinition>]
+let incOp (x : int ref) =
+    x := !x + 1
+
+[<ReflectedDefinition>]
+let incXOp (x : V3i ref) =
+    incOp &&(!x).X
+
 [<Test>]
 let ``[Dead] eliminate method modifying an unused by-ref variable``() =
     let input =
@@ -565,6 +573,23 @@ let ``[Dead] eliminate method modifying an unused by-ref variable``() =
     let expected =
         <@
             fun (a : int) ->
+                1
+        @>
+
+    input |> Opt.run |> should exprEqual expected
+
+[<Test>]
+let ``[Dead] eliminate method modifying an unused by-ref variable (deprecated ref operators)``() =
+    let input =
+        <@
+            fun (a : V3i) ->
+                incXOp &&a
+                1
+        @>
+
+    let expected =
+        <@
+            fun (a : V3i) ->
                 1
         @>
 
@@ -586,7 +611,31 @@ let ``[Dead] keep method modifying a used by-ref variable``() =
                 a
         @>
 
-    input |> Opt.run |> should exprEqual expected
+    let result = input |> Opt.run
+    result |> should exprEqual expected
+    result |> hasCall "incWrapper$" |> should be True
+    result |> hasCall "inc$" |> should be True
+
+[<Test>]
+let ``[Dead] keep method modifying a used by-ref variable (deprecated ref operators)``() =
+    let input =
+        <@
+            fun (a : V3i) ->
+                incXOp &&a
+                a
+        @>
+
+    let expected =
+        <@
+            fun (a : V3i) ->
+                incXOp &&a
+                a
+        @>
+
+    let result = input |> Opt.run
+    result |> should exprEqual expected
+    result |> hasCall "incXOp$" |> should be True
+    result |> hasCall "incOp$" |> should be True
 
 [<Test>]
 let ``[Dead] keep method with side-effects in unused let bindings (KeepCall, intrinsic)``() =
