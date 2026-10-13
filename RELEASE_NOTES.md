@@ -1,3 +1,4 @@
+- Fix ShaderDebugger with .NET 10
 - Fix dead-code elimination to properly handle deprecated `ref` operators
 
 ### 5.7.19

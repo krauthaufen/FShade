@@ -34,10 +34,10 @@ module internal Framework =
         [<return: Struct>]
         let (|NetCore|_|) =
             tryMatch [|
-                Regex "net(?<version>[0-9]\.[0.9])"
-                Regex "netcoreapp(?<version>[0-9]\.[0-9])"
-                Regex ".NET (?<version>[0-9]\.[0-9])"
-                Regex ".NET Core (?<version>[0-9]\.[0-9])"
+                Regex "net(?<version>[0-9]+\.[0-9]+(\.[0-9]+)?)"
+                Regex "netcoreapp(?<version>[0-9]+\.[0-9]+(\.[0-9]+)?)"
+                Regex ".NET (?<version>[0-9]+\.[0-9]+(\.[0-9]+)?)"
+                Regex ".NET Core (?<version>[0-9]+\.[0-9]+(\.[0-9]+)?)"
             |]
 
         [<return: Struct>]
