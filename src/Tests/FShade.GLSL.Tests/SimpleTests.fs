@@ -1779,3 +1779,18 @@ let ``Composition of fragment shaders with multiple returns`` () =
         "Color2Out = Color2C1\.xyz;", Some 2
         "Color3Out = \(fs_Color3 \+ 1\.[0-9]+\);", Some 1
     ]
+
+[<Test>]
+let ``Geometry shader with non-record yield expression`` () =
+    Setup.Run()
+
+    let normalLine (x : Point<Vertex>) =
+        line {
+            let v = x.Value
+            yield v
+            yield { v with pos = v.pos * 0.5f }
+        }
+
+    GLSL.shouldCompile [
+        Effect.ofFunction normalLine
+    ]

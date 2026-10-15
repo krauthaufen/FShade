@@ -1169,6 +1169,17 @@ module Preprocessor =
         let tryGetVertexIndex (v : Var) =
             State.get |> State.map (fun s -> Map.tryFind v s.vertexIndex)
 
+        let copyVertexIndex (v : Var) (e : Expr) =
+            match e with
+            | Var vo ->
+                state {
+                    match! tryGetVertexIndex vo with
+                    | Some idx -> do! setVertexIndex v idx
+                    | _ -> ()
+                }
+            | _ ->
+                State.value ()
+
         let readAccelerationStructure (uniform : UniformParameter) =
             state {
                 do! uniform |> readUniform true
@@ -2741,6 +2752,7 @@ module Preprocessor =
 
                 | _ ->
                     let tmp = Var("tmp", value.Type)
+                    do! State.copyVertexIndex tmp value
                     let! args = fields |> List.mapS (fun f -> preprocessNormalS <| Expr.PropertyGet(Expr.Var tmp, f))
                     let values = (sems, args) ||> List.map2 (fun s v -> s, None, v)
                     return Expr.Let(tmp, value, Expr.WriteOutputs values)
