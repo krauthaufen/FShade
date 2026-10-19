@@ -1740,29 +1740,20 @@ module Compiler =
                     let! e = toCExprS e
                     return CConditional(ct, c, i, e)
 
-
-
-
                 | AddressOf e ->
                     let! e = toCExprS e
                     return CAddressOf(CPointer(CPointerModifier.None, e.ctype), e)
 
-
-
-                | Application _ 
-                | Lambda _ ->
-                    return failwith "[FShade] lambdas not implemented atm."
-
-
+                | Application _
+                | Lambda _
                 | NewDelegate _
                 | QuoteTyped _ 
                 | QuoteRaw _
                 | TypeTest _ ->
                     return failwithf "[FShade] unsupported expression %A" e
 
-
                 | _ ->
-                    return failwithf "[FShade unexpected expression kind %A" e
+                    return failwithf "[FShade] unexpected expression kind %A" e
         }
 
     and toCLExprS (e : Expr) =
