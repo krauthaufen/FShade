@@ -1,6 +1,7 @@
-- Fix ShaderDebugger with .NET 10
 - Fix dead-code elimination to properly handle deprecated `ref` operators
 - Fix issue with geometry shaders and non-expression record values
+- [Debugger] Fix issue with parsing .NET 10 projects
+- [Debugger] Use concurrent collections to fix race conditions
 
 ### 5.7.19
 - Fix utility function calls erasing uniform information in some edge cases

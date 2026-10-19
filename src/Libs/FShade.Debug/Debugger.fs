@@ -7,6 +7,7 @@ open FSharp.Data.Adaptive
 open System
 open System.Threading
 open System.Collections.Generic
+open System.Collections.Concurrent
 open System.Reflection
 
 module ShaderDebugger =
@@ -20,7 +21,7 @@ module ShaderDebugger =
             Assembly : Assembly
 
             // Callbacks to be invoked when the project is rebuilt
-            Callbacks : List<Assembly -> bool>
+            Callbacks : ConcurrentBag<Assembly -> bool>
         }
 
     type private SourceLocation =
@@ -65,7 +66,6 @@ module ShaderDebugger =
     // Only projects that reference FShade are regarded.
     let private projects = Dictionary<string, Project>()
 
-
     module private ShaderDefinition =
         open FSharp.Quotations
 
@@ -88,7 +88,7 @@ module ShaderDebugger =
                     let inputTypes =
                         parameters
                         |> Array.skip argumentCount
-                        |> Array.map (fun p -> p.ParameterType)
+                        |> Array.map _.ParameterType
                         |> List.ofArray
 
                     let arguments =
@@ -133,12 +133,10 @@ module ShaderDebugger =
             )
 
         let ofSourceDefinition =
-            let cache = Dictionary<string, ShaderDefinition>()
+            let cache = ConcurrentDictionary<string, Lazy<Result<ShaderDefinition, string>>>()
 
             fun (id : string) (definition : SourceDefinition) ->
-                match cache.TryGetValue id with
-                | (true, def) -> Result.Ok def
-                | _ ->
+                cache.GetOrAdd(id, fun id -> lazy (
                     match definition.Expression.DebugRange with
                     | Some (srcFile, startLine, startCol, _endLine, _endCol) ->
                         let srcFile = String.normalizePath srcFile
@@ -166,27 +164,31 @@ module ShaderDebugger =
 
                         match result with
                         | Some definition ->
-                            cache.[id] <- definition
                             Result.Ok definition
                         | _ ->
                             Result.Error $"Cannot find shader definition for {location}."
 
                     | None ->
                         Result.Error $"Shader {id} is missing debug information."
+                )).Value
 
         let ofEffect (effect : Effect) =
             match effect.SourceDefinition with
             | Some def -> def |> ofSourceDefinition effect.Id
-            | _ -> Result.Error $"Effect {id} is missing a source definition."
+            | _ -> Result.Error $"Effect {effect.Id} is missing a source definition."
 
         let ofRaytracingShader (shader : RaytracingShader) =
             match shader.SourceDefinition with
             | Some def -> def |> ofSourceDefinition shader.Id
-            | _ -> Result.Error $"Raytracing shader {id} is missing a source definition."
+            | _ -> Result.Error $"Raytracing shader {shader.Id} is missing a source definition."
 
         let ofComputeShader (shader : ComputeShader) =
             shader.csSourceDefinition |> ofSourceDefinition shader.csId
 
+    type private RegisterResult<'Shader> =
+        | Registered of definition: ShaderDefinition * shader: aval<'Shader>
+        | Unresolved of definition: ShaderDefinition * error: string
+        | DefinitionNotFound of error: string
 
     let private tryRegister<'Effect, 'Shader, 'Slot when 'Slot : comparison>
                             (description : string)
@@ -196,7 +198,7 @@ module ShaderDebugger =
                             (getDefinition : 'Shader -> Result<ShaderDefinition, string>)
                             (tryResolveDefinition : Assembly -> ShaderDefinition -> Result<'Shader, string>)
                             (compose : Map<'Slot, 'Shader> -> 'Effect) =
-        let shaderCache = Dictionary<string, ShaderDefinition * aval<'Shader>>()
+        let shaderCache = ConcurrentDictionary<string, Lazy<RegisterResult<'Shader>>>()
 
         let tryHook (effect : 'Effect) =
             let mutable success = false
@@ -208,49 +210,53 @@ module ShaderDebugger =
                 |> Map.map (fun _ shader ->
                     let id = getShaderId shader
 
-                    match shaderCache.TryGetValue id with
-                    | (true, (definition, effect)) ->
+                    let registered =
+                        shaderCache.GetOrAdd(id, fun id -> lazy (
+                            match getDefinition shader with
+                            | Result.Ok definition ->
+                                let assembly = projects.[definition.Project].Assembly
+
+                                match definition |> tryResolveDefinition assembly with
+                                | Result.Ok _ ->
+                                    let cval = cval shader
+
+                                    let update (assembly : Assembly) =
+                                        match definition |> tryResolveDefinition assembly with
+                                        | Result.Ok shader ->
+                                            cval.Value <- shader
+                                            true
+
+                                        | Result.Error error ->
+                                            Report.ErrorNoPrefix error
+                                            false
+
+                                    let project = projects.[definition.Project]
+                                    project.Callbacks.Add update
+                                    FileWatchers.activate project.Data
+                                    Registered (definition, cval)
+
+                                | Result.Error error ->
+                                    Unresolved (definition, error)
+
+                            | Result.Error error ->
+                                DefinitionNotFound error
+                        ))
+
+                    match registered.Value with
+                    | Registered (definition, shader) ->
                         Report.Line(2, $"{definition} - {definition.Location}")
                         success <- true
-                        string definition, effect
+                        string definition, shader
 
-                    | _ ->
-                        match getDefinition shader with
-                        | Result.Ok definition ->
-                            let assembly = projects.[definition.Project].Assembly
+                    // Failed to resolve definition in original assembly, use shader as-is with definition as name
+                    | Unresolved (definition, error) ->
+                        Report.Warn $"{error} ({definition.Location})"
+                        string definition, AVal.constant shader
 
-                            match definition |> tryResolveDefinition assembly with
-                            | Result.Ok _ ->
-                                let cval = cval shader
-
-                                let update (assembly : Assembly) =
-                                    match definition |> tryResolveDefinition assembly with
-                                    | Result.Ok shader ->
-                                        cval.Value <- shader
-                                        true
-
-                                    | Result.Error error ->
-                                        Report.ErrorNoPrefix error
-                                        false
-
-                                Report.Line(2, $"{definition} - {definition.Location}")
-
-                                success <- true
-                                let project = projects.[definition.Project]
-                                project.Callbacks.Add update
-                                FileWatchers.activate project.Data
-                                shaderCache.[id] <- (definition, cval)
-                                string definition, cval
-
-                            // Failed to resolve definition in original assembly, use shader as-is with definition as name
-                            | Result.Error error ->
-                                Report.Warn $"{error} ({definition.Location})"
-                                string definition, AVal.constant shader
-
-                        // Failed to get definition, just use shader as-is with id as name
-                        | Result.Error error ->
-                            Report.Warn error
-                            id, AVal.constant shader
+                    // Failed to get definition, just use shader as-is with id as name
+                    | DefinitionNotFound error ->
+                        Report.Warn error
+                        id, AVal.constant shader
                 )
 
             if success then
@@ -275,18 +281,11 @@ module ShaderDebugger =
                 None
 
         // Cache results for overall effects as well
-        let effectCache = Dictionary<string, aval<'Effect> option>()
+        let effectCache = ConcurrentDictionary<string, Lazy<aval<'Effect> option>>()
 
         fun (effect : 'Effect) ->
             let id = getEffectId effect
-
-            match effectCache.TryGetValue id with
-            | (true, result) -> result
-            | _ ->
-                let result = tryHook effect
-                effectCache.[id] <- result
-                result
-
+            effectCache.GetOrAdd(id, fun id -> lazy tryHook effect).Value
 
     // Tries to register an effect to be updated automatically when the corresponding project changes.
     // Note: Only the individual shaders may change, the composition is fixed.
@@ -309,9 +308,7 @@ module ShaderDebugger =
     let private tryRegisterRaytracingEffect : RaytracingEffect -> aval<RaytracingEffect> option =
         tryRegister<RaytracingEffect, RaytracingShader, ShaderSlot>
                     "raytracing effect"
-                    (fun effect -> effect.Id)
-                    (fun shader -> shader.Id)
-                    (fun effect -> effect.ShadersWithStubs)
+                    _.Id _.Id _.ShadersWithStubs
                     ShaderDefinition.ofRaytracingShader
                     ShaderDefinition.tryResolveRaytracingShader
                     RaytracingEffect.ofShaders
@@ -319,8 +316,7 @@ module ShaderDebugger =
     let private tryRegisterComputeShader : ComputeShader -> aval<ComputeShader> option =
         tryRegister<ComputeShader, ComputeShader, int>
                     "compute shader"
-                    (fun shader -> shader.csId)
-                    (fun shader -> shader.csId)
+                    _.csId _.csId
                     (fun shader -> Map.ofList [0, shader])
                     ShaderDefinition.ofComputeShader
                     ShaderDefinition.tryResolveComputeShader
@@ -338,7 +334,7 @@ module ShaderDebugger =
                 if refs |> Array.exists (fun r -> r.Name = coreLib) then
                     match Assembly.tryGetProjectData assembly with
                     | Some data ->
-                        projects.[data.Path] <- { Data = data; Assembly = assembly; Callbacks = List() }
+                        projects.[data.Path] <- { Data = data; Assembly = assembly; Callbacks = ConcurrentBag() }
                         Log.line "Found %s" data.Name
 
                     | None ->
@@ -423,7 +419,7 @@ module ShaderDebugger =
             for p in projects.Values do
                 p.Data |> FileWatchers.install (fun _ ->
                     lock dirty (fun () ->
-                        if p.Callbacks.Count > 0 && dirty.Add p.Data.Path then
+                        if not p.Callbacks.IsEmpty && dirty.Add p.Data.Path then
                             Monitor.PulseAll dirty
                     )
                 )

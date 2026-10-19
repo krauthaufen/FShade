@@ -1,12 +1,11 @@
 ﻿namespace FShade.Debug
 
 open System.IO
-open System.Collections.Generic
+open System.Collections.Concurrent
 open Aardvark.Base
 
 module internal FileWatchers =
-
-    let private watchers = Dictionary<string, FileSystemWatcher>()
+    let private watchers = ConcurrentDictionary<string, Lazy<FileSystemWatcher>>()
 
     let install (callback : string -> unit) (project : ProjectData) =
         let filesToWatch =
@@ -14,15 +13,8 @@ module internal FileWatchers =
             |> List.groupBy Path.GetDirectoryName
             |> List.map (fun (dir, files) -> dir, Set.ofList files)
 
-        for (dir, files) in filesToWatch do
-            let watcher =
-                match watchers.TryGetValue dir with
-                | (true, w) -> w
-                | _ ->
-                    let w = new FileSystemWatcher(dir)
-                    watchers.[dir] <- w
-                    w
-
+        for dir, files in filesToWatch do
+            let watcher = watchers.GetOrAdd(dir, fun dir -> lazy new FileSystemWatcher(dir)).Value
             watcher.Changed.Add (fun e -> if Set.contains e.FullPath files then callback e.FullPath)
             watcher.Renamed.Add (fun e -> if Set.contains e.FullPath files then callback e.FullPath)
             watcher.Created.Add (fun e -> if Set.contains e.FullPath files then callback e.FullPath)
@@ -38,14 +30,14 @@ module internal FileWatchers =
 
         for dir in directories do
             match watchers.TryGetValue dir with
-            | (true, w) ->
+            | true, w ->
                 try
-                    w.EnableRaisingEvents <- true
+                    w.Value.EnableRaisingEvents <- true
                 with exn ->
                     Log.warn "[FShade] Could not enable file watcher for directory '%s': %s" dir exn.Message
             | _ ->
                 Log.warn "[FShade] File watcher for directory '%s' not found" dir
 
     let dispose() =
-        for w in watchers.Values do w.Dispose()
+        for w in watchers.Values do w.Value.Dispose()
         watchers.Clear()
