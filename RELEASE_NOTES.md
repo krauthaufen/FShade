@@ -1,3 +1,4 @@
+### 5.7.20
 - Update to .NET 10
 - Fix dead-code elimination to properly handle deprecated `ref` operators
 - Fix issue with geometry shaders and non-expression record values
