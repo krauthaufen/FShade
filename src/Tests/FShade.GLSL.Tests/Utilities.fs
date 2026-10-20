@@ -244,7 +244,7 @@ type Setup() =
             if not !initialized then
                 Aardvark.Init()
                 let glslang = typeof<GLSLang.Optimization>.Assembly
-                let ptr = Aardvark.LoadLibrary(glslang, "GLSLangNative")
+                let ptr = Aardvark.LoadLibrary("GLSLangNative", glslang)
                 if ptr = 0n then failwith "could not load glslangnative"
                 //Environment.CurrentDirectory <- Path.GetDirectoryName(typeof<Setup>.Assembly.Location)
                 initialized := true
