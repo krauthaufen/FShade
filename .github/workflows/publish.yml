@@ -13,7 +13,7 @@ concurrency:
   queue: max
 
 jobs:
-  check-release:
+  release-check:
     name: Check for Release
     runs-on: ubuntu-latest
     outputs:
@@ -56,11 +56,16 @@ jobs:
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
 
+  test:
+    name: Test
+    needs: release-check
+    if: needs.release-check.outputs.should-skip != 'true'
+    uses: ./.github/workflows/test.yml
+
   pack:
     name: Package
     runs-on: windows-latest
-    needs: check-release
-    if: needs.check-release.outputs.should-skip != 'true'
+    needs: test
     permissions:
       id-token: write # enable GitHub OIDC token issuance for this job
       contents: write
@@ -78,9 +83,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: .\pack.cmd
-
-      - name: Test
-        run: dotnet test src\FShade.sln -c Release --no-build --nologo --logger:"console;verbosity=normal"
 
       - name: Upload Packages
         uses: actions/upload-artifact@v4
