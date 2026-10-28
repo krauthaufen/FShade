@@ -1,3 +1,5 @@
+- Add support for `byte` and `sbyte`
+
 ### 5.7.20
 - Update to .NET 10
 - Fix dead-code elimination to properly handle deprecated `ref` operators

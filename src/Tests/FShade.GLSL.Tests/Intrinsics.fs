@@ -3369,3 +3369,33 @@ let ``Atomic``() =
         ] |> List.map (fun n -> n, 2)
 
     GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader] expected
+
+[<Test>]
+let ``Conversions``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        vertex {
+            let _ = assertT <| uint8  v.c.X
+            let _ = assertT <| byte   v.c.X
+            let _ = assertT <| int8   v.c.X
+            let _ = assertT <| sbyte  v.c.X
+            let _ = assertT <| uint16 v.c.X
+            let _ = assertT <| int16  v.c.X
+            let _ = assertT <| uint32 v.c.X
+            let _ = assertT <| int32  v.c.X
+            let _ = assertT <| uint64 v.c.X
+            let _ = assertT <| int64  v.c.X
+            return 0f
+        }
+
+    GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader] [
+        "\(uint8_t\(Colors\.x\)\)",  2
+        "\(int8_t\(Colors\.x\)\)",   2
+        "\(uint16_t\(Colors\.x\)\)", 1
+        "\(int16_t\(Colors\.x\)\)",  1
+        "\(uint\(Colors\.x\)\)",     1
+        "\(int\(Colors\.x\)\)",      1
+        "\(uint64_t\(Colors\.x\)\)", 1
+        "\(int64_t\(Colors\.x\)\)",  1
+    ]

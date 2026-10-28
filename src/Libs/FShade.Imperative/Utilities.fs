@@ -186,8 +186,10 @@ module ReflectionPatterns =
     let private conversionMethods =
         HashSet.ofList [
             getMethodInfo <@ int8 @> 
-            getMethodInfo <@ uint8 @> 
-            getMethodInfo <@ int16 @> 
+            getMethodInfo <@ uint8 @>
+            getMethodInfo <@ sbyte @>
+            getMethodInfo <@ byte @>
+            getMethodInfo <@ int16 @>
             getMethodInfo <@ uint16 @>  
             getMethodInfo <@ int @> 
             getMethodInfo <@ int32 @> 
