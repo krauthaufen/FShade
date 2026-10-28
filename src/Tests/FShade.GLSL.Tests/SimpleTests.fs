@@ -1167,6 +1167,7 @@ let ``Debug output``() =
             Debug.Printf("Hello, look at my float32: %f", 0.0)
             Debug.Printf("Hello, look at my float32: %f", 0.0)
             Debug.Printf("Hello, look at my float32: %f", v.c.X)
+            Debug.Printf("Hello, look at my float32: %f, %f", 0.0, v.c.X)
             Debug.Printf("Hello, look at my vector: %v4f", v.c)
 
             Debug.Printfn("Hello" + " my " +  "World!")
@@ -1174,6 +1175,7 @@ let ``Debug output``() =
             Debug.Printfn("Hello, look at my float32: %f", 0.0)
             Debug.Printfn("Hello, look at my float32: %f", 0.0)
             Debug.Printfn("Hello, look at my float32: %f", v.c.X)
+            Debug.Printfn("Hello, look at my float32: %f, %f", 0.0, v.c.X)
             Debug.Printfn("Hello, look at my vector: %v4f", v.c)
 
             return V4i.Zero
@@ -1185,12 +1187,14 @@ let ``Debug output``() =
             Debug.Printf("Hello, look at my float32: %f", 0.0)
             Debug.Printf("Hello, look at my float32: %f", 0.0)
             Debug.Printf("Hello, look at my float32: %f", v.[0].X)
+            Debug.Printf("Hello, look at my float32: %f, %f", 0.0, v.[0].X)
             Debug.Printf("Hello, look at my vector: %v4f", v.[0])
 
             Debug.Printfn("Hello" + " my " +  "World!")
             Debug.Printfn("Hello, look at my float32: %f", 0.0)
             Debug.Printfn("Hello, look at my float32: %f", 0.0)
             Debug.Printfn("Hello, look at my float32: %f", v.[0].X)
+            Debug.Printfn("Hello, look at my float32: %f, %f", 0.0, v.[0].X)
             Debug.Printfn("Hello, look at my vector: %v4f", v.[0])
         }
 

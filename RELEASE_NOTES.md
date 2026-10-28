@@ -1,4 +1,5 @@
 - Add support for `byte` and `sbyte`
+- Fix issue with invoking `Debug.Printf` with constant and non-constant arguments
 
 ### 5.7.20
 - Update to .NET 10

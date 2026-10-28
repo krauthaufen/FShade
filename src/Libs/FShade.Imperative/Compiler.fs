@@ -1608,7 +1608,8 @@ module Compiler =
                         | _ ->
                             failwithf "[FShade] Failed to evaluate Debug.Printf format expression"
 
-                    let removeCoerce = function
+                    let unboxExpr = function
+                        | Value(v, t) when t = typeof<obj> -> Expr.Value(v, v.GetType())
                         | Coerce(e, _) -> e
                         | e -> e
 
@@ -1616,7 +1617,7 @@ module Compiler =
                         match values with
                         | NewArray(_, values)
                         | NewFixedArray(_, _, values) ->
-                            values |> List.toArray |> Array.map removeCoerce
+                            values |> List.toArray |> Array.map unboxExpr
 
                         | Value((:? array<obj> as arr), _) ->
                             arr |> Array.map (fun e -> Expr.Value(e, e.GetType()))
