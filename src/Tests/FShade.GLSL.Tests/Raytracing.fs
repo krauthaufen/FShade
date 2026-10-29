@@ -627,3 +627,31 @@ let ``Overloads and optional arguments``() =
          }
 
     GLSL.shouldCompileRaytracingAndContainRegex effect ["hitObjectNV ho;"]
+
+[<Test>]
+let ``Defensive copies of global data``() =
+    Setup.Run()
+
+    let raygenShader (input: RayGenerationInput) =
+        raygen {
+            let a = scene.TraceRay<V3f>(V3f.Zero, V3f.XAxis)
+            let b = HitObject() |> traceHitObject V3f.Zero V3f.YAxis V3f.Zero
+            uniform.OutputBuffer.[input.work.id.XY] <- V4f(a + b)
+
+            let c = Callable.Execute<V3f>()
+            let d = Callable.Execute<V3f>()
+            uniform.OutputBuffer.[input.work.id.XY] <- V4f(c + d + d)
+        }
+
+    let effect =
+         raytracingEffect {
+             raygen raygenShader
+         }
+
+    GLSL.shouldCompileRaytracingAndContainRegex effect [
+        "return rayPayload0;"
+        "vec3 tmp = rayPayload0;"
+        "vec3 tmp1 = callableData0;"
+        "vec4\(\(tmp \+ b\), 0\)"
+        "vec4\(\(\(tmp1 \+ callableData0\) \+ callableData0\)"
+    ]

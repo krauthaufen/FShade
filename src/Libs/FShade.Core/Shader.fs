@@ -1576,7 +1576,9 @@ module Preprocessor =
                             [ accel; flags; cullMask; rayId; Expr.Value(-1); missId; origin; minT; direction; maxT; payloadIndex ]
                         )
 
-                    Expr.ReadRaytracingData(e.Type, payloadName)
+                    // Defensive copy (optimized away if not required)
+                    let var = Var("tmp", e.Type)
+                    Expr.Let(var, Expr.ReadRaytracingData(e.Type, payloadName), Expr.Var var)
                 ]
 
             | RayPayloadIn _ when not (ShaderStage.supportsPayloadIn stage) ->
@@ -1607,7 +1609,9 @@ module Preprocessor =
 
                     Expr.Call(MethodInfo.executeCallable, [id; callableDataIndex])
 
-                    Expr.ReadRaytracingData(e.Type, callableDataName)
+                    // Defensive copy (optimized away if not required)
+                    let var = Var("tmp", e.Type)
+                    Expr.Let(var, Expr.ReadRaytracingData(e.Type, callableDataName), Expr.Var var)
                 ]
 
             | CallableDataIn _ when stage <> ShaderStage.Callable ->
@@ -1741,7 +1745,10 @@ module Preprocessor =
                     | _ -> ()
 
                     Expr.Call(MethodInfo.hitObjectExecuteShader, [hitObject; payloadIndex])
-                    Expr.ReadRaytracingData(e.Type, payloadName)
+
+                    // Defensive copy (optimized away if not required)
+                    let var = Var("tmp", e.Type)
+                    Expr.Let(var, Expr.ReadRaytracingData(e.Type, payloadName), Expr.Var var)
                 ]
 
             | HitObjectGetAttribute _ when not (ShaderStage.supportsTraceRay stage) ->
@@ -1755,7 +1762,10 @@ module Preprocessor =
 
                 return Expr.Seq [
                     Expr.Call(MethodInfo.hitObjectExtractAttributes, [hitObject; attributeIndex])
-                    Expr.ReadRaytracingData(e.Type, attributeName)
+
+                    // Defensive copy (optimized away if not required)
+                    let var = Var("tmp", e.Type)
+                    Expr.Let(var, Expr.ReadRaytracingData(e.Type, attributeName), Expr.Var var)
                 ]
 
             | ReorderThread when stage <> ShaderStage.RayGeneration ->

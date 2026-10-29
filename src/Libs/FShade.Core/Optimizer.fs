@@ -2477,36 +2477,25 @@ module Optimizer =
     module Inlining =
         type State =
             {
-                variables       : bool
-                trivial         : bool
-                inputs          : bool
                 isSideEffect    : MethodInfo -> bool
                 functions       : UtilityFunction -> bool
             }
 
-                 
         [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
         module State =
             let empty (isSideEffect : MethodInfo -> bool) = 
-                { 
-                    variables = true
-                    trivial = true
-                    inputs = true
+                {
                     isSideEffect = isSideEffect
-                    functions = fun f -> f.functionIsInline
+                    functions    = _.functionIsInline
                 }
 
             let inlineFunction (f : UtilityFunction) =
                 State.get |> State.map (fun s -> s.functions f)
 
-            let variables = State.get |> State.map (fun s -> s.variables)
-            let trivial = State.get |> State.map (fun s -> s.trivial)
-            let inputs = State.get |> State.map (fun s -> s.inputs)
-
             let swizzle = System.Text.RegularExpressions.Regex @"[xyzw]+"
 
             [<return: Struct>]
-            let rec (|TrivialOrInput|_|) (isMutated : Var -> bool) (e : Expr) =
+            let rec (|TrivialOrInput|_|) (isMutated : Var -> bool) (isRaytracingDataModified : string -> bool) (e : Expr) =
                 match e with
                 | Var v when v.IsMutable -> 
                     if not <| isMutated v then ValueSome ()
@@ -2517,14 +2506,17 @@ module Optimizer =
                 | FieldGet(None, _)
                 | PropertyGet(None, _, [])
                 | TupleGet(Trivial, _)
-                | PropertyGet(Some (TrivialOrInput isMutated), (FSharpTypeProperty | ArrayLengthProperty), [])
-                | FieldGet(Some (TrivialOrInput isMutated), _)
+                | PropertyGet(Some (TrivialOrInput isMutated isRaytracingDataModified), (FSharpTypeProperty | ArrayLengthProperty), [])
+                | FieldGet(Some (TrivialOrInput isMutated isRaytracingDataModified), _)
                 | Unchanged
-                | ReadInputOrRaytracingData(_, _, None, _)
-                | ReadInputOrRaytracingData(_, _, Some (TrivialOrInput isMutated), _) ->
+                | ReadInput(_, _, None)
+                | ReadInput(_, _, Some (TrivialOrInput isMutated isRaytracingDataModified)) ->
                     ValueSome()
 
-                | PropertyGet(Some (TrivialOrInput isMutated as t), prop, []) ->
+                | ReadRaytracingData(name, _) when not <| isRaytracingDataModified name ->
+                    ValueSome()
+
+                | PropertyGet(Some (TrivialOrInput isMutated isRaytracingDataModified as t), prop, []) ->
                     match t.Type with
                     | TypeMeta.Patterns.VectorOf _ ->
                         if swizzle.IsMatch (prop.Name.ToLower()) then ValueSome ()
@@ -2533,39 +2525,6 @@ module Optimizer =
                         ValueNone
 
                 | _ ->
-                    ValueNone
-
-            [<return: Struct>]
-            let rec (|OnlyVar|_|) (isMutated : Var -> bool) (e : Expr) =
-                match e with
-                | Var v when v.IsMutable -> 
-                    if not <| isMutated v then ValueSome ()
-                    else ValueNone
-
-                | Var _ 
-                | Value _ ->
-                    ValueSome ()
-                | _ -> 
-                    ValueNone
-            
-            [<return: Struct>]
-            let rec (|OnlyInputs|_|) (e : Expr) =
-                match e with
-                | ReadInputOrRaytracingData _ ->
-                    ValueSome ()
-                | _ -> 
-                    ValueNone
-                        
-            [<return: Struct>]
-            let rec (|InputOrVar|_|) (isMutated : Var -> bool) (e : Expr) =
-                match e with
-                | Var v when v.IsMutable -> 
-                    if not <| isMutated v then ValueSome ()
-                    else ValueNone
-                | ReadInputOrRaytracingData _
-                | Var _ ->
-                    ValueSome ()
-                | _ -> 
                     ValueNone
 
             [<return: Struct>]
@@ -2579,37 +2538,12 @@ module Optimizer =
                 | _ ->
                     ValueNone
 
-            let letValuePattern (isMutated : Var -> bool) =
+            let letValuePattern (isMutated : Var -> bool) (isRaytracingDataModified : string -> bool) =
                 State.get |> State.map (fun s ->
-                    let pat = 
-                        match s.variables, s.trivial, s.inputs with
-                        | (false | true), true, true ->
-                            (|TrivialOrInput|_|) isMutated
-
-                        | (false | true), true, false ->
-                            (|Trivial|_|)
-
-                        | true, false, false ->
-                            (|OnlyVar|_|) isMutated
-
-                        | false, false, true ->
-                            (|OnlyInputs|_|)
-
-                        | true, false, true ->
-                            (|InputOrVar|_|) isMutated
-
-                        | false, false, false ->
-                            fun _ -> ValueNone
-
-                    let sam (e : Expr) =
+                    fun (e : Expr) ->
                         match e.Type with
-                        | SamplerOrImageType -> ValueSome ()
-                        | _ -> ValueNone
-
-                    fun e ->
-                        match sam e with
-                        | ValueSome () -> ValueSome ()
-                        | ValueNone -> pat e
+                        | SamplerOrImageType -> ValueSome () // Always inline samplers an images
+                        | _ -> (|TrivialOrInput|_|) isMutated isRaytracingDataModified e
                 )
 
         [<return: Struct>]
@@ -2668,6 +2602,26 @@ module Optimizer =
             | ShapeLambda(_, b) -> usesVar v b
             | ShapeCombination(_, args) -> List.exists (usesVar v) args
 
+        let rec private isRaytracingDataModified (name : string) (e : Expr) =
+            match e with
+            | Call(_, mi, [_; _; _; _; _; _; _; _; _; _; Value (:? int as idx, _)])
+            | Call(_, mi, [_; _; _; _; _; _; _; _; _; _; _; Value (:? int as idx, _)]) when mi = MethodInfo.traceRay && name = $"rayPayload{idx}" ->
+                true
+
+            | Call(_, mi, [_; Value (:? int as idx, _)]) when mi = MethodInfo.executeCallable && name = $"callableData{idx}" ->
+                true
+
+            | Call(_, mi, [_; Value (:? int as idx, _)]) when mi = MethodInfo.hitObjectExecuteShader && name = $"rayPayload{idx}" ->
+                true
+
+            | CallFunction(f, args) ->
+                args |> List.exists (isRaytracingDataModified name) ||
+                isRaytracingDataModified name f.functionBody
+
+            | ShapeVar _ -> false
+            | ShapeLambda(_, b) -> isRaytracingDataModified name b
+            | ShapeCombination(_, args) -> List.exists (isRaytracingDataModified name) args
+
         let rec private canInline (isSideEffect : MethodInfo -> bool) (body : Expr) (e : Expr) =
             if e.Type.IsRef || e.Type.IsArr || e.Type.IsArray then
                 match e with
@@ -2675,8 +2629,11 @@ module Optimizer =
                 | _ -> false
             else
                 match e with
-                | ReadInputOrRaytracingData(_, _, None, _) -> true
-                | ReadInputOrRaytracingData(_, _, Some idx, _) -> canInline isSideEffect body idx
+                | ReadInput(_, _, None) -> true
+                | ReadInput(_, _, Some idx) -> canInline isSideEffect body idx
+
+                | ReadRaytracingData(name, _) ->
+                    not <| isRaytracingDataModified name body
 
                 | GetArray(e, i) ->
                     canInline isSideEffect body e && canInline isSideEffect body i
@@ -2738,11 +2695,11 @@ module Optimizer =
                         )
                         return Expr.WriteOutputs map
 
-                    | ReadInputOrRaytracingData(kind, name, idx, volatile) ->
+                    | ReadInputOrRaytracingData(kind, name, idx, slot) ->
                         match idx with
                             | Some idx ->
                                 let! idx = inlineS idx
-                                return Expr.ReadInput(kind, e.Type, name, idx, volatile)
+                                return Expr.ReadInput(kind, e.Type, name, idx, slot)
                             | None ->
                                 return e
 
@@ -2940,7 +2897,7 @@ module Optimizer =
                         else
                             let! e = inlineS e
                             let! state = State.get
-                            let! pattern = State.letValuePattern (flip isMutated b)
+                            let! pattern = State.letValuePattern (flip isMutated b) (flip isRaytracingDataModified b)
                             match pattern e with
                                 | ValueSome () ->
                                     match e with
