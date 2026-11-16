@@ -47,8 +47,9 @@ top of the file. `aardpack --parse-only` reads that heading; the Publish workflo
 push to `master` that touches `RELEASE_NOTES.md` and creates a GitHub release + NuGet packages
 if no release with that version exists yet.
 
-- To record work for the next release, add bullets under a new `### <next-version>` heading at the top
+- To record unreleased work, add plain `- ...` bullets at the very top of the file, above the first `### x.y.z` heading. Do not add a version heading; the maintainer adds it at release time
 - Never append to an already released block (its release already exists)
+- Keep entries short and user-facing (what changed, which API), no implementation details
 - Prefix backend-specific entries with `[GLSL]`, `[Raytracing]`, `[Debugger]`, `[Compute]`, `[Optimizer]`, `[fshadeaot]`
 - Some notes describe features that were later reverted (e.g. `SpecConstants` in 5.7.15 was reverted
   before 5.7.16). Source is truth; verify with `rg` before relying on a note
@@ -131,7 +132,7 @@ F# quotation  ->  Preprocessor (Shader.fs)  ->  Shader record (per stage)
 - [ ] `dotnet test src/FShade.sln` passes (GLSL tests need the native glslang that ships with GLSLangSharp)
 - [ ] New code generation behaviour has a `GLSL.shouldCompile*` test; new optimizer behaviour has an `Opt.run |> should exprEqual` test
 - [ ] Serializer changes: bump `blobFormatVersion` in `src/Libs/FShade.Core/Effect.fs` if the blob layout changed
-- [ ] `RELEASE_NOTES.md` updated under the next version heading
+- [ ] `RELEASE_NOTES.md` has a bullet for the change at the top of the file (no version heading)
 - [ ] No new warnings (`#nowarn "4321"` is expected where `Preprocessor` is used directly)
 
 ## Common Failures
