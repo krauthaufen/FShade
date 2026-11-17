@@ -62,7 +62,7 @@ Semantics of merging two shaders of the same stage (`Shader.Composition.simpleIn
 1. `l` runs first; outputs of `l` that `r` reads become local variables (converted if the types differ).
 2. Outputs written by `r` win; outputs of `l` that `r` does not write are passed through.
 3. Inputs of `r` that `l` does not produce become inputs of the merged shader.
-4. Uniforms are unioned; a name with conflicting types raises `uniform 'X' has conflicting types`.
+4. Uniforms are unioned; a name with conflicting types raises `uniform 'X' has conflicting types`. Storage buffer access flags are unioned too (a buffer written by one shader and read by the other becomes read-write; `Shader.optimize` re-derives the access from the merged body). The same union happens across stages when the assembler merges the per-stage declarations (`CUniform.mergeMany`).
 5. `DepthWriteMode` of `r` wins if set.
 
 Consequences: order matters ("last writer wins"), `compose` is associative with `Effect.empty` as

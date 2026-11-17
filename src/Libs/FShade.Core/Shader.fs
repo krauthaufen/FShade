@@ -3942,6 +3942,17 @@ module Shader =
                 | _ ->
                     shader.shaderOutputVertices, shader.shaderOutputPrimitives
 
+        // Storage-buffer access is re-derived from the optimized body and merged with the existing
+        // information. Composition inlines the body of one shader into another, so a buffer written by
+        // one shader and read by the other must end up read-write here (see Shader.withBody).
+        let newStorageAccess =
+            (shader.shaderStorageBufferAccess, state.storageBufferAccess)
+            ||> Map.fold (fun acc name access ->
+                match Map.tryFind name acc with
+                | Some existing -> Map.add name (existing ||| access) acc
+                | None -> Map.add name access acc
+            )
+
         // Do not use uniform information from the optimization pass, will not be accurate since uniforms
         // are replaced by Expr.ReadInput lacking a UniformValue. Only check for its existence.
         // The same applies for inputs regarding the InterpolationMode; this assumes that the optimization pass
@@ -3952,6 +3963,7 @@ module Shader =
             shaderOutputVertices = newOutputVertices
             shaderOutputPrimitives = newOutputPrimitives
             shaderBody = newBody
+            shaderStorageBufferAccess = newStorageAccess
         }
 
     let ofExpr (inputTypes : List<Type>) (e : Expr) =

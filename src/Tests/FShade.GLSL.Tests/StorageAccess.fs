@@ -142,3 +142,49 @@ let ``Storage buffer read and write in utility function``() =
 
     GLSL.shouldCompileAndContainRegex [Effect.ofFunction fs] expected
     GLSL.shouldCompileComputeAndContainRegex (ComputeShader.ofFunction (V3i(128)) cs) expected
+
+type Vertex =
+    {
+        [<Position>] pos : V4f
+    }
+
+[<Test>]
+let ``Storage buffer access is merged when composing fragment shaders``() =
+    Setup.Run()
+
+    let writer (v : Vertex) =
+        fragment {
+            uniform.FloatScratch.[0] <- 1.0f
+            return V3f.Zero
+        }
+
+    let reader (v : Vertex) =
+        fragment {
+            return V3f(uniform.FloatScratch.[1])
+        }
+
+    // writeonly in one shader, readonly in the other: the composed shader must declare the buffer read-write
+    let expected = [ "^buffer [fF]loatScratchBuffer {" ]
+
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction writer; Effect.ofFunction reader ] expected
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction reader; Effect.ofFunction writer ] expected
+
+[<Test>]
+let ``Storage buffer access is merged across stages``() =
+    Setup.Run()
+
+    let vs (v : Vertex) =
+        vertex {
+            uniform.FloatScratch.[0] <- v.pos.X
+            return v
+        }
+
+    let fs (v : Vertex) =
+        fragment {
+            return V3f(uniform.FloatScratch.[1])
+        }
+
+    // the declaration is shared by all stages of the program: vertex writes, fragment reads
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction vs; Effect.ofFunction fs ] [
+        "^buffer [fF]loatScratchBuffer {"
+    ]

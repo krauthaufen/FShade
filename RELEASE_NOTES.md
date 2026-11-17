@@ -1,3 +1,5 @@
+- Fix storage buffer access qualifiers (`readonly` / `writeonly`) when composed shaders access the same buffer differently
+
 ### 5.7.21
 - Add support for `byte` and `sbyte`
 - Fix issue with invoking `Debug.Printf` with constant and non-constant arguments

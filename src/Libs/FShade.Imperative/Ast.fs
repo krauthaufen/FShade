@@ -914,22 +914,38 @@ type CUniform =
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module CUniform =
+    // Merges the decorations of two declarations of the same uniform (e.g. from different stages).
+    // The storage buffer access is the union of both; a declaration without access information
+    // (read-write) wins over a restricted one.
+    let private mergeDecorations (l : list<UniformDecoration>) (r : list<UniformDecoration>) =
+        let access (d : list<UniformDecoration>) =
+            d |> List.tryPick (function UniformDecoration.BufferAccess a -> Some a | _ -> None)
+
+        let withoutAccess (d : list<UniformDecoration>) =
+            d |> List.filter (function UniformDecoration.BufferAccess _ -> false | _ -> true)
+
+        match access l, access r with
+        | Some a, Some b when a <> b -> UniformDecoration.BufferAccess (a ||| b) :: withoutAccess l
+        | Some _, None -> withoutAccess l
+        | _ -> l
+
     let mergeMany (groups : seq<list<CUniform>>) =
         let all = Dictionary.empty
-        let res = CSharpList.empty
         for uniforms in groups do
             for u in uniforms do
                 match all.TryGetValue u.cUniformName with
-                    | (true, o) ->
-                        if o.cUniformType <> u.cUniformType then
-                            failwithf "[FShade] conflicting uniform type for %A (%A vs %A)" u.cUniformName o.cUniformType u.cUniformType
+                | true, o ->
+                    if o.cUniformType <> u.cUniformType then
+                        failwithf "[FShade] conflicting uniform type for %A (%A vs %A)" u.cUniformName o.cUniformType u.cUniformType
 
-                    | _ ->
-                        all.[u.cUniformName] <- u
-                        res.Add u
+                    all.[u.cUniformName] <- { o with cUniformDecorations = mergeDecorations o.cUniformDecorations u.cUniformDecorations }
 
-        res.QuickSort(fun l r -> compare l.cUniformName r.cUniformName)
-        res |> CSharpList.toList
+                | _ ->
+                    all.[u.cUniformName] <- u
+
+        all.Values
+        |> Seq.sortBy _.cUniformName
+        |> Seq.toList
 
     let internal visit (used : Used) (u : CUniform) =
         used.AddType u.cUniformType
