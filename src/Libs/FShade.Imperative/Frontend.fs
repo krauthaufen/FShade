@@ -120,6 +120,7 @@ type EntryDecoration =
     | OutputVertices of int
     | LocalSize of V3i
     | Invocations of int
+    | FragmentInterlock of FragmentInterlockMode
 
 type EntryPoint =
     {

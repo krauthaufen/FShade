@@ -36,6 +36,7 @@
     <Compile Include="Specialization.fs" />
     <Compile Include="HelperFunctions.fs" />
     <Compile Include="GenericFunctions.fs" />
+    <Compile Include="Interlock.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

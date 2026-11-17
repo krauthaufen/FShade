@@ -973,6 +973,7 @@ module Interface =
                     | EntryDecoration.LocalSize t -> GLSLLocalSize t |> Some
                     | EntryDecoration.OutputTopology t -> GLSLOutputTopology t |> Some
                     | EntryDecoration.OutputVertices t -> GLSLMaxVertices t |> Some
+                    | EntryDecoration.FragmentInterlock m -> GLSLFragmentInterlock m |> Some
                     | EntryDecoration.Stages _ -> None
             )
 
@@ -2736,11 +2737,27 @@ module Assembler =
 
 
                     | ShaderStage.Compute ->
-                        let localSize = e.cDecorations |> List.tryPick (function EntryDecoration.LocalSize s when s.AllGreater 0 -> Some s | _ -> None) 
+                        let localSize = e.cDecorations |> List.tryPick (function EntryDecoration.LocalSize s when s.AllGreater 0 -> Some s | _ -> None)
                         [
                             match localSize with
                                 | Some s -> yield sprintf "layout (local_size_x = %d, local_size_y = %d, local_size_z = %d) in;" s.X s.Y s.Z
-                                | None -> yield "layout( local_size_variable ) in;" 
+                                | None -> yield "layout( local_size_variable ) in;"
+                        ]
+
+                    | ShaderStage.Fragment ->
+                        let interlock = e.cDecorations |> List.tryPick (function EntryDecoration.FragmentInterlock m -> Some m | _ -> None)
+                        [
+                            match interlock with
+                            | Some mode ->
+                                let qualifier =
+                                    match mode with
+                                    | FragmentInterlockMode.PixelOrdered -> "pixel_interlock_ordered"
+                                    | FragmentInterlockMode.PixelUnordered -> "pixel_interlock_unordered"
+                                    | FragmentInterlockMode.SampleOrdered -> "sample_interlock_ordered"
+                                    | FragmentInterlockMode.SampleUnordered -> "sample_interlock_unordered"
+                                    | m -> failwithf "[FShade] unknown fragment interlock mode %A" m
+                                yield sprintf "layout(%s) in;" qualifier
+                            | None -> ()
                         ]
 
                     | _ ->

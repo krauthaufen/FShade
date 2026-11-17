@@ -91,6 +91,7 @@ void main() { ... }
 - Shared memory (`allocateShared`, `allocateSharedValue`) becomes `shared T name[n];` / `shared T name;`.
 - Unbounded sampler/image/SSBO arrays each get their **own descriptor set** (must be the last binding; `Assembler.fs:2203`). Dynamic indexing of descriptor arrays emits `nonuniformEXT` only when `createDescriptorSets` is on.
 - 8/16/64-bit types pull in the matching `GL_EXT_shader_explicit_arithmetic_types_*` / storage extensions automatically (`useTypeExtensions`).
+- Fragment shader interlock emits `#extension GL_ARB_fragment_shader_interlock`, `layout(<mode>_interlock_<order>) in;` in the fragment stage and the `beginInvocationInterlockARB()` / `endInvocationInterlockARB()` calls (the `FragmentInterlock` entry decoration drives the qualifier, the intrinsic table the calls). The same ARB names are used for Vulkan; glslang maps them to the EXT SPIR-V opcodes.
 
 ## Program Interface
 
@@ -105,7 +106,7 @@ void main() { ... }
 | `images` | `MapExt<string, GLSLImage>` | set/binding, `imageType` (format, dimension, arrayness, value type) |
 | `accelerationStructures` | `MapExt<string, GLSLAccelerationStructure>` | set/binding |
 | `textures`, `samplerStates` | | only populated with `separateTexturesAndSamplers` |
-| `shaders` | `GLSLProgramShaders` | `Compute iface`, `Graphics { stages }`, `Raytracing { slots }`; per-stage `GLSLShaderInterface` with used uniform names, builtins, `shaderDecorations` (`GLSLLocalSize`, `GLSLMaxVertices`, `GLSLInputTopology`, `GLSLOutputTopology`, `GLSLInvocations`, `GLSLSpacing`, `GLSLWinding`) |
+| `shaders` | `GLSLProgramShaders` | `Compute iface`, `Graphics { stages }`, `Raytracing { slots }`; per-stage `GLSLShaderInterface` with used uniform names, builtins, `shaderDecorations` (`GLSLLocalSize`, `GLSLMaxVertices`, `GLSLInputTopology`, `GLSLOutputTopology`, `GLSLInvocations`, `GLSLSpacing`, `GLSLWinding`, `GLSLFragmentInterlock`) |
 
 `iface.GetUniformStages name` tells which stages use a uniform. `GLSLType` (`UniformBufferLayout.fs:9`)
 mirrors GLSL types with sizes/strides (`Int`, `Float`, `Vec`, `Mat`, `Struct(name, fields, size)`,
@@ -139,6 +140,7 @@ To add a GLSL function for an existing Aardvark/F# method: add a row to the tabl
 - Matrices: `reverseMatrixLogic` swaps matrix multiplication operands and dimensions so row-major Aardvark matrices can be uploaded without transposing; generated matrix code intentionally differs from hand-written column-major GLSL.
 - `GLSLVersion` is a struct without comparison; compare components.
 - Double-precision (`float`, `V4d`) requires `GL_ARB_gpu_shader_fp64`; on GL 4.1 drivers this fails at glslang/driver level, not in FShade.
+- glslang accepts the fragment-interlock layout qualifier only from `#version 450` (the ARB spec itself allows 4.20); tests use a `glsl430`-derived 4.50 backend for it, drivers are expected to accept 4.20+.
 
 ## See Also
 

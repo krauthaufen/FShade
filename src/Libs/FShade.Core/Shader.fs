@@ -3601,10 +3601,12 @@ module Shader =
                     getMethodInfo <@ barrier @>
                 ]
 
-            ShaderStage.Fragment, 
+            ShaderStage.Fragment,
                 HashSet.ofList [
                     getMethodInfo <@ discard @>
                     getMethodInfo <@ barrier @>
+                    getMethodInfo <@ beginInvocationInterlock @>
+                    getMethodInfo <@ endInvocationInterlock @>
                 ]
         ]
 
@@ -4348,9 +4350,96 @@ module Shader =
 
         withOutputs desired shader
 
+    /// Validation and mode extraction for invocation interlock (GL_ARB_fragment_shader_interlock).
+    module internal Interlock =
+        let private beginMeth = getMethodInfo <@ beginInvocationInterlock @>
+        let private endMeth = getMethodInfo <@ endInvocationInterlock @>
+
+        [<Struct>]
+        type private Occurrence =
+            | Begin of FragmentInterlockMode
+            | End
+
+        [<return: Struct>]
+        let private (|InterlockCall|_|) (e : Expr) =
+            match e with
+            | Call(None, mi, [arg]) when mi = beginMeth ->
+                match Expr.TryEval arg with
+                | Some (:? FragmentInterlockMode as mode) -> ValueSome (Begin mode)
+                | _ -> failwithf "[FShade] interlock mode passed to beginInvocationInterlock must be a constant: %A" arg
+
+            | Call(None, mi, []) when mi = endMeth ->
+                ValueSome End
+
+            | _ ->
+                ValueNone
+
+        // Collects interlock calls in evaluation order. A call is "top-level" when it is a statement of the
+        // main body, i.e. reachable only through Sequential nodes and Let continuations.
+        let rec private collect (topLevel : bool) (acc : ResizeArray<Occurrence * bool>) (e : Expr) =
+            match e with
+            | InterlockCall o ->
+                acc.Add(o, topLevel)
+
+            | Sequential(l, r) ->
+                collect topLevel acc l
+                collect topLevel acc r
+
+            | Let(_, value, body) ->
+                collect false acc value
+                collect topLevel acc body
+
+            | CallFunction(f, args) ->
+                collect false acc f.functionBody
+                for a in args do collect false acc a
+
+            | ShapeVar _ ->
+                ()
+
+            | ShapeLambda(_, b) ->
+                collect false acc b
+
+            | ShapeCombination(_, args) ->
+                for a in args do collect false acc a
+
+        let private occurrences (body : Expr) =
+            let acc = ResizeArray()
+            collect true acc body
+            acc
+
+        /// Returns true if the body contains any call to begin-/endInvocationInterlock.
+        let usesInterlock (body : Expr) =
+            (occurrences body).Count > 0
+
+        /// Validates the interlock calls of a shader body and returns the interlock mode (if any).
+        let tryGetMode (stage : ShaderStage) (body : Expr) =
+            let occ = occurrences body
+            if occ.Count = 0 then
+                ValueNone
+            else
+                if stage <> ShaderStage.Fragment then
+                    failwithf "[FShade] invocation interlock can only be used in fragment shaders (used in %A shader)" stage
+
+                for o, topLevel in occ do
+                    if not topLevel then
+                        let name = match o with Begin _ -> "beginInvocationInterlock" | End -> "endInvocationInterlock"
+                        failwithf "[FShade] %s must be called at the top level of the fragment shader (not within control flow or utility functions)" name
+
+                let begins = occ |> Seq.indexed |> Seq.choose (fun (i, (o, _)) -> match o with Begin m -> Some (i, m) | End -> None) |> Seq.toList
+                let ends = occ |> Seq.indexed |> Seq.choose (fun (i, (o, _)) -> match o with End -> Some i | Begin _ -> None) |> Seq.toList
+
+                match begins, ends with
+                | [ (iBegin, mode) ], [ iEnd ] ->
+                    if iEnd < iBegin then
+                        failwith "[FShade] endInvocationInterlock must be called after beginInvocationInterlock"
+                    ValueSome mode
+                | _ ->
+                    failwithf "[FShade] beginInvocationInterlock and endInvocationInterlock must each be called exactly once (found %d and %d calls)" begins.Length ends.Length
+
     /// translates a shader to an EntryPoint which can be used for compiling
     /// the shader to a CAst
     let toEntryPoint (prev : Option<Shader>) (s : Shader) (next : Option<Shader>) =
+        let interlockMode = Interlock.tryGetMode s.shaderStage s.shaderBody
         let mutable hasSourceVertexIndex = false
         let inputs = 
             s.shaderInputs |> Map.toList |> List.choose (fun (n,i) -> 
@@ -4458,6 +4547,10 @@ module Shader =
                         | ShaderOutputVertices.Unknown -> ()
                         | ShaderOutputVertices.Computed v | ShaderOutputVertices.UserGiven v ->
                             yield EntryDecoration.OutputVertices v
+
+                    match interlockMode with
+                    | ValueSome mode -> yield EntryDecoration.FragmentInterlock mode
+                    | ValueNone -> ()
                 ]
         }
 
@@ -5293,6 +5386,9 @@ module Shader =
         match l.shaderStage, r.shaderStage with
 
             // simple case: both are vertex/fragment
+            | ShaderStage.Fragment, ShaderStage.Fragment when Interlock.usesInterlock l.shaderBody && Interlock.usesInterlock r.shaderBody ->
+                failwith "[FShade] cannot compose two fragment shaders that both use invocation interlock"
+
             | ShaderStage.Vertex, ShaderStage.Vertex
             | ShaderStage.Fragment, ShaderStage.Fragment ->
                 Composition.simple l r

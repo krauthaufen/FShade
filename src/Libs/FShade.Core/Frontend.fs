@@ -201,6 +201,25 @@ module Primitives =
     let discard () : unit = onlyInShaderCode "discard"
 
     /// <summary>
+    /// Begins the invocation interlock critical section (GL_ARB_fragment_shader_interlock).
+    /// Invocations covering the same pixel (or sample) execute the section between
+    /// <c>beginInvocationInterlock</c> and <c>endInvocationInterlock</c> mutually exclusively.
+    /// </summary>
+    /// <remarks>
+    /// Only allowed in fragment shaders. Both functions must be called exactly once at the top level of
+    /// the shader (not inside control flow or utility functions), begin before end. The mode must be a
+    /// compile-time constant.
+    /// </remarks>
+    [<KeepCall>]
+    let beginInvocationInterlock (mode : FragmentInterlockMode) : unit = onlyInShaderCode "beginInvocationInterlock"
+
+    /// <summary>
+    /// Ends the invocation interlock critical section started by <c>beginInvocationInterlock</c>.
+    /// </summary>
+    [<KeepCall>]
+    let endInvocationInterlock () : unit = onlyInShaderCode "endInvocationInterlock"
+
+    /// <summary>
     /// Signals to the optimizer that the given for-loop should be unrolled if possible.
     /// </summary>
     /// <example>

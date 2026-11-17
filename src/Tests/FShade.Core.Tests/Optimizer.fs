@@ -1144,3 +1144,17 @@ let ``[Let] parameter read is not moved past write through its address``() =
     let result = input |> Opt.run
     result |> hasCall "readThenInc$" |> should be True
     result |> exists (function Let(v, _, _) when v.Name = "b" -> true | _ -> false) |> should be True
+[<Test>]
+let ``[Interlock] calls survive dead-code elimination``() =
+    let input =
+        <@
+            beginInvocationInterlock FragmentInterlockMode.PixelOrdered
+            let a = produce<int>()
+            keep a
+            endInvocationInterlock()
+        @>
+
+    let expected =
+        input
+
+    input |> Opt.run |> should exprEqual expected

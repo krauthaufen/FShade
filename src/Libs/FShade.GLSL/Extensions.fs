@@ -4,6 +4,7 @@ module GLSLExtension =
     let [<Literal>] AMDGpuShaderHalfFloat                   = "GL_AMD_gpu_shader_half_float"
     let [<Literal>] AMDGpuShaderInt16                       = "GL_AMD_gpu_shader_int16"
     let [<Literal>] AMDGpuShaderInt64                       = "GL_AMD_gpu_shader_int64"
+    let [<Literal>] ARBFragmentShaderInterlock              = "GL_ARB_fragment_shader_interlock"
     let [<Literal>] ARBGpuShaderFp64                        = "GL_ARB_gpu_shader_fp64"
     let [<Literal>] ARBGpuShaderInt64                       = "GL_ARB_gpu_shader_int64"
     let [<Literal>] ARBSeparateShaderObjects                = "GL_ARB_separate_shader_objects"

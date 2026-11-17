@@ -498,6 +498,7 @@ type GLSLShaderDecoration =
     | GLSLSpacing of GLSLSpacing
     | GLSLWinding of GLSLWinding
     | GLSLLocalSize of V3i
+    | GLSLFragmentInterlock of FragmentInterlockMode
 
 [<AutoOpen>]
 module private Tools =
@@ -692,6 +693,7 @@ type GLSLShaderInterface =
                                 | GLSLOutputTopology d -> yield sprintf "    output-top: %A" d |> Some
                                 | GLSLInvocations d -> yield sprintf "    invocations: %A" d |> Some
                                 | GLSLLocalSize d -> yield sprintf "    local-size: %dx%dx%d" d.X d.Y d.Z |> Some
+                                | GLSLFragmentInterlock m -> yield sprintf "    interlock: %A" m |> Some
                                 | GLSLSpacing d -> yield sprintf "    spacing: %A" d |> Some
                                 | GLSLWinding d -> yield sprintf "    winding: %A" d |> Some
                         yield "}" |> Some
@@ -1097,6 +1099,9 @@ module GLSLShaderInterface =
                 dst.Write s.X
                 dst.Write s.Y
                 dst.Write s.Z
+            | GLSLFragmentInterlock m ->
+                dst.Write 7uy
+                dst.Write (int m)
 
         dst.Write (s.shaderBuiltIns.Count)
         for KeyValue(kind, m) in s.shaderBuiltIns do
@@ -1186,8 +1191,12 @@ module GLSLShaderInterface =
                     match src.ReadByte() with
                     | 0uy -> GLSLWinding GLSLWinding.CW
                     | _ -> GLSLWinding GLSLWinding.CCW
-                | _ ->
+                | 6uy ->
                     GLSLLocalSize(V3i(src.ReadInt32(), src.ReadInt32(), src.ReadInt32()))
+                | 7uy ->
+                    GLSLFragmentInterlock(src.ReadInt32() |> unbox<FragmentInterlockMode>)
+                | t ->
+                    failwithf "[FShade] unknown shader decoration tag %d" t
             )
             
         let shaderBuiltIns =

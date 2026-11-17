@@ -150,6 +150,8 @@ F# quotation  ->  Preprocessor (Shader.fs)  ->  Shader record (per stage)
 | `undefined variable "nonuniformEXT"` on GL | Dynamic descriptor-array indexing emitted for a non-descriptor backend | Fixed in 5.7.8; ensure `createDescriptorSets = false` on GL backends |
 | Debugger: `WARNING: Cannot find shader definition for ...` | PDB paths from a NuGet package do not exist locally | Build the project locally or ignore for shaders you do not edit |
 | Debugger: `Failed to resolve shader <StartupCode$...>` | Shader defined as a value, not a function | Define as `let shader () = ...` or `let shader (v : Vertex) = ...` |
+| glslang: `'fragment shader interlock layout qualifier' : not supported for this version` | glslang requires `#version 450` for interlock qualifiers | Validate with a 4.50 (or Vulkan) backend; GL drivers accept 4.20+ |
+| `[FShade] beginInvocationInterlock ... must be called at the top level` | Interlock call inside `if`/loop/helper function | Move both calls to the shader body's top level |
 
 ## Agent Workflow Tips
 

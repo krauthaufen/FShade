@@ -2106,6 +2106,13 @@ module IntrinsicFunctions =
             CIntrinsic.simple "dFdxCoarse", [ generic <@ ddxCoarse : float -> _ @> ]
             CIntrinsic.simple "dFdyCoarse", [ generic <@ ddyCoarse : float -> _ @> ]
             CIntrinsic.tagged "discard", [ exactly <@ discard @> ]
+
+            // The mode argument of beginInvocationInterlock is consumed by the entry-point layout
+            // qualifier (see EntryDecoration.FragmentInterlock); the format drops it from the call.
+            yield! requireExtension GLSLExtension.ARBFragmentShaderInterlock [
+                CIntrinsic.tagged "beginInvocationInterlockARB()", [ exactly <@ beginInvocationInterlock @> ]
+                CIntrinsic.simple "endInvocationInterlockARB",     [ exactly <@ endInvocationInterlock @> ]
+            ]
             CIntrinsic.simple "EmitVertex", [ exactly <@ emitVertex @> ]
             CIntrinsic.simple "EndPrimitive", [
                 exactly <@ restartStrip @>

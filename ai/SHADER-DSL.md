@@ -282,7 +282,43 @@ object-typed values are not supported.
 - `for i in a .. b`, `for i in a .. step .. b`, `for i = a to b`, `downto`, `for x in arr` (`Arr<_,_>` or fixed arrays); `int32` and `float32` loop variables
 - `for i in unroll 0 .. 5 do` (or `for i = unroll 0 to 5 do`) unrolls at compile time; a `match i with` inside an unrolled loop is folded per iteration
 - `discard()` in fragment shaders; `ddx`/`ddy`/`ddxFine`/`ddxCoarse` derivatives
+- `beginInvocationInterlock mode` / `endInvocationInterlock()` delimit a fragment-shader critical section (see below)
 - `Debug.Printf("P = %v4f", v.pos)` / `Debug.Printfn` emit `debugPrintfEXT` when `GL_EXT_debug_printf` is available (Vulkan validation layers), otherwise a comment
+
+## Fragment Shader Interlock
+
+`GL_ARB_fragment_shader_interlock` support (`src/Libs/FShade.Core/Frontend.fs`): invocations
+covering the same pixel (or sample) execute the code between the two calls mutually exclusively,
+which makes read-modify-write on images/storage buffers safe (order-independent transparency etc.).
+
+```fsharp
+type UniformScope with
+    member x.Accum : Image2d<Formats.rgba32f> = x?Accum
+
+type Fragment = { [<FragCoord>] fc : V4f; [<Color>] c : V4f }
+
+let accumulate (v : Fragment) =
+    fragment {
+        beginInvocationInterlock FragmentInterlockMode.PixelOrdered
+        let old = uniform.Accum.[V2i v.fc.XY]
+        uniform.Accum.[V2i v.fc.XY] <- old + v.c
+        endInvocationInterlock()
+        return v.c
+    }
+```
+
+| `FragmentInterlockMode` | GLSL qualifier |
+|-------------------------|----------------|
+| `PixelOrdered` | `layout(pixel_interlock_ordered) in;` (primitive order) |
+| `PixelUnordered` | `layout(pixel_interlock_unordered) in;` |
+| `SampleOrdered` | `layout(sample_interlock_ordered) in;` (only invocations sharing a sample) |
+| `SampleUnordered` | `layout(sample_interlock_unordered) in;` |
+
+Rules, checked when the effect is linked (`Shader.Interlock` in `Shader.fs`):
+- fragment shaders only; the mode must be a compile-time constant (literal or closure argument)
+- exactly one `begin` and one `end`, `begin` first, both as top-level statements of the shader body: not inside `if`/loops and not inside `[<ReflectedDefinition>]` helpers
+- two fragment shaders that both use interlock cannot be composed; a plain fragment shader can be composed before or after an interlocked one (its code runs outside the critical section when the interlocked shader comes first)
+- the mode is reported as `GLSLShaderDecoration.GLSLFragmentInterlock` in the program interface; Vulkan consumers must enable `VK_EXT_fragment_shader_interlock`
 
 ## Gotchas
 

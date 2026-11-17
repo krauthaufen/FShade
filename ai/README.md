@@ -30,6 +30,7 @@ conventions, compute/raytracing runtime APIs) is documented in that repository's
 - `sampler2d { }`, `textureArray`, `Image2d<Formats.rgba8>`, `SamplerState` -> SHADER-DSL.md
 - `[<ReflectedDefinition>]`, `[<Inline>]`, `[<KeepCall>]`, `[<GLSLIntrinsic>]`, `onlyInShaderCode` -> SHADER-DSL.md
 - `unroll`, `discard`, `ddx`, `Atomic`, `Bitwise`, pack/unpack -> SHADER-DSL.md
+- `beginInvocationInterlock`, `endInvocationInterlock`, `FragmentInterlockMode` -> SHADER-DSL.md
 - `compute { }`, `[<LocalSize>]`, `getGlobalId`, `allocateShared`, `barrier` -> COMPUTE.md
 - `raygen`, `miss`, `closestHit`, `anyHit`, `intersection`, `callable`, `scene { }`, `TraceRay`, `unchanged`, `HitObject` -> RAYTRACING.md
 

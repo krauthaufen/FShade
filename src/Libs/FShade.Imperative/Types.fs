@@ -232,6 +232,21 @@ type StorageAccess =
     | ReadWrite     = 0x03
     | Atomic        = 0x04
 
+/// <summary>
+/// Controls the granularity and ordering of the critical section delimited by
+/// <c>beginInvocationInterlock</c> / <c>endInvocationInterlock</c> in fragment shaders
+/// (GL_ARB_fragment_shader_interlock).
+/// </summary>
+type FragmentInterlockMode =
+    /// Critical sections of invocations covering the same pixel are mutually exclusive and run in primitive order.
+    | PixelOrdered    = 0
+    /// Critical sections of invocations covering the same pixel are mutually exclusive, in no particular order.
+    | PixelUnordered  = 1
+    /// Like PixelOrdered, but only for invocations sharing at least one covered sample.
+    | SampleOrdered   = 2
+    /// Like PixelUnordered, but only for invocations sharing at least one covered sample.
+    | SampleUnordered = 3
+
     
 type Preprocessor private() =
     [<Obsolete("Use 'unroll' instead. E.g. for i in unroll 0 .. 5 do")>]
