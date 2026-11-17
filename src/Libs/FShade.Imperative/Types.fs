@@ -19,11 +19,6 @@ type InterpolationMode =
     | Sample            = 8
     | PerPatch          = 16
 
-type MemoryType =
-    | None = 0
-    | Global = 1
-    | Local = 2
-
 /// <summary>
 /// Bitmask flags that control ray traversal, hit reporting and shader invocation.
 /// These mirror the commonly used ray flags in Vulkan (KHR) and DirectX Raytracing (DXR)
@@ -246,11 +241,6 @@ type FragmentInterlockMode =
     | SampleOrdered   = 2
     /// Like PixelUnordered, but only for invocations sharing at least one covered sample.
     | SampleUnordered = 3
-
-    
-type Preprocessor private() =
-    [<Obsolete("Use 'unroll' instead. E.g. for i in unroll 0 .. 5 do")>]
-    static member unroll() = ()
 
 [<AutoOpen>]
 module Operators = 
