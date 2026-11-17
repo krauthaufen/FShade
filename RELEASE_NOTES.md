@@ -1,3 +1,4 @@
+- Add `allocateSharedValue` for non-array shared variables in compute shaders
 - Fix dead-code elimination removing utility functions that only write storage buffers, shared memory or images
 - Inline utility functions with `ref` parameters are inlined again and modify the caller's variable (#38)
 - Fix inlining of values read from a `ref` that is later passed to a function

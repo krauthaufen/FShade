@@ -109,7 +109,7 @@ let f (v : Vertex) = fragment { let t : float32 = uniform?Time in return v.c * t
 | any other name (`PerModel`, `PerView`, ...) | uniform buffer with that name; Aardvark.Rendering groups update frequency by it |
 | `StorageBuffer` | shader storage buffer object; `T[]` element type, read/write access is inferred per shader (`readonly`/`writeonly`/none) |
 | `Arguments` | compute argument buffer (see `COMPUTE.md`) |
-| `SharedMemory` | internal, used by `allocateShared` |
+| `SharedMemory` | internal, used by `allocateShared` and `allocateSharedValue` |
 | `PushConstant` | push constant block when `Config.pushConstants` is on (Vulkan preset) |
 
 Storage buffers support element writes (`uniform.Colors.[i] <- v`, `uniform.Data.[i].Field.X <- 0.0f`),

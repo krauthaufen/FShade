@@ -87,7 +87,7 @@ void main() { ... }
 - Each entry is wrapped in `#ifdef <conditional>`; graphics stages use the stage name, raytracing slots use `ShaderSlot.Conditional` (e.g. `ClosestHit_Model_Primary`). Consumers compile the same source once per stage with the matching `#define`.
 - Names pass through `glslName` (`Assembler.fs:1325`): invalid characters become `_` or their char code, reserved words (`src/Libs/FShade.GLSL/Keywords.fs`) get a `_` prefix. `checkName` is the strict variant that throws (`[GLSL] "x" is a reserved keyword ...`).
 - Storage buffers are `std430`, uniform buffers `std140` (`Assembler.fs:2151`). A `T[][]` storage buffer becomes `buffer XBuffer { T[] data; } X[];` (`ssbCount = -1`).
-- Shared memory (`allocateShared`) becomes `shared T name[n];`.
+- Shared memory (`allocateShared`, `allocateSharedValue`) becomes `shared T name[n];` / `shared T name;`.
 - Unbounded sampler/image/SSBO arrays each get their **own descriptor set** (must be the last binding; `Assembler.fs:2203`). Dynamic indexing of descriptor arrays emits `nonuniformEXT` only when `createDescriptorSets` is on.
 - 8/16/64-bit types pull in the matching `GL_EXT_shader_explicit_arithmetic_types_*` / storage extensions automatically (`useTypeExtensions`).
 

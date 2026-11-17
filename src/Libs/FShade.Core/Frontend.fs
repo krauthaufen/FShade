@@ -336,7 +336,18 @@ module Primitives =
     let getWorkGroupSize() : V3i = onlyInShaderCode "getWorkGroupSize"
     let getWorkGroupCount() : V3i = onlyInShaderCode "getWorkGroupCount"
     let barrier() : unit = onlyInShaderCode "barrier"
-    let allocateShared<'a when 'a : unmanaged> (size : int) : 'a[] =  onlyInShaderCode "allocateShared"
+
+    /// Declares a shared array of the given constant size (compute shaders only). The result must be
+    /// bound with let and only used for element reads and writes (it cannot be passed as a whole).
+    /// The array is identified by the name of the bound variable, its element type and size: declaring
+    /// it again (e.g. in a utility function) refers to the same array.
+    let allocateShared<'a when 'a : unmanaged> (size : int) : 'a[] = onlyInShaderCode "allocateShared"
+
+    /// Declares a single shared variable (compute shaders only). The result must be bound with let;
+    /// the variable is read and written through the returned ref. The variable is identified by the
+    /// name of the bound variable and its type: declaring it again (e.g. in a utility function) refers
+    /// to the same variable.
+    let allocateSharedValue<'a when 'a : unmanaged> () : 'a ref = onlyInShaderCode "allocateSharedValue"
 
 
     [<Sealed; AbstractClass>]

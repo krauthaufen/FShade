@@ -236,6 +236,15 @@ module GLSL =
     let shouldCompileComputeAndContainRegex (c : ComputeShader) (s : list<string>) =
         shouldCompileComputeAndContainRegex' glslVulkan c s
 
+    let shouldCompileComputeAndContainRegexWithCount' (backend : Backend) (c : ComputeShader) (s : list<string * int>) =
+        let s = s |> List.map (fun (s, n) -> s, Some n)
+        let glsl, res = compileCompute' backend c
+        printResults None res glsl
+        shouldContainRegex glsl s
+
+    let shouldCompileComputeAndContainRegexWithCount (c : ComputeShader) (s : list<string * int>) =
+        shouldCompileComputeAndContainRegexWithCount' glslVulkan c s
+
 type Setup() =
     static let initialized = ref false
 

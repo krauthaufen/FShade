@@ -50,7 +50,8 @@ The `cs_` prefix on non-buffer arguments is a legacy quirk kept for backwards co
 | `getWorkGroupId() : V3i`, `getWorkGroupCount() : V3i`, `getWorkGroupSize() : V3i` | `gl_WorkGroupID`, `gl_NumWorkGroups`, `gl_WorkGroupSize` |
 | `LocalSize : V3i` | constant-folded to the attribute value |
 | `barrier()` | `barrier()`; treated as a side effect |
-| `allocateShared<'a> size : 'a[]` | `shared 'a name[size]`; `size` must be a compile-time constant, result must be bound with `let` and only indexed |
+| `allocateShared<'a> size : 'a[]` | `shared 'a name[size]`; `size` must be a compile-time constant, result must be bound with `let` and only used for element reads/writes |
+| `allocateSharedValue<'a> () : 'a ref` | `shared 'a name;` for a single value; bound with `let`, read/written via `.Value`, passable to `ref` parameters and `Atomic.*` |
 | `Atomic.Add(&&buffer.[i], 1)`, `Atomic.Min/Max/And/Or/Xor/Exchange/CompareExchange` | `atomicAdd(...)` etc. on `int`/`uint` storage locations |
 | `img.AtomicAdd(coord, v)` | `imageAtomicAdd` (int/uint images) |
 | `Debug.Printf` | `debugPrintfEXT` (Vulkan with validation layers) |
@@ -113,7 +114,8 @@ Hot reload of compute shaders via `FShade.Debug` is supported but interface chan
 
 ## Gotchas
 
-- `allocateShared` must be `let mem : T[] = allocateShared n` at statement level with a constant `n`; anything else fails with `non-static call to allocateShared` / `could not evaluate size for allocateShared`, and using `mem` as a value (not indexed) fails with `cannot use shared memory as value`.
+- `allocateShared` must be `let mem : T[] = allocateShared n` at statement level with a constant `n`; anything else fails with `non-static call to allocateShared` / `could not evaluate size for allocateShared`, and using `mem` as a value (not indexed) fails with `cannot use shared memory as value`. `allocateSharedValue<T>()` has the same `let` requirement (`non-static call to allocateSharedValue`).
+- **Shared memory is identified by name**: the GLSL variable is named after the F# variable, its type and (for arrays) size (`sum_int`, `mem_intx64`). Shared arrays cannot be passed to functions, so a utility function accesses the kernel's shared memory by declaring it again with the same name, type and size (`let mem : int[] = allocateShared 64` in both places refers to one `shared int mem_intx64[64]`). Different sizes or types give different variables. Use distinct names for distinct scratch memory.
 - A `T[]` parameter is always a storage buffer; a storage buffer declared via `uniform?StorageBuffer?X` works too, but a fixed-size `Arr<_,_>` parameter is a uniform-buffer field, never an SSBO.
 - Storage buffer access flags are inferred per shader; a buffer only written is `writeonly` and cannot be read back in the same shader without FShade seeing the read.
 - Local size is part of the hash: the same function with different `maxLocalSize` yields different shaders when `MaxLocalSize` is used.

@@ -1820,6 +1820,23 @@ module Preprocessor =
                 | Call(None, mi, [size]) when mi.Name = "allocateShared" ->
                     return failwith "[FShade] non-static call to allocateShared"
 
+                | Call(None, mi, _) when mi.Name = "allocateSharedValue" ->
+                    return failwith "[FShade] non-static call to allocateSharedValue"
+
+                // let v = allocateSharedValue<'a>() in <body>
+                // v is replaced by a reference to a shared variable of type 'a
+                | Let(v, Call(None, mi, _), b) when mi.Name = "allocateSharedValue" ->
+                    let t = mi.ReturnType.GetGenericArguments().[0]
+                    let name = sprintf "%s_%s" v.Name t.PrettyName
+
+                    let rep = Expr.RefOf(Expr.ReadInput(ParameterKind.Uniform, t, name))
+                    let b = b.Substitute(fun vv -> if vv = v then Some rep else None)
+
+                    let u = { uniformName = name; uniformType = t; uniformValue = UniformValue.Attribute(uniform?SharedMemory, name) }
+                    do! u |> State.readUniform true
+
+                    return! preprocessComputeS b
+
                 | Let(v, Call(None, mi, [size]),b) when mi.Name = "allocateShared" ->
                     let! size = preprocessComputeS size
                     match Expr.TryEval size with
