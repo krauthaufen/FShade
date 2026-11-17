@@ -275,6 +275,7 @@ object-typed values are not supported.
 - **Missing `[<ReflectedDefinition>]`**: `[FShade] cannot call function X since it is not reflectable` / `utility function X is not reflectable`.
 - **Samplers must be top-level**: a sampler created inside the shader body is not a static value and cannot be reflected into a uniform.
 - **Uniform type must be annotated**: `uniform?Foo` without a type annotation infers `obj` and fails later; conflicting annotations across shaders fail at composition with `uniform 'Foo' has conflicting types`.
+- **The uniform's identity is the string after `?`, not the member name**: `member x.A : int[] = x?StorageBuffer?Data` and `member x.B : int[] = x?StorageBuffer?Data` are the *same* uniform `Data`. They must agree on type and scope (`has conflicting types/values` otherwise). Two members with different names only give two uniforms if the strings after `?` differ.
 - **`float` literals are doubles**: `1.0 * v.pos` with `v.pos : V4f` does not compile in F#; use `1.0f`. Doubles in shaders require `GL_ARB_gpu_shader_fp64` and are slow.
 - **Reserved GLSL names** (`input`, `output`, `sample`, `union`, names with `'` or `@`) are mangled by `src/Libs/FShade.GLSL/Keywords.fs`; do not rely on exact variable names in generated code.
 - **`onlyInShaderCode` intrinsics evaluated eagerly**: do not call intrinsics in `let` bindings outside the quotation (e.g. module-level `let s = getGlobalId()` throws at module init).
