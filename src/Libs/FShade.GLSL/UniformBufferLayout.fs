@@ -501,6 +501,7 @@ type GLSLShaderDecoration =
     | GLSLWinding of GLSLWinding
     | GLSLLocalSize of V3i
     | GLSLFragmentInterlock of FragmentInterlockMode
+    | GLSLEarlyFragmentTests
 
 [<AutoOpen>]
 module private Tools =
@@ -696,6 +697,7 @@ type GLSLShaderInterface =
                                 | GLSLInvocations d -> yield sprintf "    invocations: %A" d |> Some
                                 | GLSLLocalSize d -> yield sprintf "    local-size: %dx%dx%d" d.X d.Y d.Z |> Some
                                 | GLSLFragmentInterlock m -> yield sprintf "    interlock: %A" m |> Some
+                                | GLSLEarlyFragmentTests -> yield "    early-fragment-tests" |> Some
                                 | GLSLSpacing d -> yield sprintf "    spacing: %A" d |> Some
                                 | GLSLWinding d -> yield sprintf "    winding: %A" d |> Some
                         yield "}" |> Some
@@ -1104,6 +1106,8 @@ module GLSLShaderInterface =
             | GLSLFragmentInterlock m ->
                 dst.Write 7uy
                 dst.Write (int m)
+            | GLSLEarlyFragmentTests ->
+                dst.Write 8uy
 
         dst.Write (s.shaderBuiltIns.Count)
         for KeyValue(kind, m) in s.shaderBuiltIns do
@@ -1197,6 +1201,8 @@ module GLSLShaderInterface =
                     GLSLLocalSize(V3i(src.ReadInt32(), src.ReadInt32(), src.ReadInt32()))
                 | 7uy ->
                     GLSLFragmentInterlock(src.ReadInt32() |> unbox<FragmentInterlockMode>)
+                | 8uy ->
+                    GLSLEarlyFragmentTests
                 | t ->
                     failwithf "[FShade] unknown shader decoration tag %d" t
             )

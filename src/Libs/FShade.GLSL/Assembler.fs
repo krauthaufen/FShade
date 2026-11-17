@@ -974,6 +974,7 @@ module Interface =
                     | EntryDecoration.OutputTopology t -> GLSLOutputTopology t |> Some
                     | EntryDecoration.OutputVertices t -> GLSLMaxVertices t |> Some
                     | EntryDecoration.FragmentInterlock m -> GLSLFragmentInterlock m |> Some
+                    | EntryDecoration.EarlyFragmentTests -> GLSLEarlyFragmentTests |> Some
                     | EntryDecoration.Stages _ -> None
             )
 
@@ -2692,6 +2693,11 @@ module Assembler =
 
             let! config = AssemblerState.config
 
+            // early fragment tests are core since GLSL 4.20, older versions need the extension
+            if e.cDecorations |> List.exists (function EntryDecoration.EarlyFragmentTests -> true | _ -> false) then
+                if config.version.Major < 4 || (config.version.Major = 4 && config.version.Minor < 2) then
+                    do! AssemblerState.useExtension GLSLExtension.ARBShaderImageLoadStore
+
             let prefix = 
                 match stages.Stage with
                     | ShaderStage.Geometry -> 
@@ -2769,6 +2775,9 @@ module Assembler =
                     | ShaderStage.Fragment ->
                         let interlock = e.cDecorations |> List.tryPick (function EntryDecoration.FragmentInterlock m -> Some m | _ -> None)
                         [
+                            if e.cDecorations |> List.exists (function EntryDecoration.EarlyFragmentTests -> true | _ -> false) then
+                                yield "layout(early_fragment_tests) in;"
+
                             match interlock with
                             | Some mode ->
                                 let qualifier =

@@ -335,6 +335,35 @@ Rules, checked when the effect is linked (`Shader.Interlock` in `Shader.fs`):
 - two fragment shaders that both use interlock cannot be composed; a plain fragment shader can be composed before or after an interlocked one (its code runs outside the critical section when the interlocked shader comes first)
 - the mode is reported as `GLSLShaderDecoration.GLSLFragmentInterlock` in the program interface; Vulkan consumers must enable `VK_EXT_fragment_shader_interlock`
 
+## Early Fragment Tests
+
+`layout(early_fragment_tests) in;` makes depth and stencil tests run before the fragment shader
+(needed for correct image/storage-buffer side effects of occluded fragments, and the usual companion
+of interlock). Two equivalent ways to request it:
+
+```fsharp
+[<EarlyFragmentTests>]                       // attribute on the shader function ...
+let accumulate (v : Fragment) =
+    fragment { ... }
+
+let accumulate2 (v : Fragment) =
+    fragment {
+        earlyFragmentTests()                 // ... or a marker call at the top level of the body
+        ...
+    }
+```
+
+- The attribute only works when the `fragment { }` block is directly in the attributed function (the
+  builder records the method like `[<LocalSize>]` for compute); use the marker call for local or
+  nested shader functions. The attribute is part of the effect hash.
+- The marker is fragment-only; its position does not matter (control flow and utility functions are fine) and it is removed from the generated code.
+- Composition unions the request; the qualifier is emitted once.
+- A shader that also writes `[<Depth>]` compiles but logs a warning: with early tests the written
+  depth has no effect. Conservative depth (`[<Depth(DepthWriteMode.OnlyLess)>]` etc.) is the way to
+  combine early-z with a depth output.
+- Depth/stencil are written before the shader runs, so a later `discard()` no longer prevents the write.
+- GLSL < 4.20 gets `#extension GL_ARB_shader_image_load_store` automatically.
+
 ## Gotchas
 
 - **Input access outside the builder**: `Effect.ofFunction` calls the shader function with `null`; `let x = v.pos in vertex { ... }` throws `[FShade] shader functions may not access their vertex-input statically`.

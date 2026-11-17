@@ -116,6 +116,7 @@ type EntryDecoration =
     | LocalSize of V3i
     | Invocations of int
     | FragmentInterlock of FragmentInterlockMode
+    | EarlyFragmentTests
 
 type EntryPoint =
     {

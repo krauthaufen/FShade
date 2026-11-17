@@ -8,6 +8,7 @@ module GLSLExtension =
     let [<Literal>] ARBGpuShaderFp64                        = "GL_ARB_gpu_shader_fp64"
     let [<Literal>] ARBGpuShaderInt64                       = "GL_ARB_gpu_shader_int64"
     let [<Literal>] ARBSeparateShaderObjects                = "GL_ARB_separate_shader_objects"
+    let [<Literal>] ARBShaderImageLoadStore                 = "GL_ARB_shader_image_load_store"
     let [<Literal>] ARBShaderTextureImageSamples            = "GL_ARB_shader_texture_image_samples"
     let [<Literal>] ARBShadingLanguage420pack               = "GL_ARB_shading_language_420pack"
     let [<Literal>] ARBTessellationShader                   = "GL_ARB_tessellation_shader"

@@ -93,6 +93,7 @@ void main() { ... }
 - Unbounded sampler/image/SSBO arrays each get their **own descriptor set** (must be the last binding; `Assembler.fs:2203`). Dynamic indexing of descriptor arrays emits `nonuniformEXT` only when `createDescriptorSets` is on.
 - 8/16/64-bit types pull in the matching `GL_EXT_shader_explicit_arithmetic_types_*` / storage extensions automatically (`useTypeExtensions`).
 - Fragment shader interlock emits `#extension GL_ARB_fragment_shader_interlock`, `layout(<mode>_interlock_<order>) in;` in the fragment stage and the `beginInvocationInterlockARB()` / `endInvocationInterlockARB()` calls (the `FragmentInterlock` entry decoration drives the qualifier, the intrinsic table the calls). The same ARB names are used for Vulkan; glslang maps them to the EXT SPIR-V opcodes.
+- Early fragment tests (`EntryDecoration.EarlyFragmentTests`, from `earlyFragmentTests()` or `[<EarlyFragmentTests>]`) emit `layout(early_fragment_tests) in;` in the fragment stage and request `GL_ARB_shader_image_load_store` for GLSL versions below 4.20.
 
 ## Program Interface
 
@@ -107,7 +108,7 @@ void main() { ... }
 | `images` | `MapExt<string, GLSLImage>` | set/binding, `imageType` (format, dimension, arrayness, value type), `imageMemory : MemoryQualifier` |
 | `accelerationStructures` | `MapExt<string, GLSLAccelerationStructure>` | set/binding |
 | `textures`, `samplerStates` | | only populated with `separateTexturesAndSamplers` |
-| `shaders` | `GLSLProgramShaders` | `Compute iface`, `Graphics { stages }`, `Raytracing { slots }`; per-stage `GLSLShaderInterface` with used uniform names, builtins, `shaderDecorations` (`GLSLLocalSize`, `GLSLMaxVertices`, `GLSLInputTopology`, `GLSLOutputTopology`, `GLSLInvocations`, `GLSLSpacing`, `GLSLWinding`, `GLSLFragmentInterlock`) |
+| `shaders` | `GLSLProgramShaders` | `Compute iface`, `Graphics { stages }`, `Raytracing { slots }`; per-stage `GLSLShaderInterface` with used uniform names, builtins, `shaderDecorations` (`GLSLLocalSize`, `GLSLMaxVertices`, `GLSLInputTopology`, `GLSLOutputTopology`, `GLSLInvocations`, `GLSLSpacing`, `GLSLWinding`, `GLSLFragmentInterlock`, `GLSLEarlyFragmentTests`) |
 
 `iface.GetUniformStages name` tells which stages use a uniform. `GLSLType` (`UniformBufferLayout.fs:9`)
 mirrors GLSL types with sizes/strides (`Int`, `Float`, `Vec`, `Mat`, `Struct(name, fields, size)`,

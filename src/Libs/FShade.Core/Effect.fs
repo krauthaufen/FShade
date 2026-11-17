@@ -667,6 +667,8 @@ module Effect =
             inputSemantics : Map<string, InterpolationMode>
             outputSemantics : Map<string, InterpolationMode * DepthWriteMode>
             body : Expr
+            /// attributes of the shader method that influence the generated code (EarlyFragmentTests)
+            earlyFragmentTests : bool
         }
 
     module private EffectKey =
@@ -685,6 +687,7 @@ module Effect =
             w.Write (Map.count e.outputSemantics)
             for KeyValue(name, (a, b)) in e.outputSemantics do
                 w.Write name; w.Write (int a); w.Write (int b)
+            w.Write e.earlyFragmentTests
             h.FlushFinalBlock()
             hash.Hash |> Convert.ToBase64String
 
@@ -719,6 +722,7 @@ module Effect =
                     inputSemantics = inputFields |> Seq.map (fun f -> f.Semantic, f.Interpolation) |> Map.ofSeq
                     outputSemantics = outputFields |> Seq.map (fun f -> f.Semantic, (f.Interpolation, f.DepthWriteMode)) |> Map.ofSeq
                     body = e.WithAttributes []
+                    earlyFragmentTests = Shader.EarlyFragmentTests.requestedByMethod e
                 }
          
             Serializer.Init()
@@ -760,6 +764,7 @@ module Effect =
                     inputSemantics = inputFields |> Seq.map (fun f -> f.Semantic, f.Interpolation) |> Map.ofSeq
                     outputSemantics = outputFields |> Seq.map (fun f -> f.Semantic, (f.Interpolation, f.DepthWriteMode)) |> Map.ofSeq
                     body = expression.WithAttributes []
+                    earlyFragmentTests = Shader.EarlyFragmentTests.requestedByMethod expression
                 }
          
             Serializer.Init()

@@ -220,6 +220,19 @@ module Primitives =
     let endInvocationInterlock () : unit = onlyInShaderCode "endInvocationInterlock"
 
     /// <summary>
+    /// Requests that depth and stencil tests are performed before the fragment shader runs
+    /// (<c>layout(early_fragment_tests) in;</c>). Alternatively apply <see cref="EarlyFragmentTestsAttribute"/>
+    /// to the shader function.
+    /// </summary>
+    /// <remarks>
+    /// Only allowed in fragment shaders; the position of the call does not matter. With early fragment tests
+    /// a depth value written by the shader has no effect, and depth / stencil are written even if the
+    /// fragment is discarded afterwards.
+    /// </remarks>
+    [<KeepCall>]
+    let earlyFragmentTests () : unit = onlyInShaderCode "earlyFragmentTests"
+
+    /// <summary>
     /// Signals to the optimizer that the given for-loop should be unrolled if possible.
     /// </summary>
     /// <example>
@@ -438,6 +451,17 @@ module Primitives =
         override __.ToString() =
             sprintf "LocalSize(X=%d, Y=%d, Z=%d)" x y z
 
+    /// <summary>
+    /// Requests early fragment tests (<c>layout(early_fragment_tests) in;</c>) for the fragment shader
+    /// defined by the attributed function. Equivalent to calling <c>earlyFragmentTests()</c> in the shader body.
+    /// </summary>
+    /// <remarks>
+    /// Only works when the <c>fragment { }</c> block is placed directly in the attributed function.
+    /// </remarks>
+    [<AttributeUsage(AttributeTargets.Method)>]
+    type EarlyFragmentTestsAttribute() =
+        inherit System.Attribute()
+
     type TessCoord<'a> = class end
 
     let tessellateTriangle (li : float32) (l01 : float32, l12 : float32, l20 : float32) : TessCoord<V3f> =
@@ -487,6 +511,27 @@ module ShaderBuilders =
         inherit BaseBuilder()
         member x.Return(v) = v
         member x.Quote() = ()
+
+        // Records the method containing the fragment block (if any) so that attributes
+        // like EarlyFragmentTests can be read from it. Same mechanism as ComputeBuilder.Run.
+        member inline x.Run(e : Expr<'a>) : Expr<'a> =
+            try
+                let mb = MethodBase.GetCurrentMethod()
+                if isNull mb then
+                    e
+                else
+                    // .NET SDK 10.0.401 compiler does not inline for Debug builds
+                    let mb =
+                        if mb.DeclaringType = typeof<FragmentBuilder> && mb.Name = "Run" then
+                            let frame = StackFrame(1, false)
+                            frame.GetMethod()
+                        else
+                            mb
+
+                    if isNull mb then e
+                    else e.WithAttributes(Expr.NewTuple [ Expr.Value "Method"; Expr.Value mb] :: e.CustomAttributes) |> Expr.Cast
+            with _ ->
+                e
 
         interface IShaderBuilder with
             member x.ShaderStage = ShaderStage.Fragment

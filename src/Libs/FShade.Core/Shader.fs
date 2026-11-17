@@ -3611,6 +3611,7 @@ module Shader =
                     getMethodInfo <@ barrier @>
                     getMethodInfo <@ beginInvocationInterlock @>
                     getMethodInfo <@ endInvocationInterlock @>
+                    getMethodInfo <@ earlyFragmentTests @>
                 ]
         ]
 
@@ -4020,8 +4021,60 @@ module Shader =
             shaderStorageBufferAccess = newStorageAccess
         }
 
+    /// Validation and lowering of early fragment tests (layout(early_fragment_tests) in;).
+    module internal EarlyFragmentTests =
+        let private meth = getMethodInfo <@ earlyFragmentTests @>
+
+        [<return: Struct>]
+        let private (|MarkerCall|_|) (e : Expr) =
+            match e with
+            | Call(None, mi, []) when mi = meth -> ValueSome ()
+            | _ -> ValueNone
+
+        // Returns true if the expression contains a marker call anywhere (including utility functions).
+        let rec private contains (e : Expr) =
+            match e with
+            | MarkerCall -> true
+            | CallFunction(f, args) -> contains f.functionBody || List.exists contains args
+            | ShapeVar _ -> false
+            | ShapeLambda(_, b) -> contains b
+            | ShapeCombination(_, args) -> List.exists contains args
+
+        /// Returns true if the shader method carries the EarlyFragmentTests attribute.
+        let requestedByMethod (e : Expr) =
+            match e.Method with
+            | Some m -> m.GetCustomAttributes(typeof<EarlyFragmentTestsAttribute>, true).Length > 0
+            | None -> false
+
+        /// Prepends the marker call when the shader method carries the EarlyFragmentTests attribute.
+        let applyMethodAttribute (e : Expr) =
+            if requestedByMethod e then Expr.Sequential(Expr.Call(meth, []), e)
+            else e
+
+        /// Returns whether early fragment tests are requested anywhere in the shader body (the position of the
+        /// marker does not matter since it only affects the layout qualifier of the shader).
+        let isRequested (stage : ShaderStage) (body : Expr) =
+            if contains body then
+                if stage <> ShaderStage.Fragment then
+                    failwithf "[FShade] early fragment tests can only be requested in fragment shaders (requested in %A shader)" stage
+                true
+            else
+                false
+
+        /// Removes the marker calls (they have no representation in the generated code), including those in utility functions.
+        let rec removeCalls (e : Expr) =
+            match e with
+            | Sequential(MarkerCall, r) -> removeCalls r
+            | Sequential(l, MarkerCall) -> removeCalls l
+            | MarkerCall -> Expr.Unit
+            | CallFunction(f, args) -> Expr.CallFunction(UtilityFunction.map removeCalls f, List.map removeCalls args)
+            | ShapeVar _ -> e
+            | ShapeLambda(v, b) -> Expr.Lambda(v, removeCalls b)
+            | ShapeCombination(o, args) -> RebuildShapeCombination(o, List.map removeCalls args)
+
     let ofExpr (inputTypes : List<Type>) (e : Expr) =
         let debugRange = e.CustomAttributes |> List.tryPick (function DebugRange r -> Some r | _ -> None)
+        let e = EarlyFragmentTests.applyMethodAttribute e
         Preprocessor.toShaders inputTypes Map.empty e 
             |> List.map optimize
             |> List.map (fun shader -> { shader with shaderDebugRange = debugRange })
@@ -4444,6 +4497,11 @@ module Shader =
     /// the shader to a CAst
     let toEntryPoint (prev : Option<Shader>) (s : Shader) (next : Option<Shader>) =
         let interlockMode = Interlock.tryGetMode s.shaderStage s.shaderBody
+        let earlyFragmentTests = EarlyFragmentTests.isRequested s.shaderStage s.shaderBody
+
+        if earlyFragmentTests && (s.shaderDepthWriteMode <> DepthWriteMode.None || Map.containsKey Intrinsics.Depth s.shaderOutputs) then
+            Log.warn "[FShade] fragment shader requests early fragment tests but writes a depth value; the written depth has no effect"
+
         let mutable hasSourceVertexIndex = false
         let inputs = 
             s.shaderInputs |> Map.toList |> List.choose (fun (n,i) -> 
@@ -4507,19 +4565,22 @@ module Shader =
         let prevStage = prev |> Option.map stage
         let nextStage = next |> Option.map stage
 
+        let shaderBody =
+            if earlyFragmentTests then EarlyFragmentTests.removeCalls s.shaderBody
+            else s.shaderBody
+
         let body =
             if hasSourceVertexIndex then
-                s.shaderBody.SubstituteReads(fun kind typ name index slot ->
+                shaderBody.SubstituteReads(fun kind typ name index slot ->
                     match kind, index with
                         | ParameterKind.Input, Some i when name = Intrinsics.SourceVertexIndex ->
                             Some i
                         | _ ->
                             None
-                
                 )
             else
-                s.shaderBody
-  
+                shaderBody
+
         {
             conditional    = Some (string s.shaderStage)
             entryName      = "main"
@@ -4555,6 +4616,9 @@ module Shader =
                     match interlockMode with
                     | ValueSome mode -> yield EntryDecoration.FragmentInterlock mode
                     | ValueNone -> ()
+
+                    if earlyFragmentTests then
+                        yield EntryDecoration.EarlyFragmentTests
                 ]
         }
 
