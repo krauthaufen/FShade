@@ -23,6 +23,7 @@ type ParameterDecoration =
 type UniformDecoration =
     | Format of Type
     | BufferAccess of StorageAccess
+    | Memory of MemoryQualifier
     | PushConstant
 
 type Uniform =

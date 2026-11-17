@@ -100,10 +100,15 @@ module ReflectionPatterns =
             ValueNone
 
     type UniformParameter with
-        member x.decorations =
-            match x.uniformType with
-                | ImageType(fmt,_,_,_,_) -> [Imperative.UniformDecoration.Format fmt]
-                | _ -> []
+        member this.decorations =
+            [
+                match this.uniformType with
+                | ImageType(fmt, _, _, _, _) -> Imperative.UniformDecoration.Format fmt
+                | _ -> ()
+
+                if this.uniformMemory <> MemoryQualifier.None then
+                    Imperative.UniformDecoration.Memory this.uniformMemory
+            ]
 
 type DebugRange =
     {
@@ -133,6 +138,25 @@ module BasicQuotationPatterns =
         if t = typeof<UniformScope> then UniformScopeType |> ValueSome
         else ValueNone
 
+    /// Reads the memory qualifiers declared on a uniform member and validates that they are applied
+    /// to an image or storage buffer.
+    let private memoryOf (m : MemberInfo) (name : string) (typ : Type) (value : UniformValue) =
+        let qualifier = MemoryQualifier.ofMember m
+        if qualifier = MemoryQualifier.None then
+            qualifier
+        else
+            let isStorageBuffer =
+                match value with
+                | Attribute(scope, _) when scope.Name = "StorageBuffer" ->
+                    typ.IsArray || (typ.IsGenericType && typ.GetGenericTypeDefinition() = typedefof<Arr<_, _>>)
+                | _ ->
+                    false
+
+            match typ with
+            | ImageType _ -> qualifier
+            | _ when isStorageBuffer -> qualifier
+            | _ -> failwithf "[FShade] memory qualifiers are only allowed on images and storage buffers (uniform '%s' of type %A)" name typ
+
     [<return: Struct>]
     let (|Uniform|_|) (e : Expr) =
         match e with
@@ -144,6 +168,7 @@ module BasicQuotationPatterns =
                     uniformName = name
                     uniformType = sam.GetType()
                     uniformValue = Sampler(tex.Semantic, sam.State) 
+                    uniformMemory = MemoryQualifier.None
                 } 
             | _ ->
                 match t with
@@ -166,6 +191,7 @@ module BasicQuotationPatterns =
                         uniformName = name
                         uniformType = t
                         uniformValue = SamplerArray(List.toArray samplers)
+                        uniformMemory = MemoryQualifier.None
                     }
                 | _ ->
                     ValueNone
@@ -181,6 +207,7 @@ module BasicQuotationPatterns =
                         uniformName = pi.Name
                         uniformType = sam.GetType()
                         uniformValue = Sampler(tex.Semantic, sam.State) 
+                        uniformMemory = MemoryQualifier.None
                     } 
 
                 | None ->
@@ -207,6 +234,7 @@ module BasicQuotationPatterns =
                         uniformName = pi.Name
                         uniformType = t
                         uniformValue = SamplerArray(List.toArray samplers)
+                        uniformMemory = MemoryQualifier.None
                     }
 
                 | None -> 
@@ -222,6 +250,7 @@ module BasicQuotationPatterns =
                     uniformName = unbox s
                     uniformType = e.Type
                     uniformValue = Attribute(scope, unbox s)
+                    uniformMemory = MemoryQualifier.None
                 }
 
             | None ->
@@ -238,6 +267,7 @@ module BasicQuotationPatterns =
                             uniformName = v.Semantic
                             uniformType = v.GetType()
                             uniformValue = Attribute(v.Scope, v.Semantic)
+                            uniformMemory = memoryOf p v.Semantic (v.GetType()) (Attribute(v.Scope, v.Semantic))
                         }
                     | _ ->
                         match UniformStuff.Pop old with
@@ -246,6 +276,7 @@ module BasicQuotationPatterns =
                                 uniformName = name
                                 uniformType = p.PropertyType
                                 uniformValue = Attribute(scope, name)
+                                uniformMemory = memoryOf p name p.PropertyType (Attribute(scope, name))
                             }
                         | None -> 
                             ValueNone
@@ -274,6 +305,7 @@ module BasicQuotationPatterns =
                             uniformName = v.Semantic
                             uniformType = v.GetType()
                             uniformValue = Attribute(v.Scope, v.Semantic)
+                            uniformMemory = memoryOf m v.Semantic (v.GetType()) (Attribute(v.Scope, v.Semantic))
                         }
                     | _ ->
                         match UniformStuff.Pop old with
@@ -282,6 +314,7 @@ module BasicQuotationPatterns =
                                     uniformName = name
                                     uniformType = m.ReturnType
                                     uniformValue = Attribute(scope, name)
+                                    uniformMemory = memoryOf m name m.ReturnType (Attribute(scope, name))
                                 }
                             | None -> 
                                 ValueNone

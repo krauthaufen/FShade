@@ -2173,13 +2173,33 @@ module Assembler =
         | Std140 = 1
         | Std430 = 2
 
+    let private memoryQualifiers (decorations : list<UniformDecoration>) =
+        decorations |> List.fold (fun q d ->
+            match d with
+            | UniformDecoration.Memory m -> q ||| m
+            | _ -> q
+        ) MemoryQualifier.None
+
+    let private memoryQualifierNames (q : MemoryQualifier) =
+        [
+            if q.HasFlag MemoryQualifier.Coherent then "coherent"
+            if q.HasFlag MemoryQualifier.Volatile then "volatile"
+            if q.HasFlag MemoryQualifier.Restrict then "restrict"
+        ]
+
     let private uniformLayout (layout : Layout) (decorations : list<UniformDecoration>) (set : int) (binding : int) =
-        
+
         let bufferAccess =
             decorations |> List.tryPick (function 
                 | UniformDecoration.BufferAccess a -> Some a
                 | _ -> None
             )
+
+        let memory =
+            memoryQualifiers decorations
+            |> memoryQualifierNames
+            |> List.map (sprintf "%s ")
+            |> String.concat ""
             
         let decorations =
             decorations |> List.choose (fun d ->
@@ -2206,15 +2226,15 @@ module Assembler =
 
             layout @ decorations
 
-        let layout = 
+        let layout =
             match decorations with
             | [] -> ""
-            | d -> d |> String.concat ", " |> sprintf "layout(%s)" 
+            | d -> d |> String.concat ", " |> sprintf "layout(%s)"
 
         match bufferAccess with
-        | Some StorageAccess.Read -> sprintf "%s\r\nreadonly " layout
-        | Some StorageAccess.Write -> sprintf "%s\r\nwriteonly " layout
-        | _ -> sprintf "%s\r\n" layout
+        | Some StorageAccess.Read -> sprintf "%s\r\n%sreadonly " layout memory
+        | Some StorageAccess.Write -> sprintf "%s\r\n%swriteonly " layout memory
+        | _ -> sprintf "%s\r\n%s" layout memory
     
 
 
@@ -2304,6 +2324,7 @@ module Assembler =
                                                 ssbName = name.Name
                                                 ssbType = GLSLType.ofCType config.reverseMatrixLogic ct
                                                 ssbAccess = access
+                                                ssbMemory = memoryQualifiers field.cUniformDecorations
                                                 ssbCount = outerCount
                                             }
 
@@ -2436,6 +2457,7 @@ module Assembler =
                                                             imageBinding = binding
                                                             imageName = checkName(u.cUniformName).Name
                                                             imageType = imageType
+                                                            imageMemory = memoryQualifiers u.cUniformDecorations
                                                         }
 
                                             | CAccelerationStructure ->

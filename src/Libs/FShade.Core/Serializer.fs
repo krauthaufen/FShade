@@ -938,6 +938,7 @@ module Serializer =
                 dst.Write u.uniformName
                 Type.serializeInternal state.TypeState dst u.uniformType
                 Value.serialize dst typeof<UniformValue> u.uniformValue
+                dst.Write (int u.uniformMemory)
 
             | Patterns.ReflectedCall(isInline, mi, def, args) ->
                 dst.Write (byte ExprId.ReflectedCall)
@@ -1915,6 +1916,8 @@ module Serializer =
                     dst.Write 3uy
                     dst.Write name
 
+                dst.Write (int p.uniformMemory)
+
             let deserialize (state : DeserializerState) (src : BinaryReader) =
                 let uniformName = src.ReadString()
                 let typ = Type.deserializeInternal state.TypeState src
@@ -1950,10 +1953,13 @@ module Serializer =
                         let name = src.ReadString()
                         UniformValue.AccelerationStructure name
 
+                let memory = src.ReadInt32() |> unbox<MemoryQualifier>
+
                 {
                     uniformName = uniformName
                     uniformType = typ
                     uniformValue = value
+                    uniformMemory = memory
                 }
 
 

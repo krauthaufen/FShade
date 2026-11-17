@@ -414,6 +414,7 @@ type GLSLImage =
         imageBinding    : int
         imageName       : string
         imageType       : GLSLImageType
+        imageMemory     : MemoryQualifier
     }
     
     
@@ -442,6 +443,7 @@ type GLSLStorageBuffer =
         ssbName         : string
         ssbType         : GLSLType
         ssbAccess       : StorageAccess
+        ssbMemory       : MemoryQualifier
         /// Number of buffers in the binding. 1 = a single SSBO; -1 = an UNBOUNDED
         /// (bindless) array of SSBOs ('buffer { T[] data; } X[]', from a `T[][]`
         /// storage buffer) requiring descriptor indexing. Mirrors GLSLSampler.samplerCount.
@@ -933,7 +935,7 @@ and [<StructuredFormatDisplay("{AsString}")>] GLSLProgramInterface =
                 yield Some "}"
 
             for (_,s) in MapExt.toSeq x.storageBuffers do
-                yield sprintf "ssb %s : %s[] // set: %d binding: %d" s.ssbName (GLSLType.toString s.ssbType) s.ssbSet s.ssbBinding |> Some
+                yield sprintf "ssb %s : %s[] // set: %d binding: %d access: %A memory: %A" s.ssbName (GLSLType.toString s.ssbType) s.ssbSet s.ssbBinding s.ssbAccess s.ssbMemory |> Some
 
             for (_,s) in MapExt.toSeq x.samplers do
                 let suffix =
@@ -942,7 +944,7 @@ and [<StructuredFormatDisplay("{AsString}")>] GLSLProgramInterface =
                 yield sprintf "sam %s : %s%s // set: %d binding: %d" s.samplerName (GLSLType.toString (GLSLType.Sampler s.samplerType)) suffix s.samplerSet s.samplerBinding |> Some
 
             for (_,s) in MapExt.toSeq x.images do
-                yield sprintf "img %s : %s // set: %d binding: %d" s.imageName (GLSLType.toString (GLSLType.Image s.imageType)) s.imageSet s.imageBinding |> Some
+                yield sprintf "img %s : %s // set: %d binding: %d memory: %A" s.imageName (GLSLType.toString (GLSLType.Image s.imageType)) s.imageSet s.imageBinding s.imageMemory |> Some
 
             for (_,s) in MapExt.toSeq x.accelerationStructures do
                 yield sprintf "accel %s // set: %d binding: %d" s.accelName s.accelSet s.accelBinding |> Some
@@ -1543,6 +1545,7 @@ module GLSLProgramInterface =
             dst.Write image.imageName
             dst.Write image.imageSet
             GLSLType.serializeInternal dst (GLSLType.Image image.imageType)
+            dst.Write (int image.imageMemory)
             
         dst.Write program.storageBuffers.Count
         for KeyValue(name, ssb) in program.storageBuffers do
@@ -1552,6 +1555,7 @@ module GLSLProgramInterface =
             dst.Write ssb.ssbSet
             GLSLType.serializeInternal dst ssb.ssbType
             dst.Write (int ssb.ssbAccess)
+            dst.Write (int ssb.ssbMemory)
             dst.Write ssb.ssbCount
 
         dst.Write program.uniformBuffers.Count
@@ -1718,12 +1722,14 @@ module GLSLProgramInterface =
                     match GLSLType.deserializeInternal src with
                     | GLSLType.Image i -> i
                     | t -> failwithf "bad ImageType: %A" t
+                let imageMemory = src.ReadInt32() |> unbox<MemoryQualifier>
 
                 name, {
                     imageBinding = imageBinding
                     imageName = imageName
                     imageSet = imageSet
                     imageType = imageType
+                    imageMemory = imageMemory
                 }
             )   
             |> MapExt.ofList
@@ -1737,6 +1743,7 @@ module GLSLProgramInterface =
                 let ssbSet = src.ReadInt32()
                 let ssbType = GLSLType.deserializeInternal src
                 let ssbAccess = src.ReadInt32() |> unbox<StorageAccess>
+                let ssbMemory = src.ReadInt32() |> unbox<MemoryQualifier>
                 let ssbCount = src.ReadInt32()
                 name, {
                     ssbBinding = ssbBinding
@@ -1744,6 +1751,7 @@ module GLSLProgramInterface =
                     ssbSet = ssbSet
                     ssbType = ssbType
                     ssbAccess = ssbAccess
+                    ssbMemory = ssbMemory
                     ssbCount = ssbCount
                 }
             )   

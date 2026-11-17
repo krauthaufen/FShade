@@ -228,6 +228,19 @@ type StorageAccess =
     | Atomic        = 0x04
 
 /// <summary>
+/// Memory qualifiers for images and storage buffers (GLSL <c>coherent</c>, <c>volatile</c>, <c>restrict</c>).
+/// </summary>
+[<Flags>]
+type MemoryQualifier =
+    | None     = 0
+    /// Writes are visible to other invocations (after a memory barrier) and reads are not cached across them.
+    | Coherent = 1
+    /// The underlying memory may change at any time; every access is performed.
+    | Volatile = 2
+    /// The memory is not aliased by any other variable in the shader.
+    | Restrict = 4
+
+/// <summary>
 /// Controls the granularity and ordering of the critical section delimited by
 /// <c>beginInvocationInterlock</c> / <c>endInvocationInterlock</c> in fragment shaders
 /// (GL_ARB_fragment_shader_interlock).

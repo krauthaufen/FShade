@@ -117,6 +117,21 @@ structs as elements, fixed-size `Arr<N<n>, T>` elements, 8/16/64-bit element typ
 with `int` or `uint`. A `T[][]` storage buffer is an unbounded (bindless) array of SSBOs.
 Uniform values must be constant per draw; FShade does not know about adaptive values.
 
+**Memory qualifiers** (`src/Libs/FShade.Core/Core.fs`): `[<Coherent>]`, `[<Volatile>]` and
+`[<Restrict>]` on a `UniformScope` extension member (or on a compute shader parameter, see
+`COMPUTE.md`) emit the GLSL `coherent`/`volatile`/`restrict` qualifiers. They are only allowed on
+images and storage buffers (`[FShade] memory qualifiers are only allowed on images and storage
+buffers` otherwise). Qualifiers of the same uniform declared in several shaders are unioned when
+composing, and they are part of the effect hash. Visibility of coherent writes to other
+invocations still requires a barrier: `memoryBarrier()`, `memoryBarrierBuffer()`,
+`memoryBarrierImage()`, `memoryBarrierShared()` or `groupMemoryBarrier()` (`Frontend.fs`).
+
+```fsharp
+type UniformScope with
+    [<Coherent>]           member x.Heads : int[] = x?StorageBuffer?Heads
+    [<Coherent; Restrict>] member x.Accum : UIntImage2d<Formats.r32ui> = x?Accum
+```
+
 ## Samplers and Images
 
 Samplers are module-level values built with a sampler builder; they must be static so the
@@ -328,7 +343,7 @@ Rules, checked when the effect is linked (`Shader.Interlock` in `Shader.fs`):
 - **Missing `[<ReflectedDefinition>]`**: `[FShade] cannot call function X since it is not reflectable` / `utility function X is not reflectable`.
 - **Samplers must be top-level**: a sampler created inside the shader body is not a static value and cannot be reflected into a uniform.
 - **Uniform type must be annotated**: `uniform?Foo` without a type annotation infers `obj` and fails later; conflicting annotations across shaders fail at composition with `uniform 'Foo' has conflicting types`.
-- **The uniform's identity is the string after `?`, not the member name**: `member x.A : int[] = x?StorageBuffer?Data` and `member x.B : int[] = x?StorageBuffer?Data` are the *same* uniform `Data`. They must agree on type and scope (`has conflicting types/values` otherwise). Two members with different names only give two uniforms if the strings after `?` differ.
+- **The uniform's identity is the string after `?`, not the member name**: `member x.A : int[] = x?StorageBuffer?Data` and `member x.B : int[] = x?StorageBuffer?Data` are the *same* uniform `Data`. They must agree on type and scope (`has conflicting types/values` otherwise); memory qualifiers of such aliases are unioned. Two members with different names only give two uniforms if the strings after `?` differ.
 - **`float` literals are doubles**: `1.0 * v.pos` with `v.pos : V4f` does not compile in F#; use `1.0f`. Doubles in shaders require `GL_ARB_gpu_shader_fp64` and are slow.
 - **Reserved GLSL names** (`input`, `output`, `sample`, `union`, names with `'` or `@`) are mangled by `src/Libs/FShade.GLSL/Keywords.fs`; do not rely on exact variable names in generated code.
 - **`onlyInShaderCode` intrinsics evaluated eagerly**: do not call intrinsics in `let` bindings outside the quotation (e.g. module-level `let s = getGlobalId()` throws at module init).

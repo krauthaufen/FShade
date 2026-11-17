@@ -41,6 +41,11 @@ The `cs_` prefix on non-buffer arguments is a legacy quirk kept for backwards co
 (`Shader.fs` `preprocessComputeS`, test `Compute.fs` `Arguments`). Arguments can also be read via
 `uniform?Arguments?name` inside the body (`Aardvark.GPGPU` kernels do this).
 
+Storage buffer and image parameters accept the memory qualifier attributes
+(`[<Coherent>] data : int[]`, `[<Volatile; Restrict>] img : IntImage2d<Formats.r32i>`); the
+qualifiers are reported in `csBuffers.[name].memory` / `csImages.[name].memory` and emitted as
+`coherent`/`volatile`/`restrict` (see `SHADER-DSL.md`).
+
 ### Builtins
 
 | Function (`Frontend.fs`) | GLSL |
@@ -50,6 +55,7 @@ The `cs_` prefix on non-buffer arguments is a legacy quirk kept for backwards co
 | `getWorkGroupId() : V3i`, `getWorkGroupCount() : V3i`, `getWorkGroupSize() : V3i` | `gl_WorkGroupID`, `gl_NumWorkGroups`, `gl_WorkGroupSize` |
 | `LocalSize : V3i` | constant-folded to the attribute value |
 | `barrier()` | `barrier()`; treated as a side effect |
+| `memoryBarrier()`, `memoryBarrierBuffer()`, `memoryBarrierImage()`, `memoryBarrierShared()`, `groupMemoryBarrier()` | the GLSL memory barriers; `[<KeepCall>]` |
 | `allocateShared<'a> size : 'a[]` | `shared 'a name[size]`; `size` must be a compile-time constant, result must be bound with `let` and only used for element reads/writes |
 | `allocateSharedValue<'a> () : 'a ref` | `shared 'a name;` for a single value; bound with `let`, read/written via `.Value`, passable to `ref` parameters and `Atomic.*` |
 | `Atomic.Add(&&buffer.[i], 1)`, `Atomic.Min/Max/And/Or/Xor/Exchange/CompareExchange` | `atomicAdd(...)` etc. on `int`/`uint` storage locations |

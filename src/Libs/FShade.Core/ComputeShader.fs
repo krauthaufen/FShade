@@ -14,6 +14,7 @@ type ComputeBuffer =
     {
         arrayType : Type
         access : StorageAccess
+        memory : MemoryQualifier
     }
     member this.contentType = match this.arrayType with ArrayOf ct | ArrOf(_, ct) | ct -> ct
 
@@ -25,8 +26,8 @@ type ComputeImage =
         isArray : bool
         isMS : bool
         contentType : Type
+        memory : MemoryQualifier
     }
-
 
 type internal ComputeShaderData =
     {
@@ -99,8 +100,12 @@ module ComputeShader =
                 let mutable samplerStates = Map.empty
                 let mutable textureNames = Map.empty
 
-                let addImage (fmt : Type) (name : string) (t : Type) (dim : SamplerDimension) (isArray : bool) (isMS : bool) (contentType : Type) =
-                    if not <| images.ContainsKey name then
+                let addImage (fmt : Type) (name : string) (t : Type) (dim : SamplerDimension)
+                             (isArray : bool) (isMS : bool) (contentType : Type) (memory : MemoryQualifier) =
+                    match Map.tryFind name images with
+                    | Some oi ->
+                        images <- Map.add name { (oi : ComputeImage) with memory = oi.memory ||| memory } images
+                    | None ->
                         let img =
                             {
                                 imageType = t
@@ -109,15 +114,16 @@ module ComputeShader =
                                 isArray = isArray
                                 isMS = isMS
                                 contentType = contentType
+                                memory = memory
                             }
                         images <- Map.add name img images
 
-                let addBuffer (name : string) (arrayType : Type) (access : StorageAccess) =
+                let addBuffer (name : string) (arrayType : Type) (access : StorageAccess) (memory : MemoryQualifier) =
                     match Map.tryFind name buffers with
                         | Some b ->
-                            buffers <- Map.add name { b with access = b.access ||| access } buffers
+                            buffers <- Map.add name { b with access = b.access ||| access; memory = b.memory ||| memory } buffers
                         | None ->
-                            buffers <- Map.add name { arrayType = arrayType; access = access } buffers
+                            buffers <- Map.add name { arrayType = arrayType; access = access; memory = memory } buffers
 
                 let setSamplerState (name : string) (index : int) (state : SamplerState) =
                     match Map.tryFind (name, index) samplerStates with
@@ -131,21 +137,32 @@ module ComputeShader =
                         | None ->
                             textureNames <- Map.add (name, index) textureName textureNames
 
-                let isArgument =
-                    let args = meth.GetParameters() |> Array.map (fun p -> p.Name, p.ParameterType) |> Map.ofArray
-                    fun name typ ->
-                        match args |> Map.tryFindV name with
-                        | ValueSome t -> t = typ
-                        | _ -> false
+                let parameters =
+                    if isNull meth then Map.empty
+                    else meth.GetParameters() |> Array.map (fun p -> p.Name, p) |> Map.ofArray
+
+                let tryGetParameter (name : string) (typ : Type) =
+                    let direct = parameters |> Map.tryFindV name
+                    let prefixed = if name.StartsWith "cs_" then parameters |> Map.tryFindV (name.Substring 3) else ValueNone
+
+                    match direct, prefixed with
+                    | ValueSome p, _ when p.ParameterType = typ -> ValueSome p
+                    | _, ValueSome p when p.ParameterType = typ -> ValueSome p
+                    | _ -> ValueNone
 
                 for name, p in Map.toSeq state.uniforms do
-                    let isArgument =
-                        isArgument name p.uniformType ||
-                        (name.StartsWith "cs_" && isArgument (name.Substring(3)) p.uniformType)
+                    let parameter = tryGetParameter name p.uniformType
+                    let isArgument = parameter.IsSome
+
+                    // memory qualifiers may be declared on the uniform scope member or on the compute shader parameter
+                    let memory =
+                        match parameter with
+                        | ValueSome param -> p.uniformMemory ||| MemoryQualifier.ofParameter param
+                        | ValueNone -> p.uniformMemory
 
                     match p.uniformType, p.uniformValue with
                     | ImageType(fmt, dim, isArr, isMS, valueType), _ ->
-                        addImage fmt name p.uniformType dim isArr isMS valueType
+                        addImage fmt name p.uniformType dim isArr isMS valueType memory
 
                     // Fixed-size array can either be a storage buffer or uniform
                     // Only treat as storage buffer if the scope correct -> fixed-size array as compute argument will always be treated as uniform
@@ -153,7 +170,7 @@ module ComputeShader =
                     | ArrOf _, UniformValue.Attribute(StorageBufferScope, _) ->
                         match Map.tryFind name state.storageBufferAccess with
                         | Some access ->
-                            addBuffer name p.uniformType access
+                            addBuffer name p.uniformType access memory
                         | None ->
                             Log.warn "unknown array uniform: %A" name
                             uniforms <- Map.add name p uniforms
@@ -172,6 +189,9 @@ module ComputeShader =
 
                         | _ ->
                             ()
+
+                        if memory <> MemoryQualifier.None then
+                            failwithf "[FShade] memory qualifiers are only allowed on images and storage buffers (uniform '%s' of type %A)" name p.uniformType
 
                         if isArgument then
                             uniforms <- Map.add name { p with uniformValue = UniformValue.Attribute(uniform?Arguments, name) } uniforms
@@ -248,7 +268,10 @@ module ComputeShader =
                     uniformName = n
                     uniformType = i.arrayType
                     uniformBuffer = Some "StorageBuffer"
-                    uniformDecorations = [UniformDecoration.BufferAccess i.access] 
+                    uniformDecorations = [
+                        UniformDecoration.BufferAccess i.access
+                        if i.memory <> MemoryQualifier.None then UniformDecoration.Memory i.memory
+                    ]
                     uniformTextureInfo = []
                 }
             )
@@ -266,9 +289,13 @@ module ComputeShader =
         let imageArguments =
             s.csImages |> Map.toList |> List.map (fun (n,u) ->
                 let decorations =
-                    match u.imageType with
-                        | ImageType(fmt,_,_,_,_) -> [ UniformDecoration.Format fmt ]
-                        | _ -> []
+                    [
+                        match u.imageType with
+                        | ImageType(fmt,_,_,_,_) -> UniformDecoration.Format fmt
+                        | _ -> ()
+
+                        if u.memory <> MemoryQualifier.None then UniformDecoration.Memory u.memory
+                    ]
                 { 
                     uniformName = n
                     uniformType = u.imageType

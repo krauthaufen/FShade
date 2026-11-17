@@ -621,3 +621,66 @@ let ``[ComputeHashing] including localSize``() =
     let sb = ComputeShader.ofFunction s b
 
     sa.csId |> should not' (equal sb.csId)
+// All members deliberately declare the SAME uniform "MemoryData" (the uniform identity is the string
+// after ?, not the member name) so the shaders below differ only in its memory qualifiers.
+type UniformScope with
+    member x.MemoryPlain : int[] = x?StorageBuffer?MemoryData
+
+    [<Coherent>]
+    member x.MemoryCoherent : int[] = x?StorageBuffer?MemoryData
+
+    [<Coherent>]
+    member x.MemoryCoherent2 : int[] = x?StorageBuffer?MemoryData
+
+    [<Coherent; Restrict>]
+    member x.MemoryCoherentRestrict : int[] = x?StorageBuffer?MemoryData
+
+[<Test>]
+let ``[Hashing] includes memory qualifiers``() =
+    let s1 (v : Vertex) =
+        fragment {
+            uniform.MemoryPlain.[0] <- 1
+            return V3f.Zero
+        }
+
+    let s2 (v : Vertex) =
+        fragment {
+            uniform.MemoryCoherent.[0] <- 1
+            return V3f.Zero
+        }
+
+    let s3 (v : Vertex) =
+        fragment {
+            uniform.MemoryCoherent2.[0] <- 1
+            return V3f.Zero
+        }
+
+    let s4 (v : Vertex) =
+        fragment {
+            uniform.MemoryCoherentRestrict.[0] <- 1
+            return V3f.Zero
+        }
+
+    let e1 = Effect.ofFunction s1
+    let e2 = Effect.ofFunction s2
+    let e3 = Effect.ofFunction s3
+    let e4 = Effect.ofFunction s4
+
+    e1.Id |> should not' (equal e2.Id)
+    e2.Id |> should equal e3.Id
+    e2.Id |> should not' (equal e4.Id)
+
+[<Test>]
+let ``[Serializer] memory qualifiers``() =
+    let shader (v : Vertex) =
+        fragment {
+            uniform.MemoryCoherentRestrict.[0] <- 1
+            return V3f.Zero
+        }
+
+    let effect = Effect.ofFunction shader
+    let expected = MemoryQualifier.Coherent ||| MemoryQualifier.Restrict
+    effect.FragmentShader.Value.shaderUniforms.["MemoryData"].uniformMemory |> should equal expected
+
+    let restored = effect |> Effect.pickle |> Effect.read
+    restored.FragmentShader.Value.shaderUniforms.["MemoryData"].uniformMemory |> should equal expected

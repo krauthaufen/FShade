@@ -18,9 +18,9 @@ patch compiled assemblies so `Effect.ofFunction` calls load that blob instead.
 | `Effect.UsePrecompiled` (mutable, default `true`) | honour an `Effect` carried inside a quotation via `WithValue` |
 | `GLSLShader.pickle` / `unpickle` (`FShade.GLSL`) | cache compiled GLSL + interface (consumer shader caches) |
 
-Blob layout: `[version : byte = 1][id : string][EffectDeps][shaderCount : int32][(stage : int32, Shader)*]`.
-`blobFormatVersion` lives in `Effect.fs` (`let private blobFormatVersion = 1uy`); a mismatch raises
-`[FShade] effect blob format version mismatch: got X, expected 1`. There is intentionally no
+Blob layout: `[version : byte = 2][id : string][EffectDeps][shaderCount : int32][(stage : int32, Shader)*]`.
+`blobFormatVersion` lives in `Effect.fs` (`let private blobFormatVersion = 2uy`); a mismatch raises
+`[FShade] effect blob format version mismatch: got X, expected 2`. There is intentionally no
 backwards compatibility: bump the version whenever `Serializer.Shader` output changes.
 
 The lazy-shader design means consumers can read `effect.Dependencies` and `effect.Id` from a blob

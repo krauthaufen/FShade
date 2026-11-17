@@ -27,6 +27,7 @@ conventions, compute/raytracing runtime APIs) is documented in that repository's
 - `vertex`, `fragment`, `triangle`/`line`/`point`, `tessellation`, `_triangle<'d>` -> SHADER-DSL.md
 - `[<Position>]`, `[<Color>]`, `[<Semantic>]`, `[<Depth>]`, `[<Interpolation>]`, builtin attributes -> SHADER-DSL.md
 - `uniform?Name`, `UniformScope`, `StorageBuffer`, `Arr<N<n>,T>` -> SHADER-DSL.md
+- `[<Coherent>]`, `[<Volatile>]`, `[<Restrict>]`, `MemoryQualifier`, `memoryBarrier*` -> SHADER-DSL.md
 - `sampler2d { }`, `textureArray`, `Image2d<Formats.rgba8>`, `SamplerState` -> SHADER-DSL.md
 - `[<ReflectedDefinition>]`, `[<Inline>]`, `[<KeepCall>]`, `[<GLSLIntrinsic>]`, `onlyInShaderCode` -> SHADER-DSL.md
 - `unroll`, `discard`, `ddx`, `Atomic`, `Bitwise`, pack/unpack -> SHADER-DSL.md

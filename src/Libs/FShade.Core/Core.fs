@@ -24,6 +24,51 @@ type PrimitiveIndexAttribute(index : int) =
     inherit Attribute()
     member x.Index = index
 
+/// <summary>
+/// Base class for memory qualifier attributes. Applicable to <c>UniformScope</c> extension members declaring
+/// images or storage buffers, and to image / storage buffer parameters of compute shaders.
+/// </summary>
+[<AttributeUsage(AttributeTargets.Property ||| AttributeTargets.Method ||| AttributeTargets.Parameter, AllowMultiple = true)>]
+type MemoryQualifierAttribute(qualifier : MemoryQualifier) =
+    inherit Attribute()
+    member x.Qualifier = qualifier
+
+/// Emits the GLSL <c>coherent</c> memory qualifier for the image or storage buffer.
+type CoherentAttribute() =
+    inherit MemoryQualifierAttribute(MemoryQualifier.Coherent)
+
+/// Emits the GLSL <c>volatile</c> memory qualifier for the image or storage buffer.
+type VolatileAttribute() =
+    inherit MemoryQualifierAttribute(MemoryQualifier.Volatile)
+
+/// Emits the GLSL <c>restrict</c> memory qualifier for the image or storage buffer.
+type RestrictAttribute() =
+    inherit MemoryQualifierAttribute(MemoryQualifier.Restrict)
+
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module MemoryQualifier =
+    open System.Reflection
+
+    let private combine (attributes : seq<MemoryQualifierAttribute>) =
+        attributes |> Seq.fold (fun q a -> q ||| a.Qualifier) MemoryQualifier.None
+
+    /// Gets the memory qualifiers declared on a parameter.
+    let ofParameter (p : ParameterInfo) =
+        p.GetCustomAttributes<MemoryQualifierAttribute>(true) |> combine
+
+    /// Gets the memory qualifiers declared on a member. For a property getter, the attributes of the property are considered as well.
+    let ofMember (m : MemberInfo) =
+        let own = m.GetCustomAttributes<MemoryQualifierAttribute>(true) |> combine
+
+        match m with
+        | :? MethodInfo as mi when mi.Name.StartsWith "get_" && not (isNull mi.DeclaringType) ->
+            let flags = BindingFlags.Public ||| BindingFlags.NonPublic ||| BindingFlags.Static ||| BindingFlags.Instance
+            let prop = mi.DeclaringType.GetProperty(mi.Name.Substring 4, flags)
+            if isNull prop then own
+            else own ||| (prop.GetCustomAttributes<MemoryQualifierAttribute>(true) |> combine)
+        | _ ->
+            own
+
 type IShaderBuilder =
     abstract member ShaderStage : ShaderStage
     abstract member OutputTopology : Option<OutputTopology>
@@ -212,6 +257,8 @@ type UniformParameter =
         uniformName         : string
         uniformType         : Type
         uniformValue        : UniformValue
+        /// Memory qualifiers (only meaningful for images and storage buffers).
+        uniformMemory       : MemoryQualifier
     }
 
 

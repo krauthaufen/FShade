@@ -395,7 +395,8 @@ module Effect =
 
     /// Effect blob format version. Bump when the on-disk format changes.
     /// v1 added the EffectDeps header block right after the Id.
-    let private blobFormatVersion = 1uy
+    /// v2 added the memory qualifiers of uniform parameters.
+    let private blobFormatVersion = 2uy
 
     let private writeOutputDepsMap (typeState : Serializer.Type.SerializerState) (dst : BinaryWriter) (m : Map<string, OutputDeps>) =
         dst.Write (Map.count m)

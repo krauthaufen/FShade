@@ -88,6 +88,7 @@ void main() { ... }
 - Each entry is wrapped in `#ifdef <conditional>`; graphics stages use the stage name, raytracing slots use `ShaderSlot.Conditional` (e.g. `ClosestHit_Model_Primary`). Consumers compile the same source once per stage with the matching `#define`.
 - Names pass through `glslName` (`Assembler.fs:1325`): invalid characters become `_` or their char code, reserved words (`src/Libs/FShade.GLSL/Keywords.fs`) get a `_` prefix. `checkName` is the strict variant that throws (`[GLSL] "x" is a reserved keyword ...`).
 - Storage buffers are `std430`, uniform buffers `std140` (`Assembler.fs:2151`). A `T[][]` storage buffer becomes `buffer XBuffer { T[] data; } X[];` (`ssbCount = -1`).
+- `UniformDecoration.Memory` (from `[<Coherent>]`/`[<Volatile>]`/`[<Restrict>]`) and `BufferAccess` become the qualifier prefix of storage buffers and images: `layout(...) coherent restrict readonly buffer ...`, `layout(...) coherent uniform image2D ...` (`uniformLayout`). The interface reports them as `ssbMemory` / `imageMemory`.
 - Shared memory (`allocateShared`, `allocateSharedValue`) becomes `shared T name[n];` / `shared T name;`.
 - Unbounded sampler/image/SSBO arrays each get their **own descriptor set** (must be the last binding; `Assembler.fs:2203`). Dynamic indexing of descriptor arrays emits `nonuniformEXT` only when `createDescriptorSets` is on.
 - 8/16/64-bit types pull in the matching `GL_EXT_shader_explicit_arithmetic_types_*` / storage extensions automatically (`useTypeExtensions`).
@@ -101,9 +102,9 @@ void main() { ... }
 |-------|------|---------|
 | `inputs`, `outputs` | `list<GLSLParameter>` | first-stage inputs and last-stage outputs: `paramName`, `paramSemantic`, `paramLocation`, `paramType`, `paramInterpolation` |
 | `uniformBuffers` | `MapExt<string, GLSLUniformBuffer>` | `ubSet`, `ubBinding`, `ubName`, `ubFields : list<GLSLUniformBufferField>` (`ufName`, `ufType`, `ufOffset`), `ubSize` (std140 applied) |
-| `storageBuffers` | `MapExt<string, GLSLStorageBuffer>` | `ssbSet`, `ssbBinding`, `ssbType`, `ssbAccess : StorageAccess`, `ssbCount` (1 or -1) |
+| `storageBuffers` | `MapExt<string, GLSLStorageBuffer>` | `ssbSet`, `ssbBinding`, `ssbType`, `ssbAccess : StorageAccess`, `ssbMemory : MemoryQualifier`, `ssbCount` (1 or -1) |
 | `samplers` | `MapExt<string, GLSLSampler>` | `samplerSet/Binding`, `samplerCount` (-1 unbounded), `samplerTextures : list<string * SamplerState>` (texture semantic + state per element), `samplerType` |
-| `images` | `MapExt<string, GLSLImage>` | set/binding, `imageType` (format, dimension, arrayness, value type) |
+| `images` | `MapExt<string, GLSLImage>` | set/binding, `imageType` (format, dimension, arrayness, value type), `imageMemory : MemoryQualifier` |
 | `accelerationStructures` | `MapExt<string, GLSLAccelerationStructure>` | set/binding |
 | `textures`, `samplerStates` | | only populated with `separateTexturesAndSamplers` |
 | `shaders` | `GLSLProgramShaders` | `Compute iface`, `Graphics { stages }`, `Raytracing { slots }`; per-stage `GLSLShaderInterface` with used uniform names, builtins, `shaderDecorations` (`GLSLLocalSize`, `GLSLMaxVertices`, `GLSLInputTopology`, `GLSLOutputTopology`, `GLSLInvocations`, `GLSLSpacing`, `GLSLWinding`, `GLSLFragmentInterlock`) |

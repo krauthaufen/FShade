@@ -417,6 +417,7 @@ module Preprocessor =
                         uniformName = s.AccelerationStructure.Semantic
                         uniformType = typeof<Scene>
                         uniformValue = AccelerationStructure s.AccelerationStructure.Semantic
+                        uniformMemory = MemoryQualifier.None
                     }
 
                 | _ ->
@@ -1118,11 +1119,14 @@ module Preprocessor =
                 match Map.tryFind p.uniformName s.uniforms with
                 | Some _ when not validateCompatibility ->
                     s
-                | Some { uniformType = otype; uniformValue = ovalue } ->
+                | Some ({ uniformType = otype; uniformValue = ovalue } as o) ->
                     if p.uniformType <> otype then
                         failwithf "[FShade] uniform '%s' has conflicting types %A and %A." p.uniformName otype p.uniformType
                     elif p.uniformValue <> ovalue then
                         failwithf "[FShade] uniform '%s' has conflicting values %A and %A." p.uniformName ovalue p.uniformValue
+                    elif p.uniformMemory <> o.uniformMemory then
+                        let merged = { o with uniformMemory = o.uniformMemory ||| p.uniformMemory }
+                        { s with State.uniforms = Map.add p.uniformName merged s.uniforms }
                     else
                         s
                 | None ->
@@ -1832,7 +1836,7 @@ module Preprocessor =
                     let rep = Expr.RefOf(Expr.ReadInput(ParameterKind.Uniform, t, name))
                     let b = b.Substitute(fun vv -> if vv = v then Some rep else None)
 
-                    let u = { uniformName = name; uniformType = t; uniformValue = UniformValue.Attribute(uniform?SharedMemory, name) }
+                    let u = { uniformName = name; uniformType = t; uniformValue = UniformValue.Attribute(uniform?SharedMemory, name); uniformMemory = MemoryQualifier.None }
                     do! u |> State.readUniform true
 
                     return! preprocessComputeS b
@@ -1877,7 +1881,7 @@ module Preprocessor =
 
 
                             let b = substitute b
-                            let u = { uniformName = name; uniformType = t; uniformValue = UniformValue.Attribute(uniform?SharedMemory, name) }
+                            let u = { uniformName = name; uniformType = t; uniformValue = UniformValue.Attribute(uniform?SharedMemory, name); uniformMemory = MemoryQualifier.None }
                             do! u |> State.readUniform true
 
                             return! preprocessComputeS b
@@ -2351,7 +2355,7 @@ module Preprocessor =
                 | ParameterKind.Input -> 
                     do! State.readInput name { paramType = paramType; paramInterpolation = InterpolationMode.Default }
                 | ParameterKind.Uniform ->
-                    let u = { uniformType = paramType; uniformName = name; uniformValue = UniformValue.Attribute(uniform, name) }
+                    let u = { uniformType = paramType; uniformName = name; uniformValue = UniformValue.Attribute(uniform, name); uniformMemory = MemoryQualifier.None }
                     do! u |> State.readUniform false // optimizer uses this to see which uniforms are used, scope is potentially wrong here so don't validate
                 | _ ->
                     ()
@@ -3244,7 +3248,7 @@ type ShaderOutputValue (mode : InterpolationMode, index : Option<Expr>, value : 
             uniforms |> Map.map (fun name (_,t) ->
                 match Map.tryFind name state.uniforms with
                     | Some p -> p
-                    | None -> { uniformType = t; uniformName = name; uniformValue = UniformValue.Attribute(uniform, name) }
+                    | None -> { uniformType = t; uniformName = name; uniformValue = UniformValue.Attribute(uniform, name); uniformMemory = MemoryQualifier.None }
             )
 
         value, inputs, uniforms
@@ -4075,7 +4079,7 @@ module Shader =
                     | None -> 
                         match Map.tryFind name state.uniforms with
                             | Some p -> p
-                            | None -> { uniformName = name; uniformType = t; uniformValue = UniformValue.Attribute(uniform, name) }
+                            | None -> { uniformName = name; uniformType = t; uniformValue = UniformValue.Attribute(uniform, name); uniformMemory = MemoryQualifier.None }
             )
 
         // Re-derive storage-buffer access from the NEW body. Without this, a buffer
@@ -4639,6 +4643,14 @@ module Shader =
                     |> Map.map (fun _ p -> p.paramType)
         
 
+    /// Unions two uniform maps, merging the memory qualifiers of uniforms present in both.
+    let private unionUniforms (l : Map<string, UniformParameter>) (r : Map<string, UniformParameter>) =
+        Map.union l r |> Map.map (fun name p ->
+            match Map.tryFind name l, Map.tryFind name r with
+            | Some a, Some b when a.uniformMemory <> b.uniformMemory -> { p with uniformMemory = a.uniformMemory ||| b.uniformMemory }
+            | _ -> p
+        )
+
     module internal Composition =
         let simpleInlined (l : Shader) (r : Shader) =
             let needed = Map.intersect l.shaderOutputs r.shaderInputs
@@ -4704,7 +4716,7 @@ module Shader =
                 { l with
                     shaderInputs = Map.union r.shaderInputs l.shaderInputs
                     shaderOutputs = Map.union l.shaderOutputs r.shaderOutputs
-                    shaderUniforms = Map.union l.shaderUniforms r.shaderUniforms
+                    shaderUniforms = unionUniforms l.shaderUniforms r.shaderUniforms
                     shaderBody = lBody
                     shaderDebugRange = None
                     shaderDepthWriteMode = depthWrite
@@ -4774,7 +4786,7 @@ module Shader =
                 { l with
                     shaderInputs = Map.union r.shaderInputs l.shaderInputs
                     shaderOutputs = Map.union l.shaderOutputs r.shaderOutputs
-                    shaderUniforms = Map.union l.shaderUniforms r.shaderUniforms
+                    shaderUniforms = unionUniforms l.shaderUniforms r.shaderUniforms
                     shaderBody = body
                     shaderDebugRange = None
                     shaderDepthWriteMode = depthWrite
@@ -4908,7 +4920,7 @@ module Shader =
                 { lShader with
                     shaderInputs = Map.union rInputs lShader.shaderInputs
                     shaderOutputs = Map.union lShader.shaderOutputs rOutputs
-                    shaderUniforms = Map.union lShader.shaderUniforms rShader.shaderUniforms
+                    shaderUniforms = unionUniforms lShader.shaderUniforms rShader.shaderUniforms
                     shaderBody = lBody
                     shaderDebugRange = None
                 }
@@ -5277,7 +5289,7 @@ module Shader =
                             shaderInvocations = lShader.shaderInvocations * rShader.shaderInvocations
                             shaderBody = Preprocessor.preprocess V3i.Zero body |> fst
                             shaderInputTopology = lShader.shaderInputTopology
-                            shaderUniforms = Map.union lShader.shaderUniforms rShader.shaderUniforms
+                            shaderUniforms = unionUniforms lShader.shaderUniforms rShader.shaderUniforms
                             shaderInputs = lShader.shaderInputs
                             shaderOutputVertices = outputVerices
                             shaderOutputPrimitives = outputPrimitives
@@ -5375,7 +5387,7 @@ module Shader =
                 )
 
 
-            withBody rBody { rShader with shaderUniforms = Map.union lShader.shaderUniforms rShader.shaderUniforms }
+            withBody rBody { rShader with shaderUniforms = unionUniforms lShader.shaderUniforms rShader.shaderUniforms }
 
     /// composes two shaders respecting their stages.
     ///     - implemented: { Vertex->Vertex; Geometry->Vertex; Fragment->Fragment }

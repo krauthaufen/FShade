@@ -1,3 +1,5 @@
+- Add memory qualifiers for images and storage buffers (`[<Coherent>]`, `[<Volatile>]`, `[<Restrict>]` on uniform scope members and compute shader parameters)
+- Add memory barrier intrinsics (`memoryBarrier`, `memoryBarrierBuffer`, `memoryBarrierImage`, `memoryBarrierShared`, `groupMemoryBarrier`)
 - Add support for `GL_ARB_fragment_shader_interlock` (`beginInvocationInterlock` / `endInvocationInterlock`)
 - Remove obsolete `ParameterDecoration` and `UniformDecoration` values, `MemoryType`, and `Preprocessor.unroll`
 - Rename `ComputeBuffer2` to `ComputeBuffer`

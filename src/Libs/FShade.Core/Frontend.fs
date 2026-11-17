@@ -363,6 +363,26 @@ module Primitives =
     let getWorkGroupCount() : V3i = onlyInShaderCode "getWorkGroupCount"
     let barrier() : unit = onlyInShaderCode "barrier"
 
+    /// Waits until all memory accesses (buffers, images, shared memory) of the invocation are visible to other invocations.
+    [<KeepCall>]
+    let memoryBarrier() : unit = onlyInShaderCode "memoryBarrier"
+
+    /// Waits until all storage buffer accesses of the invocation are visible to other invocations.
+    [<KeepCall>]
+    let memoryBarrierBuffer() : unit = onlyInShaderCode "memoryBarrierBuffer"
+
+    /// Waits until all image accesses of the invocation are visible to other invocations.
+    [<KeepCall>]
+    let memoryBarrierImage() : unit = onlyInShaderCode "memoryBarrierImage"
+
+    /// Waits until all shared memory accesses of the invocation are visible to other invocations of the work group (compute only).
+    [<KeepCall>]
+    let memoryBarrierShared() : unit = onlyInShaderCode "memoryBarrierShared"
+
+    /// Waits until all memory accesses of the invocation are visible to other invocations of the work group (compute only).
+    [<KeepCall>]
+    let groupMemoryBarrier() : unit = onlyInShaderCode "groupMemoryBarrier"
+
     /// Declares a shared array of the given constant size (compute shaders only). The result must be
     /// bound with let and only used for element reads and writes (it cannot be passed as a whole).
     /// The array is identified by the name of the bound variable, its element type and size: declaring
