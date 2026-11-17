@@ -539,7 +539,21 @@ module Optimizer =
 
         and private hasSideEffectsS (e : Expr) =
             state {
+                // NOTE: SetRef and SetArray are calls, so the write cases must precede the generic call cases
                 match e with
+                    | SetRef(LExpr v, _)
+                    | SetArray(LExpr v, _, _)
+                    | FieldSet(Some (LExpr v), _, _)
+                    | PropertySet(Some (LExpr v), _, _, _) ->
+                        return! EliminationState.isUsed v
+
+                    // writes to storage buffers, shared memory, images and raytracing data are global side effects
+                    | SetRef(RefOf StorageExpr, _)
+                    | SetArray(StorageExpr, _, _)
+                    | FieldSet(Some StorageExpr, _, _)
+                    | PropertySet(Some StorageExpr, _, _, _) ->
+                        return true
+
                     | CallFunction(utility, args) ->
                         match! args |> List.existsS hasSideEffectsS with
                         | true -> return true
@@ -552,12 +566,6 @@ module Optimizer =
                             match! args |> List.existsS hasSideEffectsS with
                             | true -> return true
                             | _ -> return! callNeededS t mi args
-
-                    | SetRef(LExpr v, _)
-                    | SetArray(LExpr v, _, _)
-                    | FieldSet(Some (LExpr v), _, _)
-                    | PropertySet(Some (LExpr v), _, _, _) ->
-                        return! EliminationState.isUsed v
 
                     | PropertySet(t, p, idx, value) ->
                         let call =

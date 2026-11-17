@@ -188,3 +188,45 @@ let ``Storage buffer access is merged across stages``() =
     GLSL.shouldCompileAndContainRegex [ Effect.ofFunction vs; Effect.ofFunction fs ] [
         "^buffer [fF]loatScratchBuffer {"
     ]
+
+type UniformScope with
+    member _.OutImg : IntImage2d<Formats.r32i> = uniform?OutImg
+
+[<ReflectedDefinition>]
+let writeOutput (value : int) =
+    uniform.IntOutput.[0] <- value
+
+[<ReflectedDefinition>]
+let storeImage (value : int) =
+    uniform.OutImg.[V2i.Zero] <- V4i(value)
+
+[<Test>]
+let ``Storage buffer write in utility function is kept``() =
+    Setup.Run()
+
+    let fs () =
+        fragment {
+            writeOutput 1
+            return V3f.Zero
+        }
+
+    // the call has no result and no by-ref argument; the write alone must keep it alive
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction fs] [
+        "writeOutput"
+        "^writeonly buffer [iI]ntOutputBuffer"
+    ]
+
+[<Test>]
+let ``Image store in utility function is kept``() =
+    Setup.Run()
+
+    let fs () =
+        fragment {
+            storeImage 1
+            return V3f.Zero
+        }
+
+    GLSL.shouldCompileAndContainRegex [Effect.ofFunction fs] [
+        "storeImage"
+        "imageStore\(OutImg"
+    ]
