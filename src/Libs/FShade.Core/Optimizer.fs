@@ -321,6 +321,33 @@ module Optimizer =
             | _ ->
                 ValueNone
 
+        /// Prepares an address expression (the argument of RefOf) for substitution: non-trivial
+        /// sub-expressions (e.g. computed indices) are bound to variables so they are evaluated only once.
+        /// Returns the bindings (in evaluation order) and the rewritten expression.
+        let hoistAddress (e : Expr) =
+            let bindings = ResizeArray<Var * Expr>()
+
+            let rec hoist (e : Expr) =
+                match e with
+                | TrivialOrInput ->
+                    e
+
+                | Var _ | GetArray _ | FieldGet(Some _, _) | PropertyGet(Some _, _, _) | DeRef _ | ReadInput _ ->
+                    match e with
+                    | ShapeCombination(o, args) -> RebuildShapeCombination(o, List.map hoist args)
+                    | _ -> e
+
+                | _ ->
+                    let v = Var("index", e.Type)
+                    bindings.Add((v, e))
+                    Expr.Var v
+
+            let e = hoist e
+            Seq.toList bindings, e
+
+        let bindAll (bindings : list<Var * Expr>) (body : Expr) =
+            (bindings, body) ||> List.foldBack (fun (v, e) b -> Expr.Let(v, e, b))
+
         let inlineCode (f : UtilityFunction) (args : list<Expr>) =
             let rec wrap (v : list<Var>) (e : list<Expr>) (b : Expr) =
                 match v, e with
@@ -330,6 +357,14 @@ module Optimizer =
                     | v :: vs, (TrivialOrInput as ev) :: es ->
                         let b = b.Substitute(fun vi -> if vi = v then Some ev else None)
                         wrap vs es b
+
+                    // An address passed to a ref parameter is substituted (binding it to a variable would
+                    // create a copy and modifications would be lost).
+                    // See: https://github.com/krauthaufen/FShade/issues/38
+                    | v :: vs, RefOf address :: es when v.Type.IsRef ->
+                        let bindings, address = hoistAddress address
+                        let b = b.Substitute(fun vi -> if vi = v then Some (Expr.RefOf address) else None)
+                        wrap vs es b |> bindAll bindings
 
                     | v :: vs, e :: es ->
                         let mutable useCnt = 0
@@ -369,6 +404,7 @@ module Optimizer =
             match e with
             | Var v
             | DeRef (LExpr v)
+            | RefOf (LExpr v)
             | FieldGet(Some (LExpr v), _)
             | PropertyGet(Some (LExpr v), _, _)
             | GetArray(LExpr v, _) -> ValueSome v
@@ -392,7 +428,7 @@ module Optimizer =
         /// Determines if the address of the given variable is taken in the given expression.
         let rec takesAddressOf (v: Var) (e: Expr) =
             match e with
-            | RefOf (Var r)
+            | RefOf (LExpr r)
             | AddressOf (Var r) when v = r -> true
             | ShapeVar _ -> false
             | CallFunction (_, args)
@@ -2883,6 +2919,18 @@ module Optimizer =
                     //    let! e = inlineS e
                     //    let! b = inlineS b
                     //    return Expr.Let(v, e, b)
+
+                    // A ref bound to an address or to another ref is an alias: binding it to a variable
+                    // would create a copy, so it is substituted instead.
+                    | Let(v, RefOf address, b) when v.Type.IsRef ->
+                        let! address = inlineS address
+                        let bindings, address = UtilityFunction.hoistAddress address
+                        let b = b.Substitute(fun vi -> if vi = v then Some (Expr.RefOf address) else None)
+                        return! inlineS (UtilityFunction.bindAll bindings b)
+
+                    | Let(v, (Var _ as e), b) when v.Type.IsRef ->
+                        let b = b.Substitute(fun vi -> if vi = v then Some e else None)
+                        return! inlineS b
 
                     | Let(v, (DefaultValue _ as e), b) when v.IsMutable ->
                         match tryInlineMutableDecl v b Expr.Unit with

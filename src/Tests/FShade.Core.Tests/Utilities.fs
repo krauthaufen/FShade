@@ -95,6 +95,29 @@ module Utilities =
 
         e |> get |> List.exists (fun str -> Regex.IsMatch(str, nameRx))
 
+    /// Determines whether any sub-expression (including utility function bodies) satisfies the predicate.
+    let rec exists (predicate : Expr -> bool) (e : Expr) =
+        predicate e ||
+        match e with
+        | CallFunction(f, args) -> f.functionBody :: args |> List.exists (exists predicate)
+        | ShapeVar _ -> false
+        | ShapeLambda(_, b) -> exists predicate b
+        | ShapeCombination(_, args) -> args |> List.exists (exists predicate)
+
+    /// Determines whether the variable with the given name is written through its address (&&v).
+    let writesThroughRefOf (name : string) (e : Expr) =
+        e |> exists (function
+            | SetRef(RefOf(Var v), _) when v.Name = name -> true
+            | _ -> false
+        )
+
+    /// Determines whether a variable of ref type is bound (i.e. a reference was copied).
+    let hasRefBinding (e : Expr) =
+        e |> exists (function
+            | Let(v, _, _) when v.Type.IsRef -> true
+            | _ -> false
+        )
+
     module Opt =
         open System.Reflection
 

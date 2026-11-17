@@ -2493,6 +2493,16 @@ module Preprocessor =
 
             | Let(var, e, body) ->
                 let! e = preprocessNormalS e
+
+                // A variable whose address is taken (&&var) may be modified through the reference,
+                // so the optimizer has to treat it as mutable.
+                let var, body =
+                    if not var.IsMutable && not var.Type.IsRef && takesAddressOf var body then
+                        let mutableVar = Var(var.Name, var.Type, true)
+                        mutableVar, body.Substitute(fun v -> if v = var then Some (Expr.Var mutableVar) else None)
+                    else
+                        var, body
+
                 do! State.setVariableValue var e
                 let! body = preprocessNormalS body
                 return Expr.Let(var, e, body)
@@ -2610,6 +2620,18 @@ module Preprocessor =
                     let mutable innerState = State.createInner state
                     let processedF =
                         utility |> UtilityFunction.map (fun b ->
+                            // By-value parameters whose address is taken (&&p) are copied to a mutable local
+                            // variable: the parameter itself stays by-value and the optimizer sees the modification.
+                            let b =
+                                (utility.functionArguments, b) ||> List.foldBack (fun p b ->
+                                    if not p.IsMutable && not p.Type.IsRef && takesAddressOf p b then
+                                        let local = Var(p.Name, p.Type, true)
+                                        let b = b.Substitute(fun v -> if v = p then Some (Expr.Var local) else None)
+                                        Expr.Let(local, Expr.Var p, b)
+                                    else
+                                        b
+                                )
+
                             let run : Preprocess<Expr> = preprocessByTypeS state.expressionType b
                             run.Run(&innerState)
                         )

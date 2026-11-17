@@ -54,7 +54,8 @@ Quotation node vocabulary added by FShade (`src/Libs/FShade.Imperative/Frontend.
 
 `UtilityFunction` (`UtilityFunction.fs:23`): `functionId` (hash of the reflected lambda),
 `functionName`, `functionArguments` (tuples flattened, `unit` removed, `this` made mutable),
-`functionBody`, `functionIsInline` (`[<Inline>]`, never for `ref` args). `uniqueName` =
+`functionBody`, `functionIsInline` (`[<Inline>]`; `ref` arguments are substituted by address, see
+`UtilityFunction.inlineCode`/`hoistAddress` in `Optimizer.fs`). `uniqueName` =
 `name_hash` is the GLSL function name.
 
 ## Optimizer (`src/Libs/FShade.Core/Optimizer.fs`)

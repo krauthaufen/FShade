@@ -47,6 +47,12 @@ let getAndSet (var : int ref) =
     old
 
 [<ReflectedDefinition>]
+let readThenInc (x : int) =
+    let b = x
+    incAndRet &&x |> ignore
+    b + x
+
+[<ReflectedDefinition>]
 let getPlusOne (var : int ref) =
     let value = var.Value
     value + 1
@@ -159,6 +165,21 @@ let ``Shared memory read before barrier``() =
 
     GLSL.shouldCompileComputeAndContainRegex (ComputeShader.ofFunction (V3i 64) cs) [
         @"int x = " + helper + @"\[\(63 - id\)\];\s*barrier\(\);"
+    ]
+
+[<Test>]
+let ``Parameter read before write through its address``() =
+    Setup.Run()
+
+    let frag () =
+        fragment {
+            return readThenInc 1
+        }
+
+    // the parameter stays by-value (no inout); the read of b must happen before the call
+    GLSL.shouldCompileAndContainRegex [ Effect.ofFunction frag ] [
+        @"int " + helper + @"_readThenInc_" + helper + @"\(int x\)"
+        @"int b = " + helper + @";\s*" + helper + @"_incAndRet_" + helper + @"\(" + helper + @"\);\s*return \(b \+ " + helper + @"\);"
     ]
 
 [<Test>]

@@ -690,11 +690,13 @@ let ``[Dead] keep method with side-effects in unused let bindings (by-ref argume
                 v
         @>
 
+    // v is modified through the reference and therefore not aliased to a
     let expected =
         <@
             fun (a : int) ->
-                ignore (inc2 &&a)
-                a
+                let mutable v = a
+                ignore (inc2 &&v)
+                v
         @>
 
     input |> Opt.run |> should exprEqual expected
@@ -710,12 +712,14 @@ let ``[Dead] keep method with side-effects in unused let bindings (by-ref argume
                 v
         @>
 
+    // v is modified through the reference and therefore not aliased to a
     let expected =
         <@
             fun (a : int) ->
-                inc &&a
-                ignore (inc2 &&a)
-                a
+                let mutable v = a
+                inc &&v
+                ignore (inc2 &&v)
+                v
         @>
 
     input |> Opt.run |> should exprEqual expected
@@ -735,12 +739,14 @@ let ``[Dead] keep method with side-effects in unused let bindings (by-ref argume
                 v
         @>
 
+    // v is modified through the reference and therefore not aliased to a
     let expected =
         <@
             fun (a : int) ->
-                incWrapper &&a
-                ignore (incWrapper2 &&a)
-                a
+                let mutable v = a
+                incWrapper &&v
+                ignore (incWrapper2 &&v)
+                v
         @>
 
     let result = input |> Opt.run
@@ -749,6 +755,27 @@ let ``[Dead] keep method with side-effects in unused let bindings (by-ref argume
     result |> hasCall "incWrapper2$" |> should be True
     result |> hasCall "inc$" |> should be True
     result |> hasCall "inc2$" |> should be True
+
+[<Test>]
+let ``[Let] binding modified through reference is not aliased``() =
+    let input =
+        <@
+            fun (a : int) ->
+                let v = a
+                inc &&v
+                keep (a + v)
+        @>
+
+    // aliasing v to a would make the increment visible in a
+    let expected =
+        <@
+            fun (a : int) ->
+                let mutable v = a
+                inc &&v
+                keep (a + v)
+        @>
+
+    input |> Opt.run |> should exprEqual expected
 
 type UniformScope with
     member _.MyBuffer : Arr<N<6>, int> = uniform?StorageBuffer?MyBuffer
@@ -847,12 +874,14 @@ let ``[Dead] keep arguments with side-effects for unneeded method call (intrinsi
                 v
         @>
 
+    // v is modified through the reference and therefore not aliased to a
     let expected =
         <@
             fun (a : int) ->
-                inc &&a
-                ignore (inc2 &&a)
-                a
+                let mutable v = a
+                inc &&v
+                ignore (inc2 &&v)
+                v
         @>
 
     let result = input |> Opt.run
@@ -875,12 +904,14 @@ let ``[Dead] keep arguments with side-effects for unneeded method call (utility)
                 v
         @>
 
+    // v is modified through the reference and therefore not aliased to a
     let expected =
         <@
             fun (a : int) ->
-                inc &&a
-                ignore (inc2 &&a)
-                a
+                let mutable v = a
+                inc &&v
+                ignore (inc2 &&v)
+                v
         @>
 
     let result = input |> Opt.run
@@ -1041,3 +1072,75 @@ let ``[Constant] evaluate method``() =
 let ``[Constant] evaluate throwing method``() =
     let input    = <@ keep (myNotSoCoolIntrinsic 1.0f) @>
     input |> Opt.run |> should exprEqual input
+
+[<ReflectedDefinition; Inline>]
+let incInline (x : int ref) =
+    x.Value <- x.Value + 1
+
+[<Test>]
+let ``[Inline] ref parameter is substituted with the caller's variable``() =
+    let input =
+        <@
+            fun (x : int) ->
+                let mutable a = x
+                incInline &&a
+                keep a
+        @>
+
+    let result = input |> Opt.run
+    result |> hasCall "incInline$" |> should be False
+    result |> hasRefBinding |> should be False
+    result |> writesThroughRefOf "a" |> should be True
+
+[<Test>]
+let ``[Dead] eliminate inlined write through ref if unused``() =
+    let input =
+        <@
+            fun (x : int) ->
+                let mutable a = x
+                incInline &&a
+                keep x
+        @>
+
+    let expected =
+        <@
+            fun (x : int) ->
+                keep x
+        @>
+
+    input |> Opt.run |> should exprEqual expected
+
+[<Test>]
+let ``[Inline] read is not moved past inlined write through ref``() =
+    let input =
+        <@
+            fun (x : int) ->
+                let mutable a = x
+                let b = a
+                incInline &&a
+                keep (b + a)
+        @>
+
+    let result = input |> Opt.run
+    result |> hasCall "incInline$" |> should be False
+    result |> writesThroughRefOf "a" |> should be True
+    result |> exists (function Let(v, Var a, _) when v.Name = "b" && a.Name = "a" -> true | _ -> false) |> should be True
+
+[<ReflectedDefinition>]
+let readThenInc (x : int) =
+    let b = x
+    inc &&x
+    b + x
+
+[<Test>]
+let ``[Let] parameter read is not moved past write through its address``() =
+    let input =
+        <@
+            fun (a : int) ->
+                keep (readThenInc a)
+        @>
+
+    // inside readThenInc: the read of x into b must stay before the call modifying x
+    let result = input |> Opt.run
+    result |> hasCall "readThenInc$" |> should be True
+    result |> exists (function Let(v, _, _) when v.Name = "b" -> true | _ -> false) |> should be True

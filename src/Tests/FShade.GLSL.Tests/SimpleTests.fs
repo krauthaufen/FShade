@@ -1512,24 +1512,6 @@ let ``Special floating-point constants``() =
 
     GLSL.shouldCompile [ Effect.ofFunction fs ]
 
-[<ReflectedDefinition; Inline>]
-let myMethod (variable: ref<int>) : unit =
-    variable.Value <- variable.Value + 1
-
-[<Test>]
-let ``Inlining of pass-by-reference method``() =
-    Setup.Run()
-
-    let frag () =
-        fragment {
-            let variable = 0
-            myMethod &&variable
-            myMethod &&variable
-            return variable
-        }
-
-    GLSL.shouldCompileAndContainRegexWithCount [ Effect.ofFunction frag ] [ "myMethod[_a-zA-Z0-9]*\(variable\)", 2 ]
-
 [<ReflectedDefinition>]
 let inc (x: int ref) =
     x.Value <- x.Value + 1

@@ -215,7 +215,7 @@ with each other (`Shader.compose2` has no tess+tess case).
 | `[<KeepCall>]` | mark a `unit`-returning function as a side effect so dead-code elimination keeps it |
 | `[<GLSLIntrinsic("fmt({0}, {1})")>]` + body `onlyInShaderCode "name"` | map an F# function to a GLSL expression; `{n}` are arguments; optional required extensions: `[<GLSLIntrinsic("f({0})", "GL_EXT_foo")>]` |
 | `onlyInShaderCode "name"` | placeholder body; raises `FShadeOnlyInShaderCodeException` if called on the CPU |
-| `&&x` and `ref` parameters | pass by reference (`inout`); functions with `ref` parameters are never inlined |
+| `&&x` and `ref` parameters | pass by reference (`inout`); when such a function is `[<Inline>]`, the reference is substituted so the body writes the caller's variable directly |
 | `Arr<_,_>` / array parameters | passed by value (`T[n]`), as in GLSL; writes to the parameter affect a copy and the call is removed as dead code if nothing else is observable. To fill an array in a function take `Arr<N<n>, T> ref` and call with `&&arr` |
 | `unchanged<'T>` | raytracing payload helper, see `RAYTRACING.md` |
 
