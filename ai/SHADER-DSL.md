@@ -216,6 +216,7 @@ with each other (`Shader.compose2` has no tess+tess case).
 | `[<GLSLIntrinsic("fmt({0}, {1})")>]` + body `onlyInShaderCode "name"` | map an F# function to a GLSL expression; `{n}` are arguments; optional required extensions: `[<GLSLIntrinsic("f({0})", "GL_EXT_foo")>]` |
 | `onlyInShaderCode "name"` | placeholder body; raises `FShadeOnlyInShaderCodeException` if called on the CPU |
 | `&&x` and `ref` parameters | pass by reference (`inout`); functions with `ref` parameters are never inlined |
+| `Arr<_,_>` / array parameters | passed by value (`T[n]`), as in GLSL; writes to the parameter affect a copy and the call is removed as dead code if nothing else is observable. To fill an array in a function take `Arr<N<n>, T> ref` and call with `&&arr` |
 | `unchanged<'T>` | raytracing payload helper, see `RAYTRACING.md` |
 
 ```fsharp
@@ -224,6 +225,14 @@ let lerp3 (a : V3f) (b : V3f) (c : V3f) (w : V3f) = a * w.X + b * w.Y + c * w.Z
 
 [<GLSLIntrinsic("gl_FrontFacing")>]
 let frontFacing () : bool = onlyInShaderCode "frontFacing"
+
+// arrays are values: take a ref to modify the caller's array (-> inout vec4 array[10])
+[<ReflectedDefinition>]
+let fillArray (array : Arr<N<10>, V4f> ref) (denom : float32) =
+    for i in 0 .. 9 do
+        array.Value.[i] <- V4f(float32 i / denom)
+
+// usage inside a shader: let array = Arr<N<10>, V4f>() in fillArray &&array 10.0f
 
 [<Struct; ReflectedDefinition>]
 type Ray = val mutable O : V3f; val mutable D : V3f; new(o, d) = { O = o; D = d }
@@ -271,6 +280,7 @@ object-typed values are not supported.
 ## Gotchas
 
 - **Input access outside the builder**: `Effect.ofFunction` calls the shader function with `null`; `let x = v.pos in vertex { ... }` throws `[FShade] shader functions may not access their vertex-input statically`.
+- **Array parameters are copies**: `let fill (arr : Arr<N<4>, int>) = arr.[0] <- 1` writes a GLSL copy, so `fill a` has no effect and is eliminated. Use a `ref` parameter and `&&a` (see Utility Functions); `let b = a` copies as well.
 - **Closure arguments**: extra parameters (`let shader (radius : float32) (v : Vertex) = ...`) are fine and are baked into the effect hash; lambdas/`fun` values inside the body are `[FShade] unsupported expression`.
 - **Missing `[<ReflectedDefinition>]`**: `[FShade] cannot call function X since it is not reflectable` / `utility function X is not reflectable`.
 - **Samplers must be top-level**: a sampler created inside the shader body is not a static value and cannot be reflected into a uniform.
