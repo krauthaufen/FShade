@@ -2514,7 +2514,7 @@ module Preprocessor =
                 // A variable whose address is taken (&&var) may be modified through the reference,
                 // so the optimizer has to treat it as mutable.
                 let var, body =
-                    if not var.IsMutable && not var.Type.IsRef && takesAddressOf var body then
+                    if not var.IsMutable && not var.Type.IsRef && Optimizer.Helpers.takesAddressOf var body then
                         let mutableVar = Var(var.Name, var.Type, true)
                         mutableVar, body.Substitute(fun v -> if v = var then Some (Expr.Var mutableVar) else None)
                     else
@@ -2641,7 +2641,7 @@ module Preprocessor =
                             // variable: the parameter itself stays by-value and the optimizer sees the modification.
                             let b =
                                 (utility.functionArguments, b) ||> List.foldBack (fun p b ->
-                                    if not p.IsMutable && not p.Type.IsRef && takesAddressOf p b then
+                                    if not p.IsMutable && not p.Type.IsRef && Optimizer.Helpers.takesAddressOf p b then
                                         let local = Var(p.Name, p.Type, true)
                                         let b = b.Substitute(fun v -> if v = p then Some (Expr.Var local) else None)
                                         Expr.Let(local, Expr.Var p, b)

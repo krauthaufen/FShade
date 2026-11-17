@@ -13,6 +13,16 @@ open Aardvark.Base
 open FShade.Imperative
 open FSharp.Data.Adaptive
 
+[<AutoOpen>]
+module Utilities =
+    open Aardvark.Base.Monads.State
+
+    module Option =
+        let mapS (f : 'a -> State<'s, 'b>) (m : Option<'a>) =
+            match m with
+            | Some a -> a |> f |> State.map Some
+            | None -> State.value None
+
 module PrettyPrinter =
 
     let private unaryOperators =
@@ -248,7 +258,6 @@ module PrettyPrinter =
                 failwith ""
 
 
-[<AutoOpen>]
 module Optimizer =
     open Aardvark.Base.Monads.State
 
@@ -386,12 +395,6 @@ module Optimizer =
                 State.get |> State.map (fun s ->
                     m |> State.run s
                 )
-
-        module Option =
-            let mapS (f : 'a -> State<'s, 'b>) (m : Option<'a>) =
-                match m with
-                    | Some a -> a |> f |> State.map Some
-                    | None -> State.value None
 
         [<return: Struct>]
         let (|Unchanged|_|) (e : Expr) =

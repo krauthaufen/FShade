@@ -4,39 +4,18 @@ open System
 open System.Reflection
 
 open Microsoft.FSharp.Quotations
-open Microsoft.FSharp.Quotations.Patterns
-open Microsoft.FSharp.Quotations.DerivedPatterns
-open Microsoft.FSharp.Quotations.ExprShape
-open Microsoft.FSharp.Reflection
 
 open Aardvark.Base
 open FShade.Imperative
 
-
-open System.Collections.Generic
-open Aardvark.Base.ReflectionHelpers
-
 #nowarn "4321"
 
-
 type ComputeBuffer =
-    {
-        contentType : Type
-        access : StorageAccess
-    }
-
-type ComputeBuffer2 =
     {
         arrayType : Type
         access : StorageAccess
     }
     member this.contentType = match this.arrayType with ArrayOf ct | ArrOf(_, ct) | ct -> ct
-
-module internal ComputeBuffer2 =
-    let toComputeBuffer (b: ComputeBuffer2) =
-        match b.arrayType with
-        | ArrayOf ct | ArrOf(_, ct) -> { contentType = ct; access = b.access }
-        | _ -> { contentType = b.arrayType; access = b.access }
 
 type ComputeImage =
     {
@@ -51,7 +30,7 @@ type ComputeImage =
 
 type internal ComputeShaderData =
     {
-        csBuffers       : Map<string, ComputeBuffer2>
+        csBuffers       : Map<string, ComputeBuffer>
         csImages        : Map<string, ComputeImage>
         csSamplerStates : Map<string * int, SamplerState>
         csTextureNames  : Map<string * int, string>
@@ -64,8 +43,7 @@ type ComputeShader internal(id : string, method : MethodBase, localSize : V3i, d
     member x.csId = id
     member x.csMethod = method
     member x.csLocalSize = localSize
-    member x.csBuffers = data.Value.csBuffers |> Map.map (fun _ -> ComputeBuffer2.toComputeBuffer)
-    member x.csBuffers2 = data.Value.csBuffers
+    member x.csBuffers = data.Value.csBuffers
     member x.csImages = data.Value.csImages
     member x.csSamplerStates = data.Value.csSamplerStates
     member x.csTextureNames = data.Value.csTextureNames
@@ -115,27 +93,24 @@ module ComputeShader =
                 let state =
                     { state with uniforms = state.uniforms |> Map.filter (fun n _ -> stateOpt.uniforms.ContainsKey n) }
 
-                let mutable buffers = Map.empty<string, ComputeBuffer2>
+                let mutable buffers = Map.empty<string, ComputeBuffer>
                 let mutable images = Map.empty
                 let mutable uniforms = Map.empty
                 let mutable samplerStates = Map.empty
                 let mutable textureNames = Map.empty
 
                 let addImage (fmt : Type) (name : string) (t : Type) (dim : SamplerDimension) (isArray : bool) (isMS : bool) (contentType : Type) =
-                    match Map.tryFind name images with
-                        | Some oi ->
-                            ()
-                        | None ->
-                            let img =
-                                {
-                                    imageType = t
-                                    formatType = fmt
-                                    dimension = dim
-                                    isArray = isArray
-                                    isMS = isMS
-                                    contentType = contentType
-                                }
-                            images <- Map.add name img images
+                    if not <| images.ContainsKey name then
+                        let img =
+                            {
+                                imageType = t
+                                formatType = fmt
+                                dimension = dim
+                                isArray = isArray
+                                isMS = isMS
+                                contentType = contentType
+                            }
+                        images <- Map.add name img images
 
                 let addBuffer (name : string) (arrayType : Type) (access : StorageAccess) =
                     match Map.tryFind name buffers with
@@ -268,7 +243,7 @@ module ComputeShader =
 
     let toEntryPoint (s : ComputeShader) =
         let bufferArguments = 
-            s.csBuffers2 |> Map.toList |> List.map (fun (n,i) ->
+            s.csBuffers |> Map.toList |> List.map (fun (n,i) ->
                 { 
                     uniformName = n
                     uniformType = i.arrayType
@@ -292,7 +267,7 @@ module ComputeShader =
             s.csImages |> Map.toList |> List.map (fun (n,u) ->
                 let decorations =
                     match u.imageType with
-                        | ImageType(fmt,_,_,_,_) -> [ Imperative.UniformDecoration.Format fmt ]
+                        | ImageType(fmt,_,_,_,_) -> [ UniformDecoration.Format fmt ]
                         | _ -> []
                 { 
                     uniformName = n
@@ -305,12 +280,11 @@ module ComputeShader =
 
 
         let uniforms =
-            s.csUniforms |> Map.toList |> List.map (fun (n, u) ->
+            s.csUniforms |> Map.toList |> List.map (fun (_, u) ->
                 let uniformBuffer = 
                     match u.uniformValue with
-                        | Attribute(scope, name) -> Some scope.FullName
-                        | _ -> None
-
+                    | Attribute(scope, _) -> Some scope.FullName
+                    | _ -> None
 
                 let textureInfos =
                     match u.uniformValue with
@@ -344,5 +318,5 @@ module ComputeShader =
         }
 
     let toModule (shader : ComputeShader) : Module =
-        let entries = lazy ([ toEntryPoint shader ])
+        let entries = lazy [ toEntryPoint shader ]
         Module(shader.csId, shader, entries, Shader.tryGetOverrideCode shader.csLocalSize)
