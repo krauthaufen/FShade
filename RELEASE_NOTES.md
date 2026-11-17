@@ -1,3 +1,4 @@
+- Fix inlining of values read from a `ref` that is later passed to a function
 - Fix storage buffer access qualifiers (`readonly` / `writeonly`) when composed shaders access the same buffer differently
 
 ### 5.7.21

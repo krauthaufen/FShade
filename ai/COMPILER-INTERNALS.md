@@ -63,7 +63,7 @@ Passes run by `Shader.optimize` in this order:
 
 | Pass | Function | What it does |
 |------|----------|--------------|
-| Inlining | `Optimizer.inlining isSideEffect` | inline copy variables, trivial expressions, input reads, mutable locals never mutated, functions with `[<Inline>]`; `inlining'` takes a predicate to force |
+| Inlining | `Optimizer.inlining isSideEffect` | inline copy variables, trivial expressions, input reads, mutable locals never mutated, functions with `[<Inline>]`; `inlining'` takes a predicate to force. A value read through a `ref` is not moved past a call that receives that ref (`isMutated` treats `&&v` and a bare ref argument as potential mutations; arrays are passed by value in GLSL and are not affected) |
 | Raytracing writes | `simplifyRaytracingWrites` | `{ unchanged with f = v }` -> field writes; fails if `unchanged` cannot be inlined |
 | Hoisting | `hoistImperativeConstructs` | `let a = (let b = 1 in b * 2)` -> `let b = 1 in let a = b * 2`; brings loops/ifs to statement level so C-style emission works |
 | Constant folding | `evaluateConstants'` | evaluates pure sub-expressions with constant operands (including Aardvark vector math, enum ops, `.Normalized`); `isSideEffect` marks methods that must stay |

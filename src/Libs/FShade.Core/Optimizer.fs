@@ -2571,7 +2571,10 @@ module Optimizer =
                 | CallFunction(utility, args) ->
                     (utility.functionArguments, args) ||> List.zip |> List.exists (fun (var, arg) ->
                         match arg with
+                        // a ref passed to a function becomes an inout parameter, so the callee may modify it;
+                        // everything else (including arrays) is passed by value and the callee works on a copy
                         | RefOf (LExpr o) when o = v -> isMutated var utility.functionBody
+                        | Var o when o = v && v.Type.IsRef -> isMutated var utility.functionBody
                         | _ -> isMutated v arg
                     )
 
@@ -2582,6 +2585,7 @@ module Optimizer =
                         args |> List.exists (fun a ->
                             match a with
                             | RefOf (LExpr o) when o = v -> true
+                            | Var o when o = v && v.Type.IsRef -> true
                             | _ -> isMutated v a
                         )
 
