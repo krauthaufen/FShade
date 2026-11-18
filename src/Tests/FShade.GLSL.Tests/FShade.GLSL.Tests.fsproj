@@ -39,6 +39,7 @@
     <Compile Include="Interlock.fs" />
     <Compile Include="MemoryQualifiers.fs" />
     <Compile Include="EarlyFragmentTests.fs" />
+    <Compile Include="FunctionInterface.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

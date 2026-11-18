@@ -1249,6 +1249,8 @@ module Interface =
                         shaderSamplers = HashSet.union iface.shaderSamplers info.shaderSamplers
                         shaderImages = HashSet.union iface.shaderImages info.shaderImages
                         shaderAccelerationStructures = HashSet.union iface.shaderAccelerationStructures info.shaderAccelerationStructures
+                        shaderSamplerStates = HashSet.union iface.shaderSamplerStates info.shaderSamplerStates
+                        shaderTextures = HashSet.union iface.shaderTextures info.shaderTextures
                         shaderBuiltInFunctions = HashSet.union iface.shaderBuiltInFunctions info.shaderBuiltInFunctions
                     }
                 | None ->
