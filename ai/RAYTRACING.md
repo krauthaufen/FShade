@@ -148,6 +148,7 @@ in raygen; `RecordHit`/`RecordMiss`/`ExecuteShader` only in raygen, closest hit 
 
 ## Gotchas
 
+- `hitgroup { ... }` cannot be written inline inside `raytracingEffect { ... }` (`hitgroup "Main" (hitgroup { closestHit chit })` fails with FS3095 `'hitgroup' is not used correctly`, because the inner `hitgroup` is parsed as the builder's custom operation). Bind the hit group with `let` first, as in the example above.
 - Shaders registered with the debugger must be functions (`let missShadow () = miss { ... }`), not values; see `DEBUG.md`.
 - Uniform reads inside `[<ReflectedDefinition>]` helpers that trace rays are specialized per slot (`setShaderSlotForReads`), so helper code is duplicated per shader. This is expected.
 - `hit.positions` requires `GL_EXT_ray_tracing_position_fetch`; guard with a constant bool argument and `[<Inline>]` so the read is eliminated when disabled (pattern in aardvark.rendering example `36 - Raytracing`).
