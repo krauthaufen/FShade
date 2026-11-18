@@ -1668,6 +1668,34 @@ module Optimizer =
             | e ->
                 ValueSome (e, ValueNone)
 
+        /// Determines the specialization mode of a parameter from the Specialize attributes of the method and
+        /// its parameters (a parameter attribute takes precedence, the implicit this parameter is never specialized).
+        let private specializationModes (f : UtilityFunction) =
+            let tryGetMode (m : ICustomAttributeProvider) =
+                m.GetCustomAttributes(typeof<SpecializeAttribute>, true)
+                |> Seq.tryPick (function :? SpecializeAttribute as a -> Some a.Mode | _ -> None)
+
+            let methodMode, parameterModes =
+                match f.functionMethod with
+                | Some m ->
+                    let methodMode = tryGetMode m |> Option.defaultValue SpecializationMode.ControlFlow
+                    let parameterModes =
+                        m.GetParameters()
+                        |> Array.choose (fun p -> tryGetMode p |> Option.map (fun mode -> p.Name, mode))
+                        |> Map.ofArray
+
+                    methodMode, parameterModes
+
+                | None ->
+                    SpecializationMode.ControlFlow, Map.empty
+
+            fun (v : Var) ->
+                if v.IsMutable then SpecializationMode.Off
+                else
+                    match Map.tryFind v.Name parameterModes with
+                    | Some mode -> mode
+                    | None -> methodMode
+
         let rec evaluateConstantsS (e : Expr) =
             state {
                 match e with
@@ -1786,6 +1814,12 @@ module Optimizer =
                     | CallFunction(utility, args) ->
                         let! args = args |> List.mapS evaluateConstantsS
                         let! s = State.get
+
+                        let utility =
+                            match specializeFunction s.isGlobalSideEffect utility args with
+                            | Some specialized -> specialized
+                            | None -> utility
+
                         let utility =
                             utility |> UtilityFunction.map (fun e ->
                                 let mutable innerState = { State.empty with isGlobalSideEffect = s.isGlobalSideEffect }
@@ -2149,8 +2183,12 @@ module Optimizer =
 
                     | UnionCaseTest(e, ci) ->
                         let! e = evaluateConstantsS e
-                        // TODO: could be avoided
-                        return Expr.UnionCaseTest(e, ci)
+                        match e with
+                        | Value(value, t) when not (isNull value) ->
+                            let actual, _ = FSharpValue.GetUnionFields(value, t, true)
+                            return Expr.Value(actual.Tag = ci.Tag)
+                        | _ ->
+                            return Expr.UnionCaseTest(e, ci)
 
                     | Value _ ->
                         return e
@@ -2176,6 +2214,84 @@ module Optimizer =
                     | _ ->
                         return failwithf "[FShade] unexpected expression %A" e
             }
+
+        /// Evaluates the expression with the given variable values.
+        and private foldUnder (isSideEffect : MemberInfo -> bool) (env : Map<Var, obj>) (e : Expr) =
+            let mutable state = { variableValues = env; isGlobalSideEffect = isSideEffect }
+            evaluateConstantsS(e).Run(&state)
+
+        /// Specializes the function for the constant arguments of a call. Parameters in Full mode are
+        /// substituted everywhere in the body; for parameters in ControlFlow mode (the default) only
+        /// conditions that become constant are resolved, so calls with equal control flow share one
+        /// function. Nested calls are specialized the same way. Returns None if the body is unchanged.
+        and private specializeFunction (isSideEffect : MemberInfo -> bool) (f : UtilityFunction) (args : list<Expr>) =
+            let modes = specializationModes f
+
+            let constants =
+                (f.functionArguments, args) ||> List.zip |> List.choose (fun (p, a) ->
+                    match a, modes p with
+                    | _, SpecializationMode.Off -> None
+                    | Value(value, _), mode -> Some (p, value, mode)
+                    | _ -> None
+                )
+
+            if List.isEmpty constants then
+                None
+            else
+                let changed = ref false
+
+                let full =
+                    constants |> List.choose (fun (p, v, m) -> if m = SpecializationMode.Full then Some (p, v) else None) |> Map.ofList
+
+                let env =
+                    constants |> List.choose (fun (p, v, m) -> if m = SpecializationMode.ControlFlow then Some (p, v) else None) |> Map.ofList
+
+                let body =
+                    if Map.isEmpty full then
+                        f.functionBody
+                    else
+                        changed.Value <- true
+                        f.functionBody.Substitute(fun v -> Map.tryFind v full |> Option.map (fun value -> Expr.Value(value, v.Type)))
+
+                let rec walk (env : Map<Var, obj>) (e : Expr) =
+                    match e with
+                    | IfThenElse(cond, i, t) ->
+                        let cond = walk env cond
+                        match foldUnder isSideEffect env cond with
+                        | Bool true -> changed.Value <- true; walk env i
+                        | Bool false -> changed.Value <- true; walk env t
+                        | _ -> Expr.IfThenElse(cond, walk env i, walk env t)
+
+                    | Let(v, value, b) ->
+                        let value = walk env value
+                        let env =
+                            if v.IsMutable then env
+                            else
+                                match foldUnder isSideEffect env value with
+                                | Value(c, _) -> Map.add v c env
+                                | _ -> env
+
+                        Expr.Let(v, value, walk env b)
+
+                    | CallFunction(g, gargs) ->
+                        let gargs = gargs |> List.map (walk env)
+                        let folded = gargs |> List.map (foldUnder isSideEffect env)
+
+                        // the original arguments are passed (a specialized parameter may still be used as value)
+                        match specializeFunction isSideEffect g folded with
+                        | Some g -> changed.Value <- true; Expr.CallFunction(g, gargs)
+                        | None -> Expr.CallFunction(g, gargs)
+
+                    | ShapeVar _ -> e
+                    | ShapeLambda(v, b) -> Expr.Lambda(v, walk env b)
+                    | ShapeCombination(o, cargs) -> RebuildShapeCombination(o, List.map (walk env) cargs)
+
+                let body = if Map.isEmpty env then body else walk env body
+
+                if changed.Value then
+                    Some { (f |> UtilityFunction.map (fun _ -> body)) with functionTag = null }
+                else
+                    None
 
         let evaluateConstants (e : Expr) =
             let run = evaluateConstantsS e

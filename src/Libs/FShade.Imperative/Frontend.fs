@@ -2,6 +2,7 @@
 
 open System
 open System.Reflection
+open System.Runtime.InteropServices
 
 open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Quotations.Patterns
@@ -23,7 +24,7 @@ type ParameterDecoration =
 
 [<RequireQualifiedAccess>]
 type UniformDecoration =
-    | Format of System.Type
+    | Format of Type
     | [<Obsolete("Unused")>] FieldIndex of int
     | [<Obsolete("Unused")>] BufferDescriptorSet of int
     | [<Obsolete("Unused")>] BufferBinding of int
@@ -134,10 +135,28 @@ type EntryPoint =
     }
     
 [<AttributeUsage(AttributeTargets.Method ||| AttributeTargets.Property)>]
-type InlineAttribute() = inherit System.Attribute()
+type InlineAttribute() = inherit Attribute()
 
 [<AttributeUsage(AttributeTargets.Method)>]
-type KeepCallAttribute() = inherit System.Attribute()
+type KeepCallAttribute() = inherit Attribute()
+
+/// Determines how a utility function is specialized for a constant argument.
+type SpecializationMode =
+    /// The parameter is never specialized.
+    | Off = 0
+    /// The constant is substituted only where it resolves a condition in the body (default).
+    | ControlFlow = 1
+    /// The constant is substituted everywhere in the body.
+    | Full = 2
+
+/// <summary>
+/// Controls the specialization of utility functions for constant arguments. On a parameter, the mode
+/// applies to that parameter; on a method, it applies to all parameters without their own attribute.
+/// </summary>
+[<AttributeUsage(AttributeTargets.Method ||| AttributeTargets.Property ||| AttributeTargets.Parameter)>]
+type SpecializeAttribute([<Optional; DefaultParameterValue(SpecializationMode.Full)>] mode : SpecializationMode) =
+    inherit Attribute()
+    member x.Mode = mode
 
 
 [<AutoOpen>]

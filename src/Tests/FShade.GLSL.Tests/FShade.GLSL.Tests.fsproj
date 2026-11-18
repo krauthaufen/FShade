@@ -33,6 +33,7 @@
     <Compile Include="MemoryOrdering.fs" />
     <Compile Include="InlineRefParameters.fs" />
     <Compile Include="SharedMemory.fs" />
+    <Compile Include="Specialization.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

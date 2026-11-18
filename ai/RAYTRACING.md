@@ -151,7 +151,7 @@ in raygen; `RecordHit`/`RecordMiss`/`ExecuteShader` only in raygen, closest hit 
 - `hitgroup { ... }` cannot be written inline inside `raytracingEffect { ... }` (`hitgroup "Main" (hitgroup { closestHit chit })` fails with FS3095 `'hitgroup' is not used correctly`, because the inner `hitgroup` is parsed as the builder's custom operation). Bind the hit group with `let` first, as in the example above.
 - Shaders registered with the debugger must be functions (`let missShadow () = miss { ... }`), not values; see `DEBUG.md`.
 - Uniform reads inside `[<ReflectedDefinition>]` helpers that trace rays are specialized per slot (`setShaderSlotForReads`), so helper code is duplicated per shader. This is expected.
-- `hit.positions` requires `GL_EXT_ray_tracing_position_fetch`; guard with a constant bool argument and `[<Inline>]` so the read is eliminated when disabled (pattern in aardvark.rendering example `36 - Raytracing`).
+- `hit.positions` requires `GL_EXT_ray_tracing_position_fetch`; guard with a constant bool argument so the read is eliminated when disabled (pattern in aardvark.rendering example `36 - Raytracing`). Utility functions are specialized for constant arguments that resolve a condition, so `[<Inline>]` is no longer required for this.
 - `objectToWorld`/`worldToObject` are `M34f` since 5.7.0 (`TransformPos`/`TransformDir` work; no inverse).
 - Payloads are copied defensively when read (5.7.21) because GLSL payload variables are globals; returning `input.payload` unchanged is cheap, mutating fields requires `unchanged` or a full record.
 - `RayFlags` are a `[<Flags>]` enum; combine with `|||`. Mutually exclusive flag pairs are documented in `Types.fs`.

@@ -68,6 +68,7 @@ Passes run by `Shader.optimize` in this order:
 | Raytracing writes | `simplifyRaytracingWrites` | `{ unchanged with f = v }` -> field writes; fails if `unchanged` cannot be inlined |
 | Hoisting | `hoistImperativeConstructs` | `let a = (let b = 1 in b * 2)` -> `let b = 1 in let a = b * 2`; brings loops/ifs to statement level so C-style emission works |
 | Constant folding | `evaluateConstants'` | evaluates pure sub-expressions with constant operands (including Aardvark vector math, enum ops, `.Normalized`); `isSideEffect` marks methods that must stay |
+| Specialization | `ConstantFolding.specializeFunction` | at a `CallFunction` with constant arguments: resolves conditions in the callee body that become constant (`SpecializationMode.ControlFlow`, the default) or substitutes the constant everywhere (`Full`, via `[<Specialize>]`); nested calls recurse; the result is a new `UtilityFunction` with recomputed `functionId` and cleared `functionTag`, or the original when nothing changed. DCE removes parameters that became unused |
 | Dead code | `eliminateDeadCode'` | removes unused `let`s, writes to unused outputs, calls with unused results unless `isSideEffect`; handles `ref`/address-of; fixpoint over loop-carried variables |
 | Constant folding + inlining again | | cleanup after DCE |
 | Input lifting | `liftInputs` | moves `ReadInput` out of utility functions into parameters so only `main` reads inputs/uniforms directly |

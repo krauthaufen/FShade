@@ -10,6 +10,8 @@ open FShade
 
 type InlineAttribute = FShade.Imperative.InlineAttribute
 type KeepCallAttribute = FShade.Imperative.KeepCallAttribute
+type SpecializationMode = FShade.Imperative.SpecializationMode
+type SpecializeAttribute = FShade.Imperative.SpecializeAttribute
 
 [<AutoOpen>]
 module Primitives =
