@@ -244,7 +244,10 @@ Generic utility functions are instantiated per use. Builtin math comes from Aard
 (`Vec.dot`, `Vec.normalize`, `Fun.Sin`, `clamp`, `lerp`, `M44f.TransformPos`, swizzles `v.XYZ`, ...);
 the full mapping is the `IntrinsicFunction` table in `src/Libs/FShade.GLSL/IntrinsicFunctions.fs`
 and the 100+ tests in `src/Tests/FShade.GLSL.Tests/Intrinsics.fs`. Pack/unpack helpers
-(`packUnorm4x8`, ...), `Bitwise.*` and `Atomic.*` are in `Frontend.fs`.
+(`packUnorm4x8`, ...), `Bitwise.*` and `Atomic.*` are in `Frontend.fs`. The pack/unpack helpers are GLSL
+intrinsics in shaders; their F# bodies run on the CPU and produce the same bit patterns as GLSL (first
+component in the least significant bits, snorm scaled by 32767 / 127), so they can be used to prepare
+or read back packed data (tests: `FShade.Core.Tests/Packing.fs`).
 
 ## Types
 

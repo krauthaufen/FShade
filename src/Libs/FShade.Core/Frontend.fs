@@ -207,61 +207,66 @@ module Primitives =
     /// </example>
     let unroll (loop: 'T) : 'T = onlyInShaderCode "unroll"
 
-    [<ReflectedDefinition>]
+    // The pack/unpack functions are GLSL intrinsics in shaders. The bodies below are only used on the
+    // CPU and follow the GLSL specification: the first component is stored in the least significant bits,
+    // unorm values are scaled by 65535 / 255, snorm values by 32767 / 127 as two's complement integers.
+    let inline private packUnorm16 (x : float32) = (clamp 0.0f 1.0f x) * 65535.0f |> round |> uint32
+    let inline private packSnorm16 (x : float32) = uint32 ((clamp -1.0f 1.0f x) * 32767.0f |> round |> int32) &&& 0xFFFFu
+    let inline private packUnorm8 (x : float32) = (clamp 0.0f 1.0f x) * 255.0f |> round |> uint32
+    let inline private packSnorm8 (x : float32) = uint32 ((clamp -1.0f 1.0f x) * 127.0f |> round |> int32) &&& 0xFFu
+
+    let inline private unpackUnorm16 (v : uint32) = float32 (v &&& 0xFFFFu) / 65535.0f
+    let inline private unpackSnorm16 (v : uint32) = clamp -1.0f 1.0f (float32 (int16 (v &&& 0xFFFFu)) / 32767.0f)
+    let inline private unpackUnorm8 (v : uint32) = float32 (v &&& 0xFFu) / 255.0f
+    let inline private unpackSnorm8 (v : uint32) = clamp -1.0f 1.0f (float32 (sbyte (v &&& 0xFFu)) / 127.0f)
+
+    /// <summary>Packs two normalized floats in [0, 1] into 16 bits each (x in the least significant bits).</summary>
+    /// <remarks>Can be used on the host and produces the same result as the GLSL function
+    /// (for values that scale to an exact .5 the rounding direction is implementation-defined in GLSL).</remarks>
     let packUnorm2x16 (v : V2f) : uint32 =
-        let h = (clamp 0.0f 1.0f v.X) * 65535.0f |> round |> uint32
-        let l = (clamp 0.0f 1.0f v.Y) * 65535.0f |> round |> uint32
-        (h <<< 16) ||| l
+        packUnorm16 v.X ||| (packUnorm16 v.Y <<< 16)
 
-    [<ReflectedDefinition>]
+    /// <summary>Packs two normalized floats in [-1, 1] into 16 bits each (x in the least significant bits).</summary>
+    /// <remarks>Can be used on the host and produces the same result as the GLSL function
+    /// (for values that scale to an exact .5 the rounding direction is implementation-defined in GLSL).</remarks>
     let packSnorm2x16 (v : V2f) : uint32 =
-        let h = (clamp 0.0f 1.0f (0.5f * v.X + 0.5f)) * 65535.0f |> round |> uint32
-        let l = (clamp 0.0f 1.0f (0.5f * v.Y + 0.5f)) * 65535.0f |> round |> uint32
-        (h <<< 16) ||| l
+        packSnorm16 v.X ||| (packSnorm16 v.Y <<< 16)
 
-    [<ReflectedDefinition>]
+    /// <summary>Packs four normalized floats in [0, 1] into 8 bits each (x in the least significant bits).</summary>
+    /// <remarks>Can be used on the host and produces the same result as the GLSL function
+    /// (for values that scale to an exact .5 the rounding direction is implementation-defined in GLSL).</remarks>
     let packUnorm4x8 (v : V4f) : uint32 =
-        let r = (clamp 0.0f 1.0f v.X) * 255.0f |> round |> uint32
-        let g = (clamp 0.0f 1.0f v.Y) * 255.0f |> round |> uint32
-        let b = (clamp 0.0f 1.0f v.Z) * 255.0f |> round |> uint32
-        let a = (clamp 0.0f 1.0f v.W) * 255.0f |> round |> uint32
-        (r <<< 24) ||| (g <<< 16) ||| (b <<< 8) ||| a
-        
-    [<ReflectedDefinition>]
+        packUnorm8 v.X ||| (packUnorm8 v.Y <<< 8) ||| (packUnorm8 v.Z <<< 16) ||| (packUnorm8 v.W <<< 24)
+
+    /// <summary>Packs four normalized floats in [-1, 1] into 8 bits each (x in the least significant bits).</summary>
+    /// <remarks>Can be used on the host and produces the same result as the GLSL function
+    /// (for values that scale to an exact .5 the rounding direction is implementation-defined in GLSL).</remarks>
     let packSnorm4x8 (v : V4f) : uint32 =
-        let r = (clamp 0.0f 1.0f (0.5f * v.X + 0.5f)) * 255.0f |> round |> uint32
-        let g = (clamp 0.0f 1.0f (0.5f * v.Y + 0.5f)) * 255.0f |> round |> uint32
-        let b = (clamp 0.0f 1.0f (0.5f * v.Z + 0.5f)) * 255.0f |> round |> uint32
-        let a = (clamp 0.0f 1.0f (0.5f * v.W + 0.5f)) * 255.0f |> round |> uint32
-        (r <<< 24) ||| (g <<< 16) ||| (b <<< 8) ||| a
-        
-    [<ReflectedDefinition>]
+        packSnorm8 v.X ||| (packSnorm8 v.Y <<< 8) ||| (packSnorm8 v.Z <<< 16) ||| (packSnorm8 v.W <<< 24)
+
+    /// <summary>Unpacks two normalized floats in [0, 1] from 16 bits each (inverse of packUnorm2x16).</summary>
+    /// <remarks>Can be used on the host and produces the same result as the GLSL function
+    /// (for values that scale to an exact .5 the rounding direction is implementation-defined in GLSL).</remarks>
     let unpackUnorm2x16 (v : uint32) : V2f =
-        let x = float32 (v >>> 16) / 65535.0f
-        let y = float32 (v &&& 0xFFFFu) / 65535.0f
-        V2f(x,y)
-        
-    [<ReflectedDefinition>]
+        V2f(unpackUnorm16 v, unpackUnorm16 (v >>> 16))
+
+    /// <summary>Unpacks two normalized floats in [-1, 1] from 16 bits each (inverse of packSnorm2x16).</summary>
+    /// <remarks>Can be used on the host and produces the same result as the GLSL function
+    /// (for values that scale to an exact .5 the rounding direction is implementation-defined in GLSL).</remarks>
     let unpackSnorm2x16 (v : uint32) : V2f =
-        let x = float32 (v >>> 16) / 65535.0f
-        let y = float32 (v &&& 0xFFFFu) / 65535.0f
-        V2f(2.0f * x - 1.0f, 2.0f * y - 1.0f)
-        
-    [<ReflectedDefinition>]
+        V2f(unpackSnorm16 v, unpackSnorm16 (v >>> 16))
+
+    /// <summary>Unpacks four normalized floats in [0, 1] from 8 bits each (inverse of packUnorm4x8).</summary>
+    /// <remarks>Can be used on the host and produces the same result as the GLSL function
+    /// (for values that scale to an exact .5 the rounding direction is implementation-defined in GLSL).</remarks>
     let unpackUnorm4x8 (v : uint32) : V4f =
-        let x = float32 (v >>> 24) / 255.0f
-        let y = float32 ((v >>> 16) &&& 0xFFu) / 255.0f
-        let z = float32 ((v >>> 8) &&& 0xFFu) / 255.0f
-        let w = float32 (v &&& 0xFFu) / 255.0f
-        V4f(x,y,z,w)
-        
-    [<ReflectedDefinition>]
+        V4f(unpackUnorm8 v, unpackUnorm8 (v >>> 8), unpackUnorm8 (v >>> 16), unpackUnorm8 (v >>> 24))
+
+    /// <summary>Unpacks four normalized floats in [-1, 1] from 8 bits each (inverse of packSnorm4x8).</summary>
+    /// <remarks>Can be used on the host and produces the same result as the GLSL function
+    /// (for values that scale to an exact .5 the rounding direction is implementation-defined in GLSL).</remarks>
     let unpackSnorm4x8 (v : uint32) : V4f =
-        let x = float32 (v >>> 24) / 255.0f
-        let y = float32 ((v >>> 16) &&& 0xFFu) / 255.0f
-        let z = float32 ((v >>> 8) &&& 0xFFu) / 255.0f
-        let w = float32 (v &&& 0xFFu) / 255.0f
-        V4f(2.0f * x - 1.0f, 2.0f * y - 1.0f, 2.0f * z - 1.0f, 2.0f * w - 1.0f)
+        V4f(unpackSnorm8 v, unpackSnorm8 (v >>> 8), unpackSnorm8 (v >>> 16), unpackSnorm8 (v >>> 24))
 
     [<AbstractClass; Sealed>]
     type Atomic =

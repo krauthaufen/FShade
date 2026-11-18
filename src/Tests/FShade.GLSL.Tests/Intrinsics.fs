@@ -3399,3 +3399,30 @@ let ``Conversions``() =
         "\(uint64_t\(Colors\.x\)\)", 1
         "\(int64_t\(Colors\.x\)\)",  1
     ]
+
+[<Test>]
+let ``Pack and unpack intrinsics``() =
+    Setup.Run()
+
+    let shader (v : Vertex) =
+        fragment {
+            let a = packUnorm2x16 v.c.XY
+            let b = packSnorm2x16 v.c.XY
+            let c = packUnorm4x8 v.c
+            let d = packSnorm4x8 v.c
+            let r = unpackUnorm2x16 a + unpackSnorm2x16 b
+            let s = unpackUnorm4x8 c + unpackSnorm4x8 d
+            return V4f(r, 0.0f, 0.0f) + s
+        }
+
+    GLSL.shouldCompileAndContainRegexWithCount [Effect.ofFunction shader] [
+        @"\bpackUnorm2x16\(", 1
+        @"\bpackSnorm2x16\(", 1
+        @"\bpackUnorm4x8\(", 1
+        @"\bpackSnorm4x8\(", 1
+        @"\bunpackUnorm2x16\(", 1
+        @"\bunpackSnorm2x16\(", 1
+        @"\bunpackUnorm4x8\(", 1
+        @"\bunpackSnorm4x8\(", 1
+        @"_packSnorm2x16_", 0
+    ]

@@ -1,3 +1,4 @@
+- Fix CPU implementations of `packUnorm2x16`, `packSnorm2x16`, `packUnorm4x8`, `packSnorm4x8` and their unpack counterparts to match GLSL (#40)
 - Add `allocateSharedValue` for non-array shared variables in compute shaders
 - Fix dead-code elimination removing utility functions that only write storage buffers, shared memory or images
 - Inline utility functions with `ref` parameters are inlined again and modify the caller's variable (#38)
