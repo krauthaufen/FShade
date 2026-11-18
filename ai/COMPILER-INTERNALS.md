@@ -56,7 +56,11 @@ Quotation node vocabulary added by FShade (`src/Libs/FShade.Imperative/Frontend.
 `functionName`, `functionArguments` (tuples flattened, `unit` removed, `this` made mutable),
 `functionBody`, `functionIsInline` (`[<Inline>]`; `ref` arguments are substituted by address, see
 `UtilityFunction.inlineCode`/`hoistAddress` in `Optimizer.fs`). `uniqueName` =
-`name_hash` is the GLSL function name.
+`name_hash` is the GLSL function name. Calls to `inline` functions with SRTP constraints appear as
+`CallWithWitnesses`; the original method has no reflected definition, so
+`UtilityFunction.tryCreateWithWitnesses` instantiates the reflected definition of the witness-passing
+`f$W` method with the call site's witness lambdas (beta-reduced). Witness calls that remain (operators,
+conversions) are matched by the `Call` pattern with the original method and compiled as intrinsics.
 
 ## Optimizer (`src/Libs/FShade.Core/Optimizer.fs`)
 

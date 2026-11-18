@@ -46,64 +46,104 @@ type UtilityFunction =
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module UtilityFunction =
+    let private isIntrinsic (m : MethodBase) =
+        m.GetCustomAttributes<IntrinsicAttribute>(true) |> Seq.isEmpty |> not
+
+    /// Creates the utility function for the given (uncurried) parameters and body of a method.
+    let private ofLambda (isInline : bool) (m : MethodBase) (id : string) (args : list<Var>) (body : Expr) =
+        let args, body =
+            if m.IsStatic then
+                args, body
+            else
+                match args with
+                | this :: args ->
+                    let mThis = Var(this.Name, this.Type, true)
+                    let body = body.Substitute(fun vi -> if vi = this then Some (Expr.Var mThis) else None)
+                    mThis :: args, body
+                | _ ->
+                    args, body
+
+        let args =
+            args |> List.filter (fun a -> a.Type <> typeof<unit>)
+
+        // At call-site tuple arguments will be flattened
+        let untupledArgs =
+            args |> List.collect (fun a ->
+                match a.Type with
+                | TupleType elements -> elements |> List.ofArray |> List.mapi (fun i t -> Var($"{a.Name}_{i}", t))
+                | _ -> [a]
+            )
+
+        let rec replaceTuples (e: Expr) =
+            match e with
+            | TupleGet(Var v, i) when args |> List.contains v ->
+                let var = untupledArgs |> List.find (_.Name >> (=) $"{v.Name}_{i}")
+                Expr.Var var
+            | ShapeVar _ -> e
+            | ShapeLambda(v, b) -> Expr.Lambda(v, replaceTuples b)
+            | ShapeCombination (o, args) -> RebuildShapeCombination(o, args |> List.map replaceTuples)
+
+        {
+            functionId = id
+            functionName = methodName m
+            functionArguments = untupledArgs
+            functionBody = if args = untupledArgs then body else replaceTuples body
+            functionMethod = Some m
+            functionTag = null
+            functionIsInline = isInline
+        }
+
     let tryCreate' (isInline : bool) (m : MethodBase) =
-        let intrinsic = m.GetCustomAttributes<IntrinsicAttribute>(true) |> Seq.isEmpty |> not
-        if intrinsic then
+        if isIntrinsic m then
             None
         else
             match ExprWorkardound.TryGetReflectedDefinition m with
-                | Some e ->
-                    match e with
-                        | Lambdas(args, body) ->
-                            let args = List.concat args
+            | Some (Lambdas(args, body) as e) ->
+                Some (ofLambda isInline m (Expr.ComputeHash e) (List.concat args) body)
+            | _ ->
+                None
 
-                            let args, body = 
-                                if m.IsStatic then 
-                                    args, body
-                                else
-                                    match args with
-                                        | this :: args ->
-                                            let mThis = Var(this.Name, this.Type, true)
-                                            let body = body.Substitute(fun vi -> if vi = this then Some (Expr.Var mThis) else None)
-                                            mThis :: args, body
-                                        | _ ->
-                                            args, body
-
-                            let args =
-                                args |> List.filter (fun a -> a.Type <> typeof<unit>)
-
-                            // At call-site tuple arguments will be flattened
-                            let untupledArgs =
-                                args |> List.collect (fun a ->
-                                    match a.Type with
-                                    | TupleType elements -> elements |> List.ofArray |> List.mapi (fun i t -> Var($"{a.Name}_{i}", t))
-                                    | _ -> [a]
-                                )
-
-                            let rec replaceTuples (e: Expr) =
-                                match e with
-                                | TupleGet(Var v, i) when args |> List.contains v ->
-                                    let var = untupledArgs |> List.find (_.Name >> (=) $"{v.Name}_{i}")
-                                    Expr.Var var
-                                | ShapeVar _ -> e
-                                | ShapeLambda(v, b) -> Expr.Lambda(v, replaceTuples b)
-                                | ShapeCombination (o, args) -> RebuildShapeCombination(o, args |> List.map replaceTuples)
-
-                            Some {
-                                functionId = Expr.ComputeHash e
-                                functionName = methodName m
-                                functionArguments = untupledArgs
-                                functionBody = if args = untupledArgs then body else replaceTuples body
-                                functionMethod = Some m
-                                functionTag = null
-                                functionIsInline = isInline
-                            }
-                        | _ ->
-                            None
-                | None ->
-                    None
     let tryCreate (m : MethodBase) =
         tryCreate' m.IsInline m
+
+    // reduces applications of lambdas (introduced by substituting witnesses) to let bindings or inlined arguments
+    let rec private reduceApplications (e : Expr) =
+        match e with
+        | LambdaApp r -> reduceApplications r
+        | ShapeVar _ -> e
+        | ShapeLambda(v, b) -> Expr.Lambda(v, reduceApplications b)
+        | ShapeCombination(o, args) -> RebuildShapeCombination(o, args |> List.map reduceApplications)
+
+    /// Creates the utility function for a call with witnesses, i.e. a call to an inline function with
+    /// SRTP constraints. The original method has no reflected definition; the one of the witness-passing
+    /// method takes the witnesses (functions implementing the constraints) as leading parameters, which are
+    /// replaced by the witness expressions of the call site.
+    let tryCreateWithWitnesses (original : MethodBase) (witnessMethod : MethodBase) (witnesses : list<Expr>) =
+        if isIntrinsic original then
+            None
+        else
+            match ExprWorkardound.TryGetReflectedDefinition witnessMethod with
+            | Some (Lambdas(args, body)) ->
+                let args = List.concat args
+
+                let thisArgs, args =
+                    if witnessMethod.IsStatic then [], args
+                    else List.truncate 1 args, List.skip (min 1 args.Length) args
+
+                if args.Length < witnesses.Length then
+                    None
+                else
+                    let witnessVars, args = List.splitAt witnesses.Length args
+                    let mapping = List.zip witnessVars witnesses
+
+                    let body =
+                        body.Substitute(fun v -> mapping |> List.tryPick (fun (w, e) -> if w = v then Some e else None))
+                        |> reduceApplications
+
+                    let args = thisArgs @ args
+                    Some (ofLambda original.IsInline original (Expr.ComputeHash (Expr.Lambdas(args, body))) args body)
+            | _ ->
+                None
 
     let ofMethodBase (m : MethodBase) =
         match tryCreate m with

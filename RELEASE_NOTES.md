@@ -1,3 +1,4 @@
+- Support `inline` utility functions with SRTP constraints (e.g. generic `x + y`, `GenericOne`, member constraints)
 - Identical compiler-generated helper functions are emitted only once
 - Utility functions are specialized for constant arguments that resolve conditions in their body; `[<Specialize>]` controls this per parameter or function
 - Fix CPU implementations of `packUnorm2x16`, `packSnorm2x16`, `packUnorm4x8`, `packSnorm4x8` and their unpack counterparts to match GLSL (#40)

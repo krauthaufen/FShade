@@ -241,7 +241,10 @@ type Ray = val mutable O : V3f; val mutable D : V3f; new(o, d) = { O = o; D = d 
 
 Classes, structs, records, tuples and unions defined in F# are supported, including constructors,
 instance methods, properties and indexers (`src/Tests/FShade.GLSL.Tests/StructsAndClasses.fs`).
-Generic utility functions are instantiated per use. Builtin math comes from Aardvark.Base
+Generic utility functions are instantiated per use; this includes `let inline` functions with SRTP
+constraints (`x + y`, `LanguagePrimitives.GenericOne`, `(^a : (member Length : float32) x)`, ...),
+which are compiled from the witness-passing variant the F# compiler emits (tests:
+`GenericFunctions.fs`). Builtin math comes from Aardvark.Base
 (`Vec.dot`, `Vec.normalize`, `Fun.Sin`, `clamp`, `lerp`, `M44f.TransformPos`, swizzles `v.XYZ`, ...);
 the full mapping is the `IntrinsicFunction` table in `src/Libs/FShade.GLSL/IntrinsicFunctions.fs`
 and the 100+ tests in `src/Tests/FShade.GLSL.Tests/Intrinsics.fs`. Pack/unpack helpers

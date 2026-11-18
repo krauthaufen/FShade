@@ -2659,9 +2659,18 @@ module Preprocessor =
                     return Expr.CallFunction(processedF, args)
 
             | CallWithWitnesses(t, original, m, ws, args) ->
-                match UtilityFunction.tryCreate original with
-                | Some utility -> return! preprocessNormalS <| Expr.CallFunction(utility, Option.toList t @ args)
+                let utility =
+                    match UtilityFunction.tryCreate original with
+                    | Some utility -> Some utility
+                    | _ -> UtilityFunction.tryCreateWithWitnesses original m ws
+
+                match utility with
+                | Some utility ->
+                    return! preprocessNormalS <| Expr.CallFunction(utility, Option.toList t @ args)
+
                 | _ ->
+                    // Calls without a reflected definition (e.g. operators and conversions) are
+                    // matched by the Call pattern with the original method and compiled as intrinsics
                     let! t = t |> Option.mapS preprocessNormalS
                     let! args = args |> List.mapS preprocessNormalS
 
