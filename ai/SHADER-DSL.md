@@ -111,6 +111,7 @@ let f (v : Vertex) = fragment { let t : float32 = uniform?Time in return v.c * t
 | `Arguments` | compute argument buffer (see `COMPUTE.md`) |
 | `SharedMemory` | internal, used by `allocateShared` and `allocateSharedValue` |
 | `PushConstant` | push constant block when `Config.pushConstants` is on (Vulkan preset) |
+| `SpecializationConstant` | Vulkan specialization constants when `Config.specializationConstants` is on (Vulkan preset): each scalar member (`int`/`uint`/`int64`/`float`/`double`/`bool`/enums) becomes `layout(constant_id = N) const T name = 0;`, ids are assigned by name (sorted, stable across stages) and reported in `GLSLProgramInterface.specializationConstants`; other backends emit an ordinary uniform buffer. Tests: `SpecializationConstants.fs` |
 
 Storage buffers support element writes (`uniform.Colors.[i] <- v`, `uniform.Data.[i].Field.X <- 0.0f`),
 structs as elements, fixed-size `Arr<N<n>, T>` elements, 8/16/64-bit element types, and indexing

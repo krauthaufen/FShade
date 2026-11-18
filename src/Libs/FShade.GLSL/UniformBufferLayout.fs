@@ -473,10 +473,10 @@ type GLSLAccelerationStructure =
         accelName       : string
     }
 
-/// a Vulkan specialization constant declared via the magic `SpecConstants`
-/// uniform scope: `layout(constant_id = specId) const <specType> <specName> = 0;`
-/// Backends fill VkSpecializationInfo by looking the constant_id up by NAME here.
-type GLSLSpecConstant =
+/// A specialization constant declared via the uniform scope `SpecializationConstant`:
+/// `layout(constant_id = specId) const specType specName = 0;`. Consumers look up the
+/// constant_id by name to fill the specialization info of a pipeline.
+type GLSLSpecializationConstant =
     {
         specId          : int
         specName        : string
@@ -878,7 +878,7 @@ and [<StructuredFormatDisplay("{AsString}")>] GLSLProgramInterface =
         storageBuffers          : MapExt<string, GLSLStorageBuffer>
         uniformBuffers          : MapExt<string, GLSLUniformBuffer>
         accelerationStructures  : MapExt<string, GLSLAccelerationStructure>
-        specConstants           : MapExt<string, GLSLSpecConstant>
+        specializationConstants : MapExt<string, GLSLSpecializationConstant>
         samplerStates           : MapExt<string, GLSLSamplerState>
         textures                : MapExt<string, GLSLTexture>
         shaders                 : GLSLProgramShaders
@@ -1398,7 +1398,7 @@ module GLSLProgramInterface =
     let inline storageBuffers (i : GLSLProgramInterface) = i.storageBuffers
     let inline uniformBuffers (i : GLSLProgramInterface) = i.uniformBuffers
     let inline accelerationStructures (i : GLSLProgramInterface) = i.accelerationStructures
-    let inline specConstants (i : GLSLProgramInterface) = i.specConstants
+    let inline specializationConstants (i : GLSLProgramInterface) = i.specializationConstants
     let inline shaders (i : GLSLProgramInterface) = i.shaders
 
     let usesDiscard (iface : GLSLProgramInterface) =
@@ -1584,8 +1584,8 @@ module GLSLProgramInterface =
             dst.Write acc.accelName
             dst.Write acc.accelSet
 
-        dst.Write program.specConstants.Count
-        for KeyValue(name, sc) in program.specConstants do
+        dst.Write program.specializationConstants.Count
+        for KeyValue(name, sc) in program.specializationConstants do
             dst.Write name
             dst.Write sc.specId
             dst.Write sc.specName
@@ -1799,7 +1799,7 @@ module GLSLProgramInterface =
             )
             |> MapExt.ofList
 
-        let specConstants =
+        let specializationConstants =
             let cnt = src.ReadInt32()
             List.init cnt (fun _ ->
                 let name = src.ReadString()
@@ -1947,7 +1947,7 @@ module GLSLProgramInterface =
                 uniformBuffers = uniformBuffers
                 shaders = shaders
                 accelerationStructures = accelerationStructures
-                specConstants = specConstants
+                specializationConstants = specializationConstants
                 samplerStates = samplerStates
                 textures = textures
             }

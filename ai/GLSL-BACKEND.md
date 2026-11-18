@@ -48,6 +48,7 @@ Aardvark.Rendering.Vulkan uses `{ glslVulkan.Config with availableExtensions = .
 | `availableExtensions : Map<string, bool>` | `false` suppresses an extension the assembler would otherwise require (e.g. `GL_EXT_debug_printf` -> printf becomes a comment); unlisted = available |
 | `createUniformBuffers` | `layout(...) uniform Name { ... }` blocks per scope vs. loose `uniform T x;` |
 | `pushConstants` | scope `PushConstant` becomes `layout(push_constant) uniform PushConstant { ... }` |
+| `specializationConstants` | scope `SpecializationConstant` becomes scalar `layout(constant_id = N) const` declarations with zero defaults (no binding); ids by name in `GLSLProgramInterface.specializationConstants` (`GLSLSpecializationConstant { specId; specName; specType }`) |
 | `bindingMode` | `None`: no `binding=`; `PerKind`: separate counters for UBO/SSBO/sampler/image/accel; `Global`: one counter (Vulkan) |
 | `createDescriptorSets` | emit `set = N`; descriptors occupy one binding slot regardless of array count |
 | `stepDescriptorSets` | each uniform group (buffer) gets its own set (`finishSet`), capped at 31 |

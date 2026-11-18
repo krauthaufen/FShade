@@ -59,10 +59,9 @@ type Config =
         availableExtensions         : Map<string, bool>
         createUniformBuffers        : bool
         pushConstants               : bool
-        /// emit members of the magic `SpecConstants` uniform scope as Vulkan
-        /// specialization constants (layout(constant_id=N) const ...). When
-        /// false (GL backends) they fall through to an ordinary uniform buffer.
-        specConstants               : bool
+        /// Emits the members of the uniform scope `SpecializationConstant` as specialization constants
+        /// (`layout(constant_id = N) const ...`). If false, the scope becomes an ordinary uniform buffer.
+        specializationConstants     : bool
 
         bindingMode                 : BindingMode
         createDescriptorSets        : bool
@@ -739,7 +738,7 @@ module AssemblerState =
                     storageBuffers          = MapExt.empty
                     uniformBuffers          = MapExt.empty
                     accelerationStructures  = MapExt.empty
-                    specConstants           = MapExt.empty
+                    specializationConstants = MapExt.empty
                     samplerStates           = MapExt.empty
                     textures                = MapExt.empty
                     shaders                 = GLSLProgramShaders.Graphics { stages = MapExt.empty }
@@ -1192,16 +1191,16 @@ module Interface =
             { s with ifaceNew = iface; images = MapExt.add image.imageName image s.images }
         )
 
-    /// register a specialization constant; idempotent per NAME (all stages of a
-    /// pipeline share one constant_id namespace, so a re-declaration in another
-    /// stage must reuse the same id). Returns the constant_id.
-    let addSpecConstant (name : string) (typ : GLSLType) =
+    /// Registers a specialization constant and returns its constant_id. Ids are assigned in the order of
+    /// registration and keyed by name: all stages of a pipeline share one constant_id namespace, so a
+    /// constant declared in several stages gets the same id.
+    let addSpecializationConstant (name : string) (typ : GLSLType) =
         State.custom (fun (s : AssemblerState) ->
-            match MapExt.tryFind name s.ifaceNew.specConstants with
+            match MapExt.tryFind name s.ifaceNew.specializationConstants with
             | Some sc -> s, sc.specId
             | None ->
-                let sc = { specId = s.ifaceNew.specConstants.Count; specName = name; specType = typ }
-                let iface = { s.ifaceNew with specConstants = MapExt.add name sc s.ifaceNew.specConstants }
+                let sc = { specId = s.ifaceNew.specializationConstants.Count; specName = name; specType = typ }
+                let iface = { s.ifaceNew with specializationConstants = MapExt.add name sc s.ifaceNew.specializationConstants }
                 { s with ifaceNew = iface }, sc.specId
         )
 
@@ -2344,26 +2343,28 @@ module Assembler =
 
                                 return buffers |> String.concat "\r\n"
                                 
-                            | Some "SpecConstants" when config.specConstants ->
-                                // SPECIALIZATION CONSTANTS (magic scope, like "StorageBuffer"):
-                                // each member becomes a pipeline-time constant with a stable,
-                                // name-keyed constant_id; NO descriptor binding is allocated.
-                                // Zero defaults by design: consumers use zero-means-unspecialized
-                                // semantics (e.g. bitmasks of DISABLED features), so a pipeline
-                                // created without VkSpecializationInfo behaves exactly like the
-                                // unspecialized shader. Sorted by name for deterministic ids.
+                            | Some "SpecializationConstant" when config.specializationConstants ->
+                                // Each (scalar) member becomes a specialization constant with a name-keyed constant_id;
+                                // no descriptor binding is allocated. The members are sorted by name so the ids do not
+                                // depend on the declaration order. The default value is zero, so a pipeline created
+                                // without specialization info behaves like the unspecialized shader.
                                 let! defs =
                                     fields |> List.sortBy (fun u -> u.cUniformName) |> List.mapS (fun u ->
                                         state {
                                             let name = checkName u.cUniformName
                                             let dflt =
                                                 match u.cUniformType with
-                                                | CType.CInt _ -> "0"
+                                                | CType.CInt(true, 64) -> "0l"
+                                                | CType.CInt(false, 64) -> "0ul"
+                                                | CType.CInt(true, _) -> "0"
+                                                | CType.CInt(false, _) -> "0u"
+                                                | CType.CFloat 64 -> "0.0lf"
+                                                | CType.CFloat 16 -> "0.0hf"
                                                 | CType.CFloat _ -> "0.0"
                                                 | CType.CBool -> "false"
                                                 | t -> failwithf "[GLSL] specialization constants must be scalar int/float/bool, %s is %A" name.Name t
                                             let! typ = assembleTypeS config.reverseMatrixLogic u.cUniformType
-                                            let! id = Interface.addSpecConstant name.Name (GLSLType.ofCType config.reverseMatrixLogic u.cUniformType)
+                                            let! id = Interface.addSpecializationConstant name.Name (GLSLType.ofCType config.reverseMatrixLogic u.cUniformType)
                                             return sprintf "layout(constant_id = %d) const %s %s = %s;" id typ.Name name.Name dflt
                                         }
                                     )

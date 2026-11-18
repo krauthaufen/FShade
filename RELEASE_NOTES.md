@@ -1,3 +1,4 @@
+- Rename specialization constant scope and API to `SpecializationConstant` / `specializationConstants` (was `SpecConstants`); default values are typed literals for all scalar types
 - Fix program interface missing textures and sampler states used only in utility functions
 - Add support for early fragment tests (`earlyFragmentTests()` or `[<EarlyFragmentTests>]` on the shader function)
 - Add memory qualifiers for images and storage buffers (`[<Coherent>]`, `[<Volatile>]`, `[<Restrict>]` on uniform scope members and compute shader parameters)

@@ -254,8 +254,8 @@ let main args =
             depthWriteMode              = true
             useInOut                    = true
             separateTexturesAndSamplers = true
-            pushConstants = false
-            specConstants               = false
+            pushConstants               = false
+            specializationConstants     = false
             availableExtensions = Map.empty
         }
     let glsl = 
