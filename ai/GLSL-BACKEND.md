@@ -68,7 +68,8 @@ struct Vertex { vec4 pos; vec4 c; };                       // user types
 layout(set = 0, binding = 0, std140) uniform PerModel { mat4 ModelTrafo; };
 layout(set = 1, binding = 0, std430) readonly buffer ColorsBuffer { vec4 Colors[]; };
 layout(set = 2, binding = 0) uniform sampler2D DiffuseColorTexture;
-vec4 helper_1a2b3c(vec4 x) { ... }                          // utility functions: name_hash
+vec4 lerp3_1a2b3c(vec4 x) { ... }                           // utility functions: name_hash
+float helper(float a) { ... }                               // compiler-generated for untranslatable expressions (helper, helper1, ...)
 
 #ifdef Vertex
 layout(location = 0) in vec4 Positions;                     // vertex inputs: semantic name

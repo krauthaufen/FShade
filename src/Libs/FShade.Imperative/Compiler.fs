@@ -1098,6 +1098,12 @@ module Compiler =
                 { s with reservedNames = Set.add n s.reservedNames; nameIndices = Map.add n 1 s.nameIndices }
             )
 
+        let tryFindLocalFunction (key : obj) =
+            State.get |> State.map (fun s -> HashMap.tryFind key s.usedFunctions)
+
+        let tryFindGlobalFunction (key : obj) =
+            State.get |> State.map (fun s -> HashMap.tryFind key s.moduleState.globalFunctions)
+
         let useLocalFunction (key : obj) (f : FunctionDefinition) =
             State.custom (fun s ->
                 let sign = f.Signature s.moduleState.backend
@@ -1414,21 +1420,39 @@ module Compiler =
                     }
                 )
 
-            let! name = CompilerState.newGlobalName "helper"
-            let! returnType = toCTypeS e.Type
+            // Identical helpers are shared: the key is a hash of the expression abstracted over its free
+            // variables (in parameter order), so structurally equal expressions map to the same function
+            // even though their Var instances differ.
+            let isLocal = not (HashMap.isEmpty inputValues)
+            let key = ("helper", Expr.ComputeHash (Expr.Lambdas(Array.toList free, e))) :> obj
 
-            let signature =
-                {
-                    name = name
-                    returnType = returnType
-                    parameters = parameters
-                }
-
-            let definition = ManagedFunctionWithSignature(signature, e)
+            let! existing =
+                if isLocal then CompilerState.tryFindLocalFunction key
+                else CompilerState.tryFindGlobalFunction key
 
             let! signature =
-                if HashMap.isEmpty inputValues then CompilerState.useGlobalFunction (e :> obj) definition
-                else CompilerState.useLocalFunction (e :> obj) definition
+                match existing with
+                | Some definition ->
+                    if isLocal then CompilerState.useLocalFunction key definition
+                    else CompilerState.useGlobalFunction key definition
+
+                | None ->
+                    state {
+                        let! name = CompilerState.newGlobalName "helper"
+                        let! returnType = toCTypeS e.Type
+
+                        let signature =
+                            {
+                                name = name
+                                returnType = returnType
+                                parameters = parameters
+                            }
+
+                        let definition = ManagedFunctionWithSignature(signature, e)
+
+                        if isLocal then return! CompilerState.useLocalFunction key definition
+                        else return! CompilerState.useGlobalFunction key definition
+                    }
 
             return CCall(signature, args)
         }
