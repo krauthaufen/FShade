@@ -1,3 +1,4 @@
+### 5.7.22
 - Support `inline` utility functions with SRTP constraints (e.g. generic `x + y`, `GenericOne`, member constraints)
 - Identical compiler-generated helper functions are emitted only once
 - Utility functions are specialized for constant arguments that resolve conditions in their body; `[<Specialize>]` controls this per parameter or function
