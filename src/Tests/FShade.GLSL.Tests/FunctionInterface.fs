@@ -357,3 +357,72 @@ let ``Separate texture and sampler state used in utility function``() =
     shaders.[ShaderSlot.Fragment].shaderSamplerStates |> HashSet.isEmpty |> should be False
     shaders.[ShaderSlot.Vertex].shaderTextures |> HashSet.isEmpty |> should be True
     shaders.[ShaderSlot.Vertex].shaderSamplerStates |> HashSet.isEmpty |> should be True
+
+// --- attribution of storage buffers read through helpers
+
+// the helpers are defined after the shader functions using them (let rec ... and)
+let rec private vertLate (v : Vertex) =
+    vertex {
+        return { v with pos = v.pos * readStorageLate 0 }
+    }
+
+and private vertChain (v : Vertex) =
+    vertex {
+        return { v with pos = v.pos * helperA 0 }
+    }
+
+and [<ReflectedDefinition>] readStorageLate (i : int) =
+    uniform.FsData.[i]
+
+and [<ReflectedDefinition>] helperA (i : int) =
+    helperB i + 1.0f
+
+and [<ReflectedDefinition>] helperB (i : int) =
+    uniform.FsData.[i]
+
+[<Test>]
+let ``Storage buffer read through a helper defined after the shader``() =
+    Setup.Run()
+
+    let frag (v : Vertex) =
+        fragment {
+            return v.c
+        }
+
+    let shaders = compile [ Effect.ofFunction vertLate; Effect.ofFunction frag ]
+
+    shaders.[ShaderSlot.Vertex].shaderStorageBuffers |> HashSet.contains "FsData" |> should be True
+    shaders.[ShaderSlot.Fragment].shaderStorageBuffers |> HashSet.contains "FsData" |> should be False
+
+[<Test>]
+let ``Storage buffer read at the end of a helper chain``() =
+    Setup.Run()
+
+    let frag (v : Vertex) =
+        fragment {
+            return v.c
+        }
+
+    let shaders = compile [ Effect.ofFunction vertChain; Effect.ofFunction frag ]
+
+    shaders.[ShaderSlot.Vertex].shaderStorageBuffers |> HashSet.contains "FsData" |> should be True
+    shaders.[ShaderSlot.Fragment].shaderStorageBuffers |> HashSet.contains "FsData" |> should be False
+
+[<Test>]
+let ``Storage buffer read through a helper in one stage and directly in another``() =
+    Setup.Run()
+
+    let vert (v : Vertex) =
+        vertex {
+            return { v with pos = v.pos * readStorage 0 }
+        }
+
+    let frag (v : Vertex) =
+        fragment {
+            return v.c * uniform.FsData.[1]
+        }
+
+    let shaders = compile [ Effect.ofFunction vert; Effect.ofFunction frag ]
+
+    shaders.[ShaderSlot.Vertex].shaderStorageBuffers |> HashSet.contains "FsData" |> should be True
+    shaders.[ShaderSlot.Fragment].shaderStorageBuffers |> HashSet.contains "FsData" |> should be True
