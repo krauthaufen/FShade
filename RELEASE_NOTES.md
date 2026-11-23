@@ -1,3 +1,4 @@
+- Fix compiler-generated helper functions when free variables share a name
 - Fix uniform reads inside computed spliced quotations (e.g. `%(f i)`) being evaluated on the CPU
 
 ### 5.8.0-prerelease0002

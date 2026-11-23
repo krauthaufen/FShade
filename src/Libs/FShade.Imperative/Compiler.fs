@@ -1397,6 +1397,23 @@ module Compiler =
 
             do! State.modify (fun s -> { s with moduleState = newState })
 
+            // The parameter names are unique, but free variables may share a name (e.g. shadowed lets or
+            // variables introduced by quotation rewriting). The body is compiled with the names of its free
+            // variables, so they are renamed to the parameter names.
+            let renamed =
+                (free, parameters) ||> Array.map2 (fun (v : Var) (p : CParameter) ->
+                    if v.Name = p.name then v else Var(p.name, v.Type, v.IsMutable)
+                )
+
+            let e =
+                if renamed = free then e
+                else
+                    e.Substitute(fun v ->
+                        match Array.tryFindIndex ((=) v) free with
+                        | Some i when not (obj.ReferenceEquals(renamed.[i], v)) -> Some (Expr.Var renamed.[i])
+                        | _ -> None
+                    )
+
             let! args =
                 free |> Array.mapS (fun f ->
                     state {
@@ -1424,7 +1441,7 @@ module Compiler =
             // variables (in parameter order), so structurally equal expressions map to the same function
             // even though their Var instances differ.
             let isLocal = not (HashMap.isEmpty inputValues)
-            let key = ("helper", Expr.ComputeHash (Expr.Lambdas(Array.toList free, e))) :> obj
+            let key = ("helper", Expr.ComputeHash (Expr.Lambdas(Array.toList renamed, e))) :> obj
 
             let! existing =
                 if isLocal then CompilerState.tryFindLocalFunction key
