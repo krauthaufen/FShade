@@ -125,7 +125,7 @@ types to `CIntrinsic` type names and methods to `CIntrinsic` call templates.
 
 ## Gotchas
 
-- The preprocessor evaluates parts of the quotation on the CPU (`Expr.TryEval`) to resolve samplers, uniform scopes, `allocateShared` sizes, ray/miss names. Values must be static or constant-foldable.
+- The preprocessor evaluates parts of the quotation on the CPU (`Expr.TryEval`) to resolve samplers, uniform scopes, `allocateShared` sizes, ray/miss names and computed splices (`%(f i)`; `TryEval` handles applications and quote nodes). Values must be static or constant-foldable.
 - `Shader.optimize` runs `Preprocessor.preprocess` **again** after optimization to recompute IO; optimizer output must stay preprocessable.
 - Utility function bodies are preprocessed with the caller's `localSize`; the cache key includes it.
 - Input lifting means utility functions receive inputs as parameters; a utility function that reads `uniform?X` works, but one that reads a *storage buffer* is handled specially (`computeStorageAccessS`) so access flags propagate.

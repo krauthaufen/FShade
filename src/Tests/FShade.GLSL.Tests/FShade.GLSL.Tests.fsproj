@@ -41,6 +41,7 @@
     <Compile Include="EarlyFragmentTests.fs" />
     <Compile Include="FunctionInterface.fs" />
     <Compile Include="SpecializationConstants.fs" />
+    <Compile Include="QuotationSplicing.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

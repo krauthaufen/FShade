@@ -1,3 +1,5 @@
+- Fix uniform reads inside computed spliced quotations (e.g. `%(f i)`) being evaluated on the CPU
+
 ### 5.8.0-prerelease0002
 - Rename specialization constant scope and API to `SpecializationConstant` / `specializationConstants` (was `SpecConstants`); default values are typed literals for all scalar types
 - Fix program interface missing textures and sampler states used only in utility functions

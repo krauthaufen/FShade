@@ -2331,6 +2331,20 @@ module Preprocessor =
                 else
                     return! preprocessNormalS (Expr.Coerce(v, e.Type))
 
+            // a splice whose quotation is computed (e.g. %(f x) or %(quotations.[i])) is evaluated here, before
+            // the optimizer could evaluate uniform accesses inside the quotation on the CPU
+            | Call(None, mi, [v]) when mi.Name = "op_Splice" || mi.Name = "op_SpliceUntyped" ->
+                match Expr.TryEval v with
+                | Some (:? Expr as q) ->
+                    if q.Type = e.Type then
+                        return! preprocessNormalS q
+                    else
+                        return! preprocessNormalS (Expr.Coerce(q, e.Type))
+                | _ ->
+                    // not evaluable here: left to the optimizer (as before)
+                    let! v = preprocessNormalS v
+                    return Expr.Call(mi, [v])
+
             | Call(None, MethodQuote <@ fst @> _, [t]) ->
                 return! preprocessNormalS (Expr.TupleGet(t, 0))
 

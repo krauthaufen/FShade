@@ -806,6 +806,23 @@ module ExprExtensions =
                     Expr.TryEval body
                 | None -> None
 
+            | Patterns.QuoteRaw q ->
+                Some (q :> obj)
+
+            | Patterns.QuoteTyped q ->
+                let cast = typeof<Expr>.GetMethod("Cast").MakeGenericMethod [| q.Type |]
+                Some (cast.Invoke(null, [| q :> obj |]))
+
+            | Patterns.Application(f, arg) ->
+                // f is an FSharpFunc<arg.Type, e.Type>
+                let invoke = f.Type.GetMethod("Invoke", [| arg.Type |])
+                match Expr.TryEval f, Expr.TryEval arg with
+                | Some fv, Some av when not (isNull invoke) ->
+                    try invoke.Invoke(fv, [| av |]) |> Some
+                    with _ -> None
+                | _ ->
+                    None
+
             | Patterns.IfThenElse (condition, a, b) ->
                 match Expr.TryEval condition with
                 | Some (:? bool as flag) -> Expr.TryEval (if flag then a else b)

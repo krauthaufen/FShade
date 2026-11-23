@@ -369,6 +369,7 @@ let accumulate2 (v : Fragment) =
 
 - **Input access outside the builder**: `Effect.ofFunction` calls the shader function with `null`; `let x = v.pos in vertex { ... }` throws `[FShade] shader functions may not access their vertex-input statically`.
 - **Array parameters are copies**: `let fill (arr : Arr<N<4>, int>) = arr.[0] <- 1` writes a GLSL copy, so `fill a` has no effect and is eliminated. Use a `ref` parameter and `&&a` (see Utility Functions); `let b = a` copies as well.
+- **Quotation splicing**: `%q` inside a shader body works for quotation values and for computed quotations (`%(f i)`, `%(quotations.[i])`); the preprocessor evaluates the splice (`Expr.TryEval`) before the body is analyzed, so uniform reads inside the spliced quotation are recognized (tests: `QuotationSplicing.fs`).
 - **Closure arguments**: extra parameters (`let shader (radius : float32) (v : Vertex) = ...`) are fine and are baked into the effect hash; lambdas/`fun` values inside the body are `[FShade] unsupported expression`.
 - **Missing `[<ReflectedDefinition>]`**: `[FShade] cannot call function X since it is not reflectable` / `utility function X is not reflectable`.
 - **Samplers must be top-level**: a sampler created inside the shader body is not a static value and cannot be reflected into a uniform.
