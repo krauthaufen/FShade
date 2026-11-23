@@ -424,6 +424,8 @@ type CExpr =
     | CItem of t : CType * target : CExpr * index : CExpr
 
     | CNewStruct of t : CType * args : list<CExpr>
+    /// an array constructor expression (t is the array type)
+    | CNewArray of t : CType * elements : list<CExpr>
 
     | CDebugPrintf of format : CExpr * values : CExpr[]
 
@@ -485,6 +487,7 @@ type CExpr =
             | CItem(t,_,_) -> t
 
             | CNewStruct(t,_) -> t
+            | CNewArray(t,_) -> t
 
             | CDebugPrintf _ -> CType.CVoid
 
@@ -648,6 +651,10 @@ module CExpr =
             | CNewStruct(t, args) ->
                 used.AddType t
                 for a in args do visit used a
+
+            | CNewArray(t, elements) ->
+                used.AddType t
+                for e in elements do visit used e
 
             | CDebugPrintf(fmt, values) ->
                 visit used fmt

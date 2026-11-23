@@ -445,6 +445,8 @@ module SamplerSplitter =
                 CExpr.CItem(typ, splitTexturesAndSamplers target, splitTexturesAndSamplers index)
             | CExpr.CNewStruct(typ, args) ->
                 CExpr.CNewStruct(typ, args |> List.map splitTexturesAndSamplers)
+            | CExpr.CNewArray(typ, elements) ->
+                CExpr.CNewArray(typ, elements |> List.map splitTexturesAndSamplers)
             | CExpr.CDebugPrintf(format, values) ->
                 let newValues = values |> Array.map splitTexturesAndSamplers
                 CExpr.CDebugPrintf(splitTexturesAndSamplers format, newValues)
@@ -1981,6 +1983,9 @@ module Assembler =
                     let! t = assembleTypeS config.reverseMatrixLogic t
                     return sprintf "%s(%s)" t.Name args
 
+                | CNewArray(t, elements) ->
+                    return! assembleArrayConstructorS t elements
+
                 | CDebugPrintf(fmt, values) ->
                     do! AssemblerState.useExtension GLSLExtension.EXTDebugPrintf
                     let! config = AssemblerState.config
@@ -2003,6 +2008,21 @@ module Assembler =
                         return $"/* {GLSLExtension.EXTDebugPrintf} not available */"
         }
     
+    /// assembles an array constructor `T[]( e1, e2, ... )` for the given array type and elements
+    and assembleArrayConstructorS (t : CType) (elements : list<CExpr>) =
+        state {
+            let! config = AssemblerState.config
+            let et =
+                match t with
+                    | CArray(t,_) -> t
+                    | CPointer(_,t) -> t
+                    | _ -> t
+
+            let! ct = assembleTypeS config.reverseMatrixLogic et
+            let! elements = elements |> List.mapS assembleExprS |> State.map (String.concat ", ")
+            return sprintf "%s[]( %s )" ct.Name elements
+        }
+
     and assembleExprsS (join : string) (args : seq<CExpr>) =
         args |> Seq.mapS assembleExprS |> State.map (String.concat join)
      
@@ -2017,15 +2037,7 @@ module Assembler =
                     return! assembleExprS e
 
                 | CRArray(t, args) ->
-                    let et =
-                        match t with
-                            | CArray(t,_) -> t
-                            | CPointer(_,t) -> t
-                            | _ -> t
-
-                    let! ct = assembleTypeS config.reverseMatrixLogic et
-                    let! args = args |> List.mapS assembleExprS |> State.map (String.concat ", ")
-                    return sprintf "%s[]( %s )" ct.Name args
+                    return! assembleArrayConstructorS t args
         }
 
     let rec assembleStatementS (singleLine : bool) (s : CStatement) =

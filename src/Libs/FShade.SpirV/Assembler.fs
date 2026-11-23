@@ -1227,6 +1227,9 @@ module Assembler =
                 | CNewStruct(t, args) ->
                     return failwith "not implemented"
 
+                | CNewArray(t, args) ->
+                    return failwith "not implemented"
+
                 | CDebugPrintf(fmt, values) ->
                     return failwith "not implemented"
 

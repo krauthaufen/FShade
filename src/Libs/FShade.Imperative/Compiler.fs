@@ -1330,6 +1330,17 @@ module Compiler =
                 return failwith $"[FShade] cannot compile constant: {e}"
         }
 
+    /// Determines whether the expression can be evaluated at compile time (no variables, no reads of
+    /// inputs or uniforms and no utility function calls), i.e. whether it may become a global constant.
+    let rec isConstantExpression (e : Expr) =
+        match e with
+        | Value _ -> true
+        | ReadInputOrRaytracingData _ -> false
+        | CallFunction _ -> false
+        | ExprShape.ShapeVar _ -> false
+        | ExprShape.ShapeLambda _ -> false
+        | ExprShape.ShapeCombination(_, args) -> List.forall isConstantExpression args
+
     let rec asExternalS (e : Expr) =
         state {
             let mutable variables = HashMap.empty
@@ -1482,9 +1493,14 @@ module Compiler =
                 | ReducibleExpression e ->
                     return! toCExprS e
 
-                | NewFixedArray _
-                | NewArray _ ->
-                    return! asConstantS e
+                | ArrayExpression(et, cnt, args) ->
+                    if isConstantExpression e then
+                        // constant array literals become global constants
+                        return! asConstantS e
+                    else
+                        let! ct = toCTypeS et
+                        let! args = args |> List.mapS toCExprS
+                        return CNewArray(CArray(ct, cnt), args)
 
                 | AddressSet _
                 | DefaultValue _
