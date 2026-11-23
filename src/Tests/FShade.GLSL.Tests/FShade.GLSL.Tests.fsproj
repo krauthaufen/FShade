@@ -42,6 +42,7 @@
     <Compile Include="FunctionInterface.fs" />
     <Compile Include="SpecializationConstants.fs" />
     <Compile Include="QuotationSplicing.fs" />
+    <Compile Include="ArrayLiterals.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

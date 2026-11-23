@@ -855,6 +855,9 @@ module ExprExtensions =
             ValueSome(len, et, [])
         | TypeMeta.Patterns.ArrOf (len, et), NewObject(_, [Coerce(NewArray(_, args),_)]) ->
             ValueSome(len, et, args)
+        // the element array was folded to a constant
+        | TypeMeta.Patterns.ArrOf (len, et), NewObject(_, [ (Coerce(Value((:? System.Array as arr), _), _) | Value((:? System.Array as arr), _)) ]) ->
+            ValueSome(len, et, [ for i in 0 .. arr.Length - 1 -> Expr.Value(arr.GetValue i, et) ])
         | _ ->
             ValueNone
 

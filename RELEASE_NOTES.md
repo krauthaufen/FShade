@@ -1,3 +1,4 @@
+- Fix `Arr` literals with constant elements in expression position (e.g. as function arguments)
 - Fix compiler-generated helper functions when free variables share a name
 - Fix uniform reads inside computed spliced quotations (e.g. `%(f i)`) being evaluated on the CPU
 
