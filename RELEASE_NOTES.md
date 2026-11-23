@@ -1,3 +1,4 @@
+### 5.8.0-prerelease0003
 - Fix array literals with non-constant elements (e.g. in record fields or function arguments) being emitted as global constants; they are now emitted as array constructors
 - Fix `Arr` literals with constant elements in expression position (e.g. as function arguments)
 - Fix compiler-generated helper functions when free variables share a name
